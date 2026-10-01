@@ -927,6 +927,26 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
+        self.run_after_function_like_plugins(
+            &super::plugin_hooks::FunctionLikeSite {
+                name: method.name.as_deref().unwrap_or(""),
+                class: Some(fqcn),
+                params: &method.params,
+                declared: &|| {
+                    crate::db::find_method_respecting_precedence(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn),
+                        method.name.as_deref().unwrap_or(""),
+                    )
+                    .map(|(_, m)| m.params.clone())
+                },
+                span: *member_span,
+            },
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         for param in method.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(

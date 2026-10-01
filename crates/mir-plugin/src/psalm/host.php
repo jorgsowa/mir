@@ -157,10 +157,20 @@ final class MirPsalmHost
     public array $functionProviders = [];
     /** @var array<string, class-string> lowercase FQCN -> provider class */
     public array $methodProviders = [];
+    /** @var list<class-string> */
+    public array $afterFunctionLikeHandlers = [];
     /** @var list<string> */
     public array $warnings = [];
 
     public string $currentFile = '';
+    public ?string $callingClass = null;
+    private string $projectRoot = '';
+    private ?\Psalm\Internal\Analyzer\ProjectAnalyzer $projectAnalyzer = null;
+    /** @var array<string, string> */
+    private array $fileContents = [];
+    private ?object $lastCallNode = null;
+    /** @var array<string, string> */
+    private array $knownFiles = [];
     public SplObjectStorage $nodeTypes;
     public ?object $nodeTypeProvider = null;
     private ?object $statementsSource = null;
@@ -183,6 +193,8 @@ final class MirPsalmHost
                 return $this->functionReturnType($params);
             case 'methodReturnType':
                 return $this->methodReturnType($params);
+            case 'afterFunctionLike':
+                return $this->afterFunctionLike($params);
             case 'shutdown':
                 return [];
             default:
@@ -193,6 +205,7 @@ final class MirPsalmHost
     private function init(array $params): array
     {
         $root = (string)($params['projectRoot'] ?? getcwd());
+        $this->projectRoot = $root;
         $autoload = $params['autoload'] ?? ($root . '/vendor/autoload.php');
         if (is_file($autoload)) {
             require $autoload;
@@ -250,10 +263,15 @@ final class MirPsalmHost
             }
         }
 
+        foreach (($params['pluginFiles'] ?? []) as $file) {
+            $this->loadPluginFile((string)$file);
+        }
+
         return [
             'stubs' => array_values(array_unique($this->stubs)),
             'functionIds' => array_keys($this->functionProviders),
             'methodClasses' => array_keys($this->methodProviders),
+            'afterFunctionLike' => $this->afterFunctionLikeHandlers !== [],
             'warnings' => $this->warnings,
         ];
     }
@@ -289,6 +307,55 @@ final class MirPsalmHost
         return null;
     }
 
+    private function loadPluginFile(string $file): void
+    {
+        if (!is_file($file)) {
+            $this->warnings[] = "plugin file $file not found — skipped";
+            return;
+        }
+        try {
+            $class = self::firstClassInFile($file);
+            require_once $file;
+            if ($class === null || !class_exists($class)) {
+                $this->warnings[] = "plugin file $file declares no class — skipped";
+                return;
+            }
+            $this->registerHooks($class);
+        } catch (Throwable $e) {
+            $this->warnings[] = "plugin file $file failed to load: {$e->getMessage()} — skipped";
+        }
+    }
+
+    /** First class declared in the file, matching how Psalm picks a file plugin's hook class. */
+    private static function firstClassInFile(string $file): ?string
+    {
+        $namespace = '';
+        $tokens = PhpToken::tokenize((string)file_get_contents($file));
+        $count = count($tokens);
+        for ($i = 0; $i < $count; $i++) {
+            $token = $tokens[$i];
+            if ($token->is(T_NAMESPACE)) {
+                $namespace = '';
+                for ($j = $i + 1; $j < $count && !$tokens[$j]->is(['{', ';']); $j++) {
+                    if (!$tokens[$j]->isIgnorable()) {
+                        $namespace .= $tokens[$j]->text;
+                    }
+                }
+            } elseif ($token->is(T_CLASS)) {
+                $prev = $i > 0 ? $tokens[$i - 1] : null;
+                if ($prev !== null && $prev->is([T_DOUBLE_COLON, T_NEW])) {
+                    continue;
+                }
+                for ($j = $i + 1; $j < $count; $j++) {
+                    if ($tokens[$j]->is(T_STRING)) {
+                        return ($namespace !== '' ? $namespace . '\\' : '') . $tokens[$j]->text;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     public function registerHooks(string $class): void
     {
         if (!class_exists($class)) {
@@ -307,6 +374,9 @@ final class MirPsalmHost
                 foreach ($class::getClassLikeNames() as $fqcn) {
                     $this->methodProviders[strtolower(ltrim((string)$fqcn, '\\'))] = $class;
                 }
+                $used = true;
+            } elseif (str_ends_with($iface, 'EventHandler\\AfterFunctionLikeAnalysisInterface')) {
+                $this->afterFunctionLikeHandlers[] = $class;
                 $used = true;
             } elseif (strpos($iface, 'Psalm\\Plugin\\EventHandler\\') === 0) {
                 $short = substr($iface, strrpos($iface, '\\') + 1);
@@ -334,8 +404,9 @@ final class MirPsalmHost
                 ['function_id' => $id]
             );
             $union = $class::getFunctionReturnType($event);
-            return ['type' => $union === null ? null : (string)$union];
+            return ['type' => $union === null ? null : (string)$union, 'issues' => $this->takeIssues()];
         } catch (Throwable $e) {
+            $this->takeIssues();
             $this->warnOnce("function provider $class failed for $id: {$e->getMessage()}");
             return ['type' => null];
         }
@@ -361,8 +432,9 @@ final class MirPsalmHost
                 ]
             );
             $union = $class::getMethodReturnType($event);
-            return ['type' => $union === null ? null : (string)$union];
+            return ['type' => $union === null ? null : (string)$union, 'issues' => $this->takeIssues()];
         } catch (Throwable $e) {
+            $this->takeIssues();
             $this->warnOnce("method provider $class failed for $fqcn::$method: {$e->getMessage()}");
             return ['type' => null];
         }
@@ -378,20 +450,19 @@ final class MirPsalmHost
         if (!class_exists($eventClass)) {
             throw new RuntimeException("$eventClass does not exist in this Psalm version");
         }
-        $this->currentFile = (string)($params['file'] ?? 'unknown.php');
+        $this->currentFile = $this->absolutePath((string)($params['file'] ?? 'unknown.php'));
+        $class = $params['callingClass'] ?? $params['class'] ?? null;
+        $this->callingClass = $class !== null ? (string)$class : null;
         $snippet = isset($params['snippet']) ? (string)$params['snippet'] : null;
         $argTypes = array_map('strval', (array)($params['argTypes'] ?? []));
+        $spanStart = (int)($params['spanStart'] ?? 0);
+        $spanEnd = (int)($params['spanEnd'] ?? $spanStart);
 
+        $this->psalmCodebase();
         $source = $this->statementsSource();
-        $callArgs = $this->buildCallArgs($snippet, $argTypes);
+        $callArgs = $this->buildCallArgs($snippet, $argTypes, $spanStart);
         $context = new \Psalm\Context();
-        $location = new \Psalm\CodeLocation\Raw(
-            (string)$snippet,
-            $this->currentFile,
-            basename($this->currentFile),
-            0,
-            max(0, strlen((string)$snippet))
-        );
+        $location = $this->rawLocation($spanStart, $spanEnd);
 
         $byName = $extra + [
             'statements_source' => $source,
@@ -399,6 +470,7 @@ final class MirPsalmHost
             'source' => $source,
             'call_args' => $callArgs,
             'function_args' => $callArgs,
+            'stmt' => $this->lastCallNode,
             'context' => $context,
             'code_location' => $location,
             'template_type_parameters' => null,
@@ -427,9 +499,10 @@ final class MirPsalmHost
      * variables. Each arg value node gets its mir-inferred type registered in
      * the NodeTypeProvider shim.
      */
-    private function buildCallArgs(?string $snippet, array $argTypes): array
+    private function buildCallArgs(?string $snippet, array $argTypes, int $spanStart = 0): array
     {
         $args = null;
+        $this->lastCallNode = null;
         if ($snippet !== null && $snippet !== '') {
             try {
                 $stmts = $this->parser()->parse("<?php\n" . $snippet . ';');
@@ -445,6 +518,8 @@ final class MirPsalmHost
                     $candidate = $call->getArgs();
                     if (count($candidate) === count($argTypes)) {
                         $args = $candidate;
+                        self::shiftPositions([$call], $spanStart - strlen("<?php\n"));
+                        $this->lastCallNode = $call;
                     }
                 }
             } catch (Throwable $e) {
@@ -456,6 +531,11 @@ final class MirPsalmHost
             foreach (array_keys($argTypes) as $i) {
                 $args[] = new \PhpParser\Node\Arg(new \PhpParser\Node\Expr\Variable("__mir_arg$i"));
             }
+            $this->lastCallNode = new \PhpParser\Node\Expr\MethodCall(
+                new \PhpParser\Node\Expr\Variable('__mir_receiver'),
+                new \PhpParser\Node\Identifier('__mir_method'),
+                $args
+            );
         }
 
         $this->nodeTypes = new SplObjectStorage();
@@ -508,6 +588,9 @@ final class MirPsalmHost
                     'getaliases' => 'return new \\Psalm\\Aliases();',
                     'getsuppressedissues' => 'return [];',
                     'getsource' => 'return $this;',
+                    'getfqcln' => 'return \\MirPsalmHost::$instance->callingClass;',
+                    'getclassname' => 'return \\MirPsalmHost::$instance->callingClass;',
+                    'getcodebase' => 'return \\MirPsalmHost::$instance->psalmCodebase() ?? throw new \\BadMethodCallException("no Psalm codebase available");',
                     'gettemplatetypemap' => 'return null;',
                     'setactivephpversion' => 'return;',
                 ]
@@ -515,6 +598,230 @@ final class MirPsalmHost
             $this->statementsSource = new $sourceClass();
         }
         return $this->statementsSource;
+    }
+
+    // -- Psalm environment ------------------------------------------------------
+
+    /**
+     * A real Psalm Codebase over an empty project: enough for the type
+     * comparator, location and issue machinery plugins call into, without
+     * scanning anything. Class storage is empty, so class-typed comparisons
+     * only succeed on identical names.
+     */
+    public function psalmCodebase(): ?\Psalm\Codebase
+    {
+        if (!class_exists(\Psalm\Internal\Analyzer\ProjectAnalyzer::class)) {
+            return null;
+        }
+        if ($this->projectAnalyzer === null) {
+            $dir = sys_get_temp_dir() . '/mir-psalm-host-' . getmypid();
+            if (!is_dir($dir)) {
+                mkdir($dir, 0777, true);
+            }
+            $config = \Psalm\Config::loadFromXML(
+                $dir,
+                '<?xml version="1.0"?><psalm xmlns="https://getpsalm.org/schema/config">'
+                . '<projectFiles><directory name="."/></projectFiles></psalm>'
+            );
+            $providers = new \Psalm\Internal\Provider\Providers(new \Psalm\Internal\Provider\FileProvider());
+            $this->projectAnalyzer = new \Psalm\Internal\Analyzer\ProjectAnalyzer($config, $providers);
+        }
+        $this->registerProjectFile($this->currentFile);
+        return $this->projectAnalyzer->getCodebase();
+    }
+
+    /** Psalm only reports issues in files it knows as project files; the set is private. */
+    private function registerProjectFile(string $path): void
+    {
+        if (isset($this->knownFiles[$path])) {
+            return;
+        }
+        $this->knownFiles[$path] = $path;
+        try {
+            (new ReflectionProperty(\Psalm\Internal\Analyzer\ProjectAnalyzer::class, 'project_files'))
+                ->setValue($this->projectAnalyzer, $this->knownFiles);
+        } catch (ReflectionException $e) {
+            $this->warnOnce('cannot register project files with this Psalm version; plugin issues may be dropped');
+        }
+    }
+
+    private function absolutePath(string $file): string
+    {
+        if ($file === '' || $file[0] === '/' || preg_match('#^[A-Za-z]:[\\\\/]#', $file) === 1) {
+            return $file;
+        }
+        return $this->projectRoot . '/' . $file;
+    }
+
+    private function fileContents(string $path): string
+    {
+        return $this->fileContents[$path] ??= (is_file($path) ? (string)file_get_contents($path) : '');
+    }
+
+    private function rawLocation(int $start, int $end): \Psalm\CodeLocation\Raw
+    {
+        return new \Psalm\CodeLocation\Raw(
+            $this->fileContents($this->currentFile),
+            $this->currentFile,
+            basename($this->currentFile),
+            $start,
+            max($start, $end - 1) // Psalm's end offset is inclusive
+        );
+    }
+
+    /** Shift PhpParser file positions by $delta so they index into the real file. */
+    private static function shiftPositions(array $nodes, int $delta): void
+    {
+        if (!class_exists(\PhpParser\NodeTraverser::class)) {
+            return;
+        }
+        $traverser = new \PhpParser\NodeTraverser();
+        $traverser->addVisitor(new class($delta) extends \PhpParser\NodeVisitorAbstract {
+            public function __construct(private int $delta)
+            {
+            }
+
+            public function enterNode(\PhpParser\Node $node)
+            {
+                foreach (['startFilePos', 'endFilePos'] as $key) {
+                    if ($node->hasAttribute($key)) {
+                        $node->setAttribute($key, $node->getAttribute($key) + $this->delta);
+                    }
+                }
+                return null;
+            }
+        });
+        $traverser->traverse($nodes);
+    }
+
+    /**
+     * Drain issues plugins raised through Psalm's IssueBuffer.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function takeIssues(): array
+    {
+        $issues = [];
+        if (!class_exists(\Psalm\IssueBuffer::class)) {
+            return $issues;
+        }
+        foreach (\Psalm\IssueBuffer::clear() as $perFile) {
+            foreach ($perFile as $data) {
+                $issues[] = [
+                    'name' => $data->type,
+                    'message' => $data->message,
+                    'severity' => $data->severity,
+                    'spanStart' => $data->from,
+                    'spanEnd' => $data->to,
+                ];
+            }
+        }
+        return $issues;
+    }
+
+    // -- AfterFunctionLikeAnalysis -------------------------------------------------
+
+    private function afterFunctionLike(array $params): array
+    {
+        if ($this->afterFunctionLikeHandlers === []) {
+            return ['issues' => []];
+        }
+        $this->currentFile = $this->absolutePath((string)($params['file'] ?? 'unknown.php'));
+        $this->callingClass = isset($params['class']) ? (string)$params['class'] : null;
+        $name = (string)($params['name'] ?? '');
+        $spanStart = (int)($params['spanStart'] ?? 0);
+        $spanEnd = (int)($params['spanEnd'] ?? $spanStart);
+        $isMethod = $this->callingClass !== null;
+
+        $codebase = $this->psalmCodebase();
+        $source = $this->statementsSource();
+        $location = $this->rawLocation($spanStart, $spanEnd);
+
+        $storage = $isMethod ? new \Psalm\Storage\MethodStorage() : new \Psalm\Storage\FunctionStorage();
+        $storage->cased_name = $name;
+        $storage->location = $location;
+        $storage->params = array_map(fn($p) => $this->buildParamStorage($p), (array)($params['params'] ?? []));
+
+        $stmt = $this->functionLikeNode($params, $name, $isMethod, $spanStart, $spanEnd);
+
+        $event = $this->buildEvent(
+            'Psalm\\Plugin\\EventHandler\\Event\\AfterFunctionLikeAnalysisEvent',
+            array_diff_key($params, ['snippet' => true]),
+            [
+                'stmt' => $stmt,
+                'functionlike_storage' => $storage,
+                'statements_source' => $source,
+                'codebase' => $codebase,
+                'file_replacements' => [],
+                'node_type_provider' => $this->nodeTypeProvider,
+            ]
+        );
+
+        foreach ($this->afterFunctionLikeHandlers as $class) {
+            try {
+                $class::afterStatementAnalysis($event);
+            } catch (Throwable $e) {
+                $this->warnOnce("after-function-like handler $class failed for $name: {$e->getMessage()}");
+            }
+        }
+        return ['issues' => $this->takeIssues()];
+    }
+
+    private function buildParamStorage(array $p): \Psalm\Storage\FunctionLikeParameter
+    {
+        $type = null;
+        if (isset($p['declaredType'])) {
+            try {
+                $type = \Psalm\Type::parseString((string)$p['declaredType']);
+            } catch (Throwable $e) {
+                $type = null;
+            }
+        }
+        $param = new \Psalm\Storage\FunctionLikeParameter((string)$p['name'], false, $type, $type);
+        foreach ((array)($p['attributes'] ?? []) as $a) {
+            $attrLocation = $this->rawLocation((int)$a['spanStart'], (int)$a['spanEnd']);
+            $args = [];
+            foreach ((array)($a['args'] ?? []) as $arg) {
+                try {
+                    $argType = isset($arg['type']) ? \Psalm\Type::parseString((string)$arg['type']) : \Psalm\Type::getMixed();
+                } catch (Throwable $e) {
+                    $argType = \Psalm\Type::getMixed();
+                }
+                $args[] = new \Psalm\Storage\AttributeArg($arg['name'] ?? null, $argType, $attrLocation);
+            }
+            $param->attributes[] = new \Psalm\Storage\AttributeStorage(
+                (string)$a['class'],
+                $args,
+                $attrLocation,
+                $attrLocation
+            );
+        }
+        return $param;
+    }
+
+    /** Re-parse the declaration so plugins can walk real PhpParser nodes at real file offsets. */
+    private function functionLikeNode(array $params, string $name, bool $isMethod, int $spanStart, int $spanEnd): \PhpParser\Node\FunctionLike
+    {
+        $snippet = isset($params['snippet']) ? (string)$params['snippet'] : null;
+        if ($snippet !== null && $isMethod) {
+            try {
+                $prefix = '<?php class MirWrap { ';
+                $stmts = $this->parser()->parse($prefix . $snippet . ' }');
+                $node = (new \PhpParser\NodeFinder())->findFirstInstanceOf($stmts ?? [], \PhpParser\Node\Stmt\ClassMethod::class);
+                if ($node !== null) {
+                    self::shiftPositions([$node], $spanStart - strlen($prefix));
+                    return $node;
+                }
+            } catch (Throwable $e) {
+                // fall through to a bare node
+            }
+        }
+        $node = $isMethod
+            ? new \PhpParser\Node\Stmt\ClassMethod($name)
+            : new \PhpParser\Node\Stmt\Function_($name);
+        $node->setAttribute('startFilePos', $spanStart);
+        $node->setAttribute('endFilePos', max($spanStart, $spanEnd - 1));
+        return $node;
     }
 
     private array $seenWarnings = [];

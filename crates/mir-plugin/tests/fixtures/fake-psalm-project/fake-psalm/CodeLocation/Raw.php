@@ -7,10 +7,13 @@ class Raw extends CodeLocation
 {
     public function __construct(
         public string $file_contents,
-        public string $file_path,
+        string $file_path,
         public string $file_name,
-        public int $file_start,
-        public int $file_end
+        int $file_start,
+        int $file_end
     ) {
+        $this->file_path = $file_path;
+        $this->file_start = $file_start;
+        $this->file_end = $file_end;
     }
 }

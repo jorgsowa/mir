@@ -1627,6 +1627,7 @@ fn resolve_method_return<'a>(
             &call.args,
             arg_types,
             span,
+            ctx.self_fqcn.as_deref(),
             &mut return_ty,
         );
         if call.args.is_empty() && (resolved.is_pure || resolved.is_mutation_free) {

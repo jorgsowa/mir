@@ -13,6 +13,7 @@
 //! - **Psalm PHP plugins** — reused through a PHP host subprocess
 //!   (`psalm-bridge` feature, see [`psalm`]).
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -33,7 +34,7 @@ pub mod psalm;
 
 /// Bumped whenever the [`MirPlugin`] trait or event types change incompatibly.
 /// Dylib plugins built against a different version are refused at load time.
-pub const MIR_PLUGIN_API_VERSION: u32 = 2;
+pub const MIR_PLUGIN_API_VERSION: u32 = 3;
 
 // ---------------------------------------------------------------------------
 // Issues emitted by plugins
@@ -144,6 +145,10 @@ pub struct FunctionReturnTypeProviderEvent<'a> {
     /// Psalm bridge re-parses this on the PHP side to build genuine
     /// `PhpParser` argument nodes for the wrapped plugin.
     pub call_snippet: Option<&'a str>,
+    /// FQCN of the class enclosing the call, `None` outside any class.
+    pub calling_class: Option<&'a str>,
+    /// Issues the provider raises at the call site.
+    pub issues: RefCell<Vec<PluginIssue>>,
 }
 
 /// Counterpart of Psalm's `MethodReturnTypeProviderEvent`.
@@ -157,6 +162,52 @@ pub struct MethodReturnTypeProviderEvent<'a> {
     pub span: php_ast::Span,
     pub file: &'a str,
     pub call_snippet: Option<&'a str>,
+    /// FQCN of the class enclosing the call, `None` outside any class.
+    pub calling_class: Option<&'a str>,
+    /// Issues the provider raises at the call site.
+    pub issues: RefCell<Vec<PluginIssue>>,
+}
+
+/// A parameter attribute argument, as far as mir can evaluate it statically.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttributeArgInfo {
+    pub name: Option<String>,
+    /// Docblock-syntax type of the argument; a literal for literal values
+    /// (`'abc'`, `42`). `None` when mir cannot evaluate the expression.
+    pub type_string: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttributeInfo {
+    /// Resolved attribute class FQCN (no leading `\`).
+    pub fq_class_name: String,
+    pub args: Vec<AttributeArgInfo>,
+    pub span: php_ast::Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionLikeParamInfo {
+    /// Parameter name without `$`.
+    pub name: String,
+    /// Declared type in docblock syntax (docblock overrides native hints).
+    pub declared_type: Option<String>,
+    pub attributes: Vec<AttributeInfo>,
+}
+
+/// Counterpart of Psalm's `AfterFunctionLikeAnalysisEvent`, for named
+/// functions and methods.
+pub struct AfterFunctionLikeAnalysisEvent<'a> {
+    /// Function or method name as declared.
+    pub name: &'a str,
+    /// Declaring class FQCN for methods.
+    pub class: Option<&'a str>,
+    pub params: &'a [FunctionLikeParamInfo],
+    /// Span of the whole declaration.
+    pub span: php_ast::Span,
+    /// Source text of the whole declaration.
+    pub snippet: Option<&'a str>,
+    pub file: &'a str,
+    pub issues: Vec<PluginIssue>,
 }
 
 /// Counterpart of Psalm's `AfterCodebasePopulatedEvent`. Fired once per batch
@@ -208,6 +259,7 @@ pub struct HookFlags {
     pub after_statement_analysis: bool,
     pub after_function_call_analysis: bool,
     pub after_method_call_analysis: bool,
+    pub after_function_like_analysis: bool,
     pub before_add_issue: bool,
     pub after_codebase_populated: bool,
 }
@@ -286,6 +338,8 @@ pub trait MirPlugin: Send + Sync {
 
     fn after_method_call_analysis(&self, _event: &mut AfterMethodCallAnalysisEvent<'_>) {}
 
+    fn after_function_like_analysis(&self, _event: &mut AfterFunctionLikeAnalysisEvent<'_>) {}
+
     /// Veto or pass an issue before it is reported (Psalm's
     /// `BeforeAddIssueInterface`). `Some(false)` drops the issue, `Some(true)`
     /// forces it through, `None` defers to other plugins.
@@ -323,6 +377,7 @@ pub struct PluginRegistry {
     after_stmt: Vec<usize>,
     after_fn_call: Vec<usize>,
     after_method_call: Vec<usize>,
+    after_function_like: Vec<usize>,
     before_issue: Vec<usize>,
     after_codebase: Vec<usize>,
 }
@@ -347,6 +402,7 @@ impl PluginRegistry {
         subscribe!(after_statement_analysis, after_stmt);
         subscribe!(after_function_call_analysis, after_fn_call);
         subscribe!(after_method_call_analysis, after_method_call);
+        subscribe!(after_function_like_analysis, after_function_like);
         subscribe!(before_add_issue, before_issue);
         subscribe!(after_codebase_populated, after_codebase);
 
@@ -480,6 +536,12 @@ impl PluginRegistry {
     pub fn after_method_call_analysis(&self, event: &mut AfterMethodCallAnalysisEvent<'_>) {
         for &i in &self.after_method_call {
             self.plugins[i].after_method_call_analysis(event);
+        }
+    }
+
+    pub fn after_function_like_analysis(&self, event: &mut AfterFunctionLikeAnalysisEvent<'_>) {
+        for &i in &self.after_function_like {
+            self.plugins[i].after_function_like_analysis(event);
         }
     }
 

@@ -12,7 +12,9 @@ use std::process::Command;
 
 use mir_plugin::psalm::{BridgeOptions, PsalmBridgePlugin, PsalmPluginSpec};
 use mir_plugin::{
-    mir_types, php_ast, FunctionReturnTypeProviderEvent, MirPlugin, ProvidedType, Type,
+    mir_types, php_ast, AfterFunctionLikeAnalysisEvent, AttributeArgInfo, AttributeInfo,
+    FunctionLikeParamInfo, FunctionReturnTypeProviderEvent, MethodReturnTypeProviderEvent,
+    MirPlugin, ProvidedType, Severity, Type,
 };
 
 fn php_available() -> bool {
@@ -48,6 +50,8 @@ fn provider_event<'a>(
         span: php_ast::Span::new(0, 0),
         file: "src/App.php",
         call_snippet: None,
+        calling_class: None,
+        issues: Default::default(),
     }
 }
 
@@ -158,4 +162,92 @@ fn spawn_isolated(psalm_autoload: Option<PathBuf>) -> PsalmBridgePlugin {
     let mut options = BridgeOptions::new(isolated_fixture_root(), vec![test_plugin_spec()]);
     options.psalm_autoload = psalm_autoload;
     PsalmBridgePlugin::spawn(&options).expect("bridge should spawn and initialize")
+}
+
+fn spawn_with_plugin_file() -> PsalmBridgePlugin {
+    let root = fixture_root();
+    let mut options = BridgeOptions::new(&root, Vec::new());
+    options.plugin_files = vec![root.join("plugin/FileHooks.php")];
+    PsalmBridgePlugin::spawn(&options).expect("bridge should spawn and initialize")
+}
+
+fn registry_call_event<'a>(calling_class: Option<&'a str>) -> MethodReturnTypeProviderEvent<'a> {
+    MethodReturnTypeProviderEvent {
+        fqcn: "App\\Registry",
+        method_name: "get",
+        args: &[],
+        arg_types: &[],
+        span: php_ast::Span::new(10, 30),
+        file: "src/App.php",
+        call_snippet: None,
+        calling_class,
+        issues: Default::default(),
+    }
+}
+
+#[test]
+fn bridge_loads_file_based_plugin_and_runs_method_provider() {
+    if !php_available() {
+        eprintln!("skipping psalm bridge test: no `php` binary on PATH");
+        return;
+    }
+
+    let bridge = spawn_with_plugin_file();
+    assert_eq!(bridge.method_return_type_classes(), vec!["app\\registry"]);
+    assert!(bridge.hooks().after_function_like_analysis);
+
+    let inside_class = registry_call_event(Some("App\\Caller"));
+    match bridge.method_return_type(&inside_class) {
+        Some(ProvidedType::Parse(s)) => assert_eq!(s, "string"),
+        other => panic!("expected Parse type, got {other:?}"),
+    }
+    assert!(inside_class.issues.borrow().is_empty());
+
+    let outside_class = registry_call_event(None);
+    assert!(bridge.method_return_type(&outside_class).is_none());
+    let issues = outside_class.issues.borrow();
+    assert_eq!(issues.len(), 1, "issues: {issues:?}");
+    assert_eq!(issues[0].name, "TestIssue");
+    assert_eq!(issues[0].message, "called outside a class");
+    assert_eq!(issues[0].severity, Severity::Error);
+    assert_eq!(issues[0].span, Some(php_ast::Span::new(10, 30)));
+}
+
+#[test]
+fn bridge_reports_issues_from_after_function_like_hook() {
+    if !php_available() {
+        eprintln!("skipping psalm bridge test: no `php` binary on PATH");
+        return;
+    }
+
+    let bridge = spawn_with_plugin_file();
+    let params = [FunctionLikeParamInfo {
+        name: "key".to_string(),
+        declared_type: Some("string".to_string()),
+        attributes: vec![AttributeInfo {
+            fq_class_name: "App\\Attr".to_string(),
+            args: vec![AttributeArgInfo {
+                name: None,
+                type_string: Some("'a.b'".to_string()),
+            }],
+            span: php_ast::Span::new(40, 55),
+        }],
+    }];
+    let mut event = AfterFunctionLikeAnalysisEvent {
+        name: "__construct",
+        class: Some("App\\Caller"),
+        params: &params,
+        span: php_ast::Span::new(0, 100),
+        snippet: None,
+        file: "src/App.php",
+        issues: Vec::new(),
+    };
+    bridge.after_function_like_analysis(&mut event);
+
+    assert_eq!(event.issues.len(), 1, "issues: {:?}", event.issues);
+    assert_eq!(
+        event.issues[0].message,
+        "__construct: $key string App\\Attr 'a.b'"
+    );
+    assert_eq!(event.issues[0].span, Some(php_ast::Span::new(40, 55)));
 }

@@ -62,6 +62,8 @@ pub struct Config {
     pub stub_dirs: Vec<String>,
     /// Psalm PHP plugins (from `<plugins><pluginClass class="..."/>`).
     pub psalm_plugins: Vec<PsalmPluginEntry>,
+    /// File-based Psalm plugins (from `<plugins><plugin filename="..."/>`).
+    pub psalm_plugin_files: Vec<String>,
     /// Rust cdylib plugins (from `<plugins><rustPlugin path="..."/>`).
     pub rust_plugins: Vec<String>,
 }
@@ -203,6 +205,12 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     }
                 }
 
+                if name == "plugin" && path.last().is_some_and(|s: &String| s == "plugins") {
+                    if let Some(f) = attr_value(&e, "filename") {
+                        config.psalm_plugin_files.push(f);
+                    }
+                }
+
                 text_buf.clear();
                 path.push(name);
             }
@@ -238,6 +246,10 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                                 class,
                                 config_xml: None,
                             });
+                        }
+                    } else if name == "plugin" {
+                        if let Some(f) = attr_value(&e, "filename") {
+                            config.psalm_plugin_files.push(f);
                         }
                     } else if name == "rustPlugin" {
                         if let Some(p) = attr_value(&e, "path") {
@@ -610,6 +622,21 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn parses_plugin_filename_entries() {
+        let cfg = Config::parse(
+            r#"<psalm>
+                <plugins>
+                    <plugin filename="tools/Hooks.php"/>
+                    <pluginClass class="Foo\Plugin"/>
+                </plugins>
+            </psalm>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.psalm_plugin_files, vec!["tools/Hooks.php"]);
+        assert_eq!(cfg.psalm_plugins.len(), 1);
     }
 
     #[test]

@@ -196,7 +196,7 @@ fn is_attribute_class_annotation(attr: &Attribute) -> bool {
 }
 
 /// Resolve the fully-qualified name of an attribute reference in `file` context.
-fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> String {
+pub(crate) fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> String {
     let raw = attr
         .name
         .parts

@@ -33,6 +33,23 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
+        self.run_after_function_like_plugins(
+            &super::plugin_hooks::FunctionLikeSite {
+                name: decl.name.as_deref().unwrap_or(""),
+                class: None,
+                params: &decl.params,
+                declared: &|| {
+                    lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map)
+                        .as_ref()
+                        .map(|(_, f)| f.params.clone())
+                },
+                span: decl.body.span,
+            },
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(
@@ -804,6 +821,24 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
+
+        self.run_after_function_like_plugins(
+            &super::plugin_hooks::FunctionLikeSite {
+                name: decl.name.as_deref().unwrap_or(""),
+                class: None,
+                params: &decl.params,
+                declared: &|| {
+                    lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map)
+                        .as_ref()
+                        .map(|(_, f)| f.params.clone())
+                },
+                span: decl.body.span,
+            },
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {

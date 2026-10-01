@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Psalm plugin bridge loads file-based plugins (`<plugin filename="..."/>`), registering the first class the file declares as a hook class.
+- Psalm plugin bridge runs `AfterFunctionLikeAnalysisInterface` handlers. mir plugins get a matching `after_function_like_analysis` hook with params, declared types and parameter attributes; plugin API version is now 3.
+- Return-type providers receive the enclosing class (`calling_class`) and can raise issues at the call site (`issues`); the Psalm bridge forwards issues plugins raise through `IssueBuffer::maybeAdd`.
 - Psalm plugin bridge finds a Psalm install outside the project's own `vendor/` (e.g. an isolated tools install under the project root), so plugins run when only a separate install provides `vimeo/psalm`. `MIR_PSALM_AUTOLOAD` points at a specific install's `autoload.php`.
 - PHP 8.6 support: a configured 8.6+ target makes the parser accept partial-application placeholders (`?`/`...`) instead of raising a version-gate `ParseError`. Targets below 8.6 are unchanged.
 - `AnalysisSession::subtype_files` and `AnalysisSnapshot::subtype_files` take an `include_trait_users` flag; `true` also returns files whose classes `use` the trait.
@@ -17,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Psalm plugin bridge no longer degrades literal argument types to `mixed` for plugins calling `Type::parseString`, and no longer reuses a cached provider result across different calling classes.
 - Concurrent Psalm bridge spawns in one process no longer race on the host script's temporary file.
 - Partial-application placeholder arguments are no longer reported as `MixedArgument`.
 - A child class may redeclare a property with a covariant type over a parent's get-only hooked property; writable parents and unrelated types are still reported.

@@ -1403,6 +1403,7 @@ impl CallAnalyzer {
                 &call.args,
                 &arg_types,
                 span,
+                ctx.self_fqcn.as_deref(),
                 &mut return_ty,
             );
 

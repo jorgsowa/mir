@@ -22,7 +22,10 @@ pub fn setup_plugins(
     config_base: &Path,
     composer_root: Option<&Path>,
 ) {
-    if config.psalm_plugins.is_empty() && config.rust_plugins.is_empty() {
+    if config.psalm_plugins.is_empty()
+        && config.psalm_plugin_files.is_empty()
+        && config.rust_plugins.is_empty()
+    {
         return;
     }
 
@@ -44,7 +47,7 @@ pub fn setup_plugins(
         }
     }
 
-    if !config.psalm_plugins.is_empty() {
+    if !config.psalm_plugins.is_empty() || !config.psalm_plugin_files.is_empty() {
         let specs: Vec<PsalmPluginSpec> = config
             .psalm_plugins
             .iter()
@@ -57,6 +60,11 @@ pub fn setup_plugins(
         // config file's directory for non-composer layouts.
         let project_root = composer_root.unwrap_or(config_base);
         let mut options = BridgeOptions::new(project_root, specs);
+        options.plugin_files = config
+            .psalm_plugin_files
+            .iter()
+            .map(|f| resolve(f, config_base))
+            .collect();
         if let Ok(php) = std::env::var("MIR_PHP") {
             options.php_binary = php;
         }
@@ -70,8 +78,9 @@ pub fn setup_plugins(
                         eprintln!("mir: psalm plugin: {warning}");
                     }
                     eprintln!(
-                        "mir: psalm plugins active ({} classes)",
-                        config.psalm_plugins.len()
+                        "mir: psalm plugins active ({} classes, {} files)",
+                        config.psalm_plugins.len(),
+                        config.psalm_plugin_files.len()
                     );
                 }
                 if !cli.quiet && bridge.is_effectively_empty() {

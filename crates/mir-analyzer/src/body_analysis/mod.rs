@@ -836,6 +836,7 @@ mod aggregates;
 mod classes;
 mod functions;
 mod orchestration;
+mod plugin_hooks;
 
 /// Seed `ctx.var_locations` for function/method parameters using their AST spans.
 fn seed_param_locations(

@@ -9,9 +9,9 @@ use mir_analyzer::{analyze_source_with_options, BatchOptions};
 use mir_issues::{Issue, IssueKind, Severity};
 use mir_plugin::php_ast::owned::{ExprKind, StmtKind};
 use mir_plugin::{
-    AfterExpressionAnalysisEvent, AfterFunctionCallAnalysisEvent, AfterStatementAnalysisEvent,
-    ClassPropertyProviderEvent, FunctionReturnTypeProviderEvent, HookFlags,
-    MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, PluginRegistry, ProvidedType,
+    AfterExpressionAnalysisEvent, AfterFunctionCallAnalysisEvent, AfterFunctionLikeAnalysisEvent,
+    AfterStatementAnalysisEvent, ClassPropertyProviderEvent, FunctionReturnTypeProviderEvent,
+    HookFlags, MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, PluginRegistry, ProvidedType,
 };
 
 struct TestPlugin;
@@ -26,6 +26,7 @@ impl MirPlugin for TestPlugin {
             after_expression_analysis: true,
             after_statement_analysis: true,
             after_function_call_analysis: true,
+            after_function_like_analysis: true,
             before_add_issue: true,
             ..Default::default()
         }
@@ -51,6 +52,12 @@ impl MirPlugin for TestPlugin {
         &self,
         event: &MethodReturnTypeProviderEvent<'_>,
     ) -> Option<ProvidedType> {
+        if event.calling_class == Some("PluginCaller") {
+            event.issues.borrow_mut().push(PluginIssue::new(
+                "CalledFromCaller",
+                "get() called from PluginCaller",
+            ));
+        }
         (event.method_name == "get").then(|| ProvidedType::Parse("int".to_string()))
     }
 
@@ -98,6 +105,45 @@ impl MirPlugin for TestPlugin {
                 .issues
                 .push(PluginIssue::new("DangerousCall", "dangerous() is banned"));
         }
+    }
+
+    fn after_function_like_analysis(&self, event: &mut AfterFunctionLikeAnalysisEvent<'_>) {
+        if !event.name.starts_with("plugin_fl_") {
+            return;
+        }
+        let params: Vec<String> = event
+            .params
+            .iter()
+            .map(|p| {
+                let attrs: Vec<String> = p
+                    .attributes
+                    .iter()
+                    .map(|a| {
+                        let args: Vec<String> = a
+                            .args
+                            .iter()
+                            .map(|arg| arg.type_string.clone().unwrap_or_else(|| "?".into()))
+                            .collect();
+                        format!("{}({})", a.fq_class_name, args.join(","))
+                    })
+                    .collect();
+                format!(
+                    "{}:{}[{}]",
+                    p.name,
+                    p.declared_type.as_deref().unwrap_or("-"),
+                    attrs.join(";")
+                )
+            })
+            .collect();
+        event.issues.push(PluginIssue::new(
+            "FunctionLikeSeen",
+            format!(
+                "{}|{}|{}",
+                event.class.unwrap_or("-"),
+                event.name,
+                params.join(" ")
+            ),
+        ));
     }
 
     fn before_add_issue(&self, issue: &Issue) -> Option<bool> {
@@ -281,4 +327,68 @@ function h(PluginUser $u): void {
         mismatches.is_empty(),
         "cast entry should have typed $age as int: {mismatches:?}"
     );
+}
+
+fn function_like_messages(source: &str) -> Vec<String> {
+    unsuppressed(source)
+        .into_iter()
+        .filter_map(|i| match i.kind {
+            IssueKind::PluginIssue { name, message } if name == "FunctionLikeSeen" => Some(message),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn after_function_like_hook_reports_params_and_attributes() {
+    setup();
+    let messages = function_like_messages(
+        r#"<?php
+namespace App;
+
+#[\Attribute]
+final class PluginAttr { public function __construct(public string $key = '') {} }
+
+final class PluginHolder {
+    public const KEY = 'held';
+
+    public function plugin_fl_method(
+        #[PluginAttr('literal')] string $a,
+        #[PluginAttr(self::KEY)] ?int $b,
+        #[PluginAttr(PluginHolder::KEY)] $c,
+    ): void {}
+}
+
+/** @param list<int> $items */
+function plugin_fl_function(array $items): void {}
+"#,
+    );
+    assert_eq!(
+        messages,
+        vec![
+            "App\\PluginHolder|plugin_fl_method|a:string[App\\PluginAttr('literal')] b:int|null[App\\PluginAttr(\"held\")] c:-[App\\PluginAttr(\"held\")]".to_string(),
+            "-|plugin_fl_function|items:list<int>[]".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn method_provider_receives_calling_class_and_can_raise_issues() {
+    setup();
+    let source = r#"<?php
+class PluginContainer {
+    public function get(): object { return new stdClass(); }
+}
+class PluginCaller {
+    public function run(PluginContainer $c): void { $c->get(); }
+}
+function plugin_outside(PluginContainer $c): void { $c->get(); }
+"#;
+    let issues = unsuppressed(source);
+    let hits: Vec<_> = issues
+        .iter()
+        .filter(|i| i.kind.display_name() == "CalledFromCaller")
+        .collect();
+    assert_eq!(hits.len(), 1, "{:?}", plugin_issue_names(&issues));
+    assert_eq!(hits[0].location.line, 6);
 }

@@ -8,12 +8,24 @@
 //! autoloader lacks it), invokes each configured entry point against a shim
 //! `RegistrationInterface`, and answers JSON-lines RPC from mir.
 //!
-//! ## Supported Psalm plugin capabilities (v1)
+//! ## Supported Psalm plugin capabilities
 //! - `RegistrationInterface::addStubFile` — full support; stubs feed mir's
 //!   normal stub loading.
+//! - File-based plugins (`<plugin filename>`): the file is required and its
+//!   first declared class is registered as a hook class, like Psalm does.
 //! - `FunctionReturnTypeProviderInterface` / `MethodReturnTypeProviderInterface`
 //!   — best effort: the host reconstructs the event from the call snippet and
-//!   argument types mir sends; provider results are cached per call signature.
+//!   argument types mir sends; provider results are cached per call signature
+//!   and calling class.
+//! - `AfterFunctionLikeAnalysisInterface` — fired per named function and
+//!   method with real Psalm storage objects built from mir's declarations
+//!   (params, declared types, parameter attributes).
+//!
+//! The host boots a real Psalm `Codebase` over an empty project, so plugins
+//! can use `UnionTypeComparator`, `CodeLocation` and `IssueBuffer`; issues
+//! raised through `IssueBuffer` surface as mir plugin issues. Class-typed
+//! comparisons only succeed on identical names because that codebase has no
+//! class storage.
 //!
 //! Other hook registrations (`AfterExpressionAnalysis`, taint hooks, …) are
 //! reported in [`PsalmBridgePlugin::warnings`] and skipped — they would need
@@ -28,7 +40,8 @@ use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    FunctionReturnTypeProviderEvent, MethodReturnTypeProviderEvent, MirPlugin, ProvidedType,
+    AfterFunctionLikeAnalysisEvent, FunctionReturnTypeProviderEvent, HookFlags,
+    MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, ProvidedType, Severity,
 };
 
 /// The PHP host program, embedded so the mir binary is self-contained. It is
@@ -70,6 +83,9 @@ pub struct BridgeOptions {
     /// temp dir when `None`.
     pub host_script_dir: Option<PathBuf>,
     pub plugins: Vec<PsalmPluginSpec>,
+    /// Hook files (`<plugin filename>`): required by the host, and the first
+    /// class each declares is registered as an event-handler class.
+    pub plugin_files: Vec<PathBuf>,
     /// `autoload.php` of a Psalm install outside the project's own vendor dir.
     /// When `None`, the host discovers one under the project root if the
     /// project's autoloader does not provide Psalm.
@@ -83,6 +99,7 @@ impl BridgeOptions {
             project_root: project_root.into(),
             host_script_dir: None,
             plugins,
+            plugin_files: Vec::new(),
             psalm_autoload: None,
         }
     }
@@ -156,6 +173,7 @@ pub struct PsalmBridgePlugin {
     stubs: Vec<PathBuf>,
     function_ids: Vec<String>,
     method_classes: Vec<String>,
+    after_function_like: bool,
     /// Unsupported-hook and host-side setup warnings, for the CLI to print.
     pub warnings: Vec<String>,
     /// provider-result cache: call-signature key → docblock type string.
@@ -201,6 +219,7 @@ impl PsalmBridgePlugin {
             serde_json::json!({
                 "projectRoot": options.project_root.to_string_lossy(),
                 "plugins": plugins,
+                "pluginFiles": options.plugin_files,
                 "psalmAutoload": options.psalm_autoload,
             }),
         )?;
@@ -222,6 +241,10 @@ impl PsalmBridgePlugin {
             stubs: str_list("stubs").into_iter().map(PathBuf::from).collect(),
             function_ids: str_list("functionIds"),
             method_classes: str_list("methodClasses"),
+            after_function_like: init
+                .get("afterFunctionLike")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
             warnings: str_list("warnings"),
             cache: Mutex::new(FxHashMap::default()),
         })
@@ -229,45 +252,91 @@ impl PsalmBridgePlugin {
 
     /// Whether the plugins registered anything mir can actually use.
     pub fn is_effectively_empty(&self) -> bool {
-        self.stubs.is_empty() && self.function_ids.is_empty() && self.method_classes.is_empty()
+        self.stubs.is_empty()
+            && self.function_ids.is_empty()
+            && self.method_classes.is_empty()
+            && !self.after_function_like
     }
 
+    /// Run `method` on the host. Returns the provided type string plus any
+    /// issues the plugin raised; results that raised issues are never cached,
+    /// since the issues belong to one call site.
     fn query_type(
         &self,
         method: &str,
         cache_key: String,
         params: serde_json::Value,
-    ) -> Option<ProvidedType> {
+    ) -> (Option<ProvidedType>, Vec<PluginIssue>) {
+        if self.dead.load(Ordering::Relaxed) {
+            return (None, Vec::new());
+        }
+        if let Some(cached) = self.cache.lock().get(&cache_key) {
+            return (cached.clone().map(ProvidedType::Parse), Vec::new());
+        }
+        let value = match self.call_host(method, params) {
+            Some(value) => value,
+            None => return (None, Vec::new()),
+        };
+        let type_string = value
+            .get("type")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let issues = parse_issues(&value);
+        if issues.is_empty() {
+            self.cache.lock().insert(cache_key, type_string.clone());
+        }
+        (type_string.map(ProvidedType::Parse), issues)
+    }
+
+    /// RPC call that disables the bridge on failure so analysis degrades to
+    /// normal inference.
+    fn call_host(&self, method: &str, params: serde_json::Value) -> Option<serde_json::Value> {
         if self.dead.load(Ordering::Relaxed) {
             return None;
         }
-        if let Some(cached) = self.cache.lock().get(&cache_key) {
-            return cached.clone().map(ProvidedType::Parse);
-        }
-        let result = self.rpc.lock().call(method, params);
-        let type_string = match result {
-            Ok(value) => value
-                .get("type")
-                .and_then(|v| v.as_str())
-                .map(str::to_string),
+        match self.rpc.lock().call(method, params) {
+            Ok(value) => Some(value),
             Err(e) => {
                 if !self.dead.swap(true, Ordering::Relaxed) {
                     eprintln!("mir: psalm plugin bridge disabled after error: {e}");
                 }
-                return None;
+                None
             }
-        };
-        self.cache.lock().insert(cache_key, type_string.clone());
-        type_string.map(ProvidedType::Parse)
+        }
     }
+}
+
+fn parse_issues(value: &serde_json::Value) -> Vec<PluginIssue> {
+    let Some(list) = value.get("issues").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+    list.iter()
+        .filter_map(|raw| {
+            let name = raw.get("name")?.as_str()?;
+            let message = raw.get("message")?.as_str()?;
+            let severity = match raw.get("severity").and_then(|v| v.as_str()) {
+                Some("info") => Severity::Info,
+                Some("warning") => Severity::Warning,
+                _ => Severity::Error,
+            };
+            let mut issue = PluginIssue::new(name, message).with_severity(severity);
+            let offset = |key: &str| raw.get(key).and_then(|v| v.as_u64()).map(|n| n as u32);
+            if let (Some(start), Some(end)) = (offset("spanStart"), offset("spanEnd")) {
+                issue = issue.with_span(php_ast::Span::new(start, end));
+            }
+            Some(issue)
+        })
+        .collect()
 }
 
 fn type_strings(types: &[crate::Type]) -> Vec<String> {
     types.iter().map(|t| t.to_string()).collect()
 }
 
-fn signature_key(head: &str, arg_types: &[crate::Type]) -> String {
+fn signature_key(head: &str, calling_class: Option<&str>, arg_types: &[crate::Type]) -> String {
     let mut key = String::from(head);
+    key.push('\u{1e}');
+    key.push_str(calling_class.unwrap_or(""));
     for t in arg_types {
         key.push('\u{1f}');
         key.push_str(&t.to_string());
@@ -278,6 +347,13 @@ fn signature_key(head: &str, arg_types: &[crate::Type]) -> String {
 impl MirPlugin for PsalmBridgePlugin {
     fn name(&self) -> &str {
         "psalm-bridge"
+    }
+
+    fn hooks(&self) -> HookFlags {
+        HookFlags {
+            after_function_like_analysis: self.after_function_like,
+            ..HookFlags::default()
+        }
     }
 
     fn stub_files(&self) -> Vec<PathBuf> {
@@ -292,16 +368,21 @@ impl MirPlugin for PsalmBridgePlugin {
         &self,
         event: &FunctionReturnTypeProviderEvent<'_>,
     ) -> Option<ProvidedType> {
-        self.query_type(
+        let (provided, issues) = self.query_type(
             "functionReturnType",
-            signature_key(event.function_id, event.arg_types),
+            signature_key(event.function_id, event.calling_class, event.arg_types),
             serde_json::json!({
                 "functionId": event.function_id,
                 "argTypes": type_strings(event.arg_types),
                 "snippet": event.call_snippet,
                 "file": event.file,
+                "callingClass": event.calling_class,
+                "spanStart": event.span.start,
+                "spanEnd": event.span.end,
             }),
-        )
+        );
+        event.issues.borrow_mut().extend(issues);
+        provided
     }
 
     fn method_return_type_classes(&self) -> Vec<String> {
@@ -312,10 +393,11 @@ impl MirPlugin for PsalmBridgePlugin {
         &self,
         event: &MethodReturnTypeProviderEvent<'_>,
     ) -> Option<ProvidedType> {
-        self.query_type(
+        let (provided, issues) = self.query_type(
             "methodReturnType",
             signature_key(
                 &format!("{}::{}", event.fqcn, event.method_name),
+                event.calling_class,
                 event.arg_types,
             ),
             serde_json::json!({
@@ -324,8 +406,50 @@ impl MirPlugin for PsalmBridgePlugin {
                 "argTypes": type_strings(event.arg_types),
                 "snippet": event.call_snippet,
                 "file": event.file,
+                "callingClass": event.calling_class,
+                "spanStart": event.span.start,
+                "spanEnd": event.span.end,
             }),
-        )
+        );
+        event.issues.borrow_mut().extend(issues);
+        provided
+    }
+
+    fn after_function_like_analysis(&self, event: &mut AfterFunctionLikeAnalysisEvent<'_>) {
+        let params: Vec<serde_json::Value> = event
+            .params
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "name": p.name,
+                    "declaredType": p.declared_type,
+                    "attributes": p.attributes.iter().map(|a| serde_json::json!({
+                        "class": a.fq_class_name,
+                        "spanStart": a.span.start,
+                        "spanEnd": a.span.end,
+                        "args": a.args.iter().map(|arg| serde_json::json!({
+                            "name": arg.name,
+                            "type": arg.type_string,
+                        })).collect::<Vec<_>>(),
+                    })).collect::<Vec<_>>(),
+                })
+            })
+            .collect();
+        let result = self.call_host(
+            "afterFunctionLike",
+            serde_json::json!({
+                "name": event.name,
+                "class": event.class,
+                "params": params,
+                "snippet": event.snippet,
+                "file": event.file,
+                "spanStart": event.span.start,
+                "spanEnd": event.span.end,
+            }),
+        );
+        if let Some(result) = result {
+            event.issues.extend(parse_issues(&result));
+        }
     }
 }
 

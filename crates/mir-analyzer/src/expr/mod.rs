@@ -1421,6 +1421,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         args: &[php_ast::owned::Arg],
         arg_types: &[Type],
         span: php_ast::Span,
+        calling_class: Option<&str>,
         return_ty: &mut Type,
     ) {
         let Some(plugins) = self.plugins.clone() else {
@@ -1441,10 +1442,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 span,
                 file: file.as_ref(),
                 call_snippet: snippet.as_deref(),
+                calling_class,
+                issues: Default::default(),
             };
-            if let Some(provided) = plugins.function_return_type(&event) {
+            let provided = plugins.function_return_type(&event);
+            let issues = event.issues.take();
+            if let Some(provided) = provided {
                 *return_ty = self.resolve_provided_type(provided);
             }
+            self.emit_plugin_issues(issues, span);
         }
         if has_after {
             let mut event = mir_plugin::AfterFunctionCallAnalysisEvent {
@@ -1475,6 +1481,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         args: &[php_ast::owned::Arg],
         arg_types: &[Type],
         span: php_ast::Span,
+        calling_class: Option<&str>,
         return_ty: &mut Type,
     ) {
         let Some(plugins) = self.plugins.clone() else {
@@ -1504,8 +1511,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 span,
                 file: file.as_ref(),
                 call_snippet: snippet.as_deref(),
+                calling_class,
+                issues: Default::default(),
             };
-            if let Some(provided) = plugins.method_return_type(&normalized, &event) {
+            let provided = plugins.method_return_type(&normalized, &event);
+            let issues = event.issues.take();
+            self.emit_plugin_issues(issues, span);
+            if let Some(provided) = provided {
                 *return_ty = self.resolve_provided_type(provided);
                 break;
             }
