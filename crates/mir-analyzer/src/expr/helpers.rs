@@ -822,6 +822,11 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
                 | Atomic::TKeyedArray { .. }
         )
     });
+    if left_is_array && right_is_array {
+        if let Some(union) = keyed_array_union(left, right) {
+            return union;
+        }
+    }
     if left_is_array || right_is_array {
         let merged_left = if left_is_array {
             left.clone()
@@ -846,6 +851,53 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         u.add_type(Atomic::TFloat);
         u
     }
+}
+
+/// `array + array` over single keyed shapes: left keys win, right-only keys are appended.
+/// A non-keyed right operand may add arbitrary keys, so the result is open.
+fn keyed_array_union(left: &Type, right: &Type) -> Option<Type> {
+    let [Atomic::TKeyedArray {
+        properties: lp,
+        is_open: l_open,
+        is_list: l_list,
+    }] = left.types.as_slice()
+    else {
+        return None;
+    };
+    let [Atomic::TKeyedArray {
+        properties: rp,
+        is_open: r_open,
+        is_list: r_list,
+    }] = right.types.as_slice()
+    else {
+        return Some(Type::single(Atomic::TKeyedArray {
+            properties: lp.clone(),
+            is_open: true,
+            is_list: false,
+        }));
+    };
+    let mut props = (**lp).clone();
+    for (k, rv) in rp.iter() {
+        match props.get_mut(k) {
+            Some(lv) if lv.optional => {
+                lv.ty = Type::merge(&lv.ty, &rv.ty);
+                lv.optional = rv.optional;
+            }
+            Some(_) => {}
+            None => {
+                let mut rv = rv.clone();
+                if *l_open {
+                    rv.ty = Type::mixed();
+                }
+                props.insert(k.clone(), rv);
+            }
+        }
+    }
+    Some(Type::single(Atomic::TKeyedArray {
+        properties: Box::new(props),
+        is_open: *l_open || *r_open,
+        is_list: *l_list && *r_list,
+    }))
 }
 
 /// Whether `ty` is GUARANTEED to be float at runtime — every atom is a float
