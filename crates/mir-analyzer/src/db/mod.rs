@@ -25,6 +25,10 @@ pub trait MirDatabase: salsa::Database {
     /// The PHP version configured for this analysis run.
     fn php_version_str(&self) -> Arc<str>;
 
+    /// Whether repeated zero-arg method calls are assumed to return the same
+    /// value (Psalm's `memoizeMethodCallResults`).
+    fn memoize_method_call_results(&self) -> bool;
+
     /// Return this file's first declared namespace, if any.
     fn file_namespace(&self, file: &str) -> Option<Arc<str>>;
 

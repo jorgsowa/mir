@@ -37,6 +37,7 @@ pub struct AnalysisSession {
     /// Composer.
     resolver: Option<Arc<dyn crate::ClassResolver>>,
     pub(crate) php_version: PhpVersion,
+    memoize_method_call_results: bool,
     pub(crate) user_stub_files: Vec<PathBuf>,
     pub(crate) user_stub_dirs: Vec<PathBuf>,
     /// Tracks symbols that were previously defined in a file but have since
@@ -204,6 +205,7 @@ impl AnalysisSession {
             psr4: None,
             resolver: None,
             php_version,
+            memoize_method_call_results: false,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
             stale_defined_symbols: HashMap::default(),
@@ -406,8 +408,13 @@ impl AnalysisSession {
         // Fold the user-stub fingerprint into the cache epoch. `with_user_stubs`
         // must run before this for it to be picked up (it does in `build_session`);
         // sessions without user stubs get 0, which is correct.
-        let user_stub_fp =
+        let mut user_stub_fp =
             crate::stubs::user_stub_fingerprint(&self.user_stub_files, &self.user_stub_dirs);
+        // Cached diagnostics depend on memoization too; salt the epoch so
+        // flipping it discards them. Requires `with_memoize_method_call_results` first.
+        if self.memoize_method_call_results {
+            user_stub_fp ^= 0x6d65_6d6f_697a_6531;
+        }
         self.cache = Some(Arc::new(AnalysisCache::open(
             cache_dir,
             self.php_version.cache_byte(),
@@ -458,6 +465,16 @@ impl AnalysisSession {
     pub fn with_user_stubs(mut self, files: Vec<PathBuf>, dirs: Vec<PathBuf>) -> Self {
         self.user_stub_files = files;
         self.user_stub_dirs = dirs;
+        self
+    }
+
+    /// Assume repeated zero-arg method calls on the same receiver return the
+    /// same value (Psalm's `memoizeMethodCallResults`), so narrowing them
+    /// (`if (!$a->b()) throw; return $a->b();`) holds. Call before
+    /// [`Self::with_cache_dir`].
+    pub fn with_memoize_method_call_results(mut self, enabled: bool) -> Self {
+        self.memoize_method_call_results = enabled;
+        self.db.salsa.set_memoize_method_call_results(enabled);
         self
     }
 

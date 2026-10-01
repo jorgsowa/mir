@@ -43,7 +43,13 @@ pub fn run_composer_flow(
         )
     };
     let (stub_files, stub_dirs) = collect_stub_paths(config, config_base);
-    let mut session = build_session(version, cache_dir, stub_files, stub_dirs);
+    let mut session = build_session(
+        version,
+        config.memoize_method_call_results,
+        cache_dir,
+        stub_files,
+        stub_dirs,
+    );
     session = session.with_psr4(Arc::new(map.clone()));
 
     let opts = build_batch_opts(cli.find_dead_code);
@@ -204,7 +210,13 @@ pub fn run_plain_flow(
         cli.cache_dir.clone().or_else(default_cache_dir)
     };
     let (stub_files, stub_dirs) = collect_stub_paths(config, config_base);
-    let mut session = build_session(version, cache_dir, stub_files, stub_dirs);
+    let mut session = build_session(
+        version,
+        config.memoize_method_call_results,
+        cache_dir,
+        stub_files,
+        stub_dirs,
+    );
     let opts = build_batch_opts(cli.find_dead_code);
 
     session.ensure_all_stubs();
@@ -315,11 +327,13 @@ fn resolve_php_version(config: &Config) -> PhpVersion {
 
 fn build_session(
     version: PhpVersion,
+    memoize_method_call_results: bool,
     cache_dir: Option<PathBuf>,
     stub_files: Vec<PathBuf>,
     stub_dirs: Vec<PathBuf>,
 ) -> AnalysisSession {
-    let mut session = AnalysisSession::new(version);
+    let mut session =
+        AnalysisSession::new(version).with_memoize_method_call_results(memoize_method_call_results);
     // User stubs must be configured BEFORE the cache is opened: the cache epoch
     // folds in the user-stub fingerprint, so it has to see them at open time.
     if !stub_files.is_empty() || !stub_dirs.is_empty() {

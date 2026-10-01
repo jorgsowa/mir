@@ -137,6 +137,8 @@ pub struct MirDbStorage {
     /// Set once before any analysis begins; read by `collect_file_definitions`
     /// to filter `@since`/`@removed` stub symbols.
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
+    /// Seed for [`crate::db::AnalyzeFileInput::memoize_method_call_results`].
+    memoize_method_call_results: Arc<std::sync::atomic::AtomicBool>,
     /// Lazily-created [`crate::db::AnalyzeFileInput`] singleton input (see
     /// [`MirDatabase::analyze_config`]). Holds the PHP version as a tracked
     /// field so `analyze_file` / `infer_function` memos invalidate on
@@ -356,6 +358,7 @@ impl Default for MirDbStorage {
             workspace_revision_counter: Arc::default(),
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
+            memoize_method_call_results: Arc::default(),
             analyze_config_input: Arc::default(),
             stub_cache: Arc::default(),
             parse_cache: Arc::default(),
@@ -387,6 +390,10 @@ impl salsa::Database for MirDbStorage {}
 impl MirDatabase for MirDbStorage {
     fn php_version_str(&self) -> Arc<str> {
         self.php_version.read().clone()
+    }
+
+    fn memoize_method_call_results(&self) -> bool {
+        *self.analyze_config().memoize_method_call_results(self)
     }
 
     fn note_workspace_index_walk(&self) {
@@ -595,7 +602,12 @@ impl MirDatabase for MirDbStorage {
         if let Some(cfg) = *slot {
             return cfg;
         }
-        let cfg = crate::db::AnalyzeFileInput::new(self, self.php_version.read().clone());
+        let cfg = crate::db::AnalyzeFileInput::new(
+            self,
+            self.php_version.read().clone(),
+            self.memoize_method_call_results
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
         *slot = Some(cfg);
         cfg
     }
@@ -1387,6 +1399,18 @@ impl MirDbStorage {
         if let Some(cfg) = existing {
             use salsa::Setter as _;
             cfg.set_php_version(self).to(version);
+        }
+    }
+
+    /// Enable or disable memoized zero-arg method call results; see
+    /// [`MirDatabase::memoize_method_call_results`].
+    pub fn set_memoize_method_call_results(&mut self, enabled: bool) {
+        self.memoize_method_call_results
+            .store(enabled, std::sync::atomic::Ordering::Relaxed);
+        let existing = *self.analyze_config_input.read();
+        if let Some(cfg) = existing {
+            use salsa::Setter as _;
+            cfg.set_memoize_method_call_results(self).to(enabled);
         }
     }
 

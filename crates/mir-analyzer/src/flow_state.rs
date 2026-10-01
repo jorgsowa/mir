@@ -868,6 +868,32 @@ impl FlowState {
         }
     }
 
+    /// Like [`Self::invalidate_prop_refined_receiver`], but keeps what is
+    /// narrowed on the memoized result of `receiver`'s own zero-arg call
+    /// `call_key` (`method_call_key`): repeating that call is the point of
+    /// memoization.
+    pub fn invalidate_prop_refined_receiver_keeping_call(
+        &mut self,
+        receiver: &str,
+        call_key: &str,
+    ) {
+        let receiver = receiver.trim_start_matches('$');
+        let chain_prefix = format!("{receiver}->{call_key}");
+        let kept: Vec<_> = self
+            .prop_refined
+            .iter()
+            .filter(|((obj, prop), _)| {
+                (obj.as_ref() == receiver && prop.as_ref() == call_key)
+                    || obj.as_ref().starts_with(chain_prefix.as_str())
+            })
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
+        self.invalidate_prop_refined_receiver(receiver);
+        if !kept.is_empty() {
+            Arc::make_mut(&mut self.prop_refined).extend(kept);
+        }
+    }
+
     /// Mark a variable as carrying tainted (user-controlled) data.
     pub fn taint_var(&mut self, name: &str) {
         let name = Name::from(name.trim_start_matches('$'));

@@ -47,6 +47,9 @@ pub struct RefLoc {
 pub struct AnalyzeFileInput {
     /// Resolved PHP version (`"8.1"`, `"8.2"`, …) used by the analyzer.
     pub php_version: Arc<str>,
+    /// Psalm's `memoizeMethodCallResults`: repeated zero-arg method calls on
+    /// the same receiver are assumed to return the same value.
+    pub memoize_method_call_results: bool,
 }
 
 /// Everything `analyze_file` produces for one file: diagnostics plus the

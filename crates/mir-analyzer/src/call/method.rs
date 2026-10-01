@@ -1220,7 +1220,12 @@ fn resolve_method_return<'a>(
         // must not still see `$this->user` as non-null after `reset()`.
         if !resolved.is_static && !resolved.is_pure && !resolved.is_mutation_free {
             if let ExprKind::Variable(recv_name) = &call.object.kind {
-                ctx.invalidate_prop_refined_receiver(recv_name);
+                if call.args.is_empty() && ea.db.memoize_method_call_results() {
+                    let own_key = crate::narrowing::method_call_key(method_name);
+                    ctx.invalidate_prop_refined_receiver_keeping_call(recv_name, &own_key);
+                } else {
+                    ctx.invalidate_prop_refined_receiver(recv_name);
+                }
             }
         }
         // Similarly, an object passed as an argument to a call that isn't
@@ -1630,10 +1635,15 @@ fn resolve_method_return<'a>(
             ctx.self_fqcn.as_deref(),
             &mut return_ty,
         );
-        if call.args.is_empty() && (resolved.is_pure || resolved.is_mutation_free) {
-            if let ExprKind::Variable(recv) = &call.object.kind {
+        if call.args.is_empty()
+            && (resolved.is_pure
+                || resolved.is_mutation_free
+                || ea.db.memoize_method_call_results())
+        {
+            let _memoize = crate::narrowing::memoize_scope(ea.db);
+            if let Some(recv) = crate::narrowing::memoized_receiver_key(&call.object) {
                 let key = crate::narrowing::method_call_key(method_name);
-                if let Some(refined) = ctx.get_prop_refined(recv, &key) {
+                if let Some(refined) = ctx.get_prop_refined(&recv, &key) {
                     return_ty = refined.clone();
                 }
             }

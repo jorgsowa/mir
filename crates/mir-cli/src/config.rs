@@ -56,6 +56,8 @@ pub struct Config {
     pub find_unused_code: bool,
     /// Whether unused-variable checking is enabled.
     pub find_unused_variables: bool,
+    /// Psalm's `memoizeMethodCallResults` root attribute.
+    pub memoize_method_call_results: bool,
     /// External stub files to load (from `<stubs><file name="..."/>`).
     pub stub_files: Vec<String>,
     /// External stub directories to load (from `<stubs><directory name="..."/>`).
@@ -153,6 +155,10 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     if let Some(level) = attr_value(&e, "errorLevel").and_then(parse_psalm_level) {
                         config.error_level = Some(level);
                     }
+                    config.memoize_method_call_results = matches!(
+                        attr_value(&e, "memoizeMethodCallResults").as_deref(),
+                        Some("true" | "1")
+                    );
                 }
 
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
@@ -555,6 +561,19 @@ mod tests {
     fn parses_php_version_root_attribute() {
         let cfg = Config::parse(r#"<mir phpVersion="8.2"></mir>"#).unwrap();
         assert_eq!(cfg.php_version.as_deref(), Some("8.2"));
+    }
+
+    #[test]
+    fn parses_memoize_method_call_results_root_attribute() {
+        let on = Config::parse(r#"<psalm memoizeMethodCallResults="true"></psalm>"#).unwrap();
+        assert!(on.memoize_method_call_results);
+        let off = Config::parse(r#"<psalm memoizeMethodCallResults="false"></psalm>"#).unwrap();
+        assert!(!off.memoize_method_call_results);
+        assert!(
+            !Config::parse("<psalm></psalm>")
+                .unwrap()
+                .memoize_method_call_results
+        );
     }
 
     #[test]

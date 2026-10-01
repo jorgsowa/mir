@@ -56,7 +56,7 @@ pub(crate) fn resolve_prop_current_type(
         return resolve_method_call_current_type(ctx, obj_var, prop, db);
     }
     // Resolve through the object variable's type
-    let obj_ty = ctx.get_var(obj_var);
+    let obj_ty = receiver_type(ctx, obj_var, db);
     let mut prop_ty = mir_types::Type::mixed();
     'outer: for atomic in &obj_ty.types {
         if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
@@ -211,7 +211,7 @@ pub(crate) fn extract_class_fqcn_from_expr(
 pub(crate) fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::PropertyAccess(pa) => {
-            let obj = extract_var_name(&pa.object)?;
+            let obj = extract_var_name(&pa.object).or_else(|| method_chain_key(&pa.object))?;
             let prop = match &pa.property.kind {
                 ExprKind::Identifier(s) => s.as_ref().to_string(),
                 _ => return None,
@@ -219,7 +219,7 @@ pub(crate) fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String
             Some((obj, prop))
         }
         ExprKind::MethodCall(call) if call.args.is_empty() => {
-            let obj = extract_var_name(&call.object)?;
+            let obj = extract_var_name(&call.object).or_else(|| method_chain_key(&call.object))?;
             let ExprKind::Identifier(name) = &call.method.kind else {
                 return None;
             };
@@ -235,8 +235,71 @@ pub(crate) fn method_call_key(method: &str) -> String {
     format!("{}()", method.to_ascii_lowercase())
 }
 
-/// Declared return type of a mutation-free `$obj_var->method()` with a single concrete receiver
-/// class, or `mixed` when repeated calls aren't provably equal or the type isn't receiver-independent.
+thread_local! {
+    static MEMOIZE_METHOD_CALLS: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Pins `db`'s `memoize_method_call_results` for the current narrowing call
+/// tree, so the `db`-less expression extractors can consult it.
+pub(crate) struct MemoizeScope(Option<bool>);
+
+pub(crate) fn memoize_scope(db: &dyn MirDatabase) -> MemoizeScope {
+    let outer = MEMOIZE_METHOD_CALLS.with(|c| c.get());
+    if outer.is_none() {
+        MEMOIZE_METHOD_CALLS.with(|c| c.set(Some(db.memoize_method_call_results())));
+    }
+    MemoizeScope(outer)
+}
+
+impl Drop for MemoizeScope {
+    fn drop(&mut self) {
+        MEMOIZE_METHOD_CALLS.with(|c| c.set(self.0));
+    }
+}
+
+/// Key for a chain of zero-arg method calls on a variable (`$a->b()->c()` →
+/// `a->b()->c()`). Only produced under `memoize_method_call_results`.
+pub(crate) fn method_chain_key(expr: &php_ast::owned::Expr) -> Option<String> {
+    if !MEMOIZE_METHOD_CALLS.with(|c| c.get().unwrap_or(false)) {
+        return None;
+    }
+    match &expr.kind {
+        ExprKind::MethodCall(call) if call.args.is_empty() => {
+            let ExprKind::Identifier(name) = &call.method.kind else {
+                return None;
+            };
+            let base = extract_var_name(&call.object).or_else(|| method_chain_key(&call.object))?;
+            Some(format!("{base}->{}", method_call_key(name)))
+        }
+        ExprKind::Parenthesized(inner) => method_chain_key(inner),
+        _ => None,
+    }
+}
+
+/// `prop_refined` receiver key of a method call's object: the variable, or a
+/// memoized call chain.
+pub(crate) fn memoized_receiver_key(expr: &php_ast::owned::Expr) -> Option<String> {
+    match &expr.kind {
+        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        _ => method_chain_key(expr),
+    }
+}
+
+/// Type of a narrowing receiver key: a variable, or a memoized call chain
+/// resolved through the declared return types.
+fn receiver_type(ctx: &FlowState, key: &str, db: &dyn MirDatabase) -> Type {
+    match key.rsplit_once("->") {
+        Some((base, call)) if call.ends_with("()") => ctx
+            .get_prop_refined(base, call)
+            .cloned()
+            .unwrap_or_else(|| resolve_method_call_current_type(ctx, base, call, db)),
+        _ => ctx.get_var(key),
+    }
+}
+
+/// Declared return type of `$obj_var->method()` with a single concrete receiver class, or `mixed`
+/// when repeated calls aren't provably equal (mutation-free, or memoized) or the type isn't
+/// receiver-independent.
 fn resolve_method_call_current_type(
     ctx: &FlowState,
     obj_var: &str,
@@ -244,7 +307,7 @@ fn resolve_method_call_current_type(
     db: &dyn MirDatabase,
 ) -> Type {
     let method = key.trim_end_matches("()");
-    let obj_ty = ctx.get_var(obj_var);
+    let obj_ty = receiver_type(ctx, obj_var, db);
     let [Atomic::TNamedObject { fqcn, .. }] = obj_ty.types.as_slice() else {
         return Type::mixed();
     };
@@ -266,7 +329,7 @@ fn resolve_method_call_current_type(
             _ => true,
         });
     if resolved.is_static
-        || !(resolved.is_pure || resolved.is_mutation_free)
+        || !(resolved.is_pure || resolved.is_mutation_free || db.memoize_method_call_results())
         || !receiver_independent
     {
         return Type::mixed();
@@ -284,7 +347,7 @@ pub(super) fn extract_nullsafe_prop_access(
 ) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::NullsafePropertyAccess(pa) => {
-            let obj = extract_var_name(&pa.object)?;
+            let obj = extract_var_name(&pa.object).or_else(|| method_chain_key(&pa.object))?;
             let prop = match &pa.property.kind {
                 ExprKind::Identifier(s) => s.as_ref().to_string(),
                 _ => return None,
@@ -318,6 +381,7 @@ pub(crate) fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(St
 pub(crate) fn chained_prop_receiver_key(object_expr: &php_ast::owned::Expr) -> Option<String> {
     match &object_expr.kind {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::MethodCall(_) => method_chain_key(object_expr),
         ExprKind::PropertyAccess(inner_pa) | ExprKind::NullsafePropertyAccess(inner_pa) => {
             let base = extract_var_name(&inner_pa.object)?;
             let mid_prop = match &inner_pa.property.kind {

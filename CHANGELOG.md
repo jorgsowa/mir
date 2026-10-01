@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `memoizeMethodCallResults="true"` on the config root (and `AnalysisSession::with_memoize_method_call_results`) assumes repeated zero-arg method calls on the same receiver return the same value, as in Psalm. Guards on `$a->b()`, `$a->b()->prop` and `$a->b()->c()` (null, truthiness, `instanceof`) then hold for the next identical call until an impure call on the receiver or a reassignment. Off by default.
 - Psalm plugin bridge runs `AfterClassLikeVisit`, `AfterClassLikeAnalysis` and `AfterCodebasePopulated` handlers over a codebase scanned by Psalm itself, so plugins like the PHPUnit one see real class storage. mir plugins get a matching `after_class_like_analysis` hook that can raise issues, suppress issue names inside a class and mark classes/methods as used; plugin API version is now 4.
 - Return-type providers also fire for static method calls.
 - Psalm plugin bridge loads file-based plugins (`<plugin filename="..."/>`), registering the first class the file declares as a hook class.

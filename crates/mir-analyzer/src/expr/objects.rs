@@ -962,6 +962,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // If we have a narrowed type for this property access ($var->prop,
         // or the one-more-hop $var->a->prop), return it instead of the
         // declared type.
+        let _memoize = matches!(pa.object.kind, ExprKind::MethodCall(_))
+            .then(|| crate::narrowing::memoize_scope(self.db));
         let mut resolved =
             if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object) {
                 ctx.get_prop_refined(&obj_key, &prop_name)
@@ -1040,6 +1042,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // or the one-more-hop $var->a?->prop), return it instead of the
         // declared type — matching the plain `->` path in
         // analyze_property_access above.
+        let _memoize = matches!(pa.object.kind, ExprKind::MethodCall(_))
+            .then(|| crate::narrowing::memoize_scope(self.db));
         let mut prop_ty =
             if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object) {
                 ctx.get_prop_refined(&obj_key, &prop_name)

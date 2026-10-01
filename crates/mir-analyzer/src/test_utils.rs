@@ -157,7 +157,8 @@
 //! - A fixture with no file section at all fails immediately.
 //! - `===config===` must appear **at most once** per fixture.
 //! - Every key in `===config===` must be a recognised key (`php_version`,
-//!   `suppress`, `stub_file`, `stub_dir`); unknown keys fail the test.
+//!   `suppress`, `stub_file`, `stub_dir`, `memoize_method_call_results`); unknown keys
+//!   fail the test.
 //! - `php_version` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
 //!   real CLI config); invalid values fail the test.
 //! - `suppress` accepts a comma-separated list of [`IssueKind`] names to drop
@@ -218,6 +219,7 @@ struct FixtureConfig {
     stub_files: Vec<String>,
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
     stub_dirs: Vec<String>,
+    memoize_method_call_results: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -683,8 +685,11 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
             "stub_dir" => {
                 config.stub_dirs.push(value.trim().to_string());
             }
+            "memoize_method_call_results" => {
+                config.memoize_method_call_results = value.trim() == "true";
+            }
             other => panic!(
-                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir"
+                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir, memoize_method_call_results"
             ),
         }
     }
@@ -1333,8 +1338,11 @@ fn with_fixture_session<R>(
     // materialized) and reset it afterwards by invalidating the fixture's files,
     // amortizing the one-time stub-index build. Fixtures with custom stubs or a
     // composer map get a fresh, isolated session.
-    let reusable =
-        stub_files.is_empty() && stub_dirs.is_empty() && !has_composer && session_pool_enabled();
+    let reusable = stub_files.is_empty()
+        && stub_dirs.is_empty()
+        && !has_composer
+        && !config.memoize_method_call_results
+        && session_pool_enabled();
 
     let result = if reusable {
         let mut session = checkout_base_session(version);
@@ -1345,7 +1353,8 @@ fn with_fixture_session<R>(
         return_base_session(version, session);
         result
     } else {
-        let mut session = AnalysisSession::new(version);
+        let mut session = AnalysisSession::new(version)
+            .with_memoize_method_call_results(config.memoize_method_call_results);
         if std::env::var_os("MIR_TEST_NO_STUB_CACHE").is_none() {
             session = session.with_cache_dir(&fixture_stub_cache_dir());
         }
