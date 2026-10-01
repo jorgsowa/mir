@@ -271,8 +271,14 @@ impl<'a> StatementsAnalyzer<'a> {
         let pre_diverges = ctx.diverges;
         let pre = ctx.clone();
         let mut entry = ctx.branch();
+        // The pre-loop state ignores the update expression, so diagnostics from
+        // this pass are dropped; the loop re-analyzes the condition on the widened state.
+        let issues_mark = self.issues.issue_count();
         for cond in f.condition.iter() {
             self.expr_analyzer(&entry).analyze(cond, &mut entry);
+        }
+        self.issues.truncate_to(issues_mark);
+        for cond in f.condition.iter() {
             self.check_docblock_contradiction(cond, &mut entry);
         }
         // Only the last comma-separated condition's truthiness controls the
@@ -292,6 +298,11 @@ impl<'a> StatementsAnalyzer<'a> {
             entry,
             |sa, iter| {
                 sa.analyze_stmt(&f.body, iter);
+                // The update only runs once the condition held, e.g. `$c = $c->getPrevious()`
+                // after `$c !== null`.
+                if let Some(last_cond) = f.condition.last() {
+                    narrow_from_condition(last_cond, iter, true, sa.db, &sa.file);
+                }
                 for update in f.update.iter() {
                     sa.expr_analyzer(iter).analyze(update, iter);
                 }
