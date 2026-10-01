@@ -1356,6 +1356,61 @@ pub fn find_inheritdoc_parent<'db>(
     first_any
 }
 
+/// Docblock parent of an override that declares no docblock types of its own
+/// (no `@inheritDoc`): the nearest ancestor method whose docblock `@return`
+/// refines the same bare class the override returns natively
+/// (`: Result` vs `@return Result<U, E>`). Narrower or unrelated native return
+/// types never inherit.
+pub fn find_implicit_doc_parent<'db>(
+    db: &'db dyn MirDatabase,
+    receiver_fqcn: Fqcn<'db>,
+    owner_fqcn: Fqcn<'db>,
+    method_name_lower: &str,
+    method: &MethodDef,
+) -> Option<Arc<MethodDef>> {
+    let own_return = method.return_type.as_deref()?;
+    let [Atomic::TNamedObject {
+        fqcn: own_class,
+        type_params,
+    }] = own_return.types.as_slice()
+    else {
+        return None;
+    };
+    let has_own_docblock = own_return.from_docblock
+        || !type_params.is_empty()
+        || !method.template_params.is_empty()
+        || method
+            .params
+            .iter()
+            .any(|p| p.ty.as_deref().is_some_and(|t| t.from_docblock));
+    if method.is_inherit_doc || has_own_docblock {
+        return None;
+    }
+    let receiver_name = receiver_fqcn.name(db);
+    let owner_name = owner_fqcn.name(db);
+    class_ancestors_by_fqcn(db, receiver_fqcn)
+        .iter()
+        .filter(|anc| anc.as_ref() != receiver_name.as_str() && anc.as_ref() != owner_name.as_str())
+        .find_map(|anc| {
+            let m = find_method_in_class(
+                db,
+                Fqcn::interned(db, Name::new(anc.as_ref())),
+                method_name_lower,
+            )?;
+            if m.visibility == mir_codebase::definitions::Visibility::Private {
+                return None;
+            }
+            let parent_return = m.return_type.as_deref().filter(|t| t.from_docblock)?;
+            let [Atomic::TNamedObject {
+                fqcn: parent_class, ..
+            }] = parent_return.types.as_slice()
+            else {
+                return None;
+            };
+            parent_class.eq_ignore_ascii_case(own_class).then_some(m)
+        })
+}
+
 /// Walk the inheritance chain of `fqcn` respecting `insteadof` trait precedence
 /// rules. When a class declares `use A, B { B::hello insteadof A; }`, this
 /// function skips `A::hello` and returns `B::hello` instead.

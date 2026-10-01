@@ -84,6 +84,23 @@ fn inferred_refines_bare_object(native_fqcn: &mir_types::Name, inferred: &Type) 
     )
 }
 
+fn is_callable_signature(a: &Atomic) -> bool {
+    matches!(a, Atomic::TClosure { .. } | Atomic::TCallable { .. })
+}
+
+fn is_bare_callable_hint(a: &Atomic) -> bool {
+    match a {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            type_params.is_empty() && fqcn.eq_ignore_ascii_case("Closure")
+        }
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => params.is_none() && return_type.is_none(),
+        _ => false,
+    }
+}
+
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
 pub(crate) fn resolve_method_from_db(
     db: &dyn crate::db::MirDatabase,
@@ -108,13 +125,19 @@ pub(crate) fn resolve_method_from_db(
         // or unannotated params, inherit them from the nearest ancestor that has them.
         // A native-hint `mixed` (from_docblock=false) counts as "no docblock type" so
         // that `/** @inheritdoc */ public function f(): mixed {}` still inherits.
-        let parent = crate::db::find_inheritdoc_parent(
-            db,
-            crate::db::Fqcn::from_str(db, fqcn.as_ref()),
-            crate::db::Fqcn::from_str(db, owner_fqcn.as_ref()),
-            method_name_lower,
-            &storage,
-        );
+        let receiver = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+        let owner = crate::db::Fqcn::from_str(db, owner_fqcn.as_ref());
+        let parent =
+            crate::db::find_inheritdoc_parent(db, receiver, owner, method_name_lower, &storage)
+                .or_else(|| {
+                    crate::db::find_implicit_doc_parent(
+                        db,
+                        receiver,
+                        owner,
+                        method_name_lower,
+                        &storage,
+                    )
+                });
 
         let own_has_docblock_return = storage
             .return_type
@@ -156,14 +179,26 @@ pub(crate) fn resolve_method_from_db(
                         own.ty.as_deref().map(|t| t.from_docblock).unwrap_or(false);
                     let own_is_mixed_or_absent =
                         own.ty.as_deref().map(|t| t.is_mixed()).unwrap_or(true);
-                    if !own_ty_is_docblock && own_is_mixed_or_absent {
-                        if let Some(parent_param) = p.params.get(i) {
-                            if parent_param.ty.is_some() {
-                                return DeclaredParam {
-                                    ty: parent_param.ty.clone(),
-                                    ..own.clone()
-                                };
-                            }
+                    let parent_param = p.params.get(i);
+                    // A docblock callable signature (`Closure(T): U`) refines a
+                    // bare native `Closure`/`callable` hint, so it is inherited.
+                    let parent_refines_own = |parent_ty: &Type| {
+                        parent_ty.from_docblock
+                            && parent_ty.types.iter().all(is_callable_signature)
+                            && own.ty.as_deref().is_some_and(|own_ty| {
+                                own_ty.types.iter().all(is_bare_callable_hint)
+                            })
+                    };
+                    if !own_ty_is_docblock {
+                        if let Some(parent_param) = parent_param.filter(|pp| {
+                            pp.ty.is_some()
+                                && (own_is_mixed_or_absent
+                                    || pp.ty.as_deref().is_some_and(parent_refines_own))
+                        }) {
+                            return DeclaredParam {
+                                ty: parent_param.ty.clone(),
+                                ..own.clone()
+                            };
                         }
                     }
                     own.clone()
