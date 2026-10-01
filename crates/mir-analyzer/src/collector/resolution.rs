@@ -66,6 +66,10 @@ pub(super) fn resolve_type_name(
         return Name::from(name.trim_start_matches('\\'));
     }
     let stripped = name.trim_start_matches('\\');
+    // Already-resolved `@psalm-import-type` placeholder.
+    if name.starts_with(super::IMPORT_PLACEHOLDER_PREFIX) {
+        return Name::from(name);
+    }
     let first_part = stripped.split('\\').next().unwrap_or(stripped);
     if find_alias(first_part, use_aliases).is_some() {
         return resolve_alias_only(stripped, use_aliases).as_str().into();

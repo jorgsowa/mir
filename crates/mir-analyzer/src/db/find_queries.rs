@@ -637,7 +637,154 @@ pub fn global_constant_in_file<'db>(
 #[salsa::tracked]
 pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
-    def_at(&defs.slice.classes, idx)
+    let class = def_at(&defs.slice.classes, idx)?;
+    let class = resolve_cross_file_imports(db, class);
+    if db.user_stub_source_files().contains(&file) {
+        if let Some(real) = real_class_shadowed_by_stub(db, &class) {
+            return Some(Arc::new(merge_stub_over_real(&class, &real)));
+        }
+    }
+    Some(class)
+}
+
+/// The project/vendor declaration of a class that a user stub also declares.
+/// User stubs are usually partial (a handful of annotated members), so the
+/// real class still contributes everything the stub leaves out.
+fn real_class_shadowed_by_stub(db: &dyn MirDatabase, stub: &ClassDef) -> Option<Arc<ClassDef>> {
+    let fqcn = Fqcn::from_str(db, stub.fqcn.as_ref());
+    let real_file = resolver_file_on_demand(db, fqcn)?;
+    let key = stub.fqcn.to_ascii_lowercase();
+    let defs = collect_file_definitions(db, real_file);
+    let real = defs
+        .slice
+        .classes
+        .iter()
+        .find(|c| c.fqcn.to_ascii_lowercase() == key)?;
+    Some(resolve_cross_file_imports(db, real))
+}
+
+/// Stub members win; members only the real class declares are added.
+fn merge_stub_over_real(stub: &ClassDef, real: &ClassDef) -> ClassDef {
+    let mut merged = stub.clone();
+    for (name, method) in real.own_methods.iter() {
+        merged
+            .own_methods
+            .entry(name.clone())
+            .or_insert_with(|| method.clone());
+    }
+    for (name, property) in real.own_properties.iter() {
+        merged
+            .own_properties
+            .entry(name.clone())
+            .or_insert_with(|| property.clone());
+    }
+    for (name, constant) in real.own_constants.iter() {
+        merged
+            .own_constants
+            .entry(name.clone())
+            .or_insert_with(|| constant.clone());
+    }
+    if merged.parent.is_none() {
+        merged.parent = real.parent.clone();
+    }
+    for list in [
+        (&mut merged.interfaces, &real.interfaces),
+        (&mut merged.traits, &real.traits),
+        (&mut merged.mixins, &real.mixins),
+    ] {
+        for item in list.1 {
+            if !list.0.iter().any(|existing| existing.eq_ignore_ascii_case(item)) {
+                list.0.push(item.clone());
+            }
+        }
+    }
+    merged
+}
+
+/// Alias body declared on `from_class`, read from the raw collected slice (not
+/// `class_def_at`) so mutually-importing classes can't form a query cycle.
+fn declared_type_alias(db: &dyn MirDatabase, from_class: &str, name: &str) -> Option<Type> {
+    let loc = class_like_loc(db, Fqcn::from_str(db, from_class))?;
+    let defs = collect_file_definitions(db, loc.file());
+    let slice = &defs.slice;
+    let aliases = match loc {
+        SymbolLoc::Class { idx, .. } => &slice.classes.get(idx)?.type_aliases,
+        SymbolLoc::Interface { idx, .. } => &slice.interfaces.get(idx)?.type_aliases,
+        SymbolLoc::Trait { idx, .. } => &slice.traits.get(idx)?.type_aliases,
+        SymbolLoc::Enum { idx, .. } => &slice.enums.get(idx)?.type_aliases,
+        SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => return None,
+    };
+    aliases.get(name).cloned()
+}
+
+/// Follows an import chain (`A` imports from `B`, which re-imports from `C`).
+/// An unknown source or alias is `mixed`: the missing class is reported
+/// elsewhere, and a guessed type would only add false positives.
+fn imported_alias_body(db: &dyn MirDatabase, from_class: &str, name: &str) -> Type {
+    const MAX_CHAIN: usize = 8;
+    let (mut from, mut name) = (from_class.to_string(), name.to_string());
+    for _ in 0..MAX_CHAIN {
+        let Some(body) = declared_type_alias(db, &from, &name) else {
+            break;
+        };
+        match crate::collector::import_placeholder_parts(&body) {
+            Some((next_from, next_name)) => {
+                (from, name) = (next_from.to_string(), next_name.to_string())
+            }
+            None => return body,
+        }
+    }
+    Type::mixed()
+}
+
+/// Swaps the `@psalm-import-type` placeholders the collector left for imports
+/// from other files with the source alias's body, in the class's alias map and
+/// member types.
+fn resolve_cross_file_imports(db: &dyn MirDatabase, class: Arc<ClassDef>) -> Arc<ClassDef> {
+    let bodies: FxHashMap<String, Type> = class
+        .type_aliases
+        .values()
+        .filter_map(crate::collector::import_placeholder_parts)
+        .map(|(from, name)| {
+            (
+                format!(
+                    "{}{from}::{name}",
+                    crate::collector::IMPORT_PLACEHOLDER_PREFIX
+                ),
+                imported_alias_body(db, from, name),
+            )
+        })
+        .collect();
+    if bodies.is_empty() {
+        return class;
+    }
+    let expand = |ty: &mut Type| *ty = crate::collector::expand_aliases_only(ty.clone(), &bodies);
+    let expand_arc = |ty: &mut Option<Arc<Type>>| {
+        if let Some(arc) = ty {
+            let mut inner = (**arc).clone();
+            expand(&mut inner);
+            *arc = Arc::new(inner);
+        }
+    };
+
+    let mut class = (*class).clone();
+    class.type_aliases.values_mut().for_each(expand);
+    for prop in class.own_properties.values_mut() {
+        expand_arc(&mut prop.ty);
+    }
+    for constant in class.own_constants.values_mut() {
+        expand(&mut constant.ty);
+    }
+    for method in class.own_methods.values_mut() {
+        let method = Arc::make_mut(method);
+        expand_arc(&mut method.return_type);
+        let mut params = method.params.to_vec();
+        for param in &mut params {
+            expand_arc(&mut param.ty);
+        }
+        method.params = params.into();
+    }
+    Arc::new(class)
 }
 
 /// Plain classes (not interfaces/traits/enums) defined in `analyzed_files`,

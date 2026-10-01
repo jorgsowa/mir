@@ -63,7 +63,7 @@ impl<'a> DefinitionCollector<'a> {
             return ControlFlow::Continue(());
         }
 
-        let type_aliases = self.build_type_aliases(&class_doc);
+        let type_aliases = self.build_type_aliases_deferring_imports(&class_doc);
 
         // Build class-level template params before the member loop so they can be passed
         // to build_method_storage, allowing method return types to reference class templates

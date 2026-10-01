@@ -208,6 +208,31 @@ fn is_php_builtin_type(name: &str) -> bool {
     crate::parser::docblock::is_docblock_type_keyword(name)
 }
 
+/// `@` can't start a real class name, so a placeholder never collides with one.
+pub(crate) const IMPORT_PLACEHOLDER_PREFIX: &str = "@import-type ";
+
+/// Stand-in for `@psalm-import-type original from from_class` when the source
+/// class-like lives in another file; see [`import_placeholder_parts`].
+pub(crate) fn import_placeholder(from_class: &str, original: &str) -> Type {
+    Type::single(mir_types::Atomic::TNamedObject {
+        fqcn: format!("{IMPORT_PLACEHOLDER_PREFIX}{from_class}::{original}")
+            .as_str()
+            .into(),
+        type_params: Default::default(),
+    })
+}
+
+/// `(from_class, original)` if `ty` is exactly an [`import_placeholder`].
+pub(crate) fn import_placeholder_parts(ty: &Type) -> Option<(&str, &str)> {
+    match ty.types.as_slice() {
+        [mir_types::Atomic::TNamedObject { fqcn, type_params }] if type_params.is_empty() => fqcn
+            .as_str()
+            .strip_prefix(IMPORT_PLACEHOLDER_PREFIX)?
+            .split_once("::"),
+        _ => None,
+    }
+}
+
 /// Substitute alias names in `union` with their pre-built definitions.
 /// Does not touch FQN resolution; that is left to the caller's resolution pass.
 ///
@@ -1303,6 +1328,24 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Type> {
+        self.build_type_aliases_inner(doc, false)
+    }
+
+    /// Like `build_type_aliases`, but an import from a class-like declared
+    /// outside this slice binds to an [`import_placeholder`] that the db layer
+    /// swaps for the source alias's body once that file is known.
+    fn build_type_aliases_deferring_imports(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+    ) -> FxHashMap<String, Type> {
+        self.build_type_aliases_inner(doc, true)
+    }
+
+    fn build_type_aliases_inner(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+        defer_cross_file: bool,
+    ) -> FxHashMap<String, Type> {
         let mut aliases = FxHashMap::default();
         for alias in &doc.type_aliases {
             if alias.name.is_empty() || alias.type_expr.is_empty() {
@@ -1353,11 +1396,24 @@ impl<'a> DefinitionCollector<'a> {
                 });
             if let Some(ty) = resolved {
                 aliases.insert(import.local.clone(), ty);
+            } else if defer_cross_file && !self.slice_declares(from_resolved.as_ref()) {
+                aliases.insert(
+                    import.local.clone(),
+                    import_placeholder(from_resolved.as_ref(), &import.original),
+                );
             }
         }
 
         self.expand_type_aliases_fixpoint(&mut aliases);
         aliases
+    }
+
+    fn slice_declares(&self, fqcn: &str) -> bool {
+        let slice = &self.slice;
+        slice.classes.iter().any(|c| c.fqcn.as_ref() == fqcn)
+            || slice.interfaces.iter().any(|c| c.fqcn.as_ref() == fqcn)
+            || slice.traits.iter().any(|c| c.fqcn.as_ref() == fqcn)
+            || slice.enums.iter().any(|c| c.fqcn.as_ref() == fqcn)
     }
 
     /// An alias body can itself reference another alias in the same map
