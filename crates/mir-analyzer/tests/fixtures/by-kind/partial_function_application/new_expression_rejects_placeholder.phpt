@@ -5,6 +5,7 @@ with its own "Cannot use partial function application in new expression"
 error (on top of, or instead of, the ordinary version-gate error). Locks in
 whatever mir currently surfaces for it, without crashing.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

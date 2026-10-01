@@ -16,6 +16,7 @@ not at position 0 or dropped entirely — verified by checking that
 from this cross-file fact, infers the correct element type for its
 `array_map($cb, ...)` call.
 ===config===
+php_version=8.5
 suppress=UnusedVariable,UnusedParam,UnusedFunction
 ===file:lib.php===
 <?php

@@ -4,6 +4,7 @@ first-class-callable marker — this one comes after a real positional
 argument) curries every remaining parameter at once. Parsed as
 `Arg { value: None, unpack: true }`.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

@@ -504,6 +504,11 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         arg_idx,
     } in &bindings
     {
+        // PHP 8.6 partial-application placeholder (`?`/`...`): no value to check.
+        if args.get(*arg_idx).is_some_and(|a| a.value.is_none()) {
+            continue;
+        }
+
         let param = &params[*param_idx];
 
         if param.is_byref && !arg_can_be_byref.get(*arg_idx).copied().unwrap_or(false) {

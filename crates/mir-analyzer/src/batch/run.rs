@@ -21,7 +21,7 @@ impl AnalysisSession {
             .filter_map(|path| match std::fs::read_to_string(path) {
                 Ok(src) => {
                     let file = Arc::from(path.to_string_lossy().as_ref());
-                    Some(ParsedProjectFile::new(file, Arc::from(src)))
+                    Some(ParsedProjectFile::new(file, Arc::from(src), php_version))
                 }
                 Err(e) => {
                     eprintln!("Cannot read {}: {}", path.display(), e);
@@ -616,9 +616,9 @@ impl AnalysisSession {
 
         let (symbols, surface_hash) = {
             let db = &mut self.db.salsa;
-            let parsed = collected
-                .parsed
-                .unwrap_or_else(|| php_rs_parser::parse(new_content));
+            let parsed = collected.parsed.unwrap_or_else(|| {
+                php_rs_parser::parse_versioned(new_content, php_version.parser_version())
+            });
             let surface_hash = surface_fingerprint(new_content, &parsed.program);
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);

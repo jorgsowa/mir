@@ -1,5 +1,5 @@
 ===description===
-Important, easy-to-miss behavior: mir's parser always targets PHP 8.5
+Important, easy-to-miss behavior: with a target below PHP 8.6 the parser targets 8.5
 internally (`php_rs_parser::parse()` is never called with an explicit
 higher version, decoupled from mir's own `--php-version` flag), so ANY
 partial-application placeholder unconditionally raises a `VersionTooLow`
@@ -12,6 +12,7 @@ here. This is not a bug introduced by the `Arg::value: Option<Expr>`
 migration; it's the pre-existing "a hard parse error blanks out the whole
 file's diagnostics" policy, just newly reachable via PHP 8.6 syntax.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

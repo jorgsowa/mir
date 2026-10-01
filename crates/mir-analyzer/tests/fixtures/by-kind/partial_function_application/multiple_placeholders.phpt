@@ -3,6 +3,7 @@ Every argument can be a `?` placeholder at once (full currying spelled out
 explicitly, rather than via the bare `...` rest marker) — each occupies its
 own positionally-aligned slot.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

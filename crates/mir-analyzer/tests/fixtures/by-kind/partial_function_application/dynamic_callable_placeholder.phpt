@@ -3,6 +3,7 @@ A placeholder argument through a dynamic callable call (`$fn(?, 5)`) exercises
 the separate "callee is not a plain identifier" branch of function-call
 analysis — must not crash there either.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

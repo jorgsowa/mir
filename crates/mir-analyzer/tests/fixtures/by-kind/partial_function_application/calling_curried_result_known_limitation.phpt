@@ -8,6 +8,7 @@ should then start exercising the (currently unmodeled) runtime semantics —
 the call should evaluate to a new Closure, not to `add`'s own return type —
 and this locked-in diff is where that gap will first become visible.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

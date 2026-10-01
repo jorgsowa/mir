@@ -25,7 +25,7 @@ A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](htt
 - Taint analysis — tracks data from `$_GET`/`$_POST` to HTML/SQL/shell sinks
 - Incremental cache — unchanged files skipped on re-runs via content hashing
 - Parallel analysis — rayon-powered; scales to available CPUs
-- PHP 7.4–8.5 support with version-aware stub filtering
+- PHP 7.4–8.6 support with version-aware stub filtering
 - Comprehensive built-in coverage — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) (57 extensions, 500+ functions, 100+ classes)
 
 ## Installation

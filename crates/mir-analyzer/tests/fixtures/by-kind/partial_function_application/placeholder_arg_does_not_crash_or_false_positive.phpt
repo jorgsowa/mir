@@ -1,7 +1,7 @@
 ===description===
 PHP 8.6 introduces partial function application (`?`/`...` call-argument
 placeholders), parsed by php-rs-parser 0.19 as `Arg { value: None, .. }`.
-mir's default target version is 8.5, so this correctly surfaces a
+targeting 8.5, this correctly surfaces a
 version-gate ParseError rather than crashing or silently misparsing. That
 ParseError is a *hard* parse error, which also suppresses body-level
 analysis for the whole file (see
@@ -9,6 +9,7 @@ analysis for the whole file (see
 placeholder argument must not panic the analyzer or produce any diagnostic
 beyond that single, accurate ParseError.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

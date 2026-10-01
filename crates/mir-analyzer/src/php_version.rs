@@ -14,7 +14,7 @@ pub struct PhpVersion {
 }
 
 impl PhpVersion {
-    pub const LATEST: PhpVersion = PhpVersion::new(8, 5);
+    pub const LATEST: PhpVersion = PhpVersion::new(8, 6);
 
     pub const fn new(major: u8, minor: u8) -> Self {
         Self { major, minor }
@@ -26,6 +26,16 @@ impl PhpVersion {
 
     pub const fn minor(self) -> u8 {
         self.minor
+    }
+
+    /// Parser target: 8.6 syntax is accepted only when targeting 8.6+; older
+    /// targets keep the parser's 8.5 default so syntax is not gated per version.
+    pub fn parser_version(self) -> php_rs_parser::PhpVersion {
+        if self >= PhpVersion::new(8, 6) {
+            php_rs_parser::PhpVersion::Php86
+        } else {
+            php_rs_parser::PhpVersion::Php85
+        }
     }
 
     /// Encode the version into the single byte the [`crate::stub_cache`]

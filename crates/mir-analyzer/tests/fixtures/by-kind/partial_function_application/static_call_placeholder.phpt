@@ -2,6 +2,7 @@
 Same placeholder-argument coverage as the plain-function and instance-method
 fixtures, but through a static method call.
 ===config===
+php_version=8.5
 suppress=UnusedVariable
 ===file===
 <?php

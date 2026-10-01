@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- PHP 8.6 support: `PhpVersion::LATEST` (the default target) is now `8.6`, and a configured 8.6+ target makes the parser accept partial-application placeholders (`?`/`...`) instead of raising a version-gate `ParseError`. Targets below 8.6 are unchanged.
+
+### Fixed
+
+- Partial-application placeholder arguments are no longer reported as `MixedArgument`.
+
 ## [0.82.0] - 2026-10-01
 
 ### Added

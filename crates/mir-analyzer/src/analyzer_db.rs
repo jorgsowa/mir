@@ -265,7 +265,7 @@ impl AnalyzerDb {
         }
         crate::metrics::record_stub_cache_miss();
 
-        let parsed = php_rs_parser::parse(source);
+        let parsed = php_rs_parser::parse_versioned(source, php_version.parser_version());
 
         let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 
