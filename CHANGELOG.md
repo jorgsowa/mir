@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.82.0] - 2026-10-01
+
 ### Added
 
 - `AnalysisSnapshot::stale_reference_candidates` finds, off the owner's lock, the candidates a references query would analyze, and `AnalysisSession::prepare_references_query` warms exactly those (plus the declaration owner and any pending index settle) for hosts that read through `AnalysisSnapshot`.
