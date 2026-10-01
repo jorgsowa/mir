@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PHP 8.6 support: a configured 8.6+ target makes the parser accept partial-application placeholders (`?`/`...`) instead of raising a version-gate `ParseError`. Targets below 8.6 are unchanged.
 - `AnalysisSession::subtype_files` and `AnalysisSnapshot::subtype_files` take an `include_trait_users` flag; `true` also returns files whose classes `use` the trait.
 - `indexed_direct_subtype_classes` on `AnalysisSession` and `AnalysisSnapshot`: subtypes that name a class directly in `extends`/`implements` (or `use`, with `include_trait_users`), without grandchildren.
+- `AnalysisSession::outgoing_calls(file, byte_offset)`: the calls inside the function or method around the offset, as resolved `Name`s with call-site ranges (trait aliases map to the original method).
 
 ### Fixed
 

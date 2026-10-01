@@ -466,6 +466,16 @@ impl<'a> FileAnalyzer<'a> {
         self.session
             .query_snapshot(|snap| snap.name_at(&file, byte_offset))
     }
+
+    pub(crate) fn outgoing_calls(
+        &mut self,
+        file: Arc<str>,
+        byte_offset: u32,
+    ) -> Vec<(crate::Name, crate::Range)> {
+        self.session.prepare_for_query(Some(&file));
+        self.session
+            .query_snapshot(|snap| snap.outgoing_calls(&file, byte_offset))
+    }
 }
 
 impl AnalysisSnapshot {
@@ -567,6 +577,17 @@ impl AnalysisSnapshot {
         crate::metrics::record_name_at(started.elapsed().as_micros() as u64);
         name
     }
+
+    /// Calls made inside the function or method whose declaration contains
+    /// `byte_offset` — the read half of [`AnalysisSession::outgoing_calls`].
+    /// Same preparation contract as [`Self::symbol_at`].
+    pub fn outgoing_calls(
+        &self,
+        file: &Arc<str>,
+        byte_offset: u32,
+    ) -> Result<Vec<(crate::Name, crate::Range)>, salsa::Cancelled> {
+        self.read(|db| resolve_outgoing_calls(db, self.php_version(), file, byte_offset))
+    }
 }
 
 fn resolve_name_at(
@@ -615,6 +636,147 @@ fn resolve_name_at(
         allow_expr_fallback,
     )
     .and_then(ResolvedSymbol::to_symbol)
+}
+
+/// Body span of the function or method whose declaration contains `byte_offset`.
+fn enclosing_callable_body(stmt: &Stmt, byte_offset: u32) -> Option<Span> {
+    use php_ast::owned::EnumMemberKind;
+
+    let body_span = |body: &Option<Box<php_ast::owned::Block>>| body.as_ref().map(|b| b.span);
+    match &stmt.kind {
+        StmtKind::Function(decl) => Some(decl.body.span),
+        StmtKind::Class(decl) => class_member_body(&decl.body.members, byte_offset),
+        StmtKind::Trait(decl) => class_member_body(&decl.body.members, byte_offset),
+        StmtKind::Enum(decl) => decl
+            .body
+            .members
+            .iter()
+            .filter(|m| span_contains(m.span, byte_offset))
+            .find_map(|m| match &m.kind {
+                EnumMemberKind::Method(method) => body_span(&method.body),
+                _ => None,
+            }),
+        _ => None,
+    }
+}
+
+fn class_member_body(members: &[php_ast::owned::ClassMember], byte_offset: u32) -> Option<Span> {
+    use php_ast::owned::ClassMemberKind;
+
+    members
+        .iter()
+        .filter(|m| span_contains(m.span, byte_offset))
+        .find_map(|m| match &m.kind {
+            ClassMemberKind::Method(method) => method.body.as_ref().map(|b| b.span),
+            _ => None,
+        })
+}
+
+fn resolve_outgoing_calls(
+    db: &dyn MirDatabase,
+    php_version: crate::PhpVersion,
+    file: &Arc<str>,
+    byte_offset: u32,
+) -> Vec<(crate::Name, crate::Range)> {
+    let Some(sf) = db.lookup_source_file(file.as_ref()) else {
+        return Vec::new();
+    };
+    let prepared = crate::db::prepare_analysis_file(db, sf);
+    let parsed = prepared.parse_result();
+    let source = prepared.text.as_ref();
+    let Some(stmt) = best_navigation_scope_stmt(&parsed.program, byte_offset) else {
+        return Vec::new();
+    };
+    // The body excludes the declaration name, which is itself a navigation fact.
+    let Some(body) = enclosing_callable_body(stmt, byte_offset) else {
+        return Vec::new();
+    };
+
+    let mut driver = BodyAnalyzer::new_inference_only(db, php_version);
+    driver.collect_symbols = false;
+    driver.capture_symbol_types = false;
+    driver.codebase_symbols_only = true;
+    driver.record_reference_locations = false;
+    driver.collect_navigation_facts = true;
+    let mut issues = Vec::new();
+    let guards: FxHashSet<Arc<str>> = FxHashSet::default();
+    let source_map = &parsed.source_map;
+    match &stmt.kind {
+        StmtKind::Function(decl) => {
+            driver.analyze_fn_decl(decl, file, source, source_map, &mut issues, None)
+        }
+        StmtKind::Class(decl) => {
+            driver.analyze_class_decl(decl, file, source, source_map, &mut issues, None, &guards)
+        }
+        StmtKind::Trait(decl) => {
+            driver.analyze_trait_decl(decl, file, source, source_map, &mut issues, None)
+        }
+        StmtKind::Enum(decl) => {
+            driver.analyze_enum_decl(decl, file, source, source_map, &mut issues, None)
+        }
+        _ => return Vec::new(),
+    }
+
+    let position = |offset: u32| {
+        let (line, column) = crate::diagnostics::offset_to_line_col(source, offset, source_map);
+        crate::Position {
+            line,
+            column: u32::from(column),
+        }
+    };
+    let mut facts: Vec<NavigationFact> = driver
+        .take_navigation_facts()
+        .into_iter()
+        .filter(|fact| {
+            matches!(
+                fact.name,
+                crate::Name::Method { .. } | crate::Name::Function(_)
+            ) && fact.span.start >= body.start
+                && fact.span.end <= body.end
+        })
+        .collect();
+    facts.sort_by_key(|fact| fact.span.start);
+    facts
+        .into_iter()
+        .map(|fact| {
+            let range = crate::Range {
+                start: position(fact.span.start),
+                end: position(fact.span.end),
+            };
+            (resolve_trait_alias(db, fact.name), range)
+        })
+        .collect()
+}
+
+/// Maps a call to a `use Trait { orig as alias; }` alias onto the trait's
+/// original method; any other name passes through.
+fn resolve_trait_alias(db: &dyn MirDatabase, name: crate::Name) -> crate::Name {
+    let crate::Name::Method {
+        class,
+        name: method,
+    } = &name
+    else {
+        return name;
+    };
+    let here = crate::db::Fqcn::from_str(db, class.as_ref());
+    let Some(crate::db::ClassLike::Class(cls)) = crate::db::find_class_like(db, here) else {
+        return name;
+    };
+    let Some((trait_name, orig_method, _, _)) = cls.trait_aliases.get(method.as_ref()) else {
+        return name;
+    };
+    let candidates: Vec<Arc<str>> = trait_name
+        .as_ref()
+        .map(|t| vec![t.clone()])
+        .unwrap_or_else(|| cls.traits.clone());
+    candidates
+        .into_iter()
+        .find(|trait_fqcn| {
+            let trait_ = crate::db::Fqcn::from_str(db, trait_fqcn.as_ref());
+            crate::db::find_method_in_class(db, trait_, orig_method).is_some()
+        })
+        .map(|trait_fqcn| crate::Name::method(trait_fqcn, orig_method))
+        .unwrap_or(name)
 }
 
 fn resolve_symbol_at(

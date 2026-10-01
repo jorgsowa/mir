@@ -33,6 +33,7 @@ mod measure_batch;
 mod measure_dependency_graph;
 mod named_spread_args;
 mod on_demand_loading;
+mod outgoing_calls;
 mod packaging;
 mod perf_analysis;
 mod perf_open_file_closure;

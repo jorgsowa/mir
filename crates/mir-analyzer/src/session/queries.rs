@@ -57,6 +57,22 @@ impl AnalysisSession {
         crate::FileAnalyzer::new(self).name_at(Arc::from(file), byte_offset)
     }
 
+    /// Calls inside the function or method whose declaration contains
+    /// `byte_offset` in `file`, as `(callee, call-site name range)` in source
+    /// order. Callees are resolved [`crate::Name`]s — a trait alias reports
+    /// the original method, `parent::`/`self::` the declaring class — so the
+    /// result feeds [`Self::definition_of`] and [`Self::indexed_references_to`]
+    /// directly. Calls in nested closures belong to the enclosing function.
+    /// `new Foo` is a class reference, not reported. Empty when the offset is
+    /// outside a function or method body.
+    pub fn outgoing_calls(
+        &mut self,
+        file: &str,
+        byte_offset: u32,
+    ) -> Vec<(crate::Name, crate::Range)> {
+        crate::FileAnalyzer::new(self).outgoing_calls(Arc::from(file), byte_offset)
+    }
+
     /// Resolve the symbol at `byte_offset` in `file`'s current ingested text.
     ///
     /// Answers the same as [`crate::FileAnalysis::symbol_at`] without the
