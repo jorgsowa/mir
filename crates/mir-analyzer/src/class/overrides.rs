@@ -946,8 +946,9 @@ impl<'a> ClassAnalyzer<'a> {
                     own_prop.native_ty.as_deref(),
                     parent_prop.native_ty.as_deref(),
                 ) {
+                    // A get-only hook parent exposes no write contract, so covariance is legal.
                     let same_type = own_t.is_subtype_structural(parent_t)
-                        && parent_t.is_subtype_structural(own_t);
+                        && (parent_prop.get_only_hook || parent_t.is_subtype_structural(own_t));
                     if !same_type {
                         let loc = issue_location(
                             own_prop.location.as_ref(),
