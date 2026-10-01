@@ -159,7 +159,8 @@ fn main() {
         }
     }
 
-    let composer_root = resolve_composer_root(&cli, &cwd);
+    let composer_root = resolve_composer_root(&cli, &cwd)
+        .or_else(|| composer_root_from_config(&cli, &config, &config_base));
 
     plugins::setup_plugins(&cli, &mut config, &config_base, composer_root.as_deref());
 
@@ -259,6 +260,23 @@ fn load_config(cli: &Cli) -> (Config, PathBuf) {
     }
 
     (Config::default(), cwd)
+}
+
+/// Config outside the project root: locate composer.json from its `<projectFiles>` dirs.
+fn composer_root_from_config(
+    cli: &Cli,
+    config: &Config,
+    config_base: &std::path::Path,
+) -> Option<PathBuf> {
+    if !cli.paths.is_empty() {
+        return None;
+    }
+    config
+        .project_dirs
+        .iter()
+        .map(|d| config_base.join(d))
+        .chain(std::iter::once(config_base.to_path_buf()))
+        .find_map(|p| composer::find_composer_root_for_path(&p))
 }
 
 fn resolve_composer_root(cli: &Cli, cwd: &std::path::Path) -> Option<PathBuf> {
