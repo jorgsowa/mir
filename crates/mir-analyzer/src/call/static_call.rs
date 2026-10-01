@@ -111,7 +111,7 @@ fn is_object_atomic(t: &Atomic) -> bool {
 /// (`TClassString(Some(fqcn))`, e.g. `$cls = Foo::class;`) — otherwise this
 /// call form skips method resolution/reference-recording entirely, unlike
 /// its already-handled `$cls::$prop` / `$cls::CONST` siblings.
-fn extract_object_fqcn(ty: &Type) -> Option<String> {
+fn extract_object_fqcn(ty: &Type, ctx: &FlowState) -> Option<String> {
     let mut result: Option<String> = None;
     for atom in ty.types.iter() {
         let fqcn_str = match atom {
@@ -119,7 +119,7 @@ fn extract_object_fqcn(ty: &Type) -> Option<String> {
             | Atomic::TStaticObject { fqcn }
             | Atomic::TSelf { fqcn }
             | Atomic::TParent { fqcn } => fqcn.to_string(),
-            Atomic::TClassString(Some(fqcn)) => fqcn.to_string(),
+            Atomic::TClassString(Some(_)) => ctx.class_string_target(atom)?.to_string(),
             Atomic::TNull => continue, // nullable object: skip null, resolve against class
             _ => return None,
         };
@@ -234,7 +234,7 @@ impl CallAnalyzer {
             _ => {
                 let ty = ea.analyze(&call.class, ctx);
                 // $obj::method() / $this::method(): resolve against the object's class
-                if let Some(fqcn) = extract_object_fqcn(&ty) {
+                if let Some(fqcn) = extract_object_fqcn(&ty, ctx) {
                     if ty.is_nullable() && !ty.is_mixed() {
                         ea.emit(
                             IssueKind::PossiblyNullMethodCall {

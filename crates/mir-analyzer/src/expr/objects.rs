@@ -778,11 +778,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // or a class instantiated only this way is falsely flagged unused
                 // with no go-to-definition from this call site.
                 for atomic in &ty.types {
-                    if let Atomic::TClassString(Some(fqcn)) = atomic {
+                    if let Some(fqcn) = ctx.class_string_target(atomic) {
                         self.record_class_ref(fqcn, n.class.span);
                         self.record_symbol(
                             n.class.span,
-                            ReferenceKind::ClassReference(Arc::from(fqcn.as_ref())),
+                            ReferenceKind::ClassReference(Arc::from(fqcn)),
                             crate::symbol::class_token_type(fqcn),
                         );
                     }
@@ -1216,10 +1216,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             let mut result = Type::empty();
             let mut any = false;
             for atomic in &var_ty.types {
-                let fqcn = atomic.named_object_fqcn().or_else(|| match atomic {
-                    Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
-                    _ => None,
-                });
+                let fqcn = atomic
+                    .named_object_fqcn()
+                    .or_else(|| ctx.class_string_target(atomic));
                 if let Some(fqcn) = fqcn {
                     any = true;
                     let ty = self.record_static_prop_access(
@@ -1590,10 +1589,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let mut result = Type::empty();
                 let mut any = false;
                 for atomic in &obj_ty.types {
-                    let fqcn = atomic.named_object_fqcn().or_else(|| match atomic {
-                        Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
-                        _ => None,
-                    });
+                    let fqcn = atomic
+                        .named_object_fqcn()
+                        .or_else(|| ctx.class_string_target(atomic));
                     if let Some(fqcn) = fqcn {
                         any = true;
                         let const_ty = self.record_object_const_access(

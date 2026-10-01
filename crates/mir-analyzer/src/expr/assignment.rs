@@ -53,15 +53,11 @@ pub(crate) fn resolve_static_prop_target(
                 s => Some(std::sync::Arc::from(s)),
             }?
         }
-        ExprKind::Variable(name) => {
-            ctx.get_var(name)
-                .types
-                .iter()
-                .find_map(|atomic| match atomic {
-                    Atomic::TClassString(Some(fqcn)) => Some(std::sync::Arc::from(fqcn.as_ref())),
-                    _ => None,
-                })?
-        }
+        ExprKind::Variable(name) => ctx
+            .get_var(name)
+            .types
+            .iter()
+            .find_map(|atomic| ctx.class_string_target(atomic).map(std::sync::Arc::from))?,
         _ => return None,
     };
     let prop_name = match &spa.member.kind {

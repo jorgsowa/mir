@@ -726,6 +726,19 @@ impl FlowState {
         ctx
     }
 
+    /// The concrete class named by a `class-string<X>` atom; `None` when `X` is
+    /// an in-scope `@template` (an unknown class, not a literal one).
+    pub fn class_string_target<'a>(&self, atomic: &'a mir_types::Atomic) -> Option<&'a str> {
+        match atomic {
+            mir_types::Atomic::TClassString(Some(name))
+                if !self.template_param_names.contains(name) =>
+            {
+                Some(name.as_ref())
+            }
+            _ => None,
+        }
+    }
+
     /// Get the type of a variable. Returns `mixed` if not found.
     pub fn get_var(&self, name: &str) -> Type {
         self.get_var_sym(Name::from(name.trim_start_matches('$')))

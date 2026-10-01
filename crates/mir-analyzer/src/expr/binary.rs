@@ -89,8 +89,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // checked only this way is falsely flagged unused with no
                 // go-to-definition from the check site.
                 for atomic in &right_ty.types {
-                    if let Atomic::TClassString(Some(fqcn)) = atomic {
-                        let fqcn: Arc<str> = Arc::from(fqcn.as_ref());
+                    if let Some(fqcn) = ctx.class_string_target(atomic) {
+                        let fqcn: Arc<str> = Arc::from(fqcn);
                         self.record_class_ref(&fqcn, b.right.span);
                         self.record_symbol(
                             b.right.span,

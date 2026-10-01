@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `class-string<T>` over an in-scope `@template` is no longer looked up as a class in `$c::method()`, `$c::CONST`, `$c::$prop`, `new $c` and `instanceof $c` (spurious `UndefinedClass`/`UndefinedConstant`).
+- A method override with no docblock of its own inherits the parent's generic `@return` when it returns the same class natively, and a bare native `Closure`/`callable` param inherits the parent's `Closure(T): U` signature, so `->map($fn)` on a subclass keeps its inferred type instead of `Result<mixed, …>`.
 - `$row !== []` and `count($row) > 0` drop the closed `array{}` arm from a union of shapes, so a key read after `if ($row === []) { return; }` is no longer reported as `NonExistentArrayOffset`.
 - A user stub that declares a class also present in the project or vendor no longer hides the real class's other members; stub members win and the rest are inherited from the real class, as in Psalm.
 - Psalm plugin bridge no longer degrades literal argument types to `mixed` for plugins calling `Type::parseString`, and no longer reuses a cached provider result across different calling classes.
