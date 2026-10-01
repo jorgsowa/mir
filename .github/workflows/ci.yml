@@ -83,7 +83,12 @@ jobs:
 
       - name: Test
         shell: bash
-        run: cargo nextest run --workspace --profile ci
+        run: cargo nextest run --workspace --profile ci -E 'not binary(fixtures)'
+
+      # One process so the pooled stub-indexed sessions are reused across fixtures.
+      - name: Fixture tests
+        shell: bash
+        run: cargo test -p mir-analyzer --test fixtures -- --test-threads=4
 
       - name: Doctests
         if: runner.os == 'Linux'
