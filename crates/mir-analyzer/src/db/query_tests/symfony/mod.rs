@@ -25,7 +25,8 @@ mod workspace_global_vars;
 mod workspace_symbol_index;
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::ops::Deref;
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::composer::Psr4Map;
 use crate::db::{Fqcn, MirDatabase};
@@ -83,7 +84,28 @@ fn chunked<T>(items: &[T], size: usize) -> impl Iterator<Item = &[T]> {
     items.chunks(size)
 }
 
-pub fn load_full_symfony_fixture() -> Option<FullSymfonyFixture> {
+/// Holds the process-wide fixture; tests take turns since the session is not `Sync`.
+pub struct FixtureGuard(MutexGuard<'static, Option<FullSymfonyFixture>>);
+
+impl Deref for FixtureGuard {
+    type Target = FullSymfonyFixture;
+
+    fn deref(&self) -> &FullSymfonyFixture {
+        self.0.as_ref().expect("guard exists only when loaded")
+    }
+}
+
+/// Built once per test process and shared by every test.
+pub fn load_full_symfony_fixture() -> Option<FixtureGuard> {
+    static FIXTURE: OnceLock<Mutex<Option<FullSymfonyFixture>>> = OnceLock::new();
+    let guard = FIXTURE
+        .get_or_init(|| Mutex::new(build_full_symfony_fixture()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    guard.is_some().then(|| FixtureGuard(guard))
+}
+
+fn build_full_symfony_fixture() -> Option<FullSymfonyFixture> {
     let root = fixture_root()?;
     let psr4 = Psr4Map::from_composer(&root)
         .expect("full Symfony fixture must have a valid composer.json");

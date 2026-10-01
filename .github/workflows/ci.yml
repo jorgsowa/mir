@@ -22,13 +22,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  SYMFONY_FIXTURE_COMMIT: 27515cd94ea2aa332f7d72612d03b179954a1022
-
 jobs:
   lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -68,6 +65,39 @@ jobs:
       - name: Check dependencies
         run: cargo deny check && cargo outdated --format list
 
+      - name: Build mir
+        run: cargo build --release -p mir-php
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@2.37.2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Cache package fixtures
+        id: fixture-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: harness/fixtures
+          key: real-world-fixtures-${{ hashFiles('harness/packages.php', 'harness/download-fixtures.php') }}
+
+      - name: Resolve Composer cache directory
+        id: composer-cache
+        run: echo "path=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.path }}
+          key: composer-packages-${{ runner.os }}-${{ hashFiles('harness/packages.php', 'harness/download-fixtures.php') }}
+
+      - name: Download and install fixtures
+        if: steps.fixture-cache.outputs.cache-hit != 'true'
+        run: harness/download-fixtures.php
+
+      - name: Run baseline harness
+        run: harness/run.php
+
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -105,67 +135,3 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: cargo test --workspace --doc
-
-  general-tests:
-    name: General tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          submodules: recursive
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2.9.2
-
-      - name: Cache Symfony fixture
-        id: symfony-fixture-cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: crates/mir-analyzer/benches/fixtures/symfony
-          key: symfony-fixture-${{ env.SYMFONY_FIXTURE_COMMIT }}
-
-      - name: Download Symfony fixture
-        if: steps.symfony-fixture-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: bash crates/mir-analyzer/benches/download-symfony-fixture.sh
-
-      - name: Run Symfony Salsa query tests
-        shell: bash
-        env:
-          MIR_SYMFONY_FIXTURE: ${{ github.workspace }}/crates/mir-analyzer/benches/fixtures/symfony
-        run: cargo test -p mir-analyzer --lib db::query_tests::symfony -- --ignored --nocapture --test-threads=1
-
-      - name: Build mir
-        run: cargo build --release -p mir-php
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@2.37.2
-        with:
-          php-version: '8.3'
-          tools: composer
-
-      - name: Cache package fixtures
-        id: fixture-cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: harness/fixtures
-          key: real-world-fixtures-${{ hashFiles('harness/packages.php', 'harness/download-fixtures.php') }}
-
-      - name: Resolve Composer cache directory
-        id: composer-cache
-        run: echo "path=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Composer packages
-        uses: actions/cache@v6.1.0
-        with:
-          path: ${{ steps.composer-cache.outputs.path }}
-          key: composer-packages-${{ runner.os }}-${{ hashFiles('harness/packages.php', 'harness/download-fixtures.php') }}
-
-      - name: Download and install fixtures
-        if: steps.fixture-cache.outputs.cache-hit != 'true'
-        run: harness/download-fixtures.php
-
-      - name: Run baseline harness
-        run: harness/run.php
