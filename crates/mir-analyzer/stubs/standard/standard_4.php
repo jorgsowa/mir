@@ -379,7 +379,7 @@ function highlight_string(string $string, bool $return = false) {}
  * @link https://secure.php.net/manual/en/function.hrtime.php
  * @param bool $as_number <p>Whether the high resolution time should be returned as array or number.<p>
  * @since 7.3
- * @return ($as_number is true ? int|float : array{0: int, 1: int}|false)
+ * @return ($as_number is true ? int : array{0: int, 1: int}|false)
  * @pure
  */
 function hrtime(bool $as_number = false): array|int|float|false {}
