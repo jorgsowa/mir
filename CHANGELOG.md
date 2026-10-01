@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Go-to-definition and find-references now resolve on the declaration name of global constants, class/interface/trait/enum constants and properties.
 - `@method` and `@property` members now carry their own tag location, so go-to-definition lands on the tag instead of the class; signature-mismatch diagnostics on `@method` members point at the tag too.
 - `array + array` over keyed shapes (`['a' => 1] + self::DEFAULTS`, `$o += self::DEFAULTS`) now merges the right-only keys instead of keeping just the left shape, so reads of constant-provided keys no longer report `NonExistentArrayOffset`.
+- `parent::method()` (and `Missing::method()`) against an undeclared class now records a navigation symbol on the literal class, so `name_at` and find-references resolve it instead of returning nothing.
 
 ## [0.82.0] - 2026-10-01
 

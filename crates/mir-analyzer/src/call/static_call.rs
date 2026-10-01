@@ -1289,6 +1289,14 @@ impl CallAnalyzer {
                 )),
                 call.method.span,
             );
+            ea.record_symbol(
+                call.method.span,
+                ReferenceKind::StaticCall {
+                    class: Arc::from(fqcn.as_str()),
+                    method: Arc::from(method_name),
+                },
+                Type::mixed(),
+            );
             if is_trait {
                 // The call may be satisfied by whichever class ends up consuming
                 // this trait — record a per-trait marker so DeadCodeAnalyzer can
@@ -1333,6 +1341,14 @@ impl CallAnalyzer {
                 )),
                 call.method.span,
             );
+            ea.record_symbol(
+                call.method.span,
+                ReferenceKind::StaticCall {
+                    class: Arc::from(fqcn.as_str()),
+                    method: Arc::from(method_name),
+                },
+                Type::mixed(),
+            );
             ea.emit(
                 IssueKind::UndefinedClass { name: fqcn },
                 Severity::Error,
@@ -1355,6 +1371,16 @@ impl CallAnalyzer {
                 )
             };
             ea.record_ref(Arc::from(key), call.method.span);
+            if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                ea.record_symbol(
+                    call.method.span,
+                    ReferenceKind::StaticCall {
+                        class: Arc::from(fqcn.as_str()),
+                        method: Arc::from(method_name),
+                    },
+                    Type::mixed(),
+                );
+            }
             Type::mixed()
         }
     }
