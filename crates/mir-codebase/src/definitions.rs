@@ -921,6 +921,16 @@ impl FunctionDef {
 // StubSlice — serializable bundle of definitions from one extension's stubs
 // ---------------------------------------------------------------------------
 
+/// A `namespace` declaration's byte range with the names it resolves against.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamespaceBlock {
+    pub start: u32,
+    pub end: u32,
+    pub namespace: Option<Arc<str>>,
+    pub imports: Arc<FxHashMap<Name, Name>>,
+    pub class_imports: Arc<FxHashMap<Name, Name>>,
+}
+
 /// A snapshot of all PHP definitions contributed by a single stub file set.
 ///
 /// Produced by `mir-stubs-gen` at code-generation time and deserialized at
@@ -976,6 +986,10 @@ pub struct StubSlice {
     )]
     #[serde(default = "default_imports")]
     pub class_imports: Arc<FxHashMap<Name, Name>>,
+    /// Per-block namespace and imports; populated only when the file declares
+    /// two or more `namespace` blocks, otherwise empty.
+    #[serde(skip)]
+    pub namespace_blocks: Arc<[NamespaceBlock]>,
     /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
     /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.
     #[serde(skip)]

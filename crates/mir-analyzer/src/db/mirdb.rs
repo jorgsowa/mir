@@ -386,6 +386,12 @@ impl Default for MirDbStorage {
 #[salsa::db]
 impl salsa::Database for MirDbStorage {}
 
+impl MirDbStorage {
+    fn active_ns_block(&self, file: &str) -> Option<mir_codebase::NamespaceBlock> {
+        crate::db::ns_scope::active_block(file, || self.file_namespace_blocks(file))
+    }
+}
+
 #[salsa::db]
 impl MirDatabase for MirDbStorage {
     fn php_version_str(&self) -> Arc<str> {
@@ -405,6 +411,9 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
+        if let Some(block) = self.active_ns_block(file) {
+            return block.namespace;
+        }
         let sf = self.lookup_source_file(file)?;
         crate::db::collect_file_definitions(self, sf)
             .slice
@@ -412,7 +421,21 @@ impl MirDatabase for MirDbStorage {
             .clone()
     }
 
+    fn file_namespace_blocks(&self, file: &str) -> Arc<[mir_codebase::NamespaceBlock]> {
+        let Some(sf) = self.lookup_source_file(file) else {
+            return Arc::default();
+        };
+        Arc::clone(
+            &crate::db::collect_file_definitions(self, sf)
+                .slice
+                .namespace_blocks,
+        )
+    }
+
     fn file_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
+        if let Some(block) = self.active_ns_block(file) {
+            return block.imports;
+        }
         let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
@@ -421,6 +444,9 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_class_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
+        if let Some(block) = self.active_ns_block(file) {
+            return block.class_imports;
+        }
         let mut cache = self.name_resolution_cache.0.lock();
         cache.reset_if_stale(salsa::plumbing::current_revision(self));
         if let Some((cached_file, imports)) = cache.class_imports.as_ref() {

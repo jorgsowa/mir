@@ -56,19 +56,20 @@ impl Eq for FunctionInferenceResult {}
 fn find_function_decl<'a>(
     program: &'a php_ast::owned::Program,
     db: &dyn MirDatabase,
-    file: &str,
+    file: &Arc<str>,
     target_fqn: &str,
-) -> Option<&'a php_ast::owned::FunctionDecl> {
+) -> Option<(&'a php_ast::owned::FunctionDecl, u32)> {
     use php_ast::owned::StmtKind;
-    let mut found: Option<&'a php_ast::owned::FunctionDecl> = None;
+    let mut found: Option<(&'a php_ast::owned::FunctionDecl, u32)> = None;
     crate::body_analysis::for_each_file_scope_decl(&program.stmts, &mut |stmt| {
         if found.is_some() {
             return;
         }
         if let StmtKind::Function(decl) = &stmt.kind {
             let name = decl.name.as_deref().unwrap_or("");
+            let _scope = crate::db::ns_scope::enter(db, file, stmt.span.start);
             if !name.is_empty() && crate::db::resolve_name(db, file, name) == target_fqn {
-                found = Some(decl);
+                found = Some((decl, stmt.span.start));
             }
         }
     });
@@ -97,7 +98,8 @@ pub fn infer_function(
         return None;
     }
 
-    let decl = find_function_decl(&parsed.program, db, prepared.path.as_ref(), fn_fqn.as_ref())?;
+    let (decl, start) = find_function_decl(&parsed.program, db, prepared.path, fn_fqn.as_ref())?;
+    let _scope = crate::db::ns_scope::enter(db, prepared.path, start);
 
     let driver = crate::body_analysis::BodyAnalyzer::new(db, prepared.php_version);
     let result = driver.analyze_fn_decl_pure(

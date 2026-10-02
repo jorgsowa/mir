@@ -70,7 +70,6 @@ impl<'a> BodyAnalyzer<'a> {
         {
             return;
         }
-        use php_ast::owned::StmtKind;
 
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
@@ -98,32 +97,15 @@ impl<'a> BodyAnalyzer<'a> {
         // (`namespace Shop { $o = new Order(1); }`); walk them like top-level
         // code. Declarations stay skipped at every level — they're analyzed
         // by their own scopes.
-        //
-        // Only when the file's namespaces are uniform, though: name
-        // resolution is file-scoped (`resolve_name` reads the file's first
-        // namespace), so exec code inside a second, *different* namespace
-        // block would resolve against the wrong prefix and emit bogus
-        // diagnostics, so multi-namespace files skip braced namespace bodies.
-        let mut ns_names: Vec<Option<String>> = Vec::new();
-        for stmt in program.stmts.iter() {
-            if let StmtKind::Namespace(ns) = &stmt.kind {
-                ns_names.push(ns.name.as_ref().map(crate::parser::name_to_string_owned));
-            }
-        }
-        let uniform_namespace = {
-            let mut distinct = ns_names.clone();
-            distinct.sort();
-            distinct.dedup();
-            distinct.len() <= 1
-        };
         fn exec_stmts(
             sa: &mut crate::stmt::StatementsAnalyzer<'_>,
             ctx: &mut crate::flow_state::FlowState,
             stmts: &[php_ast::owned::Stmt],
-            recurse_namespaces: bool,
+            file: &Arc<str>,
         ) {
             use php_ast::owned::StmtKind;
             for stmt in stmts.iter() {
+                let _scope = crate::db::ns_scope::enter(sa.db, file, stmt.span.start);
                 match &stmt.kind {
                     StmtKind::Function(_)
                     | StmtKind::Class(_)
@@ -132,10 +114,8 @@ impl<'a> BodyAnalyzer<'a> {
                     | StmtKind::Trait(_)
                     | StmtKind::Use(_) => {}
                     StmtKind::Namespace(ns) => {
-                        if recurse_namespaces {
-                            if let php_ast::owned::NamespaceBody::Braced(body) = &ns.body {
-                                exec_stmts(sa, ctx, &body.stmts, recurse_namespaces);
-                            }
+                        if let php_ast::owned::NamespaceBody::Braced(body) = &ns.body {
+                            exec_stmts(sa, ctx, &body.stmts, file);
                         }
                     }
                     // Process Declare so that `declare(strict_types=1)` updates
@@ -146,7 +126,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
         }
-        exec_stmts(&mut sa, &mut ctx, &program.stmts, uniform_namespace);
+        exec_stmts(&mut sa, &mut ctx, &program.stmts, file);
         drop(sa);
         if self.mode == AnalysisMode::Full {
             crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
@@ -210,6 +190,7 @@ impl<'a> BodyAnalyzer<'a> {
             sa.collect_navigation_facts = self.collect_navigation_facts;
             sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
             for stmt in program.stmts.iter() {
+                let _scope = crate::db::ns_scope::enter(self.db, &file, stmt.span.start);
                 match &stmt.kind {
                     StmtKind::Function(_)
                     | StmtKind::Class(_)
@@ -244,6 +225,7 @@ impl<'a> BodyAnalyzer<'a> {
         let mut guards: rustc_hash::FxHashSet<std::sync::Arc<str>> =
             rustc_hash::FxHashSet::default();
         for stmt in stmts.iter() {
+            let _scope = crate::db::ns_scope::enter(self.db, file, stmt.span.start);
             match &stmt.kind {
                 StmtKind::Function(decl) => {
                     self.analyze_fn_decl(
@@ -348,6 +330,7 @@ impl<'a> BodyAnalyzer<'a> {
         let mut guards: rustc_hash::FxHashSet<std::sync::Arc<str>> =
             rustc_hash::FxHashSet::default();
         for stmt in stmts.iter() {
+            let _scope = crate::db::ns_scope::enter(self.db, file, stmt.span.start);
             match &stmt.kind {
                 StmtKind::Function(decl) => {
                     self.analyze_fn_decl_typed(

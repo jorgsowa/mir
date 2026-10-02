@@ -1,5 +1,5 @@
 ===description===
-Call namespaced function from empty namespace
+Calling a namespaced function from the global namespace block without importing it is undefined
 ===file===
 <?php
 namespace A {
@@ -10,5 +10,6 @@ namespace A {
 }
 namespace {
     foo();
+//  ^^^^^ UndefinedFunction: Function foo() is not defined
 }
 ===expect===

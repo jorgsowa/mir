@@ -32,6 +32,9 @@ pub trait MirDatabase: salsa::Database {
     /// Return this file's first declared namespace, if any.
     fn file_namespace(&self, file: &str) -> Option<Arc<str>>;
 
+    /// Per-`namespace`-block data; empty unless the file declares several.
+    fn file_namespace_blocks(&self, file: &str) -> Arc<[mir_codebase::NamespaceBlock]>;
+
     /// Return this file's `use` alias map.
     ///
     /// Cheap to call: returns a cloned `Arc` of the underlying map stored
@@ -289,6 +292,7 @@ mod find_queries;
 mod inferred_types;
 mod mirdb;
 mod nodes;
+pub(crate) mod ns_scope;
 mod path_interner;
 mod per_function;
 mod queries;

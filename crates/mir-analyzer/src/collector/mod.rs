@@ -684,6 +684,23 @@ pub(super) fn const_type_with_literal_narrowing(
 // DefinitionCollector
 // ---------------------------------------------------------------------------
 
+struct NsBlockBuilder {
+    start: u32,
+    namespace: Option<Arc<str>>,
+    imports: FxHashMap<String, String>,
+    class_imports: FxHashMap<String, String>,
+}
+
+fn intern_imports(
+    raw: FxHashMap<String, String>,
+) -> Arc<FxHashMap<mir_types::Name, mir_types::Name>> {
+    Arc::new(
+        raw.into_iter()
+            .map(|(alias, fqcn)| (mir_types::Name::new(&alias), mir_types::Name::new(&fqcn)))
+            .collect(),
+    )
+}
+
 pub struct DefinitionCollector<'a> {
     slice: StubSlice,
     file: Arc<str>,
@@ -712,6 +729,8 @@ pub struct DefinitionCollector<'a> {
     /// Feeds `slice.class_imports`, consulted by class-name resolution so a
     /// function/constant import can't shadow a same-named class reference.
     accumulated_class_imports: FxHashMap<String, String>,
+    /// One entry per `namespace` declaration, in source order.
+    ns_blocks: Vec<NsBlockBuilder>,
     /// Static-property write targets found in this file, from
     /// `literal_types::scan_static_property_writes(program)` — the soundness
     /// gate for initializer-based property type refinement: a
@@ -742,6 +761,7 @@ impl<'a> DefinitionCollector<'a> {
             first_namespace: None,
             accumulated_imports: FxHashMap::default(),
             accumulated_class_imports: FxHashMap::default(),
+            ns_blocks: Vec::new(),
             static_writes: literal_types::StaticWrites::default(),
         }
     }
@@ -812,6 +832,26 @@ impl<'a> DefinitionCollector<'a> {
     /// `file_namespace()` and `file_imports()` can derive them via
     /// `collect_file_definitions`. Called at the end of `collect_slice`.
     fn finalize_slice(&mut self) {
+        if self.ns_blocks.len() >= 2 {
+            let builders = std::mem::take(&mut self.ns_blocks);
+            let ends: Vec<u32> = builders
+                .iter()
+                .skip(1)
+                .map(|b| b.start)
+                .chain([u32::MAX])
+                .collect();
+            self.slice.namespace_blocks = builders
+                .into_iter()
+                .zip(ends)
+                .map(|(b, end)| mir_codebase::NamespaceBlock {
+                    start: b.start,
+                    end,
+                    namespace: b.namespace,
+                    imports: intern_imports(b.imports),
+                    class_imports: intern_imports(b.class_imports),
+                })
+                .collect();
+        }
         if let Some(ns) = self.first_namespace.take() {
             self.slice.namespace = Some(Arc::from(ns.as_str()));
         }
@@ -1791,6 +1831,12 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                 if self.first_namespace.is_none() {
                     self.first_namespace = new_ns.clone();
                 }
+                self.ns_blocks.push(NsBlockBuilder {
+                    start: stmt.span.start,
+                    namespace: new_ns.as_deref().map(Arc::from),
+                    imports: FxHashMap::default(),
+                    class_imports: FxHashMap::default(),
+                });
                 self.namespace = new_ns;
                 match &ns.body {
                     php_ast::owned::NamespaceBody::Braced(stmts) => {
@@ -1803,6 +1849,9 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                     }
                     php_ast::owned::NamespaceBody::Simple => {
                         // Simple namespace — affects all subsequent declarations
+                        if self.ns_blocks.len() > 1 {
+                            self.use_aliases.clear();
+                        }
                     }
                 }
             }
@@ -1829,7 +1878,16 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                     // name would incorrectly resolve to the function/constant's FQN.
                     self.accumulated_imports
                         .insert(alias.to_string(), full_name.clone());
-                    if item.kind.unwrap_or(use_decl.kind) == UseKind::Normal {
+                    let is_class_import = item.kind.unwrap_or(use_decl.kind) == UseKind::Normal;
+                    if let Some(block) = self.ns_blocks.last_mut() {
+                        block.imports.insert(alias.to_string(), full_name.clone());
+                        if is_class_import {
+                            block
+                                .class_imports
+                                .insert(alias.to_string(), full_name.clone());
+                        }
+                    }
+                    if is_class_import {
                         self.use_aliases
                             .insert(alias.to_string(), full_name.clone());
                         self.accumulated_class_imports

@@ -213,6 +213,7 @@ pub fn infer_scope(
                 if found {
                     return;
                 }
+                let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
                 let (is_fn, name) = match &stmt.kind {
                     StmtKind::Function(decl) => (true, decl.name.as_deref().unwrap_or("")),
                     StmtKind::Class(decl) => (
@@ -351,6 +352,7 @@ fn check_use_decls(
 ) {
     use php_ast::owned::StmtKind;
     for stmt in stmts.iter() {
+        let _scope = crate::db::ns_scope::enter(db, file, stmt.span.start);
         match &stmt.kind {
             StmtKind::Use(use_decl) => {
                 crate::body_analysis::check_use_decl_casing(
