@@ -132,3 +132,36 @@ fn code_after_a_closed_docblock_still_resolves() {
     let src = "<?php\nfunction helper(): void {}\n/** @return void */\nfunction a(): void {}\nfunction caller(): void { help‸er(); }\n";
     assert_eq!(name_at(src), Some(Name::function("helper")));
 }
+
+#[test]
+fn use_import_of_missing_class() {
+    let src = "<?php\nuse App\\Services\\Fo‸o;\n";
+    assert_eq!(name_at(src), Some(Name::class("App\\Services\\Foo")));
+}
+
+#[test]
+fn use_import_of_missing_class_with_alias() {
+    let src = "<?php\nuse App\\Services\\Fo‸o as Bar;\n";
+    assert_eq!(name_at(src), Some(Name::class("App\\Services\\Foo")));
+}
+
+#[test]
+fn use_function_import_of_missing_function() {
+    let src = "<?php\nuse function App\\Helpers\\he‸lp;\n";
+    assert_eq!(name_at(src), Some(Name::function("App\\Helpers\\help")));
+}
+
+#[test]
+fn use_const_import_of_missing_constant() {
+    let src = "<?php\nuse const App\\Config\\VER‸SION;\n";
+    assert_eq!(
+        name_at(src),
+        Some(Name::global_constant("App\\Config\\VERSION"))
+    );
+}
+
+#[test]
+fn use_import_of_missing_class_inside_braced_namespace() {
+    let src = "<?php\nnamespace A {\n    use App\\Services\\Fo‸o;\n}\n";
+    assert_eq!(name_at(src), Some(Name::class("App\\Services\\Foo")));
+}

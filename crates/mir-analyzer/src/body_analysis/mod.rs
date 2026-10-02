@@ -1520,7 +1520,9 @@ pub(crate) fn check_use_decl_casing(
                     // so an index-based rename still finds/updates the import
                     // line — the same written name a rename query resolves
                     // through this file's imports.
-                    record_use_posting(db, crate::Name::class(full_name.as_str()));
+                    let name = crate::Name::class(full_name.as_str());
+                    record_use_posting(db, name.clone());
+                    push_unresolved_import_fact(navigation_facts.as_deref_mut(), item.span, name);
                 }
             }
             UseKind::Function => {
@@ -1579,7 +1581,9 @@ pub(crate) fn check_use_decl_casing(
                     }
                 } else {
                     // See the UseKind::Normal miss arm.
-                    record_use_posting(db, crate::Name::function(full_name.as_str()));
+                    let name = crate::Name::function(full_name.as_str());
+                    record_use_posting(db, name.clone());
+                    push_unresolved_import_fact(navigation_facts.as_deref_mut(), item.span, name);
                 }
             }
             UseKind::Const => {
@@ -1620,10 +1624,28 @@ pub(crate) fn check_use_decl_casing(
                     }
                 } else {
                     // See the UseKind::Normal miss arm.
-                    record_use_posting(db, crate::Name::global_constant(full_name.as_str()));
+                    let name = crate::Name::global_constant(full_name.as_str());
+                    record_use_posting(db, name.clone());
+                    push_unresolved_import_fact(navigation_facts.as_deref_mut(), item.span, name);
                 }
             }
         }
+    }
+}
+
+/// Lets `name_at` identify an import whose target isn't indexed, so
+/// references/rename still work from the `use` line.
+fn push_unresolved_import_fact(
+    facts: Option<&mut Vec<NavigationFact>>,
+    span: php_ast::Span,
+    name: crate::Name,
+) {
+    if let Some(facts) = facts {
+        facts.push(NavigationFact {
+            span,
+            expr_span: None,
+            name,
+        });
     }
 }
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `AnalysisSession::name_at` resolves a `use` import whose class, function or constant is not indexed.
+
 ## [0.84.0] - 2026-10-02
 
 ### Added
