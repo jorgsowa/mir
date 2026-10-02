@@ -675,12 +675,67 @@ fn resolve_atomic_for_file(
                 allow_builtin_shortcut,
             )),
         },
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => Atomic::TCallable {
+            params: params.map(|ps| resolve_fn_params(ps, db, file, allow_builtin_shortcut)),
+            return_type: return_type.map(|rt| {
+                Box::new(resolve_union_for_file_inner(
+                    *rt,
+                    db,
+                    file,
+                    allow_builtin_shortcut,
+                ))
+            }),
+        },
+        Atomic::TClosure { data } => {
+            let data = *data;
+            Atomic::TClosure {
+                data: Box::new(mir_types::atomic::ClosureData {
+                    params: resolve_fn_params(data.params, db, file, allow_builtin_shortcut),
+                    return_type: resolve_union_for_file_inner(
+                        data.return_type,
+                        db,
+                        file,
+                        allow_builtin_shortcut,
+                    ),
+                    this_type: data
+                        .this_type
+                        .map(|t| resolve_union_for_file_inner(t, db, file, allow_builtin_shortcut)),
+                }),
+            }
+        }
         Atomic::TSelf { fqcn } if fqcn.is_empty() => {
             // Sentinel from docblock parser — leave as-is; caller handles it
             Atomic::TSelf { fqcn }
         }
         other => other,
     }
+}
+
+fn resolve_fn_params(
+    params: Box<[mir_types::atomic::FnParam]>,
+    db: &dyn MirDatabase,
+    file: &str,
+    allow_builtin_shortcut: bool,
+) -> Box<[mir_types::atomic::FnParam]> {
+    let resolve = |t: &mir_types::compact::SimpleType| {
+        mir_types::compact::SimpleType::from_union(resolve_union_for_file_inner(
+            t.to_union(),
+            db,
+            file,
+            allow_builtin_shortcut,
+        ))
+    };
+    params
+        .iter()
+        .map(|p| mir_types::atomic::FnParam {
+            ty: p.ty.as_ref().map(resolve),
+            out_ty: p.out_ty.as_ref().map(resolve),
+            ..p.clone()
+        })
+        .collect()
 }
 
 /// Returns true when a scalar (non-object) atom in an array's value type is structurally
