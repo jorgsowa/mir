@@ -1,6 +1,7 @@
 //! `count()`/`sizeof()`/`iterator_count()` and `array_key_first()`/
 //! `array_key_last()` narrowing, for variable, property, and
 //! static-property receivers.
+use mir_types::{Atomic, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::ExprKind;
 
@@ -196,6 +197,58 @@ pub(crate) fn narrow_static_prop_array_key_first_or_last_null(
     }
 }
 
+/// Drops closed keyed-shape atoms whose possible lengths (required..=all keys)
+/// can't satisfy `count() op n` being `is_true`. Unchanged when no atom would
+/// survive (provably dead branch).
+fn drop_unsatisfiable_shapes(ty: Type, op: BinaryOp, n: i64, is_true: bool) -> Type {
+    let satisfiable = |atom: &Atomic| {
+        let Atomic::TKeyedArray {
+            properties,
+            is_open: false,
+            ..
+        } = atom
+        else {
+            return true;
+        };
+        let hi = properties.len() as i64;
+        let lo = properties.values().filter(|p| !p.optional).count() as i64;
+        let op = if is_true { op } else { negate_comparison(op) };
+        match op {
+            BinaryOp::Identical | BinaryOp::Equal => lo <= n && n <= hi,
+            BinaryOp::NotIdentical | BinaryOp::NotEqual => !(lo == hi && lo == n),
+            BinaryOp::Less => lo < n,
+            BinaryOp::LessOrEqual => lo <= n,
+            BinaryOp::Greater => hi > n,
+            BinaryOp::GreaterOrEqual => hi >= n,
+            _ => true,
+        }
+    };
+    if ty.types.iter().all(satisfiable) {
+        return ty;
+    }
+    let mut kept = ty.clone();
+    kept.types.retain(|a| satisfiable(a));
+    if kept.is_empty() {
+        ty
+    } else {
+        kept
+    }
+}
+
+fn negate_comparison(op: BinaryOp) -> BinaryOp {
+    match op {
+        BinaryOp::Identical => BinaryOp::NotIdentical,
+        BinaryOp::NotIdentical => BinaryOp::Identical,
+        BinaryOp::Equal => BinaryOp::NotEqual,
+        BinaryOp::NotEqual => BinaryOp::Equal,
+        BinaryOp::Less => BinaryOp::GreaterOrEqual,
+        BinaryOp::GreaterOrEqual => BinaryOp::Less,
+        BinaryOp::LessOrEqual => BinaryOp::Greater,
+        BinaryOp::Greater => BinaryOp::LessOrEqual,
+        other => other,
+    }
+}
+
 /// Narrow an array variable based on `count($arr) op n` being `is_true`.
 /// Promotes `array` / `list` to their non-empty variants when the comparison
 /// proves the count is >= 1, or drops the non-empty variants when it proves
@@ -215,7 +268,7 @@ pub(crate) fn narrow_array_count_comparison(
     // argument, so reaching ANY comparison result already proves the array
     // wasn't null — independent of whether this specific comparison also
     // proves emptiness.
-    let non_null = current.remove_null();
+    let non_null = drop_unsatisfiable_shapes(current.remove_null(), op, n, is_true);
     let narrowed = match count_or_strlen_emptiness(op, n, is_true) {
         Some(true) => non_null.narrow_to_non_empty_collection(),
         Some(false) => non_null.narrow_to_empty_collection(),
@@ -251,7 +304,7 @@ pub(crate) fn narrow_prop_array_count_comparison(
         return;
     }
     // The property's own value can't be null either, for the same reason.
-    let non_null = current.remove_null();
+    let non_null = drop_unsatisfiable_shapes(current.remove_null(), op, n, is_true);
     let narrowed = match count_or_strlen_emptiness(op, n, is_true) {
         Some(true) => non_null.narrow_to_non_empty_collection(),
         Some(false) => non_null.narrow_to_empty_collection(),
@@ -279,7 +332,7 @@ pub(crate) fn narrow_static_prop_array_count_comparison(
     // count()/sizeof()/iterator_count() throw a TypeError for a null
     // argument, so reaching ANY comparison result already proves the
     // property wasn't null.
-    let non_null = current.remove_null();
+    let non_null = drop_unsatisfiable_shapes(current.remove_null(), op, n, is_true);
     let narrowed = match count_or_strlen_emptiness(op, n, is_true) {
         Some(true) => non_null.narrow_to_non_empty_collection(),
         Some(false) => non_null.narrow_to_empty_collection(),
