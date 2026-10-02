@@ -101,6 +101,34 @@ fn is_bare_callable_hint(a: &Atomic) -> bool {
     }
 }
 
+/// Whether `fqcn::method` accepts the call's positional arg count. `None` when
+/// the method is unresolved or the call uses spread/named args.
+fn positional_arity_fits(
+    ea: &ExpressionAnalyzer<'_>,
+    call: &MethodCallExpr,
+    fqcn: &str,
+    method_name: &str,
+) -> Option<bool> {
+    if call.args.iter().any(|a| a.unpack || a.name.is_some()) {
+        return None;
+    }
+    let resolved_fqcn: Arc<str> =
+        Arc::from(crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn).as_str());
+    let method = resolve_method_from_db(
+        ea.db,
+        &resolved_fqcn,
+        &crate::util::php_ident_lowercase(method_name),
+    )?;
+    let given = call.args.len();
+    let required = method
+        .params
+        .iter()
+        .filter(|p| !p.is_optional && !p.is_variadic)
+        .count();
+    let variadic = method.params.iter().any(|p| p.is_variadic);
+    Some(given >= required && (variadic || given <= method.params.len()))
+}
+
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
 pub(crate) fn resolve_method_from_db(
     db: &dyn crate::db::MirDatabase,
@@ -538,12 +566,32 @@ impl CallAnalyzer {
         let mut self_out_union = Type::empty();
         let mut self_out_used = false;
 
-        for atomic in &receiver.types {
+        // Per-atom "method accepts this positional arg count" (None: unresolved
+        // or not applicable). An atom that rejects the count is trusted to be
+        // a sibling-only mismatch when another atom accepts it.
+        let arity_fits: Vec<Option<bool>> = if receiver.types.len() > 1 {
+            receiver
+                .types
+                .iter()
+                .map(|atomic| {
+                    let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic else {
+                        return None;
+                    };
+                    positional_arity_fits(ea, call, fqcn, method_name)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        for (atom_idx, atomic) in receiver.types.iter().enumerate() {
             match atomic {
                 mir_types::Atomic::TNamedObject {
                     fqcn,
                     type_params: receiver_type_params,
                 } => {
+                    let sibling_accepts_arity = arity_fits.get(atom_idx) == Some(&Some(false))
+                        && arity_fits.contains(&Some(true));
                     let fqcn_resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     let mut this_self_out = None;
@@ -561,7 +609,7 @@ impl CallAnalyzer {
                         &mut declaring,
                         &mut this_self_out,
                         None,
-                        union_has_call_magic,
+                        union_has_call_magic || sibling_accepts_arity,
                     ));
                     match this_self_out {
                         Some(ty) => {
