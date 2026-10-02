@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use mir_types::{ArrayKey, Atomic, Name, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Expr, ExprKind};
@@ -340,18 +341,28 @@ pub fn definite_key_state(current: &Type, key: &ArrayKey) -> Option<DefiniteKeyS
 /// per-write clones) small, and bounds how large a printed shape can get.
 const MAX_SHAPE_KEYS: usize = 8;
 
+/// A bare `array`: native hints carry a `mixed` key, docblocks an `array-key` one.
+fn is_untyped_array(a: &Atomic) -> bool {
+    matches!(a, Atomic::TArray { key, value }
+        if value.is_mixed()
+            && (key.is_mixed()
+                || matches!(key.types.as_slice(), [Atomic::TInt, Atomic::TString] | [Atomic::TString, Atomic::TInt])))
+}
+
 /// Try to extend every `TKeyedArray` atom in `current` with a brand-new
 /// `key: new_value` property in place, instead of collapsing the shape to a
 /// generic array. `None` means the caller should fall back to the generic
 /// accumulator: some atom isn't a shape, already has `key`, or is already at
-/// [`MAX_SHAPE_KEYS`].
+/// [`MAX_SHAPE_KEYS`]. An untyped `array` base becomes an open shape holding
+/// just the written key.
 fn try_insert_new_shape_key(current: &Type, key: &ArrayKey, new_value: &Type) -> Option<Type> {
     if current.types.is_empty() {
         return None;
     }
     let all_growable = current.types.iter().all(|a| {
-        matches!(a, Atomic::TKeyedArray { properties, .. }
-            if !properties.contains_key(key) && properties.len() < MAX_SHAPE_KEYS)
+        is_untyped_array(a)
+            || matches!(a, Atomic::TKeyedArray { properties, .. }
+                if !properties.contains_key(key) && properties.len() < MAX_SHAPE_KEYS)
     });
     if !all_growable {
         return None;
@@ -360,6 +371,22 @@ fn try_insert_new_shape_key(current: &Type, key: &ArrayKey, new_value: &Type) ->
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
     for atomic in &current.types {
+        if is_untyped_array(atomic) {
+            let mut properties = IndexMap::new();
+            properties.insert(
+                key.clone(),
+                mir_types::atomic::KeyedProperty {
+                    ty: new_value.clone(),
+                    optional: false,
+                },
+            );
+            result.add_type(Atomic::TKeyedArray {
+                properties: Box::new(properties),
+                is_open: true,
+                is_list: false,
+            });
+            continue;
+        }
         let Atomic::TKeyedArray {
             properties,
             is_open,

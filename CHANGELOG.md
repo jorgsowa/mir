@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Invariant template arguments match by mutual subtyping, so `Cached<int<0, max>>` accepts `Cached<non-negative-int>`.
 - A closure with a bare native `array` return type takes its body's more precise array type, so `new Cached(fn(): array => load())` infers `Cached<array<non-empty-string, mixed>>`.
 - `array_column` reads the declared public property types of class rows, and falls back to `array<array-key, mixed>` instead of a bare `array` when the result is keyed by an unresolved index.
+- Writing a literal key to an untyped `array` refines it to an open shape, so `$data['records'] = $foos` satisfies a declared `array{records: ...}`.
 
 ## [0.84.0] - 2026-10-02
 
