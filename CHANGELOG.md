@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FunctionDef::tag_descriptions` and `MethodDef::tag_descriptions` hold the prose of `@param`, `@return` and `@throws` tags.
 - `AnalysisSession::variable_references` returns every occurrence of the local variable or parameter under a cursor.
 - `InvalidPropertyAssignment` and `InvalidArgument` report a property or parameter default (`= 0`) that the declared int range (`@var int<1,255>`) excludes.
+- `AnalysisSnapshot::declaration_name_range_cached` returns a symbol's declared-name range without taking the session.
 
 ### Fixed
 
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Assigning `$this->a->b` inside its own null guard narrows the property for later reads.
 - A `while ($n !== null)` condition is judged on the loop-entry and back-edge types together, so advancing the variable in the body no longer reports an always-true comparison.
 - `name_at` resolves class-like, function and enum-case declaration names, and type hints naming a missing class.
+- `name_at` resolves promoted constructor property declarations, the name string of `define()`, and class names, `Class::member` references and `@template` bounds inside docblock types.
 - `symbol_at` resolves variables bound by closure `use` clauses, `catch` clauses, `static` and `global` declarations.
 - Docblock `Enum::Case` types resolve the enum through `use` imports instead of the current namespace.
 - `UnusedVariable` no longer fires for the internal `this->prop` key created when an assertion call (e.g. PHPUnit `assertSame`) takes a property chain.

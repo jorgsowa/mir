@@ -949,7 +949,25 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
         );
+        let is_constructor = method
+            .name
+            .as_deref()
+            .is_some_and(|n| n.eq_ignore_ascii_case("__construct"));
         for param in method.params.iter() {
+            if self.collect_navigation_facts
+                && is_constructor
+                && (param.visibility.is_some() || param.is_readonly)
+            {
+                let name = param.name.as_deref().unwrap_or("");
+                let span = super::property_name_span(source, &param.span, name);
+                if !name.is_empty() && span.end > span.start {
+                    self.navigation_facts.borrow_mut().push(NavigationFact {
+                        span,
+                        expr_span: None,
+                        name: crate::Name::property(fqcn, name),
+                    });
+                }
+            }
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(
                     hint,

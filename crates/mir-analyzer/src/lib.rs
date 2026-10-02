@@ -15,6 +15,7 @@ pub(crate) mod contradiction;
 pub mod db;
 pub(crate) mod dead_code;
 pub(crate) mod diagnostics;
+pub(crate) mod docblock_nav;
 pub(crate) mod expr;
 pub mod file_analyzer;
 pub(crate) mod flow_state;

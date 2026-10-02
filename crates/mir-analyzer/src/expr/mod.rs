@@ -207,6 +207,32 @@ impl<'a> ExpressionAnalyzer<'a> {
         ty
     }
 
+    /// `define('NAME', …)`: the quoted name is the constant's declaration site.
+    fn record_define_name_fact(&self, fc: &php_ast::owned::FunctionCallExpr) {
+        let ExprKind::Identifier(callee) = &fc.name.kind else {
+            return;
+        };
+        if !callee.eq_ignore_ascii_case("define") {
+            return;
+        }
+        let Some(name_expr) = fc.args.first().and_then(|a| a.value.as_ref()) else {
+            return;
+        };
+        let ExprKind::String(name) = &name_expr.kind else {
+            return;
+        };
+        let span = name_expr.span;
+        // Escapes make the source longer than the value; skip those.
+        if name.is_empty() || (span.end - span.start) as usize != name.len() + 2 {
+            return;
+        }
+        self.navigation_facts.borrow_mut().push(NavigationFact {
+            span: php_ast::Span::new(span.start + 1, span.end - 1),
+            expr_span: None,
+            name: crate::Name::global_constant(name.as_ref()),
+        });
+    }
+
     /// Record a resolved symbol.
     pub fn record_symbol(&mut self, span: php_ast::Span, kind: ReferenceKind, resolved_type: Type) {
         let name = kind.to_name();
@@ -624,6 +650,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Function calls --------------------------------------------
             ExprKind::FunctionCall(fc) => {
+                if self.collect_navigation_facts {
+                    self.record_define_name_fact(fc);
+                }
                 crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span)
             }
 

@@ -781,6 +781,11 @@ fn resolve_name_at(
     byte_offset: u32,
 ) -> Option<crate::Name> {
     let sf = db.lookup_source_file(file.as_ref())?;
+    if let crate::docblock_nav::DocblockLookup::InDocblock(name) =
+        crate::docblock_nav::docblock_name_at(db, file, sf.text(db).as_ref(), byte_offset)
+    {
+        return name;
+    }
     let prepared = crate::db::prepare_analysis_file(db, sf);
     let parsed = prepared.parse_result();
     if let Some(name) = resolve_name_at_via_compact_facts(
