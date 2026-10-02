@@ -1,17 +1,17 @@
-//! Bounded-memo guard for the per-scope / per-function inference queries.
+//! Bounded-memo guard for the inference queries.
 //!
-//! `infer_scope` and `infer_function` are keyed on resolved FQNs, so every
-//! rename mints a brand-new memo key; without an eviction policy a long
-//! editing session grows the memo tables monotonically. Both queries carry
-//! `lru = 4096` — these tests prove salsa actually drops the evicted values
-//! (observed through `Weak` handles on the memoized `Arc` results) once a
-//! write opens a new revision.
+//! `infer_function` is keyed on resolved FQNs, so every rename mints a
+//! brand-new memo key; without an eviction policy a long editing session grows
+//! the memo table monotonically. It carries `lru = 4096` — these tests prove
+//! salsa actually drops the evicted values (observed through `Weak` handles on
+//! the memoized `Arc` results) once a write opens a new revision.
+//! `infer_scope` is a fixpoint query and must stay LRU-free.
 
 use std::sync::{Arc, Weak};
 
 use crate::db::{
     analyze_file, file_scopes, infer_function, infer_scope, AnalyzeOutput, FunctionInferenceResult,
-    MirDatabase, ScopeInferenceResult,
+    MirDatabase,
 };
 use crate::{AnalysisSession, PhpVersion};
 
@@ -119,34 +119,36 @@ fn analyze_file_memos_bounded_under_file_storm() {
     assert!(alive > 0, "eviction dropped everything — lru misconfigured");
 }
 
+/// An LRU on `infer_scope` (a fixpoint query) made salsa throw
+/// `PropagatedPanic` when a file's memo was revalidated after other files
+/// pushed its scopes out of the cache, failing every pass until the next write.
 #[test]
-fn infer_scope_memos_bounded_under_rename_storm() {
-    let (mut session, path) = storm_session();
+fn analyze_file_revalidates_after_its_scopes_are_evicted() {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut small = String::from("<?php\n");
+    for i in 0..20 {
+        small.push_str(&format!(
+            "function s{i}($x) {{ return s{}($x); }}\n",
+            (i + 1) % 20
+        ));
+    }
+    let small_path: Arc<str> = Arc::from("/memo_bounds/small.php");
+    let big_path: Arc<str> = Arc::from("/memo_bounds/big.php");
+    session.ingest_file(small_path.clone(), Arc::from(small));
+    session.ingest_file(big_path.clone(), Arc::from(storm_source(STORM)));
 
-    let weaks: Vec<Weak<ScopeInferenceResult>> = {
-        let db = session.snapshot_db();
-        let file = db.lookup_source_file(path.as_ref()).unwrap();
-        let scopes = file_scopes(&db, file);
-        assert!(scopes.len() > LRU_CAP, "fixture must overflow the lru cap");
-        scopes
-            .iter()
-            .map(|key| Arc::downgrade(infer_scope(&db, file, key.clone())))
-            .collect()
+    let analyze = |session: &AnalysisSession, path: &Arc<str>| {
+        session.snapshot().read(|db| {
+            let file = db.lookup_source_file(path.as_ref()).unwrap();
+            let scopes = file_scopes(db, file);
+            for key in scopes.iter() {
+                infer_scope(db, file, key.clone());
+            }
+            analyze_file(db, file).clone()
+        })
     };
-    assert_eq!(
-        alive_count(&weaks),
-        weaks.len(),
-        "memos live before eviction"
-    );
-
+    analyze(&session, &small_path).expect("small pass");
+    analyze(&session, &big_path).expect("big pass");
     session.set_file_text(Arc::from("/memo_bounds/other.php"), Arc::from("<?php\n"));
-
-    let alive = alive_count(&weaks);
-    assert!(
-        alive <= LRU_CAP,
-        "infer_scope memo table not bounded: {alive} values alive after \
-         {} distinct keys (lru = {LRU_CAP})",
-        weaks.len()
-    );
-    assert!(alive > 0, "eviction dropped everything — lru misconfigured");
+    analyze(&session, &small_path).expect("small pass after eviction");
 }

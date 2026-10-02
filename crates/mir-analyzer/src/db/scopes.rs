@@ -143,13 +143,13 @@ fn for_each_top_level_decl<'a>(
 /// emitted by `analyze_file`, not per scope) and for scope keys that don't
 /// resolve to a declaration in this file.
 ///
-/// `lru = 4096` bounds the memo table: keys embed the resolved FQN, so a
-/// rename storm would otherwise mint a permanent memo per historical name.
+/// No `lru`: salsa 0.28 throws `PropagatedPanic` when a fixpoint query's evicted
+/// memo is recomputed after revalidation (see `memo_bounds`).
 ///
 /// Cross-file inferred-type demands can re-enter a scope still on the stack
 /// (`A::f` → `B::g` → `A::h`); salsa then fixpoint-iterates from an empty
 /// result, so the memo is independent of which scope was demanded first.
-#[salsa::tracked(lru = 4096, cycle_fn = infer_scope_cycle, cycle_initial = infer_scope_initial)]
+#[salsa::tracked(cycle_fn = infer_scope_cycle, cycle_initial = infer_scope_initial)]
 pub fn infer_scope(
     db: &dyn MirDatabase,
     file: SourceFile,

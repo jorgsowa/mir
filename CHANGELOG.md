@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A workspace sweep over more than 4096 scopes no longer fails with `PropagatedPanic` on every pass after salsa evicts a fixpoint memo; `infer_scope` is no longer LRU-bounded.
 - A write at the end of a loop body that the next iteration reads is no longer reported as `UnusedVariable`.
 - `do`/`while` bodies no longer narrow the initial state by the loop condition, which caused false `ImpossibleIdenticalComparison` on the first iteration.
 - `AnalysisSession::name_at` resolves a `use` import whose class, function or constant is not indexed.
