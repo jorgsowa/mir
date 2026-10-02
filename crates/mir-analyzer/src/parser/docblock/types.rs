@@ -237,15 +237,13 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
 
     // Conditional type: `($param is TypeName ? TrueType : FalseType)`
     // Parenthesized type: `(A&B)|null` — strip outer parens and recurse.
-    if s.starts_with('(') && s.ends_with(')') {
+    // `(A)|(B)` starts and ends with parens but is a union, not one group.
+    if is_balanced_parens(s) {
         let inner = s[1..s.len() - 1].trim();
         if let Some(conditional) = parse_conditional_type(inner) {
             return conditional;
         }
-        // Strip balanced outer parens: verify depth doesn't go negative before the end.
-        if is_balanced_parens(s) {
-            return parse_type_string(inner);
-        }
+        return parse_type_string(inner);
     }
 
     // Type: `A|B|C`

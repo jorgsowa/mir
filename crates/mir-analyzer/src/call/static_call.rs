@@ -999,30 +999,39 @@ impl CallAnalyzer {
                 Some(bindings) => ret_substituted.substitute_templates(bindings),
                 None => ret_substituted,
             };
-            let ret = crate::call::resolve_conditional_return(ret, ea.db, |param_name| {
-                // `@return ($this is X ? A : B)`: `self::method()`/
-                // `static::method()`/`parent::method()` still has a real
-                // `$this` when called from inside an instance method —
-                // resolve it to the same receiver `static`/`self` already
-                // substitutes into the return type above, instead of
-                // leaving it permanently unresolved (never a declared
-                // parameter).
-                if param_name == "this" {
-                    return Some(Type::single(mir_types::Atomic::TNamedObject {
-                        fqcn: Name::new(fqcn_arc.as_ref()),
-                        type_params: own_type_params.clone().into(),
-                    }));
-                }
-                resolved
-                    .params
-                    .iter()
-                    .position(|p| p.name.as_ref() == param_name)
-                    .and_then(|idx| {
-                        crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, idx)
-                    })
-                    .and_then(|idx| arg_types.get(idx))
-                    .cloned()
-            });
+            let ret = crate::call::resolve_conditional_return(
+                ret,
+                ea.db,
+                method_bindings.as_ref(),
+                |param_name| {
+                    // `@return ($this is X ? A : B)`: `self::method()`/
+                    // `static::method()`/`parent::method()` still has a real
+                    // `$this` when called from inside an instance method —
+                    // resolve it to the same receiver `static`/`self` already
+                    // substitutes into the return type above, instead of
+                    // leaving it permanently unresolved (never a declared
+                    // parameter).
+                    if param_name == "this" {
+                        return Some(Type::single(mir_types::Atomic::TNamedObject {
+                            fqcn: Name::new(fqcn_arc.as_ref()),
+                            type_params: own_type_params.clone().into(),
+                        }));
+                    }
+                    resolved
+                        .params
+                        .iter()
+                        .position(|p| p.name.as_ref() == param_name)
+                        .and_then(|idx| {
+                            crate::call::resolve_named_arg_type_index(
+                                &resolved.params,
+                                &call.args,
+                                idx,
+                            )
+                        })
+                        .and_then(|idx| arg_types.get(idx))
+                        .cloned()
+                },
+            );
             // Write @param-out types back to caller variables for by-ref params.
             // Substitute the same bindings the return type uses (class template
             // from `@extends`/inferred-from-args, then the method's own), so a

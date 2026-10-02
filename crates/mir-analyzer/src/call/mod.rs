@@ -44,7 +44,8 @@ pub(crate) fn resolve_named_arg_type_index(
         .map(|(i, _)| i)
 }
 
-/// `@return ($this is X ? A : B)` / `@return ($param is X ? A : B)` where
+/// `@return ($this is X ? A : B)` / `@return ($param is X ? A : B)` /
+/// `@return (T is X ? A : B)` where
 /// `X` is a CLASS name: `Type::resolve_conditional_returns` alone can never
 /// resolve this, even once the discriminator's argument type is looked up
 /// correctly — it's purely structural (`mir-types` has no `db`, so no
@@ -60,36 +61,62 @@ pub(crate) fn resolve_named_arg_type_index(
 pub(crate) fn resolve_conditional_return<F>(
     ty: mir_types::Type,
     db: &dyn crate::db::MirDatabase,
+    templates: Option<&rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>>,
     lookup: F,
 ) -> mir_types::Type
 where
     F: Fn(&str) -> Option<mir_types::Type>,
 {
-    if let [mir_types::Atomic::TConditional { data }] = ty.types.as_slice() {
-        let subject_is_object = !data.subject.types.is_empty()
-            && data
-                .subject
-                .types
-                .iter()
-                .all(|a| a.named_object_fqcn().is_some());
-        if subject_is_object {
-            if let Some(param_name) = &data.param_name {
-                if let Some(arg_ty) = lookup(param_name.as_ref()) {
-                    let arg_is_object = !arg_ty.types.is_empty()
-                        && arg_ty.types.iter().all(|a| a.named_object_fqcn().is_some());
-                    if arg_is_object {
-                        let branch = if crate::subtype::is_subtype(db, &arg_ty, &data.subject) {
-                            data.if_true.clone()
-                        } else {
-                            data.if_false.clone()
-                        };
-                        return branch.resolve_conditional_returns(&lookup);
-                    }
-                }
-            }
+    let mut resolved = mir_types::Type::empty();
+    for atomic in ty.types {
+        let mir_types::Atomic::TConditional { data } = &atomic else {
+            resolved.add_type(atomic);
+            continue;
+        };
+        match resolve_class_subject_branch(data, db, templates, &lookup) {
+            Some(branch) => resolved.merge_with(&branch),
+            None => resolved
+                .merge_with(&mir_types::Type::single(atomic).resolve_conditional_returns(&lookup)),
         }
     }
-    ty.resolve_conditional_returns(lookup)
+    resolved
+}
+
+/// The chosen branch of a conditional whose subject and discriminant are both
+/// object types, resolved through `is_subtype`.
+fn resolve_class_subject_branch<F>(
+    data: &mir_types::atomic::ConditionalData,
+    db: &dyn crate::db::MirDatabase,
+    templates: Option<&rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>>,
+    lookup: &F,
+) -> Option<mir_types::Type>
+where
+    F: Fn(&str) -> Option<mir_types::Type>,
+{
+    let is_object = |ty: &mir_types::Type, allow_case: bool| {
+        !ty.types.is_empty()
+            && ty.types.iter().all(|a| {
+                a.named_object_fqcn()
+                    .is_some_and(|f| allow_case || !f.contains("::"))
+            })
+    };
+    // `Class::CASE` subjects are enum cases, which arg types do not track.
+    if !is_object(&data.subject, false) {
+        return None;
+    }
+    let param_name = data.param_name.as_ref()?;
+    // `T is X`: `T` is a template, bound rather than a parameter.
+    let arg_ty = lookup(param_name.as_ref())
+        .or_else(|| templates.and_then(|t| t.get(param_name).cloned()))?;
+    if !is_object(&arg_ty, true) {
+        return None;
+    }
+    let branch = if crate::subtype::is_subtype(db, &arg_ty, &data.subject) {
+        data.if_true.clone()
+    } else {
+        data.if_false.clone()
+    };
+    Some(branch.resolve_conditional_returns(lookup))
 }
 
 /// An assignment expression in argument position (`f($x = expr)`,

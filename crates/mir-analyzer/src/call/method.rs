@@ -1752,8 +1752,11 @@ fn resolve_method_return<'a>(
         } else {
             ret_raw
         };
-        let mut return_ty =
-            crate::call::resolve_conditional_return(return_ty, ea.db, |param_name| {
+        let mut return_ty = crate::call::resolve_conditional_return(
+            return_ty,
+            ea.db,
+            Some(&bindings),
+            |param_name| {
                 // `@return ($this is X ? A : B)`: `$this` is never a declared
                 // parameter, so the lookup below always misses it — resolve it
                 // to the receiver's own concrete type instead, mirroring the
@@ -1773,7 +1776,8 @@ fn resolve_method_return<'a>(
                     })
                     .and_then(|idx| arg_types.get(idx))
                     .cloned()
-            });
+            },
+        );
         if dom_create_element_has_valid_literal_name {
             return_ty = return_ty.remove_false();
         }
