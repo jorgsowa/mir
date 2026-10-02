@@ -32,7 +32,7 @@ pub(crate) fn sup_param_is_free(ty: &Type) -> bool {
 /// Per-position variance check for two parameterizations of the SAME class
 /// (`Box<Dog>` vs `Box<Animal>`): a `@template-covariant`/`-contravariant`
 /// param may differ in the declared direction; invariant params must match
-/// exactly (the `sub_params == sup_params` fast path in `is_subtype` already
+/// by mutual subtyping (the `sub_params == sup_params` fast path in `is_subtype` already
 /// covers the all-invariant case, so a mismatch here only survives when at
 /// least one param is variant).
 pub(crate) fn variance_compatible(
@@ -65,7 +65,14 @@ pub(crate) fn variance_compatible(
         .all(|((tp, sub_p), sup_p)| match tp.variance {
             Variance::Covariant => is_subtype(db, sub_p, sup_p),
             Variance::Contravariant => is_subtype(db, sup_p, sub_p),
-            Variance::Invariant => sub_p == sup_p,
+            Variance::Invariant => {
+                // `mixed` is lenient in both directions, so it never counts as equivalent.
+                sub_p == sup_p
+                    || (!sub_p.is_mixed()
+                        && !sup_p.is_mixed()
+                        && is_subtype(db, sub_p, sup_p)
+                        && is_subtype(db, sup_p, sub_p))
+            }
         })
 }
 
