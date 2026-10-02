@@ -144,6 +144,20 @@ fn can_equal(ty: &Type, lit: &Lit) -> bool {
     ty.types.iter().any(|a| atomic_can_equal(a, lit))
 }
 
+/// Whether `default` is an int literal excluded by a bounded-int `declared`
+/// type (`int<1, 255>` with `= 0`).
+pub(crate) fn int_default_outside_range(declared: &Type, default: &Expr) -> bool {
+    let Some(Lit::Int(n)) = extract_lit(default) else {
+        return false;
+    };
+    let bounded = declared.types.iter().any(|a| match a {
+        Atomic::TIntRange { min, max } => min.is_some() || max.is_some(),
+        Atomic::TPositiveInt | Atomic::TNonNegativeInt | Atomic::TNegativeInt => true,
+        _ => false,
+    });
+    bounded && !can_equal(declared, &Lit::Int(n))
+}
+
 /// Whether `ty` is a closed set precise enough that an out-of-set comparison is
 /// a genuine contradiction: a bounded int range (`int<5, max>`), a union of
 /// at least two literals (`1|2|3`, `"a"|"b"`), or a single docblock-sourced

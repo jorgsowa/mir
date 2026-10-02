@@ -240,6 +240,7 @@ impl<'a> BodyAnalyzer<'a> {
                 if let Some(default) = &p.default {
                     let mut ea = sa.expr_analyzer(&default_ctx);
                     let _ = ea.analyze(default, &mut default_ctx);
+                    sa.check_param_default_range(fqn.as_deref().unwrap_or_default(), p, &params);
                 }
             }
         }

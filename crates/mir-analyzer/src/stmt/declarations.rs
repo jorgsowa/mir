@@ -239,6 +239,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 let mut default_ctx = ctx.clone();
                 let mut ea = self.expr_analyzer(&default_ctx);
                 let _ = ea.analyze(default, &mut default_ctx);
+                self.check_param_default_range(&fn_name, p, &params);
             }
         }
         for p in decl.params.iter() {
@@ -341,6 +342,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(default) = &prop.default {
                     let mut ea = self.expr_analyzer(&param_default_ctx);
                     let _ = ea.analyze(default, &mut param_default_ctx);
+                    self.check_property_default_range(&fqcn, prop.name.as_deref(), default);
                 }
                 if !prop.hooks.is_empty() {
                     let property_ty = crate::db::find_property_in_class(
@@ -367,13 +369,25 @@ impl<'a> StatementsAnalyzer<'a> {
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
+            let method_name = method.name.as_deref().unwrap_or("");
+            let declared_params = crate::db::find_method_in_chain(
+                self.db,
+                crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                method_name,
+            )
+            .map(|(_, storage)| storage.params.to_vec())
+            .unwrap_or_default();
             for p in method.params.iter() {
                 if let Some(default) = &p.default {
                     let mut ea = self.expr_analyzer(&param_default_ctx);
                     let _ = ea.analyze(default, &mut param_default_ctx);
+                    self.check_param_default_range(
+                        &format!("{fqcn}::{method_name}"),
+                        p,
+                        &declared_params,
+                    );
                 }
             }
-            let method_name = method.name.as_deref().unwrap_or("");
             if method_name == "__construct" {
                 for p in method.params.iter() {
                     if p.visibility.is_none() || p.hooks.is_empty() {
@@ -477,6 +491,86 @@ impl<'a> StatementsAnalyzer<'a> {
             sa.collect_navigation_facts = self.collect_navigation_facts;
             sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
             sa.analyze_stmts(&body.stmts, &mut method_ctx);
+        }
+    }
+
+    fn add_issue_at(&mut self, kind: IssueKind, span: Span) {
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let (line_end, col_end) = self.offset_to_line_col(span.end);
+        self.issues.add(Issue::new(
+            kind,
+            Location {
+                file: self.file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+            },
+        ));
+    }
+
+    pub(crate) fn check_param_default_range(
+        &mut self,
+        fn_name: &str,
+        p: &Param,
+        declared_params: &[mir_codebase::DeclaredParam],
+    ) {
+        let (Some(default), Some(raw)) = (&p.default, p.name.as_deref()) else {
+            return;
+        };
+        let name = raw.trim_start_matches('$');
+        let Some(declared) = declared_params
+            .iter()
+            .find(|d| d.name.as_str() == name)
+            .and_then(|d| d.ty.as_deref())
+        else {
+            return;
+        };
+        if crate::contradiction::int_default_outside_range(declared, default) {
+            let actual = self.source[default.span.start as usize..default.span.end as usize]
+                .trim()
+                .to_string();
+            self.add_issue_at(
+                IssueKind::InvalidArgument {
+                    param: name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: declared.to_string(),
+                    actual,
+                },
+                default.span,
+            );
+        }
+    }
+
+    pub(crate) fn check_property_default_range(
+        &mut self,
+        fqcn: &str,
+        prop_name: Option<&str>,
+        default: &php_ast::owned::Expr,
+    ) {
+        let Some(name) = prop_name.map(|n| n.trim_start_matches('$')) else {
+            return;
+        };
+        let Some(declared) = crate::db::find_property_in_class(
+            self.db,
+            crate::db::Fqcn::from_str(self.db, fqcn),
+            name,
+        )
+        .and_then(|def| def.ty.as_deref().cloned()) else {
+            return;
+        };
+        if crate::contradiction::int_default_outside_range(&declared, default) {
+            let actual = self.source[default.span.start as usize..default.span.end as usize]
+                .trim()
+                .to_string();
+            self.add_issue_at(
+                IssueKind::InvalidPropertyAssignment {
+                    property: name.to_string(),
+                    expected: declared.to_string(),
+                    actual,
+                },
+                default.span,
+            );
         }
     }
 

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DeclaredParam::default_text` holds the source text of a parameter's default value.
 - `FunctionDef::tag_descriptions` and `MethodDef::tag_descriptions` hold the prose of `@param`, `@return` and `@throws` tags.
 - `AnalysisSession::variable_references` returns every occurrence of the local variable or parameter under a cursor.
+- `InvalidPropertyAssignment` and `InvalidArgument` report a property or parameter default (`= 0`) that the declared int range (`@var int<1,255>`) excludes.
 
 ### Fixed
 

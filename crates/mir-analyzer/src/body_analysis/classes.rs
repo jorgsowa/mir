@@ -1001,10 +1001,23 @@ impl<'a> BodyAnalyzer<'a> {
             default_ctx.self_fqcn = Some(cx.fqcn.clone());
             default_ctx.parent_fqcn = cx.parent_fqcn.clone();
             default_ctx.static_fqcn = Some(cx.fqcn.clone());
+            let method_name = method.name.as_deref().unwrap_or("");
+            let declared_params = crate::db::find_method_in_chain(
+                self.db,
+                crate::db::Fqcn::from_str(self.db, fqcn),
+                method_name,
+            )
+            .map(|(_, storage)| storage.params.to_vec())
+            .unwrap_or_default();
             for p in method.params.iter() {
                 if let Some(default) = &p.default {
                     let mut ea = sa.expr_analyzer(&default_ctx);
                     let _ = ea.analyze(default, &mut default_ctx);
+                    sa.check_param_default_range(
+                        &format!("{fqcn}::{method_name}"),
+                        p,
+                        &declared_params,
+                    );
                 }
             }
             drop(sa);
@@ -1574,6 +1587,7 @@ impl<'a> BodyAnalyzer<'a> {
                     sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                     let mut ea = sa.expr_analyzer(&default_ctx);
                     let _ = ea.analyze(default, &mut default_ctx);
+                    sa.check_property_default_range(fqcn, prop.name.as_deref(), default);
                     drop(sa);
                     if self.mode == AnalysisMode::Full {
                         all_issues.extend(buf.into_all_issues());
