@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use php_ast::owned::{
-    DoWhileStmt, ExprKind, ForStmt, ForeachStmt, IfStmt, SwitchStmt, TryCatchStmt, WhileStmt,
+    DoWhileStmt, ExprKind, ForStmt, ForeachStmt, IfStmt, Stmt, SwitchStmt, TryCatchStmt, WhileStmt,
 };
 
 use mir_issues::{Issue, IssueKind, Location};
@@ -424,6 +424,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 .check_byref_arg_purity(&fe.expr, &entry, fe.expr.span);
         }
         if let Some(ref vname) = value_var {
+            let intentionally_unused = is_intentionally_unused_foreach_value(vname, &fe.body);
             entry.set_var(vname.as_str(), value_ty.clone());
             if iterable_tainted {
                 entry.taint_var(vname.as_str());
@@ -434,15 +435,17 @@ impl<'a> StatementsAnalyzer<'a> {
                 entry
                     .foreach_byref_var_names
                     .insert(Name::from(vname.as_str()));
-            } else {
+            } else if !intentionally_unused {
                 entry
                     .foreach_value_var_names
                     .insert(Name::from(vname.as_str()));
             }
-            // Record the header assignment so it appears in last_write_locs and
-            // triggers UnusedForeachValue when the value is never read in the body.
             let (line, line_end, col_start, col_end) = self.span_to_location(fe.value.span);
-            entry.record_write(vname.as_str(), line, col_start, line_end, col_end);
+            // Recording the header write is what triggers UnusedForeachValue
+            // when the value is never read in the body.
+            if !intentionally_unused {
+                entry.record_write(vname.as_str(), line, col_start, line_end, col_end);
+            }
             // Emit ResolvedSymbol for value variable at binding position
             self.record_symbol_for_var(fe.value.span, vname, value_ty.clone());
             if value_ty.is_mixed_not_template() {
@@ -1353,4 +1356,17 @@ fn record_guarded_defs(pre: &FlowState, if_stmt: &IfStmt, post: &mut FlowState) 
     for var in newly_possible {
         post.add_guarded_def(var, guard);
     }
+}
+
+/// `foreach (gen() as $ignored) { break; }` consumes the iterable for its side effects.
+fn is_intentionally_unused_foreach_value(name: &str, body: &Stmt) -> bool {
+    use php_ast::owned::StmtKind;
+    fn only_break(stmt: &Stmt) -> bool {
+        match &stmt.kind {
+            StmtKind::Break(_) => true,
+            StmtKind::Block(b) => b.stmts.len() == 1 && only_break(&b.stmts[0]),
+            _ => false,
+        }
+    }
+    matches!(name, "ignored" | "unused") || only_break(body)
 }
