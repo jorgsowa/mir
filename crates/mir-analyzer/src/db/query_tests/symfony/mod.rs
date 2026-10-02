@@ -24,8 +24,8 @@ mod workspace_functions;
 mod workspace_global_vars;
 mod workspace_symbol_index;
 
-use std::path::{Path, PathBuf};
 use std::ops::Deref;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::composer::Psr4Map;
