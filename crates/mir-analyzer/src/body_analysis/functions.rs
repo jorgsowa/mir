@@ -410,7 +410,9 @@ impl<'a> BodyAnalyzer<'a> {
             let mut fqcns = Vec::new();
             super::classes::collect_named_object_fqcns_with_arity(doc_ty, &mut fqcns);
             for (fqcn, arity) in &fqcns {
-                if template_names.iter().any(|t| *t == fqcn.as_ref()) {
+                if template_names.iter().any(|t| *t == fqcn.as_ref())
+                    || is_enum_case_ref(self.db, fqcn)
+                {
                     continue;
                 }
                 if !crate::db::class_exists(self.db, fqcn.as_ref()) {
@@ -1030,4 +1032,15 @@ impl<'a> BodyAnalyzer<'a> {
             self.record_function_inference(&fqn, &inferred);
         }
     }
+}
+
+/// Whether `name` is an `Enum::Case` docblock reference to an existing case.
+fn is_enum_case_ref(db: &dyn crate::db::MirDatabase, name: &str) -> bool {
+    let Some((enum_name, case)) = name.split_once("::") else {
+        return false;
+    };
+    matches!(
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, enum_name)),
+        Some(crate::db::ClassLike::Enum(e)) if e.cases.contains_key(case)
+    )
 }

@@ -558,7 +558,25 @@ impl<'a> ExpressionAnalyzer<'a> {
             .iter()
             .filter(|t| !matches!(t, Atomic::TNull))
             .collect();
-        let enum_fqcn_opt: Option<String> = if non_null_atoms.len() == 1 {
+        // A subject narrowed to case literals of one enum (`Enum::A|Enum::B`)
+        // only needs those cases covered.
+        let narrowed_cases: Option<(String, Vec<&str>)> = match non_null_atoms.first() {
+            Some(Atomic::TLiteralEnumCase { enum_fqcn, .. }) => non_null_atoms
+                .iter()
+                .map(|a| match a {
+                    Atomic::TLiteralEnumCase {
+                        enum_fqcn: e,
+                        case_name,
+                    } if e == enum_fqcn => Some(case_name.as_ref()),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+                .map(|cases| (enum_fqcn.to_string(), cases)),
+            _ => None,
+        };
+        let enum_fqcn_opt: Option<String> = if let Some((fqcn, _)) = &narrowed_cases {
+            Some(fqcn.clone())
+        } else if non_null_atoms.len() == 1 {
             match non_null_atoms[0] {
                 Atomic::TNamedObject { fqcn, .. } => Some(fqcn.to_string()),
                 Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
@@ -618,6 +636,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let mut uncovered: Vec<String> = enum_def
                     .cases
                     .keys()
+                    .filter(|k| {
+                        narrowed_cases
+                            .as_ref()
+                            .is_none_or(|(_, cases)| cases.contains(&k.as_ref()))
+                    })
                     .filter(|k| !covered.contains(&crate::util::php_ident_lowercase(k.as_ref())))
                     .map(|k| format!("{enum_fqcn}::{k}"))
                     .collect();
