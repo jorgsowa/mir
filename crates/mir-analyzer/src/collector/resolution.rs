@@ -344,6 +344,55 @@ pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
             Atomic::TInterfaceString(Some(ref name)) if is_self_static_parent_keyword(name) => {
                 Atomic::TInterfaceString(Some(class_fqcn.into()))
             }
+            // Keywords nested in generic arguments / array element types (`list<self>`).
+            Atomic::TNamedObject { fqcn, type_params } if !type_params.is_empty() => {
+                Atomic::TNamedObject {
+                    fqcn,
+                    type_params: vec_to_type_params(
+                        type_params
+                            .iter()
+                            .map(|t| fill_self_static_parent(t.clone(), class_fqcn))
+                            .collect(),
+                    ),
+                }
+            }
+            Atomic::TArray { key, value } => Atomic::TArray {
+                key: Box::new(fill_self_static_parent(*key, class_fqcn)),
+                value: Box::new(fill_self_static_parent(*value, class_fqcn)),
+            },
+            Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
+                key: Box::new(fill_self_static_parent(*key, class_fqcn)),
+                value: Box::new(fill_self_static_parent(*value, class_fqcn)),
+            },
+            Atomic::TList { value } => Atomic::TList {
+                value: Box::new(fill_self_static_parent(*value, class_fqcn)),
+            },
+            Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
+                value: Box::new(fill_self_static_parent(*value, class_fqcn)),
+            },
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => Atomic::TKeyedArray {
+                properties: Box::new(
+                    properties
+                        .into_iter()
+                        .map(|(key, prop)| {
+                            let ty = fill_self_static_parent(prop.ty, class_fqcn);
+                            (
+                                key,
+                                KeyedProperty {
+                                    ty,
+                                    optional: prop.optional,
+                                },
+                            )
+                        })
+                        .collect(),
+                ),
+                is_open,
+                is_list,
+            },
             other => other,
         };
         result.types.push(filled);

@@ -1079,6 +1079,44 @@ fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAna
     is_int_or_float(expected) && is_int_or_float(actual)
 }
 
+/// Rewrites docblock `Enum::Case` references (parsed as an opaque named type) to enum-case
+/// literals so they subtype their enum. References that don't name an enum case pass through.
+fn resolve_enum_case_refs(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> Type {
+    let case_literal = |name: &str| {
+        let (enum_name, case_name) = name.split_once("::")?;
+        let crate::db::ClassLike::Enum(e) =
+            crate::db::find_class_like(ea.db, crate::db::Fqcn::from_str(ea.db, enum_name))?
+        else {
+            return None;
+        };
+        e.cases
+            .contains_key(case_name)
+            .then(|| Atomic::TLiteralEnumCase {
+                enum_fqcn: e.fqcn.as_ref().into(),
+                case_name: case_name.into(),
+            })
+    };
+    if !ty
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::")))
+    {
+        return ty.clone();
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = ty.possibly_undefined;
+    result.from_docblock = ty.from_docblock;
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TNamedObject { fqcn, .. } => {
+                result.add_type(case_literal(fqcn).unwrap_or_else(|| atomic.clone()))
+            }
+            other => result.add_type(other.clone()),
+        }
+    }
+    result
+}
+
 /// Validate a callback argument against a typed callable parameter (e.g., callable(str,str,str):bool).
 /// Emits InvalidArgument if the provided callable has more required params than expected, or if a
 /// resolvable parameter type is declared too narrow to accept what the signature promises to pass.
@@ -1158,7 +1196,11 @@ pub(crate) fn check_typed_callable_arg(
             if actual.is_optional || actual.is_variadic {
                 continue;
             }
-            let Some(expected_ty) = expected.ty.as_ref().map(|t| t.to_union()) else {
+            let Some(expected_ty) = expected
+                .ty
+                .as_ref()
+                .map(|t| resolve_enum_case_refs(&t.to_union(), ea))
+            else {
                 continue;
             };
             let Some(actual_ty) = actual.ty.as_ref() else {
