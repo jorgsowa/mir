@@ -1156,10 +1156,10 @@ impl CallAnalyzer {
                     "array_pad" => super::array_builtins::array_pad_return_type(&arg_types)
                         .unwrap_or(return_ty),
                     // array_column: pulls one column out of each row of a single
-                    // resolvable shape; the whole-rows ($column_key === null) form
-                    // isn't modeled.
-                    "array_column" => super::array_builtins::array_column_return_type(&arg_types)
-                        .unwrap_or(return_ty),
+                    // resolvable shape or class.
+                    "array_column" => {
+                        super::array_builtins::array_column_return_type(ea.db, &arg_types)
+                    }
                     // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
                     "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
                     // array_key_first/array_key_last: non-null for non-empty input; int for lists.

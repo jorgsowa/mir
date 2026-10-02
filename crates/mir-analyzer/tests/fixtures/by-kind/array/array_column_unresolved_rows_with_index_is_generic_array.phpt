@@ -6,11 +6,11 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(array $rows, string $idx): void {
     $keyed = array_column($rows, 'name', $idx);
-    /** @mir-check $keyed is array */
+    /** @mir-check $keyed is array<array-key, mixed> */
     $_ = $keyed;
 
     $keyed_literal = array_column($rows, 'name', 'id');
-    /** @mir-check $keyed_literal is array */
+    /** @mir-check $keyed_literal is array<array-key, mixed> */
     $_ = $keyed_literal;
 }
 ===expect===

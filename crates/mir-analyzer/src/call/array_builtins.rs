@@ -8,6 +8,9 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::atomic::ArrayKey;
 use mir_types::{Atomic, Type};
 
+use mir_codebase::definitions::Visibility;
+
+use crate::db::MirDatabase;
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 
@@ -1372,15 +1375,46 @@ pub(crate) fn array_pad_return_type(arg_types: &[Type]) -> Option<Type> {
 /// column property isn't optional. `$column_key === null` (the "whole rows"
 /// form) has no such exclusion: every row is always present, so it carries no
 /// `.optional` dependency of its own.
-pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
-    array_column_shape_type(arg_types).or_else(|| {
+pub(crate) fn array_column_return_type(db: &dyn MirDatabase, arg_types: &[Type]) -> Type {
+    array_column_shape_type(db, arg_types).unwrap_or_else(|| {
         // Without `$index_key` the result is always a list, whatever the rows are.
-        has_no_index_key(arg_types).then(|| {
+        if has_no_index_key(arg_types) {
             Type::single(Atomic::TList {
                 value: Box::new(Type::mixed()),
             })
-        })
+        } else {
+            Type::single(Atomic::TArray {
+                key: Box::new(Type::array_key()),
+                value: Box::new(Type::mixed()),
+            })
+        }
     })
+}
+
+/// Type of `key` on a row, and whether it may be absent. Object rows expose
+/// only public, non-static properties with a declared type; since the property
+/// may be unset at runtime, it is always reported as possibly absent.
+fn row_property(db: &dyn MirDatabase, row: &Atomic, key: &ArrayKey) -> Option<(Type, bool)> {
+    match row {
+        Atomic::TKeyedArray { properties, .. } => {
+            let prop = properties.get(key)?;
+            Some((prop.ty.clone(), prop.optional))
+        }
+        Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
+            let ArrayKey::String(name) = key else {
+                return None;
+            };
+            let (owner, prop) =
+                crate::db::find_property_in_chain(db, crate::db::Fqcn::interned(db, *fqcn), name)?;
+            let templated =
+                crate::db::class_template_params(db, &owner).is_some_and(|t| !t.is_empty());
+            if prop.visibility != Visibility::Public || prop.is_static || templated {
+                return None;
+            }
+            Some((prop.ty.as_deref().cloned()?, true))
+        }
+        _ => None,
+    }
 }
 
 fn has_no_index_key(arg_types: &[Type]) -> bool {
@@ -1389,7 +1423,7 @@ fn has_no_index_key(arg_types: &[Type]) -> bool {
         .is_none_or(|t| matches!(t.types.as_slice(), [Atomic::TNull]))
 }
 
-fn array_column_shape_type(arg_types: &[Type]) -> Option<Type> {
+fn array_column_shape_type(db: &dyn MirDatabase, arg_types: &[Type]) -> Option<Type> {
     let source = arg_types.first()?;
     if source.is_mixed() {
         return None;
@@ -1398,9 +1432,7 @@ fn array_column_shape_type(arg_types: &[Type]) -> Option<Type> {
     if row.types.len() != 1 {
         return None;
     }
-    let Atomic::TKeyedArray { properties, .. } = &row.types[0] else {
-        return None;
-    };
+    let row_atomic = &row.types[0];
 
     let column_key_ty = arg_types.get(1)?;
     // `None` here means "whole rows" ($column_key === null): the value is the
@@ -1412,10 +1444,7 @@ fn array_column_shape_type(arg_types: &[Type]) -> Option<Type> {
         _ => return None,
     };
     let (value, column_optional) = match &column_key {
-        Some(key) => {
-            let column_prop = properties.get(key)?;
-            (column_prop.ty.clone(), column_prop.optional)
-        }
+        Some(key) => row_property(db, row_atomic, key)?,
         None => (row.clone(), false),
     };
 
@@ -1439,12 +1468,11 @@ fn array_column_shape_type(arg_types: &[Type]) -> Option<Type> {
         [Atomic::TLiteralInt(i)] => ArrayKey::Int(*i),
         _ => return None,
     };
-    let index_prop = properties.get(&index_key)?;
-    let key = crate::expr::helpers::coerce_array_key_type(&index_prop.ty);
+    let (index_ty, index_optional) = row_property(db, row_atomic, &index_key)?;
+    let key = crate::expr::helpers::coerce_array_key_type(&index_ty);
 
-    let non_empty = super::callable::is_non_empty_collection(source)
-        && !column_optional
-        && !index_prop.optional;
+    let non_empty =
+        super::callable::is_non_empty_collection(source) && !column_optional && !index_optional;
     let atomic = if non_empty {
         Atomic::TNonEmptyArray {
             key: Box::new(key),
