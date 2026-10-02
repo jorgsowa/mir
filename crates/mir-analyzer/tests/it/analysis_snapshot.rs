@@ -442,3 +442,19 @@ fn snapshot_reanalyze_files_stops_when_cancelled_without_committing() {
         .reference_locations("meth:App\\Base::run")
         .is_empty());
 }
+
+#[test]
+fn snapshot_declaration_name_range_matches_the_session() {
+    let (mut session, files) = workspace();
+    session.prepare_for_query(Some(&files[0]));
+    let snap = session.snapshot();
+    let run = Name::method("App\\Base", "run");
+
+    let from_snapshot = snap.declaration_name_range_cached(&run).unwrap();
+    let from_session = session.declaration_name_range(&run);
+
+    assert_eq!(from_snapshot, from_session);
+    let (file, range) = from_snapshot.expect("declaration found");
+    assert_eq!(file.as_ref(), "base.php");
+    assert_eq!(range.start.line, 3);
+}

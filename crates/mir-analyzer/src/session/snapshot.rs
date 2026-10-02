@@ -884,6 +884,17 @@ impl AnalysisSnapshot {
         out
     }
 
+    /// The symbol's declaration site, narrowed to the declared name's own
+    /// token — the lock-free read half of
+    /// [`AnalysisSession::declaration_name_range`]. Symbols the index lacks
+    /// load on demand; no input is written.
+    pub fn declaration_name_range_cached(
+        &self,
+        symbol: &crate::Name,
+    ) -> Result<Option<(Arc<str>, crate::Range)>, Cancelled> {
+        catch(|| self.declaration_name_range(symbol))
+    }
+
     /// The symbol's declaration site among already-loaded state, narrowed
     /// from the collector's whole-declaration span to the declared name's
     /// own token (matching the span shape of recorded references).
