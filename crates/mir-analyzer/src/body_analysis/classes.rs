@@ -1439,6 +1439,15 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        if let Some(name) = decl.name.as_ref().and_then(|i| i.as_deref()) {
+            self.push_decl_name_fact(
+                source,
+                0..decl.body.span.start,
+                "class",
+                name,
+                crate::Name::class(fqcn),
+            );
+        }
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());

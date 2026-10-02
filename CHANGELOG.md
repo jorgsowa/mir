@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AnalysisSession::implemented_method` returns the interface or abstract method a method implements.
+
+### Fixed
+
+- `name_at` resolves class-like, function and enum-case declaration names, and type hints naming a missing class.
+
 ## [0.83.0] - 2026-10-02
 
 ### Added

@@ -630,6 +630,28 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
+    /// Records the declaration name token before `body_start` (or inside
+    /// `region` for members) as a navigation fact.
+    fn push_decl_name_fact(
+        &self,
+        source: &str,
+        region: std::ops::Range<u32>,
+        keyword: &str,
+        short_name: &str,
+        name: crate::Name,
+    ) {
+        if !self.collect_navigation_facts || short_name.is_empty() {
+            return;
+        }
+        if let Some(span) = keyword_name_span(source, region, keyword, short_name) {
+            self.navigation_facts.borrow_mut().push(NavigationFact {
+                span,
+                expr_span: None,
+                name,
+            });
+        }
+    }
+
     pub(crate) fn take_navigation_facts(&self) -> Vec<NavigationFact> {
         std::mem::take(&mut *self.navigation_facts.borrow_mut())
     }
@@ -731,7 +753,7 @@ impl<'a> BodyAnalyzer<'a> {
         let mut all_symbols = all_symbols;
         for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
             let class_exists = crate::db::class_exists(self.db, fqcn.as_ref());
-            if self.collect_navigation_facts && class_exists {
+            if self.collect_navigation_facts {
                 self.navigation_facts.borrow_mut().push(NavigationFact {
                     span,
                     expr_span: None,
@@ -1276,6 +1298,42 @@ pub(super) fn method_decl_name_span(
         from = after_keyword;
     }
     method_header_name_span(source, method)
+}
+
+/// Span of `name` in the last `keyword name` pair inside `region` — a
+/// declaration's own name token, past attributes, modifiers and keyword.
+pub(crate) fn keyword_name_span(
+    source: &str,
+    region: std::ops::Range<u32>,
+    keyword: &str,
+    name: &str,
+) -> Option<php_ast::Span> {
+    let text = source.get(region.start as usize..(region.end as usize).min(source.len()))?;
+    let lowered = text.to_ascii_lowercase();
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_' || !c.is_ascii();
+    let mut found = None;
+    let mut from = 0;
+    while let Some(rel) = lowered[from..].find(keyword) {
+        let kw_start = from + rel;
+        let after = kw_start + keyword.len();
+        from = after;
+        if text[..kw_start].ends_with(is_ident) {
+            continue;
+        }
+        let rest = &text[after..];
+        let trimmed = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '&');
+        if trimmed.len() == rest.len() || !trimmed.starts_with(name) {
+            continue;
+        }
+        if trimmed[name.len()..].starts_with(is_ident) {
+            continue;
+        }
+        found = Some(region.start + (after + rest.len() - trimmed.len()) as u32);
+    }
+    found.map(|start| php_ast::Span {
+        start,
+        end: start + name.len() as u32,
+    })
 }
 
 /// Tight span for a bare identifier (no `$` sigil) within a bounded region —

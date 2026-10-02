@@ -33,6 +33,19 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
+        if self.collect_navigation_facts {
+            if let Some((fqn, _)) =
+                lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map)
+            {
+                self.push_decl_name_fact(
+                    source,
+                    0..decl.body.span.start,
+                    "function",
+                    decl.name.as_deref().unwrap_or(""),
+                    crate::Name::function(fqn),
+                );
+            }
+        }
         self.run_after_function_like_plugins(
             &super::plugin_hooks::FunctionLikeSite {
                 name: decl.name.as_deref().unwrap_or(""),

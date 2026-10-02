@@ -38,6 +38,13 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        self.push_decl_name_fact(
+            source,
+            0..decl.body.span.start,
+            "trait",
+            decl.name.as_deref().unwrap_or(""),
+            crate::Name::class(fqcn),
+        );
         self.check_class_generic_type_args(
             &decl.doc_comment,
             fqcn,
@@ -336,6 +343,13 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        self.push_decl_name_fact(
+            source,
+            0..decl.body.span.start,
+            "enum",
+            enum_name,
+            crate::Name::class(fqcn),
+        );
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -348,8 +362,25 @@ impl<'a> BodyAnalyzer<'a> {
         };
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
-                if let EnumMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
+                match &member.kind {
+                    EnumMemberKind::ClassConst(c) => {
+                        self.record_class_const_decl(
+                            c,
+                            &member.span,
+                            fqcn,
+                            file,
+                            source,
+                            source_map,
+                        );
+                    }
+                    EnumMemberKind::Case(case) => self.push_decl_name_fact(
+                        source,
+                        member.span.start..member.span.end,
+                        "case",
+                        case.name.as_deref().unwrap_or(""),
+                        crate::Name::class_constant(fqcn, case.name.as_deref().unwrap_or("")),
+                    ),
+                    _ => {}
                 }
                 continue;
             };
@@ -552,6 +583,13 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
+        self.push_decl_name_fact(
+            source,
+            0..decl.body.span.start,
+            "interface",
+            iface_name,
+            crate::Name::class(iface_fqcn.as_str()),
+        );
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);
 
         for member in decl.body.members.iter() {
