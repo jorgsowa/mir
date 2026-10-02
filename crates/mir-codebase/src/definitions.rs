@@ -424,6 +424,17 @@ pub struct Assertion {
 // MethodDef
 // ---------------------------------------------------------------------------
 
+/// Prose following the type and name of `@param`, `@return` and `@throws`
+/// tags. Tags without prose are omitted.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TagDescriptions {
+    /// `(parameter name without $, description)`.
+    pub params: Vec<(Arc<str>, Arc<str>)>,
+    pub returns: Option<Arc<str>>,
+    /// `(resolved exception FQCN, description)`.
+    pub throws: Vec<(Arc<str>, Arc<str>)>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MethodDef {
     pub name: Arc<str>,
@@ -475,6 +486,10 @@ pub struct MethodDef {
     /// Used for hover info.
     #[serde(default)]
     pub docstring: Option<Arc<str>>,
+    /// Prose attached to `@param`, `@return` and `@throws` tags. `None` when
+    /// no tag carries a description.
+    #[serde(default)]
+    pub tag_descriptions: Option<Arc<TagDescriptions>>,
     /// True for methods added via `@method` docblock annotations. Virtual
     /// methods must not be required as concrete interface implementations.
     #[serde(default)]
@@ -876,6 +891,10 @@ pub struct FunctionDef {
     /// Used for hover info.
     #[serde(default)]
     pub docstring: Option<Arc<str>>,
+    /// Prose attached to `@param`, `@return` and `@throws` tags. `None` when
+    /// no tag carries a description.
+    #[serde(default)]
+    pub tag_descriptions: Option<Arc<TagDescriptions>>,
     /// Parameters declared as taint sinks via `@taint-sink <kind> $param`.
     /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
     #[serde(default)]

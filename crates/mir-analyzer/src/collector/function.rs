@@ -441,6 +441,7 @@ impl DefinitionCollector<'_> {
             no_named_arguments: doc.no_named_arguments,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             docstring,
+            tag_descriptions: self.tag_descriptions(&doc),
             taint_sink_params: doc
                 .taint_sinks
                 .iter()

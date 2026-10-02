@@ -48,6 +48,7 @@ mod snapshot_reference_prelude;
 mod source_provider_prefetch;
 mod stub_cache_correctness;
 mod symbol_at;
+mod tag_descriptions;
 mod type_env;
 mod user_stubs;
 mod var_docblock_split_html_block;

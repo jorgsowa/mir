@@ -1261,6 +1261,35 @@ impl<'a> DefinitionCollector<'a> {
         Some(self.location(base + tag_span.0, base + tag_span.1))
     }
 
+    fn tag_descriptions(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+    ) -> Option<Arc<mir_codebase::TagDescriptions>> {
+        if doc.param_descriptions.is_empty()
+            && doc.return_description.is_none()
+            && doc.throws_descriptions.is_empty()
+        {
+            return None;
+        }
+        Some(Arc::new(mir_codebase::TagDescriptions {
+            params: doc
+                .param_descriptions
+                .iter()
+                .map(|(name, desc)| (Arc::from(name.as_str()), Arc::from(desc.as_str())))
+                .collect(),
+            returns: doc.return_description.as_deref().map(Arc::from),
+            throws: doc
+                .throws_descriptions
+                .iter()
+                .filter(|(class, _)| !crate::diagnostics::is_docblock_keyword(class))
+                .map(|(class, desc)| {
+                    let fqcn = resolution::resolve_name(class, &self.namespace, &self.use_aliases);
+                    (Arc::from(fqcn.as_str()), Arc::from(desc.as_str()))
+                })
+                .collect(),
+        }))
+    }
+
     fn location(&self, start: u32, end: u32) -> Location {
         let src = self.source;
         let start_off = start as usize;
@@ -1588,6 +1617,7 @@ impl<'a> DefinitionCollector<'a> {
                         .tag_location(doc_start, method.tag_span)
                         .or_else(|| location.clone()),
                     docstring: None,
+                    tag_descriptions: None,
                     is_virtual: true,
                     taint_sink_params: vec![],
                     is_taint_source: false,
@@ -2325,6 +2355,7 @@ impl<'a> DefinitionCollector<'a> {
             } else {
                 Some(Arc::from(doc.description.as_str()))
             },
+            tag_descriptions: self.tag_descriptions(&doc),
             taint_sink_params: doc
                 .taint_sinks
                 .iter()

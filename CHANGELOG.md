@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AnalysisSession::implemented_method` returns the interface or abstract method a method implements.
 - `DeclaredParam::default_text` holds the source text of a parameter's default value.
+- `FunctionDef::tag_descriptions` and `MethodDef::tag_descriptions` hold the prose of `@param`, `@return` and `@throws` tags.
 
 ### Fixed
 

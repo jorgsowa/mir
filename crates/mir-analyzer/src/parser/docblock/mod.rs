@@ -66,10 +66,12 @@ impl DocblockParser {
                                 result
                                     .param_type_strings
                                     .push((name.trim_start_matches('$').to_string(), ty_s.clone()));
-                                result.params.push((
-                                    name.trim_start_matches('$').to_string(),
-                                    parse_type_string(&ty_s),
-                                ));
+                                let bare = name.trim_start_matches('$').to_string();
+                                let desc = param_description(&body_str, &ty_s, &bare);
+                                if !desc.is_empty() {
+                                    result.param_descriptions.push((bare.clone(), desc));
+                                }
+                                result.params.push((bare, parse_type_string(&ty_s)));
                             }
                         } else if let Some(msg) = validate_type_str(&body_str, "param") {
                             // If parsing failed, validate the full body to provide better error context
@@ -98,6 +100,10 @@ impl DocblockParser {
                             result.invalid_annotations.push(msg);
                         }
                         result.return_type = Some(parse_type_string(&ty_s));
+                        let desc = description_after(&body_str, &ty_s);
+                        if !desc.is_empty() {
+                            result.return_description = Some(desc);
+                        }
                     }
                 }
                 "var" | "psalm-var" | "phpstan-var" => {
@@ -142,6 +148,7 @@ impl DocblockParser {
                 "throws" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         let first_word = body_str.split_whitespace().next().unwrap_or("");
+                        let desc = description_after(&body_str, first_word);
                         for class in first_word.split('|') {
                             if !class.is_empty() {
                                 record_backslash_keyword_types(
@@ -152,6 +159,11 @@ impl DocblockParser {
                                     text,
                                 );
                                 result.throws.push(class.to_string());
+                                if !desc.is_empty() {
+                                    result
+                                        .throws_descriptions
+                                        .push((class.to_string(), desc.clone()));
+                                }
                             }
                         }
                     }
@@ -857,6 +869,12 @@ pub struct ParsedDocblock {
     pub uses: Vec<Type>,
     /// `@throws ClassName`
     pub throws: Vec<String>,
+    /// `(parameter name, prose)` for each `@param` that has a description.
+    pub param_descriptions: Vec<(String, String)>,
+    /// Prose after the type of `@return`.
+    pub return_description: Option<String>,
+    /// `(class as written, prose)` for each `@throws` that has a description.
+    pub throws_descriptions: Vec<(String, String)>,
     /// `@psalm-assert Type $var` — the `bool` is true for the `!Type` negated
     /// form; the key path is non-empty when the target is a specific
     /// (possibly nested) array key of `$var` (`@psalm-assert Type

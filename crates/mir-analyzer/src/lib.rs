@@ -466,7 +466,9 @@ impl DependencyGraph {
 }
 
 pub mod symbol;
-pub use mir_codebase::definitions::{DeclaredParam, FunctionDef, TemplateParam, Visibility};
+pub use mir_codebase::definitions::{
+    DeclaredParam, FunctionDef, TagDescriptions, TemplateParam, Visibility,
+};
 pub use mir_issues::{Issue, IssueKind, Severity};
 pub use mir_types::Type;
 

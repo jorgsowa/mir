@@ -1236,6 +1236,31 @@ pub(super) fn parse_import_type(body: &str) -> Option<DocImportType> {
     })
 }
 
+/// Prose in a tag `body` after its leading `prefix`, whitespace-collapsed.
+/// Empty when `body` does not start with `prefix`.
+pub(super) fn description_after(body: &str, prefix: &str) -> String {
+    body.trim_start()
+        .strip_prefix(prefix)
+        .map(|rest| rest.split_whitespace().collect::<Vec<_>>().join(" "))
+        .unwrap_or_default()
+}
+
+/// Prose after the type and `[&][...]$name` of a `@param` body.
+pub(super) fn param_description(body: &str, ty: &str, name: &str) -> String {
+    let after_ty = body
+        .trim_start()
+        .strip_prefix(ty)
+        .unwrap_or("")
+        .trim_start();
+    let after_flags = after_ty.strip_prefix('&').unwrap_or(after_ty);
+    let after_flags = after_flags.strip_prefix("...").unwrap_or(after_flags);
+    after_flags
+        .strip_prefix('$')
+        .and_then(|rest| rest.strip_prefix(name))
+        .map(|rest| rest.split_whitespace().collect::<Vec<_>>().join(" "))
+        .unwrap_or_default()
+}
+
 pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
     // Formats: `Type $name`, `Type $name description`, or `Type &$name ...` (byref)
     // Types can contain $-named params inside callable syntax (`callable(int $a): void`),
