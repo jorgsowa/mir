@@ -19,6 +19,7 @@ mod definition_positions;
 mod file_analyzer;
 mod firewall_bench;
 mod firewall_premise;
+mod implemented_method;
 mod incremental_index;
 mod incremental_reanalysis;
 mod indexed_queries;

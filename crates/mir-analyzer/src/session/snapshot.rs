@@ -200,6 +200,35 @@ impl AnalysisSnapshot {
         })
     }
 
+    /// The interface or abstract method that `method` implements: the first
+    /// ancestor of its class declaring the same-named method as abstract or
+    /// as an interface member. `None` for non-methods and for methods that
+    /// implement nothing.
+    pub fn implemented_method(
+        &self,
+        method: &crate::Name,
+    ) -> Result<Option<crate::Name>, Cancelled> {
+        let crate::Name::Method { class, name } = method else {
+            return Ok(None);
+        };
+        self.read(|db| {
+            let here = crate::db::Fqcn::from_str(db, class.as_ref());
+            crate::db::class_ancestors_by_fqcn(db, here)
+                .iter()
+                .skip(1)
+                .find_map(|ancestor| {
+                    let fqcn = crate::db::Fqcn::from_str(db, ancestor.as_ref());
+                    let is_interface = matches!(
+                        crate::db::find_class_like(db, fqcn)?,
+                        crate::db::ClassLike::Interface(_)
+                    );
+                    let m = crate::db::find_method_in_class(db, fqcn, name)?;
+                    (is_interface || m.is_abstract)
+                        .then(|| crate::Name::method(ancestor.clone(), name))
+                })
+        })
+    }
+
     /// Declaration location of `symbol`. Symbols the index lacks load on
     /// demand; no input is written.
     pub fn definition_of_cached(

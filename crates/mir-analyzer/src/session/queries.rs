@@ -131,6 +131,11 @@ impl AnalysisSession {
         self.query_snapshot(|snap| snap.definition_of_cached(symbol))
     }
 
+    /// See [`AnalysisSnapshot::implemented_method`].
+    pub fn implemented_method(&self, method: &crate::Name) -> Option<crate::Name> {
+        self.query_snapshot(|snap| snap.implemented_method(method))
+    }
+
     /// Raw reference locations indexed by string symbol key, kept for tests
     /// that use the string-keyed API. Prefer [`Self::indexed_references_to`]
     /// with a typed [`crate::Name`].
