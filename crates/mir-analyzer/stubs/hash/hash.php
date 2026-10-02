@@ -19,7 +19,7 @@ use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
  * When set to <b>TRUE</b>, outputs raw binary data.
  * <b>FALSE</b> outputs lowercase hexits.
  * </p>
- * @return string a string containing the calculated message digest as lowercase hexits
+ * @return non-empty-string a string containing the calculated message digest as lowercase hexits
  * unless <i>binary</i> is set to true in which case the raw
  * binary representation of the message digest is returned.
  * @pure

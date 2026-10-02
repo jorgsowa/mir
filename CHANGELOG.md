@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A write at the end of a loop body that the next iteration reads is no longer reported as `UnusedVariable`.
 - `do`/`while` bodies no longer narrow the initial state by the loop condition, which caused false `ImpossibleIdenticalComparison` on the first iteration.
 - `AnalysisSession::name_at` resolves a `use` import whose class, function or constant is not indexed.
+- `hash()` returns `non-empty-string`.
 
 ## [0.84.0] - 2026-10-02
 
