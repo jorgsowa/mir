@@ -659,8 +659,15 @@ pub(super) fn promote_assignment_effects(
             // Promote variables that were assigned via by-ref parameters
             if let ExprKind::Identifier(fn_name) = &call.name.kind {
                 let resolved = crate::db::resolve_name(db, file, fn_name.as_ref());
-                let here = crate::db::Fqcn::from_str(db, &resolved);
-                if let Some(func) = crate::db::find_function(db, here) {
+                let find =
+                    |name: &str| crate::db::find_function(db, crate::db::Fqcn::from_str(db, name));
+                // Unqualified calls fall back to the global function.
+                let func = find(&resolved).or_else(|| {
+                    (!fn_name.starts_with('\\') && !fn_name.contains('\\'))
+                        .then(|| find(fn_name.as_ref()))
+                        .flatten()
+                });
+                if let Some(func) = func {
                     for (i, param) in func.params.iter().enumerate() {
                         if param.is_byref {
                             let arg = call.args.get(i);
