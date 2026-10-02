@@ -612,10 +612,10 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             u
         }
         "class-string" => Type::single(Atomic::TClassString(Some(
-            normalize_fqcn(inner.trim()).into(),
+            normalize_fqcn(strip_generic_args(inner.trim())).into(),
         ))),
         "interface-string" => Type::single(Atomic::TInterfaceString(Some(
-            normalize_fqcn(inner.trim()).into(),
+            normalize_fqcn(strip_generic_args(inner.trim())).into(),
         ))),
         "int" => {
             // int<min, max> — `min`/`max` keywords (or a missing/garbled bound)
@@ -1709,4 +1709,20 @@ pub(super) fn find_char_at_depth(s: &str, target: char) -> Option<usize> {
         }
     }
     None
+}
+
+/// `Handler<R, Q>` -> `Handler`: a class-string names a class, not its type arguments.
+fn strip_generic_args(name: &str) -> &str {
+    match name.split_once('<') {
+        Some((base, _))
+            if name.ends_with('>')
+                && !base.is_empty()
+                && base
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_' || c == '\\') =>
+        {
+            base
+        }
+        _ => name,
+    }
 }
