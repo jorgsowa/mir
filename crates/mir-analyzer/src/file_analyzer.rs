@@ -476,6 +476,16 @@ impl<'a> FileAnalyzer<'a> {
         self.session
             .query_snapshot(|snap| snap.outgoing_calls(&file, byte_offset))
     }
+
+    pub(crate) fn variable_references(
+        &mut self,
+        file: Arc<str>,
+        byte_offset: u32,
+    ) -> Vec<crate::Range> {
+        self.session.prepare_for_query(Some(&file));
+        self.session
+            .query_snapshot(|snap| snap.variable_references(&file, byte_offset))
+    }
 }
 
 impl AnalysisSnapshot {
@@ -588,6 +598,180 @@ impl AnalysisSnapshot {
     ) -> Result<Vec<(crate::Name, crate::Range)>, salsa::Cancelled> {
         self.read(|db| resolve_outgoing_calls(db, self.php_version(), file, byte_offset))
     }
+
+    /// Occurrences of the variable under `byte_offset` — the read half of
+    /// [`AnalysisSession::variable_references`]. Same preparation contract
+    /// as [`Self::symbol_at`].
+    pub fn variable_references(
+        &self,
+        file: &Arc<str>,
+        byte_offset: u32,
+    ) -> Result<Vec<crate::Range>, salsa::Cancelled> {
+        self.read(|db| resolve_variable_references(db, self.php_version(), file, byte_offset))
+    }
+}
+
+/// A variable-binding boundary: a function, method, closure or arrow function.
+struct VariableScope {
+    span: Span,
+    kind: VariableScopeKind,
+}
+
+enum VariableScopeKind {
+    /// Functions and methods bind their own variables only.
+    Isolated,
+    /// Arrow functions see the parent's variables except their own params.
+    Arrow { params: Vec<String> },
+    /// Closures see the parent's variables only through `use`.
+    Closure {
+        params: Vec<String>,
+        captured: Vec<String>,
+    },
+}
+
+fn param_names(params: &[php_ast::owned::Param]) -> Vec<String> {
+    params
+        .iter()
+        .filter_map(|p| p.name.as_deref())
+        .map(|n| n.trim_start_matches('$').to_string())
+        .collect()
+}
+
+fn collect_variable_scopes(program: &Program) -> Vec<VariableScope> {
+    use php_ast::owned::visitor::{walk_owned_class_member, walk_owned_expr, walk_owned_stmt};
+    use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
+    use php_ast::owned::{ClassMember, ClassMemberKind, Expr, ExprKind};
+    use std::ops::ControlFlow;
+
+    struct Collector(Vec<VariableScope>);
+    impl OwnedVisitor for Collector {
+        fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
+            if matches!(stmt.kind, StmtKind::Function(_)) {
+                self.0.push(VariableScope {
+                    span: stmt.span,
+                    kind: VariableScopeKind::Isolated,
+                });
+            }
+            walk_owned_stmt(self, stmt)
+        }
+        fn visit_class_member(&mut self, member: &ClassMember) -> ControlFlow<()> {
+            if matches!(member.kind, ClassMemberKind::Method(_)) {
+                self.0.push(VariableScope {
+                    span: member.span,
+                    kind: VariableScopeKind::Isolated,
+                });
+            }
+            walk_owned_class_member(self, member)
+        }
+        fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+            match &expr.kind {
+                ExprKind::Closure(c) => self.0.push(VariableScope {
+                    span: expr.span,
+                    kind: VariableScopeKind::Closure {
+                        params: param_names(&c.params),
+                        captured: c.use_vars.iter().map(|u| u.name.to_string()).collect(),
+                    },
+                }),
+                ExprKind::ArrowFunction(a) => self.0.push(VariableScope {
+                    span: expr.span,
+                    kind: VariableScopeKind::Arrow {
+                        params: param_names(&a.params),
+                    },
+                }),
+                _ => {}
+            }
+            walk_owned_expr(self, expr)
+        }
+    }
+
+    let mut collector = Collector(Vec::new());
+    let _ = walk_owned_program(&mut collector, program);
+    collector.0
+}
+
+/// The span of the scope that owns variable `name` at `offset`; `None` for
+/// the file's top level.
+fn variable_owner(scopes: &[VariableScope], offset: u32, name: &str) -> Option<Span> {
+    let mut enclosing: Vec<&VariableScope> = scopes
+        .iter()
+        .filter(|s| span_contains(s.span, offset))
+        .collect();
+    enclosing.sort_by_key(|s| span_len(s.span));
+    enclosing
+        .into_iter()
+        .find(|s| match &s.kind {
+            VariableScopeKind::Isolated => true,
+            VariableScopeKind::Arrow { params } => params.iter().any(|p| p == name),
+            VariableScopeKind::Closure { params, captured } => {
+                params.iter().any(|p| p == name) || !captured.iter().any(|c| c == name)
+            }
+        })
+        .map(|s| s.span)
+}
+
+fn resolve_variable_references(
+    db: &dyn MirDatabase,
+    php_version: crate::PhpVersion,
+    file: &Arc<str>,
+    byte_offset: u32,
+) -> Vec<crate::Range> {
+    use crate::symbol::ReferenceKind;
+
+    let Some(sf) = db.lookup_source_file(file.as_ref()) else {
+        return Vec::new();
+    };
+    let prepared = crate::db::prepare_analysis_file(db, sf);
+    let parsed = prepared.parse_result();
+    let source = prepared.text.as_ref();
+    let source_map = &parsed.source_map;
+    let symbols = resolve_scope_symbols(
+        db,
+        php_version,
+        file.clone(),
+        source,
+        &parsed.program,
+        source_map,
+        byte_offset,
+        false,
+        false,
+    );
+    let variables: Vec<(&ResolvedSymbol, &str)> = symbols
+        .iter()
+        .filter_map(|s| match &s.kind {
+            ReferenceKind::Variable(name) => Some((s, name.as_ref())),
+            _ => None,
+        })
+        .collect();
+    let Some(&(_, name)) = best_at(&variables, |v| v.0.span, |_| None, byte_offset, false) else {
+        return Vec::new();
+    };
+
+    let scopes = collect_variable_scopes(&parsed.program);
+    let owner = variable_owner(&scopes, byte_offset, name);
+    let mut spans: Vec<Span> = variables
+        .iter()
+        .filter(|(s, n)| *n == name && variable_owner(&scopes, s.span.start, name) == owner)
+        .map(|(s, _)| s.span)
+        .collect();
+    spans.sort_by_key(|s| (s.start, s.end));
+    spans.dedup_by_key(|s| (s.start, s.end));
+    spans
+        .into_iter()
+        .map(|span| {
+            let position = |offset: u32| {
+                let (line, column) =
+                    crate::diagnostics::offset_to_line_col(source, offset, source_map);
+                crate::Position {
+                    line,
+                    column: u32::from(column),
+                }
+            };
+            crate::Range {
+                start: position(span.start),
+                end: position(span.end),
+            }
+        })
+        .collect()
 }
 
 fn resolve_name_at(

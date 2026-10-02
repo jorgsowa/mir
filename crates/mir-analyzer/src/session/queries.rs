@@ -73,6 +73,18 @@ impl AnalysisSession {
         crate::FileAnalyzer::new(self).outgoing_calls(Arc::from(file), byte_offset)
     }
 
+    /// Every occurrence of the local variable or parameter under
+    /// `byte_offset` in `file`, in source order, as name ranges including the
+    /// `$`. An occurrence belongs to the variable when it binds to the same
+    /// declaration: nested functions and closures start a new scope, except
+    /// where a closure captures the variable with `use`; arrow functions share
+    /// the enclosing scope except for their own parameters. Empty when the
+    /// offset is not on a variable. Powers document highlight and local
+    /// rename.
+    pub fn variable_references(&mut self, file: &str, byte_offset: u32) -> Vec<crate::Range> {
+        crate::FileAnalyzer::new(self).variable_references(Arc::from(file), byte_offset)
+    }
+
     /// Resolve the symbol at `byte_offset` in `file`'s current ingested text.
     ///
     /// Answers the same as [`crate::FileAnalysis::symbol_at`] without the

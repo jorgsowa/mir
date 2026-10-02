@@ -52,6 +52,7 @@ mod tag_descriptions;
 mod type_env;
 mod user_stubs;
 mod var_docblock_split_html_block;
+mod variable_references;
 mod vendor_load_eviction;
 mod vendor_subtype_index;
 mod warm_start;

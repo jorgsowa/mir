@@ -797,6 +797,8 @@ impl<'a> StatementsAnalyzer<'a> {
                     },
                 ));
             }
+            let name_span = crate::symbol::variable_token_span(self.source, sv.span, name);
+            self.record_symbol_for_var(name_span, name, ty.clone());
             ctx.set_var(name, ty);
             std::sync::Arc::make_mut(&mut ctx.static_var_names).insert(mir_types::Name::from(name));
             let (line, col_start) = self.offset_to_line_col(sv.span.start);
@@ -851,6 +853,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .db
                     .global_var_type(var_name)
                     .unwrap_or_else(Type::mixed);
+                self.record_symbol_for_var(var.span, var_name, ty.clone());
                 ctx.set_var(var_name, ty);
                 std::sync::Arc::make_mut(&mut ctx.byref_param_names)
                     .insert(mir_types::Name::from(var_name));

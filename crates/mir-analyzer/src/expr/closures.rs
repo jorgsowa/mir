@@ -406,14 +406,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 }
             }
-            closure_ctx.set_var(
-                name,
-                if use_var.by_ref {
-                    widen_byref_capture(ctx.get_var(name))
-                } else {
-                    ctx.get_var(name)
-                },
+            let captured_ty = if use_var.by_ref {
+                widen_byref_capture(ctx.get_var(name))
+            } else {
+                ctx.get_var(name)
+            };
+            self.record_symbol(
+                crate::symbol::variable_token_span(self.source, use_var.span, name),
+                ReferenceKind::Variable(Arc::from(name)),
+                captured_ty.clone(),
             );
+            closure_ctx.set_var(name, captured_ty);
             if ctx.is_tainted(name) {
                 closure_ctx.taint_var(name);
             }

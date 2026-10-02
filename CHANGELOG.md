@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnalysisSession::implemented_method` returns the interface or abstract method a method implements.
 - `DeclaredParam::default_text` holds the source text of a parameter's default value.
 - `FunctionDef::tag_descriptions` and `MethodDef::tag_descriptions` hold the prose of `@param`, `@return` and `@throws` tags.
+- `AnalysisSession::variable_references` returns every occurrence of the local variable or parameter under a cursor.
 
 ### Fixed
 
 - `name_at` resolves class-like, function and enum-case declaration names, and type hints naming a missing class.
+- `symbol_at` resolves variables bound by closure `use` clauses, `catch` clauses, `static` and `global` declarations.
 
 ## [0.83.0] - 2026-10-02
 
