@@ -388,6 +388,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // var-receiver property) is tracked.
                 if a.by_ref {
                     if let ExprKind::Variable(target_name) = &a.target.kind {
+                        // Writes through a reference alias mutate the referent.
+                        ctx.foreach_byref_var_names
+                            .insert(mir_types::Name::from(target_name.as_ref()));
                         if let ExprKind::PropertyAccess(pa) = &a.value.kind {
                             if let ExprKind::Variable(recv_name) = &pa.object.kind {
                                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {
@@ -2254,11 +2257,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // later reads of otherwise-unknown variables must not be reported
                 // as undefined — we cannot prove they were not defined here.
                 ctx.has_dynamic_var_def = true;
+                // Unless the target name is a single known literal, the defined
+                // variables may be consumed by name elsewhere.
+                let mut names_known = false;
                 if let Some(var_name) = extract_simple_var(inner) {
                     ctx.read_vars
                         .insert(mir_types::Name::from(var_name.as_str()));
                     ctx.mark_consumed(&var_name);
                     let var_ty = ctx.get_var(&var_name);
+                    names_known = matches!(var_ty.types.as_slice(), [Atomic::TLiteralString(_)]);
                     for atomic in &var_ty.types {
                         if let Atomic::TLiteralString(accessed_var_name) = atomic {
                             ctx.set_var(accessed_var_name.as_ref(), ty.clone());
@@ -2273,6 +2280,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                     }
+                }
+                if !names_known {
+                    ctx.has_dynamic_var_read = true;
                 }
             }
             _ => {}

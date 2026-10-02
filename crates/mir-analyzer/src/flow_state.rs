@@ -206,7 +206,7 @@ pub struct FlowState {
     pub has_dynamic_var_def: bool,
 
     /// Set once a dynamic-name `compact()` call (`compact($names)`/`compact(...$names)`)
-    /// is seen on this path. Such a call reads an arbitrarily-named set of variables,
+    /// or a variable-variable write (`${$name} = …`) is seen on this path. Such code reads an arbitrarily-named set of variables,
     /// so a write anywhere in scope must not be reported as `UnusedVariable`/dead-write.
     /// Monotonic like `has_dynamic_var_def`, for the same reason.
     pub has_dynamic_var_read: bool,
@@ -251,7 +251,8 @@ pub struct FlowState {
     /// Used to emit UnusedForeachValue instead of UnusedVariable for these names.
     pub foreach_value_var_names: FxHashSet<Name>,
 
-    /// Variables bound by a by-reference foreach (`foreach ($arr as &$val)`).
+    /// Variables bound by a by-reference foreach (`foreach ($arr as &$val)`)
+    /// or a reference assignment (`$x = &$y`).
     /// Writes to these variables always have a side effect (they mutate the
     /// source array through the reference), so dead-write detection must not
     /// flag them as UnusedVariable.
@@ -1546,6 +1547,7 @@ impl FlowState {
         }
 
         result.has_dynamic_var_def = dynamic_var_def;
+        result.has_dynamic_var_read = dynamic_var_read;
         result.this_escaped_to_call = this_escaped;
         result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
 
