@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `do`/`while` bodies no longer narrow the initial state by the loop condition, which caused false `ImpossibleIdenticalComparison` on the first iteration.
 - `AnalysisSession::name_at` resolves a `use` import whose class, function or constant is not indexed.
 - `hash()` returns `non-empty-string`.
+- Unions absorb int literals and ranges by bound containment, so `non-negative-int|int` is `int` and `5|non-negative-int` is `non-negative-int`.
 
 ## [0.84.0] - 2026-10-02
 

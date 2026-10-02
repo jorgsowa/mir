@@ -72,6 +72,35 @@ pub struct Type {
     pub possibly_absent_offset: bool,
 }
 
+type IntBounds = (Option<i64>, Option<i64>);
+
+/// Inclusive `(min, max)` bounds of an int atomic; `None` bound is unbounded.
+fn int_bounds(a: &Atomic) -> Option<IntBounds> {
+    match a {
+        Atomic::TInt => Some((None, None)),
+        Atomic::TLiteralInt(n) => Some((Some(*n), Some(*n))),
+        Atomic::TPositiveInt => Some((Some(1), None)),
+        Atomic::TNonNegativeInt => Some((Some(0), None)),
+        Atomic::TNegativeInt => Some((None, Some(-1))),
+        Atomic::TIntRange { min, max } => Some((*min, *max)),
+        _ => None,
+    }
+}
+
+fn bounds_contain(outer: IntBounds, inner: IntBounds) -> bool {
+    let lo_ok = match (outer.0, inner.0) {
+        (None, _) => true,
+        (Some(o), Some(i)) => o <= i,
+        (Some(_), None) => false,
+    };
+    let hi_ok = match (outer.1, inner.1) {
+        (None, _) => true,
+        (Some(o), Some(i)) => o >= i,
+        (Some(_), None) => false,
+    };
+    lo_ok && hi_ok
+}
+
 impl Type {
     // --- Constructors -------------------------------------------------------
 
@@ -309,11 +338,18 @@ impl Type {
             return;
         }
 
-        // TLiteralInt(n) is subsumed by TInt.
-        if let Atomic::TLiteralInt(_) = &atomic {
-            if self.types.iter().any(|t| matches!(t, Atomic::TInt)) {
+        // Int atomics absorb each other by bound containment (`5 | int<0, max>`
+        // → `int<0, max>`, `non-negative-int | int` → `int`).
+        if let Some(new_bounds) = int_bounds(&atomic) {
+            if self
+                .types
+                .iter()
+                .any(|t| int_bounds(t).is_some_and(|b| bounds_contain(b, new_bounds)))
+            {
                 return;
             }
+            self.types
+                .retain(|t| !int_bounds(t).is_some_and(|b| bounds_contain(new_bounds, b)));
         }
         // TLiteralString(s) is subsumed by TString.
         if let Atomic::TLiteralString(_) = &atomic {
@@ -340,10 +376,6 @@ impl Type {
             self.types.retain(|t| !matches!(t, Atomic::TTrue));
             self.types.push(Atomic::TBool);
             return;
-        }
-        // Adding TInt widens away all TLiteralInt variants.
-        if matches!(atomic, Atomic::TInt) {
-            self.types.retain(|t| !matches!(t, Atomic::TLiteralInt(_)));
         }
         // Adding TString widens away all TLiteralString variants.
         if matches!(atomic, Atomic::TString) {
