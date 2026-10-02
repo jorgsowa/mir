@@ -65,6 +65,17 @@ pub(super) fn resolve_type_name(
     if name.starts_with('\\') {
         return Name::from(name.trim_start_matches('\\'));
     }
+    // `Enum::Case`: only the class part is a name to resolve.
+    if let Some((class, member)) = name.split_once("::") {
+        let class = resolve_type_name(
+            class,
+            full_qualify,
+            allow_builtin_shortcut,
+            namespace,
+            use_aliases,
+        );
+        return Name::from(format!("{class}::{member}"));
+    }
     let stripped = name.trim_start_matches('\\');
     // Already-resolved `@psalm-import-type` placeholder.
     if name.starts_with(super::IMPORT_PLACEHOLDER_PREFIX) {
