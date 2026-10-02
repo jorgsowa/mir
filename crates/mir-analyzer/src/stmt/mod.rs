@@ -503,7 +503,11 @@ impl<'a> StatementsAnalyzer<'a> {
                         },
                     ));
                 }
-                ctx.set_var(name.as_str(), ann.ty.clone());
+                // `@var T $obj->prop` refines the property, not a variable.
+                match name.rsplit_once("->") {
+                    Some((obj, prop)) => ctx.set_prop_refined(obj, prop, ann.ty.clone()),
+                    None => ctx.set_var(name.as_str(), ann.ty.clone()),
+                }
             }
         }
 
