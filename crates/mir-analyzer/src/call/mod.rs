@@ -191,3 +191,35 @@ thread_local! {
     pub(crate) static ARG_TYPES_BUF: std::cell::RefCell<Option<Vec<mir_types::Type>>> =
         const { std::cell::RefCell::new(Some(Vec::new())) };
 }
+
+/// Param types a callee passes to a closure bound to `param` (`callable(E)` /
+/// `Closure(E)`), with `bindings` substituted.
+pub(crate) fn callback_param_hints(
+    ea: &crate::expr::ExpressionAnalyzer<'_>,
+    param: &mir_codebase::definitions::DeclaredParam,
+    bindings: &rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>,
+) -> Option<Vec<Option<mir_types::Type>>> {
+    use mir_types::Atomic;
+    let ty = param.ty.as_ref()?.substitute_templates(bindings);
+    let mut callables = ty.types.iter().filter_map(|a| match a {
+        Atomic::TCallable {
+            params: Some(params),
+            ..
+        } => Some(params),
+        Atomic::TClosure { data } => Some(&data.params),
+        _ => None,
+    });
+    let fn_params = callables.next()?;
+    if callables.next().is_some() {
+        return None;
+    }
+    Some(
+        fn_params
+            .iter()
+            .map(|p| {
+                p.ty.as_ref()
+                    .map(|t| callable::resolve_enum_case_refs(&t.to_union(), ea))
+            })
+            .collect(),
+    )
+}

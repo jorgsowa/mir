@@ -1081,7 +1081,7 @@ fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAna
 
 /// Rewrites docblock `Enum::Case` references (parsed as an opaque named type) to enum-case
 /// literals so they subtype their enum. References that don't name an enum case pass through.
-fn resolve_enum_case_refs(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> Type {
+pub(crate) fn resolve_enum_case_refs(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> Type {
     let case_literal = |name: &str| {
         let (enum_name, case_name) = name.split_once("::")?;
         let crate::db::ClassLike::Enum(e) =

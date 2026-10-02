@@ -89,6 +89,8 @@ pub struct ExpressionAnalyzer<'a> {
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
+    /// Param types the callee passes to the closure literal about to be analyzed.
+    pub(crate) callback_param_hints: Option<Vec<Option<Type>>>,
     /// When true, the variable currently being analyzed is the BASE of an
     /// `ArrayAccess` expression (`$_SERVER` inside `$_SERVER['x']`), which
     /// already runs its own superglobal purity check at the `ArrayAccess`
@@ -160,6 +162,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             collect_navigation_facts: false,
             collect_resolved_navigation_facts: false,
             in_existence_check: false,
+            callback_param_hints: None,
             in_array_access_base: false,
             yielded_types,
             plugins: mir_plugin::snapshot(),

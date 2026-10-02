@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UnusedVariable` no longer fires for the internal `this->prop` key created when an assertion call (e.g. PHPUnit `assertSame`) takes a property chain.
 - `@phpstan-assert =Type $x` (strict equality) narrows like `Type` instead of `mixed`.
 - A method call on a union receiver no longer reports `TooFewArguments`/`TooManyArguments` for an atom when a sibling atom's method accepts the argument count.
+- `PossiblyUndefinedVariable` no longer fires for a by-ref out param (`preg_match(..., $m)`) in the true branch of `&&` or after an `||` guard in a namespaced file.
+- A closure literal passed to a method of a generic receiver takes its natively-typed params from the callee's `callable(E)` signature with the receiver's type args bound, so `Err $e` is `Err::NotFound` for a `Result<Err::NotFound, T>`.
+- `UnhandledMatchCondition` checks a subject narrowed to enum-case literals against those cases only.
+- `UndefinedDocblockClass` no longer fires for an existing `Enum::Case` in a function `@return` type.
 - `array<class-string<T>>` and `list<class-string<T>>` params no longer report `InvalidArgument` when `T` binds from the elements.
 
 ## [0.83.0] - 2026-10-02

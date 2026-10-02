@@ -233,6 +233,30 @@ impl<'a> ExpressionAnalyzer<'a> {
         (template_names, template_params, defining_entity)
     }
 
+    /// Narrows natively-typed params to the types the callee actually passes in
+    /// (`callable(Err::NotFound)` for a closure declared `Err $e`). Docblock
+    /// `@param` types win.
+    fn narrow_params_to_callback_hints(&mut self, params: &mut [mir_codebase::DeclaredParam]) {
+        let Some(hints) = self.callback_param_hints.take() else {
+            return;
+        };
+        for (param, hint) in params.iter_mut().zip(hints) {
+            let (Some(declared), Some(hint)) = (&param.ty, hint) else {
+                continue;
+            };
+            if param.is_byref
+                || param.is_variadic
+                || declared.from_docblock
+                || hint.is_never()
+                || hint == **declared
+                || !crate::subtype::is_subtype(self.db, &hint, declared)
+            {
+                continue;
+            }
+            param.ty = mir_codebase::wrap_param_type(Some(hint));
+        }
+    }
+
     pub(super) fn analyze_closure(
         &mut self,
         c: &ClosureExpr,
@@ -273,6 +297,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 &defining_entity,
             );
         }
+        self.narrow_params_to_callback_hints(&mut params);
         let return_ty_hint = c
             .return_type
             .as_ref()
@@ -582,6 +607,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 &defining_entity,
             );
         }
+        self.narrow_params_to_callback_hints(&mut params);
         let return_ty_hint = af
             .return_type
             .as_ref()

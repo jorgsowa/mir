@@ -25,6 +25,33 @@ use super::args::{
 };
 use super::CallAnalyzer;
 
+/// Template bindings from the receiver's type args, including inherited ones.
+///
+/// A plain subclass that doesn't redeclare `@template` (`class IntBox extends
+/// Box {}`) still carries `receiver_type_params` positioned against Box's own
+/// template list, so binding must walk up to that same ancestor.
+fn receiver_class_bindings(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    receiver_type_params: &[Type],
+    class_tps: &[TemplateParam],
+    owner_fqcn: &str,
+) -> rustc_hash::FxHashMap<Name, Type> {
+    let mut bindings = build_class_bindings(class_tps, receiver_type_params);
+    let inherited_bindings = crate::db::inherited_template_bindings(db, fqcn, &bindings);
+    if owner_fqcn == fqcn {
+        // Declared on the receiver's own class: its own template wins over a
+        // same-named ancestor template.
+        for (k, v) in inherited_bindings {
+            bindings.entry(k).or_insert(v);
+        }
+    } else {
+        // Inherited method: the owner's template scope wins.
+        bindings.extend(inherited_bindings);
+    }
+    bindings
+}
+
 fn extract_namespace(fqcn: &str) -> Option<&str> {
     if let Some(pos) = fqcn.rfind('\\') {
         Some(&fqcn[..pos])
@@ -405,7 +432,7 @@ impl CallAnalyzer {
                 resolve_method_from_db(ea.db, &Arc::from(resolved.as_str()), &method_name_lower)
             }
         });
-        if let Some(resolved) = premark_resolved {
+        if let Some(ref resolved) = premark_resolved {
             super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
         }
 
@@ -422,14 +449,46 @@ impl CallAnalyzer {
         // into a single unioned entry) and expanded inside
         // `resolve_method_return`, mirroring `static_call.rs`/`function.rs`.
         let mut sole_spread_ty: Option<Type> = None;
-        for arg in call.args.iter() {
+        // Closure-literal args are typed against the callee's `callable(...)`
+        // params, bound through the receiver's type args.
+        let callback_ctx = premark_resolved.as_ref().and_then(|resolved| {
+            let receiver = obj_ty.remove_null();
+            let [Atomic::TNamedObject { fqcn, type_params }] = receiver.types.as_slice() else {
+                return None;
+            };
+            if type_params.is_empty() {
+                return None;
+            }
+            let fqcn = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
+            let class_tps = crate::db::class_template_params(ea.db, &fqcn)?;
+            let bindings = receiver_class_bindings(
+                ea.db,
+                &fqcn,
+                type_params,
+                &class_tps,
+                &resolved.owner_fqcn,
+            );
+            Some((resolved.params.clone(), bindings))
+        });
+        for (arg_index, arg) in call.args.iter().enumerate() {
             // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
             // — not yet modeled; keep positional slots aligned with `mixed`.
             let Some(value) = &arg.value else {
                 arg_types.push(Type::mixed());
                 continue;
             };
+            if matches!(
+                value.kind,
+                ExprKind::Closure(_) | ExprKind::ArrowFunction(_)
+            ) && !arg.unpack
+                && arg.name.is_none()
+            {
+                ea.callback_param_hints = callback_ctx.as_ref().and_then(|(params, bindings)| {
+                    super::callback_param_hints(ea, params.get(arg_index)?, bindings)
+                });
+            }
             let ty = ea.analyze(value, ctx);
+            ea.callback_param_hints = None;
             super::consume_arg_assignment(value, ctx);
             if arg.unpack && call.args.len() == 1 {
                 sole_spread_ty = Some(ty.clone());
@@ -1203,24 +1262,13 @@ fn resolve_method_return<'a>(
         let class_tps = crate::db::class_template_params(ea.db, fqcn)
             .map(|tps| tps.to_vec())
             .unwrap_or_default();
-        let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
-        let inherited_bindings = crate::db::inherited_template_bindings(ea.db, fqcn, &bindings);
-        if resolved.owner_fqcn.as_ref() == fqcn.as_ref() {
-            // The called method is declared directly on the receiver's own
-            // class — a bare template name in its signature is the
-            // receiver's OWN template, so it must win over a same-named but
-            // unrelated ancestor template (only fill in names `bindings`
-            // doesn't already have).
-            for (k, v) in inherited_bindings {
-                bindings.entry(k).or_insert(v);
-            }
-        } else {
-            // The method is inherited from `resolved.owner_fqcn` — a bare
-            // template name in ITS signature is scoped to that owner's own
-            // declaration, which the ancestor-chain walk resolves; it must
-            // win over a same-named receiver-own template.
-            bindings.extend(inherited_bindings);
-        }
+        let mut bindings = receiver_class_bindings(
+            ea.db,
+            fqcn,
+            receiver_type_params,
+            &class_tps,
+            &resolved.owner_fqcn,
+        );
 
         // Check class-level `@template T of Bound` here too, not only at
         // `new Box(...)`: a receiver typed `Box<NotAnimal>` by annotation never
