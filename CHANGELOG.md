@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `name_at` resolves class-like, function and enum-case declaration names, and type hints naming a missing class.
 - `symbol_at` resolves variables bound by closure `use` clauses, `catch` clauses, `static` and `global` declarations.
+- Docblock `Enum::Case` types resolve the enum through `use` imports instead of the current namespace.
+- `UnusedVariable` no longer fires for the internal `this->prop` key created when an assertion call (e.g. PHPUnit `assertSame`) takes a property chain.
 
 ## [0.83.0] - 2026-10-02
 
