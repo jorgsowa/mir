@@ -1373,6 +1373,23 @@ pub(crate) fn array_pad_return_type(arg_types: &[Type]) -> Option<Type> {
 /// form) has no such exclusion: every row is always present, so it carries no
 /// `.optional` dependency of its own.
 pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
+    array_column_shape_type(arg_types).or_else(|| {
+        // Without `$index_key` the result is always a list, whatever the rows are.
+        has_no_index_key(arg_types).then(|| {
+            Type::single(Atomic::TList {
+                value: Box::new(Type::mixed()),
+            })
+        })
+    })
+}
+
+fn has_no_index_key(arg_types: &[Type]) -> bool {
+    arg_types
+        .get(2)
+        .is_none_or(|t| matches!(t.types.as_slice(), [Atomic::TNull]))
+}
+
+fn array_column_shape_type(arg_types: &[Type]) -> Option<Type> {
     let source = arg_types.first()?;
     if source.is_mixed() {
         return None;
@@ -1402,14 +1419,7 @@ pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
         None => (row.clone(), false),
     };
 
-    // Omitted or an explicit literal `null` both mean "no $index_key": a
-    // fresh 0-indexed list result.
-    let index_arg = arg_types.get(2);
-    let is_no_index = match index_arg {
-        None => true,
-        Some(t) => matches!(t.types.as_slice(), [Atomic::TNull]),
-    };
-    if is_no_index {
+    if has_no_index_key(arg_types) {
         let non_empty = super::callable::is_non_empty_collection(source) && !column_optional;
         let atomic = if non_empty {
             Atomic::TNonEmptyList {
@@ -1423,7 +1433,7 @@ pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
         return Some(Type::single(atomic));
     }
 
-    let index_key_ty = index_arg?;
+    let index_key_ty = arg_types.get(2)?;
     let index_key = match index_key_ty.types.as_slice() {
         [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
         [Atomic::TLiteralInt(i)] => ArrayKey::Int(*i),
