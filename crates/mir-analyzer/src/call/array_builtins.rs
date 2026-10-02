@@ -591,18 +591,18 @@ pub(crate) fn infer_array_filter_return(
     let default_mode = arg_types
         .get(2)
         .is_none_or(|m| m.types.iter().all(|a| matches!(a, Atomic::TLiteralInt(0))));
-    if let Some(shape) = filtered_keyed_shape(source, default_mode, callback_expr, db) {
+    let truthy_only = arg_types
+        .get(1)
+        .is_none_or(|t| t.types.iter().all(|a| matches!(a, Atomic::TNull)));
+    if let Some(shape) = filtered_keyed_shape(source, default_mode, truthy_only, callback_expr, db)
+    {
         return Some(shape);
     }
     let (key, value) = crate::stmt::infer_foreach_types(source);
     if key.is_mixed() && value.is_mixed() {
         return None;
     }
-    let value = if default_mode {
-        callback_predicate_narrowed(&value, callback_expr, db).unwrap_or(value)
-    } else {
-        value
-    };
+    let value = filtered_value(value, default_mode, truthy_only, callback_expr, db);
     Some(Type::single(Atomic::TArray {
         key: Box::new(key),
         value: Box::new(value),
@@ -614,6 +614,7 @@ pub(crate) fn infer_array_filter_return(
 fn filtered_keyed_shape(
     source: &Type,
     default_mode: bool,
+    truthy_only: bool,
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
 ) -> Option<Type> {
@@ -628,17 +629,38 @@ fn filtered_keyed_shape(
     let mut properties = properties.clone();
     for prop in properties.values_mut() {
         prop.optional = true;
-        if default_mode {
-            if let Some(narrowed) = callback_predicate_narrowed(&prop.ty, callback_expr, db) {
-                prop.ty = narrowed;
-            }
-        }
+        prop.ty = filtered_value(
+            prop.ty.clone(),
+            default_mode,
+            truthy_only,
+            callback_expr,
+            db,
+        );
     }
     Some(Type::single(Atomic::TKeyedArray {
         properties,
         is_open: *is_open,
         is_list: false,
     }))
+}
+
+/// Without a callback `array_filter` keeps only truthy values; otherwise a
+/// recognized predicate callback narrows in the default mode.
+fn filtered_value(
+    value: Type,
+    default_mode: bool,
+    truthy_only: bool,
+    callback_expr: Option<&Expr>,
+    db: &dyn crate::db::MirDatabase,
+) -> Type {
+    if truthy_only {
+        let truthy = value.narrow_to_truthy();
+        return if truthy.is_empty() { value } else { truthy };
+    }
+    if default_mode {
+        return callback_predicate_narrowed(&value, callback_expr, db).unwrap_or(value);
+    }
+    value
 }
 
 /// Narrows `value` by the recognized type-check predicate a single-param

@@ -1,5 +1,5 @@
 ===description===
-array_filter on a keyed shape keeps the keys, each made optional; a
+array_filter on a keyed shape keeps the keys, each made optional; falsy dropped; a
 predicate callback still narrows values, key/both modes leave them alone,
 open shapes stay open, and list shapes keep the generic result.
 ===config===
@@ -9,7 +9,7 @@ suppress=UnusedVariable
 /** @param array{code: int|null, key: string|null} $s */
 function plain(array $s): void {
     $f = array_filter($s);
-    /** @mir-check $f is array{'code'?: int|null, 'key'?: string|null} */
+    /** @mir-check $f is array{'code'?: int, 'key'?: non-empty-string} */
     echo 1;
 }
 
@@ -30,7 +30,7 @@ function byKey(array $s): void {
 /** @param array{code: int|null, ...} $s */
 function open(array $s): void {
     $f = array_filter($s);
-    /** @mir-check $f is array{'code'?: int|null} */
+    /** @mir-check $f is array{'code'?: int} */
     echo 1;
 }
 
