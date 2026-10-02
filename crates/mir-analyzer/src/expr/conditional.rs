@@ -794,12 +794,36 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         // Case 4: Subject is an unconstrained scalar (plain int/string/float,
-        // not a finite literal union or enum) with no default arm. No finite
-        // set of literal arms can ever prove exhaustiveness here — PHP throws
+        // not a finite literal union or enum) with no default arm. PHP throws
         // UnhandledMatchError for any value the arms don't happen to list.
         // Cases 1/1b above already return early for a subject that IS a
         // finite literal union, so reaching here with a scalar atom means at
-        // least one atom is genuinely unbounded.
+        // least one atom is genuinely unbounded. A plain int/string matched
+        // only against literal arms is a deliberate lookup, not reported.
+        let literal_arms_only = arms
+            .iter()
+            .filter_map(|a| a.conditions.as_deref())
+            .flatten()
+            .all(|cond| {
+                matches!(cond.kind, ExprKind::String(_))
+                    || extract_literal_int(cond).is_some()
+                    || self.resolve_class_const_literal(cond, ctx).is_some()
+            });
+        let int_or_string_subject = subject_ty.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TInt
+                    | Atomic::TPositiveInt
+                    | Atomic::TNonNegativeInt
+                    | Atomic::TNegativeInt
+                    | Atomic::TString
+                    | Atomic::TNonEmptyString
+                    | Atomic::TNumericString
+            )
+        });
+        if literal_arms_only && int_or_string_subject {
+            return None;
+        }
         if !subject_ty.types.is_empty()
             && subject_ty.types.iter().all(|a| {
                 matches!(

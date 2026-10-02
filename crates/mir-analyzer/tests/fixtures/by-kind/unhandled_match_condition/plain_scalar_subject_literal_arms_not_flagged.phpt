@@ -1,0 +1,79 @@
+===description===
+A plain int/string subject matched only against literal arms (inline or resolved class constants) is not reported; a non-literal arm, an unresolvable constant or a large bounded range still is.
+===config===
+suppress=UnusedParam
+===file===
+<?php
+class Kind {
+    const A = 'a';
+    const B = 'b';
+    const ONE = 1;
+    const DYNAMIC = PHP_INT_SIZE . 'x';
+
+    public static function selfConst(string $kind): int {
+        return match ($kind) {
+            self::A => 1,
+            self::B => 2,
+        };
+    }
+
+    public static function staticConst(string $kind): int {
+        return match ($kind) {
+            static::A, static::B => 1,
+        };
+    }
+
+    public static function intConst(int $n): string {
+        return match ($n) {
+            self::ONE => 'one',
+            2 => 'two',
+            -1 => 'minus',
+        };
+    }
+
+    public static function unresolvedConst(string $kind): int {
+        return match ($kind) {
+            self::DYNAMIC => 1,
+        };
+    }
+
+    public static function mixedWithVariable(string $kind, string $other): int {
+        return match ($kind) {
+            self::A => 1,
+            $other => 2,
+        };
+    }
+}
+
+function otherClassConst(string $kind): int {
+    return match ($kind) {
+        Kind::A => 1,
+        Kind::B => 2,
+    };
+}
+
+function inlineLiterals(string $kind, int $n): int {
+    $a = match ($kind) { 'x' => 1, 'y' => 2 };
+    $b = match ($n) { 1 => 1, 2 => 2 };
+    return $a + $b;
+}
+
+/** @param int<0, 100000> $n */
+function largeRangeStillFlagged(int $n): int {
+    return match ($n) {
+        0 => 1,
+        1 => 2,
+    };
+}
+
+/** @param 'a'|'b' $kind */
+function literalUnionStillFlagged(string $kind): int {
+    return match ($kind) {
+        'a' => 1,
+    };
+}
+===expect===
+UnhandledMatchCondition@30:15-32:9: Unhandled match condition: possibly-unmatched value of type 'string'
+UnhandledMatchCondition@36:15-39:9: Unhandled match condition: possibly-unmatched value of type 'string'
+UnhandledMatchCondition@58:11-61:5: Unhandled match condition: possibly-unmatched value of type 'int<0, 100000>'
+UnhandledMatchCondition@66:11-68:5: Unhandled match condition: "b"

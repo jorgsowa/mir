@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A closure with a bare native `array` return type takes its body's more precise array type, so `new Cached(fn(): array => load())` infers `Cached<array<non-empty-string, mixed>>`.
 - `array_column` reads the declared public property types of class rows, and falls back to `array<array-key, mixed>` instead of a bare `array` when the result is keyed by an unresolved index.
 - Writing a literal key to an untyped `array` refines it to an open shape, so `$data['records'] = $foos` satisfies a declared `array{records: ...}`.
+- Truthiness and null checks narrow a two-hop property path like `$this->cfg->domain`, including in `&&` chains and ternaries; a call on the receiver or a write to the path discards the narrowing.
+- `match` on a plain `int` or `string` with only literal arms (including resolved class constants) no longer reports `UnhandledMatchCondition`.
 
 ## [0.84.0] - 2026-10-02
 
