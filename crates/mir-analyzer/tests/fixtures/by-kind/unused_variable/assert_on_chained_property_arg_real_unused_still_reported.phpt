@@ -22,8 +22,8 @@ final class SomeTest extends TestCase
     public function testRead(): void
     {
         $unused = 5;
+//      ^^^^^^^ UnusedVariable: Variable $unused is never read
         self::assertSame(1, $this->dto->id);
     }
 }
 ===expect===
-UnusedVariable@19:8-19:15: Variable $unused is never read

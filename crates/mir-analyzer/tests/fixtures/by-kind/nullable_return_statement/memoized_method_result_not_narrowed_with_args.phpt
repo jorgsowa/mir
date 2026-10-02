@@ -15,6 +15,7 @@ function f(Box $b): string {
         return '';
     }
     return $b->find(1);
+//  ^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
 }
 function g(Box $b): string {
     if ($b->name() === null) {
@@ -23,4 +24,3 @@ function g(Box $b): string {
     return $b->name();
 }
 ===expect===
-NullableReturnStatement@10:4-10:23: Return type 'string|null' is not compatible with declared 'string'

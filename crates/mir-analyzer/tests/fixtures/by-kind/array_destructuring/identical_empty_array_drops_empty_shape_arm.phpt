@@ -29,6 +29,7 @@ function else_branch(array $row): string {
         $v = $row;
         /** @mir-check $v is array{} */
         return '';
+//      ^^^^^^^^^^ TypeCheckMismatch: Type of $v is expected to be array{}, got array{'algorithm': non-empty-string}|array{}
     } else {
         return $row['algorithm'];
     }
@@ -50,4 +51,3 @@ function count_check(array $row): string {
     return $row['algorithm'];
 }
 ===expect===
-TypeCheckMismatch@25:8-25:18: Type of $v is expected to be array{}, got array{'algorithm': non-empty-string}|array{}

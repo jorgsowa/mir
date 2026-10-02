@@ -13,7 +13,7 @@ enum Other { case X; }
 function onA(callable $f): void {}
 
 onA(fn(int $e) => null);
+//  ^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of onA() expects 'callable whose parameter #1 accepts App\Err::A', got 'callable whose parameter #1 only accepts int'
 onA(fn(Other $e) => null);
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of onA() expects 'callable whose parameter #1 accepts App\Err::A', got 'callable whose parameter #1 only accepts App\Other'
 ===expect===
-InvalidArgument@10:4-10:22: Argument $f of onA() expects 'callable whose parameter #1 accepts App\Err::A', got 'callable whose parameter #1 only accepts int'
-InvalidArgument@11:4-11:24: Argument $f of onA() expects 'callable whose parameter #1 accepts App\Err::A', got 'callable whose parameter #1 only accepts App\Other'

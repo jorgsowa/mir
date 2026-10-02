@@ -36,6 +36,6 @@ function returned(Cov $c): int {
 }
 function unsuppressed(Cov $c): int {
     return $c->getReport();
+//         ^^^^^^^^^^^^^^^ InternalMethod: Method Vendor\Lib\Cov::getReport() is marked @internal
 }
 ===expect===
-Main.php: InternalMethod@24:11-24:26: Method Vendor\Lib\Cov::getReport() is marked @internal

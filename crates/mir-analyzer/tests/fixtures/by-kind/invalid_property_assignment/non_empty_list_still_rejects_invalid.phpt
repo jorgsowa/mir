@@ -15,10 +15,10 @@ class Canvas {
 
 function run(Canvas $c): void {
     $c->shapes = [];
+//  ^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{}'
     $c->shapes = [new Circle(), new Other()];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{0: Circle, 1: Other}'
     $c->shapes = ['a' => new Circle()];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{'a': Circle}'
 }
 ===expect===
-InvalidPropertyAssignment@12:4-12:19: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{}'
-InvalidPropertyAssignment@13:4-13:44: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{0: Circle, 1: Other}'
-InvalidPropertyAssignment@14:4-14:38: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{'a': Circle}'

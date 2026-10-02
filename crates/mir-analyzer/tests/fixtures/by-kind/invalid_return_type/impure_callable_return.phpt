@@ -12,9 +12,9 @@ function foo(): callable {
     /** @suppress ImpureFunctionCall */
     return function() {
         echo "bar";
+//      ^^^^^^^^^^^ ImpureFunctionCall: Calling impure function echo() in a @pure function
         return 1;
     };
 }
 ===expect===
 UnusedSuppress@8:0-8:0: Suppress annotation for 'ImpureFunctionCall' is never used
-ImpureFunctionCall@9:8-9:19: Calling impure function echo() in a @pure function

@@ -30,6 +30,7 @@ function guardReassigned(bool $flag): void {
     if ($flag) { $x = compute(); }
     $flag = (bool) rand(0, 1);
     if ($flag && $x > 0) { echo $x; }
+//               ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function guardReassignedInBranch(bool $flag): void {
@@ -38,32 +39,31 @@ function guardReassignedInBranch(bool $flag): void {
         $x = compute();
     }
     if ($flag && $x > 0) { echo $x; }
+//               ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function otherGuard(bool $flag, bool $other): void {
     if ($flag) { $x = compute(); }
     if ($other && $x > 0) { echo $x; }
+//                ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function variableReassigned(bool $flag): void {
     if ($flag) { $x = compute(); }
     unset($x);
     if ($flag) { echo $x; }
+//                    ^^ UndefinedVariable: Variable $x is not defined
 }
 
 function withElseBranch(bool $flag): void {
     if ($flag) { $x = compute(); } else { echo 'no'; }
     if ($flag && $x > 0) { echo $x; }
+//               ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function negatedGuard(bool $flag): void {
     if ($flag) { $x = compute(); }
     if (!$flag && $x > 0) { echo $x; }
+//                ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@28:17-28:19: Variable $x might not be defined
-PossiblyUndefinedVariable@36:17-36:19: Variable $x might not be defined
-PossiblyUndefinedVariable@41:18-41:20: Variable $x might not be defined
-UndefinedVariable@47:22-47:24: Variable $x is not defined
-PossiblyUndefinedVariable@52:17-52:19: Variable $x might not be defined
-PossiblyUndefinedVariable@57:18-57:20: Variable $x might not be defined

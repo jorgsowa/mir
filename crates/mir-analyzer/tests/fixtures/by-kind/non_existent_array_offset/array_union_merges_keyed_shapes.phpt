@@ -46,7 +46,7 @@ function fromFunction(): int {
 function stillReportsMissingKey(): int {
     $o = ['un_c' => 3] + A::DEFAULTS;
     return $o['un_zzz'];
+//  ^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
+//            ^^^^^^^^ NonExistentArrayOffset: Array offset 'un_zzz' does not exist
 }
 ===expect===
-MixedReturnStatement@42:4-42:24: Cannot return a mixed type from function with declared return type 'int'
-NonExistentArrayOffset@42:14-42:22: Array offset 'un_zzz' does not exist

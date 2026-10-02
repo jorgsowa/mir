@@ -10,6 +10,6 @@ function f(?string $p): ?int {
         return 1;
     }
     return (int) $m[1];
+//               ^^ PossiblyUndefinedVariable: Variable $m might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@8:17-8:19: Variable $m might not be defined

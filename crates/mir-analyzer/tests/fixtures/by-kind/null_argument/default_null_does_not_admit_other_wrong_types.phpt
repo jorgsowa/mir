@@ -7,5 +7,5 @@ suppress=UnusedParam
 /** @param string $f */
 function plain($f = null): void {}
 plain([]);
+//    ^^ InvalidArgument: Argument $f of plain() expects 'string|null', got 'array{}'
 ===expect===
-InvalidArgument@4:6-4:8: Argument $f of plain() expects 'string|null', got 'array{}'

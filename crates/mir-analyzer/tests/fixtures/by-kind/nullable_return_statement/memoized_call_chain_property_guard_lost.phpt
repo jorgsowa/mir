@@ -19,6 +19,7 @@ class Context {
         }
         $this->reset();
         return $this->getIdentity()->accountId;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
     }
 
     public function afterOwnCallsOnly(): int {
@@ -36,7 +37,6 @@ function afterReassignment(Context $ctx, Context $other): int {
     }
     $ctx = $other;
     return $ctx->getIdentity()->accountId;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
 }
 ===expect===
-NullableReturnStatement@14:8-14:47: Return type 'int|null' is not compatible with declared 'int'
-NullableReturnStatement@31:4-31:42: Return type 'int|null' is not compatible with declared 'int'

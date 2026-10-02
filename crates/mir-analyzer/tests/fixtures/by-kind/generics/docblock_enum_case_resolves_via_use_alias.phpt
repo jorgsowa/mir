@@ -33,9 +33,9 @@ namespace App\App {
 
     function t(Get $g): void {
         $g->one()->get(static fn(Other $e) => new \Exception());
+//                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $onFailure of get() expects 'callable whose parameter #1 accepts App\Data\Err::X', got 'callable whose parameter #1 only accepts App\Data\Other'
         $r = $g->one();
         /** @mir-check $r is App\Util\Res<App\Data\Err::X> */
     }
 }
 ===expect===
-InvalidArgument@30:23-30:62: Argument $onFailure of get() expects 'callable whose parameter #1 accepts App\Data\Err::X', got 'callable whose parameter #1 only accepts App\Data\Other'

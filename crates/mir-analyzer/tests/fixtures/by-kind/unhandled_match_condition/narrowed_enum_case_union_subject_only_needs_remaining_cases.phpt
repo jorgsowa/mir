@@ -21,8 +21,8 @@ function missing(Err $e): int {
         return 0;
     }
     return match ($e) {
+//         ^ +2:5 UnhandledMatchCondition: Unhandled match condition: Err::Denied
         Err::NotFound => 1,
     };
 }
 ===expect===
-UnhandledMatchCondition@19:11-21:5: Unhandled match condition: Err::Denied

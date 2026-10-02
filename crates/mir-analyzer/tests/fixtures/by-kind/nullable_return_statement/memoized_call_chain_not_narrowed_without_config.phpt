@@ -18,7 +18,7 @@ class Context {
             throw new \Exception('no account');
         }
         return $this->getIdentity()->accountId;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'positive-int|null' is not compatible with declared 'positive-int'
     }
 }
 ===expect===
-NullableReturnStatement@14:8-14:47: Return type 'positive-int|null' is not compatible with declared 'positive-int'

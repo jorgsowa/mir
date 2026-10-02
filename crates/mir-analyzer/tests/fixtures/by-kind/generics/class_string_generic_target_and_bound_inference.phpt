@@ -61,7 +61,7 @@ final class Module {
         /** @mir-check $d is string */
         echo 1;
         $this->register(GetName::class, Unrelated::class);
+//                                      ^^^^^^^^^^^^^^^^ InvalidArgument: Argument $handler of register() expects 'class-string<Handler>', got 'class-string<Unrelated>'
     }
 }
 ===expect===
-InvalidArgument@58:40-58:56: Argument $handler of register() expects 'class-string<Handler>', got 'class-string<Unrelated>'

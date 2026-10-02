@@ -9,7 +9,7 @@ interface I {
     public function a(): void;
 
     public function b(): NoSuchClass;
+//                       ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
 ===expect===
 UnusedSuppress@4:0-4:0: Suppress annotation for 'UndefinedClass' is never used
-UndefinedClass@6:25-6:36: Class NoSuchClass does not exist

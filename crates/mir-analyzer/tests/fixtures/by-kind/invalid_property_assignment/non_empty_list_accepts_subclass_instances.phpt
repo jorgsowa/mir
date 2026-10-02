@@ -18,6 +18,7 @@ class Canvas {
 
     /** @param non-empty-list<Shape> $shapes */
     public function __construct(array $shapes) { $this->shapes = $shapes; }
+//                  ^^^^^^^^^^^ PropertyPossiblyUninitialized: Property Canvas::$registry may be left uninitialized by the constructor
 }
 
 function run(Canvas $c): void {
@@ -31,4 +32,3 @@ function run(Canvas $c): void {
 }
 new Canvas([new Circle(), new Square()]);
 ===expect===
-PropertyPossiblyUninitialized@15:20-15:31: Property Canvas::$registry may be left uninitialized by the constructor

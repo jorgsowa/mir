@@ -15,5 +15,5 @@ class A {
 }
 
 A::foo("for");
+//     ^^^^^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"', got '"for"'
 ===expect===
-InvalidArgument@12:7-12:12: Argument $s of foo() expects '"foo"|"bar"', got '"for"'

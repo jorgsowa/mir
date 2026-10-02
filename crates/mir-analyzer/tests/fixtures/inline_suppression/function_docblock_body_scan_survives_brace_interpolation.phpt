@@ -10,6 +10,6 @@ function f(): void {
     echo "hello {$name}";
 }
 new NoSuchClassOutside();
+//  ^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NoSuchClassOutside does not exist
 ===expect===
 UnusedSuppress@3:0-3:0: Suppress annotation for 'UndefinedClass' is never used
-UndefinedClass@7:4-7:22: Class NoSuchClassOutside does not exist

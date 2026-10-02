@@ -13,7 +13,7 @@ namespace Ns;
 
 /** @param "foo"with"|"bar"|1|2|3 $s */
 function foo($s) : void {}
+//           ^^ MissingParamType: Parameter $s of foo() has no type annotation
 foo(4);
 ===expect===
 InvalidDocblock@4:0-4:0: Invalid docblock: @param has an unterminated string literal in `"foo"with"|"bar"|1|2|3`
-MissingParamType@5:13-5:15: Parameter $s of foo() has no type annotation

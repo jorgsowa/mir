@@ -12,10 +12,10 @@ class Airport {
      */
     public static function getName(string $airport): string {
         return match ($airport) {
+//             ^ +3:9 UnhandledMatchCondition: Unhandled match condition: "lga"
             self::JFK => "John F Kennedy Airport",
             self::LHR => "London Heathrow",
         };
     }
 }
 ===expect===
-UnhandledMatchCondition@11:15-14:9: Unhandled match condition: "lga"

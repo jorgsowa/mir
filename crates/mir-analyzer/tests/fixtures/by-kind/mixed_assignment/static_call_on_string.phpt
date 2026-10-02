@@ -12,6 +12,6 @@ class A {
 $foo = "A";
 /** @suppress InvalidStringClass */
 $b = $foo::bar();
+//<^^^^^^^^^^^^^^^^ MixedAssignment: Variable $b is assigned a mixed type
 ===expect===
-MixedAssignment@9:0-9:16: Variable $b is assigned a mixed type
 UnusedSuppress@9:0-9:0: Suppress annotation for 'InvalidStringClass' is never used

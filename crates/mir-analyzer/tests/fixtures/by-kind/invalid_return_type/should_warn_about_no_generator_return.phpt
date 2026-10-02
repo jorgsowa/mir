@@ -15,9 +15,9 @@ function generator2() : Generator {
 function notagenerator() : Generator {
     if (rand(0, 1)) {
         return;
+//      ^^^^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'Generator'
     }
     return generator2();
 }
 ===expect===
 UnusedSuppress@12:0-12:0: Suppress annotation for 'InvalidNullableReturnType' is never used
-InvalidReturnType@14:8-14:15: Return type 'void' is not compatible with declared 'Generator'

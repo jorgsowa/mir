@@ -10,7 +10,7 @@ class D {
     /** @param self::MODE_* $mode */
     public function f(int $mode): bool {
         return $mode === self::OTHER;
+//             ^^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '1|2' and '9' is always false — these types can never be identical
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@9:15-9:36: '===' between '1|2' and '9' is always false — these types can never be identical

@@ -11,6 +11,6 @@ suppress=UnusedParam
  * @param 'foo $x
  */
 function bar($x): void {}
+//           ^^ MissingParamType: Parameter $x of bar() has no type annotation
 ===expect===
 InvalidDocblock@3:0-3:0: Invalid docblock: @param has an unterminated string literal in `'foo`
-MissingParamType@6:13-6:15: Parameter $x of bar() has no type annotation

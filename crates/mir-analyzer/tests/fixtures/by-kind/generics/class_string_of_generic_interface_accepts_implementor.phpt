@@ -30,7 +30,7 @@ final class Module {
     public function boot(): void {
         $this->register(GetName::class, GetNameHandler::class);
         $this->register(GetName::class, Unrelated::class);
+//                                      ^^^^^^^^^^^^^^^^ InvalidArgument: Argument $handler of register() expects 'class-string<Handler>', got 'class-string<Unrelated>'
     }
 }
 ===expect===
-InvalidArgument@27:40-27:56: Argument $handler of register() expects 'class-string<Handler>', got 'class-string<Unrelated>'

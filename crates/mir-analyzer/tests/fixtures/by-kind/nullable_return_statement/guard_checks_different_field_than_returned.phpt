@@ -17,6 +17,7 @@ final class Property {
         /** @mir-check $this->propertyId is int|null */
         return $this->propertyId;
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
     }
 
     public function propertyIdDirectGuard(): int {
@@ -24,6 +25,7 @@ final class Property {
             throw new \LogicException();
         }
         return $this->propertyId;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
     }
 
@@ -44,5 +46,3 @@ final class Property {
     }
 }
 ===expect===
-NullableReturnStatement@15:8-15:33: Return type 'int|null' is not compatible with declared 'int'
-NullableReturnStatement@23:8-23:33: Return type 'int|null' is not compatible with declared 'int'

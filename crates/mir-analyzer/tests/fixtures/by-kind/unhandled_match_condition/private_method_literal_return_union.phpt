@@ -23,6 +23,7 @@ enum Lvl {
 
     public function missingArm(): string {
         return match ($this->level()) { 0 => 'a', 1 => 'b' };
+//             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnhandledMatchCondition: Unhandled match condition: 2
     }
 
     public function finalMethod(): string {
@@ -71,4 +72,3 @@ class Str {
     }
 }
 ===expect===
-UnhandledMatchCondition@20:15-20:60: Unhandled match condition: 2

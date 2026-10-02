@@ -13,12 +13,12 @@ php_version=8.2
 class Foo {
     /** @var array{': int} */
     public $bar;
+//  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$bar has no type annotation
 
     /** @var array{": int} */
     public $baz;
+//  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$baz has no type annotation
 }
 ===expect===
 InvalidDocblock@4:0-4:0: Invalid docblock: @var has an unterminated string literal in `array{': int}`
-MissingPropertyType@5:4-5:15: Property Foo::$bar has no type annotation
-InvalidDocblock@7:0-7:0: Invalid docblock: @var has an unterminated string literal in `array{": int}`
-MissingPropertyType@8:4-8:15: Property Foo::$baz has no type annotation
+InvalidDocblock@8:0-8:0: Invalid docblock: @var has an unterminated string literal in `array{": int}`

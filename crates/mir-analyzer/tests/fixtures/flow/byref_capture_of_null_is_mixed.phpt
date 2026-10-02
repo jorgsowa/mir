@@ -37,8 +37,8 @@ function byValueKeepsNull(): void {
     $seen = null;
     $chk = function (string $id) use ($seen) {
         return $id === $seen;
+//             ^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'null' is always false — these types can never be identical
     };
     $chk('a');
 }
 ===expect===
-ImpossibleIdenticalComparison@34:15-34:28: '===' between 'string' and 'null' is always false — these types can never be identical

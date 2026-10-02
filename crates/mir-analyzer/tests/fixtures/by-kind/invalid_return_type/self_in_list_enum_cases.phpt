@@ -19,6 +19,6 @@ enum Suit {
 
 /** @mir-check $all is list<Suit> */
 $all = Suit::all();
+//<^^^^^^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $all is expected to be list<Suit>, got mixed
 echo count($all);
 ===expect===
-TypeCheckMismatch@18:0-18:19: Type of $all is expected to be list<Suit>, got mixed

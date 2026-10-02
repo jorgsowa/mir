@@ -11,6 +11,6 @@ function f(string $c): void {
     /** @mir-check $c is class-string<Foo> */
     $c::make();
     $c::missing();
+//  ^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
 }
 ===expect===
-UndefinedMethod@10:4-10:17: Method Foo::missing() does not exist

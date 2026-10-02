@@ -31,7 +31,7 @@ class Plain {
 function load(): Result { return new Result(); }
 
 load()->getOrThrow(static fn(Err $e) => match ($e) {
+//                                      ^ +2:1 UnhandledMatchCondition: Unhandled match condition: Err::Denied
     Err::NotFound => new NotFound(),
 });
 ===expect===
-UnhandledMatchCondition@30:40-32:1: Unhandled match condition: Err::Denied

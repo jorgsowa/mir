@@ -58,6 +58,7 @@ function genuinelyImpossibleInBody(?Node $start): void {
     $n = $start;
     while ($n !== null) {
         if ($n === null) {
+//          ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'Node' and 'null' is always false — these types can never be identical
             echo 'dead';
         }
         $n = $n->parent;
@@ -73,6 +74,7 @@ function headNullableAfterAdvance(): void {
 function unchangedConstantHead(): void {
     $n = new Node();
     while ($n !== null) {
+//         ^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between 'Node' and 'null' is always true — these types can never be identical
         echo 1;
         if (rand(0, 1)) {
             break;
@@ -80,5 +82,3 @@ function unchangedConstantHead(): void {
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@55:12-55:23: '===' between 'Node' and 'null' is always false — these types can never be identical
-ImpossibleIdenticalComparison@70:11-70:22: '!==' between 'Node' and 'null' is always true — these types can never be identical

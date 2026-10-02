@@ -26,6 +26,7 @@ class Notifier {
     public function key_only_read(int $currentUser, array $mentionedUserIds): void {
         foreach ($mentionedUserIds as $key => $mentionedUserId) {
 //                                            ^^^^^^^^^^^^^^^^ UnusedForeachValue: Foreach value $mentionedUserId is never read
+//                                            ^^^^^^^^^^^^^^^^ UnusedForeachValue: Foreach value $mentionedUserId is never read
             echo $key, $this->access->canView($currentUser);
         }
     }
@@ -50,4 +51,3 @@ class Notifier {
     }
 }
 ===expect===
-UnusedForeachValue@21:46-21:62: Foreach value $mentionedUserId is never read

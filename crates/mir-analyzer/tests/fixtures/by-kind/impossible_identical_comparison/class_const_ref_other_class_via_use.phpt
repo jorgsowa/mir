@@ -40,7 +40,7 @@ namespace App\Service {
 
     function genuine(string $s): bool {
         return $s === 1;
+//             ^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and '1' is always false — these types can never be identical
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@37:15-37:23: '===' between 'string' and '1' is always false — these types can never be identical

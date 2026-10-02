@@ -31,6 +31,6 @@ class Node {
 
 /** @mir-check $pair is list<Node> */
 $pair = Node::pair();
+//<^^^^^^^^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $pair is expected to be list<Node>, got mixed
 echo count($pair);
 ===expect===
-TypeCheckMismatch@30:0-30:21: Type of $pair is expected to be list<Node>, got mixed

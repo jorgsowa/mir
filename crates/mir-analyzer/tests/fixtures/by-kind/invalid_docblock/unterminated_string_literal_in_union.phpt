@@ -11,7 +11,7 @@ suppress=UnusedProperty
 class Foo {
     /** @var 'a'|' */
     public $bar;
+//  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$bar has no type annotation
 }
 ===expect===
 InvalidDocblock@4:0-4:0: Invalid docblock: @var has an unterminated string literal in `'a'|'`
-MissingPropertyType@5:4-5:15: Property Foo::$bar has no type annotation
