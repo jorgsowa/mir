@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AnalysisSession::implemented_method` returns the interface or abstract method a method implements.
+- `DeclaredParam::default_text` holds the source text of a parameter's default value.
 
 ### Fixed
 

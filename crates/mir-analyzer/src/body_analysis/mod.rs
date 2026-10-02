@@ -343,6 +343,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
             doc_type_raw: None,
             doc_type_file: None,
             has_default: p.default.is_some(),
+            default_text: None,
             is_variadic: p.variadic,
             is_byref: p.by_ref,
             is_optional: p.default.is_some() || p.variadic,

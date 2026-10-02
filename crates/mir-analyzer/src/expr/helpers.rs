@@ -1006,6 +1006,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
                 doc_type_raw: None,
                 doc_type_file: None,
                 has_default: p.default.is_some(),
+                default_text: None,
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
                 is_optional: p.default.is_some() || p.variadic,

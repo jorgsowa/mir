@@ -36,6 +36,7 @@ mod named_spread_args;
 mod on_demand_loading;
 mod outgoing_calls;
 mod packaging;
+mod param_default_text;
 mod perf_analysis;
 mod perf_open_file_closure;
 mod plugin_hooks;

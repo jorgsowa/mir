@@ -1007,6 +1007,7 @@ pub fn find_method_in_class<'db>(
                 doc_type_raw: None,
                 doc_type_file: None,
                 has_default: false,
+                default_text: None,
                 is_variadic: false,
                 is_byref: false,
                 is_optional: false,

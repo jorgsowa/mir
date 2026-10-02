@@ -315,6 +315,11 @@ impl DefinitionCollector<'_> {
                 doc_type_raw: doc_type_raw.filter(|_| ty_is_docblock),
                 doc_type_file: ty_is_docblock.then(|| self.file.clone()),
                 has_default,
+                default_text: p
+                    .default
+                    .as_ref()
+                    .and_then(|d| crate::parser::span_text(self.source, d.span))
+                    .map(Arc::from),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
                 is_optional: has_default || p.variadic,
@@ -345,6 +350,7 @@ impl DefinitionCollector<'_> {
                 doc_type_raw: None,
                 doc_type_file: None,
                 has_default: false,
+                default_text: None,
                 is_variadic: true,
                 is_byref: false,
                 is_optional: true,

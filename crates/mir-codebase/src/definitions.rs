@@ -248,9 +248,13 @@ pub struct DeclaredParam {
     /// docblock declaration.
     #[serde(default)]
     pub doc_type_file: Option<Arc<str>>,
-    /// Whether this parameter has a default value. During analysis, defaults are
-    /// never used for their value — only for marking parameters as optional.
+    /// Whether this parameter has a default value. Analysis uses it only to mark
+    /// parameters optional; the value itself is kept as text in `default_text`.
     pub has_default: bool,
+    /// Source text of the default value expression (`10`, `null`, `self::X`).
+    /// `None` when there is no default or its source text is unavailable.
+    #[serde(default)]
+    pub default_text: Option<Arc<str>>,
     pub is_variadic: bool,
     pub is_byref: bool,
     pub is_optional: bool,
@@ -260,6 +264,7 @@ impl std::hash::Hash for DeclaredParam {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.has_default.hash(state);
+        self.default_text.hash(state);
         self.is_variadic.hash(state);
         self.is_byref.hash(state);
         self.is_optional.hash(state);

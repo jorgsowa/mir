@@ -1645,6 +1645,7 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> DeclaredParam {
         doc_type_raw: None,
         doc_type_file: None,
         has_default: p.default.is_some(),
+        default_text: None,
         is_variadic: p.is_variadic,
         is_byref: p.is_byref,
         is_optional: p.is_optional,
