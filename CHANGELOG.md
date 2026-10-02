@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-10-02
+
 ### Added
 
 - `AnalysisSession::implemented_method` returns the interface or abstract method a method implements.
@@ -36,6 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UnhandledMatchCondition` checks a subject narrowed to enum-case literals against those cases only.
 - `UndefinedDocblockClass` no longer fires for an existing `Enum::Case` in a function `@return` type.
 - `array<class-string<T>>` and `list<class-string<T>>` params no longer report `InvalidArgument` when `T` binds from the elements.
+- Property reads on `@pure`/`@mutation-free` call chains are narrowed by guards without `memoizeMethodCallResults`.
+- Every `@var` tag in a docblock is applied, and a `@var`-only name is no longer reported as unused.
+- `@var T $obj->prop` refines the property instead of being reported as an unused variable.
+- `@var` and `@psalm-type` aliases are honored on promoted constructor properties.
+- `use` imports resolve inside `Closure(...)`/`callable(...)` signatures of an inline `@var`.
+- Templates mentioned only in another template's bound are inferred.
+- `class-string<Foo<...>>` targets drop their generic arguments.
+- `non-empty-list<Parent>` accepts a list-shaped array of subclasses.
+- `self` inside generic arguments resolves to the current class, and an `Enum::Case` callable param accepts its enum.
+- Template-conditional return types resolve inside unions, and `(A)|(B)` parses as a union.
+- `array_filter` without a callback drops falsy values from the result.
+- `array_column` without an index key returns `list<mixed>`.
+- A param defaulting to `null` accepts `null` arguments without a nullable type.
+- `UnusedVariable` no longer fires for reference-alias writes and dynamic variable-variable writes.
 
 ## [0.83.0] - 2026-10-02
 
