@@ -11,9 +11,10 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
 use super::core::{
-    apply_prop_narrowed, extract_static_prop_access, is_numeric_string,
-    narrow_receiver_non_null_on_prop_match, peel_parens, resolve_prop_current_type,
-    resolve_static_prop_current_type, set_narrowed, ScalarArgTarget, UnionNarrowExt,
+    apply_prop_narrowed, extract_static_prop_access, is_numeric_string, narrow_receiver_non_null,
+    narrow_receiver_non_null_on_prop_match, peel_parens, prop_receiver_type,
+    resolve_prop_current_type, resolve_static_prop_current_type, set_narrowed, ScalarArgTarget,
+    UnionNarrowExt,
 };
 
 /// Returns true if `expr` is the boolean literal `true`.
@@ -425,11 +426,11 @@ pub(super) fn narrow_prop_loose_null(
     } else {
         current.remove_null()
     };
-    let receiver_nullable = ctx.get_var(obj_var).is_nullable();
+    let receiver_nullable = prop_receiver_type(ctx, obj_var, db, file).is_nullable();
     let mark_diverges = !receiver_nullable || !is_null;
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
     if !is_null && receiver_nullable {
-        narrow_var_null(ctx, obj_var, false);
+        narrow_receiver_non_null(ctx, obj_var, db, file);
     }
 }
 

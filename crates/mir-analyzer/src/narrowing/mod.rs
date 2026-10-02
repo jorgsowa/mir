@@ -56,8 +56,9 @@ use class_introspection::{
 pub(crate) use core::{
     apply_prop_narrowed, chained_prop_receiver_key, extract_any_prop_access,
     extract_chained_prop_access, extract_class_fqcn_from_expr, extract_expr_guard_key,
-    extract_prop_access, extract_static_prop_access, is_numeric_string, memoized_receiver_key,
-    method_call_key, narrow_receiver_non_null_on_prop_match, receiver_key_is_stable,
+    extract_prop_access, extract_prop_path_access, extract_static_prop_access, is_numeric_string,
+    memoized_receiver_key, method_call_key, narrow_receiver_non_null,
+    narrow_receiver_non_null_on_prop_match, prop_receiver_type, receiver_key_is_stable,
     resolve_prop_current_type, resolve_static_prop_current_type, MatchSubject,
 };
 use core::{
@@ -274,7 +275,7 @@ pub fn narrow_from_condition(
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let ExprKind::NullsafeMethodCall(mc) = &b.left.kind {
                     narrow_nullsafe_method_call_null(ctx, mc, db, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_prop_path_access(&b.left) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
                     extract_static_prop_access(&b.left, ctx, db, file)
@@ -316,7 +317,7 @@ pub fn narrow_from_condition(
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let ExprKind::NullsafeMethodCall(mc) = &b.right.kind {
                     narrow_nullsafe_method_call_null(ctx, mc, db, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_prop_path_access(&b.right) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
                     extract_static_prop_access(&b.right, ctx, db, file)
@@ -945,7 +946,7 @@ pub fn narrow_from_condition(
             } else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_null(ctx, &name, effective_true);
-                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_prop_path_access(&b.left) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
                     extract_static_prop_access(&b.left, ctx, db, file)
@@ -955,7 +956,7 @@ pub fn narrow_from_condition(
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_null(ctx, &name, effective_true);
-                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_prop_path_access(&b.right) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
                     extract_static_prop_access(&b.right, ctx, db, file)
@@ -2184,13 +2185,15 @@ pub fn narrow_from_condition(
                     ctx.set_var(var.as_ref(), ty);
                     std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
                 }
-            } else if let Some((obj_var, prop)) = extract_any_prop_access(expr) {
+            } else if let Some((obj_var, prop)) = extract_prop_path_access(expr) {
                 // `if ($this->prop)` — property-receiver counterpart of the
                 // bare-variable truthy/falsy case above.
                 narrow_prop_loose_bool(ctx, &obj_var, &prop, db, file, is_true);
                 // Truthy also proves the receiver was non-null (a null
                 // receiver's ->/?-> access is itself falsy).
-                narrow_receiver_non_null_on_prop_match(ctx, &obj_var, is_true);
+                if is_true {
+                    narrow_receiver_non_null(ctx, &obj_var, db, file);
+                }
             } else if let Some((fqcn, prop)) = extract_static_prop_access(expr, ctx, db, file) {
                 // `if (self::$prop)` — static-property counterpart of the
                 // instance-property case above.
@@ -2356,7 +2359,7 @@ fn narrow_prop_null(
     file: &str,
     is_null: bool,
 ) {
-    if !ctx.get_var(obj_var).is_nullable() {
+    if !prop_receiver_type(ctx, obj_var, db, file).is_nullable() {
         narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, true);
         return;
     }
@@ -2404,7 +2407,7 @@ fn narrow_nullsafe_prop_null(
 ) {
     narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, !is_null);
     if !is_null {
-        narrow_var_null(ctx, obj_var, false);
+        narrow_receiver_non_null(ctx, obj_var, db, file);
     }
 }
 

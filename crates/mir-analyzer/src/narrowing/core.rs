@@ -55,8 +55,10 @@ pub(crate) fn resolve_prop_current_type(
     if prop.ends_with("()") {
         return resolve_method_call_current_type(ctx, obj_var, prop, db);
     }
-    // Resolve through the object variable's type
-    let obj_ty = receiver_type(ctx, obj_var, db);
+    let obj_ty = match split_prop_hop(obj_var) {
+        Some((base, mid)) => resolve_prop_current_type(ctx, base, mid, db, file),
+        None => receiver_type(ctx, obj_var, db),
+    };
     let mut prop_ty = mir_types::Type::mixed();
     'outer: for atomic in &obj_ty.types {
         if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
@@ -148,6 +150,46 @@ pub(crate) fn narrow_receiver_non_null_on_prop_match(
 ) {
     if proved_match {
         narrow_var_null(ctx, obj_var, false);
+    }
+}
+
+/// `(base, prop)` of a one-property-hop receiver key (`this->cfg`); `None` for
+/// a variable or a call-chain key.
+fn split_prop_hop(key: &str) -> Option<(&str, &str)> {
+    key.rsplit_once("->")
+        .filter(|(_, prop)| !prop.ends_with("()"))
+}
+
+/// Type of a property-narrowing receiver key: a variable or a one-hop
+/// property path.
+pub(crate) fn prop_receiver_type(
+    ctx: &FlowState,
+    key: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Type {
+    match split_prop_hop(key) {
+        Some((base, prop)) => resolve_prop_current_type(ctx, base, prop, db, file),
+        None => ctx.get_var(key),
+    }
+}
+
+/// Removes `null` from a receiver key: the variable, or the intermediate
+/// property of a one-hop path.
+pub(crate) fn narrow_receiver_non_null(
+    ctx: &mut FlowState,
+    key: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let Some((base, prop)) = split_prop_hop(key) else {
+        narrow_var_null(ctx, key, false);
+        return;
+    };
+    let current = resolve_prop_current_type(ctx, base, prop, db, file);
+    if !current.is_mixed() {
+        let narrowed = current.remove_null();
+        apply_prop_narrowed(ctx, base, prop, current, narrowed, false);
     }
 }
 
@@ -389,6 +431,11 @@ pub(crate) fn chained_prop_receiver_key(object_expr: &php_ast::owned::Expr) -> O
         }
         _ => None,
     }
+}
+
+/// `extract_any_prop_access`, plus the one-more-hop `$this->a->b` form.
+pub(crate) fn extract_prop_path_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+    extract_any_prop_access(expr).or_else(|| extract_chained_prop_access(expr))
 }
 
 /// Like `extract_any_prop_access`, but also accepts one more receiver hop

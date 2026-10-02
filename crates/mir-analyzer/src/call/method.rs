@@ -1378,6 +1378,13 @@ fn resolve_method_return<'a>(
                 } else {
                     ctx.invalidate_prop_refined_receiver(recv_name);
                 }
+            } else if matches!(
+                call.object.kind,
+                ExprKind::PropertyAccess(_) | ExprKind::NullsafePropertyAccess(_)
+            ) {
+                if let Some(recv_key) = crate::narrowing::chained_prop_receiver_key(&call.object) {
+                    ctx.invalidate_prop_refined_receiver(&recv_key);
+                }
             }
         }
         // Similarly, an object passed as an argument to a call that isn't

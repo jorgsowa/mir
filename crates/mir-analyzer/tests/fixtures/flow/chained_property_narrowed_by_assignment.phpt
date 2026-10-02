@@ -35,8 +35,6 @@ class A {
 //      ^^ UnusedVariable: Variable $v is never read
         /** @mir-check $v is string */
         return $this->cfg->p;
-//      ^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
-//      ^^^^^^^^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $v is expected to be string, got string|null
     }
 
     public function intermediateReassigned(Cfg $other): string {
@@ -51,7 +49,6 @@ class A {
         if ($o->cfg === null) { $o->cfg = new Cfg(); }
         if ($o->cfg->p === null) { $o->cfg->p = 'x'; }
         return $o->cfg->p;
-//      ^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
     public function staticProp(): string {
