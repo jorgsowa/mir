@@ -121,6 +121,29 @@ pub fn infer_arg_template_bindings(
         }
     }
 
+    // `@template Q of Query<R>`: once Q is bound, match its bound against that
+    // binding to learn templates (R) no argument mentioned directly.
+    for tp in template_params {
+        let Some(bound) = tp.bound.as_deref() else {
+            continue;
+        };
+        let Some(bound_arg) = bindings.get(&Name::from(tp.name.as_ref())).cloned() else {
+            continue;
+        };
+        let mut derived = FxHashMap::default();
+        infer_from_pair(
+            db,
+            bound,
+            &bound_arg,
+            &template_names,
+            &mut derived,
+            &mut FxHashMap::default(),
+        );
+        for (name, val) in derived {
+            bindings.entry(name).or_insert(val);
+        }
+    }
+
     // Use a risky contribution only where NO real parameter ever bound this
     // template name for real — `unchecked` is computed from exactly those
     // fallback uses, so a name a different parameter legitimately bound
