@@ -134,7 +134,10 @@ pub(crate) fn is_docblock_type_keyword(name: &str) -> bool {
 /// marker (`@psalm-assert !null $x` — asserts `$x` is NOT this type) that only
 /// assertion tags use, never ordinary `@param`/`@return` type positions.
 pub(crate) fn parse_assertion_type(s: &str) -> (Type, bool) {
-    match s.trim().strip_prefix('!') {
+    let s = s.trim();
+    // `=Type` (strict-equality assertion) narrows identically to `Type`.
+    let s = s.strip_prefix('=').unwrap_or(s);
+    match s.strip_prefix('!') {
         Some(rest) => (parse_type_string(rest), true),
         None => (parse_type_string(s), false),
     }
