@@ -285,8 +285,11 @@ impl<'a> StatementsAnalyzer<'a> {
                 // before the condition is ever checked, so treating it as
                 // already-proven-true here would wrongly flag the body
                 // unreachable when the condition is provably always-false.
+                // Later passes see initial ∪ narrow(back-edge).
                 if !first_pass {
-                    narrow_from_condition(&dw.condition, iter, true, sa.db, &sa.file);
+                    super::loops::narrow_back_edge_keeping_initial(iter, &pre, |s| {
+                        narrow_from_condition(&dw.condition, s, true, sa.db, &sa.file);
+                    });
                 }
                 first_pass = false;
                 sa.analyze_stmt(&dw.body, iter);

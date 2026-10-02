@@ -58,6 +58,30 @@ pub(super) fn promote_new_loop_vars_when_guaranteed(
     }
 }
 
+/// Narrows `iter` (the back-edge state) by `narrow`, then re-adds the initial
+/// type of every variable the narrowing changed: the first iteration enters
+/// the body without the condition having been checked.
+pub(super) fn narrow_back_edge_keeping_initial(
+    iter: &mut crate::flow_state::FlowState,
+    initial: &crate::flow_state::FlowState,
+    narrow: impl FnOnce(&mut crate::flow_state::FlowState),
+) {
+    let before = iter.vars.clone();
+    narrow(iter);
+    if iter.diverges {
+        return;
+    }
+    let vars = Arc::make_mut(&mut iter.vars);
+    for (name, init_ty) in initial.vars.iter() {
+        let (Some(old), Some(narrowed)) = (before.get(name), vars.get_mut(name)) else {
+            continue;
+        };
+        if old != narrowed {
+            *narrowed = mir_codebase::definitions::wrap_var_type(Type::merge(narrowed, init_ty));
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Loop widening helpers
 // ---------------------------------------------------------------------------
