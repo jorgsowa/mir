@@ -165,15 +165,22 @@ impl<'a> DefinitionCollector<'a> {
                                         .as_ref()
                                         .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                                 );
+                                // A `@var` on the promoted param itself wins over the ctor's `@param`.
+                                let param_var = self
+                                    .parse_docblock_from_node(p.doc_comment.as_ref())
+                                    .var_type;
                                 let resolve_doc = || {
-                                    ctor_doc.get_param_type(param_name).cloned().map(|u| {
-                                        self.resolve_union_doc_with_templates(
-                                            u,
-                                            &ctor_template_names,
-                                            &fqcn,
-                                            &class_template_params,
-                                        )
-                                    })
+                                    param_var
+                                        .clone()
+                                        .or_else(|| ctor_doc.get_param_type(param_name).cloned())
+                                        .map(|u| {
+                                            self.resolve_union_doc_with_templates(
+                                                super::expand_aliases_only(u, &type_aliases),
+                                                &ctor_template_names,
+                                                &fqcn,
+                                                &class_template_params,
+                                            )
+                                        })
                                 };
                                 // Same priority as an ordinary (non-promoted) `@param`:
                                 // the docblock wins by default — covering both a plain
