@@ -56,8 +56,8 @@ use class_introspection::{
 pub(crate) use core::{
     apply_prop_narrowed, chained_prop_receiver_key, extract_any_prop_access,
     extract_chained_prop_access, extract_class_fqcn_from_expr, extract_expr_guard_key,
-    extract_prop_access, extract_static_prop_access, is_numeric_string, memoize_scope,
-    memoized_receiver_key, method_call_key, narrow_receiver_non_null_on_prop_match,
+    extract_prop_access, extract_static_prop_access, is_numeric_string, memoized_receiver_key,
+    method_call_key, narrow_receiver_non_null_on_prop_match, receiver_key_is_stable,
     resolve_prop_current_type, resolve_static_prop_current_type, MatchSubject,
 };
 use core::{
@@ -116,7 +116,6 @@ pub fn narrow_from_condition(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    let _memoize = memoize_scope(db);
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {

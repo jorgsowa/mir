@@ -235,34 +235,10 @@ pub(crate) fn method_call_key(method: &str) -> String {
     format!("{}()", method.to_ascii_lowercase())
 }
 
-thread_local! {
-    static MEMOIZE_METHOD_CALLS: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
-}
-
-/// Pins `db`'s `memoize_method_call_results` for the current narrowing call
-/// tree, so the `db`-less expression extractors can consult it.
-pub(crate) struct MemoizeScope(Option<bool>);
-
-pub(crate) fn memoize_scope(db: &dyn MirDatabase) -> MemoizeScope {
-    let outer = MEMOIZE_METHOD_CALLS.with(|c| c.get());
-    if outer.is_none() {
-        MEMOIZE_METHOD_CALLS.with(|c| c.set(Some(db.memoize_method_call_results())));
-    }
-    MemoizeScope(outer)
-}
-
-impl Drop for MemoizeScope {
-    fn drop(&mut self) {
-        MEMOIZE_METHOD_CALLS.with(|c| c.set(self.0));
-    }
-}
-
 /// Key for a chain of zero-arg method calls on a variable (`$a->b()->c()` →
-/// `a->b()->c()`). Only produced under `memoize_method_call_results`.
+/// `a->b()->c()`). Whether repeated calls are interchangeable is
+/// [`receiver_key_is_stable`]'s call, made where a refinement is read.
 pub(crate) fn method_chain_key(expr: &php_ast::owned::Expr) -> Option<String> {
-    if !MEMOIZE_METHOD_CALLS.with(|c| c.get().unwrap_or(false)) {
-        return None;
-    }
     match &expr.kind {
         ExprKind::MethodCall(call) if call.args.is_empty() => {
             let ExprKind::Identifier(name) = &call.method.kind else {
@@ -277,11 +253,23 @@ pub(crate) fn method_chain_key(expr: &php_ast::owned::Expr) -> Option<String> {
 }
 
 /// `prop_refined` receiver key of a method call's object: the variable, or a
-/// memoized call chain.
+/// call chain.
 pub(crate) fn memoized_receiver_key(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         _ => method_chain_key(expr),
+    }
+}
+
+/// Whether every call in `key`'s chain is pure, mutation-free or memoized, so
+/// a refinement recorded under `key` still describes a repeated evaluation.
+pub(crate) fn receiver_key_is_stable(ctx: &FlowState, key: &str, db: &dyn MirDatabase) -> bool {
+    match key.rsplit_once("->") {
+        Some((base, call)) if call.ends_with("()") => {
+            stable_method_return(ctx, base, call, db).is_some()
+                && receiver_key_is_stable(ctx, base, db)
+        }
+        _ => true,
     }
 }
 
@@ -306,18 +294,27 @@ fn resolve_method_call_current_type(
     key: &str,
     db: &dyn MirDatabase,
 ) -> Type {
+    stable_method_return(ctx, obj_var, key, db).unwrap_or_else(Type::mixed)
+}
+
+/// Declared return type of `$obj_var->method()` when repeated calls are provably equal
+/// (`None` otherwise); see [`resolve_method_call_current_type`].
+fn stable_method_return(
+    ctx: &FlowState,
+    obj_var: &str,
+    key: &str,
+    db: &dyn MirDatabase,
+) -> Option<Type> {
     let method = key.trim_end_matches("()");
     let obj_ty = receiver_type(ctx, obj_var, db);
     let [Atomic::TNamedObject { fqcn, .. }] = obj_ty.types.as_slice() else {
-        return Type::mixed();
+        return None;
     };
-    let Some(resolved) = crate::call::method::resolve_method_from_db(
+    let resolved = crate::call::method::resolve_method_from_db(
         db,
         &std::sync::Arc::from(fqcn.as_ref()),
         method,
-    ) else {
-        return Type::mixed();
-    };
+    )?;
     let receiver_independent = resolved.template_params.is_empty()
         && resolved.return_ty_raw.types.iter().all(|a| match a {
             Atomic::TNamedObject { type_params, .. } => type_params.is_empty(),
@@ -332,9 +329,9 @@ fn resolve_method_call_current_type(
         || !(resolved.is_pure || resolved.is_mutation_free || db.memoize_method_call_results())
         || !receiver_independent
     {
-        return Type::mixed();
+        return None;
     }
-    resolved.return_ty_raw
+    Some(resolved.return_ty_raw)
 }
 
 /// Like `extract_prop_access`, but only matches the nullsafe (`?->`) form.

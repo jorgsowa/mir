@@ -962,16 +962,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         // If we have a narrowed type for this property access ($var->prop,
         // or the one-more-hop $var->a->prop), return it instead of the
         // declared type.
-        let _memoize = matches!(pa.object.kind, ExprKind::MethodCall(_))
-            .then(|| crate::narrowing::memoize_scope(self.db));
-        let mut resolved =
-            if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object) {
-                ctx.get_prop_refined(&obj_key, &prop_name)
-                    .cloned()
-                    .unwrap_or(resolved)
-            } else {
-                resolved
-            };
+        let mut resolved = if let Some(obj_key) =
+            crate::narrowing::chained_prop_receiver_key(&pa.object)
+                .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, self.db))
+        {
+            ctx.get_prop_refined(&obj_key, &prop_name)
+                .cloned()
+                .unwrap_or(resolved)
+        } else {
+            resolved
+        };
         // PHP 8 reads a plain `->` access on a null receiver as a warning
         // (not fatal), still evaluating to null — same observable value as
         // `?->`'s short-circuit (see analyze_nullsafe_property_access, which
@@ -1042,16 +1042,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         // or the one-more-hop $var->a?->prop), return it instead of the
         // declared type — matching the plain `->` path in
         // analyze_property_access above.
-        let _memoize = matches!(pa.object.kind, ExprKind::MethodCall(_))
-            .then(|| crate::narrowing::memoize_scope(self.db));
-        let mut prop_ty =
-            if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object) {
-                ctx.get_prop_refined(&obj_key, &prop_name)
-                    .cloned()
-                    .unwrap_or(resolved)
-            } else {
-                resolved
-            };
+        let mut prop_ty = if let Some(obj_key) =
+            crate::narrowing::chained_prop_receiver_key(&pa.object)
+                .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, self.db))
+        {
+            ctx.get_prop_refined(&obj_key, &prop_name)
+                .cloned()
+                .unwrap_or(resolved)
+        } else {
+            resolved
+        };
         // Only the receiver's own nullability can make `$obj?->prop` evaluate to
         // null — if `$obj` can never be null, this is exactly `$obj->prop`'s type,
         // narrowed-or-not. Adding TNull unconditionally clobbered a narrowed

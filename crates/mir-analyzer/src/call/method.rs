@@ -1675,8 +1675,9 @@ fn resolve_method_return<'a>(
                 || resolved.is_mutation_free
                 || ea.db.memoize_method_call_results())
         {
-            let _memoize = crate::narrowing::memoize_scope(ea.db);
-            if let Some(recv) = crate::narrowing::memoized_receiver_key(&call.object) {
+            if let Some(recv) = crate::narrowing::memoized_receiver_key(&call.object)
+                .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, ea.db))
+            {
                 let key = crate::narrowing::method_call_key(method_name);
                 if let Some(refined) = ctx.get_prop_refined(&recv, &key) {
                     return_ty = refined.clone();
