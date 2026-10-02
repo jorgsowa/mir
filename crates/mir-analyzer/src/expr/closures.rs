@@ -95,10 +95,11 @@ fn propagate_readonly_prop_refinements(
 /// `non-empty-string`, letting `array_map` yield `list<non-empty-string>`
 /// rather than `list<string>` — M19, B8 lineage).
 ///
-/// The refinement is deliberately limited to the string family: B8/M19 is
-/// the `non-empty-string` lineage. A declared signature is never demoted to
-/// literal precision (`"hello"`), and `mixed`/`never`/object/array body
-/// types never replace the declared contract. When the body is not a subtype
+/// The refinement is limited to the string family (B8/M19, the
+/// `non-empty-string` lineage) and to a bare native `array`. A declared
+/// signature is never demoted to literal precision (`"hello"`), and
+/// `mixed`/`never`/object/keyed-shape body types never replace the declared
+/// contract. When the body is not a subtype
 /// of the declared type (e.g. it returns `null` where the declaration does
 /// not allow it, or a different family), keep the declared one: the
 /// `InvalidReturnType`/`MixedReturnStatement` emitted for the mismatch
@@ -114,10 +115,11 @@ fn refined_closure_return(
     let refines = return_ty_hint
         .as_ref()
         .filter(|declared| {
-            is_string_family(declared)
+            let same_family = (is_string_family(declared)
                 && is_string_family(&inferred_return)
-                && !inferred_return.contains(|a| matches!(a, Atomic::TLiteralString(_)))
-                && crate::subtype::is_subtype(db, &inferred_return, declared)
+                && !inferred_return.contains(|a| matches!(a, Atomic::TLiteralString(_))))
+                || (is_bare_array(declared) && inferred_return.types.iter().all(is_generic_array));
+            same_family && crate::subtype::is_subtype(db, &inferred_return, declared)
         })
         .is_some();
     if refines {
@@ -137,6 +139,20 @@ fn is_string_family(ty: &Type) -> bool {
             .types
             .iter()
             .all(|a| a.is_string() || matches!(a, Atomic::TNull))
+}
+
+/// Native `array`: key and value are unconstrained.
+fn is_bare_array(ty: &Type) -> bool {
+    matches!(
+        ty.types.as_slice(),
+        [Atomic::TArray { key, value }]
+            if (key.is_mixed() || key.is_array_key()) && value.is_mixed()
+    )
+}
+
+/// Array atoms other than keyed shapes, whose literal entries must not leak into the signature.
+fn is_generic_array(a: &Atomic) -> bool {
+    a.is_array() && !matches!(a, Atomic::TKeyedArray { .. })
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
