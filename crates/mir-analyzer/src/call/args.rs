@@ -535,6 +535,22 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 raw_param_ty
             };
 
+            // `= null` makes the parameter implicitly nullable, whatever its docblock says.
+            let nullable_by_default;
+            let param_ty = if !param_ty.is_nullable()
+                && param
+                    .default_text
+                    .as_deref()
+                    .is_some_and(|d| d.eq_ignore_ascii_case("null"))
+            {
+                let mut widened = param_ty.clone();
+                widened.add_type(Atomic::TNull);
+                nullable_by_default = widened;
+                &nullable_by_default
+            } else {
+                param_ty
+            };
+
             // The argument's own AST expression (when the binding maps onto
             // a real positional argument) — lets the callable validations
             // consult `method_exists()` guards on the callable's receiver.
