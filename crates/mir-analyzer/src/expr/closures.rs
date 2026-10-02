@@ -18,8 +18,12 @@ use std::sync::Arc;
 /// never differ. Widens scalar literals to their base type and collapses
 /// `true`/`false` to `bool`, mirroring the `mixed` fallback already used for
 /// the undefined-capture case, but only as much as is safe for an
-/// already-typed variable.
+/// already-typed variable. A bare `null` has no base type to widen to, so it
+/// becomes `mixed` (`$seen = null;` filled in by a sibling closure).
 fn widen_byref_capture(ty: Type) -> Type {
+    if matches!(ty.types.as_slice(), [Atomic::TNull]) {
+        return Type::mixed();
+    }
     let widened = widen_for_check(ty);
     let mut out = Type::empty();
     for atomic in widened.types {

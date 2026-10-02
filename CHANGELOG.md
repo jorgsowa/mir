@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `use (&$x)` capture of a variable holding only `null` is `mixed` inside the closure, so comparisons against values a sibling closure assigns are no longer reported as always false.
 - A variable assigned under `if ($flag)` is no longer `PossiblyUndefinedVariable` where `$flag` is truthy again (`if ($flag && $x > 0)`).
 - Assigning `$this->a->b` inside its own null guard narrows the property for later reads.
 - A `while ($n !== null)` condition is judged on the loop-entry and back-edge types together, so advancing the variable in the body no longer reports an always-true comparison.
