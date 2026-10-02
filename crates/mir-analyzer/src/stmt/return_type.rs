@@ -679,7 +679,7 @@ fn resolve_atomic_for_file(
             params,
             return_type,
         } => Atomic::TCallable {
-            params: params.map(|ps| resolve_fn_params(ps, db, file, allow_builtin_shortcut)),
+            params: params.map(|ps| resolve_fn_params(&ps, db, file, allow_builtin_shortcut)),
             return_type: return_type.map(|rt| {
                 Box::new(resolve_union_for_file_inner(
                     *rt,
@@ -693,7 +693,7 @@ fn resolve_atomic_for_file(
             let data = *data;
             Atomic::TClosure {
                 data: Box::new(mir_types::atomic::ClosureData {
-                    params: resolve_fn_params(data.params, db, file, allow_builtin_shortcut),
+                    params: resolve_fn_params(&data.params, db, file, allow_builtin_shortcut),
                     return_type: resolve_union_for_file_inner(
                         data.return_type,
                         db,
@@ -715,7 +715,7 @@ fn resolve_atomic_for_file(
 }
 
 fn resolve_fn_params(
-    params: Box<[mir_types::atomic::FnParam]>,
+    params: &[mir_types::atomic::FnParam],
     db: &dyn MirDatabase,
     file: &str,
     allow_builtin_shortcut: bool,
