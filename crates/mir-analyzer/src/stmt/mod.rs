@@ -1232,6 +1232,7 @@ impl<'a> StatementsAnalyzer<'a> {
         current.inside_loop = true;
 
         let mut stabilized = false;
+        let mut back_edge_pass_done = false;
         for iter_idx in 0..MAX_ITERS {
             let prev_vars = current.vars.clone();
 
@@ -1285,26 +1286,34 @@ impl<'a> StatementsAnalyzer<'a> {
                 FlowState::merge_branches(pre, iter.clone(), None)
             };
 
-            // When the loop body reads a variable that was pending before the loop,
-            // the pre-loop write was consumed on the "loop ran" path.  The
-            // merge_branches call above uses pre.clone() as the else-path ("loop
-            // never ran"), which reintroduces those pre-loop pending writes into
-            // the union.  Only remove a variable from the result when its current
-            // location in `next` still matches the pre-loop location — meaning
-            // the loop body read the old value but did NOT write a new one.
-            // If the loop body wrote a new value (different location), keep it.
-            for name in iter.read_vars.iter() {
-                if let Some(pre_locs) = pre.last_write_locs.get(name) {
-                    if let Some(locs) = next.last_write_locs.get_mut(name) {
-                        locs.retain(|l| !pre_locs.contains(l));
-                        if locs.is_empty() {
-                            next.last_write_locs.remove(name);
-                        }
+            // `merge_branches` above uses pre.clone() as the "loop never ran"
+            // path, which reintroduces pre-loop pending writes the body
+            // consumed. Drop exactly those; a pre-loop write the body only
+            // overwrote or never read stays pending. (`read_vars` is not
+            // usable here: it also holds reads from earlier outer iterations.)
+            for (name, pre_locs) in pre.last_write_locs.iter() {
+                if let Some(locs) = next.last_write_locs.get_mut(name) {
+                    locs.retain(|l| {
+                        !(pre_locs.contains(l) && iter.consumed_write_locs.contains(&(*name, *l)))
+                    });
+                    if locs.is_empty() {
+                        next.last_write_locs.remove(name);
                     }
                 }
             }
 
             if vars_stabilized(&prev_vars, &next.vars) {
+                // A write left pending at the end of the body reaches the next
+                // iteration's reads, but only a pass entered with it pending
+                // can consume it. Types converge too early to provide one.
+                if !back_edge_pass_done && has_back_edge_read(&iter, &current) {
+                    back_edge_pass_done = true;
+                    if iter_idx + 1 < MAX_ITERS {
+                        self.issues.truncate_to(issues_mark);
+                    }
+                    current = next;
+                    continue;
+                }
                 current = next;
                 stabilized = true;
                 break;
@@ -1371,6 +1380,22 @@ impl<'a> StatementsAnalyzer<'a> {
 
         current
     }
+}
+
+/// Whether the body ends with a pending write to a variable it also reads and
+/// that the loop entry did not already hold pending.
+fn has_back_edge_read(end_of_body: &FlowState, entry: &FlowState) -> bool {
+    !end_of_body.diverges
+        && end_of_body.last_write_locs.iter().any(|(name, locs)| {
+            end_of_body.read_vars.contains(name)
+                && locs.iter().any(|loc| {
+                    !end_of_body.consumed_write_locs.contains(&(*name, *loc))
+                        && !entry
+                            .last_write_locs
+                            .get(name)
+                            .is_some_and(|entry_locs| entry_locs.contains(loc))
+                })
+        })
 }
 
 /// The loop-nesting level a `break`/`continue` statement targets. PHP only
