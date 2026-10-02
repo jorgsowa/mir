@@ -111,6 +111,19 @@ fn inferred_refines_bare_object(native_fqcn: &mir_types::Name, inferred: &Type) 
     )
 }
 
+/// A native `int`/`string` hint whose body returns only 2+ literals of that kind.
+pub(crate) fn inferred_literals_refine_native(native: &Type, inferred: &Type) -> bool {
+    if native.from_docblock || inferred.types.len() < 2 {
+        return false;
+    }
+    let is_literal: fn(&Atomic) -> bool = match native.types.as_slice() {
+        [Atomic::TInt] => |a| matches!(a, Atomic::TLiteralInt(_)),
+        [Atomic::TString] => |a| matches!(a, Atomic::TLiteralString(_)),
+        _ => return false,
+    };
+    inferred.types.iter().all(is_literal)
+}
+
 fn is_callable_signature(a: &Atomic) -> bool {
     matches!(a, Atomic::TClosure { .. } | Atomic::TCallable { .. })
 }
@@ -212,7 +225,15 @@ pub(crate) fn resolve_method_from_db(
             Some(parent_return)
         } else if let Some(native) = own_return {
             let refined = bare_native_object_fqcn(&native)
-                .and_then(|fqcn| inferred().filter(|t| inferred_refines_bare_object(fqcn, t)));
+                .and_then(|fqcn| inferred().filter(|t| inferred_refines_bare_object(fqcn, t)))
+                .or_else(|| {
+                    // Not overridable, so the body's literals are the full result set.
+                    let sealed = storage.is_final || storage.visibility == Visibility::Private;
+                    sealed
+                        .then(inferred)
+                        .flatten()
+                        .filter(|t| inferred_literals_refine_native(&native, t))
+                });
             Some(refined.unwrap_or(native))
         } else {
             inferred()

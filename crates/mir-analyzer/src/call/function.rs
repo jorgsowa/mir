@@ -51,6 +51,11 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
         let return_ty_raw = f
             .return_type
             .clone()
+            .map(|native| {
+                crate::db::inferred_function_return_type_demand(db, fqn)
+                    .filter(|t| super::method::inferred_literals_refine_native(&native, t))
+                    .unwrap_or(native)
+            })
             .or_else(|| crate::db::inferred_function_return_type_demand(db, fqn))
             .map(|t| (*t).clone())
             .unwrap_or_else(Type::mixed);
