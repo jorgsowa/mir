@@ -596,6 +596,29 @@ fn param_contains_template_or_unknown(
         })
     }
 
+    // `class-string<T>` elements count too: the template binds from the element.
+    fn contains_template_or_unknown(
+        t: &Type,
+        ea: &ExpressionAnalyzer<'_>,
+        template_names: &rustc_hash::FxHashSet<&str>,
+    ) -> bool {
+        t.types.iter().any(|v| match v {
+            Atomic::TTemplateParam { .. } => true,
+            Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+                contains_template_or_unknown(target, ea, template_names)
+            }
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TClassString(Some(fqcn))
+            | Atomic::TInterfaceString(Some(fqcn)) => {
+                if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
+                    return true;
+                }
+                !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
+            }
+            _ => false,
+        })
+    }
+
     param_ty.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
         Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
@@ -643,25 +666,6 @@ fn param_contains_template_or_unknown(
             !inner.contains('\\') && !crate::db::class_exists(ea.db, inner.as_ref())
         }
         Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
-            fn contains_template_or_unknown(
-                t: &Type,
-                ea: &ExpressionAnalyzer<'_>,
-                template_names: &rustc_hash::FxHashSet<&str>,
-            ) -> bool {
-                t.types.iter().any(|v| match v {
-                    Atomic::TTemplateParam { .. } => true,
-                    Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
-                        contains_template_or_unknown(target, ea, template_names)
-                    }
-                    Atomic::TNamedObject { fqcn, .. } => {
-                        if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
-                            return true;
-                        }
-                        !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
-                    }
-                    _ => false,
-                })
-            }
             // A templated/unknown array KEY (e.g. `@template TKey of array-key`
             // in `array<TKey, TValue>`) is forgiven like the value type, or a
             // key-only template would raise a false InvalidArgument.
@@ -669,19 +673,7 @@ fn param_contains_template_or_unknown(
                 || contains_template_or_unknown(value, ea, &template_names)
         }
         Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-            value.types.iter().any(|v| match v {
-                Atomic::TTemplateParam { .. } => true,
-                Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
-                    has_template_param(target, &template_names)
-                }
-                Atomic::TNamedObject { fqcn, .. } => {
-                    if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
-                        return true;
-                    }
-                    !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
-                }
-                _ => false,
-            })
+            contains_template_or_unknown(value, ea, &template_names)
         }
         // For A&B intersections containing a template, only suppress the
         // InvalidArgument if the arg satisfies all the concrete (non-template)

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UnusedVariable` no longer fires for the internal `this->prop` key created when an assertion call (e.g. PHPUnit `assertSame`) takes a property chain.
 - `@phpstan-assert =Type $x` (strict equality) narrows like `Type` instead of `mixed`.
 - A method call on a union receiver no longer reports `TooFewArguments`/`TooManyArguments` for an atom when a sibling atom's method accepts the argument count.
+- `array<class-string<T>>` and `list<class-string<T>>` params no longer report `InvalidArgument` when `T` binds from the elements.
 
 ## [0.83.0] - 2026-10-02
 
