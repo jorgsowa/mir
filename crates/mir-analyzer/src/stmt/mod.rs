@@ -62,6 +62,20 @@ fn simple_assignment_lhs(stmt: &php_ast::owned::Stmt) -> Option<&str> {
     Some(lhs_name.trim_start_matches('$'))
 }
 
+/// Calls `f` with the name of every plain-variable leaf of a (nested) destructuring target.
+fn for_each_destructured_var(target: &php_ast::owned::Expr, f: &mut impl FnMut(&str)) {
+    let php_ast::owned::ExprKind::Array(elements) = &target.kind else {
+        return;
+    };
+    for elem in elements.iter() {
+        match &elem.value.kind {
+            php_ast::owned::ExprKind::Variable(name) => f(name.trim_start_matches('$')),
+            php_ast::owned::ExprKind::Array(_) => for_each_destructured_var(&elem.value, f),
+            _ => {}
+        }
+    }
+}
+
 /// Apply post-narrow: after `$x = expr()` or `static $x = expr;`, override the inferred type
 /// with the annotated one. Named `@var Type $x` applies only when the target name matches. Bare
 /// `@var Type` applies to a single simple LHS (it annotates the statement, not a specific
@@ -85,10 +99,16 @@ fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ct
             if !matches!(&a.op, php_ast::ast::AssignOp::Assign) {
                 return;
             }
-            let php_ast::owned::ExprKind::Variable(lhs_name) = &a.target.kind else {
-                return;
-            };
-            apply(lhs_name.trim_start_matches('$'), ctx);
+            match &a.target.kind {
+                php_ast::owned::ExprKind::Variable(lhs_name) => {
+                    apply(lhs_name.trim_start_matches('$'), ctx)
+                }
+                // Only a named annotation can pick its target out of a destructure.
+                php_ast::owned::ExprKind::Array(_) if annotation.name.is_some() => {
+                    for_each_destructured_var(&a.target, &mut |n| apply(n, ctx));
+                }
+                _ => {}
+            }
         }
         php_ast::owned::StmtKind::StaticVar(vars) => {
             if annotation.name.is_some() {
@@ -395,7 +415,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
 
-        let var_annotation = self.extract_var_annotation_from(
+        let var_annotations = self.extract_var_annotations_from(
             doc.as_deref(),
             ctx.self_fqcn.as_deref(),
             ctx.current_method_name.as_deref(),
@@ -403,7 +423,7 @@ impl<'a> StatementsAnalyzer<'a> {
         );
 
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
-        if let Some(ref ann) = var_annotation {
+        for ann in &var_annotations {
             // UndefinedDocblockClass: `@var` names a class that doesn't exist;
             // otherwise record it as a `cls:` reference so a class named only
             // via a local `@var` assertion isn't falsely flagged UnusedClass.
@@ -506,7 +526,14 @@ impl<'a> StatementsAnalyzer<'a> {
                 // `@var T $obj->prop` refines the property, not a variable.
                 match name.rsplit_once("->") {
                     Some((obj, prop)) => ctx.set_prop_refined(obj, prop, ann.ty.clone()),
-                    None => ctx.set_var(name.as_str(), ann.ty.clone()),
+                    None => {
+                        // Not a write: a `@var` for a name never otherwise defined must not
+                        // surface as UnusedVariable.
+                        if !ctx.var_is_defined(name) {
+                            ctx.read_vars.insert(mir_types::Name::from(name.as_str()));
+                        }
+                        ctx.set_var(name.as_str(), ann.ty.clone());
+                    }
                 }
             }
         }
@@ -715,7 +742,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Post-narrow: after `$x = expr()`, override the inferred type if annotated.
-        if let Some(ref ann) = var_annotation {
+        for ann in &var_annotations {
             // An annotation that exactly matches the inferred (widened) type
             // of a simple assignment adds nothing — UnnecessaryVarAnnotation.
             // Narrowing or widening annotations stay silent.
@@ -1083,15 +1110,20 @@ impl<'a> StatementsAnalyzer<'a> {
     /// free function's body, or a nested function decl that doesn't set
     /// `current_function_fqn`), `current_function_fqn` supplies that
     /// function's own `@psalm-type`/`@phpstan-type` aliases the same way.
-    fn extract_var_annotation_from(
+    fn extract_var_annotations_from(
         &mut self,
         doc: Option<&str>,
         self_fqcn: Option<&str>,
         current_method_name: Option<&str>,
         current_function_fqn: Option<&str>,
-    ) -> Option<VarAnnotation> {
-        let parsed = crate::parser::DocblockParser::parse(doc?);
-        let mut ty = parsed.var_type?;
+    ) -> Vec<VarAnnotation> {
+        let Some(doc) = doc else {
+            return Vec::new();
+        };
+        let parsed = crate::parser::DocblockParser::parse(doc);
+        if parsed.var_tags.is_empty() {
+            return Vec::new();
+        }
         // Template params visible at this point: the enclosing class's own
         // (for a generic class referenced inside any of its methods) plus
         // the current method's own (a per-method `@template`) — a bare name
@@ -1101,11 +1133,14 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut template_names: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
         let mut template_params: Vec<mir_codebase::definitions::TemplateParam> = Vec::new();
         let defining_entity = self_fqcn.or(current_function_fqn).unwrap_or_default();
+        let mut tags = parsed.var_tags;
         if let Some(fqcn) = self_fqcn {
             if let Some(class_like) = self.cached_class_like(fqcn) {
                 let aliases = class_like.type_aliases();
                 if !aliases.is_empty() {
-                    ty = crate::collector::expand_aliases_only(ty, aliases);
+                    for (_, ty) in &mut tags {
+                        *ty = crate::collector::expand_aliases_only(ty.clone(), aliases);
+                    }
                 }
                 template_names.extend(
                     class_like
@@ -1126,7 +1161,12 @@ impl<'a> StatementsAnalyzer<'a> {
         } else if let Some(fqn) = current_function_fqn {
             if let Some(function) = self.cached_function(fqn) {
                 if !function.type_aliases.is_empty() {
-                    ty = crate::collector::expand_aliases_only(ty, &function.type_aliases);
+                    for (_, ty) in &mut tags {
+                        *ty = crate::collector::expand_aliases_only(
+                            ty.clone(),
+                            &function.type_aliases,
+                        );
+                    }
                 }
                 template_names.extend(
                     function
@@ -1137,17 +1177,19 @@ impl<'a> StatementsAnalyzer<'a> {
                 template_params.extend(function.template_params.iter().cloned());
             }
         }
-        Some(VarAnnotation {
-            name: parsed.var_name,
-            ty: return_type::resolve_union_for_file_with_templates(
-                ty,
-                self.db,
-                &self.file,
-                &template_names,
-                &template_params,
-                defining_entity,
-            ),
-        })
+        tags.into_iter()
+            .map(|(name, ty)| VarAnnotation {
+                name,
+                ty: return_type::resolve_union_for_file_with_templates(
+                    ty,
+                    self.db,
+                    &self.file,
+                    &template_names,
+                    &template_params,
+                    defining_entity,
+                ),
+            })
+            .collect()
     }
 
     // -----------------------------------------------------------------------

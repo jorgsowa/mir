@@ -113,8 +113,11 @@ impl DocblockParser {
                             if let Some(msg) = validate_type_str(&ty_s, "var") {
                                 result.invalid_annotations.push(msg);
                             }
-                            result.var_type = Some(parse_type_string(&ty_s));
-                            result.var_name = Some(name.trim_start_matches('$').to_string());
+                            let name = name.trim_start_matches('$').to_string();
+                            let ty = parse_type_string(&ty_s);
+                            result.var_tags.push((Some(name.clone()), ty.clone()));
+                            result.var_type = Some(ty);
+                            result.var_name = Some(name);
                         } else {
                             // Spaces inside PHP types only appear within <…> generics.
                             // Stop at top-level whitespace to exclude description text that
@@ -130,7 +133,9 @@ impl DocblockParser {
                             if let Some(msg) = validate_type_str(ty_s, "var") {
                                 result.invalid_annotations.push(msg);
                             }
-                            result.var_type = Some(parse_type_string(ty_s));
+                            let ty = parse_type_string(ty_s);
+                            result.var_tags.push((None, ty.clone()));
+                            result.var_type = Some(ty);
                         }
                     }
                 }
@@ -832,10 +837,12 @@ pub struct ParsedDocblock {
     pub out_params: Vec<(String, Type)>,
     /// `@return Type`
     pub return_type: Option<Type>,
-    /// `@var Type` or `@var Type $name` — type and optional variable name
+    /// `@var Type` or `@var Type $name` — type and optional variable name (last tag wins)
     pub var_type: Option<Type>,
     /// Optional variable name from `@var Type $name`
     pub var_name: Option<String>,
+    /// Every `@var` tag in docblock order, for statement-level annotations.
+    pub var_tags: Vec<(Option<String>, Type)>,
     /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
     /// The last element is the optional `@template T = Default` default type.
     pub templates: Vec<(String, Option<Type>, Variance, Option<Type>)>,

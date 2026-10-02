@@ -176,20 +176,16 @@ impl<'a> StatementsAnalyzer<'a> {
             // `@var Type $name` with a variable name narrows the variable (handled in
             // analyze_stmts loop), not the return type.
             let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
-            let check_ty = if let Some(ann) = self.extract_var_annotation_from(
-                doc.as_deref(),
-                ctx.self_fqcn.as_deref(),
-                ctx.current_method_name.as_deref(),
-                ctx.current_function_fqn.as_deref(),
-            ) {
-                if ann.name.is_none() {
-                    ann.ty
-                } else {
-                    ret_ty.clone()
-                }
-            } else {
-                ret_ty.clone()
-            };
+            let check_ty = self
+                .extract_var_annotations_from(
+                    doc.as_deref(),
+                    ctx.self_fqcn.as_deref(),
+                    ctx.current_method_name.as_deref(),
+                    ctx.current_function_fqn.as_deref(),
+                )
+                .into_iter()
+                .find(|a| a.name.is_none())
+                .map_or_else(|| ret_ty.clone(), |a| a.ty);
 
             // Check against declared return type. Inside a generator, `return <expr>;`
             // sets `Generator::getReturn()`'s value (the `TReturn`/4th type-param slot

@@ -332,15 +332,17 @@ impl<'a> StatementsAnalyzer<'a> {
 
         if let Some(vname) = extract_simple_var(&fe.value) {
             let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
-            if let Some(ann) = self.extract_var_annotation_from(
+            let annotations = self.extract_var_annotations_from(
                 doc.as_deref(),
                 ctx.self_fqcn.as_deref(),
                 ctx.current_method_name.as_deref(),
                 ctx.current_function_fqn.as_deref(),
-            ) {
-                if ann.name.as_deref() == Some(vname.as_str()) {
-                    value_ty = ann.ty;
-                }
+            );
+            if let Some(ann) = annotations
+                .into_iter()
+                .find(|a| a.name.as_deref() == Some(vname.as_str()))
+            {
+                value_ty = ann.ty;
             }
         }
 
