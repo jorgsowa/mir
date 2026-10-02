@@ -1,0 +1,29 @@
+===description===
+Skipping synthetic property-chain keys does not hide a genuinely unused local in the same method.
+===config===
+suppress=MissingConstructor,UnusedParam
+===file===
+<?php
+abstract class TestCase {
+    /**
+     * @template T
+     * @param T $expected
+     * @phpstan-assert =T $actual
+     */
+    final public static function assertSame(mixed $expected, mixed $actual): void {}
+}
+
+final class Dto { public function __construct(public int $id) {} }
+
+final class SomeTest extends TestCase
+{
+    private Dto $dto;
+
+    public function testRead(): void
+    {
+        $unused = 5;
+        self::assertSame(1, $this->dto->id);
+    }
+}
+===expect===
+UnusedVariable@19:8-19:15: Variable $unused is never read

@@ -721,6 +721,8 @@ pub(crate) fn emit_unused_variables(
             || SUPERGLOBALS.contains(&name.as_str())
             || name == "this"
             || name.starts_with('_')
+            // Synthetic narrowing key for a property chain (`this->dto`), not a PHP variable.
+            || name.contains("->")
             || ctx.foreach_byref_var_names.contains(name)
             || ctx.catch_var_names.contains(name)
             // A dynamic-name compact() call in this scope reads an unknowable set
