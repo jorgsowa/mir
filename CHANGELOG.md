@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Docblock `Cls::CONST` / `Cls::*` types naming another class are no longer reported as impossible `===`/`==` comparisons against literals.
 - A `: int`/`: string` private or final method, or function, whose body returns only 2+ literals keeps that literal union at call sites, so `match` over it is judged exhaustive against those values.
 - A `use (&$x)` capture of a variable holding only `null` is `mixed` inside the closure, so comparisons against values a sibling closure assigns are no longer reported as always false.
 - A variable assigned under `if ($flag)` is no longer `PossiblyUndefinedVariable` where `$flag` is truthy again (`if ($flag && $x > 0)`).

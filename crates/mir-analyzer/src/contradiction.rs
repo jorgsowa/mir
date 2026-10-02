@@ -347,11 +347,20 @@ enum TypeFamily {
     Object,
 }
 
+/// A docblock `Cls::CONST` / `Cls::*` reference, kept as an opaque named type
+/// whose runtime value is a constant, not an object.
+fn is_class_const_ref(a: &Atomic) -> bool {
+    matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::"))
+}
+
 /// Map an atomic to its PHP type family for `===` purposes.
 /// Returns `None` for open / unknown atomics (mixed, scalar, numeric,
 /// callable, template params, conditionals) — callers treat `None` as
 /// "could be anything" and return `true` conservatively.
 fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
+    if is_class_const_ref(a) {
+        return None;
+    }
     Some(match a {
         Atomic::TInt
         | Atomic::TLiteralInt(_)
@@ -492,17 +501,18 @@ pub(crate) fn types_can_be_identical(left: &Type, right: &Type) -> bool {
 // ---------------------------------------------------------------------------
 
 fn is_open_atomic(a: &Atomic) -> bool {
-    matches!(
-        a,
-        Atomic::TMixed
-            | Atomic::TScalar
-            | Atomic::TNumeric
-            | Atomic::TVoid
-            | Atomic::TNever
-            | Atomic::TCallable { .. }
-            | Atomic::TTemplateParam { .. }
-            | Atomic::TConditional { .. }
-    )
+    is_class_const_ref(a)
+        || matches!(
+            a,
+            Atomic::TMixed
+                | Atomic::TScalar
+                | Atomic::TNumeric
+                | Atomic::TVoid
+                | Atomic::TNever
+                | Atomic::TCallable { .. }
+                | Atomic::TTemplateParam { .. }
+                | Atomic::TConditional { .. }
+        )
 }
 
 fn is_object_atomic(a: &Atomic) -> bool {
