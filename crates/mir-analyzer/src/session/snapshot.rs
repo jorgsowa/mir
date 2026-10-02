@@ -906,13 +906,19 @@ impl AnalysisSnapshot {
             return self.global_constant_decl_range(fqn);
         }
         let loc = self.definition_of_unguarded(symbol).ok()?;
+        let declared_method_name: Arc<str>;
         let short = match symbol {
             crate::Name::Class(f) | crate::Name::Function(f) | crate::Name::GlobalConstant(f) => {
                 crate::db::subtype_index::short_name_of(f)
             }
-            crate::Name::Method { name, .. }
-            | crate::Name::Property { name, .. }
-            | crate::Name::ClassConstant { name, .. } => name.as_ref(),
+            crate::Name::Method { class, name } => {
+                declared_method_name = crate::db::trait_alias_original_name(&self.db, class, name)
+                    .unwrap_or_else(|| name.clone());
+                declared_method_name.as_ref()
+            }
+            crate::Name::Property { name, .. } | crate::Name::ClassConstant { name, .. } => {
+                name.as_ref()
+            }
         };
         // Property declarations carry a `$` sigil in source, but reference
         // ranges cover the bare name; the word-boundary search below lands on

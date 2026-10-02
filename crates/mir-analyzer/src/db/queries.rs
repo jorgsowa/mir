@@ -431,6 +431,31 @@ pub fn member_location(db: &dyn MirDatabase, symbol: &crate::Name) -> Option<Loc
     }
 }
 
+/// The trait method's own (lowercased) name when `name` is a `use T { orig as name; }` alias.
+pub fn trait_alias_original_name(
+    db: &dyn MirDatabase,
+    class: &str,
+    name: &str,
+) -> Option<Arc<str>> {
+    let lower = name.to_ascii_lowercase();
+    let mut current: Arc<str> = class.into();
+    let mut visited = std::collections::HashSet::<Arc<str>>::new();
+    while visited.insert(current.clone()) {
+        let here = crate::db::Fqcn::from_str(db, &current);
+        if crate::db::find_method_in_class(db, here, &lower).is_some() {
+            return None;
+        }
+        let crate::db::ClassLike::Class(cls) = crate::db::find_class_like(db, here)? else {
+            return None;
+        };
+        if let Some((_, orig, _, _)) = cls.trait_aliases.get(lower.as_str()) {
+            return Some(orig.clone());
+        }
+        current = cls.parent.clone()?;
+    }
+    None
+}
+
 pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     crate::db::find_class_constant_in_chain(db, here, const_name).is_some()

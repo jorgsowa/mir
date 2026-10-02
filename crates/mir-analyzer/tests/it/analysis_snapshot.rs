@@ -458,3 +458,39 @@ fn snapshot_declaration_name_range_matches_the_session() {
     assert_eq!(file.as_ref(), "base.php");
     assert_eq!(range.start.line, 3);
 }
+
+fn declaration_name_range_of(src: &str, class: &str, method: &str) -> (u32, u32, u32) {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("a.php");
+    session.ingest_file(file.clone(), Arc::from(src));
+    session.prepare_for_query(Some(&file));
+    let (_, range) = session
+        .snapshot()
+        .declaration_name_range_cached(&Name::method(class, method))
+        .unwrap()
+        .expect("declaration found");
+    (range.start.line, range.start.column, range.end.column)
+}
+
+#[test]
+fn declaration_name_range_of_trait_alias_is_the_trait_method_name() {
+    let src = "<?php\ntrait T { public function __construct(int $x) {} }\nclass Q { use T { __construct as __constructBase; } }\n";
+    assert_eq!(
+        declaration_name_range_of(src, "Q", "__constructBase"),
+        (2, 26, 37)
+    );
+}
+
+#[test]
+fn declaration_name_range_of_trait_alias_ignores_alias_text_in_params() {
+    let src =
+        "<?php\ntrait T { public function foo(int $bar) {} }\nclass Q { use T { foo as bar; } }\n";
+    assert_eq!(declaration_name_range_of(src, "Q", "bar"), (2, 26, 29));
+}
+
+#[test]
+fn declaration_name_range_of_visibility_only_trait_alias() {
+    let src =
+        "<?php\ntrait T { public function foo() {} }\nclass Q { use T { foo as protected; } }\n";
+    assert_eq!(declaration_name_range_of(src, "Q", "foo"), (2, 26, 29));
+}

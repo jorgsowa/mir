@@ -267,7 +267,8 @@ pub use self::queries::{
     has_unknown_ancestor, infer_file_return_types, inherited_template_bindings, is_final,
     is_unchecked_exception, member_location, owner_type_is_mutation_free_by_construction,
     parse_file, prepare_analysis_file, resolve_docblock_type_name, resolve_name,
-    resolve_receiver_fqcn, ClassKind, InferredFileTypes, TrackedParseResult,
+    resolve_receiver_fqcn, trait_alias_original_name, ClassKind, InferredFileTypes,
+    TrackedParseResult,
 };
 pub use self::ref_index::{FileNo, RefIndex};
 pub use self::reference_locations::*;
