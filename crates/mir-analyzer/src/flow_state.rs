@@ -274,6 +274,10 @@ pub struct FlowState {
     /// `@throws` declaration, not the generic helper.
     pub template_typed_params: Arc<FxHashSet<Name>>,
 
+    /// Variables defined only under `if ($guard)` that stay defined wherever
+    /// `$guard` is truthy again. Key: variable, value: guard variable.
+    pub guarded_defs: Arc<FxHashMap<Name, Name>>,
+
     /// FQCNs proven to exist in this branch via a `class_exists()` /
     /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
     /// `UndefinedClass` diagnostics inside guarded branches.
@@ -494,6 +498,7 @@ impl FlowState {
             catch_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             template_typed_params: Arc::new(FxHashSet::default()),
+            guarded_defs: Arc::new(FxHashMap::default()),
             class_exists_guards: FxHashSet::default(),
             class_exists_guarded_exprs: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
@@ -758,6 +763,38 @@ impl FlowState {
         let name = Name::from(name.trim_start_matches('$'));
         Arc::make_mut(&mut self.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
         Arc::make_mut(&mut self.assigned_vars).insert(name);
+        self.drop_guarded_defs_of(name);
+    }
+
+    fn drop_guarded_defs_of(&mut self, name: Name) {
+        if self
+            .guarded_defs
+            .iter()
+            .any(|(var, guard)| *var == name || *guard == name)
+        {
+            Arc::make_mut(&mut self.guarded_defs)
+                .retain(|var, guard| *var != name && *guard != name);
+        }
+    }
+
+    pub fn drop_guarded_def(&mut self, var: Name) {
+        Arc::make_mut(&mut self.guarded_defs).remove(&var);
+    }
+
+    /// Record that `var` is defined whenever `guard` is truthy.
+    pub fn add_guarded_def(&mut self, var: Name, guard: Name) {
+        Arc::make_mut(&mut self.guarded_defs).insert(var, guard);
+    }
+
+    /// Variables defined whenever `guard` is truthy and still only possibly assigned.
+    pub fn vars_guarded_by(&self, guard: Name) -> Vec<Name> {
+        self.guarded_defs
+            .iter()
+            .filter(|(var, g)| {
+                **g == guard && **var != guard && self.possibly_assigned_vars.contains(*var)
+            })
+            .map(|(var, _)| *var)
+            .collect()
     }
 
     /// Check if a variable is definitely in scope.
@@ -809,6 +846,17 @@ impl FlowState {
         );
         if self.prop_refined.contains_key(&key) {
             Arc::make_mut(&mut self.prop_refined).remove(&key);
+        }
+    }
+
+    /// Discard refinements keyed on a chained receiver rooted at `obj.prop`
+    /// (`"obj->prop"`, `"obj->prop->..."`), stale once `obj->prop` is reassigned.
+    pub fn clear_prop_refined_chain(&mut self, obj_var: &str, prop: &str) {
+        let chain = format!("{}->{prop}", obj_var.trim_start_matches('$'));
+        let prefix = format!("{chain}->");
+        let stale = |obj: &Name| obj.as_ref() == chain || obj.as_ref().starts_with(prefix.as_str());
+        if self.prop_refined.keys().any(|(obj, _)| stale(obj)) {
+            Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| !stale(obj));
         }
     }
 
@@ -1097,6 +1145,7 @@ impl FlowState {
         Arc::make_mut(&mut self.vars).remove(&sym);
         Arc::make_mut(&mut self.assigned_vars).remove(&sym);
         Arc::make_mut(&mut self.possibly_assigned_vars).remove(&sym);
+        self.drop_guarded_defs_of(sym);
     }
 
     /// Clone this context to analyze a conditional branch (`if`, `elseif`,
@@ -1365,6 +1414,14 @@ impl FlowState {
         // path.  In the common case (only the then-branch has the guard) the
         // intersection is empty, which is correct: after the if/else the guard no
         // longer applies.
+        result.guarded_defs = Arc::new(
+            if_ctx
+                .guarded_defs
+                .iter()
+                .filter(|(var, guard)| else_ctx.guarded_defs.get(*var) == Some(*guard))
+                .map(|(var, guard)| (*var, *guard))
+                .collect(),
+        );
         result.class_exists_guards = if_ctx
             .class_exists_guards
             .intersection(&else_ctx.class_exists_guards)

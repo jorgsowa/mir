@@ -832,6 +832,19 @@ fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> Strin
 }
 
 impl IssueKind {
+    /// Diagnostics claiming a condition always (or never) holds.
+    pub fn is_constant_condition(&self) -> bool {
+        matches!(
+            self,
+            IssueKind::RedundantCondition { .. }
+                | IssueKind::ImpossibleIdenticalComparison { .. }
+                | IssueKind::ImpossibleLooseComparison { .. }
+                | IssueKind::TypeDoesNotContainType { .. }
+                | IssueKind::DocblockTypeContradiction { .. }
+                | IssueKind::ParadoxicalCondition { .. }
+        )
+    }
+
     /// Default severity for this issue kind.
     pub fn default_severity(&self) -> Severity {
         match self {
@@ -2344,6 +2357,38 @@ impl IssueBuffer {
             );
             self.seen.remove(&key);
         }
+    }
+
+    /// Remove and return the issues added since `mark` whose kind satisfies `pred`.
+    pub fn take_since(&mut self, mark: usize, pred: impl Fn(&IssueKind) -> bool) -> Vec<Issue> {
+        self.take_range(mark, self.issues.len(), pred)
+    }
+
+    /// Like `take_since`, limited to issues before index `end`.
+    pub fn take_range(
+        &mut self,
+        mark: usize,
+        mut end: usize,
+        pred: impl Fn(&IssueKind) -> bool,
+    ) -> Vec<Issue> {
+        let mut taken = Vec::new();
+        let mut i = mark;
+        while i < end {
+            if pred(&self.issues[i].kind) {
+                let issue = self.issues.remove(i);
+                self.seen.remove(&(
+                    issue.kind.name(),
+                    issue.location.file.clone(),
+                    issue.location.line,
+                    issue.location.col_start,
+                ));
+                end -= 1;
+                taken.push(issue);
+            } else {
+                i += 1;
+            }
+        }
+        taken
     }
 
     pub fn is_empty(&self) -> bool {

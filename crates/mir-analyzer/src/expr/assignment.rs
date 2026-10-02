@@ -1634,17 +1634,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // compatible with the declared type (so the refined type is a valid
                 // sub-type, e.g. assigning non-null to a nullable property).
                 // Skip refinement on invalid assignments to avoid masking later errors.
-                if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object)
+                    .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, self.db))
+                {
                     if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                         // Constructor definite-assignment tracking: a plain
                         // `$this->prop = value` counts as initializing the
                         // property regardless of whether the assigned type is
                         // itself valid (an incompatible assignment is already
                         // flagged separately above; it still runs at runtime).
-                        if ctx.inside_constructor && obj_var.as_ref() == "this" {
+                        if ctx.inside_constructor && obj_key == "this" {
                             ctx.mark_this_prop_assigned(&prop_name);
                         }
-                        let obj_ty = ctx.get_var(obj_var.as_ref());
                         let declared_opt: Option<std::sync::Arc<mir_types::Type>> =
                             obj_ty.types.iter().find_map(|a| {
                                 if let Atomic::TNamedObject { fqcn, .. } = a {
@@ -1662,6 +1663,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // stored refinement, not discarded, so a later read
                         // correctly surfaces a possibly-null diagnostic
                         // instead of losing the narrowing entirely.
+                        ctx.clear_prop_refined_chain(&obj_key, &prop_name);
                         let should_refine = !ty.is_mixed()
                             && declared_opt
                                 .as_deref()
@@ -1670,11 +1672,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 })
                                 .unwrap_or(true);
                         if should_refine {
-                            ctx.set_prop_refined(obj_var.as_ref(), &prop_name, ty.clone());
+                            ctx.set_prop_refined(&obj_key, &prop_name, ty.clone());
                         } else {
                             // Assignment with incompatible or unknown (mixed) type: discard
                             // any stale guard-based narrowing so reads fall back to declared.
-                            ctx.clear_prop_refined(obj_var.as_ref(), &prop_name);
+                            ctx.clear_prop_refined(&obj_key, &prop_name);
                         }
                     }
                 }

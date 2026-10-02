@@ -26,8 +26,17 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut then_ctx = ctx.branch();
         narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
         let then_unreachable_from_narrowing = then_ctx.diverges;
+        // Sentinel entry: any write to the guard inside the branch drops it.
+        let guard = guard_variable(&if_stmt.condition);
+        if let Some(g) = guard {
+            then_ctx.add_guarded_def(g, g);
+        }
         if !then_ctx.diverges {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
+        }
+        let guard_unwritten = guard.is_some_and(|g| then_ctx.guarded_defs.get(&g) == Some(&g));
+        if let Some(g) = guard {
+            then_ctx.drop_guarded_def(g);
         }
 
         // Chained "every condition seen so far evaluated false" state, threaded
@@ -154,6 +163,9 @@ impl<'a> StatementsAnalyzer<'a> {
         for ec in elseif_ctxs {
             *ctx = FlowState::merge_branches(&pre_ctx, ec, Some(ctx.clone()));
         }
+        if guard_unwritten {
+            record_guarded_defs(&pre_ctx, if_stmt, ctx);
+        }
     }
 
     /// Emit `RedundantCondition` for a condition whose type-narrowing proves
@@ -188,8 +200,10 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     pub(super) fn analyze_while_stmt(&mut self, w: &WhileStmt, ctx: &mut FlowState) {
+        let head_mark = self.issues.issue_count();
         self.expr_analyzer(ctx).analyze(&w.condition, ctx);
         self.check_docblock_contradiction(&w.condition, ctx);
+        let head_end = self.issues.issue_count();
         let pre_diverges = ctx.diverges;
         let pre = ctx.clone();
 
@@ -203,28 +217,53 @@ impl<'a> StatementsAnalyzer<'a> {
             self.emit_redundant_condition(w.condition.span, false, Some("loop body"));
         }
 
+        // Constant verdicts on the pre-loop state are held back: if the body
+        // changes the state, the head is judged on the merged state instead.
+        let mut held_head_issues =
+            self.issues
+                .take_range(head_mark, head_end, IssueKind::is_constant_condition);
+
         // `while (1)` (and any other nonzero int literal) is just as much an
         // idiomatic infinite loop as `while (true)` — PHP truthiness treats
         // every nonzero int as true, only `0` is falsy.
         let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true))
             || matches!(w.condition.kind, ExprKind::Int(n) if n != 0);
         let condition = w.condition.clone();
+        let mut passes = 0;
         let post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
+                passes += 1;
+                if passes > 1 {
+                    // `iter` is the merged head state (not yet narrowed).
+                    let mark = sa.issues.issue_count();
+                    let mut head = iter.clone();
+                    sa.expr_analyzer(&head).analyze(&condition, &mut head);
+                    sa.issues
+                        .take_since(mark, |kind| !kind.is_constant_condition());
+                }
                 // Re-apply condition narrowing at the start of each iteration so
                 // variables introduced by assignments in the condition (e.g.
                 // `while ($line = fgets($r))`) remain definitely-assigned in the body
                 // even after loop-widening merges demote them to possibly-assigned.
                 narrow_from_condition(&condition, iter, true, sa.db, &sa.file);
                 sa.analyze_stmt(&w.body, iter);
+                // The back-edge state is only one of the head's inputs, so a
+                // constant verdict here would ignore the loop-entry type.
+                let mark = sa.issues.issue_count();
                 sa.expr_analyzer(iter).analyze(&w.condition, iter);
+                sa.issues.take_since(mark, IssueKind::is_constant_condition);
             },
             is_infinite,
             is_infinite,
             Some(&w.condition),
         );
+        if passes == 1 {
+            for issue in held_head_issues.drain(..) {
+                self.issues.add(issue);
+            }
+        }
         *ctx = post;
     }
 
@@ -1278,5 +1317,37 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         *ctx = result;
+    }
+}
+
+/// The variable of a plain `if ($var)` condition.
+fn guard_variable(condition: &php_ast::owned::Expr) -> Option<Name> {
+    let mut cond = condition;
+    while let ExprKind::Parenthesized(inner) = &cond.kind {
+        cond = inner;
+    }
+    match &cond.kind {
+        ExprKind::Variable(v) => Some(Name::from(v.trim_start_matches('$'))),
+        _ => None,
+    }
+}
+
+/// After `if ($guard) { $x = ...; }` (no else/elseif), `$x` is defined wherever
+/// `$guard` is truthy again.
+fn record_guarded_defs(pre: &FlowState, if_stmt: &IfStmt, post: &mut FlowState) {
+    if !if_stmt.elseif_branches.is_empty() || if_stmt.else_branch.is_some() {
+        return;
+    }
+    let Some(guard) = guard_variable(&if_stmt.condition) else {
+        return;
+    };
+    let newly_possible: Vec<Name> = post
+        .possibly_assigned_vars
+        .iter()
+        .filter(|v| !pre.var_possibly_defined_sym(**v) && **v != guard)
+        .copied()
+        .collect();
+    for var in newly_possible {
+        post.add_guarded_def(var, guard);
     }
 }

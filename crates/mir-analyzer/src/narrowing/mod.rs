@@ -2155,6 +2155,11 @@ pub fn narrow_from_condition(
         // if ($x)  — truthy/falsy narrowing
         _ => {
             if let Some(var_name) = extract_var_name(expr) {
+                let guarded = if is_true {
+                    ctx.vars_guarded_by(mir_types::Name::from(var_name.as_str()))
+                } else {
+                    Vec::new()
+                };
                 let current = ctx.get_var(&var_name);
                 let narrowed = if is_true {
                     current.narrow_to_truthy()
@@ -2173,6 +2178,11 @@ pub fn narrow_from_condition(
                     // variable reads as null (falsy), so the branch stays
                     // reachable at runtime.
                     ctx.diverges = true;
+                }
+                for var in guarded {
+                    let ty = ctx.get_var_sym(var);
+                    ctx.set_var(var.as_ref(), ty);
+                    std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
                 }
             } else if let Some((obj_var, prop)) = extract_any_prop_access(expr) {
                 // `if ($this->prop)` — property-receiver counterpart of the

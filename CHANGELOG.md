@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A variable assigned under `if ($flag)` is no longer `PossiblyUndefinedVariable` where `$flag` is truthy again (`if ($flag && $x > 0)`).
+- Assigning `$this->a->b` inside its own null guard narrows the property for later reads.
+- A `while ($n !== null)` condition is judged on the loop-entry and back-edge types together, so advancing the variable in the body no longer reports an always-true comparison.
 - `name_at` resolves class-like, function and enum-case declaration names, and type hints naming a missing class.
 - `symbol_at` resolves variables bound by closure `use` clauses, `catch` clauses, `static` and `global` declarations.
 - Docblock `Enum::Case` types resolve the enum through `use` imports instead of the current namespace.
