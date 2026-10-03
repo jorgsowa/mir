@@ -101,7 +101,7 @@ impl DefinitionCollector<'_> {
         // same-file `@psalm-type` alias declared on the enum itself — a
         // method body is otherwise processed with `aliases: None` below,
         // silently leaving any alias reference in its docblock unexpanded.
-        let type_aliases = self.build_type_aliases(&enum_doc);
+        let type_aliases = self.build_type_aliases_deferring_imports(&enum_doc);
 
         for member in decl.body.members.iter() {
             match &member.kind {

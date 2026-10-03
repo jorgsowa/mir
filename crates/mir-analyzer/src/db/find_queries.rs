@@ -771,35 +771,45 @@ fn expand_arc_type(ty: &mut Option<Arc<Type>>, bodies: &FxHashMap<String, Type>)
     }
 }
 
-/// Swaps the `@psalm-import-type` placeholders the collector left for imports
-/// from other files with the source alias's body, in the class's alias map and
-/// member types.
-fn resolve_cross_file_imports(db: &dyn MirDatabase, class: Arc<ClassDef>) -> Arc<ClassDef> {
-    let bodies = import_bodies(db, &class.type_aliases);
-    if bodies.is_empty() {
-        return class;
-    }
-    let expand = |ty: &mut Type| *ty = crate::collector::expand_aliases_only(ty.clone(), &bodies);
+/// Defines `$name`, which swaps the `@psalm-import-type` placeholders the
+/// collector left for imports from other files with the source alias's body,
+/// in a class-like's alias map and member types.
+macro_rules! resolve_cross_file_imports_fn {
+    ($name:ident, $def:ty) => {
+        fn $name(db: &dyn MirDatabase, def: Arc<$def>) -> Arc<$def> {
+            let bodies = import_bodies(db, &def.type_aliases);
+            if bodies.is_empty() {
+                return def;
+            }
+            let expand =
+                |ty: &mut Type| *ty = crate::collector::expand_aliases_only(ty.clone(), &bodies);
 
-    let mut class = (*class).clone();
-    class.type_aliases.values_mut().for_each(expand);
-    for prop in class.own_properties.values_mut() {
-        expand_arc_type(&mut prop.ty, &bodies);
-    }
-    for constant in class.own_constants.values_mut() {
-        expand(&mut constant.ty);
-    }
-    for method in class.own_methods.values_mut() {
-        let method = Arc::make_mut(method);
-        expand_arc_type(&mut method.return_type, &bodies);
-        let mut params = method.params.to_vec();
-        for param in &mut params {
-            expand_arc_type(&mut param.ty, &bodies);
+            let mut def = (*def).clone();
+            def.type_aliases.values_mut().for_each(expand);
+            for prop in def.own_properties.values_mut() {
+                expand_arc_type(&mut prop.ty, &bodies);
+            }
+            for constant in def.own_constants.values_mut() {
+                expand(&mut constant.ty);
+            }
+            for method in def.own_methods.values_mut() {
+                let method = Arc::make_mut(method);
+                expand_arc_type(&mut method.return_type, &bodies);
+                let mut params = method.params.to_vec();
+                for param in &mut params {
+                    expand_arc_type(&mut param.ty, &bodies);
+                }
+                method.params = params.into();
+            }
+            Arc::new(def)
         }
-        method.params = params.into();
-    }
-    Arc::new(class)
+    };
 }
+
+resolve_cross_file_imports_fn!(resolve_cross_file_imports, ClassDef);
+resolve_cross_file_imports_fn!(resolve_interface_cross_file_imports, InterfaceDef);
+resolve_cross_file_imports_fn!(resolve_trait_cross_file_imports, TraitDef);
+resolve_cross_file_imports_fn!(resolve_enum_cross_file_imports, EnumDef);
 
 /// Plain classes (not interfaces/traits/enums) defined in `analyzed_files`,
 /// each materialized exactly once and the whole list sorted by FQCN for
@@ -867,19 +877,22 @@ pub fn interface_def_at(
     idx: u32,
 ) -> Option<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
-    def_at(&defs.slice.interfaces, idx)
+    let def = def_at(&defs.slice.interfaces, idx)?;
+    Some(resolve_interface_cross_file_imports(db, def))
 }
 
 #[salsa::tracked]
 pub fn trait_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
-    def_at(&defs.slice.traits, idx)
+    let def = def_at(&defs.slice.traits, idx)?;
+    Some(resolve_trait_cross_file_imports(db, def))
 }
 
 #[salsa::tracked]
 pub fn enum_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
-    def_at(&defs.slice.enums, idx)
+    let def = def_at(&defs.slice.enums, idx)?;
+    Some(resolve_enum_cross_file_imports(db, def))
 }
 
 #[salsa::tracked]

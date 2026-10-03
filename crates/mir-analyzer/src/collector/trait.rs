@@ -38,7 +38,7 @@ impl<'a> DefinitionCollector<'a> {
         // same-file `@psalm-type` alias used in a bound/default (`@template T
         // of Numeric`) is expanded before resolution — mirrors `class.rs`'s
         // own template-param construction, which already does this.
-        let type_aliases = self.build_type_aliases(&trait_doc);
+        let type_aliases = self.build_type_aliases_deferring_imports(&trait_doc);
 
         let trait_template_names: rustc_hash::FxHashSet<String> = trait_doc
             .templates
