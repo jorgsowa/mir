@@ -1153,7 +1153,10 @@ pub(crate) fn check_typed_callable_arg(
     // a parameter the implementing closure is free to leave out of its own signature — it
     // isn't a promise that invocations always omit it, so it doesn't lower how many required
     // params a closure may declare. The real ceiling is the full declared param count (a
-    // trailing variadic accepts any number, so it never caps).
+    // trailing variadic accepts any number, so it never caps). A signature that is only a
+    // variadic (`callable(mixed...)`) has no fixed prefix to cap against, so any arity fits.
+    let expected_is_variadic_only =
+        !expected_params.is_empty() && expected_params.iter().all(|p| p.is_variadic);
     let expected_required = expected_params.iter().filter(|p| !p.is_variadic).count();
     let actual_required = candidates
         .iter()
@@ -1166,7 +1169,7 @@ pub(crate) fn check_typed_callable_arg(
         .max()
         .unwrap_or(0);
 
-    if actual_required > expected_required {
+    if !expected_is_variadic_only && actual_required > expected_required {
         ea.emit(
             IssueKind::InvalidArgument {
                 param: param_name.to_string(),

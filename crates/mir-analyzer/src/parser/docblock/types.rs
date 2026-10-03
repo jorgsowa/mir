@@ -1039,7 +1039,7 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
             let p = p.trim();
             // `...$rest` (variadic) / trailing `=` (optional) — e.g.
             // `callable(string, int=):void` or `callable(string, ...$args):void`.
-            let (p, is_variadic) = match p.strip_prefix("...") {
+            let (p, mut is_variadic) = match p.strip_prefix("...") {
                 Some(rest) => (rest.trim_start(), true),
                 None => (p, false),
             };
@@ -1051,6 +1051,14 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
                 (p[..dollar].trim(), p[dollar + 1..].to_string())
             } else {
                 (p, format!("arg{i}"))
+            };
+            // Postfix variadic: `mixed...` / `int ...$rest`.
+            let ty_str = match ty_str.strip_suffix("...") {
+                Some(rest) => {
+                    is_variadic = true;
+                    rest.trim_end()
+                }
+                None => ty_str,
             };
             mir_types::atomic::FnParam {
                 name: name.into(),
