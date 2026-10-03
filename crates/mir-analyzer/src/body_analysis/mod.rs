@@ -128,6 +128,49 @@ pub(crate) struct InferredTypes {
     pub(crate) properties: Vec<(Arc<str>, Arc<str>, Type)>,
 }
 
+/// Nearest ancestor `@param` docblock type for parameter `index` that refines
+/// `own`'s native-only hint. Skipped for generic ancestors (unbound templates)
+/// and for types naming unresolvable classes (e.g. unexpanded `@psalm-type` aliases).
+fn ancestor_param_refinement(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    method_name_lower: &str,
+    index: usize,
+    own: &mir_codebase::definitions::DeclaredParam,
+) -> Option<Arc<Type>> {
+    let own_ty = own
+        .ty
+        .as_deref()
+        .filter(|t| !t.from_docblock && !t.is_mixed())?;
+    let receiver = crate::db::Fqcn::from_str(db, fqcn);
+    crate::db::class_ancestors_by_fqcn(db, receiver)
+        .iter()
+        .skip(1)
+        .find_map(|anc| {
+            let anc_fqcn = crate::db::Fqcn::from_str(db, anc.as_ref());
+            let m = crate::db::find_method_in_class(db, anc_fqcn, method_name_lower)?;
+            let ty = m
+                .params
+                .get(index)?
+                .ty
+                .as_ref()
+                .filter(|t| t.from_docblock)?;
+            let generic = !m.template_params.is_empty()
+                || crate::db::class_template_params(db, anc.as_ref())
+                    .is_some_and(|t| !t.is_empty());
+            let mut referenced = Vec::new();
+            classes::collect_named_object_fqcns(ty, &mut referenced);
+            let resolvable = referenced
+                .iter()
+                .all(|c| crate::db::class_kind(db, c.as_ref()).is_some());
+            (m.visibility != mir_codebase::definitions::Visibility::Private
+                && !generic
+                && resolvable
+                && crate::subtype::is_subtype(db, ty, own_ty))
+            .then(|| Arc::clone(ty))
+        })
+}
+
 /// Look up `(params, return_ty, template_params, throws)` for a method via
 /// the inheritance chain. Empty defaults when nothing resolves.
 #[allow(clippy::type_complexity)]
@@ -181,6 +224,14 @@ fn method_chain_signature(
                 .iter()
                 .enumerate()
                 .map(|(i, own)| {
+                    if let Some(ty) =
+                        ancestor_param_refinement(db, fqcn, &method_name_lower, i, own)
+                    {
+                        return mir_codebase::definitions::DeclaredParam {
+                            ty: Some(ty),
+                            ..own.clone()
+                        };
+                    }
                     let own_ty_is_docblock =
                         own.ty.as_deref().map(|t| t.from_docblock).unwrap_or(false);
                     let own_is_mixed_or_absent =
@@ -200,7 +251,21 @@ fn method_chain_signature(
                 .collect::<Vec<_>>()
                 .into()
         } else {
-            Arc::clone(&storage.params)
+            storage
+                .params
+                .iter()
+                .enumerate()
+                .map(|(i, own)| {
+                    match ancestor_param_refinement(db, fqcn, &method_name_lower, i, own) {
+                        Some(ty) => mir_codebase::definitions::DeclaredParam {
+                            ty: Some(ty),
+                            ..own.clone()
+                        },
+                        None => own.clone(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .into()
         };
 
         let template_params = if storage.template_params.is_empty() {
