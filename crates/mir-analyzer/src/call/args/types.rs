@@ -578,9 +578,10 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                             .any(|arg_part| named_object_subtype(arg_part, param_part, ea))
                     });
                 }
-                return parts
-                    .iter()
-                    .any(|part| named_object_subtype(part, param, ea));
+                return parts.iter().any(|part| {
+                    named_object_subtype(part, param, ea)
+                        || crate::subtype::is_subtype(ea.db, part, param)
+                });
             }
             // Bare `object` satisfies any param that accepts `object` or `mixed`.
             Atomic::TObject => {
