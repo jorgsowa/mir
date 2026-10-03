@@ -1,12 +1,9 @@
-use php_ast::ast::{BinaryOp, MagicConstKind};
-use php_ast::owned::visitor::{walk_owned_expr, OwnedVisitor};
-use php_ast::owned::{Expr, ExprKind};
 use rustc_hash::FxHashMap;
-use std::ops::ControlFlow;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::file_extensions::PhpFileExtensions;
+use crate::include_graph::{include_closure, VendorTargets};
 
 // ---------------------------------------------------------------------------
 // Error
@@ -463,7 +460,8 @@ impl Psr4Map {
         // autoload root. Unlike that call site, don't skip `vendor`-rooted
         // targets: the starting files are themselves inside `vendor`, so their
         // sibling requires are too.
-        expand_via_local_requires(&mut vendor_eager_files, false, &extensions);
+        vendor_eager_files =
+            include_closure(vendor_eager_files, VendorTargets::Follow, &extensions);
 
         Ok(Psr4Map {
             project_entries,
@@ -487,8 +485,7 @@ impl Psr4Map {
         for path in &self.project_extra_paths {
             collect_php_path(path, &mut out, &self.extensions);
         }
-        expand_via_local_requires(&mut out, true, &self.extensions);
-        out
+        include_closure(out, VendorTargets::Skip, &self.extensions)
     }
 
     pub fn vendor_files(&self) -> Vec<PathBuf> {
@@ -615,159 +612,6 @@ fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>, extensions: &PhpFileExt
         }
     } else if meta.is_dir() {
         crate::batch::collect_php_files(path, out, extensions);
-    }
-}
-
-/// Follows `require`/`include` targets reaching outside every autoload root
-/// (composer.json's autoload sections are otherwise the sole "this file is
-/// part of the project" signal) and adds any that resolve to a real file
-/// with a PHP extension, recursing since a newly-added file may itself reach further
-/// out-of-root files. Only statically-resolvable target shapes are
-/// followed: a literal string, and `__DIR__` / `dirname(__FILE__)`
-/// concatenated with a literal string — the common manual-bootstrap idiom
-/// (e.g. `require_once __DIR__ . '/../legacy/bootstrap.php'`). A bare
-/// literal with no `__DIR__` is resolved relative to the including file's
-/// own directory, the conventional meaning for this idiom in practice.
-/// When `skip_vendor` is set, a target resolving under a `vendor` directory is
-/// dropped — those are already reached through the composer autoload
-/// machinery, and re-adding them here would double-index vendor code as
-/// project code. Callers starting from vendor files themselves (a files-autoload
-/// bootstrap's own sibling requires) pass `false`, since every target is
-/// expected to resolve inside `vendor`.
-fn expand_via_local_requires(
-    out: &mut Vec<PathBuf>,
-    skip_vendor: bool,
-    extensions: &PhpFileExtensions,
-) {
-    let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
-    let mut queue: Vec<PathBuf> = out.clone();
-    while let Some(file) = queue.pop() {
-        let Some(dir) = file.parent() else {
-            continue;
-        };
-        let Ok(text) = std::fs::read_to_string(&file) else {
-            continue;
-        };
-        // Cheap bailout: skip the full parse for the (common) majority of
-        // files that don't even mention require/include.
-        if !text.contains("require") && !text.contains("include") {
-            continue;
-        }
-        let parsed = php_rs_parser::parse(&text);
-        let mut scanner = IncludeTargetScanner {
-            dir,
-            targets: Vec::new(),
-        };
-        let _ = scanner.visit_program(&parsed.program);
-        for target in scanner.targets {
-            let resolved = if Path::new(&target).is_absolute() {
-                PathBuf::from(target)
-            } else {
-                dir.join(target)
-            };
-            let resolved = lexically_normalize(&resolved);
-            if !extensions.is_php_source(&resolved) {
-                continue;
-            }
-            if skip_vendor && resolved.components().any(|c| c.as_os_str() == "vendor") {
-                continue;
-            }
-            if !resolved.is_file() {
-                continue;
-            }
-            if seen.insert(resolved.clone()) {
-                out.push(resolved.clone());
-                queue.push(resolved);
-            }
-        }
-    }
-}
-
-/// Returns `seeds` plus every file reachable from them through statically
-/// resolvable `require`/`include` targets whose extension is in `extensions`.
-/// A target under a `vendor` directory is dropped when `skip_vendor` is set.
-pub fn follow_includes(
-    seeds: Vec<PathBuf>,
-    skip_vendor: bool,
-    extensions: &PhpFileExtensions,
-) -> Vec<PathBuf> {
-    let mut out = seeds;
-    expand_via_local_requires(&mut out, skip_vendor, extensions);
-    out
-}
-
-/// Collapses `.`/`..` components lexically instead of relying on the OS to
-/// resolve them, since a `__DIR__`-derived base can be a Windows verbatim
-/// (`\\?\`-prefixed) path — those disable `..` resolution by the OS, so a
-/// naively-concatenated `\\?\C:\...\src/../legacy/helpers.php` would never
-/// resolve to a real file even though the target genuinely exists.
-fn lexically_normalize(path: &Path) -> PathBuf {
-    let mut components = path.components().peekable();
-    let mut ret = if let Some(c @ Component::Prefix(_)) = components.peek().copied() {
-        components.next();
-        PathBuf::from(c.as_os_str())
-    } else {
-        PathBuf::new()
-    };
-
-    for component in components {
-        match component {
-            Component::Prefix(_) => unreachable!(),
-            Component::RootDir => ret.push(component.as_os_str()),
-            Component::CurDir => {}
-            Component::ParentDir => {
-                ret.pop();
-            }
-            Component::Normal(c) => ret.push(c),
-        }
-    }
-    ret
-}
-
-struct IncludeTargetScanner<'a> {
-    dir: &'a Path,
-    targets: Vec<String>,
-}
-
-impl OwnedVisitor for IncludeTargetScanner<'_> {
-    fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
-        if let ExprKind::Include(_, inner) = &expr.kind {
-            if let Some(target) = resolve_static_include_target(inner, self.dir) {
-                self.targets.push(target);
-            }
-        }
-        walk_owned_expr(self, expr)
-    }
-}
-
-/// Statically evaluates the include-target expression shapes real code
-/// actually uses: a literal string, `__DIR__` / `dirname(__FILE__)`, and `.`
-/// concatenations of those. Anything else (a variable, a non-`dirname` call)
-/// can't be resolved without running the program, so is left alone.
-fn resolve_static_include_target(expr: &Expr, dir: &Path) -> Option<String> {
-    match &expr.kind {
-        ExprKind::String(s) => Some(s.to_string()),
-        ExprKind::MagicConst(MagicConstKind::Dir) => Some(dir.to_string_lossy().into_owned()),
-        ExprKind::Parenthesized(inner) => resolve_static_include_target(inner, dir),
-        ExprKind::Binary(b) if b.op == BinaryOp::Concat => {
-            let left = resolve_static_include_target(&b.left, dir)?;
-            let right = resolve_static_include_target(&b.right, dir)?;
-            Some(format!("{left}{right}"))
-        }
-        ExprKind::FunctionCall(call) => {
-            let ExprKind::Identifier(name) = &call.name.kind else {
-                return None;
-            };
-            if !name.eq_ignore_ascii_case("dirname") {
-                return None;
-            }
-            let arg = call.args.first()?;
-            arg.value
-                .as_ref()
-                .is_some_and(|v| matches!(v.kind, ExprKind::MagicConst(MagicConstKind::File)))
-                .then(|| dir.to_string_lossy().into_owned())
-        }
-        _ => None,
     }
 }
 

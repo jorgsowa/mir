@@ -228,7 +228,7 @@ struct FixtureConfig {
     /// Raw `file_extensions=` entries; normalized by `PhpFileExtensions::new`.
     file_extensions: Vec<String>,
     /// Files (relative to temp dir) from `include_seed=`. When set, the analyzed
-    /// set is these files plus whatever `follow_includes` reaches, instead of
+    /// set is these files plus whatever `include_closure` reaches, instead of
     /// every file with a configured extension.
     include_seeds: Vec<String>,
 }
@@ -1356,7 +1356,7 @@ fn with_fixture_session<R>(
             .iter()
             .map(|f| tmp_dir.join(f))
             .collect();
-        crate::composer::follow_includes(seeds, true, &extensions)
+        crate::include_closure(seeds, crate::VendorTargets::Skip, &extensions)
     };
 
     let ws = FixtureWorkspace {

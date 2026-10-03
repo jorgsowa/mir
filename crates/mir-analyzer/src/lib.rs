@@ -21,6 +21,7 @@ pub mod file_analyzer;
 mod file_extensions;
 pub(crate) mod flow_state;
 pub(crate) mod generic;
+pub mod include_graph;
 pub mod indexing;
 #[doc(hidden)]
 pub mod metrics;
@@ -595,7 +596,8 @@ pub fn location_from_span(
 pub use symbol::{DeclarationKind, DocumentSymbol, ReferenceKind, ResolvedSymbol};
 
 pub mod composer;
-pub use composer::{follow_includes, ComposerError, Psr4Map};
+pub use composer::{ComposerError, Psr4Map};
+pub use include_graph::{include_closure, VendorTargets};
 pub use type_env::ScopeId;
 
 #[doc(hidden)]

@@ -5,9 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use mir_analyzer::{
-    composer::{follow_includes, Psr4Map},
-    discover_files, discover_files_with_extensions, AnalysisSession, BatchOptions,
-    PhpFileExtensions, PhpVersion,
+    composer::Psr4Map, discover_files, discover_files_with_extensions, include_closure,
+    AnalysisSession, BatchOptions, PhpFileExtensions, PhpVersion, VendorTargets,
 };
 use mir_issues::IssueKind;
 
@@ -57,21 +56,25 @@ fn undefined_functions(files: &[PathBuf]) -> Vec<String> {
 }
 
 #[test]
-fn follow_includes_reaches_inc_target_with_extra_extensions() {
+fn include_closure_reaches_inc_target_with_extra_extensions() {
     let f = module_and_inc_fixture();
     let exts = PhpFileExtensions::new([".php", "Module", "INC"]);
 
-    let files = follow_includes(vec![f.module.clone()], false, &exts);
+    let files = include_closure(vec![f.module.clone()], VendorTargets::Follow, &exts);
 
     assert!(files.contains(&f.root.join("b.inc")), "got {files:?}");
     assert!(undefined_functions(&files).is_empty());
 }
 
 #[test]
-fn follow_includes_ignores_inc_target_by_default() {
+fn include_closure_ignores_inc_target_by_default() {
     let f = module_and_inc_fixture();
 
-    let files = follow_includes(vec![f.module.clone()], false, &PhpFileExtensions::default());
+    let files = include_closure(
+        vec![f.module.clone()],
+        VendorTargets::Follow,
+        &PhpFileExtensions::default(),
+    );
 
     assert_eq!(files, vec![f.module.clone()]);
     assert_eq!(undefined_functions(&files), vec!["b_helper".to_string()]);
