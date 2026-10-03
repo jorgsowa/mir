@@ -1224,7 +1224,7 @@ pub(super) fn extract_description(text: &str) -> String {
 pub(super) fn parse_import_type(body: &str) -> Option<DocImportType> {
     // Split on " from " (with spaces to avoid matching partial words)
     let (before_from, from_class_raw) = body.split_once(" from ")?;
-    let from_class = from_class_raw.trim().trim_start_matches('\\').to_string();
+    let from_class = from_class_raw.trim().to_string();
     if from_class.is_empty() {
         return None;
     }
