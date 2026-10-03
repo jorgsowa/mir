@@ -279,6 +279,12 @@ impl DefinitionCollector<'_> {
                         // Mark the type as docblock-sourced so signature checks (e.g.
                         // param contravariance) can tell a `@param` refinement apart
                         // from a native type hint.
+                        doc_ty = super::per_argument_variadic_doc_type(
+                            p.variadic,
+                            native_ty.as_ref(),
+                            doc_type_raw.as_deref(),
+                            doc_ty,
+                        );
                         doc_ty.from_docblock = true;
                         doc_ty
                     })

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Enum cases now cover their enum: a union of every case equals the enum inside generic type arguments, docblock `Enum::Case` refs compare as case literals in argument checks, and a case satisfies `self`/`static`. `Enum::Case` in a `@var`/`@return`/`@property` docblock no longer reports `UndefinedDocblockClass`.
+- `@param T[] ...$x` on an untyped or `array` variadic now describes each argument (`$x` is `list<T[]>`) instead of each argument being a bare `T`.
 
 ## [0.85.0] - 2026-10-03
 

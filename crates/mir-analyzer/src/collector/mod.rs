@@ -42,6 +42,27 @@ pub(crate) static COMPLEX_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static PARAM_WITH_DEFAULT: AtomicUsize = AtomicUsize::new(0);
 
 /// Check if a Type is a simple scalar type (for profiling).
+/// `@param X[] ...$p` on an untyped (or `array`) variadic describes each argument,
+/// so store the collected `list<X[]>`. With a non-array native hint, `X[]` is the
+/// legacy spelling of the collected array and stays as-is.
+fn per_argument_variadic_doc_type(
+    is_variadic: bool,
+    native_ty: Option<&Type>,
+    doc_raw: Option<&str>,
+    doc_ty: Type,
+) -> Type {
+    let shorthand = is_variadic
+        && doc_raw.is_some_and(|r| r.ends_with("[]"))
+        && matches!(doc_ty.types.as_slice(), [Atomic::TArray { .. }])
+        && native_ty.is_none_or(|n| n.types.iter().any(|a| a.is_array()));
+    if !shorthand {
+        return doc_ty;
+    }
+    Type::single(Atomic::TList {
+        value: Box::new(doc_ty),
+    })
+}
+
 fn is_simple_scalar(u: &Type) -> bool {
     if u.possibly_undefined || u.from_docblock || u.types.len() != 1 {
         return false;
@@ -2202,6 +2223,12 @@ impl<'a> DefinitionCollector<'a> {
                         // Mark the type as docblock-sourced so signature checks (e.g.
                         // param contravariance) can tell a `@param` refinement apart
                         // from a native type hint.
+                        doc_ty = per_argument_variadic_doc_type(
+                            p.variadic,
+                            native_ty.as_ref(),
+                            doc_type_raw.as_deref(),
+                            doc_ty,
+                        );
                         doc_ty.from_docblock = true;
                         Self::fill_self_static_parent(doc_ty, class_fqcn)
                     })
