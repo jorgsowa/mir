@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 - An override with no `@param` docblock of its own now inherits a refining `@param` type from the nearest ancestor (e.g. `positive-int` for a native `int`) inside its body, instead of the bare native hint.
 - An intersection of array types (`array<string, mixed>&array{...}`) is accepted for a plain `array` parameter.
 - A closure or arrow function declared `: array` whose body returns a keyed record (`['id' => $i]`) keeps the record shape (literals widened), so `array_map` over it yields `list<array{'id': int}>` instead of `list<array>`.
@@ -23,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `<fileExtensions><extension name=".inc"/></fileExtensions>` in `mir.xml` treats those extensions as PHP source in the CLI's project, ignored-directory and composer walks.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `dirname(__FILE__, N)` in an include target honors the level, and `dirname(__DIR__)` resolves.
 - A `__call` on any member of an intersection receiver suppresses `UndefinedMethod` for the whole intersection.
@@ -58,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnalysisSnapshot::declaration_name_range_cached` returns a symbol's declared-name range without taking the session.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Docblock `Cls::CONST` / `Cls::*` types naming another class are no longer reported as impossible `===`/`==` comparisons against literals.
 - A `: int`/`: string` private or final method, or function, whose body returns only 2+ literals keeps that literal union at call sites, so `match` over it is judged exhaustive against those values.
@@ -109,6 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnalysisSession::outgoing_calls(file, byte_offset)`: the calls inside the function or method around the offset, as resolved `Name`s with call-site ranges (trait aliases map to the original method).
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `for` loops no longer report the condition as always true when the update expression reassigns the variable (`for ($c = $e; $c !== null; $c = $c->getPrevious())`), and the update runs with the condition's narrowing applied.
 - `hrtime(true)` returns `int` instead of `int|float`.
@@ -164,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `G<Class>` arguments are accepted for a `G<static>`/`G<self>` `@param` when `Class` is the receiver class.
 - `class-string<X>` satisfies a bare `class-string` bound.
 - `$x->get() instanceof Y` (and null/type checks) now narrow later identical zero-argument calls on `$x` when `get()` is `@psalm-pure`/`@psalm-mutation-free`; the narrowing is dropped after an impure call on, or reassignment of, `$x`.
@@ -196,6 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by kind when a method shares the name.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 
 - Re-analysis after an edit no longer panics with "Data for reusable `Fqcn`
@@ -268,6 +279,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `indexed_references_to` could return, and keep serving from its memo, a
   result missing a file that was opened via `ingest_file` with unchanged text
   while a snapshot query was in flight.
@@ -298,6 +311,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Session write-path deadlocks:** resolved two Salsa handle deadlocks where
   a live database snapshot outlived the point where the same thread waited
   on the database lock, in reanalysis and in cancellable workspace-index
@@ -316,6 +331,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Incremental indexing:** resolved a deadlock in FileNo-interned index
   commits during analyzer database updates.
 - **Array-shape subtype checks:** keyed arrays now satisfy intersections with
@@ -331,6 +348,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions to `0.76.0` and refreshed `Cargo.lock` to match.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Incremental cache invalidation:** mirror workspace growth now invalidates
   affected cache entries, including selective invalidation for changed files,
@@ -349,6 +368,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions to `0.75.0` and refreshed `Cargo.lock` to match.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Control-flow and inference:** guaranteed `foreach` iterations and loop
   writes now retain their inferred state; dynamic nested array-shape updates,
@@ -384,6 +405,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions to `0.74.0` and refreshed `Cargo.lock` to match.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Analyzer inference:** `pathinfo()` component calls retain their string
   return type; `array_keys()` preserves source keys; and `ini_get_all()` keeps
@@ -426,6 +449,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions to `0.73.0` and refreshed `Cargo.lock` to match.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **PHP 8.4 property-hook initialization:** get-only hooked properties are
   treated as virtual, while properties with both get and set hooks still
@@ -481,6 +506,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Docblock pseudotype precedence:** same-named classes no longer regress
   docblock pseudotype resolution, including imported aliases and inherited
   method calls.
@@ -524,6 +551,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`#[Pure]` stub honors:** purity analysis now respects a `#[Pure]`
   attribute on user stubs.
 - **readonly / enum mutation-free receivers:** enum receiver accessors,
@@ -541,6 +570,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scopes, inference, and path resolution.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Release lint formatting:** Rust sources added for the Symfony query
   regression suite now pass the workspace `rustfmt` check.
@@ -574,6 +605,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a replacement.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Query-memo staleness across off-salsa subtype-edge commits:**
   `indexed_references_to` / `indexed_subtype_classes` memoized per text
@@ -675,6 +708,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`indexed_subtype_classes` re-walked every candidate file on every
   call, even a byte-for-byte repeat.** Same shape as the
   `indexed_references_to` fix below: `commit_defs_for_matching`'s
@@ -713,6 +748,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (PHP 8.5).
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **`assert()`/`if` null-check now narrows array-offset access:**
   `assert($arr['k'] !== null)` and `if ($arr['k'] === null) { return; }`
@@ -927,6 +964,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`<ignoreFiles>`/`<projectFiles>` directory matching works when
   `canonicalize()` changes the path shape:** `canonicalize()` (used for the
   composer root and target path) can resolve symlinks, 8.3 short names, or
@@ -939,6 +978,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.66.0] - 2026-07-31
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **`new $var(...)` accepts an object receiver:** `is_valid_class_name_type`
   rejected any object-typed value, but `new $obj(...)` is valid PHP — it
@@ -1085,6 +1126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Promoted constructor properties honor docblock refinements like ordinary
   params:** a promoted property only let a `@param` docblock override the
   native hint when the hint was exactly plain `array`/`mixed`; any other
@@ -1211,6 +1254,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `self`/`static`/`parent` inside `class-string<...>`/`interface-string<...>`
   generic arguments now substitute to the enclosing class type.
 - `define()` calls inside function and method bodies are collected as
@@ -1331,6 +1376,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path of keys; the existing shape-path plumbing already supported it.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **First index build no longer re-collects definitions ~3× per file:**
   `collect_file_definitions`' `lru = 4096` cap sat below real workspace
@@ -1757,6 +1804,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Static-call reference fallback:** a static/`parent::`/`self::` call whose
   receiver class can't be resolved (e.g. an external/vendor symbol) no longer
   falls back to a class-agnostic `methname:` posting — it now scopes to the
@@ -1828,6 +1877,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Narrowing:** `array_is_list()` now recognizes `TKeyedArray` shapes —
   previously any array literal or docblock shape was narrowed as if it could
   never be a list, regardless of its own `is_list` flag.
@@ -1847,11 +1898,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **CI:** 0.59.1's crates.io publish still failed on `mir-plugin`, since a first-time crate publish needs the `publish-new` token scope that the CI token doesn't have; `mir-analyzer` and `mir-php` were never reached. `mir-plugin` has now been published manually so the crate exists on the index, and this release carries no other changes — it exists so the remaining crates land on crates.io at a version CI can publish end to end.
 
 ## [0.59.1] - 2026-07-18
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **CI:** the release workflow never published `mir-plugin`, so `mir-analyzer` (which depends on it) failed to publish and broke the 0.59.0 release partway through. Each publish step now also skips crates/versions already uploaded, so a rerun after a partial failure doesn't error out on the ones that already succeeded.
 
@@ -1918,6 +1973,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Generics:** `static`/`self` nested inside generic docblock arguments
   (`@return Builder<static>`) now resolve to the receiver class like the
   top-level forms, instead of leaking an unresolved atom that degraded every
@@ -1971,6 +2028,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Narrowing:** loose `==`/`!=` comparisons against `false` on call results (e.g. `strpos($h, $n) != false`) now narrow like the strict `===`/`!== false` arm already did.
 - **Narrowing:** `array_key_exists()`/`key_exists()` now resolve a variable holding an already-narrowed literal key (`$key = 'name'; array_key_exists($key, $arr)`), not just an inline string/int literal, so shape-narrowing applies to this common pattern.
 - **Narrowing:** `is_a($x, 'Foo', true)` now checks the class-string's subtype relationship instead of keeping every string/class-string atom unconditionally in the true branch — a `class-string<Bar>` atom unrelated to `Foo` is dropped from the true branch (and kept in the false branch), matching the existing object-side behavior.
@@ -1987,6 +2046,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`use:` postings for unresolvable imports:** `use` items whose target class/function/constant doesn't resolve (vendor-only, not yet loaded, or genuinely missing) previously recorded no `use:` posting, so an index-based rename couldn't find the import line. The miss path now records the posting keyed by the written FQN.
 - **Narrowing:** `!is_float()`/`!is_double()` no longer leaves `TIntegralFloat` in the negative branch.
 
@@ -1999,6 +2060,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.55.1] - 2026-07-16
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Reference postings committed before a dependency existed stayed "fresh" forever:** a file's committed find-references postings were trusted for as long as its own source text was unchanged, so a file analyzed before a class/function it references was defined elsewhere (e.g. `$this->svc->run()` committed before `Svc` existed) kept serving its incomplete postings indefinitely — whether the definition later arrived via a newly-registered file, an edit to an already-registered file, or the postings were replayed from a previous session's disk cache (`warm_start_files`). Commits are now stamped with the workspace generation — which advances on file adds/removes and, newly, when an ingest defines symbols in an existing file — and are re-verified once it has moved on. The stamp is captured *before* the analysis snapshot, so a registration racing an in-flight analysis leaves the commit stale (self-healing on the next query) rather than wrongly fresh.
 
@@ -2057,6 +2120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `collect_definitions` (the vendor-tree walker) and `analyze_paths` (the CLI
   batch pipeline) never fed the subtype index from the `StubSlice` they
   already collect, unlike the single-file LSP edit path (`ingest_file`) — an
@@ -2094,6 +2159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Defaulted `mixed` type parameters collapse in display:** `array<mixed, mixed>`/`array<array-key, mixed>` now print as `array` (same for `non-empty-array`), `list<mixed>`/`non-empty-list<mixed>` as `list`, and `Traversable<mixed, mixed>`-style named objects as the bare class name when every param is a literal, unconstrained `mixed`. Template params bounded by `mixed` are left untouched since they carry real signature info. Also fixes the root cause for the array case: a bare `array` docblock keyword was building its key as `TMixed` instead of the true PHP array-key domain (`int|string`), now shared via `Type::array_key()`.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **`vsprintf()` didn't infer a `non-empty-string` return type like `sprintf()`:** `sprintf_return_type` only ever consults the format-string argument (index 0), which `vsprintf` shares with `sprintf` verbatim — extending the special case to `vsprintf` closes the same precision gap already fixed for `array_reduce`.
 - **Hover symbol missing on plain variable-assignment write targets:** `assign_to_target`'s `ExprKind::Variable` arm only updated flow-state variable tracking, never calling `record_symbol` — unlike the read path (`analyze_variable`) and the already-fixed property/static-property write siblings. Hovering `$x` at its own `$x = 5;` site (or any `list()`/array-destructuring target) resolved nothing.
@@ -2213,6 +2280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`$this` inside a free-standing closure/arrow function falsely flagged `InvalidScope`:** a closure declared outside any class can legitimately reference `$this` if it's later rebound to an object via `Closure::bind()`/`bindTo()`/`call()` — a common macro/PHPUnit-style idiom. `$this` was only seeded into a closure's flow-state when it was lexically inside a method; non-static closures and arrow functions now seed `$this` as a generic object instead of leaving it undefined.
 - **View-template path detection missed mixed path separators:** `is_view_template_path` matched only pure `/resources/views/` or `\resources\views\` substrings, so it missed paths mixing both separators — which `PathBuf::join` produces on Windows when the joined-in component already contains forward slashes — silently suppressing no diagnostics for such paths and failing fixture tests on `windows-latest` CI. Detection now splits on either separator instead of substring-matching.
 - **Nested `@psalm-type`/`@phpstan-type` aliases only expanded one level deep:** an alias whose body referenced another same-file alias (`@psalm-type UserId = Id` where `Id` is itself an alias) resolved to the unexpanded alias name instead of its final type. Alias expansion is now re-run to a fixpoint, bounded so a cyclic alias definition converges to a stable self-reference instead of looping.
@@ -2231,6 +2300,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `Issue`'s `impl fmt::Display` is removed from `mir-issues`; colored text rendering moved to `mir-cli` as `format_issue`, alongside the crate's other renderers (junit, sarif). Library consumers formatting an `Issue` via `{}`/`to_string()` need their own formatter.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Unbounded memory growth / OOM on a corrupted or stale disk cache:** bincode's plain `deserialize_from()`/`deserialize()` has no allocation limit, so a bit-flipped or stale `cache.bin`/stub-cache entry could desync the length-prefixed decoding and attempt to allocate a garbage multi-gigabyte collection before ever returning an `Err` — reproduced locally as a single mismatched stub-cache entry driving one process to a 110GB RSS footprint and a SIGKILL. Every disk-backed bincode read is now bounded to the entry's own byte length, so a format mismatch fails fast as a cache miss instead of paging the machine to death.
 - **Reference-index key collisions between same-named members:** `Foo::bar` as a property, a method, and a class constant shared the identical unprefixed reference-index key, so `references_to()` merged their locations together and dead-code detection could hide a truly-dead property behind a same-named method's usage. Keys are now prefixed by kind (`cls:`/`fn:`/`meth:`/`prop:`/`cnst:`/`gcnst:`).
@@ -2276,6 +2347,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Write-path warm-up and an opt-out of the legacy reference index for LSP hosts:** `ingest_file_prepared` now runs a file's Phase-1 warm-up (resolve + lazy-load its direct class references) at write time, so subsequent reference lookups and re-analysis reads find every candidate already prepared. `without_reference_index()` lets a host stop maintaining the imperative `RefIndex` on the incremental paths entirely for sessions that read references exclusively through the memoized `references_to_in_files` path, cutting a lock acquisition per edit.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Unbounded memory growth in long editing sessions:** the FQN-keyed `infer_scope`/`infer_function` memo tables now carry an LRU bound (4096, matching `collect_file_definitions`) instead of growing forever as renames mint new memo keys. The process-global lowercase-`Name` cache now clears itself past 65,536 entries instead of growing unbounded across a rename storm.
 - **A wedged editing suite under concurrent salsa writes:** `class_issues` took a database snapshot and then re-entered the session lock per file to read sources, which could deadlock against a concurrent writer. Sources are now read through the snapshot already in hand — also one lock acquisition per call instead of one per file.
@@ -2324,6 +2397,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Match/switch/instanceof narrowing:** comma-separated `match(true)` conditions and `switch(true)`/plain `switch` fallthrough bodies are now narrowed as the OR/union of every condition or label that can reach them, instead of collapsing to the last one (or the bare declared type). `$x instanceof A && $x instanceof B` on two unrelated interfaces now narrows to `A&B` instead of discarding `A`; a provably-impossible double `instanceof` now correctly propagates as an empty (unreachable) type instead of masking `RedundantCondition`. Scalar type-check disjuncts (`is_int($x) || is_string($x)`) are now unioned the same way `instanceof` disjuncts already were. `EnumName::CaseName` narrowing is now recognized from its real `ClassConstAccess` AST shape (it was previously unreachable). `$x` is now narrowed on `get_class($x) === Foo::class`, matching the existing `=== 'Foo'` string-literal form. An intersection union member no longer gets duplicated across OR-`instanceof` disjuncts, and a prior `instanceof` narrowing is no longer dropped by a second, unrelated `instanceof` check.
 - **Generics — binding & inference:** template bindings now infer through an argument's own inheritance chain, a plain (non-redeclaring) subclass's implicit template slot, and a class's own `@implements`/`@extends` type args (including through an interface's own `@extends` chain, previously untracked entirely). A receiver's own type params now propagate through `: static` return types, into property types, into first-class-callable closures, and into a static factory's class-level template. `@template-covariant`/`-contravariant` is now honored across inheritance chains, not just between two instantiations of the same class.
 - **Generics — bound checking:** class-level `@template T of Bound` is now enforced on `new`, on a static method's own bound, and on `@implements`/`@extends` type args against the target's declared bound. A template fully explained by a union alternative (`T|null` called with `null`) is no longer bound-checked against `T`'s own bound. Overrides now check against a concretely-bound class template on both the parent and child side, and a duplicate `@template` name declaration is checked only against its first bound.
@@ -2345,6 +2420,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.50.2] - 2026-07-02
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Process abort (SIGABRT) under concurrent workspace indexing:** Fetching the workspace revision epoch (`index_generation`) and deriving a file's defined symbols during `ingest_file` ran salsa queries on the shared, non-snapshot database handle. Two threads doing so at once raced its single thread-local query stack, tripping a debug-assertion `unreachable_unchecked` that aborted the whole process (in release builds it would silently corrupt state). The revision epoch is now read from an off-salsa atomic mirror, and `ingest_file` derives its symbol set from the `FileDefinitions` it already computed — neither touches salsa on the shared handle.
 
@@ -2369,6 +2446,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Exhaustiveness check for integer literal unions:** `check_match_exhaustiveness` now handles `match` on a union of integer literals (e.g. `@param 1|2|3 $n` or an `int-mask<…>` expansion): `UnhandledMatchCondition` is emitted for any literal value not covered by an arm. Negative literals and default arms are handled correctly.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **`ImplicitFloatToIntCast` false positive for `floor`/`ceil`/`round` results:** Introduces `Atomic::TIntegralFloat` — a float subtype whose value is always whole. `floor`, `ceil`, and `round` (with zero precision) now return `TIntegralFloat` instead of `TFloat`. Passing `TIntegralFloat` to an `int` parameter in non-strict mode is lossless, so `ImplicitFloatToIntCast` no longer fires. Strict mode still emits `InvalidArgument`.
 - **Untyped promoted constructor properties now detected:** `MissingPropertyType` is now emitted for promoted constructor parameters without a type hint (e.g. `public function __construct(public $x) {}`). Previously, `check_property_member` only walked `ClassMemberKind::Property` nodes and silently skipped promoted params.
@@ -2400,6 +2479,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`TCallableString` in `is_callable()` false branch (N5):** `callable-string` is definitionally callable, but `Atomic::is_callable()` only matched `TCallable` and `TClosure`. The false-branch filter now correctly removes `TCallableString` atoms and marks the branch as diverging when that is the only type — e.g. `!is_callable(callable-string $x)` now emits `RedundantCondition`. The true branch is unchanged: `TCallableString` was already kept via `t.is_string()`.
 - **`: never` bodies that fall through:** A function declared `: never` must throw, call `exit`, or otherwise diverge on every code path. `return_requires_value` previously exempted `never` alongside `void`/`mixed`; removing that exemption causes `check_missing_return` to emit `InvalidReturnType` when the body does not always diverge. Explicit `return $value;` and bare `return;` inside `: never` bodies remain parser-enforced PHP parse errors.
 - **Composer binary self-heal on platform mismatch:** The shim now loads the Composer autoloader and calls `Installer::run()` before exec-ing the binary. On a mismatch (e.g. a macOS-built darwin binary inside an Alpine container) it re-downloads the correct binary for the current platform instead of silently exiting 126; the marker check makes this a no-op when the binary is already correct. `ldd` detection now uses `ldd --version 2>/dev/null`: when `ldd` is absent the suppressed error leaves stdout empty, which is treated as musl rather than falling back to gnu — a safer default for minimal containers.
@@ -2428,6 +2509,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **`class_exists` guard on interface extends:** `interface Foo extends GuardedIface {}` after an `interface_exists(…)` throw-guard no longer emits `UndefinedClass`. Mirrors the fix already applied to class `extends`/`implements`.
 - **`is_callable()` narrowing (N5):** The true branch now preserves string and array atoms (PHP accepts function-name strings and `['Class', 'method']` arrays as valid callables) alongside `callable`/`Closure`.
 - **PHP 8.3 typed class constants (N3):** `const int FOO = 1` declarations are now resolved to their declared type instead of always returning `mixed`. Accessing typed constants now produces correct `InvalidArgument`/`ArgumentTypeCoercion` diagnostics at call sites.
@@ -2453,6 +2536,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `key-of<T>` and `value-of<T>` now resolve to the real key and value types in return-type checks; valid returns are accepted without false `InvalidReturnType`. Float-literal docblock types (e.g. `@return 3.14`) now parse and accept a matching float return. Psalm pseudo-types (`truthy-string`, `int-mask<…>`, `non-falsy-string`) in `@return` no longer emit `UndefinedClass`.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Method overrides (G4/G5):** Return-covariance violations in mixed `object|scalar` unions are now caught (e.g. widening `string|Cat` to `string|Animal` is flagged). Covariance-legal narrowing (e.g. `string|Animal` to `string|Cat`) and parameter widening are still accepted. Template `@return T of Bound` methods no longer emit false `InvalidReturnType` when the returned value satisfies the bound.
 - **FP-H (`@method static` return type):** `@method static name()` is now correctly parsed as a non-static method returning `static`, not a static modifier. Carbon-style fluent docblocks no longer cause `MethodSignatureMismatch` on concrete overrides in subclasses.
@@ -2488,6 +2573,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Truthy/falsy narrowing corrected across scalar types: `bool` narrows to the `true`/`false` literal (including on `=== true`/`=== false`), `string` narrows the string type, `int`/`float` falsy checks narrow to the zero literal, and `int` ranges tighten their bounds around zero (`int<min,0>`, zero-inclusive ranges, single-point exclusion now marks branch divergence). `!==` / `===` on an int-range edge tightens the bound.
 - `non-empty-array`/`non-empty-list` are never falsy and a closed empty `array{}` is never truthy, fixing `can_be_falsy`/`can_be_truthy` for these and for `TNumericString`, `TNonNegativeInt`, and zero-inclusive `TIntRange`.
 - Named integer subtypes (`positive-int`, `non-negative-int`, etc.) now carry their implicit bounds through arithmetic and comparisons, intersect correctly on comparison, and have correct subtype/contradiction handling — fixing missing `TNumeric`/`TScalar`/`TFloat` subtype entries, `DocblockTypeContradiction` detection, `impossible_comparison` with negative literals, and `RedundantCondition` on always-true named-int comparisons.
@@ -2507,6 +2594,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `int-range` sub-ranges are now correctly recognized as subtypes of containing int-ranges. `positive-int` is now a subtype of `scalar`, `numeric`, and `int<min,max>` when the range contains all positive integers.
 - `list<T>` subtype check for `array<K,V>` now verifies `int <: K` (accepts `array-key`-keyed arrays). Keyed array shapes like `array{0:Child,1:Child}` now satisfy `list<Base>` when `Child extends Base`.
 - `do-while` bodies are now known to execute at least once: variables introduced in the body are stripped of `possibly_undefined` / `possibly_assigned` after the first pass, matching PHP's guaranteed-first-iteration semantics.
@@ -2525,6 +2614,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.43.0] - 2026-06-16
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `int` values passed to `string` parameters in non-strict-mode files (without `declare(strict_types=1)`) are no longer flagged as `InvalidArgument`. PHP's coercive typing silently casts integers to strings in this context.
 - Batch analysis path (`analyze_paths`) now calls `ensure_vendor_eager_functions()`, ensuring Composer `autoload.files` globals (e.g. Laravel Prompts helpers: `confirm`, `select`, `suggest`) are indexed before body analysis. Previously, 61 spurious `UndefinedFunction` diagnostics were emitted on the Laravel corpus.
@@ -2560,6 +2651,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Diagnostic column numbers are now 0-based throughout, matching the LSP UTF-32 convention documented in `mir_types::Location`. Body-analysis diagnostics were previously emitting 1-indexed columns, inconsistent with collector-stored diagnostics (which were already 0-indexed).
 - Classes referenced only in docblock annotations (`@param`, `@return`, `@var`, `@extends`, `@implements`) are now pre-loaded during AST prioritization. Previously such classes were invisible to the pre-loader; method and property checks on the annotated variable would silently degrade to `mixed` when the class had not yet been eagerly indexed.
 
@@ -2579,6 +2672,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Symbol reference recording for static-call class name tokens, enabling go-to-definition and find-references on `ClassName::method()` expressions.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Class-level template parameters are now correctly resolved in method parameter types during generic method binding.
 - Named-object arguments now satisfy bare `object` parameter types via `named_object_subtype` checking.
@@ -2638,6 +2733,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Result cache now invalidates when the running binary, target PHP version, or user-configured stubs change. Previously the cache keyed validity on file content hash only, leaving unchanged files serving stale diagnostics after a version upgrade, `--php-version` change, or stub set update.
 - `--clear-cache` now correctly targets the project-local cache directory (`{composer_root}/.mir/cache`) instead of always looking at the platform default cache dir and attempting to remove a `cache.json` that no longer exists (the format is `cache.bin`), making it a functional operation for normal project runs.
 
@@ -2650,6 +2747,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MissingReturnType` / `MissingParamType` (Info) — top-level functions with neither a native hint nor a docblock type are now reported (previously only interface methods were checked), on all three analysis paths (per-scope salsa, batch typed, pure per-function).
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `reanalyze_dependents` no longer deadlocks on workspaces with high dependent fan-out. The per-dependent warm-up (`prepare_ast_for_analysis`, introduced in 0.37.0) loads classes by mutating shared salsa inputs, and salsa input mutation blocks until every other database handle is released. Running the warm-up inside the parallel rayon worker meant a worker mutated the storage while sibling workers held live snapshots mid-`analyze_file`, so the write blocked on them forever — hanging indefinitely on high-fan-out workspaces. Warm-up now runs before the parallel read-only analyze loop, with each iteration holding only a scoped snapshot that is dropped before any input write, restoring the "no input writes while a snapshot is live" invariant. Covered by a regression test (`reanalyze_dependents_lazy_load_warmup_does_not_deadlock`).
 - Large false-positive reduction on the Laravel reference corpus across several diagnostic kinds (each fix ships with regression fixtures, including the negative cases):
@@ -2673,6 +2772,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Closure and arrow-function parameter/return type hints (`function (Foo $x) {}`, `fn (Foo $x) => ...`) now contribute reference-index entries and `ClassReference` symbols, so find-references and hover cover closure usages.
 - `$x instanceof Foo` now records a `ClassReference` symbol at the class-name span, unblocking hover and the `symbol_at` → `references_to` round-trip for instanceof sites.
 - Property references and symbols now key on the declaring class (as `find_property_in_chain` returns it) instead of the receiver type, fixing find-references and `symbol_at` for inherited properties accessed through a subtype.
@@ -2693,6 +2794,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Reference-location synchronization drift eliminated by consolidating three independent maps into `RefIndex`.
 
 ## [0.36.0] - 2026-06-11
@@ -2712,6 +2815,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Psalm compatibility: all 1843 fixture tests now pass, including un-ignoring 120+ Psalm-specific test cases covering edge-case behaviors.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Constructor-promoted property handling: `UnusedParam` and `UnusedVariable` false positives eliminated for promoted properties accessed through property-assignment or constructor side effects.
 - `if`-condition variable assignment detection: variables assigned in `if` condition expressions (e.g., `if ($x = foo())`) are no longer incorrectly flagged as unused.
@@ -2734,6 +2839,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `DuplicateClass` no longer fires when two classes share the same name in separate unbraced namespace blocks.
 - `abs(int)` now returns `int` instead of `float|int`.
 - Symbol lookup now records parameter declaration sites as `Variable` symbols, enabling go-to-definition on function/method parameters.
@@ -2755,6 +2862,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trait `insteadof` conflict resolution is now applied during method lookup (go-to-definition and call resolution resolve to the winning trait instead of whichever was indexed first).
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `__get` return type is now propagated to magic property-access inference: accesses that fall through to `__get` carry the declared return type instead of always resolving to `mixed`.
 - `enum::cases()` now synthesizes `list<EnumType>` instead of `mixed`, allowing `foreach` loop variables to be typed as the specific enum and enabling `UnhandledMatchCondition` to fire on enum matches.
@@ -2786,6 +2895,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `ATTR_TARGET_ALL` corrected from 127 to 63 (the correct sum of the six `TARGET_*` flags). The wrong value accidentally set bit 6 (`IS_REPEATABLE = 64`), making every `#[Attribute]` class without explicit target flags appear repeatable and silently suppressing the "not repeatable" diagnostic.
 - `NonStaticSelfCall` no longer suppresses the diagnostic when the class defines `__callStatic`. `__callStatic` only intercepts *undefined* static methods, not explicitly-defined non-static ones.
 - `$this` no longer leaks into static arrow functions when resolving captured outer scope.
@@ -2801,6 +2912,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Eager + background vendor indexing with configurable chunk size and memory targets (controlled via `--vendor-memory` flag; defaults to 128 MiB chunks).
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Fixed exponential memory growth when analyzing files with nested conditional branches and repeated dead-write tracking. `FlowState::merge_branches` now deduplicates dead writes instead of concatenating, preventing allocation of gigabytes of memory on large projects like Laravel (NotificationSender.php was OOM-ing at 20GB; now uses 33MB).
 - Fixed workspace index singleton cache refresh when analyzing project and lazy-loaded classes, ensuring proper resolution in batch analysis.
@@ -2851,6 +2964,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `@mixin` property resolution: properties declared on `@mixin` classes are now found via the full inheritance chain, eliminating `UndefinedProperty` false positives for mixin-based patterns.
 - Narrowing false positive: possibly-undefined variables no longer cause the `else`/`elseif` branch to be incorrectly marked as unreachable.
 - Narrowing in `elseif`/`else` chains: each failed `elseif` condition is now applied as a negative narrowing to the `else` branch.
@@ -2870,6 +2985,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All issue locations now carry `line_end`/`col_end` in addition to the existing start position, enabling tighter diagnostic ranges in SARIF, LSP, and playground consumers.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `UnusedVariable` false positives for variables used as dynamic property or method names (`$this->$var`, `$this->{$var}`, `$this->$method()`).
 - `UndefinedClass` false positives for class names used as the argument to `class_exists()`, `interface_exists()`, or `trait_exists()`, and for usages of optional classes inside the guarded true-branch.
@@ -2910,6 +3027,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `$argv` and `$argc` are now seeded as predefined globals, eliminating `UndefinedVariable` false positives in CLI scripts.
 - Single-star `/* @var $this */` annotations (the form PhpStorm generates for Yii2 view templates) are now recognized in addition to `/**` PHPDoc blocks. Fixes #290.
 - `PossiblyUndefinedVariable` false positives eliminated for variables assigned inside `while(true)` and `for(;;)` loops before every `break`. Infinite loops no longer treat the "loop never executes" path as reachable.
@@ -2931,6 +3050,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Variance checking for generic return types: a method return type that widens its parent's generic parameter now emits a diagnostic.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Template bounds (FQN resolution)**: eliminated ~2,100 false-positive `InvalidTemplateParam` and `InvalidArgument` diagnostics caused by bare class names in `@template T of …` bounds not being namespace-qualified. Fixes cover all definition collectors (class, interface, trait, function, method), intersection bounds, `@var` and property type annotations, and generic type arguments.
 - **Template conditional returns**: `@return (T is null ? X : Y)` now parses and resolves correctly at call sites. When T is already bound in the substitution, the conditional collapses to the correct branch. When the discriminator is nullable-but-not-only-null, the conditional widens to `X|Y` instead of emitting a false positive.
@@ -2959,6 +3080,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Composer installer now embeds the target triple in the version marker, preventing a binary installed on one platform (e.g. macOS) from being reused on a different one (e.g. Linux in Docker). The shim error message for `proc_open` failures now mentions a possible architecture mismatch.
 - Broken relative links in the error codes reference table (`./` → `../`) that caused 404s when navigating from the codes page to individual issue pages.
 - Documentation corrections for `ImplicitToStringCast`, `InvalidCast`, `UndefinedClass`, `InvalidScope`, `DeprecatedMethod`, and `DeprecatedMethodCall` issue pages. Added missing `UndefinedTrait` (MIR0009) documentation page.
@@ -2973,6 +3096,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - php-rs-parser 0.13.0: parse errors now carry precise source locations via `err.span()` instead of hardcoded line 1 col 0; `ForbiddenWarning` diagnostics emit at `Severity::Warning` and do not block semantic analysis.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Literal integer (`1`, `42`, `-3`) and quoted-string (`'foo'`, `"bar"`) types in docblock annotations now parse as `TLiteralInt` / `TLiteralString` instead of `TNamedObject`, making `@return 2|3` and similar annotations work correctly.
 - `@return` / `@param` docblocks written on the line preceding a standalone function declaration (rather than attached as an AST `doc_comment`) are now applied, matching the existing behavior for class methods.
@@ -3017,6 +3142,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `analyze_dependents_of()` now returns the correct dependent set after a symbol is deleted or renamed. Previously, files referencing a now-gone symbol were silently dropped because `dependency_graph()` routed edges through `symbol_defining_file()`, which returns `None` for deleted symbols. Three coordinated fixes: a `file_to_defined_symbols` forward index for O(1) definition lookup on removal; a `symbol_referencers` reverse index that survives symbol deletion; and a `stale_defined_symbols` accumulator in `AnalysisSession` that feeds deleted symbols' referencers back into the BFS.
 
 ## [0.24.0] - 2026-05-15
@@ -3030,6 +3157,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Reference location recording now complete at all five previously-missing call sites: `instanceof`, `catch`, `::class`, `::CONST`, and type-hint declarations. Files referencing a class only via these constructs are now correctly visible to the incremental dependency graph and `analyze_dependents_of()`.
 
 ## [0.23.0] - 2026-05-14
@@ -3042,6 +3171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type narrowing for `$var === SomeClass::class` comparisons, refining object types when matched against class constants.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Bare-FQN references (e.g., `new \Service()`, `\Helper::go()`) now correctly wired into the incremental dependency graph so `analyze_dependents_of()` returns files referencing classes via unqualified absolute paths.
 
@@ -3060,12 +3191,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `@template T as Bound` syntax now parsed correctly (previously only `@template T of Bound` was recognized), enabling proper type narrowing for templates declared with the `as` keyword.
 - Callable/closure return types in `@return` annotations (e.g., `@return \Closure(): T`) now correctly capture the return type after the colon, fixing false `MixedMethodCall` diagnostics when template parameters were used as closure return types.
 
 ## [0.21.1] - 2026-05-09
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `cargo-deny` configuration format migration to version 2.
 
@@ -3076,6 +3211,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tier 1 & 2 parser optimizations: pre-sized arena allocators and parallel user stub discovery for improved cold-start performance (25-40% improvement expected).
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `cargo-deny` configuration format corrected to use proper advisories section syntax.
 - Security audit findings: eliminated unwrap calls and unsafe UTF-8 conversions.
@@ -3111,6 +3248,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `@var` annotation narrowing now applies to global-scope statements, not just function bodies. Previously `analyze_stmt()` (used for top-level statements) skipped the pre/post narrowing that `analyze_stmts()` performed for function bodies, so `@var` had no effect at global scope. Fixes `global_with_var_no_indent`, `function_with_var`, and `invalid_mixed_clone` fixtures.
 
 ### Changed
@@ -3129,6 +3268,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Magic method resolution (`__get`, `__invoke`) now checks the complete ancestor chain instead of stopping at the immediate parent, fixing false negatives where inherited magic methods were not detected.
 - Unused method tests now properly handle collateral errors, improving test reliability and reducing false positives in fixture validation.
 
@@ -3139,6 +3280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AbstractInstantiation` diagnostic to detect attempts to instantiate abstract classes via `new ClassName()`.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Closure `use()` clause validation: now detects undefined variables referenced in closure use() clauses. Example: `use ($i)` will report `UndefinedVariable` if `$i` is not defined in the parent scope.
 - Mixin method resolution with generics: docblock `@mixin Foo<T>` annotations now correctly resolve to class `Foo` instead of attempting to look up a non-existent class named `Foo<T>`.
@@ -3160,12 +3303,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - The published `mir-analyzer` crate is no longer shipped with an empty stub set. The `stubs/` directory lived at the workspace root, outside the package, so `cargo package` excluded it; downstream consumers (e.g. `php-lsp`) saw `STUB_FILES = &[]` and every PHP built-in resolved as `UndefinedFunction` / `UndefinedClass`. Stubs now live inside the crate at `crates/mir-analyzer/stubs/` and are included in the published artifact. `build.rs` panics if the directory is missing, and a new `tests/packaging.rs` test asserts `cargo package --list` includes `stubs/Core/Core.php` plus the rest of the stub set — closing the publish-time gap.
 - Built-in function and class lookups are now case-insensitive, matching PHP semantics. `Restore_Error_Handler()`, `RESTORE_ERROR_HANDLER()`, `new arrayobject([])`, and `new ARRAYOBJECT([])` no longer produce false-positive `UndefinedFunction` / `UndefinedClass` diagnostics. Implemented as side indices on `MirDb` (`function_node_keys_lower`, `class_node_keys_lower`) so the canonical-FQN storage that `active_*_node_fqns`, `function_count`, `type_count`, and `clear_file_references` depend on is unchanged. Constants remain case-sensitive (PHP semantics).
 
 ## [0.17.1] - 2026-05-03
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Unqualified class names in namespaced files no longer silently fall back to the global namespace when the namespaced class is missing. PHP only does that fallback for functions and constants; mir's `resolve_name_via_db` was incorrectly extending it to classes, masking real `UndefinedClass` bugs.
 - Composer autoload parsing now covers `psr-0`, `classmap`, and `files` in addition to `psr-4`, for both project `composer.json` and each package in `vendor/composer/installed.json`. Vendor packages that expose global helpers via `autoload.files` (Symfony polyfills, Laravel helpers, ramsey/uuid bootstrap, etc.) and classmap-only packages no longer produce false-positive `UndefinedFunction` / `UndefinedClass` diagnostics.
@@ -3186,6 +3333,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - CLI Composer detection now walks up from a single explicit file path to find the nearest `composer.json`, so root config files such as `.php-cs-fixer.php` can resolve project PSR-4 namespaces instead of reporting false-positive `UndefinedClass` diagnostics.
 
 ## [0.16.0] - 2026-04-28
@@ -3200,6 +3349,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lazy finalization removes the pass barrier (Phase 3 item 7): the eager `finalize()` barrier that blocked all of Pass 2 until every ancestor chain was warm is removed. `ensure_finalized()` is now called at each `all_parents` read site (`get_method_inner`, `get_property_inner`, `get_class_constant`, `extends_or_implements`, `has_unknown_ancestor`, `collect_members_for_fqcn`, `ClassAnalyzer::analyze_all`, `check_trait_constraints`, `argument_type_satisfies_param`). Phase 3 is now complete.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - LSP incremental re-analysis: classes defined in an analyzed file but never referenced during Pass 2 had empty `all_parents` at snapshot time, causing `restore_all_parents` to silently restore empty ancestor chains on the LSP fast path. `file_structural_snapshot` now calls `ensure_finalized` for each symbol before capturing it.
 
@@ -3222,6 +3373,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ParsedDocblock::is_inherit_doc` flag: set when `@inheritDoc`, `@inheritdoc`, or `{@inheritDoc}` is present in a docblock, enabling LSP clients to walk the inheritance chain for hover and completion without implementing resolution in mir itself.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - LSP / incremental re-analysis: `inject_stub_slice` now populates `file_namespaces` and `file_imports` in the codebase, fixing false-positive `UndefinedClass` diagnostics for `use`-aliased classes after any incremental re-analysis triggered by `re_analyze_file`.
 
@@ -3258,6 +3411,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Infinite recursion on circular `@mixin` references: the mixin resolver now carries a seen-set and breaks cycles instead of stack-overflowing.
 - Benchmark harness: rayon stack size raised to 16 MiB and the global thread pool is initialised explicitly, preventing stack overflows on deeply recursive PHP files during benchmarking.
 
@@ -3268,6 +3423,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.1] - 2026-04-26
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Release CI: GitHub Release is now created from the CHANGELOG before binaries are uploaded, fixing a race condition where `upload-rust-binary-action` failed with "release not found".
 
@@ -3296,6 +3453,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `cargo install mir-cli` references in README and docs corrected to `mir-php` (the actual crate name).
 - Panic in docblock extraction when source text before a declaration contains multibyte characters (e.g., `→`). `find_preceding_docblock` now correctly advances past multibyte chars when scanning for word boundaries.
 
@@ -3312,6 +3471,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Psalm docblock parity: `@psalm-param` and `@psalm-return` type narrowing annotations. (#267)
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - SARIF output: `startColumn`/`endColumn` are now correctly 1-based per SARIF 2.1.0 §3.30.5 (previously off by one). (#270)
 - SARIF output: rules now include `defaultConfiguration.level` so the GitHub Code Scanning rules panel shows severity. (#270)
@@ -3334,6 +3495,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - `PossiblyUndefinedVariable` promoted to `Warning` severity, making it visible at the default error level and matching Psalm's behavior. (#261)
 - 10 false-positive `UndefinedMethod` reports eliminated: dynamic method calls via variable expressions (`$obj->{$var}()`) no longer trigger a spurious lookup, and private trait methods are now correctly accessible from classes that use the trait. (#260)
 - Improved Psalm docblock parity. (#265, #266)
@@ -3348,6 +3511,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `php_version` is now propagated through `StatementsAnalyzer` and `ExpressionAnalyzer` for version-gated checks.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `UndefinedClass` is now detected in 7 previously-silent code paths.
 - Static method call spans now use the parser span for the method name rather than manual offset arithmetic.
@@ -3377,6 +3542,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unified single-file and multi-file `.phpt` fixture parsers into a single `parse_phpt` function; existing `===source===` markers renamed to `===file===`.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `UnimplementedAbstractMethod` and `UnimplementedInterfaceMethod` errors now report the method name with its original declared casing instead of the lowercase-normalized form.
 
@@ -3419,6 +3586,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Leading backslash in `use` imports** — fully qualified use-imports (`use \Foo\Bar;`) now resolve correctly by stripping the leading backslash. (#247)
 - **`composer.json` detection from path argument** — when invoked with a path argument, mir now walks up from that path to locate `composer.json` instead of only checking the CWD. (#247)
 
@@ -3436,6 +3605,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Real-world Criterion benchmark suite** — added a benchmark that runs analysis over a realistic PHP codebase for continuous performance regression tracking. (#219)
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Intersection type hints** — `type_from_hint` now correctly resolves intersection types (`A&B`), fixing false positives in type-narrowing and parameter checks. (#221)
 
@@ -3457,6 +3628,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Trait-of-trait method resolution** — `get_method()` now walks the full transitive trait chain with a cycle guard, eliminating false `UnimplementedInterfaceMethod` errors for methods contributed by indirectly used traits. (#209)
 - **`elseif` narrowing and branch merge** — elseif branches now correctly narrow on the parent `if` condition being false, and all elseif branches are folded into the post-if merge (previously only the last branch survived). (#211)
 - **`TKeyedArray` foreach key type** — `infer_foreach_types` now derives `TLiteralString` / `TLiteralInt` keys from `ArrayKey` entries instead of always returning `TMixed`. (#211)
@@ -3470,6 +3643,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Single-pass definition collection** — merged the pre-index and definition collection sub-passes into one parallel `par_iter`, eliminating the second parse of every file and removing the sequential serialisation barrier. (#196)
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Column offsets in diagnostics now use Unicode character counts consistently throughout mir-core. (#201)
 
@@ -3487,6 +3662,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - Property access symbols now use the identifier span and nullsafe accesses (`?->`) are tracked. (#189)
 - Function, method, and static call symbols now use the identifier span rather than the full call expression span. (#192)
 - `$this` is now injected into method context so `$this->method()` calls are correctly resolved by `symbol_at`. (#193)
@@ -3494,6 +3671,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2026-04-12
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - **Diagnostic column offsets** — fixed `col_end` always being equal to `col_start` (resulting in zero-width diagnostic ranges) and column offsets being raw UTF-8 byte positions instead of character counts. Diagnostics now correctly highlight the full variable/expression range with proper multi-byte character handling. (#182)
 
@@ -3509,6 +3688,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency updates** — upgraded php-rs-parser and php-ast to v0.6.0 for improved parsing robustness and performance.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - `is_builtin_function` now uses the full loaded stubs to properly detect built-in functions across all extensions.
 
@@ -3527,6 +3708,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
+
 - **Class-level issue reporting** — proper source locations (line/column in `storage::Location`) and code snippets now emit correctly for class-level issues. (#105)
 - **Magic method parameters** — `UnusedParam` checks now exclude magic method parameters (`__construct`, `__get`, etc.). (#108)
 
@@ -3537,6 +3720,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded php-ast and php-rs-parser to v0.5.0.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Proper source mapping threading from `ParseResult` through the analysis pipeline.
 
@@ -3549,6 +3734,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test fixture infrastructure with 96 fixture-based tests across 10 rule categories.
 
 ### Fixed
+
+- A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 
 - Reduced `UnusedVariable` false positives from 405 to 127 through improved read tracking in closures and assignment contexts.
 
