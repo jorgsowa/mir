@@ -1239,6 +1239,12 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                     _ => *is_open,
                 });
             }
+            // class-string<Child> fits class-string<Parent>, including inside shapes/lists.
+            Atomic::TClassString(Some(_)) | Atomic::TInterfaceString(Some(_)) => {
+                let single = Type::single(av.clone());
+                return scalar_arg_fits_param(&single, param_ty)
+                    || named_object_subtype(&single, param_ty, ea);
+            }
             _ => return scalar_arg_fits_param(&Type::single(av.clone()), param_ty),
         };
 
