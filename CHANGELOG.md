@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.85.0] - 2026-10-03
+
 ### Added
 
 - `PhpFileExtensions` (with `is_php_source`) for treating non-`.php` extensions (e.g. Drupal's `.module`, `.inc`) as PHP source. `discover_files_with_extensions`, `Psr4Map::from_composer_with_extensions` and the new public `include_closure` (with `VendorTargets`) accept them; the existing entry points keep `.php` only.
@@ -29,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Writing a literal key to an untyped `array` refines it to an open shape, so `$data['records'] = $foos` satisfies a declared `array{records: ...}`.
 - Truthiness and null checks narrow a two-hop property path like `$this->cfg->domain`, including in `&&` chains and ternaries; a call on the receiver or a write to the path discards the narrowing.
 - `match` on a plain `int` or `string` with only literal arms (including resolved class constants) no longer reports `UnhandledMatchCondition`.
+- Names resolve per namespace block in multi-namespace files, and top-level code in them is analyzed.
+- `@psalm-import-type` resolves across files on free functions, interfaces, traits and enums, and accepts sources written with a leading backslash.
+- Local type aliases expand in `@throws`.
+- Postfix variadic callable params such as `callable(mixed...)` keep `mixed` builtin inside a namespace.
+- `UnusedForeachValue` is skipped for break-only bodies and for ignored or unused names.
+- `AnalysisSession` declaration lookup on a trait-aliased method narrows to the trait method's name token.
 
 ## [0.84.0] - 2026-10-02
 
