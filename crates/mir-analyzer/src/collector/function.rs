@@ -400,6 +400,14 @@ impl DefinitionCollector<'_> {
             Some(Arc::from(doc.description.as_str()))
         };
 
+        let assertions = self.build_assertions(
+            &doc,
+            Some(&type_aliases),
+            &template_names,
+            &template_params,
+            fqn.as_str(),
+        );
+
         let storage = FunctionDef {
             fqn: fqn.clone().into(),
             short_name: short_name.into(),
@@ -407,7 +415,7 @@ impl DefinitionCollector<'_> {
             return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             template_params,
-            assertions: self.build_assertions(&doc, Some(&type_aliases)),
+            assertions,
             throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 // Only detect #[Deprecated] without arguments (no-arg form used in

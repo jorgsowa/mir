@@ -1304,6 +1304,9 @@ impl<'a> DefinitionCollector<'a> {
         &self,
         doc: &crate::parser::ParsedDocblock,
         type_aliases: Option<&FxHashMap<String, Type>>,
+        template_names: &rustc_hash::FxHashSet<String>,
+        template_params: &[TemplateParam],
+        defining_entity: &str,
     ) -> Vec<Assertion> {
         // Expand local type aliases before resolving, matching every other
         // type position (@param/@return/template bounds).
@@ -1312,7 +1315,16 @@ impl<'a> DefinitionCollector<'a> {
                 Some(a) => expand_aliases_only(u, a),
                 None => u,
             };
-            self.resolve_union_doc(expanded)
+            if template_names.is_empty() {
+                self.resolve_union_doc(expanded)
+            } else {
+                self.resolve_union_doc_with_templates(
+                    expanded,
+                    template_names,
+                    defining_entity,
+                    template_params,
+                )
+            }
         })
     }
 
@@ -2385,6 +2397,21 @@ impl<'a> DefinitionCollector<'a> {
             Arc::new(Self::fill_self_static_parent(resolved, class_fqcn))
         });
 
+        let assertions = {
+            let explicit = self.build_assertions(
+                &doc,
+                effective_aliases,
+                &template_names,
+                template_params_for_resolve,
+                class_fqcn,
+            );
+            if explicit.is_empty() {
+                annotation::synthesize_predicate_assertions(m)
+            } else {
+                explicit
+            }
+        };
+
         let method_name = m.name.as_deref().unwrap_or_default();
         let is_override = m.attributes.iter().any(|a| {
             a.name
@@ -2432,14 +2459,7 @@ impl<'a> DefinitionCollector<'a> {
             is_final: m.is_final,
             is_constructor: method_name == "__construct",
             template_params,
-            assertions: {
-                let explicit = self.build_assertions(&doc, effective_aliases);
-                if explicit.is_empty() {
-                    annotation::synthesize_predicate_assertions(m)
-                } else {
-                    explicit
-                }
-            },
+            assertions,
             throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 if m.attributes.iter().any(|a| {
