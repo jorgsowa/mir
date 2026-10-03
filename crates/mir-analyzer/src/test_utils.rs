@@ -175,6 +175,7 @@
 //!   PHP source (default `php`); every fixture file with one is analyzed.
 //! - `include_seed=a.module` (repeatable) analyzes only that file plus what `require`/`include`
 //!   following reaches under the configured extensions, instead of every matching file.
+//! - `include_vendor_targets=follow` (default `skip`) lets that following enter `vendor` directories.
 //! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
 //! - `===description===` must appear **at most once** and before any file section.
 //! - `===ignore===` must appear **at most once** and before any file section.
@@ -231,6 +232,7 @@ struct FixtureConfig {
     /// set is these files plus whatever `include_closure` reaches, instead of
     /// every file with a configured extension.
     include_seeds: Vec<String>,
+    follow_vendor_targets: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -707,8 +709,15 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
             "include_seed" => {
                 config.include_seeds.push(value.trim().to_string());
             }
+            "include_vendor_targets" => match value.trim() {
+                "follow" => config.follow_vendor_targets = true,
+                "skip" => config.follow_vendor_targets = false,
+                other => panic!(
+                    "fixture {path}: include_vendor_targets must be follow or skip, got {other:?}"
+                ),
+            },
             other => panic!(
-                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir, memoize_method_call_results, file_extensions, include_seed"
+                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir, memoize_method_call_results, file_extensions, include_seed, include_vendor_targets"
             ),
         }
     }
@@ -1356,7 +1365,12 @@ fn with_fixture_session<R>(
             .iter()
             .map(|f| tmp_dir.join(f))
             .collect();
-        crate::include_closure(seeds, crate::VendorTargets::Skip, &extensions)
+        let vendor = if config.follow_vendor_targets {
+            crate::VendorTargets::Follow
+        } else {
+            crate::VendorTargets::Skip
+        };
+        crate::include_closure(seeds, vendor, &extensions)
     };
 
     let ws = FixtureWorkspace {

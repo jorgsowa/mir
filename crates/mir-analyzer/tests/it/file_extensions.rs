@@ -118,3 +118,138 @@ fn psr4_project_files_use_configured_extensions() {
     assert!(files.contains(&f.root.join("a.module")), "got {files:?}");
     assert!(files.contains(&f.root.join("b.inc")), "got {files:?}");
 }
+
+fn write(root: &std::path::Path, rel: &str, content: &str) {
+    let path = root.join(rel);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, content).unwrap();
+}
+
+#[test]
+fn walk_recurses_and_skips_excluded_dirs_with_custom_extensions() {
+    let dir = create_temp_dir("walk_skips");
+    let root = dir.path();
+    write(root, "a/b/deep.inc", "<?php\n");
+    write(root, "top.module", "<?php\n");
+    write(root, "vendor/skip.inc", "<?php\n");
+    write(root, ".git/skip.inc", "<?php\n");
+    write(root, "node_modules/skip.inc", "<?php\n");
+    write(root, "a/ignored.txt", "x");
+
+    let exts = PhpFileExtensions::new(["module", "inc"]);
+    let mut found = discover_files_with_extensions(root, &exts);
+    found.sort();
+
+    assert_eq!(
+        found,
+        vec![root.join("a/b/deep.inc"), root.join("top.module")]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn walk_skips_symlinks_with_custom_extensions() {
+    let dir = create_temp_dir("walk_symlinks");
+    let root = dir.path();
+    write(root, "real/x.inc", "<?php\n");
+    write(root, "real.inc", "<?php\n");
+    std::os::unix::fs::symlink(root.join("real"), root.join("linked_dir")).unwrap();
+    std::os::unix::fs::symlink(root.join("real.inc"), root.join("linked.inc")).unwrap();
+
+    let exts = PhpFileExtensions::new(["inc"]);
+    let mut found = discover_files_with_extensions(root, &exts);
+    found.sort();
+
+    assert_eq!(found, vec![root.join("real/x.inc"), root.join("real.inc")]);
+}
+
+fn write_vendor_package(root: &std::path::Path, autoload: &str) -> PathBuf {
+    write(
+        root,
+        "composer.json",
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    );
+    write(
+        root,
+        "vendor/composer/installed.json",
+        &format!(r#"{{"packages":[{{"name":"v/pkg","autoload":{autoload}}}]}}"#),
+    );
+    root.join("vendor/v/pkg")
+}
+
+#[test]
+fn vendor_files_use_configured_extensions() {
+    let dir = create_temp_dir("vendor_files_ext");
+    let root = dir.path();
+    let pkg = write_vendor_package(root, r#"{"classmap":["lib/"]}"#);
+    write(&pkg, "lib/a.inc", "<?php\n");
+    write(&pkg, "lib/b.php", "<?php\n");
+
+    let default = Psr4Map::from_composer(root).unwrap().vendor_files();
+    assert_eq!(default, vec![pkg.join("lib/b.php")]);
+
+    let exts = PhpFileExtensions::new(["php", "inc"]);
+    let mut files = Psr4Map::from_composer_with_extensions(root, exts)
+        .unwrap()
+        .vendor_files();
+    files.sort();
+    assert_eq!(files, vec![pkg.join("lib/a.inc"), pkg.join("lib/b.php")]);
+}
+
+#[test]
+fn vendor_eager_files_follow_sibling_inc_when_configured() {
+    let dir = create_temp_dir("vendor_eager_ext");
+    let root = dir.path();
+    let pkg = write_vendor_package(root, r#"{"files":["bootstrap.php"]}"#);
+    write(
+        &pkg,
+        "bootstrap.php",
+        "<?php require __DIR__ . '/impl.inc';\n",
+    );
+    write(&pkg, "impl.inc", "<?php function pkg_impl() {}\n");
+
+    let default = Psr4Map::from_composer(root).unwrap().vendor_eager_files();
+    assert_eq!(default, vec![pkg.join("bootstrap.php")]);
+
+    let exts = PhpFileExtensions::new(["php", "inc"]);
+    let eager = Psr4Map::from_composer_with_extensions(root, exts)
+        .unwrap()
+        .vendor_eager_files();
+    assert!(eager.contains(&pkg.join("impl.inc")), "got {eager:?}");
+}
+
+#[test]
+fn include_closure_follows_absolute_path_literal() {
+    let f = module_and_inc_fixture();
+    let abs = f.root.join("b.inc");
+    write(
+        &f.root,
+        "abs.module",
+        &format!("<?php\nrequire '{}';\n", abs.display()),
+    );
+    let exts = PhpFileExtensions::new(["php", "module", "inc"]);
+
+    let files = include_closure(vec![f.root.join("abs.module")], VendorTargets::Skip, &exts);
+
+    assert!(files.contains(&abs), "got {files:?}");
+}
+
+#[test]
+fn include_closure_skips_vendor_targets_only_when_asked() {
+    let dir = create_temp_dir("closure_vendor");
+    let root = dir.path();
+    write(
+        root,
+        "a.module",
+        "<?php require __DIR__ . '/vendor/h.inc';\n",
+    );
+    write(root, "vendor/h.inc", "<?php\n");
+    let exts = PhpFileExtensions::new(["module", "inc"]);
+    let seed = vec![root.join("a.module")];
+
+    let skipped = include_closure(seed.clone(), VendorTargets::Skip, &exts);
+    let followed = include_closure(seed, VendorTargets::Follow, &exts);
+
+    assert_eq!(skipped, vec![root.join("a.module")]);
+    assert!(followed.contains(&root.join("vendor/h.inc")));
+}
