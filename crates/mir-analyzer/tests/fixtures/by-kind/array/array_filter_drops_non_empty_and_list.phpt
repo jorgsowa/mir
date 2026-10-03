@@ -11,9 +11,9 @@ suppress=UnusedVariable,UnusedParam,MissingClosureReturnType
  * @param non-empty-list<string> $words
  */
 function test(array $assoc, array $words): void {
-    // non-empty-array<string, int> → array<string, int> (no longer non-empty)
+    // non-empty-array<string, int> → array<string, int<1, max>> (no longer non-empty; `> 0` narrows)
     $filtered_assoc = array_filter($assoc, fn(int $v) => $v > 0);
-    /** @mir-check $filtered_assoc is array<string, int> */
+    /** @mir-check $filtered_assoc is array<string, int<1, max>> */
     $_ = $filtered_assoc;
 
     // non-empty-list<string> → array<int, string> (no longer non-empty, no longer list)

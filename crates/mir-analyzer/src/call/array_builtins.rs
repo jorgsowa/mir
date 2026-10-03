@@ -669,7 +669,8 @@ fn filtered_value(
 /// Narrows `value` by the recognized type-check predicate a single-param
 /// predicate callback tests its argument with, using the exact same
 /// `(fn_name, is_true)` classification and narrowing logic a flow guard's
-/// `if (is_string($v))` would use on a plain variable — see
+/// `if (is_string($v))` would use on a plain variable, or by an int comparison
+/// (`$v > 0`) — see
 /// `narrowing::{classify_var_predicate, type_fn_narrowed}`. Returns `None`
 /// when the callback isn't shaped like a recognizable single-value predicate.
 fn callback_predicate_narrowed(
@@ -678,8 +679,10 @@ fn callback_predicate_narrowed(
     db: &dyn crate::db::MirDatabase,
 ) -> Option<Type> {
     let (param_name, body) = super::callable::single_param_predicate_body(callback_expr?)?;
-    let (fn_name, is_true) = crate::narrowing::classify_var_predicate(body, param_name)?;
-    crate::narrowing::type_fn_narrowed(value, fn_name.as_ref(), db, is_true)
+    if let Some((fn_name, is_true)) = crate::narrowing::classify_var_predicate(body, param_name) {
+        return crate::narrowing::type_fn_narrowed(value, fn_name.as_ref(), db, is_true);
+    }
+    crate::narrowing::int_comparison_predicate_narrowed(value, body, param_name)
 }
 
 /// Infer the result type of `array_slice($array, $offset, $length, $preserve_keys)`.

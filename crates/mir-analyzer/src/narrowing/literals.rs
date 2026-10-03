@@ -251,6 +251,28 @@ pub(super) fn narrow_static_prop_int_comparison(
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
 }
 
+/// Narrows `value` by a predicate body `$param <op> N` / `N <op> $param` that holds.
+/// Returns `None` when `body` isn't such a comparison on `param`.
+pub(crate) fn int_comparison_predicate_narrowed(
+    value: &Type,
+    body: &php_ast::owned::Expr,
+    param: &str,
+) -> Option<Type> {
+    let ExprKind::Binary(b) = &peel_parens(body).kind else {
+        return None;
+    };
+    let is_param = |e: &php_ast::owned::Expr| matches!(&peel_parens(e).kind, ExprKind::Variable(n) if n.trim_start_matches('$') == param);
+    let (op, n) = if is_param(&b.left) {
+        (b.op, extract_int_literal(&b.right)?)
+    } else if is_param(&b.right) {
+        (flip_comparison_op(b.op), extract_int_literal(&b.left)?)
+    } else {
+        return None;
+    };
+    let (min, max) = int_comparison_bounds(op, n, true)?;
+    Some(narrow_type_to_int_range(value, min, max))
+}
+
 /// Apply integer bounds `[min, max]` to all integer components of a type.
 ///
 /// Integer atoms (`int`, `int<a,b>`, literal ints) that fall within the bounds

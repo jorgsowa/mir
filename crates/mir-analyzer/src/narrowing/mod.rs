@@ -103,6 +103,7 @@ use type_fn::{narrow_from_type_fn, narrow_prop_from_type_fn, narrow_static_prop_
 /// Re-exported for `FlowState`-free predicate-callback consumers outside
 /// `narrowing` (e.g. `call::array_builtins`'s `array_filter` element-type
 /// narrowing) — see `type_fn::classify_var_predicate`'s doc comment.
+pub(crate) use literals::int_comparison_predicate_narrowed;
 pub(crate) use type_fn::{classify_var_predicate, type_fn_narrowed};
 
 // ---------------------------------------------------------------------------
