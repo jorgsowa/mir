@@ -1295,6 +1295,42 @@ impl<'a> DefinitionCollector<'a> {
         })
     }
 
+    /// `@throws` class names resolved against the namespace; a local type alias
+    /// naming class types expands to those classes.
+    fn resolve_throws(
+        &self,
+        throws: &[String],
+        aliases: Option<&FxHashMap<String, Type>>,
+    ) -> Vec<Arc<str>> {
+        let mut out = Vec::new();
+        // Pseudo-types (`@throws void`) must be dropped before namespace-qualifying,
+        // or they'd be stored as bogus `{namespace}\void` classes.
+        for t in throws
+            .iter()
+            .filter(|t| !crate::diagnostics::is_docblock_keyword(t))
+        {
+            let alias_classes: Option<Vec<Arc<str>>> = aliases
+                .and_then(|a| a.get(t.as_str()))
+                .filter(|ty| import_placeholder_parts(ty).is_none())
+                .and_then(|ty| {
+                    ty.types
+                        .iter()
+                        .map(|a| match a {
+                            mir_types::Atomic::TNamedObject { fqcn, .. } => {
+                                Some(Arc::from(fqcn.as_str()))
+                            }
+                            _ => None,
+                        })
+                        .collect()
+                });
+            match alias_classes {
+                Some(classes) => out.extend(classes),
+                None => out.push(Arc::from(self.resolve_name(t).as_str())),
+            }
+        }
+        out
+    }
+
     /// Source location of a docblock tag; `None` when the docblock's position is unknown.
     fn tag_location(&self, doc_start: Option<u32>, tag_span: (u32, u32)) -> Option<Location> {
         let base = doc_start?;
@@ -2282,17 +2318,7 @@ impl<'a> DefinitionCollector<'a> {
             (None, None) => None,
         };
 
-        let throws = doc
-            .throws
-            .iter()
-            // See collector/function.rs's identical filter: docblock keywords
-            // (`@throws void` = "doesn't throw", `@throws int` ≈ int-mask) must
-            // be dropped BEFORE namespace-qualifying, or stored as bogus classes.
-            .filter(|t| !crate::diagnostics::is_docblock_keyword(t))
-            .map(|t| {
-                Arc::from(resolution::resolve_name(t, &self.namespace, &self.use_aliases).as_str())
-            })
-            .collect();
+        let throws = self.resolve_throws(&doc.throws, effective_aliases);
 
         // Resolve `@if-this-is` while the template-param borrow is still live
         // (it must not outlive the `template_params` move into MethodDef below).

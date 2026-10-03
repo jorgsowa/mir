@@ -386,22 +386,7 @@ impl DefinitionCollector<'_> {
             }
         };
 
-        let throws = doc
-            .throws
-            .iter()
-            // A pseudo-type (`@throws void` meaning "doesn't throw", or the
-            // rare `self`/`static`/`parent`/etc.) must be filtered out BEFORE
-            // namespace-qualifying — otherwise bare `void` becomes
-            // `{namespace}\void` in a namespaced file, which no longer
-            // matches `is_pseudo_type`'s literal check anywhere downstream,
-            // so it's stored as if it were a real (bogus) throwable class.
-            .filter(|t| !crate::diagnostics::is_docblock_keyword(t))
-            .map(|t| {
-                Arc::from(
-                    super::resolution::resolve_name(t, &self.namespace, &self.use_aliases).as_str(),
-                )
-            })
-            .collect();
+        let throws = self.resolve_throws(&doc.throws, Some(&type_aliases));
 
         let docstring = if doc.description.trim().is_empty() {
             None
