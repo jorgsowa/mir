@@ -157,7 +157,8 @@
 //! - A fixture with no file section at all fails immediately.
 //! - `===config===` must appear **at most once** per fixture.
 //! - Every key in `===config===` must be a recognised key (`php_version`,
-//!   `suppress`, `stub_file`, `stub_dir`, `memoize_method_call_results`); unknown keys
+//!   `suppress`, `stub_file`, `stub_dir`, `memoize_method_call_results`, `file_extensions`,
+//!   `include_seed`); unknown keys
 //!   fail the test.
 //! - `php_version` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
 //!   real CLI config); invalid values fail the test.
@@ -170,6 +171,10 @@
 //!   functions don't emit unsolicited noise. That default is held back only
 //!   when the fixture's `===expect===` references one of those kinds, which is
 //!   how a fixture opts in to dead-code reporting.
+//! - `file_extensions=module,inc` (repeatable, comma-separated) sets the extensions treated as
+//!   PHP source (default `php`); every fixture file with one is analyzed.
+//! - `include_seed=a.module` (repeatable) analyzes only that file plus what `require`/`include`
+//!   following reaches under the configured extensions, instead of every matching file.
 //! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
 //! - `===description===` must appear **at most once** and before any file section.
 //! - `===ignore===` must appear **at most once** and before any file section.
@@ -220,6 +225,12 @@ struct FixtureConfig {
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
     stub_dirs: Vec<String>,
     memoize_method_call_results: bool,
+    /// Raw `file_extensions=` entries; normalized by `FileExtensions::new`.
+    file_extensions: Vec<String>,
+    /// Files (relative to temp dir) from `include_seed=`. When set, the analyzed
+    /// set is these files plus whatever `follow_includes` reaches, instead of
+    /// every file with a configured extension.
+    include_seeds: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -688,8 +699,16 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
             "memoize_method_call_results" => {
                 config.memoize_method_call_results = value.trim() == "true";
             }
+            "file_extensions" => {
+                config
+                    .file_extensions
+                    .extend(value.split(',').map(|e| e.to_string()));
+            }
+            "include_seed" => {
+                config.include_seeds.push(value.trim().to_string());
+            }
             other => panic!(
-                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir, memoize_method_call_results"
+                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir, memoize_method_call_results, file_extensions, include_seed"
             ),
         }
     }
@@ -1304,14 +1323,18 @@ fn with_fixture_session<R>(
     let stub_files: Vec<PathBuf> = config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
     let stub_dirs: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
     let stub_file_set: HashSet<PathBuf> = stub_files.iter().cloned().collect();
-    let project_files: Vec<PathBuf> = php_files_only(&paths)
+    let extensions = crate::FileExtensions::new(&config.file_extensions);
+    let project_files: Vec<PathBuf> = files_with_extensions(&paths, &extensions)
         .into_iter()
         .filter(|p| !stub_file_set.contains(p) && !stub_dirs.iter().any(|d| p.starts_with(d)))
         .collect();
 
     let has_composer = files.iter().any(|(name, _)| *name == "composer.json");
     let psr4 = has_composer
-        .then(|| crate::composer::Psr4Map::from_composer(&tmp_dir).ok())
+        .then(|| {
+            crate::composer::Psr4Map::from_composer_with_extensions(&tmp_dir, extensions.clone())
+                .ok()
+        })
         .flatten()
         .map(Arc::new);
     let analyzed: Vec<PathBuf> = match &psr4 {
@@ -1324,6 +1347,16 @@ fn with_fixture_session<R>(
                 .collect()
         }
         None => project_files.clone(),
+    };
+    let analyzed = if config.include_seeds.is_empty() {
+        analyzed
+    } else {
+        let seeds = config
+            .include_seeds
+            .iter()
+            .map(|f| tmp_dir.join(f))
+            .collect();
+        crate::composer::follow_includes(seeds, true, &extensions)
     };
 
     let ws = FixtureWorkspace {
@@ -1396,10 +1429,10 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     })
 }
 
-fn php_files_only(paths: &[PathBuf]) -> Vec<PathBuf> {
+fn files_with_extensions(paths: &[PathBuf], extensions: &crate::FileExtensions) -> Vec<PathBuf> {
     paths
         .iter()
-        .filter(|p| p.extension().map(|e| e == "php").unwrap_or(false))
+        .filter(|p| crate::has_php_extension(p, extensions))
         .cloned()
         .collect()
 }
