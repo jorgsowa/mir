@@ -116,8 +116,9 @@ fn propagate_readonly_prop_refinements(
 /// The refinement is limited to the string family (B8/M19, the
 /// `non-empty-string` lineage) and to a bare native `array`. A declared
 /// signature is never demoted to literal precision (`"hello"`), and
-/// `mixed`/`never`/object/keyed-shape body types never replace the declared
-/// contract. When the body is not a subtype
+/// `mixed`/`never`/object/list-literal body types never replace the declared
+/// contract. A keyed record body (`['id' => $i]`) refines a bare `array` with
+/// its literal values widened. When the body is not a subtype
 /// of the declared type (e.g. it returns `null` where the declaration does
 /// not allow it, or a different family), keep the declared one: the
 /// `InvalidReturnType`/`MixedReturnStatement` emitted for the mismatch
@@ -130,13 +131,25 @@ fn refined_closure_return(
     return_ty_hint: Option<Type>,
     inferred_return: Type,
 ) -> Type {
+    let inferred_return = match &return_ty_hint {
+        Some(declared)
+            if is_bare_array(declared) && inferred_return.types.iter().any(is_record_shape) =>
+        {
+            widen_record_literals(&inferred_return)
+        }
+        _ => inferred_return,
+    };
     let refines = return_ty_hint
         .as_ref()
         .filter(|declared| {
             let same_family = (is_string_family(declared)
                 && is_string_family(&inferred_return)
                 && !inferred_return.contains(|a| matches!(a, Atomic::TLiteralString(_))))
-                || (is_bare_array(declared) && inferred_return.types.iter().all(is_generic_array));
+                || (is_bare_array(declared)
+                    && inferred_return
+                        .types
+                        .iter()
+                        .all(|a| is_generic_array(a) || is_record_shape(a)));
             same_family && crate::subtype::is_subtype(db, &inferred_return, declared)
         })
         .is_some();
@@ -145,6 +158,41 @@ fn refined_closure_return(
     } else {
         return_ty_hint.unwrap_or(inferred_return)
     }
+}
+
+/// Non-list keyed shape: a string-keyed record rather than a positional literal.
+fn is_record_shape(a: &Atomic) -> bool {
+    matches!(a, Atomic::TKeyedArray { is_list: false, .. })
+}
+
+/// Widen scalar literals inside record shapes, recursing into nested ones.
+fn widen_record_literals(ty: &Type) -> Type {
+    let mut out = Type::empty();
+    for a in &ty.types {
+        match a {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list: false,
+            } => {
+                let properties = properties
+                    .iter()
+                    .map(|(k, p)| {
+                        let mut p = p.clone();
+                        p.ty = widen_record_literals(&crate::stmt::widen_for_check(p.ty));
+                        (k.clone(), p)
+                    })
+                    .collect();
+                out.add_type(Atomic::TKeyedArray {
+                    properties: Box::new(properties),
+                    is_open: *is_open,
+                    is_list: false,
+                });
+            }
+            other => out.add_type(other.clone()),
+        }
+    }
+    out
 }
 
 /// String family: every atom is a string variant (a `null` in the union is

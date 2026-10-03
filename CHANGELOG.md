@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A closure or arrow function declared `: array` whose body returns a keyed record (`['id' => $i]`) keeps the record shape (literals widened), so `array_map` over it yields `list<array{'id': int}>` instead of `list<array>`.
 - Enum cases now cover their enum: a union of every case equals the enum inside generic type arguments, docblock `Enum::Case` refs compare as case literals in argument checks, and a case satisfies `self`/`static`. `Enum::Case` in a `@var`/`@return`/`@property` docblock no longer reports `UndefinedDocblockClass`.
 - `@param T[] ...$x` on an untyped or `array` variadic now describes each argument (`$x` is `list<T[]>`) instead of each argument being a bare `T`.
 
