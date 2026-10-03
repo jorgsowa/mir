@@ -44,6 +44,7 @@ You can also point to a config file explicitly with `-c`.
 | `errorLevel` attribute | Optional Psalm-compatible strictness: `1` (strictest) to `8` (most lenient). Default: unset, mir's own severities. See [Psalm error levels](#psalm-error-levels). |
 | `<projectFiles>` | Source directories to analyze. |
 | `<ignoreFiles>` | Directories or files to exclude (e.g. `vendor/`). |
+| `<fileExtensions>` | `<extension name=".inc"/>` entries treated as PHP source. `.php` must be listed explicitly once any are given. |
 | `<issueHandlers>` | Per-issue-kind severity overrides (see below). |
 | `<phpVersion>` | Target PHP version string, e.g. `8.2`. Supported range: `7.4`–`8.6`. |
 | `<findUnusedCode>` | Enable dead-code detection (`true`/`false`). Default: `false`. |

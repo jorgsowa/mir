@@ -45,6 +45,9 @@ pub struct Config {
     pub project_dirs: Vec<String>,
     /// Directories/files to skip (from `<ignoreFiles>`).
     pub ignore_dirs: Vec<String>,
+    /// Extensions treated as PHP source (from `<fileExtensions><extension name=".inc"/>`).
+    /// Empty means `.php` only; `php` must be listed explicitly once any are given.
+    pub file_extensions: Vec<String>,
     /// Per-issue-kind severity overrides from `<issueHandlers>`.
     pub issue_handlers: HashMap<String, ErrorLevel>,
     /// Optional Psalm-compatible strictness, 1 (strictest) to 8 (most lenient).
@@ -177,6 +180,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 if name == "file" || name == "directory" {
                     collect_project_file_entry(&e, &path, &mut config);
                 }
+                collect_file_extension_entry(&e, &path, &mut config);
 
                 // <file name="..."> or <directory name="..."> inside <stubs>
                 if name == "file" || name == "directory" {
@@ -239,6 +243,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 if name == "file" || name == "directory" {
                     collect_project_file_entry(&e, &path, &mut config);
                 }
+                collect_file_extension_entry(&e, &path, &mut config);
 
                 // <file name="..."/> or <directory name="..."/> inside <stubs>
                 if name == "file" || name == "directory" {
@@ -317,6 +322,19 @@ fn collect_project_file_entry<'a>(
                 _ => {}
             }
         }
+    }
+}
+
+/// Handle `<extension name=".inc"/>` inside `<fileExtensions>`.
+fn collect_file_extension_entry(
+    e: &quick_xml::events::BytesStart<'_>,
+    path: &[String],
+    config: &mut Config,
+) {
+    if path.last().map_or("", |s| s.as_str()) == "fileExtensions"
+        && bytes_to_string(e.name().as_ref()) == "extension"
+    {
+        config.file_extensions.extend(attr_value(e, "name"));
     }
 }
 
@@ -550,6 +568,23 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_file_extensions() {
+        let cfg = Config::parse(
+            r#"<mir><fileExtensions><extension name=".php"/><extension name=".inc"></extension></fileExtensions></mir>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.file_extensions, [".php", ".inc"]);
+    }
+
+    #[test]
+    fn file_extensions_default_to_empty() {
+        assert!(Config::parse("<mir></mir>")
+            .unwrap()
+            .file_extensions
+            .is_empty());
+    }
 
     #[test]
     fn parses_php_version_child_element() {

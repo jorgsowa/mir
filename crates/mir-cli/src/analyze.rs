@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use mir_analyzer::{
-    dead_code_issue_kinds, discover_files, AnalysisResult, AnalysisSession, BatchOptions,
-    IndexCancel, IndexParallelism, PhpVersion,
+    dead_code_issue_kinds, discover_files_with_extensions, AnalysisResult, AnalysisSession,
+    BatchOptions, IndexCancel, IndexParallelism, PhpFileExtensions, PhpVersion,
 };
 
 use crate::config::Config;
@@ -24,7 +24,11 @@ pub fn run_composer_flow(
     config_base: &std::path::Path,
     composer_root: &std::path::Path,
 ) -> (Vec<PathBuf>, AnalysisResult, Duration) {
-    let map = match mir_analyzer::composer::Psr4Map::from_composer(composer_root) {
+    let extensions = PhpFileExtensions::new(&config.file_extensions);
+    let map = match mir_analyzer::composer::Psr4Map::from_composer_with_extensions(
+        composer_root,
+        extensions.clone(),
+    ) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("mir: composer error: {e}");
@@ -84,7 +88,7 @@ pub fn run_composer_flow(
             filter_to_dirs(all, &project_roots, composer_root)
         }
     } else {
-        discover_files(&cli.paths[0])
+        discover_files_with_extensions(&cli.paths[0], &extensions)
     };
 
     let files = filter_ignore(discovered, &ignore_dirs, composer_root);
@@ -149,6 +153,7 @@ pub fn run_plain_flow(
         cli.paths.clone()
     };
 
+    let extensions = PhpFileExtensions::new(&config.file_extensions);
     let ignore_dirs = resolve_ignore_dirs(config, config_base);
 
     let scan_roots: Vec<PathBuf> = if !config.project_dirs.is_empty() && cli.paths.is_empty() {
@@ -168,7 +173,7 @@ pub fn run_plain_flow(
         .collect();
     let files: Vec<PathBuf> = scan_roots
         .iter()
-        .flat_map(|p| discover_files(p))
+        .flat_map(|p| discover_files_with_extensions(p, &extensions))
         .filter(|p| {
             if normalized_ignore_dirs.is_empty() {
                 return true;
@@ -223,8 +228,10 @@ pub fn run_plain_flow(
 
     // Collect type definitions from ignore_dirs (vendor) — no error reporting there.
     if !ignore_dirs.is_empty() {
-        let vendor_files: Vec<PathBuf> =
-            ignore_dirs.iter().flat_map(|p| discover_files(p)).collect();
+        let vendor_files: Vec<PathBuf> = ignore_dirs
+            .iter()
+            .flat_map(|p| discover_files_with_extensions(p, &extensions))
+            .collect();
         if !vendor_files.is_empty() {
             if !cli.quiet {
                 eprintln!(
