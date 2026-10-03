@@ -6,6 +6,8 @@ use std::ops::ControlFlow;
 use std::path::{Component, Path, PathBuf};
 use thiserror::Error;
 
+use crate::file_extensions::{has_php_extension, FileExtensions};
+
 // ---------------------------------------------------------------------------
 // Error
 // ---------------------------------------------------------------------------
@@ -61,6 +63,7 @@ pub struct Psr4Map {
     vendor_eager_files: Vec<PathBuf>,
     #[allow(dead_code)] // used by issue #50 (lazy FQCN resolution)
     root: PathBuf,
+    extensions: FileExtensions,
 }
 
 fn ensure_trailing_backslash(prefix: &str) -> String {
@@ -386,6 +389,15 @@ fn psr0_logical_path(key: &str) -> PathBuf {
 
 impl Psr4Map {
     pub fn from_composer(root: &Path) -> Result<Self, ComposerError> {
+        Self::from_composer_with_extensions(root, FileExtensions::default())
+    }
+
+    /// Like [`Self::from_composer`], but file walks and include-following accept
+    /// every extension in `extensions` instead of only `.php`.
+    pub fn from_composer_with_extensions(
+        root: &Path,
+        extensions: FileExtensions,
+    ) -> Result<Self, ComposerError> {
         let composer_path = root.join("composer.json");
         let content = std::fs::read_to_string(&composer_path)?;
         let value: serde_json::Value = serde_json::from_str(&content)?;
@@ -451,7 +463,7 @@ impl Psr4Map {
         // autoload root. Unlike that call site, don't skip `vendor`-rooted
         // targets: the starting files are themselves inside `vendor`, so their
         // sibling requires are too.
-        expand_via_local_requires(&mut vendor_eager_files, false);
+        expand_via_local_requires(&mut vendor_eager_files, false, &extensions);
 
         Ok(Psr4Map {
             project_entries,
@@ -463,28 +475,29 @@ impl Psr4Map {
             classmap,
             vendor_eager_files,
             root: root.to_path_buf(),
+            extensions,
         })
     }
 
     pub fn project_files(&self) -> Vec<PathBuf> {
         let mut out = Vec::new();
         for (_, dir) in &self.project_entries {
-            crate::batch::collect_php_files(dir, &mut out);
+            crate::batch::collect_php_files(dir, &mut out, &self.extensions);
         }
         for path in &self.project_extra_paths {
-            collect_php_path(path, &mut out);
+            collect_php_path(path, &mut out, &self.extensions);
         }
-        expand_via_local_requires(&mut out, true);
+        expand_via_local_requires(&mut out, true, &self.extensions);
         out
     }
 
     pub fn vendor_files(&self) -> Vec<PathBuf> {
         let mut out = Vec::new();
         for (_, dir) in &self.vendor_entries {
-            crate::batch::collect_php_files(dir, &mut out);
+            crate::batch::collect_php_files(dir, &mut out, &self.extensions);
         }
         for path in &self.vendor_extra_paths {
-            collect_php_path(path, &mut out);
+            collect_php_path(path, &mut out, &self.extensions);
         }
         out
     }
@@ -590,25 +603,25 @@ impl Psr4Map {
     }
 }
 
-/// Collect `.php` files from `path`. If `path` is a file, push it directly
-/// (when it has a `.php` extension); if it is a directory, walk it.
-fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>) {
+/// Collect PHP files from `path`. If `path` is a file, push it directly
+/// (when its extension is in `extensions`); if it is a directory, walk it.
+fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>, extensions: &FileExtensions) {
     let Ok(meta) = std::fs::metadata(path) else {
         return;
     };
     if meta.is_file() {
-        if path.extension().and_then(|e| e.to_str()) == Some("php") {
+        if has_php_extension(path, extensions) {
             out.push(path.to_path_buf());
         }
     } else if meta.is_dir() {
-        crate::batch::collect_php_files(path, out);
+        crate::batch::collect_php_files(path, out, extensions);
     }
 }
 
 /// Follows `require`/`include` targets reaching outside every autoload root
 /// (composer.json's autoload sections are otherwise the sole "this file is
-/// part of the project" signal) and adds any that resolve to a real `.php`
-/// file, recursing since a newly-added file may itself reach further
+/// part of the project" signal) and adds any that resolve to a real file
+/// with a PHP extension, recursing since a newly-added file may itself reach further
 /// out-of-root files. Only statically-resolvable target shapes are
 /// followed: a literal string, and `__DIR__` / `dirname(__FILE__)`
 /// concatenated with a literal string — the common manual-bootstrap idiom
@@ -621,7 +634,11 @@ fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>) {
 /// project code. Callers starting from vendor files themselves (a files-autoload
 /// bootstrap's own sibling requires) pass `false`, since every target is
 /// expected to resolve inside `vendor`.
-fn expand_via_local_requires(out: &mut Vec<PathBuf>, skip_vendor: bool) {
+fn expand_via_local_requires(
+    out: &mut Vec<PathBuf>,
+    skip_vendor: bool,
+    extensions: &FileExtensions,
+) {
     let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
     let mut queue: Vec<PathBuf> = out.clone();
     while let Some(file) = queue.pop() {
@@ -649,7 +666,7 @@ fn expand_via_local_requires(out: &mut Vec<PathBuf>, skip_vendor: bool) {
                 dir.join(target)
             };
             let resolved = lexically_normalize(&resolved);
-            if resolved.extension().and_then(|e| e.to_str()) != Some("php") {
+            if !has_php_extension(&resolved, extensions) {
                 continue;
             }
             if skip_vendor && resolved.components().any(|c| c.as_os_str() == "vendor") {
@@ -664,6 +681,19 @@ fn expand_via_local_requires(out: &mut Vec<PathBuf>, skip_vendor: bool) {
             }
         }
     }
+}
+
+/// Returns `seeds` plus every file reachable from them through statically
+/// resolvable `require`/`include` targets whose extension is in `extensions`.
+/// A target under a `vendor` directory is dropped when `skip_vendor` is set.
+pub fn follow_includes(
+    seeds: Vec<PathBuf>,
+    skip_vendor: bool,
+    extensions: &FileExtensions,
+) -> Vec<PathBuf> {
+    let mut out = seeds;
+    expand_via_local_requires(&mut out, skip_vendor, extensions);
+    out
 }
 
 /// Collapses `.`/`..` components lexically instead of relying on the OS to

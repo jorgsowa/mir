@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `FileExtensions` and `has_php_extension` for treating non-`.php` extensions (e.g. Drupal's `.module`, `.inc`) as PHP source. `discover_files_with_extensions`, `Psr4Map::from_composer_with_extensions` and the new public `composer::follow_includes` accept them; the existing entry points keep `.php` only.
+
 ### Fixed
 
 - A `__call` on any member of an intersection receiver suppresses `UndefinedMethod` for the whole intersection.

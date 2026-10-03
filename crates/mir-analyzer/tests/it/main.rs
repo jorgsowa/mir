@@ -17,6 +17,7 @@ mod cross_vendor_lazy_load;
 mod deferred_revision_bumps;
 mod definition_positions;
 mod file_analyzer;
+mod file_extensions;
 mod firewall_bench;
 mod firewall_premise;
 mod implemented_method;

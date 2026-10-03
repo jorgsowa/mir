@@ -18,6 +18,7 @@ pub(crate) mod diagnostics;
 pub(crate) mod docblock_nav;
 pub(crate) mod expr;
 pub mod file_analyzer;
+mod file_extensions;
 pub(crate) mod flow_state;
 pub(crate) mod generic;
 pub mod indexing;
@@ -49,9 +50,10 @@ pub(crate) mod util;
 
 pub use batch::{
     analyze_source, analyze_source_with_options, dead_code_issue_kinds, discover_files,
-    AnalysisResult, BatchOptions,
+    discover_files_with_extensions, AnalysisResult, BatchOptions,
 };
 pub use file_analyzer::{FileAnalysis, FileAnalyzer};
+pub use file_extensions::{has_php_extension, FileExtensions};
 pub use indexing::{IndexBatchOutcome, IndexCancel, IndexParallelism};
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
@@ -593,7 +595,7 @@ pub fn location_from_span(
 pub use symbol::{DeclarationKind, DocumentSymbol, ReferenceKind, ResolvedSymbol};
 
 pub mod composer;
-pub use composer::{ComposerError, Psr4Map};
+pub use composer::{follow_includes, ComposerError, Psr4Map};
 pub use type_env::ScopeId;
 
 #[doc(hidden)]
