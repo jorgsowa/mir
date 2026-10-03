@@ -616,20 +616,24 @@ impl CallAnalyzer {
         // type system, never at runtime — the real value always satisfies the
         // magic-`__call` sibling. So a sibling atom's catch-all `__call`
         // suppresses UndefinedMethod on atoms that lack the method themselves.
-        let union_has_call_magic = receiver.types.iter().any(|atomic| {
-            let fqcn = match atomic {
-                mir_types::Atomic::TNamedObject { fqcn, .. }
-                | mir_types::Atomic::TSelf { fqcn }
-                | mir_types::Atomic::TStaticObject { fqcn }
-                | mir_types::Atomic::TParent { fqcn } => Some(fqcn),
-                _ => None,
-            };
-            fqcn.is_some_and(|fqcn| {
-                let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
-                let resolved: Arc<str> = Arc::from(resolved.as_str());
-                crate::db::class_exists(ea.db, &resolved)
-                    && crate::db::has_method_in_chain(ea.db, &resolved, "__call")
-            })
+        let has_call_magic = |fqcn: &str| {
+            let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
+            let resolved: Arc<str> = Arc::from(resolved.as_str());
+            crate::db::class_exists(ea.db, &resolved)
+                && crate::db::has_method_in_chain(ea.db, &resolved, "__call")
+        };
+        let union_has_call_magic = receiver.types.iter().any(|atomic| match atomic {
+            mir_types::Atomic::TNamedObject { fqcn, .. }
+            | mir_types::Atomic::TSelf { fqcn }
+            | mir_types::Atomic::TStaticObject { fqcn }
+            | mir_types::Atomic::TParent { fqcn } => has_call_magic(fqcn),
+            // Any member's `__call` answers the call on the whole intersection.
+            mir_types::Atomic::TIntersection { parts } => parts
+                .iter()
+                .flat_map(|part| part.types.iter())
+                .filter_map(|inner| inner.named_object_fqcn())
+                .any(&has_call_magic),
+            _ => false,
         });
         let mut result = Type::empty();
         // Declaring class of the resolved method, threaded out of
@@ -778,6 +782,8 @@ impl CallAnalyzer {
                     }
                     if found_method {
                         result.merge_with(&intersection_result);
+                    } else if union_has_call_magic {
+                        result.add_type(mir_types::Atomic::TMixed);
                     } else {
                         ea.emit(
                             IssueKind::UndefinedMethod {

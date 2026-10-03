@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `__call` on any member of an intersection receiver suppresses `UndefinedMethod` for the whole intersection.
 - `array_filter` narrows int values by an `$v > 0`-style comparison callback, so `array_filter([$id], fn($x) => $x > 0)` is accepted as `list<positive-int>`.
 - A workspace sweep over more than 4096 scopes no longer fails with `PropagatedPanic` on every pass after salsa evicts a fixpoint memo; `infer_scope` is no longer LRU-bounded.
 - A write at the end of a loop body that the next iteration reads is no longer reported as `UnusedVariable`.
