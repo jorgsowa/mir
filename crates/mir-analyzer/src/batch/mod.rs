@@ -25,7 +25,7 @@ use crate::cache::{hash_content, surface_fingerprint};
 use crate::db::{
     collect_file_definitions, FileDefinitions, MirDatabase, MirDbStorage, RefLoc, SourceFile,
 };
-use crate::file_extensions::{has_php_extension, FileExtensions};
+use crate::file_extensions::PhpFileExtensions;
 use crate::php_version::PhpVersion;
 use crate::session::AnalysisSession;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
@@ -483,11 +483,11 @@ fn emit_unused_suppressions(
 
 /// Discover all `.php` files under a directory, recursively.
 pub fn discover_files(root: &Path) -> Vec<PathBuf> {
-    discover_files_with_extensions(root, &FileExtensions::default())
+    discover_files_with_extensions(root, &PhpFileExtensions::default())
 }
 
 /// Discover all files under a directory whose extension is in `extensions`, recursively.
-pub fn discover_files_with_extensions(root: &Path, extensions: &FileExtensions) -> Vec<PathBuf> {
+pub fn discover_files_with_extensions(root: &Path, extensions: &PhpFileExtensions) -> Vec<PathBuf> {
     if root.is_file() {
         return vec![root.to_path_buf()];
     }
@@ -496,7 +496,11 @@ pub fn discover_files_with_extensions(root: &Path, extensions: &FileExtensions) 
     files
 }
 
-pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>, extensions: &FileExtensions) {
+pub(crate) fn collect_php_files(
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+    extensions: &PhpFileExtensions,
+) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             if entry.file_type().map(|ft| ft.is_symlink()).unwrap_or(false) {
@@ -512,7 +516,7 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>, extensions: 
                     continue;
                 }
                 collect_php_files(&path, out, extensions);
-            } else if has_php_extension(&path, extensions) {
+            } else if extensions.is_php_source(&path) {
                 out.push(path);
             }
         }

@@ -225,7 +225,7 @@ struct FixtureConfig {
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
     stub_dirs: Vec<String>,
     memoize_method_call_results: bool,
-    /// Raw `file_extensions=` entries; normalized by `FileExtensions::new`.
+    /// Raw `file_extensions=` entries; normalized by `PhpFileExtensions::new`.
     file_extensions: Vec<String>,
     /// Files (relative to temp dir) from `include_seed=`. When set, the analyzed
     /// set is these files plus whatever `follow_includes` reaches, instead of
@@ -1323,7 +1323,7 @@ fn with_fixture_session<R>(
     let stub_files: Vec<PathBuf> = config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
     let stub_dirs: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
     let stub_file_set: HashSet<PathBuf> = stub_files.iter().cloned().collect();
-    let extensions = crate::FileExtensions::new(&config.file_extensions);
+    let extensions = crate::PhpFileExtensions::new(&config.file_extensions);
     let project_files: Vec<PathBuf> = files_with_extensions(&paths, &extensions)
         .into_iter()
         .filter(|p| !stub_file_set.contains(p) && !stub_dirs.iter().any(|d| p.starts_with(d)))
@@ -1429,10 +1429,10 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     })
 }
 
-fn files_with_extensions(paths: &[PathBuf], extensions: &crate::FileExtensions) -> Vec<PathBuf> {
+fn files_with_extensions(paths: &[PathBuf], extensions: &crate::PhpFileExtensions) -> Vec<PathBuf> {
     paths
         .iter()
-        .filter(|p| crate::has_php_extension(p, extensions))
+        .filter(|p| extensions.is_php_source(p))
         .cloned()
         .collect()
 }

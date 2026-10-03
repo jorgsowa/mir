@@ -6,7 +6,7 @@ use std::ops::ControlFlow;
 use std::path::{Component, Path, PathBuf};
 use thiserror::Error;
 
-use crate::file_extensions::{has_php_extension, FileExtensions};
+use crate::file_extensions::PhpFileExtensions;
 
 // ---------------------------------------------------------------------------
 // Error
@@ -63,7 +63,7 @@ pub struct Psr4Map {
     vendor_eager_files: Vec<PathBuf>,
     #[allow(dead_code)] // used by issue #50 (lazy FQCN resolution)
     root: PathBuf,
-    extensions: FileExtensions,
+    extensions: PhpFileExtensions,
 }
 
 fn ensure_trailing_backslash(prefix: &str) -> String {
@@ -389,14 +389,14 @@ fn psr0_logical_path(key: &str) -> PathBuf {
 
 impl Psr4Map {
     pub fn from_composer(root: &Path) -> Result<Self, ComposerError> {
-        Self::from_composer_with_extensions(root, FileExtensions::default())
+        Self::from_composer_with_extensions(root, PhpFileExtensions::default())
     }
 
     /// Like [`Self::from_composer`], but file walks and include-following accept
     /// every extension in `extensions` instead of only `.php`.
     pub fn from_composer_with_extensions(
         root: &Path,
-        extensions: FileExtensions,
+        extensions: PhpFileExtensions,
     ) -> Result<Self, ComposerError> {
         let composer_path = root.join("composer.json");
         let content = std::fs::read_to_string(&composer_path)?;
@@ -605,12 +605,12 @@ impl Psr4Map {
 
 /// Collect PHP files from `path`. If `path` is a file, push it directly
 /// (when its extension is in `extensions`); if it is a directory, walk it.
-fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>, extensions: &FileExtensions) {
+fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>, extensions: &PhpFileExtensions) {
     let Ok(meta) = std::fs::metadata(path) else {
         return;
     };
     if meta.is_file() {
-        if has_php_extension(path, extensions) {
+        if extensions.is_php_source(path) {
             out.push(path.to_path_buf());
         }
     } else if meta.is_dir() {
@@ -637,7 +637,7 @@ fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>, extensions: &FileExtens
 fn expand_via_local_requires(
     out: &mut Vec<PathBuf>,
     skip_vendor: bool,
-    extensions: &FileExtensions,
+    extensions: &PhpFileExtensions,
 ) {
     let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
     let mut queue: Vec<PathBuf> = out.clone();
@@ -666,7 +666,7 @@ fn expand_via_local_requires(
                 dir.join(target)
             };
             let resolved = lexically_normalize(&resolved);
-            if !has_php_extension(&resolved, extensions) {
+            if !extensions.is_php_source(&resolved) {
                 continue;
             }
             if skip_vendor && resolved.components().any(|c| c.as_os_str() == "vendor") {
@@ -689,7 +689,7 @@ fn expand_via_local_requires(
 pub fn follow_includes(
     seeds: Vec<PathBuf>,
     skip_vendor: bool,
-    extensions: &FileExtensions,
+    extensions: &PhpFileExtensions,
 ) -> Vec<PathBuf> {
     let mut out = seeds;
     expand_via_local_requires(&mut out, skip_vendor, extensions);

@@ -53,7 +53,7 @@ pub use batch::{
     discover_files_with_extensions, AnalysisResult, BatchOptions,
 };
 pub use file_analyzer::{FileAnalysis, FileAnalyzer};
-pub use file_extensions::{has_php_extension, FileExtensions};
+pub use file_extensions::PhpFileExtensions;
 pub use indexing::{IndexBatchOutcome, IndexCancel, IndexParallelism};
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};

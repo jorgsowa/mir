@@ -1,4 +1,4 @@
-//! Non-`.php` source extensions (Drupal's `.module`/`.inc`) are collected and
+//! Non-`.php` source extensions (`.module`, `.inc`) are collected and
 //! followed through `include_once` when configured.
 
 use std::fs;
@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use mir_analyzer::{
     composer::{follow_includes, Psr4Map},
-    discover_files, discover_files_with_extensions, AnalysisSession, BatchOptions, FileExtensions,
-    PhpVersion,
+    discover_files, discover_files_with_extensions, AnalysisSession, BatchOptions,
+    PhpFileExtensions, PhpVersion,
 };
 use mir_issues::IssueKind;
 
@@ -19,7 +19,7 @@ struct Fixture {
     module: PathBuf,
 }
 
-fn drupal_fixture() -> Fixture {
+fn module_and_inc_fixture() -> Fixture {
     let dir = create_temp_dir("file_extensions");
     let root = dir.path().to_path_buf();
     fs::create_dir_all(root.join("sub")).unwrap();
@@ -58,8 +58,8 @@ fn undefined_functions(files: &[PathBuf]) -> Vec<String> {
 
 #[test]
 fn follow_includes_reaches_inc_target_with_extra_extensions() {
-    let f = drupal_fixture();
-    let exts = FileExtensions::new([".php", "Module", "INC"]);
+    let f = module_and_inc_fixture();
+    let exts = PhpFileExtensions::new([".php", "Module", "INC"]);
 
     let files = follow_includes(vec![f.module.clone()], false, &exts);
 
@@ -69,9 +69,9 @@ fn follow_includes_reaches_inc_target_with_extra_extensions() {
 
 #[test]
 fn follow_includes_ignores_inc_target_by_default() {
-    let f = drupal_fixture();
+    let f = module_and_inc_fixture();
 
-    let files = follow_includes(vec![f.module.clone()], false, &FileExtensions::default());
+    let files = follow_includes(vec![f.module.clone()], false, &PhpFileExtensions::default());
 
     assert_eq!(files, vec![f.module.clone()]);
     assert_eq!(undefined_functions(&files), vec!["b_helper".to_string()]);
@@ -79,12 +79,12 @@ fn follow_includes_ignores_inc_target_by_default() {
 
 #[test]
 fn discover_files_collects_only_configured_extensions() {
-    let f = drupal_fixture();
+    let f = module_and_inc_fixture();
 
     let default = discover_files(&f.root);
     assert_eq!(default, vec![f.root.join("sub/c.php")]);
 
-    let exts = FileExtensions::new(["php", "module", "inc"]);
+    let exts = PhpFileExtensions::new(["php", "module", "inc"]);
     let mut found = discover_files_with_extensions(&f.root, &exts);
     found.sort();
     assert_eq!(
@@ -99,7 +99,7 @@ fn discover_files_collects_only_configured_extensions() {
 
 #[test]
 fn psr4_project_files_use_configured_extensions() {
-    let f = drupal_fixture();
+    let f = module_and_inc_fixture();
     fs::write(
         f.root.join("composer.json"),
         r#"{ "autoload": { "classmap": ["a.module"], "psr-4": { "App\\": "sub/" } } }"#,
@@ -109,7 +109,7 @@ fn psr4_project_files_use_configured_extensions() {
     let default = Psr4Map::from_composer(&f.root).unwrap().project_files();
     assert_eq!(default, vec![f.root.join("sub/c.php")]);
 
-    let exts = FileExtensions::new(["php", "module", "inc"]);
+    let exts = PhpFileExtensions::new(["php", "module", "inc"]);
     let map = Psr4Map::from_composer_with_extensions(&f.root, exts).unwrap();
     let files = map.project_files();
     assert!(files.contains(&f.root.join("a.module")), "got {files:?}");

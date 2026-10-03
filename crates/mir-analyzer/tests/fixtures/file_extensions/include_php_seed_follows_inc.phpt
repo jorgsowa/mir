@@ -1,5 +1,5 @@
 ===description===
-A plain .php file including a .inc file follows it (the standard Drupal bootstrap shape)
+A plain .php file including a .inc file follows it
 ===config===
 file_extensions=php,module,inc
 include_seed=index.php
