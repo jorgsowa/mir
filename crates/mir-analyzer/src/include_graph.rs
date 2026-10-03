@@ -39,7 +39,7 @@ pub fn include_closure(
     let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
     let mut queue: Vec<PathBuf> = out.clone();
     while let Some(file) = queue.pop() {
-        let Some(dir) = file.parent() else {
+        let Some(dir) = file.parent().map(Path::to_path_buf) else {
             continue;
         };
         let Ok(text) = std::fs::read_to_string(&file) else {
@@ -52,7 +52,7 @@ pub fn include_closure(
         }
         let parsed = php_rs_parser::parse(&text);
         let mut scanner = IncludeTargetScanner {
-            dir,
+            file: &file,
             targets: Vec::new(),
         };
         let _ = scanner.visit_program(&parsed.program);
@@ -112,14 +112,14 @@ fn lexically_normalize(path: &Path) -> PathBuf {
 }
 
 struct IncludeTargetScanner<'a> {
-    dir: &'a Path,
+    file: &'a Path,
     targets: Vec<String>,
 }
 
 impl OwnedVisitor for IncludeTargetScanner<'_> {
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::Include(_, inner) = &expr.kind {
-            if let Some(target) = resolve_static_include_target(inner, self.dir) {
+            if let Some(target) = resolve_static_include_target(inner, self.file) {
                 self.targets.push(target);
             }
         }
@@ -128,31 +128,43 @@ impl OwnedVisitor for IncludeTargetScanner<'_> {
 }
 
 /// Statically evaluates the include-target expression shapes real code
-/// actually uses: a literal string, `__DIR__` / `dirname(__FILE__)`, and `.`
-/// concatenations of those. Anything else (a variable, a non-`dirname` call)
-/// can't be resolved without running the program, so is left alone.
-fn resolve_static_include_target(expr: &Expr, dir: &Path) -> Option<String> {
+/// actually uses: a literal string, `__DIR__`, `__FILE__`, `dirname()` of those
+/// (with an optional literal level), and `.` concatenations. Anything else (a
+/// variable, another call) can't be resolved without running the program, so
+/// is left alone.
+fn resolve_static_include_target(expr: &Expr, file: &Path) -> Option<String> {
     match &expr.kind {
         ExprKind::String(s) => Some(s.to_string()),
-        ExprKind::MagicConst(MagicConstKind::Dir) => Some(dir.to_string_lossy().into_owned()),
-        ExprKind::Parenthesized(inner) => resolve_static_include_target(inner, dir),
+        ExprKind::MagicConst(MagicConstKind::File) => Some(file.to_string_lossy().into_owned()),
+        ExprKind::MagicConst(MagicConstKind::Dir) => {
+            Some(file.parent()?.to_string_lossy().into_owned())
+        }
+        ExprKind::Parenthesized(inner) => resolve_static_include_target(inner, file),
         ExprKind::Binary(b) if b.op == BinaryOp::Concat => {
-            let left = resolve_static_include_target(&b.left, dir)?;
-            let right = resolve_static_include_target(&b.right, dir)?;
+            let left = resolve_static_include_target(&b.left, file)?;
+            let right = resolve_static_include_target(&b.right, file)?;
             Some(format!("{left}{right}"))
         }
         ExprKind::FunctionCall(call) => {
             let ExprKind::Identifier(name) = &call.name.kind else {
                 return None;
             };
-            if !name.eq_ignore_ascii_case("dirname") {
+            if !name.eq_ignore_ascii_case("dirname") || call.args.len() > 2 {
                 return None;
             }
-            let arg = call.args.first()?;
-            arg.value
-                .as_ref()
-                .is_some_and(|v| matches!(v.kind, ExprKind::MagicConst(MagicConstKind::File)))
-                .then(|| dir.to_string_lossy().into_owned())
+            let path = resolve_static_include_target(call.args.first()?.value.as_ref()?, file)?;
+            let levels = match call.args.get(1) {
+                None => 1,
+                Some(arg) => match arg.value.as_ref()?.kind {
+                    ExprKind::Int(n) if n >= 1 => n,
+                    _ => return None,
+                },
+            };
+            let mut path = Path::new(&path);
+            for _ in 0..levels {
+                path = path.parent()?;
+            }
+            Some(path.to_string_lossy().into_owned())
         }
         _ => None,
     }
