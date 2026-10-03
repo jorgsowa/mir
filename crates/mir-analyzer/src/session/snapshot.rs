@@ -886,7 +886,7 @@ impl AnalysisSnapshot {
 
     /// The symbol's declaration site, narrowed to the declared name's own
     /// token — the lock-free read half of
-    /// [`AnalysisSession::declaration_name_range`]. Symbols the index lacks
+    /// [`crate::AnalysisSession::declaration_name_range`]. Symbols the index lacks
     /// load on demand; no input is written.
     pub fn declaration_name_range_cached(
         &self,
