@@ -10,6 +10,8 @@
 //! ad-hoc inheritance check (`named_object_subtype`, `named_object_return_compatible`)
 //! don't need to switch — but new call sites should reach for this function
 //! first.
+use std::borrow::Cow;
+
 use rustc_hash::FxHashMap;
 
 use mir_types::{Atomic, Name, Type, Variance};
@@ -185,6 +187,10 @@ pub(crate) fn named_object_type_params_ok(
 pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
     if sub.is_subtype_structural(sup) {
         return true;
+    }
+    let (sub_norm, sup_norm) = (canonical_enum_cases(db, sub), canonical_enum_cases(db, sup));
+    if let (Cow::Owned(_), _) | (_, Cow::Owned(_)) = (&sub_norm, &sup_norm) {
+        return is_subtype(db, &sub_norm, &sup_norm);
     }
     if sup.is_mixed() {
         return true;
@@ -502,4 +508,145 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
 
 fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
+}
+
+fn atomic_mentions_enum_case(a: &Atomic) -> bool {
+    match a {
+        Atomic::TLiteralEnumCase { .. } => true,
+        Atomic::TNamedObject { fqcn, type_params } => {
+            fqcn.contains("::") || type_params.iter().any(mentions_enum_case)
+        }
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            mentions_enum_case(key) || mentions_enum_case(value)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => mentions_enum_case(value),
+        Atomic::TKeyedArray { properties, .. } => {
+            properties.values().any(|p| mentions_enum_case(&p.ty))
+        }
+        _ => false,
+    }
+}
+
+fn mentions_enum_case(ty: &Type) -> bool {
+    ty.types.iter().any(atomic_mentions_enum_case)
+}
+
+/// [`normalize_enum_cases`], borrowing when `ty` mentions no enum case.
+pub(crate) fn canonical_enum_cases<'a>(db: &dyn MirDatabase, ty: &'a Type) -> Cow<'a, Type> {
+    if !mentions_enum_case(ty) {
+        return Cow::Borrowed(ty);
+    }
+    let normalized = normalize_enum_cases(db, ty);
+    if normalized == *ty {
+        Cow::Borrowed(ty)
+    } else {
+        Cow::Owned(normalized)
+    }
+}
+
+/// Canonical form for enum cases: docblock `Enum::Case` refs become case
+/// literals, and a union covering every case of an enum collapses to the enum.
+fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
+    let norm = |t: &Type| Box::new(normalize_enum_cases(db, t));
+    let mut out = Type::empty();
+    out.possibly_undefined = ty.possibly_undefined;
+    out.from_docblock = ty.from_docblock;
+    for atomic in &ty.types {
+        out.add_type(match atomic {
+            Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::") => {
+                docblock_case_literal(db, fqcn).unwrap_or_else(|| atomic.clone())
+            }
+            Atomic::TNamedObject { fqcn, type_params } if !type_params.is_empty() => {
+                Atomic::TNamedObject {
+                    fqcn: *fqcn,
+                    type_params: mir_types::union::vec_to_type_params(
+                        type_params
+                            .iter()
+                            .map(|t| normalize_enum_cases(db, t))
+                            .collect(),
+                    ),
+                }
+            }
+            Atomic::TArray { key, value } => Atomic::TArray {
+                key: norm(key),
+                value: norm(value),
+            },
+            Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
+                key: norm(key),
+                value: norm(value),
+            },
+            Atomic::TList { value } => Atomic::TList { value: norm(value) },
+            Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList { value: norm(value) },
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => Atomic::TKeyedArray {
+                properties: Box::new(
+                    properties
+                        .iter()
+                        .map(|(k, p)| {
+                            let mut p = p.clone();
+                            p.ty = normalize_enum_cases(db, &p.ty);
+                            (k.clone(), p)
+                        })
+                        .collect(),
+                ),
+                is_open: *is_open,
+                is_list: *is_list,
+            },
+            other => other.clone(),
+        });
+    }
+    collapse_complete_enums(db, out)
+}
+
+fn docblock_case_literal(db: &dyn MirDatabase, name: &str) -> Option<Atomic> {
+    let (enum_name, case_name) = name.split_once("::")?;
+    let crate::db::ClassLike::Enum(e) =
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, enum_name))?
+    else {
+        return None;
+    };
+    e.cases
+        .contains_key(case_name)
+        .then(|| Atomic::TLiteralEnumCase {
+            enum_fqcn: e.fqcn.as_ref().into(),
+            case_name: case_name.into(),
+        })
+}
+
+fn collapse_complete_enums(db: &dyn MirDatabase, ty: Type) -> Type {
+    let mut enums: Vec<Name> = Vec::new();
+    for a in &ty.types {
+        if let Atomic::TLiteralEnumCase { enum_fqcn, .. } = a {
+            if !enums.contains(enum_fqcn) {
+                enums.push(*enum_fqcn);
+            }
+        }
+    }
+    let mut result = ty;
+    for enum_fqcn in enums {
+        let Some(crate::db::ClassLike::Enum(e)) =
+            crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, enum_fqcn.as_ref()))
+        else {
+            continue;
+        };
+        let covers_all = e.cases.keys().all(|case| {
+            result.types.iter().any(|a| {
+                matches!(a, Atomic::TLiteralEnumCase { enum_fqcn: f, case_name }
+                    if *f == enum_fqcn && case_name.as_ref() == case.as_ref())
+            })
+        });
+        if covers_all && !e.cases.is_empty() {
+            result.types.retain(
+                |a| !matches!(a, Atomic::TLiteralEnumCase { enum_fqcn: f, .. } if *f == enum_fqcn),
+            );
+            result.add_type(Atomic::TNamedObject {
+                fqcn: enum_fqcn,
+                type_params: mir_types::union::empty_type_params(),
+            });
+        }
+    }
+    result
 }

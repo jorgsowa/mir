@@ -111,6 +111,11 @@ pub(crate) fn check_one(
         super::super::callable::record_callable_string_ref(ea, arg_ty, arg_span);
     }
 
+    let (param_ty, arg_ty) = (
+        &*crate::subtype::canonical_enum_cases(ea.db, param_ty),
+        &*crate::subtype::canonical_enum_cases(ea.db, arg_ty),
+    );
+
     // Null checks run here to preserve the original emission order
     // (after callable validations but before type-compat checks).
     super::nullability::check_one(

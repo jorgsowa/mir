@@ -483,7 +483,10 @@ impl<'a> BodyAnalyzer<'a> {
                 if crate::diagnostics::is_docblock_keyword(cls_fqcn.as_ref()) {
                     continue;
                 }
-                if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
+                if !crate::db::class_exists(
+                    self.db,
+                    crate::diagnostics::docblock_class_part(cls_fqcn.as_ref()),
+                ) {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedDocblockClass {
                             name: cls_fqcn.to_string(),
@@ -576,7 +579,10 @@ impl<'a> BodyAnalyzer<'a> {
                         ) {
                             continue;
                         }
-                        if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
+                        if !crate::db::class_exists(
+                            self.db,
+                            crate::diagnostics::docblock_class_part(cls_fqcn.as_ref()),
+                        ) {
                             all_issues.push(mir_issues::Issue::new(
                                 mir_issues::IssueKind::UndefinedDocblockClass {
                                     name: cls_fqcn.to_string(),
@@ -752,7 +758,7 @@ impl<'a> BodyAnalyzer<'a> {
         if crate::diagnostics::is_docblock_keyword(cls_fqcn) {
             return;
         }
-        if !crate::db::class_exists(self.db, cls_fqcn) {
+        if !crate::db::class_exists(self.db, crate::diagnostics::docblock_class_part(cls_fqcn)) {
             all_issues.push(mir_issues::Issue::new(
                 mir_issues::IssueKind::UndefinedDocblockClass {
                     name: cls_fqcn.to_string(),

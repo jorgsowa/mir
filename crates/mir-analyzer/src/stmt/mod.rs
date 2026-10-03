@@ -433,7 +433,10 @@ impl<'a> StatementsAnalyzer<'a> {
                         continue;
                     }
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
-                    if !crate::db::class_exists(self.db, fqcn.as_ref()) {
+                    if !crate::db::class_exists(
+                        self.db,
+                        crate::diagnostics::docblock_class_part(fqcn.as_ref()),
+                    ) {
                         self.issues.add(Issue::new(
                             IssueKind::UndefinedDocblockClass {
                                 name: fqcn.to_string(),

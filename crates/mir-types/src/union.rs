@@ -1932,6 +1932,10 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TLiteralEnumCase { enum_fqcn, .. }, Atomic::TNamedObject { fqcn, .. }) => {
             enum_fqcn == fqcn
         }
+        (Atomic::TLiteralEnumCase { enum_fqcn, .. }, Atomic::TSelf { fqcn })
+        | (Atomic::TLiteralEnumCase { enum_fqcn, .. }, Atomic::TStaticObject { fqcn }) => {
+            enum_fqcn == fqcn
+        }
         // Bare generic property accepts parameterized value: Box accepts Box<string>.
         // The reverse is NOT true — bare Box value does not satisfy Box<string> property
         // (invariant check). Only sup being bare (empty type_params) is the wildcard.
@@ -2594,6 +2598,25 @@ mod tests {
             type_params: empty_type_params(),
         });
         assert!(!sub.is_subtype_structural(&sup));
+    }
+
+    #[test]
+    fn subtype_enum_case_under_own_self_and_static() {
+        let case = |enum_fqcn: &str| {
+            Type::single(Atomic::TLiteralEnumCase {
+                enum_fqcn: Name::new(enum_fqcn),
+                case_name: Name::new("A"),
+            })
+        };
+        let own = Type::single(Atomic::TSelf {
+            fqcn: Name::new("Suit"),
+        });
+        let own_static = Type::single(Atomic::TStaticObject {
+            fqcn: Name::new("Suit"),
+        });
+        assert!(case("Suit").is_subtype_structural(&own));
+        assert!(case("Suit").is_subtype_structural(&own_static));
+        assert!(!case("Other").is_subtype_structural(&own));
     }
 
     #[test]

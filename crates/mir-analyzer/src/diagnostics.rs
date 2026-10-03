@@ -426,6 +426,11 @@ pub(crate) fn is_pseudo_type(name: &str) -> bool {
     crate::util::is_native_type_name(name)
 }
 
+/// The class part of a docblock `Enum::Case` reference; other names unchanged.
+pub(crate) fn docblock_class_part(name: &str) -> &str {
+    name.split_once("::").map_or(name, |(class, _)| class)
+}
+
 /// Wide docblock gate: `is_pseudo_type` extended with the parser's full
 /// keyword table (`interface-string`, `int-mask`, `class-string-map`, …).
 /// Docblock keywords that survive parsing as a `TNamedObject` (backslash-
