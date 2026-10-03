@@ -741,12 +741,13 @@ fn imported_alias_body(db: &dyn MirDatabase, from_class: &str, name: &str) -> Ty
     Type::mixed()
 }
 
-/// Swaps the `@psalm-import-type` placeholders the collector left for imports
-/// from other files with the source alias's body, in the class's alias map and
-/// member types.
-fn resolve_cross_file_imports(db: &dyn MirDatabase, class: Arc<ClassDef>) -> Arc<ClassDef> {
-    let bodies: FxHashMap<String, Type> = class
-        .type_aliases
+/// Source alias bodies for the import placeholders in `aliases`, keyed by
+/// placeholder name so they can drive `expand_aliases_only`.
+fn import_bodies(
+    db: &dyn MirDatabase,
+    aliases: &FxHashMap<Arc<str>, Type>,
+) -> FxHashMap<String, Type> {
+    aliases
         .values()
         .filter_map(crate::collector::import_placeholder_parts)
         .map(|(from, name)| {
@@ -758,33 +759,42 @@ fn resolve_cross_file_imports(db: &dyn MirDatabase, class: Arc<ClassDef>) -> Arc
                 imported_alias_body(db, from, name),
             )
         })
-        .collect();
+        .collect()
+}
+
+fn expand_arc_type(ty: &mut Option<Arc<Type>>, bodies: &FxHashMap<String, Type>) {
+    if let Some(arc) = ty {
+        *arc = Arc::new(crate::collector::expand_aliases_only(
+            (**arc).clone(),
+            bodies,
+        ));
+    }
+}
+
+/// Swaps the `@psalm-import-type` placeholders the collector left for imports
+/// from other files with the source alias's body, in the class's alias map and
+/// member types.
+fn resolve_cross_file_imports(db: &dyn MirDatabase, class: Arc<ClassDef>) -> Arc<ClassDef> {
+    let bodies = import_bodies(db, &class.type_aliases);
     if bodies.is_empty() {
         return class;
     }
     let expand = |ty: &mut Type| *ty = crate::collector::expand_aliases_only(ty.clone(), &bodies);
-    let expand_arc = |ty: &mut Option<Arc<Type>>| {
-        if let Some(arc) = ty {
-            let mut inner = (**arc).clone();
-            expand(&mut inner);
-            *arc = Arc::new(inner);
-        }
-    };
 
     let mut class = (*class).clone();
     class.type_aliases.values_mut().for_each(expand);
     for prop in class.own_properties.values_mut() {
-        expand_arc(&mut prop.ty);
+        expand_arc_type(&mut prop.ty, &bodies);
     }
     for constant in class.own_constants.values_mut() {
         expand(&mut constant.ty);
     }
     for method in class.own_methods.values_mut() {
         let method = Arc::make_mut(method);
-        expand_arc(&mut method.return_type);
+        expand_arc_type(&mut method.return_type, &bodies);
         let mut params = method.params.to_vec();
         for param in &mut params {
-            expand_arc(&mut param.ty);
+            expand_arc_type(&mut param.ty, &bodies);
         }
         method.params = params.into();
     }
@@ -879,7 +889,30 @@ pub fn function_def_at(
     idx: u32,
 ) -> Option<Arc<FunctionDef>> {
     let defs = collect_file_definitions(db, file);
-    def_at(&defs.slice.functions, idx)
+    let function = def_at(&defs.slice.functions, idx)?;
+    Some(resolve_function_cross_file_imports(db, function))
+}
+
+/// [`resolve_cross_file_imports`] for a free function's signature.
+fn resolve_function_cross_file_imports(
+    db: &dyn MirDatabase,
+    function: Arc<FunctionDef>,
+) -> Arc<FunctionDef> {
+    let bodies = import_bodies(db, &function.type_aliases);
+    if bodies.is_empty() {
+        return function;
+    }
+    let mut function = (*function).clone();
+    for ty in function.type_aliases.values_mut() {
+        *ty = crate::collector::expand_aliases_only(ty.clone(), &bodies);
+    }
+    expand_arc_type(&mut function.return_type, &bodies);
+    let mut params = function.params.to_vec();
+    for param in &mut params {
+        expand_arc_type(&mut param.ty, &bodies);
+    }
+    function.params = params.into();
+    Arc::new(function)
 }
 
 /// Composite: resolve `fqcn` to its defining file, then locate any

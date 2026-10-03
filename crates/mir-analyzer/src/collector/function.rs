@@ -180,7 +180,7 @@ impl DefinitionCollector<'_> {
             return;
         }
 
-        let type_aliases = self.build_type_aliases(&doc);
+        let type_aliases = self.build_type_aliases_deferring_imports(&doc);
 
         // Build template names first so bound resolution below can recognise template-param
         // names and avoid FQN-qualifying them (e.g. `@template T of K` where K is another param).
