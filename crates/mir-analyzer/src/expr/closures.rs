@@ -36,6 +36,24 @@ fn widen_byref_capture(ty: Type) -> Type {
     out
 }
 
+/// Parent type after a closure writes a by-ref capture. An empty array is
+/// dropped once the closure has written an array, so keys it adds are readable.
+fn merge_byref_write(pre: Type, written: &Type) -> Type {
+    let writes_array = written
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TArray { .. } | Atomic::TKeyedArray { .. }));
+    let mut base = Type::empty();
+    for atomic in pre.types {
+        let is_empty_array =
+            matches!(&atomic, Atomic::TKeyedArray { properties, .. } if properties.is_empty());
+        if !(writes_array && is_empty_array) {
+            base.add_type(atomic);
+        }
+    }
+    Type::merge(&base, written)
+}
+
 fn param_name_span(source: &str, p: &Param) -> Span {
     let Some(raw) = p.name.as_deref() else {
         return p.span;
@@ -398,6 +416,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             }
         }
+        let mut byref_captures: Vec<(&str, Type)> = Vec::new();
         for use_var in c.use_vars.iter() {
             let name = use_var.name.trim_start_matches('$');
             // A by-ref capture (`use (&$f)`) binds by reference and auto-creates
@@ -461,7 +480,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ReferenceKind::Variable(Arc::from(name)),
                 captured_ty.clone(),
             );
-            closure_ctx.set_var(name, captured_ty);
+            closure_ctx.set_var(name, captured_ty.clone());
+            if use_var.by_ref {
+                byref_captures.push((name, captured_ty));
+            }
             if ctx.is_tainted(name) {
                 closure_ctx.taint_var(name);
             }
@@ -542,6 +564,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         } else {
             crate::body_analysis::build_generator_return_type(&sa.yielded_types, inferred_return)
         };
+
+        // The closure may run zero or more times, so a by-ref write widens the
+        // parent's type rather than replacing it. A bare `null` becomes `mixed`,
+        // matching the capture side (`widen_byref_capture`).
+        for (name, captured_ty) in byref_captures {
+            let written_ty = closure_ctx.get_var(name);
+            let pre_ty = ctx.get_var(name);
+            if matches!(pre_ty.types.as_slice(), [Atomic::TNull]) {
+                ctx.set_var(name, Type::mixed());
+            } else if written_ty != captured_ty {
+                let merged = merge_byref_write(pre_ty, &written_ty);
+                ctx.set_var(name, merged);
+            }
+        }
 
         // If the closure reads an outer-scope variable without capturing it via `use`,
         // mark that variable as read in the outer context to suppress false UnusedParam.
