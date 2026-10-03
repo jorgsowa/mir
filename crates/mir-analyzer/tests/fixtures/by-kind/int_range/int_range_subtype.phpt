@@ -1,7 +1,9 @@
 ===description===
 `int<1,255>` is a subtype of `int<0,255>`.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 /** @param int<0,255> $c */

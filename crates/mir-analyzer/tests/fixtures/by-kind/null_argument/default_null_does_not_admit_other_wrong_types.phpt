@@ -1,7 +1,11 @@
 ===description===
 Implicit nullability adds only null: other wrong argument types are still reported.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string $f */

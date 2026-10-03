@@ -2,7 +2,12 @@
 Anonymous class that implements an interface (but does not extend a class) still
 emits ParentNotFound for parent:: calls — implements does not establish a parent.
 ===config===
-suppress=UnusedVariable,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

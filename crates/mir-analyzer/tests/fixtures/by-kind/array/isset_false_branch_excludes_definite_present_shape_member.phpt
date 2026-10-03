@@ -5,7 +5,13 @@ but only for a single-level access — a nested path's false branch doesn't
 pin down which level failed, and a lone shape whose key is nullable is
 already consistent with the false branch and stays unnarrowed.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

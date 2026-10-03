@@ -4,7 +4,11 @@ type-check function (`case $x instanceof A:` / `case is_string($x):`) must
 narrow to the union of both, the same as an all-instanceof or all-type-fn
 fallthrough already does.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

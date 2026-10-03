@@ -1,7 +1,11 @@
 ===description===
 A closure with a declared return type also fires MixedReturnStatement when returning a mixed value
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $fn = function (): string {

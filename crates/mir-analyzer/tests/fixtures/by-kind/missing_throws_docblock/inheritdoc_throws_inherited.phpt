@@ -2,7 +2,9 @@
 FALSE POSITIVE reproducer. @inheritdoc should inherit @throws from the parent
 so the child method body is not flagged for throwing a declared exception.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class NotFoundException extends \RuntimeException {}

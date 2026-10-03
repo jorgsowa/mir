@@ -1,7 +1,11 @@
 ===description===
 Analyze constructor for nonexistent attributes
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo

@@ -3,7 +3,11 @@ A plain string passed to a `(callable)|TValue|string` union param (Collection
 ::max / ::contains pattern) matches the non-callable alternatives — it must
 not be validated as a function name. A pure `callable` param still validates.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

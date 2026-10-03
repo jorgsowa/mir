@@ -2,7 +2,12 @@
 String encoding/transformation functions preserve non-empty-string when the input is non-empty.
 htmlspecialchars, urlencode, base64_encode, nl2br, str_rot13, etc.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-string $s */

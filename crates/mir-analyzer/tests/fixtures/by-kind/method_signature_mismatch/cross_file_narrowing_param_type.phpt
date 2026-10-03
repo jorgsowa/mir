@@ -1,7 +1,11 @@
 ===description===
 cross file narrowing param type
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Animal.php===
 <?php
 class Animal {

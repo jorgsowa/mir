@@ -3,7 +3,11 @@ A named `@var Foo|null $x` docblock above a multi-variable `static $x = null, $y
 declaration must apply only to the named `$x`, leaving `$y`'s type derived from its own
 literal initializer untouched.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

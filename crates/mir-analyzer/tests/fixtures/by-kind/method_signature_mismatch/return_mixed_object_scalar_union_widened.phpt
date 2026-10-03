@@ -3,7 +3,11 @@ A child override widening a mixed object+scalar union return type (string|Cat ->
 violates return covariance. Now that named_object_return_compatible splits mixed unions per
 atom (G5), the override check catches it instead of skipping.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

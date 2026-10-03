@@ -4,7 +4,12 @@
 own element/return type is still bound and checked against `T`'s bound,
 while a legitimately-in-bound element stays silent.
 ===config===
-suppress=UnusedParam,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

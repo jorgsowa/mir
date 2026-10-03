@@ -5,7 +5,13 @@ unreachable either — `narrow_prop_loose_null` skipped the nullable-receiver
 gate that `narrow_prop_null` already had. Non-nullable receivers keep
 diverging on a genuine contradiction.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {}

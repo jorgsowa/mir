@@ -2,7 +2,12 @@
 Int atomics in a union absorb each other by bound containment: literals into
 ranges, ranges into wider ranges or `int`; `int<0, max>` is `non-negative-int`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-negative-int $n */

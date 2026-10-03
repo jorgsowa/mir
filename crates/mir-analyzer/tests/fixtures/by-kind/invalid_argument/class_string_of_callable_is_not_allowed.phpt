@@ -1,7 +1,11 @@
 ===description===
 Class string of callable is not allowed
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

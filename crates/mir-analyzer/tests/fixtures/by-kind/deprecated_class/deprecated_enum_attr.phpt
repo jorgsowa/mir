@@ -2,7 +2,11 @@
 Sibling of deprecated_enum_as_param: #[Deprecated] attribute fallback
 (no docblock tag) on an enum declaration.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 #[\Deprecated]

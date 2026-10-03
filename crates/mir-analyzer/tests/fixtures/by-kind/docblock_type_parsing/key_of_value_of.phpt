@@ -3,7 +3,13 @@
 array shape, generic array, or list, rather than staying an opaque
 `TKeyOf`/`TValueOf` placeholder.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_key_of_array_shape($x) {

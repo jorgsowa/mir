@@ -2,7 +2,11 @@
 A local `@psalm-type` alias naming exception classes expands in `@throws` of
 methods and functions instead of being treated as a class `Ns\Alias`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

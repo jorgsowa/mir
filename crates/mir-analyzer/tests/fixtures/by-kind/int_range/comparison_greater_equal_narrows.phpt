@@ -2,7 +2,12 @@
 `$x > 0` on an `int<0, max>` (from count) narrows to `int<1, max>` in true branch.
 The false branch gets `int<0, 0>` (i.e. exactly zero).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string> $arr */

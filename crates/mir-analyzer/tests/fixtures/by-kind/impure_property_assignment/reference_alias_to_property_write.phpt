@@ -5,7 +5,11 @@ aliasing at all -- only a direct $this->prop = value write was caught.
 Narrow: only this one AST-visible pattern (a bare local var ref-aliased
 directly to a var-receiver property) is tracked.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

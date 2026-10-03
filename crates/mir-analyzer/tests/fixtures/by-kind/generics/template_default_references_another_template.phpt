@@ -5,7 +5,11 @@ it against the bindings already computed for T — the concrete argument's
 type was lost and TReturn stayed an unresolved template, degrading to
 `mixed` downstream instead of the argument's real inferred type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

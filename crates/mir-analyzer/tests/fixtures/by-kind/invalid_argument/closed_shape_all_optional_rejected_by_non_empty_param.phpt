@@ -4,7 +4,12 @@ can still be `[]` at runtime — a non-empty properties map alone doesn't
 prove `non-empty-array`/`non-empty-list`, unlike a genuinely required
 property or an open shape (which may hide an unknown non-empty key).
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-array<string, int> $counts */

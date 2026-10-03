@@ -5,7 +5,12 @@ shared extract_class_fqcn_from_expr explicitly excluded self/static/parent
 instead of resolving them via the caller's own known FQCNs, unlike its
 sibling extract_class_name.
 ===config===
-suppress=UnusedParam,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

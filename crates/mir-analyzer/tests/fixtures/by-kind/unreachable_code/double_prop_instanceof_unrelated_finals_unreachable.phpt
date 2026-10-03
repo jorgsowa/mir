@@ -3,7 +3,11 @@
 classes must be flagged, same as the already-fixed plain-variable case —
 narrow_prop_instanceof never marked the branch as diverging.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

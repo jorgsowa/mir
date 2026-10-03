@@ -2,7 +2,13 @@
 Variable callable with multiple by-ref out-params: each argument variable
 gets the correct type written back after the call.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $fill = function(string &$a, int &$b): void {

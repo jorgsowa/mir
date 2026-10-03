@@ -1,7 +1,11 @@
 ===description===
 Class constant no class
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace Ns;

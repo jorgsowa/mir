@@ -23,13 +23,19 @@
 //! Child.php: UndefinedMethod: Method Child::bar() does not exist
 //! ```
 //!
-//! **With config** (optional `===config===` section, must appear before file sections):
+//! **With config** (optional `===config===` section, must appear before file sections;
+//! the body is a real `mir.xml`):
 //! ```text
 //! ===config===
-//! php_version=8.1
-//! suppress=MissingThrowsDocblock,UnusedFunction
-//! stub_file=stubs/helpers.php
-//! stub_dir=stubs
+//! <mir>
+//!   <stubs>
+//!     <file name="stubs/helpers.php"/>
+//!   </stubs>
+//!   <issueHandlers>
+//!     <MissingThrowsDocblock errorLevel="suppress"/>
+//!   </issueHandlers>
+//!   <phpVersion>8.1</phpVersion>
+//! </mir>
 //! ===file===
 //! <?php
 //! ...
@@ -37,10 +43,10 @@
 //! ...
 //! ```
 //!
-//! `stub_file=path` and `stub_dir=path` refer to files/directories already declared
+//! `<stubs>` `<file>`/`<directory>` names refer to files/directories already declared
 //! with `===file:path===` markers. They are wired into the session via
 //! `AnalysisSession::with_user_stubs` and excluded from the analysis file list, so only the non-stub PHP
-//! files are analysed. Multiple `stub_file=` and `stub_dir=` lines are allowed.
+//! files are analysed.
 //!
 //! **With Composer/PSR-4**:
 //! ```text
@@ -156,27 +162,27 @@
 //! - `===file===` and `===file:name===` cannot appear in the same fixture.
 //! - A fixture with no file section at all fails immediately.
 //! - `===config===` must appear **at most once** per fixture.
-//! - Every key in `===config===` must be a recognised key (`php_version`,
-//!   `suppress`, `stub_file`, `stub_dir`, `memoize_method_call_results`, `file_extensions`,
-//!   `include_seed`); unknown keys
-//!   fail the test.
-//! - `php_version` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
+//! - The `===config===` body must be a `<mir>` document using only supported options:
+//!   root attribute `memoizeMethodCallResults`, and the children `<phpVersion>` (also
+//!   accepted as a root attribute), `<findUnusedCode>`, `<fileExtensions>`, `<issueHandlers>`,
+//!   `<stubs>` and `<projectFiles>`. Anything else fails the test.
+//! - `<phpVersion>` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
 //!   real CLI config); invalid values fail the test.
-//! - `suppress` accepts a comma-separated list of [`IssueKind`] names to drop
+//! - `<issueHandlers>` entries (`<IssueKind errorLevel="suppress"/>`) drop that [`IssueKind`]
 //!   from the analyzer's output. Every other kind is asserted strictly: a
-//!   fixture must either expect each issue its example code produces or list
+//!   fixture must either expect each issue its example code produces or suppress
 //!   the kind here. The dead-code group (`UnusedFunction`/`UnusedMethod`/
 //!   `UnusedProperty`) is the one exception — it is suppressed by default
-//!   (merged on top of any explicit `suppress=`) so a fixture's bare top-level
-//!   functions don't emit unsolicited noise. That default is held back only
-//!   when the fixture's `===expect===` references one of those kinds, which is
-//!   how a fixture opts in to dead-code reporting.
-//! - `file_extensions=module,inc` (repeatable, comma-separated) sets the extensions treated as
-//!   PHP source (default `php`); every fixture file with one is analyzed.
-//! - `include_seed=a.module` (repeatable) analyzes only that file plus what `require`/`include`
-//!   following reaches under the configured extensions, instead of every matching file.
-//! - `include_vendor_targets=follow` (default `skip`) lets that following enter `vendor` directories.
-//! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
+//!   (merged on top of any explicit handlers) so a fixture's bare top-level
+//!   functions don't emit unsolicited noise. That default is held back when the
+//!   fixture sets `<findUnusedCode>true</findUnusedCode>` or its `===expect===`
+//!   references one of those kinds.
+//! - `<fileExtensions><extension name="module"/>…` sets the extensions treated as PHP
+//!   source (default `php`); every fixture file with one is analyzed.
+//! - `<projectFiles><file name="a.module"/>` analyzes only that file plus what
+//!   `require`/`include` following reaches under the configured extensions, instead of every
+//!   matching file. Listing `<directory name="vendor"/>` lets that following enter `vendor`.
+//! - `<stubs>` names accept a relative path (matching a `===file:===` name).
 //! - `===description===` must appear **at most once** and before any file section.
 //! - `===ignore===` must appear **at most once** and before any file section.
 //! - `===cursor===` must appear **at most once** and before any file section,
@@ -217,7 +223,7 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 struct FixtureConfig {
     php_version: Option<PhpVersion>,
     /// Issue kinds to drop from the analyzer's output, set from the
-    /// `suppress=Foo,Bar` config key. The runner additionally merges in the
+    /// `<issueHandlers>` entries (`errorLevel="suppress"`). The runner additionally merges in the
     /// dead-code group by default (see `run_fixture`) unless the fixture
     /// expects a dead-code diagnostic.
     suppressed_issue_kinds: Option<rustc_hash::FxHashSet<String>>,
@@ -226,13 +232,15 @@ struct FixtureConfig {
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
     stub_dirs: Vec<String>,
     memoize_method_call_results: bool,
-    /// Raw `file_extensions=` entries; normalized by `PhpFileExtensions::new`.
+    /// Raw `<fileExtensions>` entries; normalized by `PhpFileExtensions::new`.
     file_extensions: Vec<String>,
-    /// Files (relative to temp dir) from `include_seed=`. When set, the analyzed
+    /// `<projectFiles><file>` entries (relative to temp dir). When set, the analyzed
     /// set is these files plus whatever `include_closure` reaches, instead of
     /// every file with a configured extension.
     include_seeds: Vec<String>,
     follow_vendor_targets: bool,
+    /// `<findUnusedCode>true</findUnusedCode>`: dead-code kinds are reported.
+    find_unused_code: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -666,62 +674,125 @@ fn parse_cursor_query(text: &str, path: &str) -> CursorQuery {
     }
 }
 
+/// Parse a `===config===` body as a `mir.xml`, honoring the subset of real options fixtures need.
 fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
+    use quick_xml::events::{BytesStart, Event};
+    use quick_xml::{Reader, XmlVersion};
+
+    fn attr(e: &BytesStart<'_>, name: &str) -> Option<String> {
+        e.attributes()
+            .flatten()
+            .find(|a| a.key.as_ref() == name)
+            .map(|a| a.value.as_ref().to_owned())
+    }
+
     let mut config = FixtureConfig::default();
-    for raw_line in text.lines() {
-        let line = raw_line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let (key, value) = line.split_once('=').unwrap_or_else(|| {
-            panic!("fixture {path}: invalid config line {line:?} — expected key=value")
-        });
-        match key.trim() {
-            "php_version" => {
-                let v = value.trim().parse::<PhpVersion>().unwrap_or_else(|e| {
-                    panic!("fixture {path}: invalid php_version: {e}")
-                });
-                config.php_version = Some(v);
-            }
-            "suppress" => {
-                let set = config.suppressed_issue_kinds.get_or_insert_with(Default::default);
-                for name in value.split(',') {
-                    let trimmed = name.trim();
-                    if !trimmed.is_empty() {
-                        set.insert(trimmed.to_string());
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(true);
+    let mut stack: Vec<String> = Vec::new();
+    let mut text_buf = String::new();
+    let mut project_entries: Vec<(String, String)> = Vec::new();
+
+    loop {
+        let event = reader
+            .read_event()
+            .unwrap_or_else(|e| panic!("fixture {path}: invalid mir.xml config: {e}"));
+        let (e, empty) = match &event {
+            Event::Start(e) => (Some(e), false),
+            Event::Empty(e) => (Some(e), true),
+            _ => (None, false),
+        };
+        if let Some(e) = e {
+            let name = e.name().as_ref().to_owned();
+            let parent = stack.last().map(String::as_str);
+            match (parent, name.as_str()) {
+                (None, "mir") => {
+                    for a in e.attributes().flatten() {
+                        let key = a.key.as_ref().to_owned();
+                        let value = a.value.as_ref().to_owned();
+                        match key.as_str() {
+                            "phpVersion" => config.php_version = Some(parse_php_version(&value, path)),
+                            "memoizeMethodCallResults" => {
+                                config.memoize_method_call_results = value == "true";
+                            }
+                            k if k.starts_with("xmlns") => {}
+                            other => panic!(
+                                "fixture {path}: unsupported <mir> attribute {other:?} — supported: phpVersion, memoizeMethodCallResults"
+                            ),
+                        }
                     }
                 }
-            }
-            "stub_file" => {
-                config.stub_files.push(value.trim().to_string());
-            }
-            "stub_dir" => {
-                config.stub_dirs.push(value.trim().to_string());
-            }
-            "memoize_method_call_results" => {
-                config.memoize_method_call_results = value.trim() == "true";
-            }
-            "file_extensions" => {
-                config
-                    .file_extensions
-                    .extend(value.split(',').map(|e| e.to_string()));
-            }
-            "include_seed" => {
-                config.include_seeds.push(value.trim().to_string());
-            }
-            "include_vendor_targets" => match value.trim() {
-                "follow" => config.follow_vendor_targets = true,
-                "skip" => config.follow_vendor_targets = false,
-                other => panic!(
-                    "fixture {path}: include_vendor_targets must be follow or skip, got {other:?}"
+                (None, other) => panic!("fixture {path}: root element must be <mir>, got <{other}>"),
+                (Some("mir"), "phpVersion" | "findUnusedCode" | "fileExtensions" | "issueHandlers" | "stubs" | "projectFiles") => {}
+                (Some("mir"), other) => panic!(
+                    "fixture {path}: unsupported <{other}> — supported: phpVersion, findUnusedCode, fileExtensions, issueHandlers, stubs, projectFiles"
                 ),
-            },
-            other => panic!(
-                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir, memoize_method_call_results, file_extensions, include_seed, include_vendor_targets"
-            ),
+                (Some("issueHandlers"), kind) => {
+                    let level = attr(e, "errorLevel").unwrap_or_default();
+                    assert_eq!(
+                        level, "suppress",
+                        "fixture {path}: <{kind}> errorLevel must be \"suppress\" (other levels don't change which issues a fixture sees)"
+                    );
+                    config
+                        .suppressed_issue_kinds
+                        .get_or_insert_with(Default::default)
+                        .insert(kind.to_string());
+                }
+                (Some("fileExtensions"), "extension") => {
+                    config.file_extensions.extend(attr(e, "name"));
+                }
+                (Some("stubs"), "file") => config.stub_files.extend(attr(e, "name")),
+                (Some("stubs"), "directory") => config.stub_dirs.extend(attr(e, "name")),
+                (Some("projectFiles"), kind @ ("file" | "directory")) => {
+                    project_entries.push((kind.to_string(), attr(e, "name").unwrap_or_default()));
+                }
+                (Some(parent), other) => panic!("fixture {path}: unsupported <{other}> inside <{parent}>"),
+            }
+            if !empty {
+                text_buf.clear();
+                stack.push(name);
+            }
+        }
+        match event {
+            Event::Text(t) => text_buf = t.xml_content(XmlVersion::Implicit1_0).to_string(),
+            Event::End(_) => {
+                match (stack.pop().as_deref(), stack.last().map(String::as_str)) {
+                    (Some("phpVersion"), Some("mir")) => {
+                        config.php_version = Some(parse_php_version(text_buf.trim(), path));
+                    }
+                    (Some("findUnusedCode"), Some("mir")) => {
+                        config.find_unused_code = text_buf.trim() == "true";
+                    }
+                    _ => {}
+                }
+                text_buf.clear();
+            }
+            Event::Eof => break,
+            _ => {}
         }
     }
+
+    for (kind, name) in project_entries {
+        match kind.as_str() {
+            "file" => config.include_seeds.push(name),
+            // A listed `vendor` directory opts into following includes into it.
+            _ if name.trim_end_matches('/') == "vendor" => config.follow_vendor_targets = true,
+            _ => panic!("fixture {path}: <projectFiles> <directory name={name:?}> is unsupported — only <file> entries and the vendor directory"),
+        }
+    }
+    if config.find_unused_code {
+        config
+            .suppressed_issue_kinds
+            .get_or_insert_with(Default::default);
+    }
     config
+}
+
+fn parse_php_version(value: &str, path: &str) -> PhpVersion {
+    value
+        .trim()
+        .parse::<PhpVersion>()
+        .unwrap_or_else(|e| panic!("fixture {path}: invalid phpVersion: {e}"))
 }
 
 /// `(name, content)` of every `{prefix}name===` section; content runs to the
@@ -1041,32 +1112,18 @@ fn run_edit_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
 }
 
 fn suppress_dead_code_by_default(fixture: &mut ParsedFixture) {
-    // Auto-suppression: the dead-code group (UnusedMethod/Property/Function) is
-    // suppressed by default so authors don't have to sprinkle boilerplate
-    // `suppress=` lines on every fixture whose example code happens to declare
-    // an uncalled global function. This default is applied *additively* — it
-    // merges with any explicit `suppress=Foo,Bar` rather than being skipped when
-    // one is present — and is held back in two cases, so the `dead_code_enabled`
-    // path filter in `run_analyzer` keeps its semantics:
-    //   1. the fixture expects a dead-code diagnostic, or
-    //   2. the fixture sets an explicit *empty* `suppress=`, which is the marker
-    //      for "report everything, including dead code" (used by the negative
-    //      dead-code fixtures that assert a *used* symbol is not flagged).
-    //
-    // Every other diagnostic — including the noisy kinds like UnusedParam,
-    // MixedArgument, or MissingParamType — is asserted strictly: a fixture must
-    // either expect each issue its example code produces or list the kind in an
-    // explicit `suppress=` config line.
+    // The dead-code group (UnusedMethod/Property/Function) is suppressed by default so
+    // fixtures don't need boilerplate handlers for an uncalled global function. It is
+    // merged on top of any explicit `<issueHandlers>` and held back when the fixture
+    // expects a dead-code diagnostic or sets `<findUnusedCode>true</findUnusedCode>`.
+    // Every other diagnostic is asserted strictly.
     let dead = crate::batch::dead_code_issue_kinds();
     let expects_dead_code = fixture
         .expected
         .iter()
         .chain(&fixture.expected_before_edits)
         .any(|e| dead.contains(&e.kind_name.as_str()));
-    let opts_into_dead_code = matches!(
-        &fixture.config.suppressed_issue_kinds,
-        Some(set) if set.is_empty()
-    );
+    let opts_into_dead_code = fixture.config.find_unused_code;
     if !expects_dead_code && !opts_into_dead_code {
         let set = fixture
             .config
@@ -1826,30 +1883,30 @@ mod parser_validation {
     #[test]
     #[should_panic(expected = "===config=== must appear at most once")]
     fn duplicate_config_section() {
-        p("===config===\nsuppress=Foo\n===config===\nsuppress=Bar\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir/>\n===config===\n<mir/>\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]
-    #[should_panic(expected = "unknown config key")]
+    #[should_panic(expected = "unsupported <foo>")]
     fn unknown_config_key() {
-        p("===config===\nfoo=bar\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir><foo/></mir>\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]
-    #[should_panic(expected = "invalid php_version")]
+    #[should_panic(expected = "invalid phpVersion")]
     fn invalid_php_version() {
-        p("===config===\nphp_version=banana\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir><phpVersion>banana</phpVersion></mir>\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]
     #[should_panic(expected = "===config=== must appear before the first ===file===")]
     fn config_after_file_marker() {
-        p("===file===\n<?php\n===config===\nsuppress=Foo\n===expect===\n");
+        p("===file===\n<?php\n===config===\n<mir/>\n===expect===\n");
     }
 
     #[test]
     fn valid_config_is_accepted() {
-        p("===config===\nphp_version=8.1\nsuppress=Foo,Bar\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir><phpVersion>8.1</phpVersion><issueHandlers><Foo errorLevel=\"suppress\"/></issueHandlers></mir>\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]
@@ -1909,8 +1966,10 @@ mod parser_validation {
 
     #[test]
     fn config_before_cursor_section_is_accepted() {
-        let f = p("===config===\nphp_version=8.1\n===cursor===\nsymbol\n\
-                   ===file===\n<?php f<CURSOR>();\n===expect===\n");
+        let f = p(
+            "===config===\n<mir><phpVersion>8.1</phpVersion></mir>\n===cursor===\nsymbol\n\
+                   ===file===\n<?php f<CURSOR>();\n===expect===\n",
+        );
         assert_eq!(f.cursor.map(|c| c.query), Some(CursorQuery::Symbol));
     }
 
@@ -1954,7 +2013,7 @@ mod parser_validation {
     #[test]
     #[should_panic(expected = "suppress has no effect in a ===cursor=== fixture")]
     fn suppress_in_cursor_fixture() {
-        p("===config===\nsuppress=Foo\n===cursor===\nsymbol\n\
+        p("===config===\n<mir><issueHandlers><Foo errorLevel=\"suppress\"/></issueHandlers></mir>\n===cursor===\nsymbol\n\
            ===file===\n<?php <CURSOR>\n===expect===\n");
     }
 

@@ -1,7 +1,11 @@
 ===description===
 Reference reuse foreach value
 ===config===
-suppress=UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var array<int> */

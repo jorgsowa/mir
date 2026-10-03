@@ -1,7 +1,12 @@
 ===description===
 str_repeat() with a non-empty-string input and positive count returns non-empty-string.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-string $s */

@@ -1,7 +1,11 @@
 ===description===
 array access index not reported
 ===config===
-suppress=MixedArrayOffset
+<mir>
+  <issueHandlers>
+    <MixedArrayOffset errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(array $arr): mixed {

@@ -6,7 +6,12 @@ provably-impossible branch was wrongly treated as reachable. Mirrors the
 existing `int_comparison_php_int_max_boundary_unreachable.phpt` reachability
 probe but for the literal `!==`/`===` exclusion path, not `>`/`<=`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<9223372036854775807, 9223372036854775807> $x */

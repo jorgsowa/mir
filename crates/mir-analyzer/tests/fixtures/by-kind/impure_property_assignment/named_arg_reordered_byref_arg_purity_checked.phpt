@@ -6,7 +6,15 @@ call-site's textual position — a named-arg-reordered by-ref target
 wrong argument (`$b`, a plain non-byref param, which is a no-op) instead
 of the real by-ref target (`$b->items`).
 ===config===
-suppress=MissingConstructor,MixedArgument,MixedArrayAssignment,UnusedParam,ImpureFunctionCall
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <ImpureFunctionCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

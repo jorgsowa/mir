@@ -5,7 +5,12 @@ own class must not be flagged — `static` late-binds independently at each
 call site, so a `Base` receiver accepting a `Base` and a `Sub` receiver
 accepting a `Sub` are both valid.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

@@ -1,7 +1,12 @@
 ===description===
 Functions that open a URL or host from their first argument are SSRF sinks.
 ===config===
-suppress=MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

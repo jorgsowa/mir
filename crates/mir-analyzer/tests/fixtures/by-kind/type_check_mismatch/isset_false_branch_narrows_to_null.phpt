@@ -5,7 +5,12 @@ property/static-property counterparts, which already handle both
 branches. A non-nullable always-assigned parameter makes the false
 branch provably unreachable.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function narrowsParamToNull(?string $x): void {

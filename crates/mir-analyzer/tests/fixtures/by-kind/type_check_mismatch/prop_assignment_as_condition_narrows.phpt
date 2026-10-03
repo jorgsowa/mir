@@ -3,7 +3,12 @@
 truthiness, the property-access counterpart of the plain-variable
 assignment-as-condition case.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

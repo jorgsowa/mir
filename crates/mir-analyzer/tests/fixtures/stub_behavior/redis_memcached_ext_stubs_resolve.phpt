@@ -2,8 +2,12 @@
 Bundled redis/memcached extension stubs resolve, including a top-level class imported via `use` into a namespaced file (the phpredis/Memcached usage pattern in Laravel) — both class-constant fetches and instantiation
 
 ===config===
-suppress=UnusedVariable,UnusedParam
-
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

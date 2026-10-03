@@ -2,7 +2,9 @@
 `array_filter()` with an `is_string()` predicate narrows the returned values —
 same narrowing family as the `is_null()` case, generalized beyond it.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 final class Item

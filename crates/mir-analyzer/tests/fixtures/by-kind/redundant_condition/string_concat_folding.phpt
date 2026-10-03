@@ -1,7 +1,12 @@
 ===description===
 String concatenation of literals folds to a literal result: "foo" . "bar" = "foobar"
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

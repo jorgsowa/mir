@@ -5,7 +5,11 @@ placeholder — the parser disambiguates by checking for `...)` as the very
 first token. This must keep working exactly as before 0.19 (no spurious
 "requires PHP 8.6" version-gate diagnostic).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

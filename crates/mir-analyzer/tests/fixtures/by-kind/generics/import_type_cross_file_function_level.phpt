@@ -2,7 +2,14 @@
 A function-level cross-file `@psalm-import-type` expands in `@param`, `@return`,
 local `@var`, and the call-site result.
 ===config===
-suppress=UnusedParam,UnusedVariable,MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:lib.php===
 <?php
 namespace Lib;

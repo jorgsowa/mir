@@ -1,7 +1,13 @@
 ===description===
 a constant path is never a taint sink
 ===config===
-suppress=MixedArgument,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

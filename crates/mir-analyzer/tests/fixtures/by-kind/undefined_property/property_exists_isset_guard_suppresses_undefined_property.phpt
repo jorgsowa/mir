@@ -4,7 +4,11 @@ property fact at all — a dynamic/BC property proven present by either
 guard still flags UndefinedProperty on a later `$this->x` read inside
 the guarded block.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class BackwardsCompatShim {

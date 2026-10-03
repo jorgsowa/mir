@@ -3,8 +3,12 @@ The parser explicitly allows the bare `...` rest placeholder after a named
 argument (`f(a: 1, ...)`), unlike an ordinary positional argument which is
 forbidden in that position. Must not crash either way.
 ===config===
-php_version=8.5
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.5</phpVersion>
+</mir>
 ===file===
 <?php
 

@@ -1,7 +1,11 @@
 ===description===
 Impure callable return
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

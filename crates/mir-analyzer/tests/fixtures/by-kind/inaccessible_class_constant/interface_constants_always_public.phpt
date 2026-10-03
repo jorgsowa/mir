@@ -1,7 +1,12 @@
 ===description===
 InaccessibleClassConstant does NOT fire for interface constants, which are always public.
 ===config===
-suppress=UnusedVariable,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Limits {

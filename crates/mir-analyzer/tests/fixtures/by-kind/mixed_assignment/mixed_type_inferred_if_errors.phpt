@@ -1,7 +1,11 @@
 ===description===
 Mixed type inferred if errors
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

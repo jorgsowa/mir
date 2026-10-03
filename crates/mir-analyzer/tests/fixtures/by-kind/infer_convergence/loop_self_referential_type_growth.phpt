@@ -13,7 +13,16 @@ the fix: with the bug it OOMs; fixed, it completes in milliseconds. Diagnostics
 are identical either way (the blow-up is transient), so the guard is that it
 analyzes at all.
 ===config===
-suppress=MissingPropertyType,MixedArgument,MixedArrayAccess,MixedArrayOffset,MixedAssignment,MixedPropertyFetch
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArrayOffset errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class NotificationSender

@@ -6,7 +6,15 @@ reuses the same conventional template letter (`T`) as its
 ANCESTOR's binding, not the subclass's own T — the ancestor declares
 `offsetGet()`, not the subclass.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam,MissingPropertyType,MixedArrayOffset
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArrayOffset errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

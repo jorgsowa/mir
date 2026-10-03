@@ -1,7 +1,11 @@
 ===description===
 Negative control: when no union atom accepts the arg count, every rejecting atom is still flagged
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

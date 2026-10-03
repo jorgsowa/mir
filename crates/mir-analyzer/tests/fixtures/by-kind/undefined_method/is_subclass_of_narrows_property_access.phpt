@@ -2,7 +2,13 @@
 `is_subclass_of($obj->prop, X::class)` must narrow the property receiver like
 the already-correct variable case.
 ===config===
-suppress=MissingConstructor,PossiblyNullArgument,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

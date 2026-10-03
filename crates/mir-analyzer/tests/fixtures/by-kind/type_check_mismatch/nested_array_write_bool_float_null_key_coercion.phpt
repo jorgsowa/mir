@@ -5,7 +5,12 @@ float truncates, null -> ""); the inner walk-up loop's key stayed
 uncoerced, so a dynamic bool/float/null key anywhere but the last bracket
 kept its raw type instead.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function nestedBoolKeyCoercesToInt(bool $flag): void {

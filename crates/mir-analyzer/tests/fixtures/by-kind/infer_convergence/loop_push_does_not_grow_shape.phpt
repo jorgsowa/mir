@@ -4,7 +4,12 @@ Regression guard: a `[]` push inside a loop body must keep generalizing to
 introduced for straight-line code — growing a property per iteration would
 never let the fixed-point loop analysis converge.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

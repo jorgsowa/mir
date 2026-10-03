@@ -1,8 +1,15 @@
 ===description===
 A bare relative literal resolves against the including file's directory, not the project root
 ===config===
-file_extensions=module,inc
-include_seed=sub/a.module
+<mir>
+  <projectFiles>
+    <file name="sub/a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:sub/a.module===
 <?php
 require_once 'b.inc';

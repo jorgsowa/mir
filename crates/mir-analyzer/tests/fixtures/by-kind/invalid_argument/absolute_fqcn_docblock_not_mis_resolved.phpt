@@ -2,7 +2,11 @@
 Absolute FQCN in docblock (leading backslash) is not mis-resolved via use aliases.
 \Carbon\CarbonImmutable should not be confused with an Illuminate\Support\Carbon subpath.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

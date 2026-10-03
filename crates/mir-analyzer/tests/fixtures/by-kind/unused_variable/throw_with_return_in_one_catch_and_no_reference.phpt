@@ -1,7 +1,11 @@
 ===description===
 Throw with return in one catch and no reference
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class E1 extends Exception {}

@@ -1,7 +1,12 @@
 ===description===
 does not report after false check
 ===config===
-suppress=ForbiddenCode,MixedAssignment
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @return array|false */

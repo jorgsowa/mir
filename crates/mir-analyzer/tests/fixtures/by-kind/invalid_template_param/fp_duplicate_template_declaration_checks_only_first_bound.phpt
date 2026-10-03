@@ -5,7 +5,11 @@ binding against every duplicate's own bound treated each extra
 declaration as an unrelated, additional constraint the caller never
 agreed to satisfy
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

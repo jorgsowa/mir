@@ -1,7 +1,12 @@
 ===description===
 Trait and enum methods in a later braced namespace block register their parameters.
 ===config===
-suppress=UnusedFunction,UnusedMethod
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+    <UnusedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace A {

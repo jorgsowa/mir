@@ -3,7 +3,12 @@
 type, matching `class-string-map<T, T>`, instead of silently degrading the
 value type to `mixed`.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

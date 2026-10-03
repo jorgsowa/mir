@@ -5,7 +5,11 @@ leak into the merged true-branch, since $y stays Foo|Bar on the "$x unset" path 
 narrowing it down to plain Foo there would mask a genuine error if the branch body
 went on to call a Bar-only method assuming $y could never be Bar.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {}

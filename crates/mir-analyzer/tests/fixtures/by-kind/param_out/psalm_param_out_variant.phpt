@@ -2,7 +2,12 @@
 @psalm-param-out (Psalm's tag) is an alias for @param-out and must be
 recognized and applied identically.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

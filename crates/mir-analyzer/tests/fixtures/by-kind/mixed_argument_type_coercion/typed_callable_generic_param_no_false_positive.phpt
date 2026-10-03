@@ -4,7 +4,11 @@ A `callable(TValue): bool` docblock using an unsubstituted template parameter
 a concrete closure signature — TValue is a placeholder, not a real type, so
 flagging a mismatch here would be a false positive.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

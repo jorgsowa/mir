@@ -1,7 +1,11 @@
 ===description===
 Min specified as second
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

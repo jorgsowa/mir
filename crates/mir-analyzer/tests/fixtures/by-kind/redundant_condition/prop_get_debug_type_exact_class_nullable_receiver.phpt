@@ -6,7 +6,13 @@ which is never `'Foo'`, so a nullable receiver can make the comparison true
 regardless of the property's own precise declared type. Non-nullable
 receivers keep diverging on a genuine contradiction.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {}

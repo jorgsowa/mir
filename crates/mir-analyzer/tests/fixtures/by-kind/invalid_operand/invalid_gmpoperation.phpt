@@ -1,7 +1,12 @@
 ===description===
 Invalid g m p operation
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = gmp_init(2);

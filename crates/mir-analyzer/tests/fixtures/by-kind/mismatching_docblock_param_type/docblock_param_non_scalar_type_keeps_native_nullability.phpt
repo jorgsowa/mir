@@ -5,7 +5,11 @@ regardless of what the docblock says, unlike the scalar family, which
 already had an explicit conflict guard. Covers both null-check directions
 (`===`/`!==`) on the same variable.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param object ...$objects */

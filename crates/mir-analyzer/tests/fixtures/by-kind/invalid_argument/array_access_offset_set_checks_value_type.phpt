@@ -3,7 +3,12 @@
 `offsetSet()`'s declared value-param type — previously any value was
 silently accepted, since the write path only ever matched a plain array.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

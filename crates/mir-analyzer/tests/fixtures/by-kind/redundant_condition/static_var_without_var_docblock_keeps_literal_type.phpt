@@ -4,7 +4,11 @@ docblock, a static var's type must still come from its literal initializer as be
 — `static $x = null;` alone still makes a later `$x !== null` check genuinely always
 false, and that diagnostic must keep firing.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

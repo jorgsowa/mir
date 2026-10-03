@@ -3,7 +3,12 @@ FP: `break N` (N > 1) was always recorded against the innermost loop's
 break-context bucket instead of the loop N levels out, so code after the
 OUTER loop was wrongly reported unreachable even though `break 2` reaches it.
 ===config===
-suppress=MixedArgument,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(array $matrix): void {

@@ -3,7 +3,13 @@ A union of closures with different arities (e.g. from a ternary) must have every
 branch checked against a typed callable param, not just the first — here the
 over-arity closure is the first ternary branch.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(string):void $c */

@@ -3,7 +3,13 @@ A bare `new Gen()` (nothing to infer the template from) is `Gen<mixed>`, so a
 `Gen<int>` property, parameter or return accepts it — same class, a
 `@extends`-forwarding subclass, and an uninferable constructor argument.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

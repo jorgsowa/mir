@@ -4,7 +4,12 @@ a binding that is itself a template param, self, or static resolves only at
 a concrete call site (Eloquent relation pattern). A genuinely wrong concrete
 binding still violates.
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Model {}

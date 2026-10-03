@@ -2,7 +2,12 @@
 count()/strlen() equality comparisons (===0, !==0, ==0, !=0, exact positive
 counts) narrow arrays/strings to non-empty variants, like the </>/<=/>= forms.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

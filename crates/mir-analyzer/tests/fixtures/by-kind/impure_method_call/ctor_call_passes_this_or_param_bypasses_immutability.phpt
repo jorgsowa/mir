@@ -8,7 +8,12 @@ impure METHOD call on it already catches. Contrast with passing a plain
 VALUE read off `$this` (not an object), which must stay unflagged — the
 standard immutable "wither" idiom.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Wrapper {

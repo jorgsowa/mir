@@ -3,7 +3,11 @@
 open-shape marker at all — only a bare `...` item set `is_open`, so this shape parsed as
 sealed to just its declared keys and rejected any extra key.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{exception?: Throwable, ...array<string, mixed>} $context */

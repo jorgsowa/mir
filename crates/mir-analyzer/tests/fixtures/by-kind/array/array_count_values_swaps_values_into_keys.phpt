@@ -5,7 +5,12 @@ int<1, max> counts. A source whose values aren't entirely int|string (e.g.
 array-of-arrays) can't succeed at runtime and isn't modeled — falls back
 to the generic stub.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -6,7 +6,11 @@ fixed-point widening algorithm's first pass sees $i still at its narrow
 entry type (e.g. `0` or `0|1`, before widening kicks in); that provisional,
 unstabilized-pass type must not leak a diagnostic into the final result.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function find_five(int $n): void {

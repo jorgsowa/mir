@@ -1,7 +1,11 @@
 ===description===
 Passing a non-existent class name to an interface-string parameter emits UndefinedClass
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

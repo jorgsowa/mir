@@ -5,7 +5,11 @@ protected/full) fell back to int (the shared type of the listed keys)
 instead of their real bool type, flagging a bogus InvalidArgument for a
 bool-typed param.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

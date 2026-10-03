@@ -4,7 +4,14 @@ runtime, which sanitizes it against SQL/shell/HTML injection — but
 `is_expr_tainted` ignored the cast kind and kept propagating taint through
 any cast, including the standard `(int) $_GET['id']` defensive idiom.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MixedAssignment,ImplicitToStringCast
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <ImplicitToStringCast errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(mysqli $db): void {

@@ -3,7 +3,12 @@ When both branches of an if/else assign different types to the same
 untyped property, the inferred type is their union — `prop_refined` already
 merges same as it does for any other narrowed property.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

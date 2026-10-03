@@ -1,7 +1,12 @@
 ===description===
 array_map with a void/never callback is degenerate — the generic stub array is kept
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $nums */

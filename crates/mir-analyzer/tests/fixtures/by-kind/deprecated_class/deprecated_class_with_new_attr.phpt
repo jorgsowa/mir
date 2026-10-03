@@ -1,7 +1,11 @@
 ===description===
 Deprecated class with new attr
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 #[\Deprecated]

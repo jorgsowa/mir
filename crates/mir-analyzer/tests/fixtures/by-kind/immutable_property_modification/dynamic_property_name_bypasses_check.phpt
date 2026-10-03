@@ -6,7 +6,12 @@ check behind `if let Some(prop_name) = ...`, so it quietly no-oped instead
 of falling back to a conservative "assume mutation" treatment. Falls back
 to the property expression's own source text as a display name.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-immutable */

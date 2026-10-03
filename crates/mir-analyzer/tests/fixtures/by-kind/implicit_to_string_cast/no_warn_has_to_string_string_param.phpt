@@ -1,7 +1,11 @@
 ===description===
 No warning when object with __toString (no \Stringable) is passed to a string parameter
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Label {

@@ -1,8 +1,13 @@
 ===description===
 array_is_list() narrows the argument to a list type in the true branch.
 ===config===
-php_version=8.1
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 

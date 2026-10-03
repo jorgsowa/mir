@@ -2,7 +2,12 @@
 sprintf() returns non-empty-string when the format string guarantees it
 (literal prefix/suffix, %d/%f specifiers, %%).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

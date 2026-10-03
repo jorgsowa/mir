@@ -11,7 +11,13 @@ assert the bug instead of documenting it. Only the generic (parameterized)
 form is checked, since it doesn't hit the display-side `TObject` sibling
 quirk that the bare keyword's expansion adds.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_associative_array_generic($x) {

@@ -5,7 +5,13 @@ must not mark a branch unreachable — `$obj->prop` itself evaluates to
 property's own declared type doesn't account for. Uses the
 `@mir-check $_ is never` reachability-probe pattern.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

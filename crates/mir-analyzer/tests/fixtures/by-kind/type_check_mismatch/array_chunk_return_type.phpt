@@ -1,7 +1,12 @@
 ===description===
 array_chunk returns list<list<T>> for default preserve_keys=false; outer list is non-empty when source is non-empty.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

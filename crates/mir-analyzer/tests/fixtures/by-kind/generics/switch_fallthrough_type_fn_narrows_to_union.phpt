@@ -5,7 +5,11 @@ the last label's type — narrow_instanceof_disjuncts only recognized
 `instanceof` conditions, so this shape fell through to narrowing each
 condition individually (AND semantics), collapsing to the last one.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

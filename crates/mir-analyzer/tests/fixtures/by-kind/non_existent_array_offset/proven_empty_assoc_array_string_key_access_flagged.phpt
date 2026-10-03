@@ -4,7 +4,11 @@ The same proven-empty narrowing applies to a plain associative
 `=== []` branch is flagged the same way an int-key access on an empty list
 is.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> $counts */

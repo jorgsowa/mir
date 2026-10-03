@@ -5,7 +5,11 @@ variance silently degraded to invariant, because named_object_subtype looked
 up the class's own-declared (empty) template params instead of the effective
 (inherited) ones — rejecting a valid covariant argument.
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant T */

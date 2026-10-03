@@ -1,7 +1,9 @@
 ===description===
 cross file removed 8 0 function not defined on php 8 0
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file:TextHelper.php===
 <?php
 function format_hebrew(string $text): void {

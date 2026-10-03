@@ -3,7 +3,13 @@ A shape whose key is merely optional can't satisfy a declared shape that
 requires the same key present — an optional key may legally be absent at
 runtime, unlike a genuinely required one.
 ===config===
-suppress=MissingPropertyType,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -1,7 +1,11 @@
 ===description===
 A write at the end of a loop body is live when the next iteration reads it before reassigning.
 ===config===
-suppress=UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cand { public string $key = ''; }

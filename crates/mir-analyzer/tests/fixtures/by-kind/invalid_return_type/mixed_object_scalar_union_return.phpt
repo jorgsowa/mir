@@ -3,7 +3,11 @@ G5: a `string|Cat` value satisfies a declared `string|Animal` return type when
 `Cat extends Animal`. The object atom resolves through the inheritance graph while
 the scalar atom is checked structurally — the mixed union must not be a false positive.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

@@ -1,7 +1,12 @@
 ===description===
 Array reduce invalid closure too few args
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $arr = [2, 3, 4, 5];

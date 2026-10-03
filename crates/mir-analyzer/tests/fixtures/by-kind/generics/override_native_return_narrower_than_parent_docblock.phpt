@@ -1,7 +1,11 @@
 ===description===
 A narrower native return type on an override is not replaced by the parent's docblock
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

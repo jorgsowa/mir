@@ -2,7 +2,11 @@
 An inherited constructor keeps its own purity when called through an
 intermediate parent class that does not redeclare it.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class BaseException {

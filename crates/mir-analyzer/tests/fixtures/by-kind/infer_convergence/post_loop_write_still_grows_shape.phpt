@@ -3,7 +3,12 @@ Regression guard: code after a loop is not itself "inside the loop" — a
 push onto a freshly-empty array declared after the loop body still grows a
 precise shape instead of inheriting the loop's forced generalization.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $n): void {

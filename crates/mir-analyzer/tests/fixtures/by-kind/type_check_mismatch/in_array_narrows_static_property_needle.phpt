@@ -3,7 +3,13 @@
 var/instance-property counterparts already do, both true and false
 branches.
 ===config===
-suppress=MissingConstructor,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Container {

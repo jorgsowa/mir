@@ -6,7 +6,12 @@ early `current.is_mixed()` bail that their var-receiver siblings (and the
 sibling narrow_prop_to_class_string/_to_specific_class) don't have, even
 though the narrowing logic itself already handles a TMixed atom correctly.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status {

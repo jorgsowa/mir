@@ -1,7 +1,11 @@
 ===description===
 new global scope via use alias no error
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Entity.php===
 <?php
 namespace App\Model;

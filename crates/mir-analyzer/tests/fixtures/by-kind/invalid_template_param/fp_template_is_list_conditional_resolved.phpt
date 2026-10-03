@@ -2,7 +2,12 @@
 FP: conditional return (A is list ? X : Y) resolves to X when a list is passed —
 inactive else-branch template vars must not leak
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

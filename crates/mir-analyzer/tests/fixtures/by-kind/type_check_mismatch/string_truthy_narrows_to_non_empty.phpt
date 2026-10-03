@@ -2,7 +2,12 @@
 Truthy check on string narrows to non-empty-string; falsy branch is ''|'0'.
 A nullable string truthy check additionally removes null in the true branch.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string $x */

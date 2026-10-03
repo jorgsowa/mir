@@ -5,7 +5,13 @@ declared present (so the recursive narrowing into `a`'s own value returns no
 change on its own, which previously meant the outer key's optionality was
 never cleared either).
 ===config===
-suppress=UnusedParam,UnusedVariable,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a?: array{x: int}} $arr */

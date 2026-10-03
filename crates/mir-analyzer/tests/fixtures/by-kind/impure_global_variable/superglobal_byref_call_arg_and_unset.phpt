@@ -7,7 +7,13 @@ and the unset() array-index unwrap loop had no bare-Variable arm at all.
 Fixed as a side effect of the shared check_var_write_purity helper added
 for the by-ref-parameter sector.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,ImpureFunctionCall
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <ImpureFunctionCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

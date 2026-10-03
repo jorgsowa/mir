@@ -4,7 +4,12 @@
 matched a bare variable or an (any-form) instance-property receiver,
 never extract_static_prop_access.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Factory {}

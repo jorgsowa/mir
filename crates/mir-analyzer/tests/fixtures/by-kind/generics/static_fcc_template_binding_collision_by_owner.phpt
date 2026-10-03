@@ -4,7 +4,14 @@ class-level `@return T` declared on an `@extends`-fixed ANCESTOR (not the
 receiver class itself) must use the ancestor's fixed binding, not the
 receiver's own, same-lettered template.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

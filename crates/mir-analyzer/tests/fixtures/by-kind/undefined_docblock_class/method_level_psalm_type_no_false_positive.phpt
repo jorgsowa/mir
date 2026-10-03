@@ -1,7 +1,11 @@
 ===description===
 @psalm-type alias defined on a method docblock does not produce false positives
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

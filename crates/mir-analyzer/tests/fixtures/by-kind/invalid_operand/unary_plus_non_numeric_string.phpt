@@ -2,7 +2,11 @@
 FN: unary `+` never checked for a non-numeric operand, unlike binary
 arithmetic and unary `~`.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = +"abc";

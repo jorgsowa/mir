@@ -2,7 +2,11 @@
 Negative counterpart: `array_key_exists()` on a nested path only narrows the
 key it actually checks — an unrelated optional sibling key is still nullable.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a: array{b?: string, c?: string}} $arr */

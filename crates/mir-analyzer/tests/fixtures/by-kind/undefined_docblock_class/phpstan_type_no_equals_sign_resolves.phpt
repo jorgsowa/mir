@@ -6,7 +6,11 @@ leaving every reference an UndefinedDocblockClass. The `=` form must keep
 working too (some codebases mix conventions), and `@psalm-type` must still
 require `=` (unchanged) since real Psalm has no bare form.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @phpstan-type NoEquals array{a: int, b: string} */

@@ -1,7 +1,12 @@
 ===description===
 InvalidCatch fires only for the invalid type in a multi-type (union) catch clause, leaving the valid type unflagged.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ValidExc extends \Exception {}

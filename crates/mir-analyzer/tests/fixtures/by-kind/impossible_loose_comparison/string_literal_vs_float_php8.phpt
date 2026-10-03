@@ -2,8 +2,12 @@
 PHP 8: non-numeric literal string vs float is always false.
 The float is converted to a string ("1.5") and compared — "hello" can never equal "1.5".
 ===config===
-php_version=8.0
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 function test(): void {

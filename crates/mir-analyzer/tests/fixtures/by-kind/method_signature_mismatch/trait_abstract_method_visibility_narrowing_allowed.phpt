@@ -7,7 +7,11 @@ CONCRETE methods from override checks (they're not "parents", they're
 flattened into `own`), but an abstract trait method still went through the
 normal never-narrower visibility check.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait PublicRequirement {

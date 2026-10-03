@@ -3,7 +3,12 @@ A literal that doesn't match any case's backing value (an impossible
 comparison) is left alone rather than narrowed to something incorrect —
 the type stays the full enum union in both branches.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit: string {

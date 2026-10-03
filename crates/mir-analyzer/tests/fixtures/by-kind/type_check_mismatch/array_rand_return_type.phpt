@@ -4,7 +4,12 @@ type alone (PHP 8 throws on empty input, never returns false); a literal
 count > 1 -> a non-empty-list of the key type. A non-literal $num falls
 back to the stub.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

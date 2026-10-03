@@ -5,7 +5,14 @@ plain-variable receiver — unlike the analogous `instanceof`/null/literal-match
 arms elsewhere in narrowing.rs, which all already have a property-access
 fallback. `is_string($this->prop)` etc. narrowed nothing.
 ===config===
-suppress=UnusedVariable,MissingConstructor,MixedArgument,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

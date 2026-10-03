@@ -5,7 +5,12 @@ all inference — `class_template_params(IntBox)` returned empty since
 IntBox declares no template of its own, so infer_new_type_params bailed
 out before ever binding T from the constructor argument.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -4,7 +4,12 @@ NON-nullable native hint must not gain a spurious `|null` — the
 nullability-preserving fix only applies when the native hint itself is
 nullable.
 ===config===
-suppress=MissingConstructor,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

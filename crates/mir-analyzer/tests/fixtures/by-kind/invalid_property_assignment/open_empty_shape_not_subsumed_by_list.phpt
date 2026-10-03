@@ -4,7 +4,13 @@ non-list, extra keys at runtime — it must not be silently dropped when
 merged into a union with a list<T> across a branch, since (unlike list<T>
 itself) it isn't provably list-compatible.
 ===config===
-suppress=MissingPropertyType,MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

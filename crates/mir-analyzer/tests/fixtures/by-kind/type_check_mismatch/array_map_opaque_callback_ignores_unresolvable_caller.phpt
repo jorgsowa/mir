@@ -3,7 +3,11 @@ A caller that forwards its own opaque callback (itself unresolvable) must not
 poison the result to the generic `array` fallback — only resolvable callers
 contribute to the union.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function apply(callable $cb, array $nums): array {

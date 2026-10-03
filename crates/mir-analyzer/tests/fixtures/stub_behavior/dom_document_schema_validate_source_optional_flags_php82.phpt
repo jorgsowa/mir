@@ -2,8 +2,12 @@
 DOMDocument::schemaValidateSource() retains its required schema source while accepting
 the optional flags argument on PHP 8.2.
 ===config===
-php_version=8.2
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

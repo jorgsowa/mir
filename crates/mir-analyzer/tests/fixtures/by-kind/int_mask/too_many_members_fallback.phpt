@@ -2,7 +2,11 @@
 int-mask with more than 8 members would generate >256 OR-combinations. To
 avoid excessive union size, mir falls back to plain `int` and accepts any integer.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -2,7 +2,11 @@
 isset short-circuit with && operator — property access on narrowed variable
 isset($obj) && $obj->prop applies narrowing from LHS to property access in RHS
 ===config===
-suppress=MixedPropertyFetch
+<mir>
+  <issueHandlers>
+    <MixedPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 if (isset($obj) && $obj->prop) {

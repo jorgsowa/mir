@@ -2,7 +2,12 @@
 NoInterfaceProperties fires once per distinct unknown property access on the
 same sealed interface.
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

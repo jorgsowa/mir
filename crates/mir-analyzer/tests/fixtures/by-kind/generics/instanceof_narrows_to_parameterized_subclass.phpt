@@ -11,7 +11,12 @@ through a plain `extends` (same declared template arity, no explicit
 `@extends` type args) and an explicit `@implements Iface<TKey, TValue>`
 clause naming the subclass's own template params.
 ===config===
-suppress=MissingPropertyType,MixedArrayOffset
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArrayOffset errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

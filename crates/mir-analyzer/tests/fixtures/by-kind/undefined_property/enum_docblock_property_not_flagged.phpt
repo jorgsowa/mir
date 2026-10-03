@@ -4,7 +4,12 @@ then discarded — `EnumDef` had no `own_properties` field at all, unlike
 Class/Trait/Interface, so a documented virtual property always fired
 UndefinedProperty. A real undefined property still gets flagged.
 ===config===
-suppress=UnusedParam,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @property-read string $label */

@@ -1,7 +1,12 @@
 ===description===
 cross file psr4 throws stdlib exception
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Config.php===

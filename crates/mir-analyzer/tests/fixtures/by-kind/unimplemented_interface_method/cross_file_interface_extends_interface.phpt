@@ -1,7 +1,11 @@
 ===description===
 cross file interface extends interface
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Readable.php===
 <?php
 interface Readable {

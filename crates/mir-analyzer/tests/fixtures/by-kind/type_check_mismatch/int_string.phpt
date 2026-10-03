@@ -1,7 +1,11 @@
 ===description===
 mir-check detects int vs string type mismatch
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $x = 5;

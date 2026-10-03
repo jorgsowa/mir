@@ -2,8 +2,12 @@
 PHP 7: non-numeric literal string vs a non-zero literal int is always false.
 PHP 7 converts the string to int(0); 0 != 3, so this is impossible in all versions.
 ===config===
-php_version=7.4
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file===
 <?php
 function test(): void {

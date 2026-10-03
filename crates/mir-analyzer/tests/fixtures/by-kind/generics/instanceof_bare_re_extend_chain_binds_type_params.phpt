@@ -8,7 +8,13 @@ that 0 always failed the arity match, so `$b instanceof SmallBox` on a
 `MediumBox<int>` receiver dropped the type args entirely instead of
 projecting `SmallBox<int>`.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

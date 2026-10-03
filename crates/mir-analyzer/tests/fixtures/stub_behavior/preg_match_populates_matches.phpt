@@ -1,7 +1,11 @@
 ===description===
 preg match populates matches
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function extract(string $s): string {

@@ -2,7 +2,9 @@
 A private property whose only reference is a compound concat assign
 ($this->log .= 'x') must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

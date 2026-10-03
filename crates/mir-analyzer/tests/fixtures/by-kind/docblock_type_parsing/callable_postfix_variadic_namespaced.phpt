@@ -3,7 +3,13 @@ Postfix variadic params in `callable`/`Closure` signatures keep their builtin
 type (`mixed...` is never `Ns\mixed`) inside a namespace, so narrower closures
 are accepted.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

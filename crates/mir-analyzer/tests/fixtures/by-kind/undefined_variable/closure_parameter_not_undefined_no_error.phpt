@@ -1,7 +1,11 @@
 ===description===
 closure parameter not undefined no error
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $fn = function(string $name): string {

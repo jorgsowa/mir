@@ -4,7 +4,12 @@ to class-string in the true branch; interface_exists($var) narrows to the more
 precise interface-string.  @mir-check assertions verify the narrowed type inside
 the guard, after a negative early-exit, and that the false branch is unchanged.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

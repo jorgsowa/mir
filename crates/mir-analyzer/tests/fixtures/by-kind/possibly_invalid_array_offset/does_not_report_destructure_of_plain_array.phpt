@@ -1,7 +1,12 @@
 ===description===
 does not report destructure of plain array
 ===config===
-suppress=ForbiddenCode,MixedAssignment
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @return array */

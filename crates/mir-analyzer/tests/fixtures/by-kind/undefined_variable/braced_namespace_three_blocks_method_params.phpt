@@ -1,7 +1,12 @@
 ===description===
 Same short class name in two braced namespaces: each method sees its own parameters.
 ===config===
-suppress=UnusedFunction,UnusedMethod
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+    <UnusedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace A {

@@ -2,7 +2,9 @@
 A private instance method used only through first-class-callable syntax
 (`$this->helper(...)`) must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

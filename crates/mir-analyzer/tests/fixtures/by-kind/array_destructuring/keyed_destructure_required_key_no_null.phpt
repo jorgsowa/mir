@@ -2,7 +2,11 @@
 Sibling of keyed_destructure_optional_key_includes_null: a required
 (non-optional) shape key stays exactly its declared type, no null.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

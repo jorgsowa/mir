@@ -1,7 +1,11 @@
 ===description===
 Catch with no return and finally does not return
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo() : bool {

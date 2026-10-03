@@ -2,7 +2,12 @@
 A value typed interface-string<T> satisfies a plain class-string parameter:
 every interface-string is a valid class-string at runtime.
 ===config===
-suppress=MissingReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

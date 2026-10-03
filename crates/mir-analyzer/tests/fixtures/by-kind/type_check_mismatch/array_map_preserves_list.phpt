@@ -1,7 +1,12 @@
 ===description===
 array_map() on a list returns a list; on a non-empty-list returns a non-empty-list.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<string> $strs */

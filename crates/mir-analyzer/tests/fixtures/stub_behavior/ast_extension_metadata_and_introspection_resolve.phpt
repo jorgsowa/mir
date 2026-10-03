@@ -3,7 +3,11 @@ FP-C6: `ast\Metadata` plus the remaining introspection functions
 (get_metadata/get_supported_versions/kind_uses_flags) must resolve too —
 covers every symbol in the ast/ast.php stub, not just the parse entry points.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

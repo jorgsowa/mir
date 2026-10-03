@@ -3,7 +3,12 @@ new ClassName() via use-import alias resolves the fully-qualified name — no
 UndefinedClass is emitted and the result type carries the FQN, enabling
 correct hover and go-to-definition behaviour.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:RequestGuard.php===
 <?php
 namespace Illuminate\Auth;

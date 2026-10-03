@@ -2,7 +2,12 @@
 FN: enum constants never checked the #[Deprecated] attribute fallback,
 unlike class constants — only the @deprecated docblock tag worked.
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit {

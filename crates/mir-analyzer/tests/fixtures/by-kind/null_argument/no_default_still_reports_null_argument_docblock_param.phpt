@@ -1,7 +1,11 @@
 ===description===
 Without a default, a docblock non-null param still rejects null.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string $f */

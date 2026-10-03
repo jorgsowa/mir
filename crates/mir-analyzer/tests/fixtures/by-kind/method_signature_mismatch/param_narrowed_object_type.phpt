@@ -2,7 +2,11 @@
 G4: a child illegally narrows an object param from Animal to Cat (contravariance
 violation) — must emit MethodSignatureMismatch.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

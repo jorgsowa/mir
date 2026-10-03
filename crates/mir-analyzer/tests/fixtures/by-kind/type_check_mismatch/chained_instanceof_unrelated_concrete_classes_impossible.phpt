@@ -4,7 +4,11 @@
 makes "also an A" impossible once already known to be a B — so the branch
 is flagged as unreachable rather than silently narrowing to just B.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

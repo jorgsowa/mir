@@ -4,7 +4,14 @@
 fell through to the catch-all untainted case, even though the method
 itself is annotated.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedReturnStatement,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Request {

@@ -5,7 +5,12 @@ strict subclass — `ScalarArgTarget` has no static-property variant
 (tracked as S19), so these previously matched neither Var nor Prop on a
 static receiver and narrowed nothing.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

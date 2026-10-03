@@ -2,7 +2,12 @@
 FP: conditional return (A is string ? X : Y) resolves to Y when a non-string is passed —
 inactive if-true branch template vars must not leak into the result
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

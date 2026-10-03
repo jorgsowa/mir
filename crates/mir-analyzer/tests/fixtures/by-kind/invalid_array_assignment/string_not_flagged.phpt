@@ -1,7 +1,11 @@
 ===description===
 InvalidArrayAssignment does NOT fire for string — PHP allows single-character string subscript writes.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = "hello";

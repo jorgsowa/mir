@@ -2,7 +2,9 @@
 A free function used only through first-class-callable syntax (`helper(...)`)
 must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function helper(): void {}

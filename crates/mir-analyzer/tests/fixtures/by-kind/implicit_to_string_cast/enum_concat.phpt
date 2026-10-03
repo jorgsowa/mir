@@ -2,7 +2,11 @@
 FN: enum-case atomics were invisible to every implicit-to-string check —
 only TNamedObject was matched.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit {

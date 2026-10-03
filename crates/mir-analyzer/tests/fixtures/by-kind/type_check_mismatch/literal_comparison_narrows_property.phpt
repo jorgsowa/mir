@@ -4,7 +4,14 @@ as they already do for plain variables — extract_prop_access was missing
 from these three arms even though the null/enum-case arms already support
 it.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -3,7 +3,13 @@
 either operand order, strict and loose `==`) narrows the static property
 like its var/instance-property counterparts already do.
 ===config===
-suppress=MissingConstructor,UnusedParam,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

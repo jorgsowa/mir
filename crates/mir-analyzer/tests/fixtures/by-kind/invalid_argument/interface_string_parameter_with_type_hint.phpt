@@ -1,7 +1,11 @@
 ===description===
 interface-string parameter accepts a matching interface reference (positive case)
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {

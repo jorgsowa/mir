@@ -4,7 +4,13 @@ is a real array (evaluating array_key_exists's second argument required
 it) — the outer key `a` must no longer be optional there either, mirroring
 the already-correct true-branch clearing.
 ===config===
-suppress=UnusedParam,UnusedVariable,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a?: array{x?: int}} $arr */

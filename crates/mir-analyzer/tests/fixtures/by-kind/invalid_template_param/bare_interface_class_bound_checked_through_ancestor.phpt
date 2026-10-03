@@ -7,7 +7,12 @@ single-parent `extends` chain for `ClassLike::Class`, returning `None`
 immediately for an interface receiver and silently skipping the bound
 check.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

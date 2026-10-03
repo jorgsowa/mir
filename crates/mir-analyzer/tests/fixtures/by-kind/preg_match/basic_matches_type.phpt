@@ -1,8 +1,14 @@
 ===description===
 preg_match without PREG_OFFSET_CAPTURE writes list<string> to $matches.
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

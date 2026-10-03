@@ -1,7 +1,12 @@
 ===description===
 Assignment as reference only prevents reference confusion after assignment
 ===config===
-suppress=MixedAssignment,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $arr = [1, 2, 3];

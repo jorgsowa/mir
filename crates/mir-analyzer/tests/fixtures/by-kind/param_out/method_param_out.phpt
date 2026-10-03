@@ -2,7 +2,11 @@
 @param-out on a class method: the out-type is written back to the caller's
 variable after the method call.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Parser {

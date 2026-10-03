@@ -5,7 +5,11 @@ enclosing *method's* own `@template` (not a class-level one, mirrors
 `T` to a `TTemplateParam` instead of an ordinary (and namespace-mis-
 qualified) class reference.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

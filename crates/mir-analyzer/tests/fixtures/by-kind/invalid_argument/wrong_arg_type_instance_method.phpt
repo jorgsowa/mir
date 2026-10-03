@@ -1,7 +1,11 @@
 ===description===
 wrong argument type via bare FQN instance method call is still caught
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Processor.php===
 <?php
 class Processor {

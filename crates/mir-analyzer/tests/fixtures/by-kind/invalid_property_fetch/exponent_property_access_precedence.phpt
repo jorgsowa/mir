@@ -2,7 +2,9 @@
 FP-G (regression): `10 ** $this->maxDigits` must parse as `10 ** ($this->maxDigits)`.
 Fixed in php-rs-parser 0.18.1 (MEMBER_ACCESS_BP raised above **).
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

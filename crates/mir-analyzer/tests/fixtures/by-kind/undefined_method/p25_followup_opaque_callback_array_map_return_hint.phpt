@@ -12,7 +12,12 @@ Fixed by adding `resolve_union_for_file_native` (mirrors the split already made 
 `collector::resolution` for the primary property/param/return path) and using it for
 the two closure/arrow-fn native-hint sites in `opaque_callback.rs`.
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -2,7 +2,12 @@
 Arrow-function analogue of closure_param_docblock_type_applied.phpt — a
 `@param` docblock preceding `fn(...) => ...` must type its parameter too.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

@@ -1,7 +1,11 @@
 ===description===
 Unused param
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(int $i) {}

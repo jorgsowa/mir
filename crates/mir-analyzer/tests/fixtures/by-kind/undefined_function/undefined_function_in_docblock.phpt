@@ -1,7 +1,11 @@
 ===description===
 Undefined function in docblock
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

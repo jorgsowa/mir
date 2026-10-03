@@ -7,7 +7,14 @@ and the ancestor's `@var T`/method's `T` resolves to the ancestor's
 whichever merge direction happened to run last silently clobber the
 other.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

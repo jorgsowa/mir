@@ -4,6 +4,7 @@ than discarding RHS's `diverges` — a contradiction found while analyzing RHS
 alone (the "$x set" path) must not make the whole condition look
 unreachable, since the "$x unset" path is still live.
 ===config===
+<mir/>
 ===file===
 <?php
 interface Marker {}

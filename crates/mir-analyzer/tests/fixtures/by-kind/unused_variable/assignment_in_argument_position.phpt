@@ -3,7 +3,13 @@ An assignment expression in argument position (function, method, static and
 constructor calls) has its value consumed by the call — not UnusedVariable
 even without a later read. A plain unused assignment still reports.
 ===config===
-suppress=MissingParamType,MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Mock {

@@ -1,8 +1,15 @@
 ===description===
 dirname(__FILE__, N), dirname(__DIR__) and parenthesized concatenation resolve to the right directory
 ===config===
-file_extensions=module,inc
-include_seed=deep/er/a.module
+<mir>
+  <projectFiles>
+    <file name="deep/er/a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:deep/er/a.module===
 <?php
 require dirname(__FILE__, 2) . '/up2.inc';

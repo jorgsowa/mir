@@ -5,7 +5,12 @@ instance of ClassName — the same relationship is_subclass_of() proves, and
 narrowed the same way (true branch narrows, false branch stays unchanged).
 Covers both plain-variable and property receivers.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

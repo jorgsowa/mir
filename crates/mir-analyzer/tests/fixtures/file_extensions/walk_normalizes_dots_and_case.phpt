@@ -1,8 +1,13 @@
 ===description===
 Entries with a leading dot or mixed case match files case-insensitively, including uppercase file extensions
 ===config===
-file_extensions=.PHP, Module
-file_extensions=.INC
+<mir>
+  <fileExtensions>
+    <extension name=".PHP"/>
+    <extension name=" Module"/>
+    <extension name=".INC"/>
+  </fileExtensions>
+</mir>
 ===file:a.MODULE===
 <?php
 function a_hook(): int { return 'x'; }

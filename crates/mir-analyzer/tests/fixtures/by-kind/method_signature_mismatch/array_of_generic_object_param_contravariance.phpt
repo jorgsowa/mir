@@ -4,7 +4,12 @@ compatibility of the array's value type — is_subtype had no (TArray,TArray)/
 (TList,TList) arms at all, so this fell to a pure structural check that
 always rejected the pair, even a legal contravariant widening.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

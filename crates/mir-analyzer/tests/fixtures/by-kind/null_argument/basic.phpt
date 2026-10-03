@@ -1,7 +1,11 @@
 ===description===
 Basic
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takes_string(string $s): void { var_dump($s); }

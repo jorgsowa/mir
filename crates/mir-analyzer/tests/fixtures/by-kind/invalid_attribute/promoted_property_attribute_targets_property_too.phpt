@@ -5,7 +5,11 @@ against real PHP semantics. An attribute restricted to TARGET_PROPERTY alone
 (no TARGET_PARAMETER) must still be accepted on a promoted param, since it
 also declares a property. Covers class and trait constructors.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

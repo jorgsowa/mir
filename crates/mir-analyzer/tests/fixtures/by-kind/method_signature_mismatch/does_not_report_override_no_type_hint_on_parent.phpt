@@ -1,7 +1,11 @@
 ===description===
 does not report override no type hint on parent
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

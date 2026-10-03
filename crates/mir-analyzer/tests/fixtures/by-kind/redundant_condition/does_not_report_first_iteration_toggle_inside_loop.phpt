@@ -7,7 +7,11 @@ every later pass (and every iteration after the first at runtime) sees
 `bool`. Diagnostics from an unstabilized pass must not leak into the final
 result just because that pass happened to see an overly-narrow type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<string> $items */

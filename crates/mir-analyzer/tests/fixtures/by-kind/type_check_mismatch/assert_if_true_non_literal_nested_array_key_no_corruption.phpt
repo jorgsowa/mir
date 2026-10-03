@@ -5,7 +5,13 @@ partially split the path and corrupt the whole `$config` parameter's type
 — same no-corruption guarantee the single-key case already has, extended
 to a multi-segment path.
 ===config===
-suppress=MissingReturnType,MixedArgument,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

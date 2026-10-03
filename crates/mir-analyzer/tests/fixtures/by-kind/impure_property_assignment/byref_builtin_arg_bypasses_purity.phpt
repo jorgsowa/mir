@@ -5,7 +5,13 @@ would, but every by-ref write-back site only ever matched
 `ExprKind::Variable` -- a property argument was silently skipped, never
 even checked for purity.
 ===config===
-suppress=MissingPropertyType,ImpureFunctionCall,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <ImpureFunctionCall errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

@@ -6,7 +6,14 @@ receiver, but none for a STATIC-PROPERTY hop — `self::$param->get('id')`
 through to `None`, so the chain walk died at the static-property hop and the
 whole expression was untainted.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedArrayAccess,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Param {

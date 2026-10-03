@@ -4,7 +4,11 @@ lack the key entirely, not just narrow the arm that has it — otherwise a
 later access still sees the no-key arm and gets flagged as non-existent.
 Mirrors the existing `isset($arr['a'])` closed-shape-arm exclusion.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

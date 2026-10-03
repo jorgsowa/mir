@@ -5,7 +5,12 @@ docblock" idiom (a class-level template with no way to natively express
 the template param) must still attach the docblock template type — the
 fix generalizes the old special case rather than replacing it.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

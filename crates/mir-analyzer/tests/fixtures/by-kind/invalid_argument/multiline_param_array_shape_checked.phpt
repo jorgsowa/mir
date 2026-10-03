@@ -2,7 +2,11 @@
 A @param array shape wrapped across multiple lines is still parsed and checked,
 not silently dropped to an unchecked parameter.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

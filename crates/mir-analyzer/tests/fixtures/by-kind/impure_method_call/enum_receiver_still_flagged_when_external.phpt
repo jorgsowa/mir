@@ -1,7 +1,11 @@
 ===description===
 Mutable object method calls remain impure in immutable contexts.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class MutableCode {

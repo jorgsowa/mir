@@ -1,7 +1,11 @@
 ===description===
 use const import not reported
 ===config===
-suppress=UndefinedConstant
+<mir>
+  <issueHandlers>
+    <UndefinedConstant errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 use const Vendor\Missing\SOME_CONST;

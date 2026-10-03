@@ -4,7 +4,11 @@ still escaped @psalm-immutable checks -- root_receiver_var's chain-walk
 only recursed through PropertyAccess/NullsafePropertyAccess, so an
 ArrayAccess node in the middle made it bail out to None.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cache {

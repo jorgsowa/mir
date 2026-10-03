@@ -1,8 +1,16 @@
 ===description===
 A composer autoload root and an include seed together: the seed's include closure is analyzed alongside
 ===config===
-file_extensions=php,module,inc
-include_seed=legacy/a.module
+<mir>
+  <projectFiles>
+    <file name="legacy/a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="php"/>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Main.php===

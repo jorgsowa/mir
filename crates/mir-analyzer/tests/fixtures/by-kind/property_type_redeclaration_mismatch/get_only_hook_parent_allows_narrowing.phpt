@@ -2,7 +2,9 @@
 A get-only hook parent property exposes no write contract, so a child may narrow its type
 (plain, readonly or hooked), including via a bound template parent.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 abstract class Id {

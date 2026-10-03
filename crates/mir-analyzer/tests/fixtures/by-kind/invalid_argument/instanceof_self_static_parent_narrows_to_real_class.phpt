@@ -7,7 +7,13 @@ Previously the narrowed type became e.g. `TNamedObject{fqcn:"self"}`, a
 nonexistent class; member/argument checks against an unresolvable class are
 treated permissively, so real bugs on the narrowed value went undetected.
 ===config===
-suppress=UnusedVariable,MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Marker {}

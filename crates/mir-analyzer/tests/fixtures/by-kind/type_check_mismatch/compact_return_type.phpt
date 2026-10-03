@@ -5,7 +5,13 @@ undefined variable's key is marked optional (compact() silently omits an
 undefined name rather than including it as null). Falls back to the stub
 for a non-literal/spread name.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyUndefinedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyUndefinedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

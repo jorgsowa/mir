@@ -4,7 +4,11 @@ does (`2 ** 63` is `float`, not `int`) — it must type as `int|float` for
 two int-like operands, not pure `int`, so an overflow-guard `(int)` cast
 isn't flagged redundant.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function backoff(int $retries): int {

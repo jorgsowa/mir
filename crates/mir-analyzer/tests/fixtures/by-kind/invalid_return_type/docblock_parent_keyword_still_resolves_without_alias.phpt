@@ -3,7 +3,11 @@ Negative control for the L11 fix: without a colliding `@psalm-type Parent`
 alias in scope, `@return parent` must keep resolving to the real parent
 class — the alias lookup must not change genuine keyword behavior.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

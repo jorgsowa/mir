@@ -1,7 +1,11 @@
 ===description===
 Closure from callable invokable named class wrong args
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace NS;

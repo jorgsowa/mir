@@ -1,7 +1,11 @@
 ===description===
 class-string<T> over an in-scope template is not resolved as a literal class
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -4,7 +4,15 @@ type) and no constructor is not "uninitialized" in PHP (untyped props default to
 null). The missing-constructor check now only counts native-typed properties, so
 mir no longer emits MissingConstructor (e.g. base Grammar::$connection).
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedProperty
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedProperty errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Connection {}

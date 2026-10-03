@@ -4,7 +4,11 @@ plain array is guaranteed excluded, so `Box|array` still narrows to `Box` in
 the else branch and a real bug there is caught (previously silently skipped
 as unreachable).
 ===config===
-suppress=UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {}

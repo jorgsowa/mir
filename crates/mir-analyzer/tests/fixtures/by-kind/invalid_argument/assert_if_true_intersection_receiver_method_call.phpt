@@ -5,7 +5,11 @@ only handled a single concrete class/self/static/parent atom, falling
 through to None for a TIntersection even though ordinary method-call
 resolution (call/method.rs) already dispatches through it fine.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Bar {}

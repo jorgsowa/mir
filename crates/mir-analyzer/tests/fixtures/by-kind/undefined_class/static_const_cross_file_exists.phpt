@@ -1,7 +1,11 @@
 ===description===
 Foo::CONST cross file exists — no UndefinedClass when class is defined in another file
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Config.php===
 <?php
 namespace App;

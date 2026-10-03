@@ -1,7 +1,12 @@
 ===description===
 implode() with a non-empty array of non-empty strings returns non-empty-string.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-list<non-empty-string> $parts */

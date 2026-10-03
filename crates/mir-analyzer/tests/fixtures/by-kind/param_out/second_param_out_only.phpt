@@ -2,7 +2,12 @@
 Only the second parameter has @param-out; the first param is positional and not
 a byref — verifies correct param-index alignment in write-back.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

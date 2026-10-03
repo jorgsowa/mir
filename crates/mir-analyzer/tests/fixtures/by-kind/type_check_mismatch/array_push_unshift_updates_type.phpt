@@ -1,7 +1,12 @@
 ===description===
 array_push and array_unshift update the by-ref array to a non-empty type with the pushed element types merged in.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

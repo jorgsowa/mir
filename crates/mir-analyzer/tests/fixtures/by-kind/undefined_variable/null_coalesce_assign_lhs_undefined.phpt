@@ -2,7 +2,11 @@
 null coalesce assign (??=) should not emit UndefinedVariable for the target
 $x ??= 'default' is valid PHP even if $x is undefined
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): string {

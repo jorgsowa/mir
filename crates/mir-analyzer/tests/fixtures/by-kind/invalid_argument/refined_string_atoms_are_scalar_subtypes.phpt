@@ -4,7 +4,12 @@ class-string, ...) were not recognized as subtypes of `scalar` — only the
 int family and TLiteralString had a `TScalar` arm in atomic_subtype. Every
 one of these is still just a `string`, hence a `scalar`, at runtime.
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

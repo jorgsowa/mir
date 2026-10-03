@@ -2,8 +2,12 @@
 Conservative: numeric literal strings ("123", "3.14") can loosely equal integers/floats.
 PHP 8 compares them numerically when the string is numeric — no warning.
 ===config===
-php_version=8.0
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 function test(): void {

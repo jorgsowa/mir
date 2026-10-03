@@ -3,7 +3,16 @@ Invariant template args compare by mutual subtyping, so equivalent spellings
 (`int<0, max>`, `non-negative-int`, literal-absorbed unions) are accepted while
 a genuinely different arg is still rejected.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingParamType,MixedAssignment,MissingConstructor,UnnecessaryVarAnnotation
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnnecessaryVarAnnotation errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

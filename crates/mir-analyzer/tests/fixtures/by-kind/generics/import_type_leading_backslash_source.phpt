@@ -2,7 +2,12 @@
 `@psalm-import-type ... from \Fqcn` resolves the source as a global name for
 class, interface, trait and enum sources, not relative to the importer's namespace.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:lib.php===
 <?php
 namespace Lib\Sub;

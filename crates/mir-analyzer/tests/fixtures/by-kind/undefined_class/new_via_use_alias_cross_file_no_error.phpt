@@ -1,7 +1,12 @@
 ===description===
 new via use alias cross file no error
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Entity.php===
 <?php
 namespace App\Model;

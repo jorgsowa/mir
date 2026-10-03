@@ -4,7 +4,13 @@ user-defined function declaring a `&$param` -- the write-back loop for
 user-defined functions is a separate code path from the built-in one and
 had the identical Variable-only blind spot.
 ===config===
-suppress=MissingPropertyType,ImpureFunctionCall,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <ImpureFunctionCall errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

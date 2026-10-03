@@ -1,7 +1,11 @@
 ===description===
 No fatal for unknown assert class
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

@@ -2,8 +2,12 @@
 FALSE POSITIVE reproducer. @inheritdoc should inherit the parent's @return type so
 a correct implementation does not emit InvalidReturnType.
 ===config===
-suppress=UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class User {}

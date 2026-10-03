@@ -6,7 +6,13 @@ pinned down here — see the description in
 associative_array_and_arraylike_object.phpt for why composite expansions are
 risky to hand-encode.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_void($x) {

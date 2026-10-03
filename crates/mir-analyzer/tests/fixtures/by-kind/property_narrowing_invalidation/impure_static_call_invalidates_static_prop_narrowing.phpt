@@ -5,7 +5,12 @@ forwarding call to a non-static, unproven instance method must invalidate
 `$this`'s own narrowing the same way an explicit `$this->reset()` would. A
 `@pure` static call must not invalidate anything.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

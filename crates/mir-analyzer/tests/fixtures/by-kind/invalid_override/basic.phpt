@@ -1,7 +1,9 @@
 ===description===
 InvalidOverride fires when #[Override] is used but no parent method exists.
 ===config===
-php_version=8.3
+<mir>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file===
 <?php
 class Base {}

@@ -4,7 +4,14 @@ non-empty-string when the needle is a property already narrowed to a
 single non-empty string literal, same as a plain variable needle already
 does — needle_non_empty resolution only tried extract_var_name.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

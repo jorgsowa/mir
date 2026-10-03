@@ -5,7 +5,14 @@ reserved). The underlying php-rs-parser over-broadly rejected `numeric` (and
 `resource`); mir now drops that spurious reserved-class ParseError so the
 declaration analyzes normally.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedClass
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedClass errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Numeric {

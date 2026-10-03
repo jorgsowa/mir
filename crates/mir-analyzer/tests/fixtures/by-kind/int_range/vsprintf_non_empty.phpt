@@ -3,7 +3,12 @@ vsprintf() gets the same non-empty-string narrowing as sprintf() when the
 format string guarantees it — the return-type check only ever consults the
 format-string argument, which vsprintf shares with sprintf.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_literal_prefix(int $n): void {

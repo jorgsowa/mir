@@ -1,7 +1,9 @@
 ===description===
 Subclasses of `Argument` belong in a `list<Argument>` (covariant element assignment).
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 abstract class Argument {}

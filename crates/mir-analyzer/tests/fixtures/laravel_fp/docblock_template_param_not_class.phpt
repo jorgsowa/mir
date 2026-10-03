@@ -4,7 +4,18 @@ referencing the class's own @template params must treat TKey/TValue as template
 params, not resolve them to namespaced classes (Illuminate\Support\TKey). mir no
 longer emits InvalidTemplateParam (Collection::flip).
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedProperty,MixedArgument,MixedAssignment,MixedReturnStatement,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedProperty errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Support;

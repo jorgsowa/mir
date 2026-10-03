@@ -4,7 +4,9 @@ prior guard-based refinement. Without the fix, the stale `string` refinement
 (from the null-check guard) survives the `$this->data = mixed_fn()` assignment
 and incorrectly silences a subsequent NullableReturnStatement.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

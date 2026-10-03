@@ -1,7 +1,12 @@
 ===description===
 Falsy check on int narrows to 0; falsy check on float narrows to 0 (literal float 0.0 displays as "0").
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int $x */

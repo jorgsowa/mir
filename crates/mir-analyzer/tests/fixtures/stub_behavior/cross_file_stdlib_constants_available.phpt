@@ -1,7 +1,12 @@
 ===description===
 cross file stdlib constants available
 ===config===
-suppress=MixedReturnStatement,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Limits.php===
 <?php
 function getMaxId(): int {

@@ -3,7 +3,13 @@ FN: taint through a `match` expression arm was never tracked — `is_expr_tainte
 had no arm for `ExprKind::Match`, so a tainted value returned from a match arm
 reaching a SQL sink went unreported.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(mysqli $db, int $mode): void {

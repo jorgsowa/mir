@@ -4,7 +4,11 @@ definitely initialized on every path reaching the merge point — a further
 write after the merge is a certain re-init and must be flagged, unlike the
 single-branch case.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

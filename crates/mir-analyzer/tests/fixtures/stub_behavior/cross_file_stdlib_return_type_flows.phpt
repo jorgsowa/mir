@@ -1,7 +1,11 @@
 ===description===
 cross file stdlib return type flows
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Clock.php===
 <?php
 function now(): \DateTimeImmutable {

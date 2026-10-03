@@ -3,7 +3,13 @@ method_exists()/property_exists() false branch also excludes non-object/
 non-string atoms — PHP throws TypeError for those regardless of which
 boolean the call returns, so reaching the false branch proves it too.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyInvalidArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyInvalidArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo { public function bar(): void {} }

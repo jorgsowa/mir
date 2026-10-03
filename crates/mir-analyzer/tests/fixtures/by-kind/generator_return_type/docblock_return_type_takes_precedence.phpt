@@ -3,7 +3,11 @@ An explicit `@return Generator<...>` docblock always wins over the inferred
 type from the body's yields — inference only fills in when nothing is
 declared.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @return Generator<string, int> */

@@ -5,7 +5,13 @@ property like the already-correct instance-property and variable cases —
 narrow_prop_from_type_fn's dispatch never checked
 extract_static_prop_access.
 ===config===
-suppress=MissingConstructor,MissingPropertyType,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

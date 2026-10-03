@@ -1,7 +1,11 @@
 ===description===
 DeprecatedMethod fires when calling a deprecated instance method.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Logger {

@@ -1,7 +1,13 @@
 ===description===
 Callable arity mismatch
 ===config===
-suppress=MissingParamType,MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // Function with wrong arity

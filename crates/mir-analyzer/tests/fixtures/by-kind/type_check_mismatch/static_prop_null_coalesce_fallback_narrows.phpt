@@ -3,7 +3,12 @@
 narrows the static property to non-null, mirroring the existing
 plain-variable and instance-property counterparts.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

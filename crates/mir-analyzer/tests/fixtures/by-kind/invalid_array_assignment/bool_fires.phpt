@@ -1,7 +1,12 @@
 ===description===
 InvalidArrayAssignment fires for bool-typed variables.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(bool $a): void {

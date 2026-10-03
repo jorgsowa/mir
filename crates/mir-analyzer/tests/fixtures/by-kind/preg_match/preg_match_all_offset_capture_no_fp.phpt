@@ -2,8 +2,14 @@
 FP-D(a): preg_match_all with PREG_OFFSET_CAPTURE. Accessing $matches[0][0][1] (the
 byte offset) must not emit NonExistentArrayOffset.
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

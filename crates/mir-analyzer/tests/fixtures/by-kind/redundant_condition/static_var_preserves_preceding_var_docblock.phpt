@@ -5,7 +5,11 @@ the static var's type was computed purely from the literal initializer (`null` -
 wrongly reported as always false. The post-narrow `@var` reapplication that already
 ran for plain `$x = expr;` assignments now also runs for `static` declarations.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

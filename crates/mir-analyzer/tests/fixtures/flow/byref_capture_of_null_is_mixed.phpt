@@ -1,7 +1,13 @@
 ===description===
 A by-ref capture of a variable holding only `null` is `mixed` inside the closure, since sibling closures fill it in.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function sibling(): void {

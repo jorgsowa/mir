@@ -6,7 +6,12 @@ their own `is_list` flag) instead of always treating them as non-list.
 any non-contiguous int) correctly clears it, so a later `array_is_list()`
 check is proven false rather than wrongly still-possibly-true.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function plainListLiteralStaysList(): void {

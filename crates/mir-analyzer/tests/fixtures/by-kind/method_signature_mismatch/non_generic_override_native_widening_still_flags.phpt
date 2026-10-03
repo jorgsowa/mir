@@ -4,7 +4,11 @@ non-generic override that widens its native return type beyond the direct
 ancestor's own native hint must still be flagged — the fix is scoped to
 comparisons that only fail because of class-level template substitution.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

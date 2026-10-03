@@ -1,7 +1,13 @@
 ===description===
 mixed is open — no ImpossibleIdenticalComparison should fire.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(mixed $x): void {

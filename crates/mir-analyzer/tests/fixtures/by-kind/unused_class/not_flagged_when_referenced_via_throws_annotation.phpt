@@ -2,7 +2,9 @@
 A final exception class named only in a function's `@throws` docblock tag
 must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class MyException extends \RuntimeException {}

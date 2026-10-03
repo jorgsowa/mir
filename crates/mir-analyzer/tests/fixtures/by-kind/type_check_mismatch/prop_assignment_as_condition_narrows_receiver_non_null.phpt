@@ -5,7 +5,13 @@ assignment at all — regardless of which branch is taken — already
 proves it: PHP fatals assigning a property on a null receiver, unlike a
 plain read.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

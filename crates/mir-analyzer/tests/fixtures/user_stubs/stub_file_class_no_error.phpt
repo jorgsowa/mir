@@ -1,7 +1,11 @@
 ===description===
 stub file class no error
 ===config===
-stub_file=stubs/framework.php
+<mir>
+  <stubs>
+    <file name="stubs/framework.php"/>
+  </stubs>
+</mir>
 ===file:stubs/framework.php===
 <?php
 class FrameworkClient {

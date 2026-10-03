@@ -1,7 +1,13 @@
 ===description===
 Casts on literal values fold to the result literal: (string)42 = "42", (int)"5" = 5, (bool)0 = false
 ===config===
-suppress=UnusedVariable,UnusedParam,RedundantCast
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <RedundantCast errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

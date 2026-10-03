@@ -4,7 +4,13 @@ Scalar pseudo-type aliases (`integer`, `double`, `boolean`, `array-key`,
 variable, so `@mir-check` right after it reads back exactly what the
 docblock type parser produced.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_integer_alias($x) {

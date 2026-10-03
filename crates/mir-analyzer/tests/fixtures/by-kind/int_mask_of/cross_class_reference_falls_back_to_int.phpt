@@ -3,7 +3,11 @@ int-mask-of<Other::FLAG_*> referencing a *different* class's constants is
 not resolved (would need cross-file lookup unavailable during docblock
 parsing) and falls back to plain `int` — no false positives.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Other {

@@ -2,7 +2,11 @@
 @param-out type is preserved when a static method is captured as a
 first-class callable. $out should be int (from @param-out int), not mixed.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

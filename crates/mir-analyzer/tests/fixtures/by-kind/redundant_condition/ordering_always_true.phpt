@@ -2,7 +2,12 @@
 Ordering comparison that is always true for a bounded int range fires RedundantCondition.
 `$a < 10` where `$a: int<min, 5>` is always true — the false branch is unreachable.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<min, 5> $a */

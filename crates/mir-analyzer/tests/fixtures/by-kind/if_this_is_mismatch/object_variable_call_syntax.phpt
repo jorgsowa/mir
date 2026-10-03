@@ -2,7 +2,11 @@
 `@if-this-is` must be checked on `$var::staticMethod()` through an
 object-typed variable too, not just self::/static::/parent::/$this->.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

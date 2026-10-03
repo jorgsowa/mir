@@ -7,7 +7,11 @@ byte-exact, so both subtype relations were missed and spurious
 InvalidArgument issues were emitted. The WrongCaseClass style diagnostic on
 the `implements` clause is still reported.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface IFoo {}

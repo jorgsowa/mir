@@ -3,7 +3,12 @@ A closure with more required parameters than the typed callable param expects
 must emit InvalidArgument. The caller will pass only the declared number of
 arguments, so a callable demanding more is incompatible.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(string):void $c */

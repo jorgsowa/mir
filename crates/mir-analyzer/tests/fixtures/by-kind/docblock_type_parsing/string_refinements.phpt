@@ -4,7 +4,13 @@ case/falsiness precisely, so several of these are approximations (documented
 in parser/docblock/types.rs) — the checks below assert the actual
 approximation, not an idealized one.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_non_empty_string($x) {

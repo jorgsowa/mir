@@ -4,7 +4,12 @@ diff/intersect family (key-only comparison; user-callback comparison of both
 key and value) — proves the shared return-type helper's dispatch wiring
 reaches these variants too, not just array_diff/array_intersect themselves.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

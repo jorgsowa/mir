@@ -3,7 +3,12 @@ An open shape's KNOWN properties still must satisfy array<K,V>'s value type
 even though the shape may carry extra unknown keys — the is_open flag only
 excuses the unknown keys, not the ones already declared.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> $arr */

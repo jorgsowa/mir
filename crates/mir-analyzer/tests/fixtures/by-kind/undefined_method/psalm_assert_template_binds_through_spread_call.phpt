@@ -5,7 +5,11 @@ inferred from a sibling `class-string<T>` positional argument silently
 defaulted instead of binding to the concrete class, so the
 `@psalm-assert-if-true T $value` narrowing that should apply never did.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

@@ -1,7 +1,11 @@
 ===description===
 stub file function type checked
 ===config===
-stub_file=stubs/helpers.php
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 function my_helper(string $s): string { return $s; }

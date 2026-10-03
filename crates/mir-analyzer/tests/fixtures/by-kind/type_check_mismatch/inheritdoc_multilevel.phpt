@@ -3,8 +3,13 @@ FALSE POSITIVE reproducer. @inheritdoc resolution should walk the full ancestor
 chain, so a grandchild with @inheritdoc picks up the grandparent's @return type
 when the intermediate class also has @inheritdoc (and no explicit return type).
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class Product {}

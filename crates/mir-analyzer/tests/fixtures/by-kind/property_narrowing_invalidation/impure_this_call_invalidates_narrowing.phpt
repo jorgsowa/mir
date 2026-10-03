@@ -4,7 +4,11 @@ narrowed across a call to another method of the same class that isn't proven
 pure/mutation-free — the callee's `$this` is the same object and may
 reassign the property (e.g. reset it back to null).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Session {

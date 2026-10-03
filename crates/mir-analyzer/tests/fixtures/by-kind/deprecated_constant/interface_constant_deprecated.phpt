@@ -1,7 +1,12 @@
 ===description===
 DeprecatedConstant fires when accessing a deprecated constant on an interface.
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Flags {

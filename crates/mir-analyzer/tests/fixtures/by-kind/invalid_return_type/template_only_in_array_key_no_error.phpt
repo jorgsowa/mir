@@ -4,7 +4,12 @@ its key — a template appearing only as the array key (`array<TKey, string>`)
 was invisible to the leniency check that suppresses InvalidReturnType for an
 unresolved template.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

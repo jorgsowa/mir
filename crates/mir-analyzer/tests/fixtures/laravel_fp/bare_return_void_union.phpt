@@ -4,7 +4,15 @@ Regression (laravel/framework): declared `@return HtmlString|void` with a bare
 the single-atomic `is_void()`), so void-in-a-union no longer emits
 InvalidReturnType.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class HtmlString {}

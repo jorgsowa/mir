@@ -4,7 +4,12 @@ same static-property receiver; the guard has no effect once outside the
 branch, or for property_exists() (methods/properties are independent
 namespaces).
 ===config===
-suppress=MissingReturnType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {}

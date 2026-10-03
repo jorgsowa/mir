@@ -2,7 +2,11 @@
 Test nested intersection types where TKeyedArray appears at multiple levels.
 This covers complex intersection patterns with nested array structures.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

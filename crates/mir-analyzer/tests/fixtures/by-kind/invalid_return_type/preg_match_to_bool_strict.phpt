@@ -1,7 +1,11 @@
 ===description===
 In strict PHP (strict_types=1), returning int|false where bool is declared IS an error.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

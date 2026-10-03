@@ -4,7 +4,11 @@ narrow $x to A|string — a MIX of instanceof and is_TYPE() disjuncts that
 neither the pure-instanceof-OR nor the pure-type-fn-OR narrowing handles
 alone, since each requires every disjunct to be its own single kind.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

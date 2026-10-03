@@ -5,7 +5,12 @@ parameter should not produce InvalidArgument.
 ===php_version===
 8.0
 ===config===
-suppress=MissingClosureReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace Foo\Bar;

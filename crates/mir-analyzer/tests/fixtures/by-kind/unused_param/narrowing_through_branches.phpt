@@ -5,7 +5,11 @@ $value can only be bool there — previously masked because each elseif
 re-derived its context from the primary if's condition alone, discarding
 the prior elseif's own narrowing.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function testBranches(int|string|bool $value) {

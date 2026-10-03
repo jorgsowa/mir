@@ -1,7 +1,12 @@
 ===description===
 cross-file unannotated generic return resolves to int type parameter
 ===config===
-suppress=MissingPropertyType,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:box.php===
 <?php
 /**

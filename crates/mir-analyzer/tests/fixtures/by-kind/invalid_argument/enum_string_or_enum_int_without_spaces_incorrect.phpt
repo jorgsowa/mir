@@ -6,7 +6,11 @@ unbalanced quote is now reported as an unterminated string literal (see the
 discards the bogus type entirely rather than InvalidArgument checking
 `foo(4)` against a nonsensical pseudo-type parsed out of it.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace Ns;

@@ -4,7 +4,11 @@
 left the type unchanged instead of excluding the intersection-satisfying
 atom and narrowing to `C`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A {}

@@ -1,7 +1,11 @@
 ===description===
 InvalidPropertyFetch does NOT fire after a null guard narrows the type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

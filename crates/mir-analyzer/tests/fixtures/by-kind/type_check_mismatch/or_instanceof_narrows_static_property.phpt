@@ -4,7 +4,13 @@ static property like its instance-property/plain-variable counterparts
 already do, including a mixed instanceof/is_TYPE() disjunct and the
 switch(true)/match(true) fallthrough shape.
 ===config===
-suppress=MissingConstructor,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A {}

@@ -2,7 +2,11 @@
 The constructor of a @psalm-immutable class is allowed to assign to $this->prop —
 initialization is not a mutation.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

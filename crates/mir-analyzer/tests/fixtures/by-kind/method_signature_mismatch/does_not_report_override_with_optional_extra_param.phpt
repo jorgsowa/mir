@@ -1,7 +1,11 @@
 ===description===
 does not report override with optional extra param
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

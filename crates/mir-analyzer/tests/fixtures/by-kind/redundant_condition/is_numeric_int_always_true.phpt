@@ -1,7 +1,12 @@
 ===description===
 is_numeric($n) on int is always true - fires RedundantCondition
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $n): void {

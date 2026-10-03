@@ -5,7 +5,14 @@ template letter (`T`) as its `@extends`-fixed ancestor resolves
 fixed via `@extends Box<int>`), not the subclass's own T — the ancestor
 declares `current()`, not the subclass.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

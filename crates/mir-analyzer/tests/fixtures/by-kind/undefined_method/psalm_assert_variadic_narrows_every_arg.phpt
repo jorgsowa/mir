@@ -3,7 +3,11 @@ A `@psalm-assert-if-true` on a variadic param narrows every trailing
 positional arg it swallows, not just the first — arg_for_param_index only
 ever resolved a single positional arg for the assertion.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

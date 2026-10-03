@@ -1,7 +1,12 @@
 ===description===
 Sibling of nested_array_shape_value_no_error: a genuinely wrong inner shape value still errors.
 ===config===
-suppress=MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

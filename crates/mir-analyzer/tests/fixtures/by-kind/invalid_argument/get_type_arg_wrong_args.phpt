@@ -1,7 +1,11 @@
 ===description===
 Get type arg wrong args
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function testInt(int $var): void {

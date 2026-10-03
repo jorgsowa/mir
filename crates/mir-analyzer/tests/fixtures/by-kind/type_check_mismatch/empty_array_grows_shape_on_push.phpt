@@ -4,7 +4,12 @@ loop) grows the closed `array{}` shape by one property instead of collapsing
 straight to `list<int>` — the same shape-preserving precision an array
 literal `[1]` itself would type as.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $arr */

@@ -5,7 +5,12 @@ bottom type, which satisfies any expected argument type at the call site.
 An overrider that DOES return a real value is unaffected (own inferred
 type wins there).
 ===config===
-suppress=UnusedParam,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

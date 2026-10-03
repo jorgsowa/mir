@@ -1,7 +1,11 @@
 ===description===
 No ReadonlyPropertyAssignment when assigning to another instance of the same class (same declaring scope)
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

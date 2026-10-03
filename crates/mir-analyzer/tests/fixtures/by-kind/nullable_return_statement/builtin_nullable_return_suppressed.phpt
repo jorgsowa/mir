@@ -4,7 +4,9 @@ emit NullableReturnStatement when the caller returns the result as string —
 the null branch only fires on programming error (invalid regex), which is
 not modeled at compile time.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

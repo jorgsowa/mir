@@ -4,7 +4,12 @@ an instance method's first-class-callable closure that DOES satisfy the
 method's own `@template T of Base` bound (a `Sub extends Base` argument)
 must not be flagged — only an actual bound violation should be.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

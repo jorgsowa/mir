@@ -2,7 +2,11 @@
 !isset short-circuit with || operator — property chain on narrowed variable
 Variable used with property access in RHS should be narrowed as defined from !isset() LHS
 ===config===
-suppress=MixedPropertyFetch
+<mir>
+  <issueHandlers>
+    <MixedPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 if (!isset($obj) || $obj->prop->method()) {

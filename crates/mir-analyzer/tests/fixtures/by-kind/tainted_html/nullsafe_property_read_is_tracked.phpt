@@ -3,7 +3,14 @@
 `PropertyAccess` variant was matched, so a tainted property read through
 `?->` fell to the catch-all `_ => false`.
 ===config===
-suppress=MixedAssignment,MissingConstructor,MissingPropertyType,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

@@ -2,7 +2,9 @@
 An initialization overwritten by a foreach that is known to execute is not an
 unused variable when the foreach result is read afterwards.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Item {

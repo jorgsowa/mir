@@ -5,7 +5,12 @@ so a haystack with none of those proves a match wasn't null. When the
 haystack DOES contain a falsy literal, null can't be ruled out and no
 narrowing happens.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

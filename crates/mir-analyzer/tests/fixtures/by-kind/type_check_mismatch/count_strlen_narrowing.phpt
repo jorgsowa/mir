@@ -1,7 +1,12 @@
 ===description===
 count() > 0 and strlen() > 0 narrow arrays/strings to non-empty variants.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

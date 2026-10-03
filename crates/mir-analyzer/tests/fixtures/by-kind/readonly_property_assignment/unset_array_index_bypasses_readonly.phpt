@@ -4,7 +4,11 @@ readonly property (not an ArrayAccess object) still mutates the property's
 own contents in place — the offset-write exemption only applies when the
 property actually holds an ArrayAccess-implementing object.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

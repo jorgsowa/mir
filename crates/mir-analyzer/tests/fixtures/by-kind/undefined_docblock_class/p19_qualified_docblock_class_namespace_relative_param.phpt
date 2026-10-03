@@ -7,7 +7,11 @@ the collector-resolved stored type directly (a native-hinted param takes a
 different, already-correct db-level re-resolution path and wouldn't exercise
 this bug).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Warning.php===
 <?php
 namespace App\Warning;

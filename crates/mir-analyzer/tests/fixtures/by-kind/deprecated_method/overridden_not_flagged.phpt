@@ -1,7 +1,11 @@
 ===description===
 DeprecatedMethod does NOT fire when a child class overrides the parent's deprecated method without carrying @deprecated — the override itself is not deprecated.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

@@ -7,7 +7,11 @@ as "covered"), merging a bogus `Closure(): X` binding into the same slot as
 the correct `X` binding from the return-type structural match, so `T`
 resolved to `Closure(): X|X` and failed its own bound check.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

@@ -4,7 +4,12 @@ int<a,b>) must be accepted where float is expected. Previously only TInt and
 TLiteralInt were coerced in the per-pair subtype path, causing false
 InvalidArgument/InvalidReturnType for the narrower int variants.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -2,7 +2,9 @@
 A class named only in a `class_parents('Foo')` string-literal call
 must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Base {}

@@ -4,7 +4,11 @@ A `@param` referencing the enclosing class's own bare name as a generic type
 (self-reference) while still converting the inner `S` to a template param,
 not a literal undefined class `S`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

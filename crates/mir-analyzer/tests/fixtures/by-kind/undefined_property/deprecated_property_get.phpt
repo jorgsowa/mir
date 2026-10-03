@@ -1,7 +1,11 @@
 ===description===
 Deprecated property get
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A{

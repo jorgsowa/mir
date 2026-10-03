@@ -5,7 +5,13 @@ property_receiver_retypes_property.phpt's fix -- that fix only matched
 extract_prop_access (plain `->`), not extract_any_prop_access, so the
 nullsafe receiver form fell through unretyped.
 ===config===
-suppress=UnusedParam,MissingConstructor,PossiblyNullMethodCall
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <PossiblyNullMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Factory {}

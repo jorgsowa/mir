@@ -2,7 +2,12 @@
 An override with only a native return hint inherits the parent's docblock refinement
 (`class-string<T>`, `positive-int`); the wider native hint is not a mismatch.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Item {}

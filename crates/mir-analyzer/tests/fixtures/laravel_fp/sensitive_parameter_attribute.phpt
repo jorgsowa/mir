@@ -6,7 +6,14 @@ against the file namespace (→ App\Encryption\SensitiveParameter), yielding
 UndefinedAttributeClass; attribute-name resolution now honors the FullyQualified
 name kind.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Encryption;

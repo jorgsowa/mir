@@ -3,7 +3,11 @@
 lack the key entirely, not just narrow the arm that has it — otherwise a
 later access still sees the no-key arm and gets flagged as non-existent.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

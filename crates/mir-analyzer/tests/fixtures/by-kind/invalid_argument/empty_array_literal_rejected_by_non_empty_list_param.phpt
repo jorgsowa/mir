@@ -4,7 +4,12 @@ An empty array literal `[]` (a closed, zero-property shape) is not a valid
 `array_list_compatible`'s `.all()` over an empty shape's properties being
 vacuously true and silently accepting it.
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-list<int> $values */

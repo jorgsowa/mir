@@ -1,7 +1,12 @@
 ===description===
 Native type intersection as class property using unknown interfaces
 ===config===
-suppress=InvalidPropertyAssignment,UnusedProperty
+<mir>
+  <issueHandlers>
+    <InvalidPropertyAssignment errorLevel="suppress"/>
+    <UnusedProperty errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class C {

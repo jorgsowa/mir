@@ -1,7 +1,11 @@
 ===description===
 Each function declaration uses its own braced namespace, not the file's first namespace.
 ===config===
-suppress=UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace First {

@@ -3,7 +3,12 @@
 non-null 'a' never runs its right-hand side — the result must stay exactly
 the existing value, not a union with the never-assigned right-hand side.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

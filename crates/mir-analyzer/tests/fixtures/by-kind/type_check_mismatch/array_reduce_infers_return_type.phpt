@@ -1,7 +1,11 @@
 ===description===
 array_reduce infers the result type from the callback's return type, not bare mixed.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $ints */

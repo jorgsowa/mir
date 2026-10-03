@@ -3,7 +3,12 @@ Growing a shape with a new key and overwriting an already-known key compose
 correctly: overwriting 'a' twice must not add a duplicate property, and a
 later new key ('b') still grows the shape rather than generalizing it.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> $counts */

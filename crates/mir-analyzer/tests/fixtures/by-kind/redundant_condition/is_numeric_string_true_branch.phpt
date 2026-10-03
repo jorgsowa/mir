@@ -1,7 +1,12 @@
 ===description===
 is_numeric($s) on a string type should not mark true branch unreachable
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(string $s): void {

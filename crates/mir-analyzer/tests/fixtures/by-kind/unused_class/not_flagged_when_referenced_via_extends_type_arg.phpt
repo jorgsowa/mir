@@ -3,7 +3,9 @@ A class named only inside an `@extends`/`@implements` generic
 type-argument list, or a `@template T of Bound`, must not be reported
 UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class OnlyUsedInExtendsTypeArg {}

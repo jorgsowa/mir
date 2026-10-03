@@ -2,7 +2,11 @@
 Test TKeyedArray against TIntersection of two TKeyedArray shapes.
 A shape satisfies an intersection of shapes iff it satisfies each individual shape.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

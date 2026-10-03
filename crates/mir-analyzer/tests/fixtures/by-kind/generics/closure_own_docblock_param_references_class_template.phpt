@@ -5,7 +5,13 @@ resolved it through the template-unaware `resolve_named_objects_in_union`, so a
 bare `T` matching the enclosing class's `@template` became an ordinary (and
 namespace-mis-qualified) class reference instead of a `TTemplateParam`.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

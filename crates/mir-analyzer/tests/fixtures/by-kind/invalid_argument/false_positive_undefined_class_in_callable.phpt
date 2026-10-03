@@ -1,7 +1,12 @@
 ===description===
 False positive undefined class in callable
 ===config===
-suppress=MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // This demonstrates the FALSE POSITIVE issue:

@@ -4,8 +4,12 @@ reported as undefined on a PHP 7.4 session. Regression guard for the pull-path
 version-filtering bug where collect_file_definitions always used the db default
 (8.2) instead of the configured target version.
 ===config===
-php_version=7.4
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file:App.php===
 <?php
 function check(string $s): bool {

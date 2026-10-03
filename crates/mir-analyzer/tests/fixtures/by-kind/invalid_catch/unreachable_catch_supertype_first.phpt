@@ -4,7 +4,12 @@ caught by an EARLIER clause on the same try can never run — the earlier
 clause always wins. The try/catch validation only ever checked each catch
 type against Throwable, never against previously-listed catch types.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function doSomething(): void {}

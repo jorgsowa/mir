@@ -5,7 +5,12 @@ through a subclass (`IntBox::make(42)`) lost inference because the
 class-template lookup used the LSB-resolved call class (IntBox, no own
 template) instead of walking up to Box, where the template is declared.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

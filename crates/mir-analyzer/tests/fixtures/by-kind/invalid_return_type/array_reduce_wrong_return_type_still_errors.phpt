@@ -1,7 +1,11 @@
 ===description===
 Sibling of array_reduce_infers_return_type: a genuinely wrong declared return type still errors.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

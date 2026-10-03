@@ -4,7 +4,12 @@ alias name as a literal nonexistent class. This fired UndefinedDocblockClass
 on the class docblock AND a bogus InvalidTemplateParam on a call that
 actually satisfies the (correctly expanded) bound.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

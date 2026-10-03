@@ -3,8 +3,12 @@ Assignment nested inside an array subscript within a `&&` condition should be pr
 to definitely-assigned in the true-branch. Pattern: `$arr[$n = count($arr) - 1]`.
 `promote_assignment_effects` previously didn't recurse into `ArrayAccess` nodes.
 ===config===
-php_version=8.1
-suppress=RedundantCast
+<mir>
+  <issueHandlers>
+    <RedundantCast errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

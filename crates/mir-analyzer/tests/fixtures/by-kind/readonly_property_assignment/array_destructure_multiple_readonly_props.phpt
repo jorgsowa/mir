@@ -4,7 +4,11 @@ statement, but the array-destructure arm passed the same outer statement
 span to every element — the second violation collided with the first's
 (kind, file, line, col_start) dedup key and was silently discarded.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Point {

@@ -1,7 +1,12 @@
 ===description===
 Possibly null function call
 ===config===
-suppress=MixedReturnStatement,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

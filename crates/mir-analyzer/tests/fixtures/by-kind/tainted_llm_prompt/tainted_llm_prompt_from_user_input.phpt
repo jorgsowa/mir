@@ -1,7 +1,12 @@
 ===description===
 Tainted llm prompt from user input
 ===config===
-suppress=MixedArrayAccess,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class LlmAgent {

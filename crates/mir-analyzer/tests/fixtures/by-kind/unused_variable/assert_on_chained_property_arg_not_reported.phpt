@@ -1,7 +1,12 @@
 ===description===
 A `@phpstan-assert`/`@psalm-assert` call whose argument is a property chain (`$this->dto->id`) must not report the synthetic `this->dto` narrowing key as an unused variable.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class TestCase {

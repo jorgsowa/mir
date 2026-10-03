@@ -2,7 +2,11 @@
 Negative counterpart: no member declares the method nor `__call`, so
 UndefinedMethod still fires, including inside a union with an intersection.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A { public function a(): int; }

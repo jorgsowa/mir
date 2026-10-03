@@ -7,7 +7,13 @@ the class that carries the `@implements Iterator<TKey,TValue>`/
 receiver's own-only template params to build the substitution map, which
 is empty for a bare subclass, so the item type leaked through unresolved.
 ===config===
-suppress=MissingConstructor,MixedArrayOffset,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArrayOffset errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

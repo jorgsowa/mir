@@ -3,7 +3,11 @@
 params, and throws already are — an override that redeclares no docblock of
 its own still retypes the receiver.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

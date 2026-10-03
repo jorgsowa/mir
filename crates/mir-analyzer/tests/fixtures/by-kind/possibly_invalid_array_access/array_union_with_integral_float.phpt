@@ -3,7 +3,11 @@ is_invalid_for_access omitted TIntegralFloat (floor()/ceil()'s return type),
 unlike the definite-invalid check right above it, so an array|TIntegralFloat
 union silently skipped PossiblyInvalidArrayAccess.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(array $arr, float $n, bool $cond): void {

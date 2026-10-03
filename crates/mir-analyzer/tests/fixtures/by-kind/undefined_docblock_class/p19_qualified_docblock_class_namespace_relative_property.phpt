@@ -6,7 +6,12 @@ instead. `@var Warning\Warning` inside `namespace App;` must become
 `App\Warning\Warning`, not stay the literal (nonexistent) `Warning\Warning` and
 get flagged UndefinedDocblockClass.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Warning.php===
 <?php
 namespace App\Warning;

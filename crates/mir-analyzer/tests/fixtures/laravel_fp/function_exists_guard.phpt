@@ -4,7 +4,15 @@ Regression (laravel/framework): a call guarded by `if (! function_exists('lzf_co
 function_exists() guard (combined with negation + divergence of the throw branch),
 so it no longer emits UndefinedFunction for the guarded call.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function compress(string $data): string {

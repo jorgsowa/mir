@@ -1,7 +1,11 @@
 ===description===
 subclass of a generic base with concrete type params should satisfy template bound with free type vars
 ===config===
-suppress=InvalidCast
+<mir>
+  <issueHandlers>
+    <InvalidCast errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

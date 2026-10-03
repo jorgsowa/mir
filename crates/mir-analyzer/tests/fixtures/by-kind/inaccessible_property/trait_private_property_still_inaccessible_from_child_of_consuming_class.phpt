@@ -5,7 +5,11 @@ that class had declared it itself — so a further subclass (which doesn't
 itself `use` the trait) must still be denied access, exactly like a
 private property declared directly on the parent.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -2,7 +2,12 @@
 `class-string<T>` nested in an array/list param binds T from the element and
 does not report the argument as invalid.
 ===config===
-suppress=UnusedParam,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

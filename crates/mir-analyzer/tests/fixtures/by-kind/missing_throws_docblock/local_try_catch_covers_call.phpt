@@ -6,7 +6,11 @@ never escapes this function. A catch that doesn't cover the thrown type
 and coverage accumulates through nested try/catch (an outer catch still
 counts even if a nested inner catch doesn't cover it).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @throws \Exception */

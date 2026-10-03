@@ -1,7 +1,12 @@
 ===description===
 $arr['k'] .= 'x' analyzes the array-offset target instead of being treated as an opaque string.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run(): void {

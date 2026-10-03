@@ -5,7 +5,12 @@ type. The closure gets its own StatementsAnalyzer, so its yields must be
 read from its own `yielded_types`, not silently dropped in favor of only
 `return_types`.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $gen = function () {

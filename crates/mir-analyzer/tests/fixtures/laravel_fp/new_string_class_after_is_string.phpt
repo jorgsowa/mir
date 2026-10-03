@@ -7,7 +7,16 @@ was parsed as `(new $this)->job()` instead of `new ($this->job)()`. Fixed in
 php-rs-parser 0.18.0 via `parse_new_variable_tail`, which correctly handles
 member-access class references.
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,MixedReturnStatement,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class PendingChain {

@@ -1,7 +1,12 @@
 ===description===
 a function declared inside a closure body is local, not a file-scope declaration
 ===config===
-suppress=MissingClosureReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $fn = function () {

@@ -1,7 +1,11 @@
 ===description===
 InvalidArrayAccess does NOT fire when the object's class implements ArrayAccess
 ===config===
-suppress=MixedArrayOffset
+<mir>
+  <issueHandlers>
+    <MixedArrayOffset errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box implements \ArrayAccess

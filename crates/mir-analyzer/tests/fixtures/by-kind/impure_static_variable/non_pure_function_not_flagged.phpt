@@ -1,7 +1,11 @@
 ===description===
 ImpureStaticVariable does NOT fire inside a function that is NOT marked @pure.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function impure(): int {

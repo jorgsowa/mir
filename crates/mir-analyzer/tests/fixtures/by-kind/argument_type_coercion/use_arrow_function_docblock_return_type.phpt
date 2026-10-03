@@ -4,7 +4,11 @@ Arrow-function analogue of use_closure_docblock_type.phpt — a `@return` docblo
 immediately preceding `fn(...) => ...` must override the inferred return type,
 just like it does for `function(...) {...}`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

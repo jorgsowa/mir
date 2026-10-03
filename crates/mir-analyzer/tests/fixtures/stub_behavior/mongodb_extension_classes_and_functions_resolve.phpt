@@ -3,7 +3,13 @@ FP-I1: the `mongodb` PECL extension (MongoDB\Driver\Manager, BSON types,
 exceptions) had no vendored stubs/ dir despite PhpStormStubsMap.php already
 listing every entry — same missing-stub root cause as the fixed C6 (ast).
 ===config===
-suppress=UnusedParam,UnusedVariable,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

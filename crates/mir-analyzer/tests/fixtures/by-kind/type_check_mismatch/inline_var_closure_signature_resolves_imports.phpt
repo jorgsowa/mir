@@ -1,7 +1,11 @@
 ===description===
 Names in Closure(...)/callable(...) signatures of an inline @var resolve through use imports
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:lib.php===
 <?php
 namespace Lib;

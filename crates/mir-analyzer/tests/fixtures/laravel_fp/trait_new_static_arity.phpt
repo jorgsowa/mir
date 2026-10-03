@@ -4,7 +4,17 @@ Regression (laravel/framework): `new static($items)` inside a trait
 the trait's (which has none). mir no longer validates constructor args for
 `new static`/`new self`/`new parent` inside a trait, so no TooManyArguments.
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedArgument,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait MakesItems {

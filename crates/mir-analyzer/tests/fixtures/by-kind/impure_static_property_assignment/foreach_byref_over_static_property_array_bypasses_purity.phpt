@@ -5,7 +5,12 @@ in place, exactly as much as a by-ref call argument
 statement never routed the iterable expression through the same purity
 check at all.
 ===config===
-suppress=UnusedForeachValue,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

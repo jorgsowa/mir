@@ -1,7 +1,12 @@
 ===description===
 A union of parenthesized types (`(T is Dog ? int : string)|(null)`) is split as a union instead of being read as one conditional.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

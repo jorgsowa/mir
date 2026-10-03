@@ -2,7 +2,12 @@
 G1: a generic class Box<T> with a get() method returns T as the concrete type when the
 class was constructed with a known argument, so @mir-check can verify the result type.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -5,7 +5,11 @@ starts directly with `$name`, so `parse_param_line`'s whitespace-before-`$name` 
 never matches; the docblock's variable name was falling into the fallback full-body
 type validation and getting flagged as a variable in type position.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

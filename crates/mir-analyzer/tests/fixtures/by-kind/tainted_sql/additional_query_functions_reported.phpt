@@ -1,7 +1,14 @@
 ===description===
 Prepare/exec variants across database extensions are SQL sinks.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MissingParamType,UndefinedFunction
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <UndefinedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(mysqli $db, $odbc): void {

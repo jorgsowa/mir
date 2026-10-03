@@ -8,7 +8,13 @@ likewise not flagged — the loop might run zero times, so the merge with the
 "this loop might run more than once", a known limitation). Writes to
 different receiver instances of the same class must not cross-contaminate.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

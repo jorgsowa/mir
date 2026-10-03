@@ -2,7 +2,13 @@
 method_exists()/property_exists() true branch narrows a `bool|int|float|string`
 argument to `string`, not `object` — a scalar can never be an object instance.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param scalar $x */

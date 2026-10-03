@@ -2,7 +2,12 @@
 Several sequential `[]` pushes in straight-line code keep growing the same
 list shape, one property per push, staying list-shaped throughout.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $arr */

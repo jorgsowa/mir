@@ -3,7 +3,12 @@
 static-property array, mirroring the literal-array and instance-property
 haystack cases already supported.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Container {

@@ -2,7 +2,12 @@
 Comparison on `positive-int` intersects with its implicit `int<1,max>` bound.
 `$n < 5` on `positive-int` narrows to `int<1,4>`, not `int<min,4>`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

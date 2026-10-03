@@ -1,7 +1,11 @@
 ===description===
 Undefined callable function
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(callable $c): void {}

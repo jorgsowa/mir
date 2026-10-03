@@ -6,7 +6,12 @@ is caught. Both partial-arity `@var` docblocks are now also flagged
 directly (InvalidDocblock) regardless of whether the supplied positions
 happen to match.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

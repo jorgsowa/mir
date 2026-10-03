@@ -1,7 +1,11 @@
 ===description===
 Static methods of a @psalm-immutable class have no $this — no ImmutablePropertyModification.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

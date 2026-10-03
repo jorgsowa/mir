@@ -11,7 +11,11 @@ whether the variable is later written or only read, so it stays scoped to
 @pure's stricter no-external-dependency contract (see
 `impure_global_immutable.phpt`), not extended here.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

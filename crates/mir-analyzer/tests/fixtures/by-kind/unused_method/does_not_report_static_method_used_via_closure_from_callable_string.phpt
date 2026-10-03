@@ -1,7 +1,9 @@
 ===description===
 a private static method used only as a "Class::method" string argument to Closure::fromCallable must not be reported unused
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Filters {

@@ -2,7 +2,12 @@
 `$this->prop instanceof A || $this->prop instanceof B` must narrow the
 property like its plain-variable counterpart already does.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A {}

@@ -2,7 +2,11 @@
 int-mask-of<self::*> resolves against an interface's own literal-int
 constants when referenced from a method declared on that same interface.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface HasFlags {

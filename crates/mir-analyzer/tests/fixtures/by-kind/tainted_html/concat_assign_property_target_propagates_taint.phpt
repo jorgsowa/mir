@@ -3,7 +3,14 @@
 non-variable branch of AssignOp::Concat, which analyzed/reassigned the
 target's type but never propagated taint either.
 ===config===
-suppress=MixedAssignment,MissingConstructor,MixedArrayAccess,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Logger {

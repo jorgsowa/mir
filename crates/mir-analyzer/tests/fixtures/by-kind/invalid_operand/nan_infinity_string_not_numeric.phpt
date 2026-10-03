@@ -2,7 +2,11 @@
 "NAN"/"INF"/"Infinity" literal strings are rejected by PHP's is_numeric(),
 unlike Rust's f64 parser — arithmetic on them must still flag InvalidOperand.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = "NAN" + 1;

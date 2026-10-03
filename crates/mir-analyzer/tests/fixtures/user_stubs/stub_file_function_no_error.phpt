@@ -1,8 +1,14 @@
 ===description===
 stub file function no error
 ===config===
-stub_file=stubs/helpers.php
-suppress=UnusedVariable
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 function my_helper(string $s): string { return $s; }

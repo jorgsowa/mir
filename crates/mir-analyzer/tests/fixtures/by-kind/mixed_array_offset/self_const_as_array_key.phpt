@@ -2,7 +2,11 @@
 Bitmask class constants used as array keys should not emit MixedArrayOffset.
 self::INT_CONST / static::INT_CONST return their literal type, not mixed.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cache {

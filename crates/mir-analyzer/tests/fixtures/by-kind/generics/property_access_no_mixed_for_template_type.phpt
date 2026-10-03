@@ -2,7 +2,13 @@
 G1: property access on template-typed variables must not emit MixedPropertyFetch —
 template params (both unconstrained and bounded) are intentionally parameterised, not mixed.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

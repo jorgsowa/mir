@@ -5,7 +5,11 @@ never resolving `static`/`self` to the receiver's concrete class the way a
 direct `Child::create()` call already does via substitute_static_in_return
 — so invoking the resulting closure returned the wrong (declaring) class.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

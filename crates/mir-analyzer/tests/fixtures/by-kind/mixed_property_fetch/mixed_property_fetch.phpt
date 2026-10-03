@@ -1,7 +1,11 @@
 ===description===
 Mixed property fetch
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

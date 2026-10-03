@@ -3,7 +3,16 @@ A closure's bare native `array` return is refined by its body's array type, so a
 template-bearing constructor infers the precise arg. Non-array and
 non-subtype bodies keep the declared type.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingParamType,MixedAssignment,MissingConstructor,UnnecessaryVarAnnotation
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnnecessaryVarAnnotation errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

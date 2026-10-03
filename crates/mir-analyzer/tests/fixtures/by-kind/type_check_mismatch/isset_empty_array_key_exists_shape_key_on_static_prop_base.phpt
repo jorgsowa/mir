@@ -3,7 +3,14 @@ isset()/!empty()/array_key_exists() shape-key narrowing on a nested array
 access now also works when the array base is a static-property receiver
 (`self::$data['key']`), not just a plain variable or instance property.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

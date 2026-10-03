@@ -1,7 +1,11 @@
 ===description===
 reports variadic param
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takesInts(int ...$ns): void { var_dump($ns); }

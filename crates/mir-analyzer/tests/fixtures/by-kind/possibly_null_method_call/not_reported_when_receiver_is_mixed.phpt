@@ -3,7 +3,13 @@ A `mixed | null` receiver yields only MixedMethodCall, never PossiblyNullMethodC
 The union arises from a `@template TValue` accessor declared `@return TValue|null`
 used unbound (TValue → mixed), mirroring Laravel's `Fluent::__get`.
 ===config===
-suppress=UnusedParam,MissingPropertyType,MixedPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

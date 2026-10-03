@@ -3,7 +3,12 @@ FP: conditional return type (A is string ? X : A is list ? Y : Z) should resolve
 when the call-site argument is string — leaking unbound template vars I/K/V from the
 inactive branches must not trigger InvalidTemplateParam.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

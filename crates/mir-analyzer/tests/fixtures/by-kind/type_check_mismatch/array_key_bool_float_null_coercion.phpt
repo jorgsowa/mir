@@ -4,7 +4,12 @@ float -> truncated int, null -> "". Both a keyed write (`$arr[key] = …`)
 and an array literal (`[key => …]`) must apply the same casting instead of
 keeping the raw bool/float/null value as the key type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function writeBoolKey(): void {

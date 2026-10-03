@@ -4,7 +4,11 @@ provably empty array is identical to appending onto one (both just place
 the pushed values in order, 0-indexed), so it must not leave the variable
 stale at `array{}`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): int {

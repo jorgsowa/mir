@@ -5,7 +5,11 @@ an explicit `use Generator;` import and there's no local class of that name — 
 `use`-alias lookup in `resolve_type_name` still runs before namespace-qualification
 either way, so this path was never the buggy one.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

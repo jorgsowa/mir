@@ -1,7 +1,9 @@
 ===description===
 cross file since 8 0 class not defined on php 7 4
 ===config===
-php_version=7.4
+<mir>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file:Cache.php===
 <?php
 function make_weak_cache(): void {

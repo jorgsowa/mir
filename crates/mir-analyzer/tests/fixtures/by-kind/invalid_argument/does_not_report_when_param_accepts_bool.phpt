@@ -1,7 +1,11 @@
 ===description===
 does not report when param accepts bool
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takesBool(bool $b): void { var_dump($b); }

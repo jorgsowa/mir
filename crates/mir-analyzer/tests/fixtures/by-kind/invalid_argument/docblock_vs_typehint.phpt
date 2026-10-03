@@ -2,7 +2,12 @@
 When @param int conflicts with bool PHP hint, the PHP hint wins. Passing a bool is OK;
 passing an int fires InvalidArgument (not ArgumentTypeCoercion) because the param is bool.
 ===config===
-suppress=UnusedParam,MismatchingDocblockParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MismatchingDocblockParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

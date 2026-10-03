@@ -5,7 +5,13 @@ bool(false) and the literal to bool(N), so whether null survives depends
 on whether N == 0, unlike the already-fixed N-independent `>`/`<=`
 directions. Covers both var and property receivers.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function greaterOrEqualZeroAdmitsNull(?int $x): void {

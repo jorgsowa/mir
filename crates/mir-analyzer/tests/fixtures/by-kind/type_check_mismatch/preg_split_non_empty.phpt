@@ -2,7 +2,12 @@
 preg_split with default flags (0) always returns at least one element and the false
 case only fires on an invalid regex, so the result is non-empty-list<string>.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

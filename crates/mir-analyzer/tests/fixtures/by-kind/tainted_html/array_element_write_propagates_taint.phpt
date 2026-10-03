@@ -4,7 +4,13 @@ propagation at all -- the assign-target match had no ArrayAccess arm,
 unlike the Variable/PropertyAccess/Array(destructuring) arms right
 above it.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

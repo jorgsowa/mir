@@ -5,7 +5,13 @@ otherwise a `T|TDefault`-shaped method param binds the whole argument to
 the method's own template directly, skipping the class-template
 exemption and producing a false `InvalidTemplateParam`.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

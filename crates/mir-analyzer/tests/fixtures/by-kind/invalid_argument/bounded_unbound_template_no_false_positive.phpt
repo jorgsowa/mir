@@ -1,7 +1,11 @@
 ===description===
 bounded unbound template parameter does not fabricate receiver type parameter
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Repo.php===
 <?php
 class Base {}

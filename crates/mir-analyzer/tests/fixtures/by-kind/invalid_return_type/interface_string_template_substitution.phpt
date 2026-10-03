@@ -1,7 +1,11 @@
 ===description===
 interface-string<T> in return type is substituted with the inferred interface
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

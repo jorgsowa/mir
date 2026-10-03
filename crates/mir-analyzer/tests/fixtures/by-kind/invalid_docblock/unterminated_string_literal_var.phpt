@@ -6,8 +6,12 @@ starts_with and ends_with for the string-literal parse arm, so slicing it as
 `s[1..s.len()-1]` panicked (a naive length check would still index out of
 bounds even where it no longer parses as a literal).
 ===config===
-suppress=UnusedProperty
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedProperty errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

@@ -4,7 +4,12 @@ produces a `Closure` — the method can't be statically resolved, but the
 first-class-callable expression's result type must still be `Closure`,
 not a generic `callable`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

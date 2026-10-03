@@ -5,7 +5,12 @@ lint fires (and nothing else — no UndefinedMethod/visibility false positives),
 while the reference index still records the site under the owner (covered by
 indexed_queries.rs; this pins the diagnostic surface).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

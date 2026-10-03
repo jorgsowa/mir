@@ -1,7 +1,11 @@
 ===description===
 Backslash-qualified parameter keywords are invalid; unqualified keywords are valid.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

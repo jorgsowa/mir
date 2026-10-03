@@ -1,7 +1,11 @@
 ===description===
 Multiple instance of conditions not met in one arm
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

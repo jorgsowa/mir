@@ -3,7 +3,11 @@ Abstract trait method with different param type. The implementing method's nativ
 parameter type (B) is incompatible with the trait's abstract requirement (A), an LSP
 violation PHP rejects — mirrors the return-type sibling fixture. (G4)
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

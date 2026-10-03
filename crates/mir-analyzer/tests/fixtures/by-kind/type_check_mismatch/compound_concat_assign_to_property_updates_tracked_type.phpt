@@ -1,7 +1,11 @@
 ===description===
 $this->prop .= 'x' updates the property's flow-tracked type instead of leaving it stale.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

@@ -2,7 +2,11 @@
 A typed catch-all remainder (`...array<K, V>`) only excuses UNKNOWN extra keys — a
 key the shape actually declares must still satisfy its own declared value type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a: int, ...array<string, int>} $x */

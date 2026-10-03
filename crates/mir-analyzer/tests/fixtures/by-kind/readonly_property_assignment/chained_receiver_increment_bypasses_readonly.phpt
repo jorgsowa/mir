@@ -4,7 +4,11 @@ much as `$this->box->n = ...` does, but `check_property_readonly_write` only
 resolved a bare-variable receiver (`ctx.get_var`), silently skipping any
 receiver that's itself a property access.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

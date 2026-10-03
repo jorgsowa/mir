@@ -5,7 +5,13 @@ keys, and nesting. `object{...}` has no dedicated shape atom and is
 approximated as plain `object` (property shape is lost — see
 parser/docblock/types.rs).
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_array_shape_basic($x) {

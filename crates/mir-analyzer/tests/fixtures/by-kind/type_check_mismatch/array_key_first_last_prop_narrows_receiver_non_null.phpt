@@ -5,7 +5,14 @@ array_key_last(null) throw a TypeError, so reaching either comparison
 result proves the receiver was non-null. narrow_prop_array_key_first_or_last_null
 never called narrow_receiver_non_null_on_prop_match at all.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch,PossiblyNullArgument,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

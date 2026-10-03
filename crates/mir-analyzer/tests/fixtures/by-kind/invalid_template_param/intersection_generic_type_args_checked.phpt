@@ -5,7 +5,12 @@ argument — the `(TNamedObject, TIntersection)` subtype arm previously
 dropped each intersection part's own type args, checking only the bare
 class name.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Countable {}

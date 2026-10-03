@@ -1,7 +1,9 @@
 ===description===
 A class named only inside an interface's own `@extends` generic type-argument list must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Arg {

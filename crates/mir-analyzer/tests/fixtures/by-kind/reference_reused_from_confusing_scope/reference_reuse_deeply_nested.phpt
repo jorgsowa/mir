@@ -1,7 +1,11 @@
 ===description===
 Reference reuse deeply nested
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var list<list<list<int>>> */

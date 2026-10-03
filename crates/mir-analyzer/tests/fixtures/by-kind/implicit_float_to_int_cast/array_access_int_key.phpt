@@ -2,7 +2,12 @@
 Using int value as array offset - should not emit ImplicitFloatToIntCast
 
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $arr = [];

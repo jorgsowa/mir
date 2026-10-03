@@ -4,7 +4,12 @@ narrows the property receiver the same way a plain-variable needle already
 does, for both the true branch (intersect with the haystack) and the false
 branch (remove matched literals from a finite literal-union property type).
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Request {

@@ -2,8 +2,13 @@
 PHP 8: non-numeric literal string vs int<1, 100> is always false.
 No integer in the range [1, 100] can loosely equal a non-numeric string in PHP 8+.
 ===config===
-php_version=8.0
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 /** @param int<1, 100> $n */

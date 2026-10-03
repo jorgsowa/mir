@@ -1,7 +1,12 @@
 ===description===
 Arithmetic on two integer literals produces a literal result: 5 + 3 = 8, 10 - 4 = 6, 3 * 7 = 21
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

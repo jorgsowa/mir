@@ -1,7 +1,9 @@
 ===description===
 Predicate-method guards narrow properties before return.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 final class Box

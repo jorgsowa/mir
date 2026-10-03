@@ -6,7 +6,14 @@ own `T` to `Collection` via `@implements Collection<T>`, given `Collection`'s
 `is_subtype`'s cross-hierarchy variance path directly (not through function
 argument checking).
 ===config===
-suppress=ForbiddenCode,UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant T */

@@ -1,7 +1,11 @@
 ===description===
 Template bound referencing a same-namespace class is FQN-qualified and no longer produces a spurious bound violation
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib/Container.php===
 <?php
 namespace Lib;

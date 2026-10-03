@@ -3,7 +3,13 @@ Integer, negative-integer, float, negative-float, and single-/double-quoted
 string literal types — including that the two quote styles produce the same
 literal-string atom.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_int_literal($x) {

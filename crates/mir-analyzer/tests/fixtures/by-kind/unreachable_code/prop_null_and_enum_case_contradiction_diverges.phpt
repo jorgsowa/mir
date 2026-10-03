@@ -5,7 +5,11 @@ as their plain-variable counterparts — `narrow_prop_null` and
 `narrow_prop_to_literal_enum_case` never called `apply_prop_narrowed`, so a
 contradiction silently stored an empty refined type instead of diverging.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

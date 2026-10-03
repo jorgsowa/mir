@@ -4,7 +4,11 @@ the static-property readonly check too — same root cause as the purity
 gap: `resolve_static_prop_target` only matched a literal class-name
 `Identifier`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Registry {

@@ -1,7 +1,11 @@
 ===description===
 InaccessibleClassConstant does NOT fire when a private constant is accessed within the declaring class itself.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

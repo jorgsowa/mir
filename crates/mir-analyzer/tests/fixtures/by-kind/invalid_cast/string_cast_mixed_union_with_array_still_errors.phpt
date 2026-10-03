@@ -4,7 +4,12 @@ union includes array, even alongside scalar-safe atoms — PHP's "Array to
 string conversion" warning fires on the array branch regardless of what
 else the union contains.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function option(string $key): string|array|bool|null {

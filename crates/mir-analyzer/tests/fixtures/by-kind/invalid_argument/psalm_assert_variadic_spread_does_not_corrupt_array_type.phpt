@@ -6,7 +6,11 @@ overwriting the array variable's own tracked type with the assertion's
 per-element type. `count($list)` on the (correctly still-array) `$list`
 must not be flagged.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

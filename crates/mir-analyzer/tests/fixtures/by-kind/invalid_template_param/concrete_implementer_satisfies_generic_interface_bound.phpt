@@ -7,7 +7,11 @@ its `@implements Collection<int>` binding, because it treated an empty
 check" instead of "no OWN bindings, but an ancestor binding may still
 apply".
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

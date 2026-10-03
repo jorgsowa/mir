@@ -3,7 +3,9 @@ Multi-level inheritance: grandparent has @property magic, grandchild declares a
 real property with the same name. The intermediate ancestor has no own property.
 No OverriddenPropertyAccess should be emitted.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

@@ -4,7 +4,15 @@ Factory) is valid late static binding — it constructs the concrete subclass at
 runtime, not the abstract class. mir no longer emits AbstractInstantiation for
 `new static` (only for `new self` / `new AbstractName`).
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class Model {

@@ -2,7 +2,12 @@
 Truthy check on an int range that includes 0 tightens the lower bound:
 `int<0,10>` → `int<1,10>` (truthy) / `0` (falsy); `non-negative-int` → `positive-int` (truthy).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<0, 10> $x */

@@ -6,7 +6,12 @@ narrower `Dog` — the callback must accept ANY `Animal` since `apply()` may
 invoke it with a plain (non-Dog) Animal, so this is a real contravariance
 violation, not something the class-template-corruption fix should suppress.
 ===config===
-suppress=MissingPropertyType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

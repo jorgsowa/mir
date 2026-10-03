@@ -1,7 +1,9 @@
 ===description===
 Property is non-null after the `=== null` branch assigns it.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 class Cache {

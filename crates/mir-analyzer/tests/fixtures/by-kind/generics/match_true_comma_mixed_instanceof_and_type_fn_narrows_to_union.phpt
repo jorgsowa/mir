@@ -4,7 +4,12 @@ with a scalar type-check function (`$x instanceof A, is_string($x)`) are OR
 semantics — the arm must narrow $x to A|string, the same as an all-instanceof
 or all-type-fn comma list already does.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

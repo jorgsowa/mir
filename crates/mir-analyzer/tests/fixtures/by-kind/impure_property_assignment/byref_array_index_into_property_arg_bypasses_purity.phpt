@@ -5,7 +5,15 @@ contents just as much as a direct property argument (`sort($b->items)`,
 already fixed) does, but `check_byref_arg_purity` only special-cased a
 direct `PropertyAccess` argument, not an `ArrayAccess` whose base is one.
 ===config===
-suppress=MissingPropertyType,ImpureFunctionCall,MixedArgument,MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <ImpureFunctionCall errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

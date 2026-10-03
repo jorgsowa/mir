@@ -4,7 +4,11 @@ but for an arrow function — `analyze_arrow_function` is a separate code path
 from `analyze_closure` and had the same template-unaware resolution bug for
 its own leading `@return` docblock.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace PhpOption;

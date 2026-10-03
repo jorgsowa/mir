@@ -1,7 +1,11 @@
 ===description===
 ReadonlyPropertyAssignment still fires when an external (non-class) function assigns to a readonly property
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

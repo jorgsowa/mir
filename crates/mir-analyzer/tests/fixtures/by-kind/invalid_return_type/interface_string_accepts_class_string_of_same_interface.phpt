@@ -4,6 +4,7 @@ types as class-string<Shape> (interfaces don't get their own ::class type) —
 the name still literally resolves to an interface, so it satisfies the
 narrower declared return type.
 ===config===
+<mir/>
 ===file===
 <?php
 interface Shape {}

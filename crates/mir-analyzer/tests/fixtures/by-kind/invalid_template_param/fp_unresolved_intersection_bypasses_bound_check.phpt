@@ -6,7 +6,13 @@ unresolved" check had no arm for `TIntersection`, so it was compared against
 the bound literally instead of being skipped until a concrete call site
 resolves it.
 ===config===
-suppress=UnusedVariable,MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Marker {}

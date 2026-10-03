@@ -3,7 +3,14 @@
 prefix was previously only accepted for @phpstan-implements, not
 @psalm-implements).
 ===config===
-suppress=MissingPropertyType,UnusedParam,MissingThrowsDocblock,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

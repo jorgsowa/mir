@@ -6,7 +6,11 @@ assert-if-true template binder built its own positional arg list via
 argument out of declared order fed the wrong parameter's value into T's
 inference, resolving T to the wrong (or unresolved) type.
 ===config===
-suppress=UnusedParameter
+<mir>
+  <issueHandlers>
+    <UnusedParameter errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

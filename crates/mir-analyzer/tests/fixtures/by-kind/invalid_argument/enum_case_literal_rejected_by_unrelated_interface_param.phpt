@@ -3,8 +3,12 @@ Negative control for the enum-case/interface subtype fix: an enum-case
 literal must still be rejected when passed to a parameter typed as an
 interface its declaring enum does NOT implement.
 ===config===
-php_version=8.1
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 interface Unrelated {

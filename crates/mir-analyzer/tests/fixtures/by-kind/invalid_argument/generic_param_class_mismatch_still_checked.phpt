@@ -8,7 +8,11 @@ template as "forgive the whole param," even when the argument's own class
 (or complete absence of a class, for a bare scalar) could never satisfy
 `Bar` regardless of what `T` resolves to.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

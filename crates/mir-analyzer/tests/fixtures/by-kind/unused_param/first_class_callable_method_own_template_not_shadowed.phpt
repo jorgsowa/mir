@@ -8,7 +8,13 @@ unfiltered, baking it into a parameter that should have stayed generic —
 producing a false-positive InvalidArgument that the direct call correctly
 avoids.
 ===config===
-suppress=UnusedVariable,UnusedParam,ShadowedTemplateParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <ShadowedTemplateParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

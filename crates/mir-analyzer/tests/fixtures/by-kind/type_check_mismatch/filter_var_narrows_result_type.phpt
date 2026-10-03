@@ -5,7 +5,12 @@ float|false, bool, string|false depending on the filter. A 3rd (options)
 argument bails out to the stub's `mixed`, since FILTER_NULL_ON_FAILURE
 (settable there) would add `null` to the failure case.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_int(string $s): void {

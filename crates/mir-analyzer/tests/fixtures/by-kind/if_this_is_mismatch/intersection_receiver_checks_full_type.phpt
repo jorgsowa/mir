@@ -7,7 +7,11 @@ provides it) both false-positived a satisfying receiver and would have
 false-negatived a receiver missing that part, since the comparison target
 never carried the other parts either way.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface HasBar {

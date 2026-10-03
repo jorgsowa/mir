@@ -3,7 +3,12 @@ An array callable [$obj, 'method'] passed to a callable(string):string typed
 parameter must not emit InvalidArgument. The method signature is not statically
 resolved for array callables, so the arity check bails out gracefully.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Formatter {

@@ -1,7 +1,11 @@
 ===description===
 alias renames an abstract (unimplemented) trait method — still reported
 ===config===
-suppress=UnimplementedAbstractMethod
+<mir>
+  <issueHandlers>
+    <UnimplementedAbstractMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait A {

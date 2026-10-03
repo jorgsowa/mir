@@ -1,7 +1,11 @@
 ===description===
 Implicit nullability from a null default applies to functions, instance methods and static methods.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string $f */

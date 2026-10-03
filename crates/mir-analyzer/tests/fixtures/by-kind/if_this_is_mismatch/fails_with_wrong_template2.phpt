@@ -1,7 +1,12 @@
 ===description===
 Fails with wrong template2
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Frozen {}

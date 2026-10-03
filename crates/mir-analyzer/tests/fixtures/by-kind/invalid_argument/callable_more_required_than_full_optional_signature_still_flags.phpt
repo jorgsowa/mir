@@ -3,7 +3,11 @@ Negative control for the optional-trailing-param arity fix: a closure requiring 
 params than the FULL declared signature (including the `=`-marked ones) is still unsafe —
 the type never promises more than that many args will ever be passed — and must still flag.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param Closure(mixed, array=, string=):mixed $cb */

@@ -6,7 +6,11 @@ dropped, and no element is analyzed twice. A key that doesn't resolve to a
 single literal still forces the generic-array fallback, merging every
 element's type instead.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

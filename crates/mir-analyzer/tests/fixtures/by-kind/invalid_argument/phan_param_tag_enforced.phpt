@@ -4,7 +4,12 @@ way `@param`/`@psalm-param`/`@phpstan-param` already are — a bare `$value`
 parameter typed only via `@phan-param int $value` still rejects a
 non-int argument.
 ===config===
-suppress=UnusedParam,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

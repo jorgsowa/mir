@@ -2,7 +2,12 @@
 When @param int conflicts with a bool PHP hint, the PHP hint is the runtime
 truth. Passing a bool (e.g. isset()) must NOT fire InvalidArgument.
 ===config===
-suppress=UnusedParam,MismatchingDocblockParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MismatchingDocblockParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Converter {

@@ -1,7 +1,12 @@
 ===description===
 $obj::CONST (constant access through an object-instance variable) resolves to the constant's literal type instead of falling back to mixed.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Suit {

@@ -1,7 +1,12 @@
 ===description===
 Assert scalar and empty
 ===config===
-suppress=MixedArgument,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

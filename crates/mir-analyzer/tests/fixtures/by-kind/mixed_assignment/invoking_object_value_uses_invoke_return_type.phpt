@@ -3,7 +3,11 @@ M3: invoking an object value (`$obj(...)`) resolves __invoke()'s declared
 return type instead of falling back to mixed — including the recursive
 `$this(...)` self-invocation idiom.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Adder {

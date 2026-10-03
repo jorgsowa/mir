@@ -5,7 +5,12 @@ instead of returning only the first matching atom's — a shape member no
 longer silently drops a co-existing array<K,V>/list<V> alternative's value
 type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

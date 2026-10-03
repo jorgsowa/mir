@@ -1,7 +1,11 @@
 ===description===
 Detect redundancy after loop with continue
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $gap = null;

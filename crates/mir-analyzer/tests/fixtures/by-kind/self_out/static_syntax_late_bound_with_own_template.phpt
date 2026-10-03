@@ -5,7 +5,11 @@ not the declaring class, and (b) substitute `T` with this call's inferred
 argument type — combining the two behaviors the `self`/`static`-with-generics
 sentinel has to get right at once.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

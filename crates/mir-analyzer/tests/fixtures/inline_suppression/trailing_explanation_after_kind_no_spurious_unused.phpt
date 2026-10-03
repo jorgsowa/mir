@@ -6,6 +6,7 @@ its own bogus additional kind name, each producing its own spurious
 UnusedSuppress since none of them ever match a real issue kind. The real
 kind (UndefinedClass) IS used here, so no UnusedSuppress should fire at all.
 ===config===
+<mir/>
 ===file===
 <?php
 /** @psalm-suppress UndefinedClass because of a vendor stub */

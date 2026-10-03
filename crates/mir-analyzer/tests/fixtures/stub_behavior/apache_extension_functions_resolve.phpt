@@ -5,7 +5,14 @@ vendored file — same missing-stub root cause as the fixed imap/ldap/ssh2/xdebu
 gaps. `apache_request_headers`/`getallheaders` are excluded here since they
 are already stubbed under stubs/standard/.
 ===config===
-suppress=UnusedParam,UnusedVariable,MixedAssignment,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

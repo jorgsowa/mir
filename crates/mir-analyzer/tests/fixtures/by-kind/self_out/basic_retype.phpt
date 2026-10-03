@@ -2,7 +2,11 @@
 @psalm-self-out retypes the receiver variable to the declared type after the
 call returns.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class MaybeString {

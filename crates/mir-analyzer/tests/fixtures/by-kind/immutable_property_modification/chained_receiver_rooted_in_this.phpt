@@ -4,7 +4,11 @@ $this->cache->v = 5 (a chained, non-$this-literal receiver) escaped
 matched when pa.object was LITERALLY `$this`, never when `$this` was
 reached through an intermediate property in the chain.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cache {

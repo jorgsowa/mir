@@ -4,7 +4,11 @@ FP-C6: the `ast` PECL extension (nikic/php-ast) has no vendored stub, so
 though `PhpStormStubsMap.php` already lists them (pointing at a stub file that
 didn't exist on disk).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -2,7 +2,11 @@
 Foo::class in a match arm does not emit UndefinedClass — ::class is a compile-time
 string constant that does not require the class to be defined.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

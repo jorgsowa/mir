@@ -1,7 +1,12 @@
 ===description===
 Passing a mutable object to an impure constructor from an immutable context is invalid.
 ===config===
-suppress=MissingConstructor,InvalidReturnType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <InvalidReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class MutableState {

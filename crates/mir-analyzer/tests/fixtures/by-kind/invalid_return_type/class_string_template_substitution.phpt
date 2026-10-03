@@ -1,7 +1,11 @@
 ===description===
 class-string<T> in return type is substituted with the inferred class
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

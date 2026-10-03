@@ -1,7 +1,11 @@
 ===description===
 $this->__construct() from a regular method (not __wakeup/__clone) is still flagged.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

@@ -4,7 +4,13 @@ literal (true branch) or exclude it (false branch), same as the instance-
 property `$this->prop` counterpart already does — only the null-check and
 instanceof narrowing families existed for static properties.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

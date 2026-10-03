@@ -3,7 +3,14 @@
 FunctionCall), so the taint-sink dispatch keyed on function names never saw
 it. Tainted data reaching eval() is arbitrary code execution.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

@@ -1,7 +1,11 @@
 ===description===
 Wrong case in namespace prefix segment is reported.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace MyApp\Service;

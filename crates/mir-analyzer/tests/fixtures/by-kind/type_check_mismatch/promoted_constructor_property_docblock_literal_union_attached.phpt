@@ -5,7 +5,11 @@ the property — previously only a plain unspecialized `array`/`mixed`
 native hint let the docblock through at all; any other concrete native
 scalar hint discarded the docblock refinement entirely.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Attr {

@@ -1,7 +1,9 @@
 ===description===
 A `do { } while` body always executes at least once, so `$id` is always defined after the loop.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 function run(): int {

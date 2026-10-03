@@ -4,7 +4,12 @@ callee declares them must still bind each argument's template param to its
 OWN declared parameter, not to whichever parameter sits at that argument's
 syntactic position. Covers a free function, a method, and a constructor.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

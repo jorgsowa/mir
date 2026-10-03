@@ -1,7 +1,11 @@
 ===description===
 Prevent trait property type
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait T {}

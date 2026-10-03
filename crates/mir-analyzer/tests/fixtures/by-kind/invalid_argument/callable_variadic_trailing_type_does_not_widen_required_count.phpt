@@ -4,7 +4,11 @@ zero-or-more extra args, never a guaranteed count — it must stay excluded from
 required-param ceiling, not silently raise it. A closure requiring more fixed params than the
 non-variadic prefix must still flag.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param Closure(int, ...string):void $cb */

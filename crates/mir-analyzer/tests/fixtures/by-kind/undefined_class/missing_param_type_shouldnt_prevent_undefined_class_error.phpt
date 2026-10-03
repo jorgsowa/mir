@@ -1,7 +1,12 @@
 ===description===
 Missing param type shouldnt prevent undefined class error
 ===config===
-suppress=UnusedParam,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @suppress MissingParamType */

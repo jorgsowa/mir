@@ -1,7 +1,11 @@
 ===description===
 MagicMethodReturnTypesCheckedForClasses
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A

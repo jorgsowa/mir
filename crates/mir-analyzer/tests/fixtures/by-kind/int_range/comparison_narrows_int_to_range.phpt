@@ -2,7 +2,12 @@
 Comparison operators narrow integer variables to bounded ranges.
 `$x < 5` narrows `$x: int` to `int<min, 4>` in the true branch and `int<5, max>` in the false branch.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $x): void {

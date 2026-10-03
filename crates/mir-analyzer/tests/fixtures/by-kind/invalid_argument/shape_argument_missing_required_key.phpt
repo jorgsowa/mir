@@ -4,7 +4,12 @@ parameter is rejected — `array_list_compatible`'s shape-to-shape arm
 previously returned unconditionally `true`, treating every shape as
 compatible with every other shape regardless of required keys.
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{host: string, port: int} $config */

@@ -5,6 +5,7 @@ branch leaking in), so passing the `?:` fallback into a string-only function
 flagged PossiblyInvalidArgument. A literal/non-null $name can never hit the
 no-args array branch.
 ===config===
+<mir/>
 ===file===
 <?php
 

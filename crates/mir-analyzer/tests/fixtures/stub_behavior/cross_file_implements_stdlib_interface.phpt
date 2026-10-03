@@ -1,7 +1,11 @@
 ===description===
 cross file implements stdlib interface
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Collection.php===
 <?php
 class NumberList implements \Iterator {

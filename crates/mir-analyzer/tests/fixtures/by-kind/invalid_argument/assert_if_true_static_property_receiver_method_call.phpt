@@ -6,7 +6,11 @@ no-oping the whole assertion for a static-property receiver, even though
 that shape is already a first-class case for the assertion's TARGET side
 elsewhere in this file.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Validator {

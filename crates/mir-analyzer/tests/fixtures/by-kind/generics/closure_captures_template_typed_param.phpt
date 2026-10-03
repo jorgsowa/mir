@@ -5,7 +5,14 @@ typed property inside a closure must not be flagged as InvalidPropertyAssignment
 — the same assignment written directly in the enclosing function is correctly
 allowed since the template placeholder isn't provably incompatible.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingPropertyType,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

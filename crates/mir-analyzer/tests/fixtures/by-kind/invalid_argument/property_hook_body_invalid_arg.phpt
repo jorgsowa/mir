@@ -1,8 +1,12 @@
 ===description===
 Invalid arguments in property hooks are analyzed.
 ===config===
-php_version=8.4
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

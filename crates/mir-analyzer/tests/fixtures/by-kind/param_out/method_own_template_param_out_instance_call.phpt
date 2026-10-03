@@ -6,7 +6,11 @@ already does for `Foo::method(...)`. The instance-call write-back loop used
 name stripped out (so `check_args` can still infer it from the arguments),
 so the method-level template leaked to the caller unsubstituted.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box2 {

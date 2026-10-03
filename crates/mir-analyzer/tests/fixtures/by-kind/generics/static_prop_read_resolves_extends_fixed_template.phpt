@@ -4,7 +4,15 @@ inherited `@extends Box<int>`-fixed ancestor template, same as an instance
 property read and the write side already do — the read paths took `p.ty`
 raw with no `inherited_template_bindings` substitution at all.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -3,7 +3,11 @@ Negative control for the J8 array-shorthand-key fix: `T[]` widens the KEY
 type to array-key, but the element (value) type is still enforced — a
 wrong element type must still flag.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

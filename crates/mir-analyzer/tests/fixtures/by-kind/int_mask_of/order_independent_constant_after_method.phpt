@@ -3,7 +3,11 @@ int-mask-of<self::*> resolution does not depend on source order — a
 constant declared *after* the method that references it via `self::` still
 resolves, since PHP itself allows forward references to class constants.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

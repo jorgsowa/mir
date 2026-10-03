@@ -2,7 +2,9 @@
 A dynamic first-class-callable on one class must not blanket-exempt an
 unrelated class's private method.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

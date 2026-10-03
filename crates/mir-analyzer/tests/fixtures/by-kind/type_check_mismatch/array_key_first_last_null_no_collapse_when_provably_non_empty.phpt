@@ -3,7 +3,12 @@ array_key_first($arr)/array_key_last($arr) === null on an array already
 known to be exclusively non-empty must not collapse $arr to an empty
 union — same no-collapse guard count()/strlen() comparisons already have.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-array<string, int> $arr */

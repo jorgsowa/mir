@@ -4,7 +4,11 @@ keys are present and their types are compatible. This mirrors the Psalm idiom of
 using intersection types for "shape plus extra keys allowed" patterns like:
 @psalm-type Context = array<string,mixed> & array{actor:...,target?:...,outcome:...}
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

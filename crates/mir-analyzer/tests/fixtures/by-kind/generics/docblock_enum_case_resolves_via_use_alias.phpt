@@ -1,7 +1,13 @@
 ===description===
 `Alias::Case` in a docblock resolves through an aliased `use`, and a wrong enum is still rejected.
 ===config===
-suppress=MissingThrowsDocblock,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Data {

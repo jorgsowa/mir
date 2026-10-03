@@ -5,7 +5,11 @@ inferred binding — not erase the annotation's `<U>` and reattach the
 receiver's pre-call type params, which would leave the receiver's stale
 class-level binding untouched.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

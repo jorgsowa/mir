@@ -6,7 +6,12 @@ receiver reached through one more property hop than the already-fixed
 single-hop case fell through to nothing. Retypes via a synthetic
 "base->mid_prop" key in the same flat prop_refined map.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Factory {}

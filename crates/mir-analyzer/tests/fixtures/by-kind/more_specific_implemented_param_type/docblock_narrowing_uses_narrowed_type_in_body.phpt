@@ -3,7 +3,12 @@ When an override narrows the @param type via docblock, the method body may
 call methods available only on the narrowed subtype without triggering
 UndefinedMethod — the analyzer uses the docblock type for intra-body checks.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Message {}

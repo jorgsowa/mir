@@ -1,7 +1,12 @@
 ===description===
 Sibling of init_in_child_constructor: a subclass constructor may still init its own readonly property.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

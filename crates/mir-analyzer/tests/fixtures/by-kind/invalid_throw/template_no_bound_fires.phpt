@@ -1,7 +1,11 @@
 ===description===
 Template param with no bound does not fire InvalidThrow — unbounded T defaults to mixed, which cannot be statically rejected
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

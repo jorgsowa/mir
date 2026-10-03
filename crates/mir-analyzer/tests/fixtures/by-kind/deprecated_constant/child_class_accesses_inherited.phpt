@@ -1,7 +1,12 @@
 ===description===
 DeprecatedConstant fires using the accessor class name when a child class is used to access a deprecated constant inherited from a parent.
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

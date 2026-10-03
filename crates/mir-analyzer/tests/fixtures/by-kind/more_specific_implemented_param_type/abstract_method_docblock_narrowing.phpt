@@ -3,7 +3,11 @@ Overriding an abstract method with a more-specific @param docblock must not emit
 MethodSignatureMismatch. The native hint stays at the parent type; only the
 docblock refines it to a concrete subclass.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Event {}

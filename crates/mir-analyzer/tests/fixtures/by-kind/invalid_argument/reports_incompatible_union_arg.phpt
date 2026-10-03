@@ -1,7 +1,11 @@
 ===description===
 reports incompatible union arg
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function g(): int|string { return 1; }

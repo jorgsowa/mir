@@ -2,7 +2,11 @@
 Methods that only read $this properties in a @psalm-immutable class do not trigger
 ImmutablePropertyModification.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

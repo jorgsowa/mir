@@ -6,7 +6,12 @@ is already treated as a hard `InvalidArgument` elsewhere in the analyzer, so
 the typed-callable check stays consistent rather than inventing a more
 permissive policy just for closures.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(bool):void $c */

@@ -4,7 +4,11 @@ null) must not trigger a false NullableReturnStatement on a trivial identity
 function — the bare template atom itself is never TNull even though its
 bound's expansion is.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

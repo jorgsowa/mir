@@ -2,7 +2,12 @@
 Passing an undefined variable to a @param-out by-ref parameter defines it —
 UndefinedVariable must not fire. The out-type is the variable's type after.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

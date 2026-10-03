@@ -1,7 +1,11 @@
 ===description===
 A union receiver where a sibling atom's method accepts the arg count does not flag the atom that rejects it
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Plain {

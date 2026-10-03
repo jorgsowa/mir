@@ -1,7 +1,11 @@
 ===description===
 Magic parent call should not pollute context
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

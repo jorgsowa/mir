@@ -6,7 +6,12 @@ every other resolved-type slot (return type, `@if-this-is`,
 plug the declaring class in, but the param path didn't, so a call site
 passing a real instance of the declaring class got a bogus InvalidArgument.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Point {

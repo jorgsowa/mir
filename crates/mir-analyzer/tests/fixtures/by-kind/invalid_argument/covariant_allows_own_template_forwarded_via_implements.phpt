@@ -4,7 +4,13 @@ FP: a class that is ITSELF generic (`@template T`) and forwards its own T to a
 interface parameterized with a supertype of its own concrete T — not just the
 fixed-args case (`@extends Box<Cat>` with no class-level template of its own).
 ===config===
-suppress=ForbiddenCode,UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant T */

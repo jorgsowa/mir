@@ -3,7 +3,9 @@ A private method reachable only via a dynamic method call ($this->$name())
 elsewhere on the class must not be reported unused, since the exact target
 isn't statically known.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

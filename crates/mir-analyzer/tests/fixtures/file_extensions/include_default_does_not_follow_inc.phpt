@@ -1,7 +1,11 @@
 ===description===
 With the default extension list an included .inc target is not followed, so its function is undefined
 ===config===
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+</mir>
 ===file:a.module===
 <?php
 include_once __DIR__ . '/b.inc';

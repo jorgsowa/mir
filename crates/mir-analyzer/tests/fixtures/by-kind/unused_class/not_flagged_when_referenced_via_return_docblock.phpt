@@ -2,7 +2,9 @@
 A final class named only in a function's `@return` docblock tag (no native
 return type naming it) must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Foo {}

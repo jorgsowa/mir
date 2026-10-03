@@ -4,7 +4,12 @@ variable's own concrete type args (e.g. `Box<int> $b`), matching what
 `$b->method()` already did — a static method's `@return T`/`@param T` no
 longer leaks the raw template atom or skips argument-type checking.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

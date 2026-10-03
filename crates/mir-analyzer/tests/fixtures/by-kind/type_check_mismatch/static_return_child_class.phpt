@@ -1,7 +1,11 @@
 ===description===
 Regression: static return type should resolve to child class when called on child
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Model {

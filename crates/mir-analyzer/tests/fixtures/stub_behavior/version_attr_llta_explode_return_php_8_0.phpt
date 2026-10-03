@@ -1,8 +1,12 @@
 ===description===
 LanguageLevelTypeAware return: explode() returns string[] (no false) on PHP 8.0
 ===config===
-php_version=8.0
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 $parts = explode(",", "a,b,c");

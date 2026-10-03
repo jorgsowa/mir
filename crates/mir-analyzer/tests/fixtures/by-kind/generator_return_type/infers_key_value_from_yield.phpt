@@ -2,7 +2,12 @@
 A function with no return type declaration at all is inferred as
 Generator<TKey, TValue, mixed, void> from its `$k => $v` yields.
 ===config===
-suppress=UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function gen() {

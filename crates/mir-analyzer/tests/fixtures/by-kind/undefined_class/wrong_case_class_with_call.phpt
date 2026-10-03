@@ -1,7 +1,11 @@
 ===description===
 Wrong case class in type hint is now reported as WrongCaseClass.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

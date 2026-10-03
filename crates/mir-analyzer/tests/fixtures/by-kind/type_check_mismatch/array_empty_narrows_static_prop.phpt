@@ -6,7 +6,12 @@ guard (any StaticPropertyAccess operand) intercepted this comparison
 shape first and silently swallowed it before the array-empty arm ever
 ran, in both the strict and loose arms.
 ===config===
-suppress=MissingConstructor,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

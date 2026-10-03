@@ -1,7 +1,11 @@
 ===description===
 `self` from a grandparent stays the grandparent even when the method is called on a deeper subclass.
 ===config===
-suppress=UnusedMethod
+<mir>
+  <issueHandlers>
+    <UnusedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

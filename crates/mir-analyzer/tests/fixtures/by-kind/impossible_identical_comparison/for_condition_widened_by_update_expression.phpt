@@ -2,7 +2,11 @@
 `for` condition on a variable reassigned by the update expression is not
 always-true: the pre-loop state ignores the update (`$c = $c->getPrevious()`).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function depth(\Throwable $e): int {

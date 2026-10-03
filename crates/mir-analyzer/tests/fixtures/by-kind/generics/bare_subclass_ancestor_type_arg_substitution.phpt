@@ -5,7 +5,12 @@ binding instead of leaking the raw unbound `T`, so passing it where a
 `Collection<Dog>` is expected is correctly rejected as `Collection<Cat>`,
 not vacuously accepted via an unresolved template.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant T */

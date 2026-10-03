@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset does not fire inside an is_string() guard when the variable was declared @var mixed — is_string() narrows mixed to a concrete string type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var mixed $key */

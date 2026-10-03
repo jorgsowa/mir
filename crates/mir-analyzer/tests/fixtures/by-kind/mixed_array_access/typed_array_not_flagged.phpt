@@ -1,7 +1,11 @@
 ===description===
 MixedArrayAccess does NOT fire when the array has a concrete element type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var array<int, string> $arr */

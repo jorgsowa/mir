@@ -2,7 +2,12 @@
 Concatenation with a non-empty operand (int, non-empty-string, positive-int)
 yields non-empty-string.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

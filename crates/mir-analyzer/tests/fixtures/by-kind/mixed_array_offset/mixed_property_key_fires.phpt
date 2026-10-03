@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset fires when a mixed-typed class property is used as the array key
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Router {

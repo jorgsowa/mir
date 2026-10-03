@@ -6,7 +6,11 @@ only the one-time declaration site fired, and only under @pure. Unlike
 to @mutation-free/@external-mutation-free, the same class of persistent
 cross-call state a static PROPERTY write already correctly flags.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

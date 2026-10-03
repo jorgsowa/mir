@@ -5,7 +5,12 @@ narrowed (non-|false / non-|null) type with no new diagnostics — the
 falsy_stripped exemption must only affect defensive-check impossibility/
 redundancy checks, not everyday unchecked usage.
 ===config===
-suppress=UnusedParam,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

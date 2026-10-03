@@ -2,7 +2,11 @@
 Variable assigned inside while-condition via ($x = expr()) === null pattern and consumed
 in the loop body must not be reported as unused — across multiple fixpoint iterations.
 ===config===
-suppress=PossiblyNullMethodCall
+<mir>
+  <issueHandlers>
+    <PossiblyNullMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Ex {

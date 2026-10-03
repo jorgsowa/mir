@@ -1,7 +1,13 @@
 ===description===
 `@taint-sink header $value` raises TaintedHeader.
 ===config===
-suppress=MixedArrayAccess,MixedArgument,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @taint-sink header $value */

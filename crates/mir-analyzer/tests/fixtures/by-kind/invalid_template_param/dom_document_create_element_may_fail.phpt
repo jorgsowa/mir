@@ -1,7 +1,11 @@
 ===description===
 DOMDocument::createElement() explains that a dynamically named result must be checked for false before insertion
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

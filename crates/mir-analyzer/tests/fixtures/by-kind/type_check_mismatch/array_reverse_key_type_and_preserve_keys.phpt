@@ -4,7 +4,12 @@ the source's actual key type and the `$preserve_keys` argument. PHP only
 renumbers INT keys when `$preserve_keys` is false (the default); string
 keys are always kept, and `$preserve_keys = true` keeps int keys too.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> $arr */

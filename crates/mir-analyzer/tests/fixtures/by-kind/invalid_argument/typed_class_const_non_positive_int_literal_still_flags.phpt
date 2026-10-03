@@ -3,7 +3,11 @@ Negative control for the typed-class-const literal-narrowing fix: narrowing to t
 literal value must not become a blanket bypass — a literal that genuinely violates the
 target type (a negative int against `positive-int`) still flags.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {

@@ -3,7 +3,11 @@
 trigger OverriddenPropertyAccess when a child class declares a real property
 with the same name.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

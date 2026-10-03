@@ -1,7 +1,11 @@
 ===description===
 P3: First-class callable from an inherited method resolves through the ancestor chain.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

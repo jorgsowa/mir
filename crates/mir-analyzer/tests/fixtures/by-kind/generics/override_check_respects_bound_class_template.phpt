@@ -5,7 +5,12 @@ a subclass that never binds the template at all (no `@extends Box<...>`
 type argument) must keep the old "can't check statically" skip rather than
 gaining a new false positive.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

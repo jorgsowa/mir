@@ -1,7 +1,9 @@
 ===description===
 A private static property read only through `$cls::$prop` where `$cls` holds a class-string variable must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

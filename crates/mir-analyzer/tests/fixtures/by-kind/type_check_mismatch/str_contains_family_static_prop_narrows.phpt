@@ -4,7 +4,12 @@ narrow a static property — ScalarArgTarget has no static-property variant
 (tracked as S19), so these previously matched neither Var nor Prop on a
 static receiver and narrowed nothing.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

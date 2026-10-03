@@ -1,7 +1,11 @@
 ===description===
 Generic array reads retain their value type when passed as arguments.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<int, string> $map */

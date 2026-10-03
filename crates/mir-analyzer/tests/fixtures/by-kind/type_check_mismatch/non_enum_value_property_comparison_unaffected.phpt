@@ -3,7 +3,13 @@ Regression guard: a plain (non-enum) object with its own `value` property
 compared against a string literal must not be mistaken for the backed-enum
 `->value` idiom — the receiver's type is left completely alone.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Money {

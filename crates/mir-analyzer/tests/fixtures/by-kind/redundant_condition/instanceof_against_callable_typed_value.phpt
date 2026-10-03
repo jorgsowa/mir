@@ -5,7 +5,11 @@ legitimately includes an invokable object of any class. A `Closure`-typed
 value (a real, final PHP class) checked against an unrelated class is
 still genuinely impossible and must keep flagging.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Handler {

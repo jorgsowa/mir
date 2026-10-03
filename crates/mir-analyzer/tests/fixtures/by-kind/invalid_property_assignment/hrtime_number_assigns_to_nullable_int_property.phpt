@@ -1,7 +1,11 @@
 ===description===
 hrtime(true) is int; the array form and a non-literal flag are still not assignable to ?int.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Timer {

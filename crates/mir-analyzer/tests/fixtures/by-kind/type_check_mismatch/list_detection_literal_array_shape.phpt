@@ -4,7 +4,12 @@ only checked `TList`/`TNonEmptyList`, missing the `TKeyedArray{is_list:
 true}` representation an array literal (`[1, 2, 3]`) actually uses —
 operating on a literal-array argument lost its list-ness.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function sliceLiteralListStaysList(): void {

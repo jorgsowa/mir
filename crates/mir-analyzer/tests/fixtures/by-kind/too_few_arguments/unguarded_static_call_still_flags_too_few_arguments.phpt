@@ -2,7 +2,12 @@
 Without an existence guard, the same static call is checked normally and
 TooFewArguments is reported.
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class NewApi {

@@ -4,7 +4,15 @@ reaching EITHER branch already proves $h->data (and thus $h) was non-null —
 but the prop arm never called narrow_receiver_non_null_on_prop_match like
 every sibling arm (class_exists, str_contains, in_array, ...) does.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyNullArgument,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

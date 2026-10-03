@@ -8,7 +8,11 @@ and replacing it with a literal `TMixed` atom, which then trips a real
 MixedAssignment since `is_mixed_not_template()` no longer sees any
 template atom to protect.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

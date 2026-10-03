@@ -6,7 +6,12 @@ clause (the other branch throws) is definite on the reachable path; a
 property with a default value, a nullable property, and a docblock-only
 (non-native) property never require initialization at all.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class PromotedOk {

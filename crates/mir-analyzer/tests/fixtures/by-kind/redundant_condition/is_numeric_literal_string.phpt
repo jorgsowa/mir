@@ -2,7 +2,12 @@
 is_numeric on a literal-string "123" is always true (numeric literal string eliminated from false branch);
 is_numeric on "hello" is always false (non-numeric literal string eliminated from true branch)
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_always_true(string $s): void {

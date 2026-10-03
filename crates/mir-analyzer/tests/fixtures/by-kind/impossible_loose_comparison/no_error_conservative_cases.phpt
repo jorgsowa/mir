@@ -2,7 +2,12 @@
 Conservative: no warning for open types (mixed), object vs true,
 general arrays vs false/true, and scalar vs scalar coercions.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(\stdClass $obj, array $arr, mixed $m, bool $b): void {

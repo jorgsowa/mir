@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset fires when json_decode() result (which is mixed) is used as array key
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $key = json_decode('"hello"');

@@ -6,7 +6,12 @@ provably does NOT implement the interface is guaranteed false and so is
 kept, and a non-final class (unknown subclasses might implement it) is also
 kept.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class PlainFinal {}

@@ -1,7 +1,12 @@
 ===description===
 A write at the end of a loop body that no later iteration reads is still unused.
 ===config===
-suppress=UnusedForeachValue,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function overwritten_before_any_read(array $items): void {

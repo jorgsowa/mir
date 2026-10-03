@@ -7,7 +7,12 @@ property is readonly (verified live). check_property_readonly_write treated
 every array-index write through a property base as mutating the property
 itself, regardless of whether the property actually held a plain array.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Store implements ArrayAccess {

@@ -1,7 +1,12 @@
 ===description===
 count() over a shape with a required key is int<1, max>
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{id: int, name?: string} $row */

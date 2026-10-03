@@ -7,7 +7,11 @@ an enum case), it fell through to nothing instead of treating the
 property as a receiver and checking the other side for an enum-case or
 class-const target.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status {

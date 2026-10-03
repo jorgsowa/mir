@@ -5,7 +5,13 @@ same as `get_class(self::$prop) === Foo::class` already does — the
 side, never a static property. Covers both operand orders, the
 string-literal comparison form, and the loose `==` form.
 ===config===
-suppress=MissingConstructor,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

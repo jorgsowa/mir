@@ -3,7 +3,11 @@ FN: atomic_subtype had no (TIntersection, TIntersection) arm, so a valid
 contravariant-param override widening to FEWER conjuncts (a supertype)
 was falsely flagged as narrowing.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Boxed {

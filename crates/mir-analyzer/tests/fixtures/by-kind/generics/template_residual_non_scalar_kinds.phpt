@@ -4,7 +4,13 @@ same-class named-object concrete alternatives, not just scalar kinds —
 a `T|array` or `T|Foo` param no longer lets the array/object arg leak
 into the template's binding instead of being filtered out.
 ===config===
-suppress=UnusedParam,MissingThrowsDocblock,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

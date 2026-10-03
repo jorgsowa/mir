@@ -3,7 +3,11 @@ When only one branch of a union receiver declares @psalm-self-out, the
 other branch's type must survive in the retyped union — not get silently
 overwritten by whichever atomic happened to be resolved last.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

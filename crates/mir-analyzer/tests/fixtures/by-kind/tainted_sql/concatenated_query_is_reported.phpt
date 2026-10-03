@@ -1,7 +1,11 @@
 ===description===
 concatenated query is reported
 ===config===
-suppress=MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(mysqli $db): void {

@@ -4,7 +4,13 @@ counterparts of strpos_family_not_false_narrows_haystack.phpt and
 array_search_not_false_narrows_needle.phpt) — both extractors only ever
 recognized a plain-variable argument, not a property receiver.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

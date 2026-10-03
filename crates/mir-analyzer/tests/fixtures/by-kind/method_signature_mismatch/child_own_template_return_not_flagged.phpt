@@ -13,7 +13,11 @@ path because a bound-less template's `is_mixed()` is true, tripping the
 adjacent mixed-return early-out instead — a bound is needed to reach the
 buggy comparison.)
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

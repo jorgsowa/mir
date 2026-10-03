@@ -3,7 +3,11 @@
 but none for `TTrue` — `@psalm-assert !true $v` on a `bool` fell to the
 catch-all and left the type unchanged instead of narrowing to `false`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

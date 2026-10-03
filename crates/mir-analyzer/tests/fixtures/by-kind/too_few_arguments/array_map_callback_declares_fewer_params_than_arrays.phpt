@@ -4,7 +4,11 @@ invocation arguments are simply dropped, not an error. array_map(callback, array
 array2, ...) invokes callback with one element per array; mir previously required
 the callback to declare AT LEAST as many params as arrays passed, which is backwards.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function acceptsNone(): bool {

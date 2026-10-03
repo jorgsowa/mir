@@ -5,7 +5,14 @@ mirroring the standalone-function proof in
 `invalid_return_type/class_string_template_substitution.phpt` but for an
 instance method call.
 ===config===
-suppress=MissingReturnType,MissingParamType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template TValue */

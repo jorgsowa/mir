@@ -1,7 +1,11 @@
 ===description===
 closure return type resolved
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

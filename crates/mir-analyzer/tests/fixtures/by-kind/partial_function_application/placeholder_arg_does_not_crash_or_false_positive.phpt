@@ -9,8 +9,12 @@ analysis for the whole file (see
 placeholder argument must not panic the analyzer or produce any diagnostic
 beyond that single, accurate ParseError.
 ===config===
-php_version=8.5
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.5</phpVersion>
+</mir>
 ===file===
 <?php
 

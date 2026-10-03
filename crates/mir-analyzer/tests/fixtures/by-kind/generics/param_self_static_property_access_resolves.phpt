@@ -4,7 +4,12 @@ resolves the real property type — `resolve_property_type` only matched
 `TNamedObject`, so a param stored as `TSelf`/`TStaticObject` (per
 `@param self`/`@param static`) fell through to `mixed`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Point {

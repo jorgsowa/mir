@@ -6,7 +6,12 @@ mirrors instanceof's existing classes_can_coexist fallback, which
 narrow_strict_subclass_of lacked. Two unrelated concrete classes remain
 mutually exclusive and are still correctly dropped.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Nameable {}

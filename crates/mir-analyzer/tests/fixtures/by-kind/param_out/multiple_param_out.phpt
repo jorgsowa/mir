@@ -2,7 +2,13 @@
 Multiple @param-out annotations on different parameters — each variable should
 receive its declared out-type after the call.
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

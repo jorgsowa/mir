@@ -2,6 +2,7 @@
 A `@return` type with an unterminated string literal must be reported the
 same way as `@var`/`@param`.
 ===config===
+<mir/>
 ===file===
 <?php
 

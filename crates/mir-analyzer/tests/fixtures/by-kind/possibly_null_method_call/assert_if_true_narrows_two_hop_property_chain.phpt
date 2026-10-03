@@ -5,7 +5,12 @@ be a plain variable) — a 2-hop chain (`$c->box->inner`) silently no-oped
 the whole assertion, unlike `@psalm-self-out`'s write-back, which already
 supports the same synthetic 2-hop key via `extract_chained_prop_access`.
 ===config===
-suppress=MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

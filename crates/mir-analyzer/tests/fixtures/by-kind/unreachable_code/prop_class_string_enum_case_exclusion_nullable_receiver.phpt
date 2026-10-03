@@ -5,7 +5,13 @@
 a class-string or enum-case literal, regardless of the property's own
 declared type. Uses the `@mir-check $_ is never` reachability probe.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {}

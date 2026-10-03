@@ -7,7 +7,15 @@ Y` arm — $obj itself stayed nullable even though a true result is only
 possible when $obj->prop is a real (non-null) value, which requires $obj
 itself to be non-null.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyNullPropertyFetch,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

@@ -1,7 +1,12 @@
 ===description===
 count() - 1 can be -1 (empty array) — the range lower bound drops to -1
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<int> $arr */

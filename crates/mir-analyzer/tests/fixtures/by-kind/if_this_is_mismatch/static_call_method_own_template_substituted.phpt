@@ -3,7 +3,12 @@ Same gap as the instance-call-syntax fix, for a method reached through
 self::/static:: call syntax — an @if-this-is constraint referencing the
 method's own @template was never substituted before the comparison.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -7,7 +7,11 @@ list against the subclass's @extends args, instead of the edge's effective
 this produced an empty bindings map, leaving the inherited ancestor template
 unsubstituted and silently masking a real argument type mismatch.
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template TBox */

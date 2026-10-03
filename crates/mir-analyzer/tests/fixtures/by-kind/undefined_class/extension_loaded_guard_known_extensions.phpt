@@ -3,8 +3,12 @@ FP-A: extension_loaded() guard works for well-known PHP extensions whose classes
 exist in stubs. Both the guard form and the post-guard (early-exit) form must
 not emit UndefinedClass even without stubs (the guard is sufficient).
 ===config===
-php_version=8.2
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

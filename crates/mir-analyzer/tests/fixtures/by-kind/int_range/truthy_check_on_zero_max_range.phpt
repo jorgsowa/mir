@@ -3,7 +3,12 @@ Truthy check on int<min, 0> tightens the upper bound:
 `int<min, 0>` → `negative-int` (truthy) / `0` (falsy);
 `int<-5, 0>` → `int<-5, -1>` (truthy) / `0` (falsy).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<min, 0> $x */

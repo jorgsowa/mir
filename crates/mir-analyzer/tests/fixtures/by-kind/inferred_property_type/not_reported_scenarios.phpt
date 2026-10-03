@@ -6,7 +6,12 @@ has no inferred type either — `prop_refined` drops a refinement not present
 on every path at the merge point, so there's no signal left to record (a
 known, accepted precision gap, not a false positive).
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

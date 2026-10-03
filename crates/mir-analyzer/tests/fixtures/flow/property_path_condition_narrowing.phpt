@@ -1,7 +1,11 @@
 ===description===
 Truthiness and null checks on a two-hop property path (`$this->cfg->domain`) narrow it in `&&` chains, ternaries and guards. A call on the receiver or a write to an intermediate property discards the narrowing.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cfg {

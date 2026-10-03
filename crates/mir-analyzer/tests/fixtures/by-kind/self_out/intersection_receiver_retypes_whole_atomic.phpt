@@ -2,7 +2,11 @@
 @psalm-self-out on a method reached through an intersection-typed receiver
 (`A&B`) retypes the whole intersection atomic, not silently dropped.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface HasName {}

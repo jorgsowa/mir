@@ -4,7 +4,12 @@ declaring interface's own `@psalm-type` alias, the same gap as class/trait
 properties. The constant resolved to the literal, nonexistent class
 `Payload` instead of the aliased shape.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

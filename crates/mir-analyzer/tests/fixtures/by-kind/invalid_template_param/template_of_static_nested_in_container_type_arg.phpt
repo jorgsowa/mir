@@ -5,7 +5,12 @@ only rewrote a top-level `static` atom, so this always failed the bound
 check (a false positive) even for a genuinely-typed receiver. A real
 mismatch through the same nested position still correctly violates.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

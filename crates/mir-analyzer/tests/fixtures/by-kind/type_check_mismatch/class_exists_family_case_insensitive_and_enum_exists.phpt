@@ -2,7 +2,12 @@
 class_exists()/interface_exists()/trait_exists() narrow case-insensitively
 (PHP calls are case-insensitive); enum_exists() narrows like class_exists().
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -1,7 +1,11 @@
 ===description===
 `method_exists()` suppresses undefined methods for guarded array callables.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Notification {}

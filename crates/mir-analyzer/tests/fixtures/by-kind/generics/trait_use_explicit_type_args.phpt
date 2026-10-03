@@ -2,7 +2,14 @@
 `@use TraitName<T>` binds a used trait's own `@template` from an explicit
 type-argument list, instead of always falling back to `mixed`.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

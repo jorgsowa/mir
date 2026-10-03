@@ -5,7 +5,14 @@ for `StaticMethodCall`, so a taint-source method reached through an
 intermediate static factory call fell through to `None` and the whole
 expression was untainted.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedArrayAccess,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Param {

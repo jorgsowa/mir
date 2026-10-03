@@ -4,7 +4,11 @@ docblock already reflects nullability (either via `?T` shorthand or a
 `T|null` union), or the hint isn't nullable at all, there's no
 contradiction and nothing should be flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

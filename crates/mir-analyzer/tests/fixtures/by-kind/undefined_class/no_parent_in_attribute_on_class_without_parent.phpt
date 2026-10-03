@@ -1,7 +1,11 @@
 ===description===
 No parent in attribute on class without parent
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 #[Attribute]

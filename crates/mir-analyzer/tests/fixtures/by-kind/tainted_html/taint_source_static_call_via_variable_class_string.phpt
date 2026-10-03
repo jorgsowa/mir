@@ -5,7 +5,13 @@ variable holding a known class-string fell through unhandled, unlike
 the instance-method arm right above it, which already resolves a
 variable receiver via `resolve_chained_receiver_type`.
 ===config===
-suppress=MixedReturnStatement,MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Request {

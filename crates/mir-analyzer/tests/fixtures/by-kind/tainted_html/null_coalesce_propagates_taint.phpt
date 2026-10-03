@@ -4,7 +4,12 @@ superglobal defensively, but `is_expr_tainted` had a `Ternary` arm and no
 `NullCoalesce` arm, so it fell through to the untainted catch-all and this
 extremely common idiom silently bypassed taint tracking entirely.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

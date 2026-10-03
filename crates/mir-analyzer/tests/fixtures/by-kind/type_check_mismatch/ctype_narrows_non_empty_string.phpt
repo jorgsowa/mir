@@ -2,7 +2,13 @@
 ctype_*() truthy result narrows a string argument to non-empty-string, since
 every ctype_*() function returns false on the empty string.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyInvalidArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyInvalidArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_ctype_digit(string $s): void {

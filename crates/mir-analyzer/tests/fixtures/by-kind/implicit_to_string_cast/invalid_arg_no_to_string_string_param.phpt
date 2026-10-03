@@ -1,7 +1,11 @@
 ===description===
 InvalidArgument when object has neither __toString nor Stringable and is passed to a string param
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Opaque {}

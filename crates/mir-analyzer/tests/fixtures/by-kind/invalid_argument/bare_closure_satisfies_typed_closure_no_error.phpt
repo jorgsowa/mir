@@ -1,7 +1,11 @@
 ===description===
 bare Closure type satisfies Closure(): T parameter — no InvalidArgument
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class PDO {}

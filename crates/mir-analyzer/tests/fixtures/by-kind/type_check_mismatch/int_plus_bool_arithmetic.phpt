@@ -2,8 +2,13 @@
 FP: int + bool (e.g. `$i += 2 + isset($x)`) should infer int, not int|float.
 PHP always coerces bool→int in arithmetic; the result is never float.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.4
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 

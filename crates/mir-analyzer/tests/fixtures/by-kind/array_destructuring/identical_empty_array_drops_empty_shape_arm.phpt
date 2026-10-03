@@ -2,7 +2,11 @@
 `$row === []` / `$row !== []` on a union of a shape and `array{}` must drop
 the empty-shape arm from the non-empty branch, so the key access is valid.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{algorithm: non-empty-string}|array{} $row */

@@ -1,7 +1,11 @@
 ===description===
 nested class method parameter not undefined no error
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function outer(): void {

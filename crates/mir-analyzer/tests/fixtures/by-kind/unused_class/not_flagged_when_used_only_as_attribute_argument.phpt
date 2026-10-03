@@ -1,7 +1,9 @@
 ===description===
 A class named only inside an attribute constructor argument (e.g. `Target::class`) must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Target {

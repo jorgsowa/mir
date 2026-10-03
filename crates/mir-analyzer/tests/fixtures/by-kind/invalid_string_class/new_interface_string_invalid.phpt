@@ -3,7 +3,11 @@
 never be instantiated, unlike class-string<AbstractClass> which may still hold a
 concrete non-abstract subclass name at runtime.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

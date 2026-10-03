@@ -4,7 +4,12 @@ closed empty shape `array{}` — it drops the non-empty-array/non-empty-list
 variants (since those can never be empty) and narrows the remaining plain
 array/list down to the same type an empty `[]` literal itself has.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-array<string, int>|list<int> $arr */

@@ -3,7 +3,13 @@
 must not leak the class_exists guard into the merged true-branch: the branch
 is also reachable via the "$x unset" path, where class_exists() never ran.
 ===config===
-suppress=UnusedVariable,PossiblyUndefinedVariable,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyUndefinedVariable errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f($x): void {

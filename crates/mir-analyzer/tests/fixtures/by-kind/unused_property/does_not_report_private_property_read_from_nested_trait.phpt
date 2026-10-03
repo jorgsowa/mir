@@ -3,7 +3,9 @@ Same as `does_not_report_private_property_read_only_from_trait.phpt`, but the
 read site lives in a transitively-composed trait (`Outer` uses `Inner`, `Foo`
 uses `Outer`).
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 trait Inner {

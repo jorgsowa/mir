@@ -6,7 +6,12 @@ no-space `callable(int):string` spelling already worked and must keep
 working; a plain `@var string some description` (no callable signature at
 all) must still stop at the type and not swallow the description.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

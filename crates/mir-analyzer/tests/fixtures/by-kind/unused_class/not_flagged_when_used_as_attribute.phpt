@@ -2,7 +2,9 @@
 A final attribute class used only via #[MyAttr(...)] annotation elsewhere
 must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 #[Attribute]

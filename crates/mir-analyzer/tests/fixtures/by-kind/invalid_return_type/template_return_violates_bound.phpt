@@ -3,7 +3,11 @@ G1: an `@return T of Animal` method returns a value that is not even a subtype o
 template bound (a Plant) — the erased return type is `Animal`, so this is a real
 InvalidReturnType.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

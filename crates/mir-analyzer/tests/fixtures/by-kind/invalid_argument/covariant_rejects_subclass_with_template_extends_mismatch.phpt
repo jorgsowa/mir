@@ -1,7 +1,11 @@
 ===description===
 covariant rejects subclass with template extends mismatch
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant T */

@@ -6,7 +6,13 @@ on the value still being "generically T" (e.g. returning it from a function
 declared `@return T`) silently degraded to the concrete narrowed class. The
 OR-chain form (`$x instanceof A || $x instanceof B`) has the same gap.
 ===config===
-suppress=MissingReturnType,UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

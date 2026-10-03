@@ -7,7 +7,12 @@ builtin were actually called. The function-call dispatch used to match
 narrowing `$x` to `null` even though the callable bound to `$is_null` has
 nothing to do with the real `is_null()`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_dynamic_call_variable_named_like_builtin(?int $x): void {

@@ -6,7 +6,12 @@ how a variable receiver is retyped, so a subsequent access no longer
 false-positives as calling an undefined method on the property's original
 (declared) type.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Factory {}

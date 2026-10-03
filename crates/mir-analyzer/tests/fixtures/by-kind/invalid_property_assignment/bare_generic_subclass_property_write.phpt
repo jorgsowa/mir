@@ -7,7 +7,12 @@ more than it already isn't flagged inside the declaring class itself —
 unresolved. A receiver with concrete type args must still catch a real
 mismatch.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Named {}

@@ -1,7 +1,11 @@
 ===description===
 `method_exists()` does not suppress array callables outside its branch.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Notification {}

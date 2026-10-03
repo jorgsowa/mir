@@ -2,7 +2,11 @@
 An empty array literal satisfies a generic list/array type-argument, but a wrong
 non-empty type-argument is still reported (generics stay invariant otherwise).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -1,7 +1,11 @@
 ===description===
 cross file array keys optional filter value
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Helper.php===
 <?php
 function extractKeys(array $map): array {

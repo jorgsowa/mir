@@ -3,7 +3,11 @@
 late-static-bound receiver, not the parent class `parent::` resolves the
 method through — those differ whenever the call happens inside a subclass.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class Base {

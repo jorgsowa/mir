@@ -1,7 +1,9 @@
 ===description===
 MissingPropertyType does NOT fire for properties declared with the 'mixed' type — explicit mixed is a valid native type in PHP 8.0+.
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 class Container {

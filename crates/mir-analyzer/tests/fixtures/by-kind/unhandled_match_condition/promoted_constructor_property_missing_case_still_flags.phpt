@@ -2,7 +2,11 @@
 Negative control for the promoted-property docblock-literal-union fix: a
 genuinely missing arm still flags, naming the uncovered literal.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Attr {

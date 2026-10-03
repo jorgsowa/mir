@@ -1,7 +1,11 @@
 ===description===
 No ImplicitToStringCast when arg type directly satisfies a non-string arm of the union
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

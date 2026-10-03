@@ -4,7 +4,14 @@ declaring class-like's own `@psalm-type` alias — unlike `@param`/`@return`
 and an inline local `@var`, which already did. The property resolved to
 the literal, nonexistent class `Payload` instead of the aliased shape.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

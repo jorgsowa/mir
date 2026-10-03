@@ -1,7 +1,13 @@
 ===description===
 A query() method on a class unrelated to PDO/mysqli/SQLite3 is not treated as a SQL sink.
 ===config===
-suppress=UnusedParam,MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class SearchIndex {

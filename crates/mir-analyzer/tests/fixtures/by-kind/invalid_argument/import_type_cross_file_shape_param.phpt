@@ -2,7 +2,13 @@
 `@psalm-import-type` from a class in another file/namespace expands to the
 source alias body instead of a same-named class in the importing namespace.
 ===config===
-suppress=UnusedParam,UnusedVariable,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:repo.php===
 <?php
 namespace Core\Repository;

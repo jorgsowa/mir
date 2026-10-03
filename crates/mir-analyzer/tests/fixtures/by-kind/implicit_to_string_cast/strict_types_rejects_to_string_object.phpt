@@ -1,7 +1,11 @@
 ===description===
 Under strict_types=1, passing an object with __toString to a string param is InvalidArgument — PHP does not coerce
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php declare(strict_types=1);
 class Label {

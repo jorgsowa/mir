@@ -2,7 +2,12 @@
 Excluding a value at the edge of an int range tightens the bound:
 non-negative-int !== 0 → positive-int; positive-int !== 1 → int<2,max>; int<min,-1> !== -1 → negative-int without -1
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-negative-int $a */

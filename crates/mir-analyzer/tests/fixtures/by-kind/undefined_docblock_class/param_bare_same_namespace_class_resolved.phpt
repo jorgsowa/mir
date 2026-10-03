@@ -6,7 +6,11 @@ resolve against the current namespace, same as a native type hint would —
 `Closure`), so `Calculator` and `App\Calculator` were treated as two
 different, incompatible classes.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

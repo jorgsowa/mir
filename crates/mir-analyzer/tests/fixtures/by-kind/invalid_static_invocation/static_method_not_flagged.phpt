@@ -1,7 +1,11 @@
 ===description===
 InvalidStaticInvocation does NOT fire when calling a static method statically.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Math {

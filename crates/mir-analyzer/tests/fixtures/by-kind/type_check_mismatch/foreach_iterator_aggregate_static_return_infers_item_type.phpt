@@ -4,7 +4,13 @@ IteratorAggregate+Iterator class — resolves the loop's item type through the
 class's own Iterator implementation instead of leaking `mixed` because
 `static` is a `TStaticObject`, not a `TNamedObject`, atom.
 ===config===
-suppress=MissingPropertyType,UnusedParam,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

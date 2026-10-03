@@ -1,7 +1,11 @@
 ===description===
 No ImplicitToStringCast when class defines __toString — PHP coerces implicitly, no warning needed
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

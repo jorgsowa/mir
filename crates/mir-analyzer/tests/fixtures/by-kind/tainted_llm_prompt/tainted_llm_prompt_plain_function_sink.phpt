@@ -2,7 +2,12 @@
 @taint-sink on a plain (non-method) function is honored, not just on a
 method/static-method call.
 ===config===
-suppress=MixedArrayAccess,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @taint-sink llm_prompt $prompt */

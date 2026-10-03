@@ -4,7 +4,13 @@
 that doesn't redeclare `@template` — previously `check_generic_type_args`
 looked up Target's own-only template params, so this silently passed.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T of Countable */

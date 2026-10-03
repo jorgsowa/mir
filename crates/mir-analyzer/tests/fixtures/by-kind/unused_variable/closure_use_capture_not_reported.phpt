@@ -1,7 +1,11 @@
 ===description===
 closure use capture not reported
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(): array {

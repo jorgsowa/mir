@@ -4,7 +4,13 @@ equality is also true for those, so collapsing to `TNull` would be unsound.
 `!= null` still narrows to non-null exactly like the strict `!== null` form.
 Property receivers get the same treatment as plain variables.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_loose_equal_null_narrows_to_falsy(int|null $x): void {

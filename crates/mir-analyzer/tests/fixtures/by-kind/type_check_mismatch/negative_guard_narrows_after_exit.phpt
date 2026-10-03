@@ -3,7 +3,9 @@ FP-O (broader): negative type-guard early-exit narrows the type in the fallthrou
 `if (!is_string($x)) { throw ...; }` must narrow $x to string after the block.
 `if (!is_int($n)) { return; }` must narrow $n to int after the block.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

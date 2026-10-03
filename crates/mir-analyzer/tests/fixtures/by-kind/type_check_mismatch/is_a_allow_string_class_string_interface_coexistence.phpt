@@ -4,7 +4,12 @@ just because C isn't provably related to $class — when either C or $class
 is an interface, a single class could still implement both, mirroring the
 object-atom coexistence check just above this one in the same file.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Cacheable {}

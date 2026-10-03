@@ -1,7 +1,11 @@
 ===description===
 `is_int()` and `!is_null()` narrow array-offset types.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{v: string|int} $arr */

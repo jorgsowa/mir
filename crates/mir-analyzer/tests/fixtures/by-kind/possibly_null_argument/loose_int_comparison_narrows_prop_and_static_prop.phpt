@@ -4,7 +4,13 @@ narrows a property/static-property receiver, mirroring the already-existing
 plain-variable narrowing — property/static-property receivers previously
 stayed unnarrowed (tracked as W5).
 ===config===
-suppress=UnusedVariable,MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

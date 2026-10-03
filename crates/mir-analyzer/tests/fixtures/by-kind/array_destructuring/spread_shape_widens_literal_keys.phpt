@@ -3,7 +3,11 @@ Spreading a single, closed, string-keyed shape into a new array literal
 (`[...$a]`) preserves each key as its own literal instead of widening the
 key domain to a generic `string`.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

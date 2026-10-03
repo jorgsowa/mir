@@ -4,7 +4,12 @@ is non-null, same reasoning as the literal/bool/int/enum-case cases already
 fixed — `null !== []` always, so a matched-true comparison rules out a null
 receiver. The excluded/false direction proves nothing.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

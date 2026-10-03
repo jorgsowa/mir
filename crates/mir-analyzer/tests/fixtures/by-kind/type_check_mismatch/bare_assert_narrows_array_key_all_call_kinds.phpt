@@ -6,7 +6,13 @@ var/prop/static-prop application loop for this call shape, none of which
 ever read `assertion.param_key`. Now routed through the same shared
 apply_one_assertion the conditional if-true/if-false dispatch uses.
 ===config===
-suppress=MissingReturnType,MixedArgument,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-assert string $arr['key'] */

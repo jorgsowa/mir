@@ -4,7 +4,11 @@ verbatim in the stored name, so even a BARE (non-parameterized) use site
 never matched by the plain name — the alias was silently 100% dead, not
 just unable to substitute its template param.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

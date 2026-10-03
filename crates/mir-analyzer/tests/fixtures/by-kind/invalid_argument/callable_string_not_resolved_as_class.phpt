@@ -1,7 +1,11 @@
 ===description===
 Callable string not resolved as class
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // A function name passed as string should NOT emit UndefinedClass

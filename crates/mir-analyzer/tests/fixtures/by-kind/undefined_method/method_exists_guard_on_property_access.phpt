@@ -1,7 +1,11 @@
 ===description===
 method_exists() guard on a typed property suppresses UndefinedMethod for that object
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Notification {}

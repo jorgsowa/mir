@@ -3,7 +3,12 @@
 A value outside the subtype bounds (e.g. -1 on positive-int) produces an empty
 intersection and leaves the type unchanged (dead-code branch).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

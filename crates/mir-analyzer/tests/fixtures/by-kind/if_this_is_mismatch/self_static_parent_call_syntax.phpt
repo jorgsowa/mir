@@ -3,7 +3,12 @@
 syntax too, not just `$this->method()` — analyze_static_method_call never
 invoked the check at all.
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait Foo {

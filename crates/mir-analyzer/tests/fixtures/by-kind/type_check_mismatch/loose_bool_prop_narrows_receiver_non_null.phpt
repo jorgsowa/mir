@@ -6,7 +6,12 @@ the receiver wasn't null. Without it, a nullable receiver's own
 nullability leaks back into the property's resolved type even after the
 property itself narrowed correctly.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyAccess
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

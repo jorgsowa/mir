@@ -2,7 +2,9 @@
 A private static method reachable only via a dynamic static
 first-class-callable (self::$name(...)) must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

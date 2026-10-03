@@ -2,7 +2,14 @@
 @psalm-extends is recognized as an alias for @extends (the vendor prefix
 was previously only accepted for @phpstan-extends, not @psalm-extends).
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

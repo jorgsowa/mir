@@ -2,7 +2,12 @@
 Calling a variable callable with a fresh (undefined) variable passed to a by-ref
 param must not emit UndefinedVariable — the pre-marking runs before arg analysis.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $writer = function(int &$x): void { $x = 42; };

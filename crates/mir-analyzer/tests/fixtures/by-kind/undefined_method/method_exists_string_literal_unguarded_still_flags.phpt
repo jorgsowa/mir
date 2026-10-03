@@ -3,7 +3,11 @@ Without a method_exists() guard, a 'Foo::method' string callable whose
 target method does not exist is checked normally and UndefinedMethod is
 reported.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Other {}

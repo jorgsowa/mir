@@ -4,7 +4,11 @@ its first-class-callable closure the same way a static/instance method's
 is — a plain `function(...)` FCC previously built its closure straight from
 the function's raw params with no template substitution at all.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

@@ -3,7 +3,12 @@ A write read on ANY path is used: ternary arms, match arms, and the
 loop-never-ran path after a foreach that overwrites the variable. Genuinely
 dead writes are still reported.
 ===config===
-suppress=MissingReturnType,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function ternary_read(?int $number): array {

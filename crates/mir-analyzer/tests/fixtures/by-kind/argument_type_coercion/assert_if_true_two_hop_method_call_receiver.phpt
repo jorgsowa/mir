@@ -4,7 +4,11 @@ property-access receiver — a 2-hop chain (`$this->service->validator`)
 silently no-oped the whole @psalm-assert-if-true dispatch, unlike the
 1-hop case (`$this->validator->isInt($p)`) which already worked.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Validator {

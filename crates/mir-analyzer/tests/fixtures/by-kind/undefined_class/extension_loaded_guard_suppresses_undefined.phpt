@@ -3,8 +3,13 @@ FP-A: extension_loaded() guard suppresses UndefinedClass for optional PHP extens
 Both the direct if-block form and the negative early-exit form must work.
 Classes used inside the guarded block are assumed to come from the extension.
 ===config===
-php_version=8.2
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

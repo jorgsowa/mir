@@ -2,7 +2,12 @@
 a helpers file present on disk but not registered via stub_file= is analyzed as a
 regular source file — its symbols are available but its body is checked for errors
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 /**

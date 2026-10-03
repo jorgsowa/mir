@@ -3,7 +3,12 @@ is_a($x, 'Foo', true) with $allow_string=true must not narrow a string/class-str
 variable to an object type, and must not mark the true or false branch as diverging.
 String and class-string atoms are valid is_a()-true values and must be preserved.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

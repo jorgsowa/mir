@@ -5,7 +5,11 @@ compared self_fqcn against the trait's own FQCN (the reported owner),
 with no awareness that a trait's members are copy-pasted into every
 consuming class, unlike normal inheritance.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

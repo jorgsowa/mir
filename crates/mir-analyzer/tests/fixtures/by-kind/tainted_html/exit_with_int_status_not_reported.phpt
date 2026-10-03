@@ -1,7 +1,11 @@
 ===description===
 An integer `exit` operand is a status code, not output.
 ===config===
-suppress=MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

@@ -4,7 +4,11 @@ callable(...): R / Closure(...): R return type — not signature-checked
 (matches the existing leniency for callable-typed arguments), but a class
 with no __invoke() at all still correctly fails.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Handler {

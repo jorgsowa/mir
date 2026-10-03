@@ -1,7 +1,11 @@
 ===description===
 Use of globals makes function impure
 ===config===
-suppress=MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

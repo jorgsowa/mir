@@ -6,7 +6,12 @@ swelling union like `"a"|"b"|"c"|...` rather than the `string` a generic
 array's key type should actually be. Values still keep their precise
 literal union, matching how this codebase treats value precision elsewhere.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

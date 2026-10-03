@@ -1,7 +1,12 @@
 ===description===
 No ImplicitToStringCast when passing a type that declares __toString via interface — __toString is sufficient
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface I {

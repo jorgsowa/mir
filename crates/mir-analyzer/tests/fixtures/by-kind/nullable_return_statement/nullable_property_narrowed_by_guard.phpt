@@ -1,7 +1,9 @@
 ===description===
 `?int` property is non-null inside an `if ($this->id !== null)` guard.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 class Box {

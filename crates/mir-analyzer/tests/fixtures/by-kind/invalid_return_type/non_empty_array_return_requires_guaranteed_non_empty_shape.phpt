@@ -4,7 +4,11 @@ property, or an open shape that may hold unknown extra keys) to satisfy a
 declared non-empty-array/non-empty-list return type. A closed shape with no
 required property — including the fully-empty `[]` case — is rejected.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

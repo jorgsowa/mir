@@ -2,7 +2,11 @@
 A method composed purely via `use Trait;` with a signature compatible with
 the real parent must not be flagged.
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

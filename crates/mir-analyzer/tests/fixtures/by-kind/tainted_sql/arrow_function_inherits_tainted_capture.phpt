@@ -4,7 +4,13 @@ taint status — a tainted value flowing into a sink through
 fn() => sink($tainted) was previously never flagged, unlike the equivalent
 use($tainted) closure.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(mysqli $db): void {

@@ -1,7 +1,11 @@
 ===description===
 Variable assigned in if-condition and used only in the true branch is not reported
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function getToken(): ?string { return null; }

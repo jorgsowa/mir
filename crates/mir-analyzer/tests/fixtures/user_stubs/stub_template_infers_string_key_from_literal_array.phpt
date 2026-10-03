@@ -1,8 +1,15 @@
 ===description===
 stub with @template TKey returns list<TKey> inferred as list<string> from string-keyed literal array
 ===config===
-stub_file=stubs/helpers.php
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 /**

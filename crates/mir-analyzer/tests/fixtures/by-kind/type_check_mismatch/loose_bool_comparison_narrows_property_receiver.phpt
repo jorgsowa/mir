@@ -3,7 +3,12 @@
 property-receiver counterpart of narrow_var_loose_bool (which only handled a
 plain variable receiver).
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

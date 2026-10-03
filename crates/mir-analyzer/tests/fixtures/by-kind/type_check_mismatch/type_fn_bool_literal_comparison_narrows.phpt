@@ -6,7 +6,12 @@ on the OTHER operand, never recursing into narrow_from_condition to
 dispatch the FunctionCall/Instanceof arm a bare `if (is_string($x))`
 already gets.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function identicalTrue(int|string $x): void {

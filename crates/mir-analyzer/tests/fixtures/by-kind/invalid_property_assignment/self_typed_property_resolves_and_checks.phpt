@@ -5,7 +5,12 @@ staying an unbound `self()` (read side); writing through a self/static/
 parent-typed receiver now runs the same property-type check a plain
 class-typed receiver already gets (write side).
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

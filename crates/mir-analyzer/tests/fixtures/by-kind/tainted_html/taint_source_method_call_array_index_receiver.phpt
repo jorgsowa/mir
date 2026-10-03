@@ -5,7 +5,15 @@ through to the catch-all untainted case -- resolve_chained_receiver_type
 had no ArrayAccess arm, unlike its sibling root_receiver_var, so the
 chain broke off with None before ever reaching the taint-source check.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedReturnStatement,MixedArrayAccess,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Request {

@@ -6,7 +6,11 @@ the alias map first -- a class-level type alias referenced from a
 method on the same interface/trait failed to expand and resolved as a
 bogus undefined-class reference instead.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

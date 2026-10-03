@@ -2,8 +2,12 @@
 A placeholder occupying the slot ahead of a variadic parameter's own
 arguments — must not desync the variadic-binding logic or crash.
 ===config===
-php_version=8.5
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.5</phpVersion>
+</mir>
 ===file===
 <?php
 

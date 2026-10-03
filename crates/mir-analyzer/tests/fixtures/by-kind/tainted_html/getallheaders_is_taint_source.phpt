@@ -3,7 +3,13 @@ getallheaders()/apache_request_headers() return raw HTTP request headers
 -- as attacker-controlled as any superglobal -- but neither was ever
 treated as a taint source.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,PossiblyInvalidArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <PossiblyInvalidArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function fromGetAllHeaders(): void {

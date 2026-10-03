@@ -2,7 +2,12 @@
 Comparison on `non-negative-int` intersects with its implicit `int<0,max>` bound.
 `$n < 3` on `non-negative-int` narrows to `int<0,2>`, not `int<min,2>`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-negative-int $n */

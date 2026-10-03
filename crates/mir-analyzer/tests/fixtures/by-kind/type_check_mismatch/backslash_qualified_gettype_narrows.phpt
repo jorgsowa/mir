@@ -2,7 +2,13 @@
 Fully-qualified (leading `\`) get_class()/gettype()/get_debug_type() calls
 narrow exactly like the bare name.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

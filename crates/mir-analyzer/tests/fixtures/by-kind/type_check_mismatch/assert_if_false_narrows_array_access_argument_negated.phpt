@@ -5,7 +5,12 @@ current value via `get_shape_path_type`, not the whole container) also
 works for the array-key assertion target, not just the whole-parameter
 case.
 ===config===
-suppress=MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

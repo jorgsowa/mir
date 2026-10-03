@@ -4,7 +4,11 @@ FP-J8: `T[]` docblock shorthand parsed as `array<int, T>` instead of
 string-keyed array (the common PSR-3 `$context` idiom) into a
 `mixed[]`/`string[]`-docblocked param falsely flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

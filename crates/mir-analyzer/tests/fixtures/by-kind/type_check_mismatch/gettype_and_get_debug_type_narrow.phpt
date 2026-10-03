@@ -2,7 +2,13 @@
 gettype($x) === 'literal' and get_debug_type($x) === 'literal'/Foo::class
 narrow $x the same way is_string()/is_int()/etc and get_class() do.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

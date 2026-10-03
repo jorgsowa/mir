@@ -4,7 +4,14 @@ instance method call's by-ref write-back loop (`call/method.rs`) — a
 by-ref target passed via a named argument out of declared order was
 checked against the wrong argument instead of the real by-ref target.
 ===config===
-suppress=MissingConstructor,MixedArgument,MixedArrayAssignment,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

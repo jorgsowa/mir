@@ -4,7 +4,16 @@ type) accepts null at runtime. mir now widens an untyped (docblock-only) propert
 with null for the assignment check, so assigning a nullable value no longer emits
 InvalidPropertyAssignment.
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedProperty,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedProperty errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Connection {

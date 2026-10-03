@@ -4,7 +4,11 @@ A bare `iterable` @return/@param docblock type expands internally to
 built-in interface, not get namespace-qualified against the file's own
 namespace (which would misreport it as an undefined class).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

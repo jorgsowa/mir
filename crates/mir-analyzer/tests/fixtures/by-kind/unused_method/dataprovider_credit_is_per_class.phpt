@@ -1,7 +1,9 @@
 ===description===
 dataProvider credit does not leak to an unrelated class or a genuinely unused method
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class FooTest {

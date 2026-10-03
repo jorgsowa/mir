@@ -1,7 +1,11 @@
 ===description===
 cross file inheritance
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:A.php===
 <?php
 class A {

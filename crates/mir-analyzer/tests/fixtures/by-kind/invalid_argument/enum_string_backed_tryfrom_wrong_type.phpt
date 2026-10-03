@@ -1,7 +1,9 @@
 ===description===
 String-backed enum ::tryFrom() rejects int argument
 ===config===
-php_version=8.1
+<mir>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum Status: string {

@@ -5,7 +5,12 @@ FP: a template nested inside an intersection param alternative
 argument instead of being recognized as fully explained by that alternative —
 producing a bogus InvalidTemplateParam against T's bound.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Countable2 {}

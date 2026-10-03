@@ -2,7 +2,11 @@
 @param-out on a static method: the out-type is written back to the caller's
 variable after the static call.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Registry {

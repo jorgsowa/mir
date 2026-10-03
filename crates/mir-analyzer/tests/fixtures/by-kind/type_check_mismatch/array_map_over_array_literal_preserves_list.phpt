@@ -4,7 +4,12 @@ true}`, not `TList`/`TNonEmptyList` — array_map's list/non-empty detection
 only matched the latter two, so mapping over a literal list lost list-ness
 and fell back to a generic `array<int, T>`.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $arr = [1, 2, 3];

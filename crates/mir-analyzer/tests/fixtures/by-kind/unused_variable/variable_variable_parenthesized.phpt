@@ -2,7 +2,12 @@
 parenthesized variable-variable with known variable name
 
 ===config===
-suppress=MissingReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test() {

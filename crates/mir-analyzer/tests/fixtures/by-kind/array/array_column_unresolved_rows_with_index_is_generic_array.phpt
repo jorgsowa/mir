@@ -1,7 +1,12 @@
 ===description===
 array_column with a dynamic $index_key is not necessarily a list and keeps the stub's array type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(array $rows, string $idx): void {

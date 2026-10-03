@@ -6,7 +6,11 @@ all — collect_enum silently dropped EnumMemberKind::TraitUse, so neither
 this check nor trait-method resolution through class_ancestors_by_fqcn ever
 saw an enum's traits.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait HasCounter {

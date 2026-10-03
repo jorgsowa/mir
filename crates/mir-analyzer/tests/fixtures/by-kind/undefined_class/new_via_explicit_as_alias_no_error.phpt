@@ -1,7 +1,12 @@
 ===description===
 new via explicit as alias no error
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Entity.php===
 <?php
 namespace App\Model;

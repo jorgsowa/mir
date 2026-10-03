@@ -9,7 +9,11 @@ against the bare builtin name flagged every method on the local class as undefin
 Found in phpunit-phpunit (`PHPUnit\Runner\Baseline\Generator` vs.
 `Subscriber::generator(): Generator`).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

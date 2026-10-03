@@ -5,7 +5,12 @@ same reasoning as the already-fixed `in_array()` sibling: a found result
 proves the property read wasn't null-derived. The not-found direction
 (last two functions) proves nothing about the receiver.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

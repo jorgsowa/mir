@@ -1,7 +1,9 @@
 ===description===
 __toString() with string|int union return type fires — not all atoms are string
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 class UnionReturn {

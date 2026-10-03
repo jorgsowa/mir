@@ -1,7 +1,9 @@
 ===description===
 `list<int>` is an `array<array-key,int>`.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 class Holder {

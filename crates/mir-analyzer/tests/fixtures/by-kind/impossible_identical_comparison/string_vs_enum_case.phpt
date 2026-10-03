@@ -1,7 +1,12 @@
 ===description===
 A string property can never be === to an enum case; converting with from() is fine.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Kind: string { case Admin = 'admin'; }

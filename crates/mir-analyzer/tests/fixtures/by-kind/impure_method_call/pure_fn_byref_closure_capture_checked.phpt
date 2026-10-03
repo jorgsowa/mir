@@ -6,7 +6,12 @@ SAME external variable, not a copy, so it's just as externally observable,
 but was silently excluded from the extension entirely, letting a mutating
 method call or a property write through it bypass @pure completely.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

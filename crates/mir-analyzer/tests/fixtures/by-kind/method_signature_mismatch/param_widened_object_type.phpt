@@ -2,7 +2,11 @@
 G4: a child may widen an object param (Cat → Animal) — contravariance-legal, no error.
 Same-type and widening overrides must not be flagged as narrowing.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

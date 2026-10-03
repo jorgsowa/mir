@@ -1,7 +1,12 @@
 ===description===
 Array map use method on inferable int
 ===config===
-suppress=MissingClosureReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = array_map(function ($i) { return $i->foo(); }, [1, 2, 3, 4]);

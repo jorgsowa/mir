@@ -3,7 +3,11 @@
 no visibility contract. A child class declaring a real property with the same
 name and any visibility must NOT emit OverriddenPropertyAccess.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

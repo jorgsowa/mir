@@ -3,7 +3,12 @@ An `array<int, T>` return override checks class-hierarchy compatibility of
 the array's value type, not just a structural fallback that never
 recognizes a subclass as compatible with its declared ancestor.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

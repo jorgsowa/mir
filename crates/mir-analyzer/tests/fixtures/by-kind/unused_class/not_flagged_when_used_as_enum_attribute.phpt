@@ -2,7 +2,9 @@
 A final attribute class used only via #[MyAttr] on an enum declaration or one
 of its cases must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 #[Attribute]

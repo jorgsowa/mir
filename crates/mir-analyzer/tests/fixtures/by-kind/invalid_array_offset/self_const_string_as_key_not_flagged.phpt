@@ -2,7 +2,11 @@
 self::STRING_CONST used as array key does not emit InvalidArrayOffset.
 String constants are valid array keys; the literal string type is returned.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Routes {

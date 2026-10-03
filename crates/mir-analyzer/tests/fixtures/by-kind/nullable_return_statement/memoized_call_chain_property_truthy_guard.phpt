@@ -2,8 +2,12 @@
 With memoize_method_call_results, a guard on `$this->getIdentity()->accountId`
 narrows the next identical read, so the nullable declared type is not returned.
 ===config===
-memoize_method_call_results=true
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir memoizeMethodCallResults="true">
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Identity {

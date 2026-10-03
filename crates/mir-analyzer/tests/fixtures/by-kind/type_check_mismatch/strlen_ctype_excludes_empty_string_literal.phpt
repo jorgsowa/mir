@@ -8,7 +8,12 @@ opposite gap: it only dropped `non-empty-string`, leaving non-empty
 literals/numeric-string/class-string untouched even though none of those
 can ever be `""`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param '123'|'' $s */

@@ -2,7 +2,11 @@
 `$row !== []` must keep shapes that can still be non-empty: a shape whose
 keys are all optional, and an open shape. Only the closed empty shape is dropped.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a?: int}|array{} $row */

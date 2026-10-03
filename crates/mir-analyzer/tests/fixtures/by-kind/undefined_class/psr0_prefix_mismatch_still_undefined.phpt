@@ -2,7 +2,11 @@
 A psr-0 autoload entry must not over-match: a class outside the mapped
 prefix's namespace is still genuinely undefined.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:composer.json===
 {"autoload":{"psr-0":{"Mailer\\":"src/"}}}
 ===file:Handler.php===

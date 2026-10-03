@@ -4,7 +4,14 @@ non-null — count() throws on a non-Countable (including null) so either
 branch proves it, while strlen(null) returns 0 so only the non-empty
 branch proves it.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch,PossiblyNullArgument,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

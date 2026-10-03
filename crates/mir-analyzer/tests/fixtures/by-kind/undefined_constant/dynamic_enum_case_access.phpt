@@ -2,8 +2,12 @@
 FALSE POSITIVE reproducer. Valid PHP: `Color::{$name}` is dynamic enum-case access on a defined enum, not a bare constant.
 Expected: no issue.
 ===config===
-php_version=8.4
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 enum Color: string {

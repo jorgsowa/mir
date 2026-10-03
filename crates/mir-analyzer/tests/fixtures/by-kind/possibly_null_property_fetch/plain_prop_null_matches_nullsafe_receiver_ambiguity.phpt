@@ -4,7 +4,12 @@ PHP 8 reads a `->` access on a null receiver as a warning, not fatal,
 still evaluating to null. Non-nullable receivers keep the old behavior
 (see prop_null_and_enum_case_contradiction_diverges.phpt).
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

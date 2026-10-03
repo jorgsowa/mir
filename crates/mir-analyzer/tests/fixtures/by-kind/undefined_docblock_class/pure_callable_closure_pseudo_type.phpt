@@ -3,7 +3,12 @@
 shape as `callable(...)`/`Closure(...)` (purity qualifier is dropped) instead
 of being misparsed as a bogus named class.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param pure-callable(int): string $cb */

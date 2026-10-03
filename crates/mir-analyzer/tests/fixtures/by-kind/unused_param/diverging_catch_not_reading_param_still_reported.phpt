@@ -5,7 +5,11 @@ leave it flagged as unused. Guards against an overly broad fix that treats
 every diverging catch's whole state as "used", rather than only its actual
 reads.
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function h(\ReflectionClass $reflectionClass): void {

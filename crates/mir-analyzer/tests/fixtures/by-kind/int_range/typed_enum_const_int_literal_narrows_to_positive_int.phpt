@@ -2,7 +2,11 @@
 The typed-const literal-narrowing gap was duplicated verbatim in the enum collector: a
 typed constant declared on an enum lost the same literal precision as the class case.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit {

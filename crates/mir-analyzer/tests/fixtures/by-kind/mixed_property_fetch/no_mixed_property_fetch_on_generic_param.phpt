@@ -2,7 +2,12 @@
 Property access on a generic type parameter must not emit MixedPropertyFetch —
 generic containers like Repository<T> routinely fetch properties from T values.
 ===config===
-suppress=MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

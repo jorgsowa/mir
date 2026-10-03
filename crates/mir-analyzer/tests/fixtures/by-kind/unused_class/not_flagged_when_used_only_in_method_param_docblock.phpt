@@ -1,7 +1,9 @@
 ===description===
 A class named only inside a method's `@param` docblock (no native type hint) must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Target {

@@ -4,7 +4,13 @@ key 'id', but the taint check never consulted the named variable's taint
 state — echoing the result silently produced no diagnostic even when the
 source variable was tainted.
 ===config===
-suppress=MixedArrayAccess,MixedArgument,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function viaCompact(): void {

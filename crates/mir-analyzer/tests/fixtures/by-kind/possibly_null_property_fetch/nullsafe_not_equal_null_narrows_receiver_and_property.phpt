@@ -3,7 +3,12 @@
 receiver would have short-circuited the whole chain to `null`) and the
 property `$b->value` itself — matching the plain `$b->value !== null` case.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

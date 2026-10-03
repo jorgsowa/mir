@@ -5,7 +5,12 @@ was extracted verbatim including the bracket suffix (`"arr['key']"`),
 which could never match a real declared parameter name, so the whole
 assertion silently no-oped for this shape.
 ===config===
-suppress=MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

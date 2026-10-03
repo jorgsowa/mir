@@ -8,7 +8,14 @@ assignment needed. Each case below has both a passing (correct) assertion
 and a failing (deliberately wrong) one, so a mismatch is proven to still be
 caught rather than the check silently always passing.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

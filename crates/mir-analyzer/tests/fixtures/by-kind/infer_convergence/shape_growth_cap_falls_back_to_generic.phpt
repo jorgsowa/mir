@@ -5,7 +5,12 @@ generalizes the whole variable to a plain `list<int>` instead, the same
 fallback a loop would produce — this keeps a long run of literal pushes from
 producing an ever-growing printed shape.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $arr */

@@ -4,7 +4,12 @@ equivalent `@param callable(string):void $c` — previously the dispatch that
 wires up the typed-callable check only matched `Atomic::TCallable`, so the
 `Closure(...)` docblock spelling silently skipped arity checking entirely.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param Closure(string):void $c */

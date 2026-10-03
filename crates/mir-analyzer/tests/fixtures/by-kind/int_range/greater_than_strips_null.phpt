@@ -6,7 +6,13 @@ never be true. `>=`/`<` are N-dependent (see
 `int_comparison_n_dependent_null_stripping.phpt` for the full truth
 table); `$x >= 5` here correctly excludes null since N != 0.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyNullPropertyAccess
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullPropertyAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function greaterThanTrueBranch(?int $x): void {

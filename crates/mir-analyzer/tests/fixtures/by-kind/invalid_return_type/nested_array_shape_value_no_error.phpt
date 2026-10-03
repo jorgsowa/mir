@@ -1,7 +1,12 @@
 ===description===
 A valid array<K, array{...}> return is not spuriously flagged (TKeyedArray<:TKeyedArray).
 ===config===
-suppress=MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

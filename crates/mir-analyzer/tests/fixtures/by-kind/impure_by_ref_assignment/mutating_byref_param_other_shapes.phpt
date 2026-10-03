@@ -7,7 +7,15 @@ arm) — every other mutation shape on the same bare variable (`.=`,
 silently bypassed the check entirely, unlike the sibling property-receiver
 case which already covers all of these shapes.
 ===config===
-suppress=MissingReturnType,UnusedForeachValue,MixedAssignment,UnusedParam,ImpureFunctionCall
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <ImpureFunctionCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

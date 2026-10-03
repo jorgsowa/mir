@@ -1,7 +1,11 @@
 ===description===
 interface method fulfilled only via a `use Trait { orig as alias; }` rename is not reported
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait A {

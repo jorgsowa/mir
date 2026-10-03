@@ -1,7 +1,12 @@
 ===description===
 Objects can never be loosely equal to integers in PHP.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(\stdClass $obj, int $n): void {

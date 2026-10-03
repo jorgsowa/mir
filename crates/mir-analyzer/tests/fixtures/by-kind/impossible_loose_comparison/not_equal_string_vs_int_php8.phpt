@@ -2,8 +2,12 @@
 PHP 8: "foo" != 0 is always true (the != operator).
 The != operator is the inverse of ==; the same impossibility applies.
 ===config===
-php_version=8.0
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 function test(): void {

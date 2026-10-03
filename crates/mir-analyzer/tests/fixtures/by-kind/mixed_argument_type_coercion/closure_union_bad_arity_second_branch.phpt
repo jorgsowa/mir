@@ -4,7 +4,13 @@ swapped so the over-arity closure is the *second* union member. Regression test
 for a bug where the arity check only inspected the first closure in a union,
 silently missing the second — this must emit the same diagnostic either way.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(string):void $c */

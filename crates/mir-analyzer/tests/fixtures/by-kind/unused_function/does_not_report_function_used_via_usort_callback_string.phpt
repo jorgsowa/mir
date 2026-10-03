@@ -1,7 +1,9 @@
 ===description===
 a function used only as a bare string callback to usort must not be reported unused
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function my_cmp(int $a, int $b): int { return $a <=> $b; }

@@ -2,7 +2,14 @@
 A cross-file imported alias is expanded in return types, property types and
 `@var` annotations, and honours the `as` rename.
 ===config===
-suppress=UnusedParam,UnusedVariable,MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:repo.php===
 <?php
 namespace Core\Repository;

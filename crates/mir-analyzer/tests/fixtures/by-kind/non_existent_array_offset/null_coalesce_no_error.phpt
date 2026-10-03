@@ -1,7 +1,11 @@
 ===description===
 No NonExistentArrayOffset on the LHS of ??
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = ["k" => 1];

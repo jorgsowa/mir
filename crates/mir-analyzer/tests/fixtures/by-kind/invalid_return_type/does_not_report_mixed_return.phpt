@@ -1,7 +1,12 @@
 ===description===
 does not report mixed return
 ===config===
-suppress=MixedAssignment,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(): int {

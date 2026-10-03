@@ -4,7 +4,13 @@ instead of reusing `literal_array_key_of_kind` — a bool/float/null index
 fell back to merging every shape property (wrong value type) and could
 silently skip a `NonExistentArrayOffset` diagnostic that should fire.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function readBoolKeyResolvesToCanonicalSlot(): void {

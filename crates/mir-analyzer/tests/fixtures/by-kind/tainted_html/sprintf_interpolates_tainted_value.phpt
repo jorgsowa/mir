@@ -4,7 +4,12 @@ returned string, but neither was ever modeled as a taint pass-through —
 echoing their result with a tainted argument silently produced no
 diagnostic at all.
 ===config===
-suppress=MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function viaSprintf(): void {

@@ -3,7 +3,11 @@ G1: returning the template parameter itself (a param typed `T`, erased to its bo
 the body) or a subtype of the bound from an `@return T` method is compatible. Template
 params erase to their bound for the return-site check, so neither case is a false positive.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

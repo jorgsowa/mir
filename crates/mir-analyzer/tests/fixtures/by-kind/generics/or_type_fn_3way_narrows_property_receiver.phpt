@@ -4,7 +4,12 @@
 the property — `single_leaf_disjunct_prop` didn't recurse into a nested
 `||`, unlike its var-side sibling `single_leaf_disjunct_var`.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

@@ -7,7 +7,14 @@ class, so `T` fell back to `mixed` instead of the argument's actual type
 param, even though the class hierarchy is already walked for subtype checks
 elsewhere. `@mir-check` pins the return type at the call site.
 ===config===
-suppress=MissingPropertyType,UnusedParam,MissingThrowsDocblock,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

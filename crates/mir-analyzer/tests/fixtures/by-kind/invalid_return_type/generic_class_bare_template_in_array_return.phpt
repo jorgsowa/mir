@@ -1,7 +1,13 @@
 ===description===
 No FP InvalidReturnType when declared return has template params nested inside array/list type params of a generic class
 ===config===
-suppress=UnusedParam,UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Result.php===
 <?php
 

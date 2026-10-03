@@ -2,7 +2,12 @@
 strtolower, strtoupper, ucfirst, lcfirst, ucwords, mb_strtolower, mb_strtoupper
 preserve non-empty-string when the input is provably non-empty.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-string $s */

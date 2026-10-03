@@ -2,7 +2,11 @@
 int-mask<1, 2, 4> expands to all 8 OR-combinations {0,1,2,3,4,5,6,7}.
 Passing any of those values is accepted without error.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

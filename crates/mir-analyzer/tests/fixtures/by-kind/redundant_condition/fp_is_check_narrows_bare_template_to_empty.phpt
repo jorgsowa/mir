@@ -6,7 +6,12 @@ the way they already do for `TMixed`. An empty narrowed type reads as an
 unreachable branch, so every one of these checks was flagged redundant even
 though `T` could resolve to anything at the call site.
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -3,7 +3,12 @@
 int|string — the property-receiver counterpart of or_type_fn_narrows_to_union,
 which only wired the var-side narrow_type_fn_disjuncts into narrow_or_instanceof_true.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

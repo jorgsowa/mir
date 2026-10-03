@@ -2,7 +2,13 @@
 intdiv() on non-negative dividend with positive divisor infers a bounded range:
 non-negative-int / positive-int → non-negative-int; int<0,N> / K → int<0, N/K>.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-negative-int $n */

@@ -1,7 +1,14 @@
 ===description===
 new catch use alias in namespaced file no error
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock,UnusedFunction,InvalidCatch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <InvalidCatch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Entity.php===
 <?php
 namespace App\Model;

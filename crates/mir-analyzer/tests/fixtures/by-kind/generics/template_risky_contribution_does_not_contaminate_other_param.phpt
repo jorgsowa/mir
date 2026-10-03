@@ -4,7 +4,11 @@ A "fully explained by a sibling alternative" contribution from one param
 contaminate a DIFFERENT param's real binding for the same template name —
 both a false-positive argument error and a masked bound violation.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

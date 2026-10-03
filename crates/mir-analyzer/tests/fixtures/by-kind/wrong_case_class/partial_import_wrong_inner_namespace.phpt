@@ -1,7 +1,11 @@
 ===description===
 Partial namespace import with wrong inner namespace segment reports the fully resolved path.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace MyApp\Deep\Service;

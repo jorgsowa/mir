@@ -1,7 +1,11 @@
 ===description===
 passing array<object, mixed> to @template TKey of array-key violates the bound
 ===config===
-stub_file=stubs/helpers.php
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 /**

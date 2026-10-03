@@ -1,7 +1,11 @@
 ===description===
 does not report when param is mixed
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takesMixed(mixed $v): void { var_dump($v); }

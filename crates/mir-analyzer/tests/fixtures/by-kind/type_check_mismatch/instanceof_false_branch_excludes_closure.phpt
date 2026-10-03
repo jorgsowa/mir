@@ -5,7 +5,12 @@ excluded — filter_out_instanceof_match had no TClosure arm, so the false
 branch (and its reuse by is_a()'s false branch / negated instanceof) silently
 kept the impossible Closure atom alive.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

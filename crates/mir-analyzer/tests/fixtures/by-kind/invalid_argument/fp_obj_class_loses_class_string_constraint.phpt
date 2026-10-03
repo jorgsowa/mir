@@ -1,7 +1,11 @@
 ===description===
 $obj::class should produce class-string<T> not bare class-string (FP G)
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

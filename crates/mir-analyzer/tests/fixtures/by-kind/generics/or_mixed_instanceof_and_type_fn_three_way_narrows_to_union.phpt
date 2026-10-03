@@ -5,7 +5,12 @@ narrows to the full union — the 2-way case already worked, but a nested
 `||` on the left-associative parse tree wasn't recursed into. A chain that
 mixes in a different variable still bails out (no narrowing, no crash).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

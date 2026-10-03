@@ -1,7 +1,13 @@
 ===description===
 `arraylike-object` preserves indexed, iterable, and countable capabilities.
 ===config===
-suppress=MissingConstructor,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

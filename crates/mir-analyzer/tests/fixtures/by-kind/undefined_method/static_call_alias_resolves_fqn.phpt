@@ -3,7 +3,13 @@ Alias::method() where Alias is a use-imported class resolves both the class
 FQN (ClassReference on the Alias token) and the method (StaticCall with the
 correct declaring class). Return type and no UndefinedMethod confirm resolution.
 ===config===
-suppress=UnusedFunction,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Str.php===
 <?php
 namespace Illuminate\Support;

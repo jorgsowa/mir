@@ -10,7 +10,17 @@ becomes `TObject | FormRequest`; the bare `TObject` in the arg hit `_ => false`,
 causing `all()` to fail. Fixed by adding an explicit `TObject` arg arm that checks
 whether the param accepts bare `object`.
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,MixedMethodCall,MixedReturnStatement,UndefinedMethod
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <UndefinedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

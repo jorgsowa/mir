@@ -3,7 +3,11 @@ int-mask-of<self::FLAG_*> resolves against the class's own literal-int
 constants matching the `FLAG_` prefix and expands to all 8 OR-combinations
 of {1, 2, 4}, same as writing int-mask<1, 2, 4> by hand.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

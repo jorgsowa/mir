@@ -2,7 +2,11 @@
 int-mask-of<self::FLAG_*> resolves against a trait's own constants when the
 method is declared directly on the trait.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait HasFlags {

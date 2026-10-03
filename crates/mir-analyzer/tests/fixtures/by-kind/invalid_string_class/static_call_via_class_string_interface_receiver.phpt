@@ -3,7 +3,11 @@ A class-string<Interface>-typed variable used as a :: receiver holds the
 class-string of whatever concrete implementing class it was assigned — valid
 PHP, must analyze clean.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

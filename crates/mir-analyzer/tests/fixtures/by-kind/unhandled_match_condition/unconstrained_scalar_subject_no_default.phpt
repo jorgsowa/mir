@@ -1,7 +1,11 @@
 ===description===
 A match() on a plain scalar subject with no default arm can throw UnhandledMatchError for any value the arms don't list; it is reported when an arm is not a literal.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function no_default(int $x, int $y): string {

@@ -1,7 +1,13 @@
 ===description===
 Configured extensions are walked: issues surface in .module/.inc files and cross-file calls resolve
 ===config===
-file_extensions=php,module,inc
+<mir>
+  <fileExtensions>
+    <extension name="php"/>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 function a_hook(): int { return 'x'; }

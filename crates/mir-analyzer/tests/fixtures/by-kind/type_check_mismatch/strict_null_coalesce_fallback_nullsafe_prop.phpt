@@ -6,7 +6,13 @@ also proves the receiver wasn't null. Without this, a later plain read of
 the same property re-admits null via the receiver's own nullability. Also
 covers the `?->` extractor gap: the strict arm only matched plain `->`.
 ===config===
-suppress=UnusedVariable,MissingConstructor,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Box {

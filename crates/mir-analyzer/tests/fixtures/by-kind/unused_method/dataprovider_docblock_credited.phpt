@@ -1,7 +1,9 @@
 ===description===
 @dataProvider method is credited as used, not flagged
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class FooTest {

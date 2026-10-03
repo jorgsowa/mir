@@ -2,7 +2,12 @@
 array_filter with an `$v <op> N` predicate narrows int values to the kept range, in
 either operand order; non-int atoms and unrecognized predicates leave values alone.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<positive-int> $ids */

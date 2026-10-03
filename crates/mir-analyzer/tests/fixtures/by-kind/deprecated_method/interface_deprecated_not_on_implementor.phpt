@@ -1,7 +1,11 @@
 ===description===
 DeprecatedMethod does NOT fire when an interface declares a method as @deprecated but the implementing class provides a fresh, non-deprecated implementation — the deprecation is on the interface declaration, not the class method.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Printable {

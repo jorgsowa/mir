@@ -5,7 +5,11 @@ be checked against the rebound scope, not the closure's lexically enclosing
 class. Only the statement immediately following the assignment is trusted for
 this — nothing reassigns `$copy` in between.
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class DeepCopy {

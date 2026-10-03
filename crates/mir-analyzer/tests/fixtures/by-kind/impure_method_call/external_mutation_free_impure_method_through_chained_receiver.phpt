@@ -4,7 +4,11 @@ Same chained-receiver gap as the @psalm-immutable case, but for
 property ($other->cache->bump()) escaped the check because it only ever
 matched a literal Variable receiver, never a chained one.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cache {

@@ -3,7 +3,11 @@
 counterpart of `isset($x)` narrowing a plain variable — `isset()` is false
 for both an unset and a null-valued property, so a true result proves both.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

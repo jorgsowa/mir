@@ -5,7 +5,12 @@ narrow $foo to A|B for the arm body. Before this fix each instanceof was
 applied in sequence (AND semantics), collapsing $foo to just the LAST
 disjunct (B) instead of the true union.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

@@ -4,7 +4,13 @@ must not reject a bare `null` argument — the `null` alternative in the union
 already accounts for it, so this call gives no information about `T` at all
 and must not be checked against `T`'s bound.
 ===config===
-suppress=UnusedVariable,MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

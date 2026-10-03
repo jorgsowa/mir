@@ -1,7 +1,11 @@
 ===description===
 interface_exists guard suppresses UndefinedClass in true branch
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

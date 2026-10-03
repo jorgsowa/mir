@@ -4,7 +4,13 @@ matching bool literal (true branch) or exclude it (false branch), the
 bool-literal counterpart of the already-existing static-property
 int/string literal narrowing.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

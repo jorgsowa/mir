@@ -3,7 +3,11 @@ do-while loop building a keyed array must converge without infinite type union g
 Exercises the same widen_array_with_value_and_key accumulation path as foreach,
 but through the do-while control-flow shape.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

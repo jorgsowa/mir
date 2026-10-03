@@ -2,7 +2,12 @@
 PHP === is type-and-value strict: int and float are different types.
 $x === 1.5 is always false when $x is int.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $x): void {

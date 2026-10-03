@@ -2,7 +2,12 @@
 rand($min, $max) / mt_rand / random_int with literal integer bounds return int<min, max>.
 With no arguments or variable bounds, falls through to the stub return type.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_rand(): void {

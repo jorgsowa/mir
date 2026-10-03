@@ -4,7 +4,11 @@ form: expanding it also manufactures an implicit `Traversable` member, which
 must resolve as the global built-in interface rather than being qualified
 against the file's namespace.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace Webmozart\Assert;

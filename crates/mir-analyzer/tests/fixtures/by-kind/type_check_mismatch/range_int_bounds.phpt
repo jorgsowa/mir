@@ -1,7 +1,11 @@
 ===description===
 range() with integer literal bounds returns non-empty-list<int<min,max>>.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -3,7 +3,11 @@ PHP_INT_SIZE retains its 4|8 literal union for typed returns and comparisons:
 both real platform widths remain possible, while an unsupported width is
 correctly impossible.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @return 4|8 */

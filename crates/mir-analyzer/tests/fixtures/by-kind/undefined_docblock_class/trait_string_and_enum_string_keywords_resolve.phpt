@@ -3,7 +3,11 @@ M23: `trait-string` and `enum-string` are recognized docblock type
 keywords (parallel to the already-working `class-string`/
 `interface-string`), not undefined class names.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait HasName {}

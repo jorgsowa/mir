@@ -1,7 +1,12 @@
 ===description===
 array_map with an arrow fn refines the result to array<sourceKey, callbackReturn>
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

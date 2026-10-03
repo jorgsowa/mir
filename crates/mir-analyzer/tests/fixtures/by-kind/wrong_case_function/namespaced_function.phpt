@@ -1,7 +1,11 @@
 ===description===
 Namespaced function with wrong-case short name is reported.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Utils;

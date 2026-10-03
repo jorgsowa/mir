@@ -4,7 +4,12 @@ the inferred type (real code rarely checks for it), but code that DOES defensive
 check for it — the vlucas/phpdotenv `Util\Str` pattern — must not get a false
 ImpossibleIdenticalComparison or RedundantCondition on its own guard.
 ===config===
-suppress=UnusedParam,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

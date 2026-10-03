@@ -4,7 +4,14 @@
 special-cased a direct `PropertyAccess` operand -- an array-index-into-
 property operand had no purity check at all.
 ===config===
-suppress=MissingPropertyType,MixedArrayAccess,MixedAssignment,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Tally {

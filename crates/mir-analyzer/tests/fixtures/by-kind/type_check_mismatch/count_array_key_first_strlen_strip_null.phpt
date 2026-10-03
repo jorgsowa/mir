@@ -4,7 +4,13 @@ comparison result (even one that doesn't determine emptiness) already
 excludes null. strlen(null) doesn't throw, so only the proven-non-empty
 direction excludes null.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array|null $arr */

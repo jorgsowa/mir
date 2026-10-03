@@ -6,7 +6,13 @@ for these two tags, since they allow reading external state and only
 forbid writing it). Both the whole-variable overwrite and a property
 write through a global-held object went completely unflagged.
 ===config===
-suppress=MissingConstructor,MixedAssignment,MixedPropertyAssignment
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedPropertyAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

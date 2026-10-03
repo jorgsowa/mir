@@ -1,8 +1,12 @@
 ===description===
 cross file substr count version params 5 3
 ===config===
-php_version=5.3
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>5.3</phpVersion>
+</mir>
 ===file:StringHelper.php===
 <?php
 function countWord(string $output): int {

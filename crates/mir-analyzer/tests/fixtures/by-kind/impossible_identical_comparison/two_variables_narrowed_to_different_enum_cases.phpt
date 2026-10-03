@@ -3,7 +3,12 @@ Two variables independently narrowed to different cases of the same enum via
 real `EnumName::CaseName` (===) comparisons make a later `===` between them
 statically impossible.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit {

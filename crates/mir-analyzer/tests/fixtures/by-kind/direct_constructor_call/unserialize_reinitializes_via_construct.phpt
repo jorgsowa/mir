@@ -3,7 +3,11 @@ $this->__construct() inside the legacy Serializable::unserialize() method must n
 DirectConstructorCall. This is the standard, PHP-manual-documented re-initialization idiom for
 classes implementing the (deprecated but still supported) Serializable interface.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class DbConnection implements \Serializable {

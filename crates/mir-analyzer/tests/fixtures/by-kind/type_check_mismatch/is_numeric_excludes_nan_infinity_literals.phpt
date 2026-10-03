@@ -2,7 +2,12 @@
 is_numeric() true-branch excludes the 'NAN' literal from a 'NAN'|'42' union
 — 'NAN' is not a PHP numeric string, unlike '42'. False-branch keeps it.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 'NAN'|'42' $s */

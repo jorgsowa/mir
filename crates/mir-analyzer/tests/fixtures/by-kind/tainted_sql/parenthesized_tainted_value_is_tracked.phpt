@@ -3,7 +3,12 @@ A parenthesized tainted expression ((`$sql`)) still taints a SQL sink —
 is_expr_tainted previously had no arm to unwrap Parenthesized, silently
 breaking propagation through any parenthesized subexpression.
 ===config===
-suppress=MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(mysqli $db): void {

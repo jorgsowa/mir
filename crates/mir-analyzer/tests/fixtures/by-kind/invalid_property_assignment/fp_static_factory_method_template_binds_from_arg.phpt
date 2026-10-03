@@ -4,7 +4,11 @@ FP: static factory method with method-level @template T should bind T to the arg
 producing Option<T>|Option<never> instead of Option<mixed>|Option<never>, which
 then failed the InvalidPropertyAssignment check against Option<string|null>.
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

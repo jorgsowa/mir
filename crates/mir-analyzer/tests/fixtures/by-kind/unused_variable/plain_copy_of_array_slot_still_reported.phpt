@@ -1,7 +1,12 @@
 ===description===
 A plain (non-reference) copy of an array slot that is only written to is still reported.
 ===config===
-suppress=MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<array{g: int, id: int}> $rows */

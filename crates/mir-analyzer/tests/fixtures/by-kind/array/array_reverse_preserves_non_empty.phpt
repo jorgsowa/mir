@@ -3,7 +3,12 @@ array_reverse preserves non-emptiness: reversing a non-empty list is still non-e
 The result is always a list (integer re-indexed) regardless of whether the source
 was an associative array or a list. A possibly-empty source stays possibly-empty.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

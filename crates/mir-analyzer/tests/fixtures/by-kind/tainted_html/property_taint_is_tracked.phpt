@@ -4,7 +4,14 @@ assigning a tainted value to $obj->prop and later reading $obj->prop was
 previously never recognized as tainted (is_expr_tainted had no
 PropertyAccess arm at all).
 ===config===
-suppress=MixedAssignment,MixedArgument,MixedArrayAccess,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

@@ -3,7 +3,12 @@
 own bound type param before writing back to the caller's variable, the same
 way a normal `@param T`/`@return T` already does.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

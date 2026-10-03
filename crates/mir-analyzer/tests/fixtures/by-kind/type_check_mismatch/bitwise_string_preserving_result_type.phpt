@@ -5,8 +5,12 @@ these operators, so `bin2hex(~$bytes)` flagged a bogus PossiblyInvalidArgument.
 `<<`/`>>` always coerce to int regardless of operand type, so they keep the
 old int-only behavior.
 ===config===
-suppress=UnusedParam
-php_version=8.4
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 

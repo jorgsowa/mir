@@ -1,7 +1,9 @@
 ===description===
 A heredoc with an interpolated part is not a compile-time literal, so it must not credit the interpolated-looking function name as used.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function formatRow(int $row): string { return (string) $row; }

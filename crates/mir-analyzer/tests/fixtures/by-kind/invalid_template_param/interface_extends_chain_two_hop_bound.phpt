@@ -6,7 +6,12 @@ gap: `InterfaceDef` didn't carry `@extends` type args, so the inherited-
 binding walk couldn't resolve the distant ancestor's template param and fell
 back to `mixed`, which trivially satisfies any bound.
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant E */

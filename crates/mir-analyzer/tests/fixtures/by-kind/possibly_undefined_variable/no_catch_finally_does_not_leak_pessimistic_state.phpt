@@ -7,7 +7,11 @@ thrown in try propagates past the whole statement after finally runs —
 it never reaches code after the statement — so reaching that code means
 try completed and $str was assigned.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function encode(mixed $value): void {

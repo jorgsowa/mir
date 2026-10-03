@@ -2,7 +2,11 @@
 Sanity check: fixing the false positive for a concrete class that SATISFIES
 `Collection<int>` must not disable rejecting one that doesn't.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

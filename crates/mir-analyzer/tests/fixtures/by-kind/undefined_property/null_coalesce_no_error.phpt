@@ -1,7 +1,11 @@
 ===description===
 UndefinedProperty suppressed when property is guarded by ?? operator
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Mailable {

@@ -3,7 +3,11 @@ A `@param` type with a genuinely unterminated string literal (an opening
 quote with no closing quote, not just a lone quote character) must be
 reported the same way as the lone-quote case.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

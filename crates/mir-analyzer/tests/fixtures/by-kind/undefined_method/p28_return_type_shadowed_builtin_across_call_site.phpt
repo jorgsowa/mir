@@ -4,7 +4,11 @@ docblock-shadowed-builtin return value (`$f->make()->build()`) must resolve
 `make()`'s return type the same way body-analysis flow-seeding does, via
 the reconciliation in `resolve_method_from_db` (`call/method.rs`).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

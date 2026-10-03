@@ -1,7 +1,12 @@
 ===description===
 gettype switch arm unreachable for the argument's inferred type
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function scope(int $n): void {

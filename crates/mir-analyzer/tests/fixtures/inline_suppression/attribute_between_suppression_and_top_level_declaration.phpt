@@ -7,7 +7,12 @@ there instead of continuing past it, landing the suppression target on
 the attribute line while the declaration's own diagnostic fires one line
 further down.
 ===config===
-suppress=UndefinedAttributeClass,UnusedParam
+<mir>
+  <issueHandlers>
+    <UndefinedAttributeClass errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @mir-ignore UndefinedClass */

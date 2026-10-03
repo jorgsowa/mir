@@ -1,7 +1,11 @@
 ===description===
 Switch bad method call in case
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(string $p): void { }

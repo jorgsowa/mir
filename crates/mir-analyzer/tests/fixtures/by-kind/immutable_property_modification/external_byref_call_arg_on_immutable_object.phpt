@@ -3,7 +3,11 @@ Same cross-class immutable-write gap as the array-index-write sibling,
 but for a by-ref call argument (`sort($b->items)`) through a non-`$this`
 receiver.
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-immutable */

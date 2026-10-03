@@ -4,7 +4,14 @@ ANCESTOR (not the receiver class itself) checks against the ancestor's
 fixed binding, not the receiver's own, same-lettered template — the
 write-side counterpart of the already-fixed read-side property access.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -1,7 +1,11 @@
 ===description===
 UndefinedDocblockClass fires for a member of a `Foo&Bar` intersection @return docblock type.
 ===config===
-suppress=InvalidReturnType
+<mir>
+  <issueHandlers>
+    <InvalidReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Countable2 {}

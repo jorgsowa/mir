@@ -5,8 +5,14 @@ but the write-back site only ever called ctx.set_var for the new type —
 never taint_var/clear_var_taint — so $matches stayed untainted even
 though it holds pieces of a tainted string.
 ===config===
-suppress=MixedArgument,MissingReturnType,MixedArrayAccess
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 function run(): void {

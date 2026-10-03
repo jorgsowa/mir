@@ -1,7 +1,12 @@
 ===description===
 cross file stream functions available
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:StreamHelper.php===
 <?php
 function isTerminalStream(mixed $stream): bool {

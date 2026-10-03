@@ -1,7 +1,9 @@
 ===description===
 cross file invalid arg type to since 8 0 function
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file:StringHelper.php===
 <?php
 function test_wrong_type(int $n): void {

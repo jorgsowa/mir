@@ -4,7 +4,12 @@ fresh list regardless of pad direction, merging the fill value's type into
 the element union. A literal non-zero $length guarantees the result is
 non-empty even when the source itself isn't provably non-empty.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

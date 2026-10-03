@@ -1,7 +1,12 @@
 ===description===
 An enum-case subject (`T is Key::A`) cannot be decided from the argument type, so the conditional widens to both branches without a bogus class or ImplicitToStringCast.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Key { case A; case B; }

@@ -2,7 +2,12 @@
 A return type that grows on every fixpoint iteration (`[$this->f()]`,
 `n() + 1`) widens to `mixed` instead of diverging.
 ===config===
-suppress=MissingReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class T {

@@ -5,7 +5,13 @@ dispatch had arms for MethodCall and StaticMethodCall but no
 NullsafeMethodCall, unlike taint.rs's taint-source check which already
 pairs both.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Validator {

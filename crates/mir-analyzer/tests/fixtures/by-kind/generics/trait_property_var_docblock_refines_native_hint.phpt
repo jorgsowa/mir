@@ -2,7 +2,12 @@
 FN: a trait property's @var docblock was ignored entirely — only the
 native type hint was ever used, unlike the equivalent class property.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait HasCount {

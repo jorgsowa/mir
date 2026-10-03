@@ -1,7 +1,11 @@
 ===description===
 DeprecatedMethod fires when calling a deprecated method that comes from a used trait.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait Logger {

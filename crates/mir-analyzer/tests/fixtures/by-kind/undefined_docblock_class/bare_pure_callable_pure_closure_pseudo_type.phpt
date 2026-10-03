@@ -5,7 +5,11 @@ form (`pure-callable(int): string`) already worked via
 `parse_callable_syntax`, but a bare keyword with no signature never reached
 it.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param pure-callable $cb */

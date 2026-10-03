@@ -1,8 +1,15 @@
 ===description===
 Files that include each other are each visited once
 ===config===
-file_extensions=module,inc
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 require_once __DIR__ . '/b.inc';

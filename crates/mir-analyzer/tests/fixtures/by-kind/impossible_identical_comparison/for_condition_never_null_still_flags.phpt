@@ -1,7 +1,11 @@
 ===description===
 Negative control: a `for` condition that no iteration can ever change is still flagged.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(\Throwable $e): void {

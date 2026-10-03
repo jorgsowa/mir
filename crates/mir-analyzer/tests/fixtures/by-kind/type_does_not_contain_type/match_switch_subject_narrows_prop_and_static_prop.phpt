@@ -5,7 +5,13 @@ fallthrough `case 'a': case 'b':`) now narrows the same way. Last function
 proves genuine mismatches on a property subject are still caught, not
 blanket-suppressed.
 ===config===
-suppress=UnusedParam,MissingConstructor,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

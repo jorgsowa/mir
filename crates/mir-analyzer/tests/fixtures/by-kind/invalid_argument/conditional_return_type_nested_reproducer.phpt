@@ -1,7 +1,11 @@
 ===description===
 nested conditional return type passed to typed param should not report InvalidArgument
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

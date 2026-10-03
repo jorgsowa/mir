@@ -3,7 +3,11 @@
 $x to int|string — the scalar-type-check counterpart of instanceof-OR
 narrowing, which only recognized `instanceof` conditions.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

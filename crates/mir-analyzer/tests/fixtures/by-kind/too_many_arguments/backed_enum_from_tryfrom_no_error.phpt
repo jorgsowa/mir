@@ -1,7 +1,12 @@
 ===description===
 backed enum ::from() and ::tryFrom() accept one argument without TooManyArguments
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Color: string {

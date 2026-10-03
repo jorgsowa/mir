@@ -1,7 +1,11 @@
 ===description===
 `: static` and a trait's `: self` still bind to the receiver class.
 ===config===
-suppress=UnusedMethod
+<mir>
+  <issueHandlers>
+    <UnusedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

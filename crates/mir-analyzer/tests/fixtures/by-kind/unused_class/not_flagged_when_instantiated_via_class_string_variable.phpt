@@ -1,7 +1,9 @@
 ===description===
 A final class instantiated only through `new $class()` where `$class` holds a class-string variable must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Widget {}

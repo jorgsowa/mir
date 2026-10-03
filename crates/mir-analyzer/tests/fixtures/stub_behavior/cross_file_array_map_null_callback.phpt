@@ -1,7 +1,11 @@
 ===description===
 cross file array map null callback
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Zipper.php===
 <?php
 function zipArrays(array $a, array $b): array {

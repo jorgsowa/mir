@@ -2,8 +2,12 @@
 Enum ::cases() returns list<EnumType> for both pure and backed enums.
 Expected: no issue.
 ===config===
-php_version=8.1
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum Color: string {

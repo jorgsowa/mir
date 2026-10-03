@@ -3,7 +3,12 @@ N5 (false-branch fix): TCallableString must be recognised as callable so the
 !is_callable false branch correctly removes it. A callable-string atom is
 definitionally callable, so is_callable() is always true for it.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

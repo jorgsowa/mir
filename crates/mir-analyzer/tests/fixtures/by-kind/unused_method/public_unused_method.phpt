@@ -1,7 +1,9 @@
 ===description===
 Public unused method
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class A {

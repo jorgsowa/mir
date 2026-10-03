@@ -2,7 +2,11 @@
 Bitwise OR of self::INT_CONST values used as an array key does not flag.
 The OR of two literal ints produces an int, which is a valid array-key.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Permission {

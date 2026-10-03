@@ -1,7 +1,11 @@
 ===description===
 No fatal error on missing class without slash
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Func {

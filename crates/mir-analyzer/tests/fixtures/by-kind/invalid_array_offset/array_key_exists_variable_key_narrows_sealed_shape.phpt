@@ -2,7 +2,12 @@
 array_key_exists($key, $arr) resolves $key when it's a variable already
 narrowed to a single literal, same as passing the literal inline.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{title: string} $meta */

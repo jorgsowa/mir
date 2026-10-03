@@ -3,7 +3,11 @@ D4: each arrow function in a nested chain is checked against its own declared
 return type independently — the inner mismatch must not be swallowed by the
 outer arrow function's (correct) return type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $f = fn(): string => (fn(): string => 123)();

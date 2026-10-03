@@ -1,7 +1,11 @@
 ===description===
 arrow function parameter not undefined no error
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $fn = fn(int $n): int => $n * 2;

@@ -2,7 +2,13 @@
 is_a() narrows using instanceof semantics (includes the exact class).
 is_subclass_of() uses strict-subclass semantics (the exact class is excluded).
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

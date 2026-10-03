@@ -6,7 +6,12 @@ TypeError for such an argument) — this branch is unreachable, mirroring
 every sibling `is_*()` narrower instead of silently reverting to the
 unnarrowed type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function methodExistsUnreachable(int $x): void {

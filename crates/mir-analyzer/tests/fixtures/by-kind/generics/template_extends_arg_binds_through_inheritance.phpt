@@ -4,7 +4,11 @@ param must be stored as template params, not namespace-qualified into a
 phantom `NS\U` class — otherwise a `Base` method's `@return T` can't chase
 T -> U -> the receiver's concrete binding and leaks the raw template atom.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace NS;

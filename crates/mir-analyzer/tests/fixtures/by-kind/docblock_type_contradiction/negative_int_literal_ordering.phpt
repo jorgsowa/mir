@@ -3,7 +3,12 @@ Ordering comparisons with negative int literals: `int<5, 10> < -1` is
 impossible since min=5 > -1; these also require extract_lit to handle
 negated literals.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<5, 10> $n */

@@ -2,7 +2,11 @@
 preg_replace_callback with string subject returns string|null — no NullableReturnStatement
 when result is coalesced
 ===config===
-suppress=MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function formatDate(string $date): string {

@@ -8,7 +8,12 @@ with a closure accepting `Animal` (contravariantly valid for T=Animal) must
 keep T as Animal, not silently rebind it to whatever the closure's own
 parameter type happens to be.
 ===config===
-suppress=MissingPropertyType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

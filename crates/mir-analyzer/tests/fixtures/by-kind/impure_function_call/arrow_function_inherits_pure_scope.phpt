@@ -3,7 +3,11 @@ An arrow function invoked from inside a @pure function must inherit the
 pure scope, just like a regular closure — calling an impure function
 through fn() => impure_fn() was previously never flagged.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function impure_fn(): void { echo "side effect"; }

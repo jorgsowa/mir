@@ -4,7 +4,13 @@ the static-property receiver like the already-correct instance-property
 and variable cases — extract_static_prop_access was never checked at this
 dispatch site.
 ===config===
-suppress=MissingConstructor,MissingPropertyType,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

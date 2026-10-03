@@ -7,7 +7,11 @@ byte-exact, so the subtype relation was missed and spurious
 InvalidArgument / InvalidReturnType issues were emitted. The
 WrongCaseClass style diagnostic on the `extends` clause is still reported.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

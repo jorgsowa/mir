@@ -2,7 +2,12 @@
 Comparisons on named int subtypes that are always true are reported as
 RedundantCondition: positive-int > 0, non-negative-int >= 0, negative-int < 0.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

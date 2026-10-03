@@ -4,7 +4,12 @@ parameter is still accepted — regression guard for the required-key check
 added to `array_list_compatible`'s shape-to-shape arm, so it doesn't
 over-tighten to require every declared key.
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{host: string, port?: int} $config */

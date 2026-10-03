@@ -3,7 +3,11 @@ The receiver-scoped invalidation isn't special-cased to `$this` — calling an
 unproven method on ANY narrowed object variable must drop that object's own
 narrowing, since the callee's `$this` is that object.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

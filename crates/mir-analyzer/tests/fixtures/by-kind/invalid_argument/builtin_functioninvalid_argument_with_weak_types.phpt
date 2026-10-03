@@ -1,7 +1,11 @@
 ===description===
 Builtin functioninvalid argument with weak types
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $s = substr(5, 4);

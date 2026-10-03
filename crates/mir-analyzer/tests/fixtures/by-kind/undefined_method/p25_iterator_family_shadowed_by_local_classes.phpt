@@ -5,7 +5,11 @@ alongside `Generator`, so a same-namespace class/interface reusing any of those
 names must resolve the same way — via a param type hint (`Iterator`), a return type
 hint (`Traversable`), and an implemented-interface type hint (`IteratorAggregate`).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

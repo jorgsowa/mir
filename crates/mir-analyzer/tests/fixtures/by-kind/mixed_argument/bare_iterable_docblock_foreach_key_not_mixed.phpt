@@ -6,7 +6,13 @@ guard for the parser bug where `iterable`/`iterable<V>` built that key as
 foreach key to a strictly-typed `int|string` parameter would fire
 MixedArgument; it must not.
 ===config===
-suppress=UnusedForeachValue,UnusedParam,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function needsIntOrString(int|string $k): void {}

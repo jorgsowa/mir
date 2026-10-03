@@ -3,7 +3,9 @@ FP-H: `@method static name()` — `static` is the PHP return type for fluent API
 the static method modifier. When a subclass provides a concrete non-static `addDay()`
 the parent docblock should not cause MethodSignatureMismatch.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

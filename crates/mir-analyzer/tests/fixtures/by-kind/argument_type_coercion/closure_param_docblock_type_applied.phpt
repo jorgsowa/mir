@@ -3,7 +3,13 @@ A `@param` docblock immediately preceding a closure literal must type its
 parameter for checks inside the closure body — previously only native type
 hints were used, so a docblock-only param type silently stayed `mixed`.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

@@ -5,8 +5,12 @@ fix, `parse_keyed_array` ran the key text through `strip_quotes`, which had
 the same starts_with/ends_with-on-the-same-char bug as the string-literal
 arm of `parse_type_string` and panicked on the same slice.
 ===config===
-suppress=UnusedProperty
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedProperty errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

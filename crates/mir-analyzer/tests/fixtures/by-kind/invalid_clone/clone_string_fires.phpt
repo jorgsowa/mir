@@ -1,7 +1,11 @@
 ===description===
 InvalidClone fires when cloning a string parameter.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(string $s): void {

@@ -1,7 +1,11 @@
 ===description===
 does not report too many with spread
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takes_one(int $a): void {}

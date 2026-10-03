@@ -4,7 +4,15 @@ functional twin `shell_exec()`/`exec()`, but this arm discarded its
 interpolated parts entirely and never ran them through is_expr_tainted,
 so a tainted value never produced TaintedShell here.
 ===config===
-suppress=MixedArgument,MixedAssignment,ForbiddenCode,MixedArrayAccess,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

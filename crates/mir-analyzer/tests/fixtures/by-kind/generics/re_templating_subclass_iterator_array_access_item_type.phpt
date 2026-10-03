@@ -9,7 +9,13 @@ ancestor carries the `@implements Iterator</ArrayAccess<TKey,TValue>`
 annotation leaked the ancestor's raw template name (`TValue`) instead of
 resolving it through the subclass's own binding.
 ===config===
-suppress=MissingConstructor,MixedArrayOffset,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArrayOffset errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

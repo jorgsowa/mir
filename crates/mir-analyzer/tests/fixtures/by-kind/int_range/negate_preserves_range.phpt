@@ -2,7 +2,12 @@
 Unary negation propagates int range and literal types:
 -positive-int → negative-int; -negative-int → positive-int; -(int<a,b>) → int<-b,-a>.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

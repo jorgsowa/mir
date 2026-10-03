@@ -4,7 +4,16 @@ counts as a use. The static-property-access path now resolves self/static/parent
 through the FlowState and records the reference, so mir no longer reports
 UnusedProperty (MimeType::$mime).
 ===config===
-suppress=MissingClosureReturnType,MissingPropertyType,UnusedParam,UnusedVariable,MixedReturnStatement,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class MimeTypes {}

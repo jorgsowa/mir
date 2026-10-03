@@ -5,7 +5,11 @@ haystack's literal-int union, since strict (===) comparison rules out the
 cross-type loose-equality matches (e.g. string "1" vs int 1) that make this
 unsafe without the strict flag.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int|string $x): void {

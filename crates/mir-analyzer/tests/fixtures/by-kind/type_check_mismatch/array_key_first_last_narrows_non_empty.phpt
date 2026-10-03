@@ -2,7 +2,12 @@
 array_key_first($arr)/array_key_last($arr) !== null narrows $arr to
 non-empty-array, same non-empty idiom as count($arr) > 0.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> $arr */

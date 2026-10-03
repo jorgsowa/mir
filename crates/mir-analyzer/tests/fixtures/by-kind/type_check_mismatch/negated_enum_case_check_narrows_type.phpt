@@ -4,7 +4,11 @@ variable's type (not just incidentally silencing the match check
 elsewhere): after excluding Status::Pending, $s is provably
 Status::Active|Status::Inactive.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status { case Active; case Inactive; case Pending; }

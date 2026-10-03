@@ -3,7 +3,12 @@ strpos()/mb_strpos() family recognizes a variable holding a single non-empty
 string literal as the needle, not just an inline literal — mirrors
 array_key_exists()'s handling of a variable-held literal key.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_strpos_not_false_variable_needle(string $s): void {

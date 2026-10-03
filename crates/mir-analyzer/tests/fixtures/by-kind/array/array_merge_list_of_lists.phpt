@@ -3,7 +3,12 @@ array_merge of two list-typed arguments produces a list whose element type is th
 union of both element types. The result is non-empty if at least one argument is
 provably non-empty; otherwise possibly-empty.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

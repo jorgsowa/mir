@@ -2,7 +2,9 @@
 A final class referenced only by name in a `call_user_func('Foo::helper')`
 class-string callable must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Foo {

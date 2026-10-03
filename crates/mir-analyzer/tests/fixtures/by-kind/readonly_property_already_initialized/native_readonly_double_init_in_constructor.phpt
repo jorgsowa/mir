@@ -3,7 +3,11 @@ A native `readonly` property assigned twice in its own constructor is a
 runtime error ("Cannot modify readonly property ... once initialized") on
 the second assignment — only the first write is legal.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Point {

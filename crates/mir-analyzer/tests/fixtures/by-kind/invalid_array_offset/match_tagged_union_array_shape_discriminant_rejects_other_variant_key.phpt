@@ -1,7 +1,11 @@
 ===description===
 Tagged-union match arms reject keys from other variants.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{type: 'a', foo: int}|array{type: 'b', bar: string} $x */

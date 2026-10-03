@@ -1,7 +1,9 @@
 ===description===
 Both members of a `@throws A|B` union tag must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class FirstException extends \RuntimeException {}

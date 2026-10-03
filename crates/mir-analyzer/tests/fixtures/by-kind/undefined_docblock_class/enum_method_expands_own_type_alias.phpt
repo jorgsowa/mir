@@ -6,7 +6,11 @@ was computed AFTER the member loop had already processed every method.
 A method's `@param` referencing the alias resolved to the literal,
 nonexistent class `Payload` instead of the aliased shape.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

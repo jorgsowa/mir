@@ -1,7 +1,11 @@
 ===description===
 Bad by ref
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function fooFoo(string &$v): void {}

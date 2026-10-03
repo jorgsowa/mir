@@ -3,7 +3,12 @@ is_a()/is_string()/in_array()'s property-argument extraction now recognizes
 a nullsafe (?->) property access the same as a plain (->) one, matching
 every other comparison-narrowing arm in the file.
 ===config===
-suppress=UnusedVariable,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Item {}

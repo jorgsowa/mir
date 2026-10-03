@@ -3,7 +3,13 @@ array_key_exists()/key_exists() throw a TypeError on a null 2nd arg, so
 reaching either branch proves the array argument itself wasn't null, for
 var/prop/static-prop receivers alike.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

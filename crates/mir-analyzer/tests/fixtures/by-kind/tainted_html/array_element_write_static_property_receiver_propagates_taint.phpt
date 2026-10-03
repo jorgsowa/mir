@@ -2,7 +2,12 @@
 `self::$items['id'] = $tainted;` — same array-element-write taint gap
 as the instance-property sibling, for a static-property base.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cache {

@@ -3,7 +3,11 @@ An explicit @phpstan-impure declaration overrides a pure interface contract:
 the implementation body is not analyzed as pure and pure callers still see
 the method as impure.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Builder {

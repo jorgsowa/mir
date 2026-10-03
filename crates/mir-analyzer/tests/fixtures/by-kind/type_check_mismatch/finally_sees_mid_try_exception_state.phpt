@@ -4,7 +4,11 @@ narrowed to its final value alone — an exception could have been thrown
 before the try body completed, same conservative pre/post merge already
 used to seed catch blocks
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

@@ -2,7 +2,11 @@
 The opaque-callback caller scan is workspace-wide, not file-local: a caller
 in a different file must still resolve the callback's return type.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:lib.php===
 <?php
 function apply(callable $cb, array $nums): array {

@@ -6,7 +6,12 @@ completely unnarrowed, and switch(true)/match(true) fell back to
 narrowing each condition SEQUENTIALLY (AND-composing them instead of
 unioning) instead of using the union machinery this fix makes reachable.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

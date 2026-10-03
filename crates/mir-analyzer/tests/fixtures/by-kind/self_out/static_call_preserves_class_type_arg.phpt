@@ -2,7 +2,12 @@
 @psalm-self-out static<T> on a static:: call keeps the class's own inferred
 type argument, instead of erasing it to a bare, unparameterized class.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -18,7 +18,12 @@ with a bare `T` left as a named-object reference instead of substituting to
 `TTemplateParam`, which is why `UndefinedDocblockClass` now additionally
 fires below — another symptom of this same pinned limitation, not a new bug.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

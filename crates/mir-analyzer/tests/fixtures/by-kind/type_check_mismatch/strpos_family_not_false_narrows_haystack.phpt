@@ -2,7 +2,12 @@
 strpos()/stripos()/strrpos()/strripos() (and mb_ variants) compared with
 !== false / === false narrow the haystack like str_contains() does.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_strpos_not_false(string $s): void {

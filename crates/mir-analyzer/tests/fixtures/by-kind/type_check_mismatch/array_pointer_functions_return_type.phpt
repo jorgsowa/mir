@@ -3,7 +3,12 @@ reset()/end() narrow to the array's value type (plus false); current()/
 next()/prev() always include false too, even for a provably non-empty
 source, since the pointer's position from prior calls isn't tracked.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

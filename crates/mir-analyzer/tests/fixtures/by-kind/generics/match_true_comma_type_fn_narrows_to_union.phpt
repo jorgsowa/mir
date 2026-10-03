@@ -4,7 +4,12 @@ functions (`is_int($x), is_string($x)`) are OR semantics — the arm must
 narrow $x to int|string, not collapse to just the last disjunct via
 sequential (AND) narrowing.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

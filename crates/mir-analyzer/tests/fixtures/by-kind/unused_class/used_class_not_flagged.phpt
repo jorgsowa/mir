@@ -1,7 +1,9 @@
 ===description===
 UnusedClass does NOT fire for a class that is instantiated or referenced.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 /** @psalm-internal */

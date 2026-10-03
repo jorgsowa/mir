@@ -6,7 +6,14 @@ checking the array argument's taint (not the callback) is enough,
 mirroring the existing compact()/sprintf() "check the args, not the
 callee" shortcut.
 ===config===
-suppress=MixedArrayAccess,MixedArgument,MixedReturnStatement,MixedArgumentTypeCoercion
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedArgumentTypeCoercion errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function viaArrayMap(): void {

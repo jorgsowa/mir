@@ -3,7 +3,12 @@
 truthy/falsy check, since PHP defines loose comparison to a bool literal as
 `(bool)$x === value`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string $x */

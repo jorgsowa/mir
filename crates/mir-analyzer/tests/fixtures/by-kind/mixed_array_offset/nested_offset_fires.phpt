@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset fires when a mixed key indexes into an inner array obtained from a typed outer access
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var mixed $key */

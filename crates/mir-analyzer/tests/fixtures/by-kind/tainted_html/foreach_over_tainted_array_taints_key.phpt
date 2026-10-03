@@ -4,7 +4,12 @@ attacker-controlled exactly as much as the value (a reflected-XSS vector
 via GET param NAMES), but only the value binding ever called taint_var;
 the key binding set its type without ever tainting it.
 ===config===
-suppress=MixedAssignment,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

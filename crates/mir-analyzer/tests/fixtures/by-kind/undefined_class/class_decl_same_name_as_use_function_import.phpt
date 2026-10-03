@@ -1,7 +1,12 @@
 ===description===
 class declaration is registered under its own namespace, not shadowed by a use-function import of the same short name
 ===config===
-suppress=UnusedFunction,UnusedClass
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+    <UnusedClass errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Helpers.php===
 <?php
 namespace App\Helpers;

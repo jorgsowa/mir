@@ -1,7 +1,11 @@
 ===description===
 No ImplicitToStringCast when class defines __toString and param is a union containing string
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

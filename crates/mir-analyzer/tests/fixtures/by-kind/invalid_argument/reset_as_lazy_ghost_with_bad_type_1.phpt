@@ -1,7 +1,11 @@
 ===description===
 resetAsLazyGhostWithBadType_1
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

@@ -6,7 +6,12 @@ true/false constant, arms are arbitrary boolean expressions) is excluded —
 its exhaustiveness depends on the arms' condition coverage, not on literal
 true/false arms existing.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function both_arms(bool $b): string {

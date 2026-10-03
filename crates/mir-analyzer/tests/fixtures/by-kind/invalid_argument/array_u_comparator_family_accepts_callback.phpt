@@ -4,7 +4,11 @@ argument(s) must not be rejected as `array` — phpstorm-stubs' `@param array
 ...$rest` docblock mistypes the actual runtime slot, which is always a
 callback.
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = ['a' => 1];

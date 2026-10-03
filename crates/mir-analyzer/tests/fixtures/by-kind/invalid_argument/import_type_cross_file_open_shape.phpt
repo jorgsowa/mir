@@ -2,7 +2,11 @@
 An imported unsealed shape (`...array<string, mixed>`) accepts extra keys but
 still requires its declared ones.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:logger.php===
 <?php
 namespace Log;

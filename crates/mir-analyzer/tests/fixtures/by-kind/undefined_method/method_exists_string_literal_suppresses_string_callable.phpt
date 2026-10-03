@@ -3,7 +3,11 @@ method_exists() with a string-literal class name registers the same guard
 key as the `::class` form, suppressing UndefinedMethod for a
 'Foo::method' string callable inside the guarded branch.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Other {}

@@ -4,7 +4,11 @@ the keys of its source array — but a tainted source array (`extract($_GET)`)
 never made any of those variables taint-tracked, silently producing no
 diagnostic when one was later echoed.
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function viaExtract(): void {

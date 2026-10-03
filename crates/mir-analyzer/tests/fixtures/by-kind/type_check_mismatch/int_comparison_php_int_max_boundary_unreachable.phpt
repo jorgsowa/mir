@@ -7,7 +7,12 @@ range, so the impossible branch was wrongly treated as reachable. Uses the
 marks divergent skips analysis of its body entirely, so the assertion
 silently produces no diagnostic; a reachable branch produces a mismatch.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<0,10> $x */

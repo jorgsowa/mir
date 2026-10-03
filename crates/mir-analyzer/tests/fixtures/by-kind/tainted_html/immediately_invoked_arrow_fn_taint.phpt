@@ -6,7 +6,12 @@ deliberately doesn't model, since an arrow function's single-expression
 body can be checked directly against the same ctx with no params to
 shadow the outer scope.
 ===config===
-suppress=MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

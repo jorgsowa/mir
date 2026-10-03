@@ -2,7 +2,12 @@
 strpos()/array_search() compared with loose != false / == false narrow like
 the strict !== false / === false handling; == false stays ambiguous (0 == false).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_strpos_loose_not_false(string $s): void {

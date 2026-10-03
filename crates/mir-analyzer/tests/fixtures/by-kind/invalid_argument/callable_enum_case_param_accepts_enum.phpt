@@ -1,7 +1,12 @@
 ===description===
 callable(Enum::Case) accepts a callback whose parameter is the enum or one of its interfaces
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

@@ -5,7 +5,13 @@ null receiver's `->`/`?->` access is itself unset/falsy, so proving the
 condition true also proves the receiver wasn't null. Also fixes the
 extractor gap: all three arms only matched plain `->`, missing `?->`.
 ===config===
-suppress=UnusedVariable,MissingConstructor,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Box {

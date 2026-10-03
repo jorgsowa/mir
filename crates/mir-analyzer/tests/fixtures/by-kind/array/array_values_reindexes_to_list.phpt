@@ -4,7 +4,12 @@ Non-emptiness is preserved: a non-empty source yields a non-empty-list,
 a possibly-empty source yields a list. The key type is always discarded;
 only the value type is carried into the list element type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

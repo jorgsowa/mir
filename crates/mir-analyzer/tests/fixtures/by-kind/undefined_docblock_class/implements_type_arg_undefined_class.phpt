@@ -2,7 +2,13 @@
 UndefinedDocblockClass fires when a class name inside an `@implements`
 generic type-argument list does not exist.
 ===config===
-suppress=UnusedParam,MissingReturnType,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

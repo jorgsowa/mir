@@ -3,7 +3,12 @@ Negative counterpart: `is_a($obj->prop, X::class)` narrowing must not
 over-widen — a method that only exists on an unrelated sibling class is
 still flagged.
 ===config===
-suppress=MissingConstructor,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

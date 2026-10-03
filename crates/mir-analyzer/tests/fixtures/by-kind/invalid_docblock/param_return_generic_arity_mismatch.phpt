@@ -3,7 +3,11 @@
 params is flagged as an arity mismatch, same as the existing `@var` check
 — a bare `TypedMap` (no type args) and a fully correct arg list stay silent.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

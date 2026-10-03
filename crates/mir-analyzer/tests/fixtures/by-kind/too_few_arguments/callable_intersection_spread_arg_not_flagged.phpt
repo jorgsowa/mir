@@ -4,7 +4,12 @@ A spread argument (...$args) against an intersection-typed callable value
 fallback used when full param types aren't resolvable must treat a spread
 arg as unknown-count, same as the full check_args path already does.
 ===config===
-suppress=MixedArgument,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

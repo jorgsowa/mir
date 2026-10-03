@@ -4,7 +4,11 @@ receiver, no `->prop`) narrows the receiver itself to the asserted type —
 sibling of the already-working `$this->prop` form. An unguarded call still
 correctly flags, since nothing proves the narrower type without the guard.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class TestData {

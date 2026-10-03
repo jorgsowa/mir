@@ -1,7 +1,11 @@
 ===description===
 InaccessibleClassConstant does NOT fire when a grandchild class accesses a protected constant from a grandparent.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class GrandParent {

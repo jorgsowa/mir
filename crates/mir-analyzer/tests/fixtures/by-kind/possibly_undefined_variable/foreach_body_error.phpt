@@ -1,7 +1,12 @@
 ===description===
 foreach body error
 ===config===
-suppress=MixedAssignment,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(array $items): string {

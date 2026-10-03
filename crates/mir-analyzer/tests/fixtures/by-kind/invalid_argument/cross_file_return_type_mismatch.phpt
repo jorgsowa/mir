@@ -1,7 +1,11 @@
 ===description===
 Cross-file return type mismatch produces InvalidArgument
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Maker.php===
 <?php
 class Apple {}

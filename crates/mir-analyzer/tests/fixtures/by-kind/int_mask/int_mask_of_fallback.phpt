@@ -2,7 +2,11 @@
 int-mask-of<T::*> cannot resolve class constants at parse time, so it falls
 back to plain `int`. Any integer value is accepted without false-positive errors.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

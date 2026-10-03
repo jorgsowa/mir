@@ -5,7 +5,12 @@ exclude a sealed-shape alternative that guarantees the key's presence —
 the already-correct instance-property and variable behavior, never wired
 for a static-property array_key_exists() dispatch.
 ===config===
-suppress=MissingConstructor,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

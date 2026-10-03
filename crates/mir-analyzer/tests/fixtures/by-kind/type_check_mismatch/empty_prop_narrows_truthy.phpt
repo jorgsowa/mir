@@ -3,7 +3,12 @@
 counterpart of `empty($var)` — the bare-variable arm already narrows by
 truthiness but the property-access arm was a no-op.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyAccess
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

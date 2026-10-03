@@ -3,7 +3,12 @@
 variable/property assignment both taint their target, but array
 destructuring was the one assignment-target shape with no equivalent.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

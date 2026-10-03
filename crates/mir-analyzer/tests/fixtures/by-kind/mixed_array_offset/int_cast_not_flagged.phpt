@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset does NOT fire after an explicit (int) cast — the cast produces a concrete int type
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var mixed $x */

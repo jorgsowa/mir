@@ -1,8 +1,15 @@
 ===description===
 stub without @template annotations returns array<mixed, mixed>, not a typed list
 ===config===
-stub_file=stubs/helpers.php
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 function array_key_list(array $array): array {}

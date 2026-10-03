@@ -6,7 +6,11 @@ predicate arm in the purely-structural resolver — both had to be fixed
 together for a `$this is ClassName` conditional to ever resolve, instead
 of silently widening to the union of both branches.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

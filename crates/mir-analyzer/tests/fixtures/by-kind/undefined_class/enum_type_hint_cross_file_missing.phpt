@@ -1,7 +1,11 @@
 ===description===
 enum type hint cross file missing
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Service.php===
 <?php
 use App\MissingEnum;

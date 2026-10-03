@@ -4,7 +4,11 @@ and the `self`/`static`/`parent`/`$this` keyword match is case-insensitive
 (PHP's own class-reference keywords are), same as the bare `self`/`static`
 forms already are.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

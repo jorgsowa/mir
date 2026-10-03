@@ -1,7 +1,11 @@
 ===description===
 does not report correct abstract implementation
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class Base {

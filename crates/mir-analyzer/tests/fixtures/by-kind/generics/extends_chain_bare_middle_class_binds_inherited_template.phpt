@@ -9,7 +9,12 @@ IntBox(...)`) so the binding can only come from this ancestor-chain
 resolution, not constructor-arg inference, and `get()`'s body throws instead
 of returning a literal so the type can't be inferred from the body either.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

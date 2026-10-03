@@ -3,7 +3,11 @@ A real PHP property without a type hint (has_native_type=false, from_docblock=fa
 still establishes a visibility contract. Reducing visibility on such a property
 must still emit OverriddenPropertyAccess.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

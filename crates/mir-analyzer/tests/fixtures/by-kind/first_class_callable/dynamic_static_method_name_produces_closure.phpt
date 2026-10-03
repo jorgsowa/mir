@@ -2,7 +2,12 @@
 `Foo::$name(...)` with a dynamic (non-identifier) static method name still
 produces a `Closure`, matching the instance-method dynamic-name case.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

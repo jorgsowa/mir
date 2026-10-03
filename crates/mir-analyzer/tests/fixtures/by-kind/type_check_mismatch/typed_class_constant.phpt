@@ -3,8 +3,13 @@ N3: PHP 8.3 typed class constants — the declared type hint must be used when
 resolving Foo::CONST accesses, not mixed. This enables proper type-checking of
 constants and allows downstream InvalidArgument to fire when the wrong type is used.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.3
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file===
 <?php
 

@@ -3,7 +3,11 @@ Positional `list()`/`[$a, $b]` destructuring of a literal array must resolve
 each target's type from the source's per-index property, not fall back to
 mixed.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

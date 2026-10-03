@@ -1,7 +1,11 @@
 ===description===
 a use-function import does not make an unrelated same-named type hint resolve against its target
 ===config===
-suppress=UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Helpers.php===
 <?php
 namespace App\Helpers;

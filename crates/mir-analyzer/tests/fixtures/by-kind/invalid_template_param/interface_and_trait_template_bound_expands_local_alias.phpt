@@ -8,7 +8,13 @@ was namespace-qualified as if it were a real (nonexistent) class instead
 of expanding to `int|float` — any implementer's bound check then ran
 against that phantom class instead of the real bound.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

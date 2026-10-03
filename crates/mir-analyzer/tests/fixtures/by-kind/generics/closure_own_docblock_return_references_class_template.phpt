@@ -4,7 +4,11 @@ enclosing class's `@template`, must resolve to a `TTemplateParam` just like
 the closure body already does — not get treated as an ordinary (and
 namespace-mis-qualified) class reference named "T".
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace PhpOption;

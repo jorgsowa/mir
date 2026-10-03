@@ -9,7 +9,11 @@ statement, not just inside a condition, which already worked for
 one-argument functions via the general call-analysis path but is pinned
 here alongside the negated form.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

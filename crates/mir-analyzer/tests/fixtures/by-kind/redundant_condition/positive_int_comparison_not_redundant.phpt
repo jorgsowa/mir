@@ -1,7 +1,12 @@
 ===description===
 positive-int >= 5 is NOT always true (can be 1-4), so no RedundantCondition
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

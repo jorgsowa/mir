@@ -2,7 +2,12 @@
 Without memoize_method_call_results, a guard on a property of a
 @mutation-free / @pure getter's result narrows the identical later read.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Identity {

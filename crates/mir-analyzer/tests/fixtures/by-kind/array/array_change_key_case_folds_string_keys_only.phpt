@@ -5,7 +5,12 @@ string key's TYPE is a no-op — the source type is returned unchanged. For
 a keyed-array shape, each string key is rewritten to CASE_LOWER (default)
 or CASE_UPPER when the $case argument resolves to a known literal.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> $assoc */

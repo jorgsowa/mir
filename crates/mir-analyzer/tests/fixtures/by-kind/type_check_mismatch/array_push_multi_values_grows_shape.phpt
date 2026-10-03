@@ -3,7 +3,12 @@
 each value in order, same as that many sequential `$arr[] = …;` writes —
 the resulting shape gains one property per pushed value.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

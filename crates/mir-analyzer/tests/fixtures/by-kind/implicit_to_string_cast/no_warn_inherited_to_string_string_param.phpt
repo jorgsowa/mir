@@ -1,7 +1,11 @@
 ===description===
 No warning when object inherits __toString from a parent and is passed to a string param
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

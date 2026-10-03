@@ -1,7 +1,11 @@
 ===description===
 Abstract class instantiation
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class AbstractService {

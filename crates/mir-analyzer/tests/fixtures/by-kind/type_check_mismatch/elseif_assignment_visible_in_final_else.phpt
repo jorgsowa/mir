@@ -5,7 +5,13 @@ separate branch off the pre-if context that only ever type-narrowed
 elseif conditions, never analyzed their expressions, so an assignment made
 in an elseif condition never became visible in `else`.
 ===config===
-suppress=UnusedVariable,MixedAssignment,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

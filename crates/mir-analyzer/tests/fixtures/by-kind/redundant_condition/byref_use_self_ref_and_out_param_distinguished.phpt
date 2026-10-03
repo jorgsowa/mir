@@ -6,7 +6,11 @@ Confirms the fix decides per-capture, inside one `use()` list, rather than
 seeding every capture on a self-referential closure as callable (or every
 capture on any closure as mixed).
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run(): void {

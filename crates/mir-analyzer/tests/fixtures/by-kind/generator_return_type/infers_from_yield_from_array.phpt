@@ -2,7 +2,12 @@
 `yield from $array` contributes the array's own key/value types rather than
 `mixed`/`mixed`.
 ===config===
-suppress=UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function gen() {

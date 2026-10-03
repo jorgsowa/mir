@@ -1,7 +1,12 @@
 ===description===
 int<0,0> (exactly zero) is never truthy; truthy-check on it is a RedundantCondition.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<0, 0> $n */

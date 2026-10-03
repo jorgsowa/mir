@@ -4,7 +4,11 @@ A static call through a variable receiver typed as a plain interface
 holds — valid PHP. Only a literal Interface::method() receiver is genuinely
 invalid (see static_interface_call.phpt).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -4,7 +4,11 @@ plain (non-promoted) property type hint and a plain method param type hint, not
 just constructor promotion — both go through the same `resolve_union`/
 `resolve_type_name` path.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

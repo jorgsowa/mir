@@ -5,7 +5,13 @@ stayed tainted forever even after being reassigned to a proven-clean value
 arm, which already clears stale taint on a clean overwrite. A reassignment
 to another tainted source must still leave the variable tainted.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function reassignedToLiteralIsClean(): void {

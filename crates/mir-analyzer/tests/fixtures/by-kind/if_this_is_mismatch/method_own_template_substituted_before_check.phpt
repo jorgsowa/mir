@@ -7,7 +7,12 @@ template atom and could never actually contradict. Moved the check to
 run after the method's own bindings are inferred from the call's
 arguments.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

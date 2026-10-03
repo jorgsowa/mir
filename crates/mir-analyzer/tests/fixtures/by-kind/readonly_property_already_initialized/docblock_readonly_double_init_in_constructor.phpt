@@ -4,7 +4,12 @@ constructor is flagged the same way a native `readonly` property is — the
 docblock tag makes the same "write once" contract, just unenforced by PHP
 itself.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Point {

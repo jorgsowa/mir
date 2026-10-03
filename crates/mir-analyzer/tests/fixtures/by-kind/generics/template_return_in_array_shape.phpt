@@ -6,7 +6,13 @@ inside a shape leaked through as a bogus, unresolved `TNamedObject` atom
 instead of becoming a real `TTemplateParam`, which `infer_template_bindings`
 requires to recognize an argument position as inferrable at all.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

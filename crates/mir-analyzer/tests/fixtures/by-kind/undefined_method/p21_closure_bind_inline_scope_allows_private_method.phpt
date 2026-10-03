@@ -3,7 +3,11 @@ FP-P21: a closure literal passed directly as `Closure::bind`'s first argument,
 rebound to a class-name-literal `$newScope`, must be checked against that
 scope for private-method visibility — not its lexically enclosing class.
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class DeepCopy {

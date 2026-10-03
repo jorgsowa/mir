@@ -1,7 +1,9 @@
 ===description===
 Interface methods are implicitly abstract; an abstract class may re-declare them `abstract`.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 interface Writer {

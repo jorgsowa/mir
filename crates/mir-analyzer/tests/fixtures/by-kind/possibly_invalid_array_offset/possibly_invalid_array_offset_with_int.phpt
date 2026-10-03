@@ -1,7 +1,12 @@
 ===description===
 Possibly invalid array offset with int
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $x = rand(0, 5) > 2 ? ["a" => 5] : "hello";

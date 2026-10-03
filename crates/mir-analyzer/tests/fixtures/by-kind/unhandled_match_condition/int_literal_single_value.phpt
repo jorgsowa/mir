@@ -1,7 +1,11 @@
 ===description===
 UnhandledMatchCondition fires for a single int literal subject with no matching arm.
 ===config===
-suppress=TypeDoesNotContainType
+<mir>
+  <issueHandlers>
+    <TypeDoesNotContainType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 42 $n */

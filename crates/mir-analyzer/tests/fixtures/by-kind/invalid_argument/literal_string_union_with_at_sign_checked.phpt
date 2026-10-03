@@ -2,7 +2,11 @@
 A literal-string union containing '@' (e.g. email addresses) is parsed and
 checked, not flagged as a malformed docblock type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 'admin@example.com'|'guest@example.com' $email */

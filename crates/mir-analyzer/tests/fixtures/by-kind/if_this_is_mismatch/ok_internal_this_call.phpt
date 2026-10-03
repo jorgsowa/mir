@@ -1,7 +1,13 @@
 ===description===
 Calling an @if-this-is method on $this inside the generic class body is not flagged
 ===config===
-suppress=MissingPropertyType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

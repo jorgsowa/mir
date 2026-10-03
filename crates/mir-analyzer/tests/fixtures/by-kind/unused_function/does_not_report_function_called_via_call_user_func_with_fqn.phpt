@@ -1,7 +1,9 @@
 ===description===
 does not report function called via call user func with fqn
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 namespace App;

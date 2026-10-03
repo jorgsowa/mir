@@ -1,7 +1,11 @@
 ===description===
 A function without a declared return type does NOT fire MixedReturnStatement even when returning a mixed value
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function decode() {

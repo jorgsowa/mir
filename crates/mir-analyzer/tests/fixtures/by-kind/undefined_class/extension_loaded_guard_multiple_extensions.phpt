@@ -2,8 +2,12 @@
 FP-A: extension_loaded() guard works with multiple extensions combined via &&,
 and with nested guards. The else branch does NOT carry the guard.
 ===config===
-php_version=8.2
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

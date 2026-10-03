@@ -2,7 +2,11 @@
 P3: A typed first-class method callable satisfies a callable(int):string typed param
 without false positives.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

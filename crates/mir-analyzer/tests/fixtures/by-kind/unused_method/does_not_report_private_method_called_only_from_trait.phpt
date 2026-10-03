@@ -3,7 +3,9 @@ A private method called only from a trait's own method body ($this->helper()
 inside the trait, where helper() is supplied by the composing class) must
 not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 trait T {

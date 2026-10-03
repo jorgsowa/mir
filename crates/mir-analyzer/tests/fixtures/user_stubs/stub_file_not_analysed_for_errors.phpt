@@ -1,7 +1,11 @@
 ===description===
 stub file not analysed for errors
 ===config===
-stub_file=stubs/helpers.php
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 // Stub files are not analysed — errors inside them must not be reported.

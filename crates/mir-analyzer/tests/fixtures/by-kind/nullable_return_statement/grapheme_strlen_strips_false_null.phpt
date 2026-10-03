@@ -2,8 +2,13 @@
 FP-C: grapheme_strlen returns int|false|null in stubs, but false/null only on
 invalid UTF-8 input. Normal usage should not emit NullableReturnStatement.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

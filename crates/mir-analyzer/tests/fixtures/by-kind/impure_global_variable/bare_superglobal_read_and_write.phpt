@@ -5,7 +5,11 @@ ever checked, in arrays.rs/assign_to_target's ArrayAccess arm. Reading
 or overwriting the WHOLE superglobal array is the same external mutable
 state, just without an index.
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

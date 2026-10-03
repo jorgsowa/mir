@@ -1,8 +1,15 @@
 ===description===
 Template bound to non-empty-array<K, V> param type correctly infers V from argument
 ===config===
-stub_file=stubs/helpers.php
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <stubs>
+    <file name="stubs/helpers.php"/>
+  </stubs>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:stubs/helpers.php===
 <?php
 /**

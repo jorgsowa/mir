@@ -4,7 +4,11 @@ must not collapse a division's result to bare float — only a value
 GUARANTEED float should do that. Otherwise a later strict `!== 0` int
 comparison on the (possibly-still-int) result is wrongly flagged always-true.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $maxDigits, int $mul, int $value): void {

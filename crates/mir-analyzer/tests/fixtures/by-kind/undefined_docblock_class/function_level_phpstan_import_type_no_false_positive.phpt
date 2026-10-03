@@ -1,7 +1,11 @@
 ===description===
 @phpstan-import-type on a standalone function resolves to its definition without false positives
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

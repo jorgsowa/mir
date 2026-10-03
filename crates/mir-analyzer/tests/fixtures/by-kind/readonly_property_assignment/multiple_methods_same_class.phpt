@@ -1,7 +1,12 @@
 ===description===
 Multiple methods in declaring class can each init different readonly properties
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ValueObject {

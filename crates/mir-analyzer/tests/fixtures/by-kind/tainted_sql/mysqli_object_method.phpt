@@ -1,7 +1,12 @@
 ===description===
 $mysqli->query($sql) (OOP mysqli API) is a SQL sink, same as mysqli_query().
 ===config===
-suppress=MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(mysqli $db): void {

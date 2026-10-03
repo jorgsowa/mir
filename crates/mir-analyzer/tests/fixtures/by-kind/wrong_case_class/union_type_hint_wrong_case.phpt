@@ -1,7 +1,11 @@
 ===description===
 Wrong case class name in a union type hint is reported; correct-case member is not.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

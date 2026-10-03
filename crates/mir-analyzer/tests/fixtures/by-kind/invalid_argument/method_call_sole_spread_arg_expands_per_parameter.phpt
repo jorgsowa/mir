@@ -4,7 +4,12 @@ expanded into one binding per element on an instance METHOD call too, not
 just function/static-call/constructor calls — both for per-parameter
 argument checking and for template inference from the call's own args.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Calc {

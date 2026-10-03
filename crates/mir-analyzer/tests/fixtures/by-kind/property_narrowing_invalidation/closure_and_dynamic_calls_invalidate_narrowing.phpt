@@ -5,7 +5,12 @@ at the call site — so both must conservatively invalidate `$this`'s
 narrowing and any narrowed object passed as an argument, the same way an
 unproven direct call does.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

@@ -3,7 +3,15 @@ A carry-forward variable (written at end of loop body, read at start of next ite
 must not be reported as UnusedVariable. The last iteration's write is never read again
 after the loop, but that is unavoidable from the developer's perspective.
 ===config===
-suppress=MixedAssignment,RedundantCondition,NullArrayAccess,MixedArgument,PossiblyNullArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <RedundantCondition errorLevel="suppress"/>
+    <NullArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <PossiblyNullArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function before(array $items): mixed {

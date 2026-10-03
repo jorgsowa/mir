@@ -4,7 +4,13 @@ place, exactly as much as a by-ref call argument (`sort($t->items)`,
 already checked) does — but the foreach statement never routed the
 iterable expression through the same purity check at all.
 ===config===
-suppress=MissingPropertyType,UnusedForeachValue,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Tally {

@@ -3,7 +3,13 @@
 (`pure-callable`, `pure-closure`), and a signature with no explicit return
 type (defaults to `mixed`).
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_bare_callable($x) {

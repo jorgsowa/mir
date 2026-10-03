@@ -1,7 +1,11 @@
 ===description===
 A callable-array pair (keyed array [$obj, 'method']) satisfies a callable parameter type
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Handler {

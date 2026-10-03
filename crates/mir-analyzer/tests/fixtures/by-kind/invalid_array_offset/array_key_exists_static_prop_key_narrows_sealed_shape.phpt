@@ -3,7 +3,12 @@ array_key_exists(self::$key, $arr) resolves the key when it's a static
 property already narrowed to a single literal, same as a plain variable or
 instance property already does — literal_key resolution had no static-prop arm.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

@@ -1,7 +1,13 @@
 ===description===
 template-conditional return with nullable discriminator widens to if_true|if_false at the call site — no InvalidArgument when the union is passed to a function expecting array
 ===config===
-suppress=UnusedParam,UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

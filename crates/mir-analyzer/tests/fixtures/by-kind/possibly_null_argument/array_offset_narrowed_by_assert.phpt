@@ -7,7 +7,11 @@ refinement store, so the narrowed shape is picked up by a later
 `$arr['key']` read for free. Without a guard, the same read is still
 correctly flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{0: string, 1: ?string} $option */

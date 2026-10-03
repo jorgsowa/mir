@@ -1,7 +1,9 @@
 ===description===
 `array_filter()` with a non-null predicate narrows the returned values.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 final class Item

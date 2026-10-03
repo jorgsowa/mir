@@ -1,7 +1,12 @@
 ===description===
 No warning when an interface declares __toString and a concrete implementation is passed to a string param
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Printable {

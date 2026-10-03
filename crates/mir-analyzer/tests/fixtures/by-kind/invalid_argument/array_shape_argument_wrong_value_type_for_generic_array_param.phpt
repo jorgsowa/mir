@@ -3,7 +3,12 @@ A shape argument whose property values don't fit a generic array<K,V>
 param's value type is flagged, per-property rather than as one merged
 union
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<int,int> $x */

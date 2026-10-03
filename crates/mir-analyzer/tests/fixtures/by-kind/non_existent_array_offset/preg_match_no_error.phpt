@@ -1,7 +1,11 @@
 ===description===
 No error when accessing preg_match captures after success check (=== 1 or truthy)
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // Exact reproducer: fresh variable, === 1 check

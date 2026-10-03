@@ -4,7 +4,14 @@ narrowed range but never called narrow_receiver_non_null_on_prop_match
 even when int_comparison_excludes_null proves the comparison couldn't
 have been satisfied by a null receiver — $obj itself stayed nullable.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Node {

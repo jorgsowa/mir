@@ -4,7 +4,12 @@ haystack (not just a TKeyedArray shape) when its element type is itself a
 pure literal union, mirroring array_key_exists()'s TKeyedArray-vs-list
 coverage pattern.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

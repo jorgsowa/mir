@@ -5,7 +5,12 @@ it never substituted the receiver's own bound type params (`Box<int>`'s
 T -> int), so calling the resulting closure with a mismatched argument was
 silently accepted where the direct call correctly rejects it.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -3,7 +3,12 @@ Negative control for the K3 fix: two classes that share a common ancestor
 but aren't in an ancestor/descendant relationship with EACH OTHER must
 still be denied access to each other's protected properties.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

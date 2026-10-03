@@ -1,7 +1,13 @@
 ===description===
 catch type via use
 ===config===
-suppress=MissingThrowsDocblock,UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 use Vendor\Missing\MyException;

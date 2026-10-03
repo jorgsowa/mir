@@ -5,7 +5,12 @@ narrow a static property used as the haystack/needle argument —
 these previously matched neither Var nor Prop on a static receiver and
 narrowed nothing.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

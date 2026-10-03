@@ -1,7 +1,12 @@
 ===description===
 In-place sort functions preserve element types; re-indexing sorts (sort/rsort/usort/shuffle) convert to list; key-preserving sorts (asort/arsort/ksort/krsort/uasort/uksort/natsort/natcasesort) keep the original type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

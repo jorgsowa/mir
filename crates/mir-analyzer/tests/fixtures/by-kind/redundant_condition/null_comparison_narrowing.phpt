@@ -1,7 +1,11 @@
 ===description===
 Strict null comparisons narrow types correctly
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function testTripleEqNull(int|null $x) {

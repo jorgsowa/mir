@@ -1,7 +1,11 @@
 ===description===
 get_class() string comparison narrowing
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {

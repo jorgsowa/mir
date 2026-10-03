@@ -4,7 +4,13 @@ property-access argument, not just a bare variable — `apply_docblock_assertion
 only tried `extract_var_name`, unlike the built-in `assert()` path which
 already handles properties. An unrelated property stays untouched.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-assert string $value */

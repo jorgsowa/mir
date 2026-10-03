@@ -6,7 +6,17 @@ checked `t.is_void()` (pure single-atomic void), so it fired `InvalidReturnType`
 for `void` even when `void` is a union member. Fixed by adding a
 `t.contains(TVoid)` guard.
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,MixedMethodCall,MixedReturnStatement,InvalidPropertyAssignment
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <InvalidPropertyAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Password {

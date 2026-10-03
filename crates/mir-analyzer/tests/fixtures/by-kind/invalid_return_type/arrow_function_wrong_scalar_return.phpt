@@ -2,7 +2,11 @@
 D4: arrow function body checked against its declared return type, same as a
 regular closure/function body.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $f = fn(): int => 'not an int';

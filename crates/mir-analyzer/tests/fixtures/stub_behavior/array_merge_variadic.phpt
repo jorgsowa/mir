@@ -1,7 +1,11 @@
 ===description===
 array_merge arrays are variadic
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // array_merge with one array

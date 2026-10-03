@@ -1,7 +1,12 @@
 ===description===
 Writes through a variable bound with `=&` mutate the referent, so the alias is not reported as unused.
 ===config===
-suppress=MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<array{g: int, id: int}> $rows */

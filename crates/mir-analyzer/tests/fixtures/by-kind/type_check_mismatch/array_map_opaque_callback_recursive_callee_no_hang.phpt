@@ -5,7 +5,11 @@ resolve via its one concrete external caller without hanging or crashing —
 the recursive call site's forwarded `$cb` argument is itself unresolvable and
 is simply skipped, not treated as a cycle.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function process(callable $cb, array $items): array {

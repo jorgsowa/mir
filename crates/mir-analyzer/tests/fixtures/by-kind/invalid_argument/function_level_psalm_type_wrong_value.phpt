@@ -1,7 +1,11 @@
 ===description===
 Passing a value that does not satisfy a function-level @psalm-type alias triggers InvalidArgument
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

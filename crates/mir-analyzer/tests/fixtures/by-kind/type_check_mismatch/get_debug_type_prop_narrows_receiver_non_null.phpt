@@ -4,7 +4,14 @@
 narrow_receiver_non_null_on_prop_match, unlike the identical get_class()
 idiom right next to them in the dispatch — $obj itself stayed nullable.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

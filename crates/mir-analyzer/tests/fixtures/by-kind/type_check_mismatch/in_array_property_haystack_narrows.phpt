@@ -5,7 +5,13 @@ $this->allowedValues)` never narrowed `$x` even though
 `$this->allowedValues` carries a known literal-array shape, unlike the
 needle side which already had a property-receiver counterpart.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Validator {

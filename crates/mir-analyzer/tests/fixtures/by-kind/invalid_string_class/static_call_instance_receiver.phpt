@@ -4,7 +4,12 @@ receivers typed only by an inherited property. Must analyze clean — no
 InvalidStaticInvocation/UndefinedMethod — and the reference index records the
 site under the owner (covered by indexed_queries.rs; this pins diagnostics).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

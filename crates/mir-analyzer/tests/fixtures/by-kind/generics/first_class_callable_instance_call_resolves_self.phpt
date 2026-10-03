@@ -4,7 +4,11 @@ built its closure's return type from the raw, unsubstituted `@return
 static`, the same gap as the static-call-syntax case, via the Method/
 NullsafeMethod arm of build_closure_from_resolved_params.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

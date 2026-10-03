@@ -2,8 +2,12 @@
 FP-A(b): class_exists($var) guard must narrow $var from string to class-string so
 that passing it to a class-string-typed parameter does not emit InvalidArgument.
 ===config===
-suppress=UnusedVariable
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

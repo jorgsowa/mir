@@ -5,7 +5,11 @@ compatibility check between them (verified live: this file loads with no
 fatal, `$this->foo()` inside the trait itself still calls the trait's own
 0-arg copy, unaffected by the composing class's replacement).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait T {

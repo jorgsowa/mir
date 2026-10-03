@@ -4,7 +4,14 @@ taint arm, no read-side StaticPropertyAccess arm in is_expr_tainted, no
 static-keyed taint set in FlowState at all (unlike instance properties,
 which already had this via tainted_props).
 ===config===
-suppress=UnusedParam,MixedArrayAccess,MissingPropertyType,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Registry {

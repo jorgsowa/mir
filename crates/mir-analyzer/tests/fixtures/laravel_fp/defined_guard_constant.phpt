@@ -3,7 +3,15 @@ Regression (laravel/framework): a constant read guarded by `defined('ARTISAN_BIN
 is safe. mir now honors the defined() guard and no longer emits UndefinedConstant
 inside the guarded branch.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function binary(): string {

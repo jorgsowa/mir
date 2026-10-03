@@ -1,7 +1,11 @@
 ===description===
 SKIPPED-referenceToTypedArrayConstrainsAssignment
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo

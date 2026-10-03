@@ -1,7 +1,12 @@
 ===description===
 reports both elements of multi var destructure
 ===config===
-suppress=ForbiddenCode,MixedAssignment
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @return array|false */

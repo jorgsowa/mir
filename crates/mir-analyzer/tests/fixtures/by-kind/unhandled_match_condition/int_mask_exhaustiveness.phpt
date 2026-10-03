@@ -2,7 +2,11 @@
 UnhandledMatchCondition fires when a match on an int-mask type misses values.
 int-mask<1, 2> expands to 0|1|2|3; arms for 0 and 1 leave 2 and 3 uncovered.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int-mask<1, 2> $flags */

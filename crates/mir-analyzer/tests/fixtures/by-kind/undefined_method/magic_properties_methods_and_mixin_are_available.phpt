@@ -1,7 +1,12 @@
 ===description===
 magic properties methods and mixin are available
 ===config===
-suppress=MixedMethodCall,UnusedFunction
+<mir>
+  <issueHandlers>
+    <MixedMethodCall errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

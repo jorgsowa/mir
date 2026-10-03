@@ -2,7 +2,12 @@
 @param-out type is preserved when a function is captured as a first-class
 callable. $id should be int (from @param-out int), not mixed.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

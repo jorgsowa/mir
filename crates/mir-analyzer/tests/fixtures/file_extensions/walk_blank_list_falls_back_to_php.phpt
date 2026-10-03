@@ -1,7 +1,12 @@
 ===description===
 A blank file_extensions entry normalizes to the default, so only .php is walked
 ===config===
-file_extensions= , .
+<mir>
+  <fileExtensions>
+    <extension name=""/>
+    <extension name=" ."/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 function a_hook(): int { return 'x'; }

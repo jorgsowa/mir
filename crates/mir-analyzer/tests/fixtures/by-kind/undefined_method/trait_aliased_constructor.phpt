@@ -1,8 +1,12 @@
 ===description===
 `use BaseInit { __construct as __constructBase; }` makes `__constructBase` a real method.
 ===config===
-suppress=UnusedParam
-php_version=8.4
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 trait BaseInit {

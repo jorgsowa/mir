@@ -2,7 +2,12 @@
 `yield $v;` without an explicit key defaults to an int key, same as PHP's
 own auto-incrementing generator keys.
 ===config===
-suppress=UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function gen() {

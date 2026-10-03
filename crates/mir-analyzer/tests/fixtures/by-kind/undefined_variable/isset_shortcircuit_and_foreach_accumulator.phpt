@@ -2,7 +2,11 @@
 isset short-circuit with && — foreach loop with isset guard
 isset($prev) && $v > $prev should not report UndefinedVariable on $prev in RHS
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<int> $items */

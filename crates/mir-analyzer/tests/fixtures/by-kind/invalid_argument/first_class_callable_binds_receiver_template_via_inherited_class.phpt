@@ -8,7 +8,12 @@ effective_class_template_params for this. Covers both instance-method FCC
 receiver form (dynamic class-expr path, the one shape that actually carries
 receiver type params into a static call).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

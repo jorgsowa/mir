@@ -6,7 +6,12 @@ callee, through a receiver that's itself safe (not $this, not a
 parameter), went completely unflagged, unlike new X(...), free-function
 calls, and static calls.
 ===config===
-suppress=MissingConstructor,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

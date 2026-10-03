@@ -2,7 +2,11 @@
 @psalm-self-out also retypes $this when the method is reached through
 parent::/self::/static:: call syntax, not just `$obj->method()`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

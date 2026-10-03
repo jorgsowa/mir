@@ -3,7 +3,12 @@
 replaces it -- appending a clean literal to an already-tainted variable
 must not clear its taint.
 ===config===
-suppress=MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

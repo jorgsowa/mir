@@ -6,7 +6,12 @@ as `T`, not `int`. Property-type resolution never substituted the
 receiver's own `type_params` (`Box<int>`'s `T -> int`) into the declared
 property type at all.
 ===config===
-suppress=MissingPropertyType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

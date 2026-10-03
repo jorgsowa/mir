@@ -5,7 +5,11 @@ comparisons only tried the plain `->` extractor, so a nullsafe receiver
 silently skipped narrowing entirely, unlike the null/instanceof arms
 which already handle both operator forms.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status {

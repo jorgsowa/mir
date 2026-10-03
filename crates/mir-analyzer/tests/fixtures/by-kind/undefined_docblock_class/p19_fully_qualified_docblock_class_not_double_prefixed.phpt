@@ -4,7 +4,12 @@ be used as-is, not prefixed a second time with the current namespace — guards
 against the `resolve_type_name` fix over-correcting the qualified-but-relative
 case into also re-qualifying already-absolute names.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Warning.php===
 <?php
 namespace App\Warning;

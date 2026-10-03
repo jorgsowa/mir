@@ -2,7 +2,12 @@
 Comparison with literal on the left (`5 > $x`) is equivalent to `$x < 5`.
 Operator is flipped automatically during normalization.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $x): void {

@@ -1,7 +1,11 @@
 ===description===
 InvalidPropertyFetch does NOT fire when accessing an existing property on a concrete class instance.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Point {

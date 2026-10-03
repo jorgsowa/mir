@@ -1,7 +1,12 @@
 ===description===
 Prevent possibly undefined var in try
 ===config===
-suppress=MissingThrowsDocblock,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

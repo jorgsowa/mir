@@ -15,7 +15,12 @@ Since the mis-resolved fqcn ("App\Glob") doesn't exist,
 diagnostic, hence the `@mir-check` assertion below rather than an empty
 expected-issues list.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace {

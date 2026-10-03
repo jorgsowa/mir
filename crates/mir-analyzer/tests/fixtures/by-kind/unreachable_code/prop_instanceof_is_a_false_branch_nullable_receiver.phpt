@@ -5,7 +5,13 @@ always false, so a nullable $obj can make the false branch true regardless
 of the property's own declared type. Non-nullable receivers keep diverging
 on a genuine contradiction. The true branch was already sound.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {}

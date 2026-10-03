@@ -1,7 +1,11 @@
 ===description===
 Method-level @psalm-type overrides a class-level alias with the same name without false positives
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

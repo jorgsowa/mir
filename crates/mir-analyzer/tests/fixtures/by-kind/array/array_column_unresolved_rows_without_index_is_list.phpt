@@ -2,7 +2,12 @@
 array_column without $index_key is a list even when the row shape or column is unresolvable;
 array_map over it stays a list.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(array $rows, array $objects, string $col): void {

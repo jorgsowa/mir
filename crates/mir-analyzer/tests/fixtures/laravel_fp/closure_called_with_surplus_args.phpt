@@ -4,7 +4,15 @@ passed to a closure (they remain available via func_get_args). mir no longer emi
 TooManyArguments for a direct closure call with extra args (named functions and
 methods still keep the lint).
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function dispatchPair(): void {

@@ -4,7 +4,15 @@ is valid — the by-ref use auto-creates the variable the assignment defines. mi
 treats a by-ref capture as defined (typed as a callable of unknown arity), so it no
 longer reports UndefinedVariable / MixedFunctionCall.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function build(): int {

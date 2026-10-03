@@ -3,7 +3,13 @@ gettype($this->prop) === 'literal' and get_debug_type($this->prop) ===
 'literal'/Foo::class narrow the property the same way the plain-variable
 receiver does.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

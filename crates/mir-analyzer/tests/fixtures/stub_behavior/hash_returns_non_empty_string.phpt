@@ -2,7 +2,12 @@
 hash() returns non-empty-string; max() with a non-negative literal and an int
 returns a non-negative range.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Ids {

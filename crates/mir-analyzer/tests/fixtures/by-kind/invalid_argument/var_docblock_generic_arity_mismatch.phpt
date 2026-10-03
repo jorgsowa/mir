@@ -4,7 +4,12 @@
 with no type args at all stays silent (the legitimate bare-generic-reference
 shorthand), and a fully and correctly supplied arg list stays silent too.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

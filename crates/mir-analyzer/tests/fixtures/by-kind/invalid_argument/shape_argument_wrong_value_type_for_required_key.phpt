@@ -3,7 +3,12 @@ A shape argument that HAS the required key but with an incompatible value
 type is still rejected — the shape-to-shape required-key check must
 validate value compatibility, not just key presence.
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{host: string, port: int} $config */

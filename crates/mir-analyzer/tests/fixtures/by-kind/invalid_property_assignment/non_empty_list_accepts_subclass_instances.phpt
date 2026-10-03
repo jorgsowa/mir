@@ -1,7 +1,11 @@
 ===description===
 non-empty-list<Parent> accepts list literals of subclasses on every assignment path
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class Shape {}

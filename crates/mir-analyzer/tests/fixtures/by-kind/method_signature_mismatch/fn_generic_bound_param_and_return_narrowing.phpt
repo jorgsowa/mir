@@ -5,7 +5,12 @@ parent's param/return type mentioned a template, even when this class's own
 inherited binding into the ancestor's type before comparing now catches a
 real signature narrowing that was previously silent.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -3,7 +3,11 @@ A static call through a property-access receiver typed as an interface
 ($h->provider::method()) is the same dynamic-dispatch shape as a plain
 variable receiver — must analyze clean.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

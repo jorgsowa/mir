@@ -2,7 +2,9 @@
 A private static method used only through first-class-callable syntax
 (`self::helper(...)`) must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

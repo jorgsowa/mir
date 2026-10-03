@@ -8,7 +8,12 @@ survives as an intersection, same as plain instanceof narrowing); false
 branch excludes the exact match. Covers both plain-variable and property
 receivers.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Quacks {}

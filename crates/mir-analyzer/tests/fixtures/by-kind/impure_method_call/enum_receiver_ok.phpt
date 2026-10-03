@@ -1,7 +1,11 @@
 ===description===
 Enum method calls are allowed in immutable contexts.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-immutable */

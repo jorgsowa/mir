@@ -1,7 +1,12 @@
 ===description===
 cross file inferred return type
 ===config===
-suppress=ForbiddenCode,MissingReturnType
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Consumer.php===
 <?php
 function requireInt(int $n): void { var_dump($n); }

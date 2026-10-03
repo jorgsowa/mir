@@ -2,7 +2,11 @@
 MissingParamType fires per untyped top-level function parameter; native hints
 and docblock @param types both satisfy it.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

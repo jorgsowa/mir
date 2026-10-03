@@ -5,7 +5,13 @@ every single-disjunct property narrowing already does. An `is_null(...)`
 disjunct is excluded since it doesn't prove non-null (a null receiver's
 ->prop read is itself null).
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

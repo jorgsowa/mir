@@ -4,7 +4,13 @@ Array/list pseudo-types, the `T[]`/`T[][]` shorthand, and `iterable`'s
 back to `iterable`/`iterable<K, V>`, so the cross-form checks below still
 match after round-tripping through the parser twice).
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_array($x) {

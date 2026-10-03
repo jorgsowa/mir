@@ -4,7 +4,12 @@ itself -- `then_expr` is None for this form -- but is_expr_tainted's
 Ternary arm's `is_some_and` on a None then_expr was unconditionally
 false, so the condition's own taint was never checked at all.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

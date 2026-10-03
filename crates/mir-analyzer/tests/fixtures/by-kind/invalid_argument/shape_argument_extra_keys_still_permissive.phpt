@@ -4,7 +4,12 @@ declared set is still accepted — the required-key check added to
 `array_list_compatible`'s shape-to-shape arm only validates the param's
 own declared keys, it doesn't reject unknown arg keys.
 ===config===
-suppress=MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{host: string, port: int} $config */

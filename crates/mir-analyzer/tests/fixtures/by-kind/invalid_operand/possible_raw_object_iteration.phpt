@@ -1,7 +1,12 @@
 ===description===
 Possible raw object iteration
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

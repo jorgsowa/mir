@@ -1,7 +1,11 @@
 ===description===
 cross file subclass accepted
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Base.php===
 <?php
 class Base {}

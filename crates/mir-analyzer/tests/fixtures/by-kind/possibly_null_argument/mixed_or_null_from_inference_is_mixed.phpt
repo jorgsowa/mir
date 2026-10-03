@@ -5,7 +5,12 @@ TValue` magic accessor declared `@return TValue|null` used unbound (TValue →
 mixed), so substitution produces an un-normalized `mixed | null`. Mirrors
 Laravel's `Fluent::__get` (`@return TValue|null`) on a bare `Fluent` command.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

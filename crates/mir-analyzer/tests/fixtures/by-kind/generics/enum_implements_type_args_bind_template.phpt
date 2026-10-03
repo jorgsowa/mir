@@ -3,7 +3,14 @@ An enum's `@implements Interface<ConcreteType>` type args are now recognized
 when inferring a template through the implements chain — `EnumDef` had no
 `implements_type_args` field at all, so this always fell back to `mixed`.
 ===config===
-suppress=MissingPropertyType,UnusedParam,MissingThrowsDocblock,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -3,7 +3,11 @@ Spreading two string-keyed shapes into a literal (`[...$x, ...$y]`) merges
 into a precise shape with both operands' keys, not a generic
 `array<string, int|string>` (let alone `array<mixed, mixed>`).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -2,7 +2,12 @@
 `interface-string<T>` and a static-method receiver also bind T from a nested
 list element without an InvalidArgument.
 ===config===
-suppress=UnusedParam,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Handler {}

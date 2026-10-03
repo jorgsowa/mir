@@ -6,7 +6,12 @@ evaluating to null, same ambiguity as the already-fixed nullsafe/null-check
 case. Only the matched-true direction proves this; the excluded/false
 direction (last function) proves nothing about the receiver.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status {

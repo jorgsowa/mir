@@ -3,7 +3,11 @@
 type from the referenced case, instead of falling back to `mixed` — a value
 of the wrong type is still caught.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit {

@@ -5,7 +5,14 @@ must use the ancestor's fixed binding, not the receiver's own,
 same-lettered template — the two are unrelated template scopes despite
 sharing the conventional name `T`.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

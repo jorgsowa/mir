@@ -1,7 +1,11 @@
 ===description===
 A signature edit propagates through an unchanged intermediate caller.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:A.php===
 <?php
 function a(): int { return 1; }

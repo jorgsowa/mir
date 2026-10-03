@@ -2,7 +2,11 @@
 An anonymous class extending a nonexistent base must report UndefinedClass,
 matching a named class's `extends` check.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $x = new class extends UndefinedBase {};

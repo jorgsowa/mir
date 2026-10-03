@@ -2,7 +2,12 @@
 array_key_first/array_key_last return int|string (never null) for non-empty collections;
 int-only for list inputs.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

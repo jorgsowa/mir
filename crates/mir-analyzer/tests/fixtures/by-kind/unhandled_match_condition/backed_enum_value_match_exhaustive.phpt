@@ -6,7 +6,11 @@ when every arm is `EnumName::Case->value` and all cases are covered —
 backing scalar type on both the subject and (via `Kind::Foo->value`) the
 arms, so no finite arm set could ever "prove" coverage.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Kind: string {

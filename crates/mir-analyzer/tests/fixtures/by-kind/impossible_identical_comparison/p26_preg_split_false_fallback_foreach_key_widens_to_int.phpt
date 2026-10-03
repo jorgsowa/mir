@@ -5,7 +5,11 @@ must widen the foreach key type to plain `int` — not collapse to the
 fallback shape's literal `int(0)` key, which made `$index % 2 === 1`
 look like an always-false comparison.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

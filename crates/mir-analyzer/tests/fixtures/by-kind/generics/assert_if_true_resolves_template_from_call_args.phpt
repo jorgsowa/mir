@@ -7,7 +7,11 @@ type mismatched. The plain (non-generic) `@psalm-assert` path used at direct
 call sites already substituted template bindings before narrowing; the
 narrowing-time assert-if-true/-if-false path did not.
 ===config===
-suppress=UnusedParameter
+<mir>
+  <issueHandlers>
+    <UnusedParameter errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

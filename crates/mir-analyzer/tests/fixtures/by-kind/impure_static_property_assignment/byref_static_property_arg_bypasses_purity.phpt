@@ -4,7 +4,12 @@ Passing a static property by reference to a built-in function
 `Bag::$queue = ...` would, but `check_byref_arg_purity` had no
 `StaticPropertyAccess` arm at all.
 ===config===
-suppress=ImpureFunctionCall,MixedArgument
+<mir>
+  <issueHandlers>
+    <ImpureFunctionCall errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

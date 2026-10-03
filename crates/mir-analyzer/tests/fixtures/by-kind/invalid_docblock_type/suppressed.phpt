@@ -1,7 +1,11 @@
 ===description===
 Suppressing `InvalidDocblockType` hides the warning.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

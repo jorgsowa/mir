@@ -7,7 +7,18 @@ The fix moves template setup before the param loop and uses
 `resolve_union_doc_with_templates` for method params, so class-level template
 params are recognized and stored as `TTemplateParam`.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,MissingPropertyType,MixedArgument,MixedAssignment,MixedReturnStatement,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Relations;

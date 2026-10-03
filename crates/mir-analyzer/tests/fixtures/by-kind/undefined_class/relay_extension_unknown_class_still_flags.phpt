@@ -4,7 +4,11 @@ the real stub files must not turn `Relay\*` into a wildcard-resolved
 namespace — a class that isn't actually part of the extension must still
 be flagged undefined.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(Relay\NotARealClass $x): void {}

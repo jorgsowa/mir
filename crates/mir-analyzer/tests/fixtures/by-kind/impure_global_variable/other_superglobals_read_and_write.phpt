@@ -4,7 +4,13 @@ check — $_SESSION/$_ENV/etc. are exactly the same shape (reading OR
 writing them depends on/mutates state outside the function) but were
 completely unrecognized, for both a read and a write.
 ===config===
-suppress=MixedArrayAccess,MixedReturnStatement,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

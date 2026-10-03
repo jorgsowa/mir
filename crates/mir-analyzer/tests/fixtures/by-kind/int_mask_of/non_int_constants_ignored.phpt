@@ -3,7 +3,11 @@ int-mask-of<self::FLAG_*> only pulls in constants that are literal ints; a
 same-prefixed string constant is silently excluded from the mask rather than
 breaking resolution.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

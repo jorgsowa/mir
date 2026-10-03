@@ -1,7 +1,9 @@
 ===description===
 `instanceof` narrows a union receiver; the method exists on the narrowed member (mir even picks the wrong member).
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 class Holders { public function findFirst(): int { return 0; } }

@@ -6,7 +6,12 @@ method was never referenced at all in this file — a genuinely static call
 passing an object argument reachable from $this/a parameter went
 completely unflagged, unlike new X(...) and free-function calls.
 ===config===
-suppress=MissingConstructor,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

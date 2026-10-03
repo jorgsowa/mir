@@ -3,7 +3,12 @@
 (llm_prompt/html/sql/shell) falls back to the generic TaintedInput issue,
 naming the kind, instead of silently doing nothing.
 ===config===
-suppress=MixedArrayAccess,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @taint-sink ldap $filter */

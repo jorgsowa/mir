@@ -3,7 +3,11 @@ Class constants whose initializer references another already-collected
 same-file class-like's enum case or plain constant infer that member's real
 type instead of `mixed`, so a compatible downstream use is not flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit {

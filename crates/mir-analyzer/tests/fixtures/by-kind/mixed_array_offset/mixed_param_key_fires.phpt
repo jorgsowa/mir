@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset fires when a mixed-typed function parameter is used as the array key
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

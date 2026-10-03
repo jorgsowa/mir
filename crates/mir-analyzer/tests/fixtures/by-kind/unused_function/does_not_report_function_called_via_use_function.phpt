@@ -1,7 +1,9 @@
 ===description===
 does not report function called via use function
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file:lib.php===
 <?php
 namespace Utils;

@@ -4,7 +4,11 @@ the instance-call path but never checked for template shadowing — the exact
 same shadow via a static call went unreported. Property-parity counterpart
 of reports_method_shadows_class_template.phpt.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -4,7 +4,11 @@ assignment does (PHP itself forbids unsetting a readonly property from any
 scope), but unset() only ever ran the purity-only helper, never the
 readonly check.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

@@ -1,7 +1,12 @@
 ===description===
 `mysqli_real_query()` and `mysqli_multi_query()` are SQL sinks.
 ===config===
-suppress=MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(mysqli $db): void {

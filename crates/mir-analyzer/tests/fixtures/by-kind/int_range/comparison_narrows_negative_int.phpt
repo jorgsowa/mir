@@ -2,7 +2,12 @@
 Comparison on `negative-int` intersects with its implicit `int<min,-1>` bound.
 `$n > -5` on `negative-int` narrows to `int<-4,-1>`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param negative-int $n */

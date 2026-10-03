@@ -4,7 +4,12 @@ fix: when an arm's condition isn't a resolvable class constant (a plain
 variable here), the receiver must NOT be narrowed — calling a method that
 only exists on one union member must still be flagged.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ErrorA {

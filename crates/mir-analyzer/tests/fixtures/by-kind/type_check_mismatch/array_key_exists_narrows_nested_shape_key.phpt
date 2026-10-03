@@ -4,7 +4,11 @@ way `isset($arr['a']['b'])` narrowing already does for a nested path —
 previously only a plain-variable or single-level-property array argument was
 handled.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a: array{b?: string}} $arr */

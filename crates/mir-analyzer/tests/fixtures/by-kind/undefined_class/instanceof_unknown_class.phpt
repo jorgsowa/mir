@@ -1,7 +1,11 @@
 ===description===
 instanceof unknown class
 ===config===
-suppress=MissingParamType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test($x): bool {

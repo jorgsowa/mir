@@ -2,7 +2,9 @@
 FP-E: Inside a trait method, $this->prop declared in the same trait must
 resolve to its declared type, not mixed. UndefinedProperty must not be emitted.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

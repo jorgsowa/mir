@@ -1,8 +1,15 @@
 ===description===
 Includes nested in conditionals and function bodies are still discovered
 ===config===
-file_extensions=module,inc
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 function a_fn(bool $f): int {

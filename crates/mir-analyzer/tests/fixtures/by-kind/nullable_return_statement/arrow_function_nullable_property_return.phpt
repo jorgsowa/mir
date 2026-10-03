@@ -3,7 +3,13 @@ D4: an arrow function's `=> expr` is exactly one implicit `return expr;` — a
 nullable property read against a non-nullable declared return type must flag
 the same way an equivalent `function(){...}` closure already does.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

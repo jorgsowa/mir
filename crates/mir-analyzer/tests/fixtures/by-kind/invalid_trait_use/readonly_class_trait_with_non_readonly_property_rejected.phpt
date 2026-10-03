@@ -5,7 +5,12 @@ previously only cross-checked a trait's require-extends/require-implements
 constraints; it never looked at the class-level `readonly` modifier against
 properties contributed by a trait.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait HasName {

@@ -8,7 +8,13 @@ parsed as a literal, so a non-literal key still produced the bare name
 `apply_assertions` reads as "target the whole variable" — turning a
 harmless unsupported case into an active false-positive generator.
 ===config===
-suppress=MissingReturnType,MixedArgument,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

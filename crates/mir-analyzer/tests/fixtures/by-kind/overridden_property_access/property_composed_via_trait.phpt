@@ -3,7 +3,11 @@ FN: a property composed purely via `use Trait;` (never redeclared in the
 class body) was invisible to the visibility-reduction check — only
 literally-declared own_properties() were checked against the parent.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

@@ -1,7 +1,11 @@
 ===description===
 Early returns for null generic array reads are allowed.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, array<string, int>> $matrix */

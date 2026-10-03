@@ -4,7 +4,11 @@ constant NOT in the small environment-dependent allowlist must still be
 narrowed to its literal value — the widening must not generalize to every
 global constant.
 ===config===
-suppress=UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

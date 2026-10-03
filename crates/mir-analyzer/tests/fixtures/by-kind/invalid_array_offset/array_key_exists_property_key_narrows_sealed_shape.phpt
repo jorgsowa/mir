@@ -3,7 +3,13 @@ array_key_exists($this->key, $arr) resolves the key when it's a property
 already narrowed to a single literal, same as a plain variable already
 does — literal_key resolution only tried extract_var_name.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

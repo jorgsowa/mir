@@ -10,7 +10,12 @@ which doesn't exist. Same root cause broke by-ref out-param premarking on an
 intersection receiver (`named_object_fqcn()` returning `None` for
 `TIntersection` skipped it outright).
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace {

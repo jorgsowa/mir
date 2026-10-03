@@ -1,7 +1,11 @@
 ===description===
 literal int type parameter is widened so setter accepts other int values
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Box.php===
 <?php
 /**

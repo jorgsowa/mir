@@ -1,7 +1,11 @@
 ===description===
 @readonly docblock (advisory, not runtime-enforced) dropped in child — no error
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

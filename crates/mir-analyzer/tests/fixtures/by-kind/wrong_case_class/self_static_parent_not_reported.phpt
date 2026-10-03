@@ -1,7 +1,11 @@
 ===description===
 self, static, and parent references are never reported as wrong case.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

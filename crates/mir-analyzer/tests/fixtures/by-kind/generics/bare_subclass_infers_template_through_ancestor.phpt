@@ -4,7 +4,14 @@ param binds X correctly when the arg is a bare subclass that doesn't
 redeclare @template (`class IntBox extends Box {}`), the same way a
 directly-generic arg class already does.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

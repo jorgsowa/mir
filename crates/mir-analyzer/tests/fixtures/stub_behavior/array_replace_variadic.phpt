@@ -1,7 +1,11 @@
 ===description===
 array_replace replacements are variadic and optional
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // array_replace with just one base array (no replacements)

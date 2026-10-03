@@ -1,7 +1,11 @@
 ===description===
 conditional types with different branches are not simplified
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class TestFactory {

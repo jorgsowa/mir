@@ -1,7 +1,12 @@
 ===description===
 `@return (T is Dog ? int : string)` resolves from the argument type bound to the template, including inside a union.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

@@ -3,7 +3,11 @@
 not just the base array — a shape property typed string|null returns
 provably non-null after the check
 ===config===
-suppress=MissingParamType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a: string|null} $arr */

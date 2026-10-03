@@ -3,8 +3,13 @@ FALSE POSITIVE reproducer. Calling a method annotated @inheritdoc should resolve
 to the parent's declared return type, not mixed. The @mir-check below would fail
 if the return type remained mixed.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class User {}

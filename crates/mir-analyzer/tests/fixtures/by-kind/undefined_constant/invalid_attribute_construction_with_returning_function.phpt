@@ -1,7 +1,11 @@
 ===description===
 Invalid attribute construction with returning function
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Enumm

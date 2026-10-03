@@ -1,7 +1,11 @@
 ===description===
 cross-file unannotated generic return with explicit @var property resolves correctly
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:holder.php===
 <?php
 /**

@@ -2,8 +2,13 @@
 Only zero-arg calls are memoized: a call with arguments is not assumed to
 return the same value twice.
 ===config===
-memoize_method_call_results=true
-suppress=UnusedVariable,MissingThrowsDocblock,UnusedParam
+<mir memoizeMethodCallResults="true">
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

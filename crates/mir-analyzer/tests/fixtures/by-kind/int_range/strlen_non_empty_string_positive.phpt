@@ -1,7 +1,12 @@
 ===description===
 strlen() on non-empty-string returns int<1, max>; on plain string returns int<0, max>
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_string(string $s): void {

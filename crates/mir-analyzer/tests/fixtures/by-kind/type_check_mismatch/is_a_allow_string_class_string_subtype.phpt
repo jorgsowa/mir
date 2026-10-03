@@ -4,7 +4,12 @@ an unrelated class-string is dropped in the true branch and dropped from
 the false branch only when it's a provable match, mirroring the object
 side of the same check.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

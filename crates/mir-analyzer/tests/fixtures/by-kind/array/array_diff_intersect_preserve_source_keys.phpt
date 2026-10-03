@@ -5,7 +5,12 @@ values. So the result's key/value types are exactly the first argument's.
 Never provably non-empty (everything could be filtered out) and never a
 list (original, possibly non-sequential, int keys are preserved verbatim).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

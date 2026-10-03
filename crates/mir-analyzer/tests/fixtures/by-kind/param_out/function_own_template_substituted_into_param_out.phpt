@@ -5,7 +5,11 @@ before the function's inferred template bindings were computed, so a
 generic identity/setter-style function always wrote back the raw
 `TTemplateParam` atom instead of the concrete argument type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

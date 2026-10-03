@@ -2,7 +2,12 @@
 G1: template combined with null — T|null param and return type correctly propagates
 the concrete type without emitting MixedAssignment.
 ===config===
-suppress=UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

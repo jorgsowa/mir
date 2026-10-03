@@ -1,7 +1,12 @@
 ===description===
 Foreach iteration variable type recorded at binding position
 ===config===
-suppress=UnusedForeachValue,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

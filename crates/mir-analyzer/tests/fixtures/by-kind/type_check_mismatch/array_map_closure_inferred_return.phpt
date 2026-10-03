@@ -1,7 +1,13 @@
 ===description===
 array_map infers the result element type from a closure with no explicit return type
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

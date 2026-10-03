@@ -6,7 +6,13 @@ must be dropped unless the callee is proven pure or (for methods)
 `@psalm-external-mutation-free`. A free function has no equivalent
 mutation-free-on-args signal, so only `@pure` is trusted for it.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Logger {

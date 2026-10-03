@@ -1,7 +1,12 @@
 ===description===
 Contravariant template param accepts a supertype in a return statement.
 ===config===
-suppress=UnusedParam,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-contravariant T */

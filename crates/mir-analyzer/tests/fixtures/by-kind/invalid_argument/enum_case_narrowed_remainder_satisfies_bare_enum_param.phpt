@@ -5,8 +5,12 @@ satisfy a parameter typed as the bare enum — for both pure and
 backed enums.
 Expected: no issue.
 ===config===
-php_version=8.1
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum RoundingMode {

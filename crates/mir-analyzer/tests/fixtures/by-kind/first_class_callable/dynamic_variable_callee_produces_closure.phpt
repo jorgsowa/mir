@@ -4,7 +4,12 @@ always produces a `Closure`, same as the static-name form — the callee
 isn't statically resolvable to a known signature, but the expression's
 result type must still be `Closure`, not the callee's own `callable` type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

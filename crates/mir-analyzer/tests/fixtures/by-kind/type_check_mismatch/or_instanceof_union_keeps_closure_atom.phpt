@@ -6,7 +6,13 @@ the merged type, producing a false-positive RedundantCondition on an inner
 re-check that's actually reachable. `Bar` keeps the outer OR non-exhaustive
 so only the inner re-check's behavior is under test.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

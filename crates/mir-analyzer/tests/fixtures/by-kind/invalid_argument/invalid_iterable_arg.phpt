@@ -1,7 +1,11 @@
 ===description===
 Invalid iterable arg
 ===config===
-suppress=UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

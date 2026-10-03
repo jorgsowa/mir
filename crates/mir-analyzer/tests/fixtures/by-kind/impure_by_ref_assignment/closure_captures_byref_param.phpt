@@ -6,7 +6,11 @@ the SAME caller-visible reference as a direct write in the enclosing
 scope would, but was completely invisible to check_var_write_purity/
 assign_to_target, both keyed off that set.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

@@ -6,7 +6,12 @@ Sound to reuse for loose comparison here (enum cases are singleton objects,
 and these functions always return plain strings), unlike a general
 bare-variable-vs-class-string-literal comparison, which stays unhandled.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status {

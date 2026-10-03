@@ -1,8 +1,12 @@
 ===description===
 DOMDocument::schemaValidateSource() accepts an omitted optional flags argument on PHP 7.4.
 ===config===
-php_version=7.4
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file===
 <?php
 

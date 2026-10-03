@@ -2,7 +2,12 @@
 The `->value` comparison narrowing also applies to an int-backed enum, not
 just string-backed — the literal side is an int, not a string.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Priority: int {

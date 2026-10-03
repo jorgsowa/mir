@@ -7,7 +7,12 @@ though the declared type promises `int|string` — the declared type acts as a
 floor so the generalized type never ends up narrower than the function's own
 contract.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int|string> $counts */

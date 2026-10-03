@@ -2,7 +2,12 @@
 Multiplying non-negative int ranges produces a non-negative result:
 non-negative-int * non-negative-int → int<0, max>; bounded × bounded → bounded product.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

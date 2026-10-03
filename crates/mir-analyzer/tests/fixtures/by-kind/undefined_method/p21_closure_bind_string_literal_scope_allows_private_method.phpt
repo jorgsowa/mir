@@ -3,7 +3,11 @@ FP-P21: `$newScope` written as a bare string literal (`'DeepCopy'`) rather
 than `DeepCopy::class` must resolve the same way — both are the syntactic
 literal forms real code uses.
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class DeepCopy {

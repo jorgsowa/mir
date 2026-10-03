@@ -3,7 +3,11 @@ Negative control: when the enum-typed receiver itself is nullable,
 covering every case's `->value` still isn't exhaustive without an
 explicit `null` arm — `$type->value` on a null `$type` evaluates to null.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Kind: string {

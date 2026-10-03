@@ -1,7 +1,11 @@
 ===description===
 Missing attribute on param
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(#[Pure] string $str) : void {}

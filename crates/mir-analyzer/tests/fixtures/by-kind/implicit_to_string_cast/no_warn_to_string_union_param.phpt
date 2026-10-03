@@ -1,7 +1,11 @@
 ===description===
 No warning when __toString object is passed to a string|int union parameter
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Tag {

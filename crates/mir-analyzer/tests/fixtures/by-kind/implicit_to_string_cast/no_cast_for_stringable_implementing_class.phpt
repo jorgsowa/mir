@@ -1,7 +1,11 @@
 ===description===
 No ImplicitToStringCast when class implements \Stringable — and also no warning for __toString-only classes
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class FluentString implements \Stringable {

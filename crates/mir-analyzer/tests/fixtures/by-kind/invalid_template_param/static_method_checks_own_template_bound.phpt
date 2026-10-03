@@ -3,7 +3,12 @@ A static method's own `@template U of Bound` was never enforced — only
 instance-method and free-function calls checked template bounds. `Foo::bar()`
 (and `self::`/`parent::` static calls) must check the bound too.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

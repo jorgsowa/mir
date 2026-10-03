@@ -7,7 +7,14 @@ instanceof-style narrowing for both, wrongly keeping the exact-class atom
 for class_parents(). Covers var/prop/static-prop receivers; false branch
 never narrows (mirrors is_subclass_of()'s own convention).
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {

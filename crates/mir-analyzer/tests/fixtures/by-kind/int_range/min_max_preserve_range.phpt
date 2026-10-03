@@ -3,7 +3,14 @@ min() and max() on integer subtypes infer a tighter return range:
 - min(a, b): result_min = min(a_min, b_min), result_max = min(a_max, b_max)
 - max(a, b): result_min = max(a_min, b_min), result_max = max(a_max, b_max)
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingParamType,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -2,8 +2,14 @@
 Without PREG_UNMATCHED_AS_NULL, an unmatched capture group is always the empty
 string, never null — comparing it to null must still be flagged.
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

@@ -3,7 +3,11 @@ Native `readonly` allows initialization from any method of the declaring
 class, not just the constructor — but two writes to the same property
 within that SAME method are still only the first-one-legal.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

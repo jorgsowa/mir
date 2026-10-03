@@ -6,7 +6,12 @@ unioned, non-empty if any argument is non-empty. The general string-keyed
 recursive-merge case (colliding scalars wrap, colliding arrays deep-merge)
 isn't modeled — falls back to the generic stub for non-list arguments.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

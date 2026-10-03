@@ -7,7 +7,11 @@ override "fewer parameters than parent" check counted it anyway — a child
 overriding with the SAME real param list was wrongly flagged as having
 fewer parameters than the (artificially inflated) parent.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

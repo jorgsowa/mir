@@ -5,7 +5,11 @@ null/true/false/string/list/array/int/float/bool, with no arm for an
 object atom at all, so any class-typed subject silently widened to the
 union of both branches regardless of the argument's real type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

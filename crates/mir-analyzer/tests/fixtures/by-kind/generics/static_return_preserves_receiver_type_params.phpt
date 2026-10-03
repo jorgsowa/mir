@@ -3,7 +3,12 @@ G1: a fluent `: static`-returning method must preserve the receiver's own
 inferred type params instead of erasing them to a bare class type — chaining
 another generic-returning call on the result must still resolve correctly.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

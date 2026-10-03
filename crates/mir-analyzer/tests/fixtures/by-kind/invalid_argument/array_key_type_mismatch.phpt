@@ -5,7 +5,12 @@ compared the value type, never the key, so a definite int-vs-string key
 mismatch went completely unchecked. A merely dynamic/unresolved key
 (array-key, mixed) stays permissive.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<int, int> $a */

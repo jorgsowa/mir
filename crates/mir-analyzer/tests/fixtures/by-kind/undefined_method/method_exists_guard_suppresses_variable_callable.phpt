@@ -1,7 +1,11 @@
 ===description===
 `method_exists()` on the receiver suppresses UndefinedMethod for an array callable held in a variable.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Notification {}

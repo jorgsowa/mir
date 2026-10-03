@@ -1,7 +1,14 @@
 ===description===
 !is_float()/!is_double() false branch also excludes TIntegralFloat (e.g. floor()).
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedArgument,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_true_branch(bool $cond, string $s) {

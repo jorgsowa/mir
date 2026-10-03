@@ -1,7 +1,11 @@
 ===description===
 `arraylike-object` rejects objects without array-like capabilities.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class PlainObject {}

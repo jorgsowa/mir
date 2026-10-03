@@ -1,7 +1,13 @@
 ===description===
 catch type cross file missing
 ===config===
-suppress=MissingThrowsDocblock,UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Exceptions.php===
 <?php
 namespace App;

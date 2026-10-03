@@ -1,7 +1,14 @@
 ===description===
 tainted path reaching file_get_contents is reported (path traversal / SSRF)
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

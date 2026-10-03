@@ -2,7 +2,13 @@
 G1: property fetch on a template param inside a generic class method must not emit
 MixedPropertyFetch — T is an intentionally parameterised type, not truly mixed.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

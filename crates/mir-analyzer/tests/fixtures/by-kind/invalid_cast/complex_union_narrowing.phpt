@@ -1,7 +1,12 @@
 ===description===
 Complex union type narrowing scenarios
 ===config===
-suppress=ForbiddenCode,MissingReturnType
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function multiUnionNarrowing(int|string|null|bool $value) {

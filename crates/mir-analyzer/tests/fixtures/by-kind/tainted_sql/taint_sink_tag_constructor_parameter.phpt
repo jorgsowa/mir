@@ -3,7 +3,13 @@
 had no taint-sink check at all, unlike call/function.rs and call/method.rs
 which both check it for their own call shapes.
 ===config===
-suppress=MixedArrayAccess,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Query {

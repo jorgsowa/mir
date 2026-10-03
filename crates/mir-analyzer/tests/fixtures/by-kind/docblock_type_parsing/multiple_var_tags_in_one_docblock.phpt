@@ -1,7 +1,12 @@
 ===description===
 Every named @var tag in a docblock applies, not only the last one.
 ===config===
-suppress=MixedAssignment,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo { public function m(): int { return 1; } }

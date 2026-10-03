@@ -3,7 +3,13 @@
 `class-string-map<T, V>` expands to a plain array from `class-string` to `V`
 (one-arg shorthand defaults `V` to `T` itself).
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

@@ -1,7 +1,11 @@
 ===description===
 cross-file self-referential unannotated return falls back without hanging
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:rec.php===
 <?php
 /**

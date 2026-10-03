@@ -3,7 +3,11 @@ Positive counterpart: the true branch of `is_iterable()` is unaffected by the
 false-branch fix and still narrows `Box|array` down to iterable atoms only,
 so `foreach` over the array member raises nothing.
 ===config===
-suppress=UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {}

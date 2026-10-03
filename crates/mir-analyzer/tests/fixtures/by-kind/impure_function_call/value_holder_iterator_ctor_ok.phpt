@@ -1,7 +1,13 @@
 ===description===
 Immutable methods can construct iterators from immutable receivers.
 ===config===
-suppress=MissingConstructor,UnusedClass,InvalidReturnType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedClass errorLevel="suppress"/>
+    <InvalidReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-immutable */

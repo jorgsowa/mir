@@ -3,7 +3,11 @@ preg_replace with a string subject returns string (not string|null or string[]|n
 Null is only returned on pattern error which is a programming mistake, not a type
 we expose to callers.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $input = 'hello world';

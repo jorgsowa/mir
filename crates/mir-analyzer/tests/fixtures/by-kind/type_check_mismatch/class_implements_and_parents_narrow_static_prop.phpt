@@ -3,7 +3,13 @@ array_key_exists('Iface', class_implements(self::$prop)) / class_parents()
 narrow a static-property receiver, the static-property counterpart of the
 already-existing plain-variable/instance-property narrowing.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Quacks {}

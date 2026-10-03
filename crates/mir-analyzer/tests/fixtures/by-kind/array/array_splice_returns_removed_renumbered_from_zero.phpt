@@ -4,7 +4,12 @@ there's no preserve_keys parameter — int keys are always renumbered from 0
 in the return value, so a list source's removed elements are also a list;
 a string-keyed source preserves key/value types (not modeled as a list).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

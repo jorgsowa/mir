@@ -4,7 +4,12 @@ string. Previously `check_typed_callable_arg` only compared parameter *counts*,
 so a closure declaring an incompatible parameter type (`int`) passed silently
 even though calling it with the promised string would throw at runtime.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(string):void $c */

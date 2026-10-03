@@ -3,7 +3,11 @@ Implementing an interface method with a more-specific @param docblock must not
 emit MethodSignatureMismatch. Docblock narrowing is an intentional refinement,
 not an LSP violation — the native type hint is unchanged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Shape {}

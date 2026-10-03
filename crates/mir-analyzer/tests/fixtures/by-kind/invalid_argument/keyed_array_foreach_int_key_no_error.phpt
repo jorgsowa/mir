@@ -1,7 +1,12 @@
 ===description===
 keyed array foreach int key no error
 ===config===
-suppress=ForbiddenCode,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // Bug: foreach over a list-shaped keyed array always produced TMixed for the key.

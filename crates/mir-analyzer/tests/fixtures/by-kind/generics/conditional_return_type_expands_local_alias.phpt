@@ -5,7 +5,11 @@ A `@psalm-type` alias used inside a conditional return type's branch
 it fell through to the catch-all and leaked the raw, unexpanded alias atom
 name into the resolved return type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

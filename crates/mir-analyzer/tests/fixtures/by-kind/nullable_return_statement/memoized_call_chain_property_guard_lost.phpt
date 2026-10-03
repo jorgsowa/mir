@@ -2,8 +2,12 @@
 A memoized call chain narrowing is dropped when the receiver may have changed:
 an impure call on it, a reassignment, or an unguarded sibling method.
 ===config===
-memoize_method_call_results=true
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir memoizeMethodCallResults="true">
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Identity {

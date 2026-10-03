@@ -1,8 +1,12 @@
 ===description===
 Symbol-level PhpStormStubsElementAvailable: var_dump() resolves the 8.0 declaration (requires an argument)
 ===config===
-php_version=8.0
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 var_dump();

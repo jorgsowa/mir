@@ -3,7 +3,11 @@ FN: calling a static method from a @pure function bypassed purity checking
 entirely — static_call.rs never consulted resolved.is_pure, unlike the
 analogous check for plain function calls in call/function.rs.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

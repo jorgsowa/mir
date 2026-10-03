@@ -17,7 +17,12 @@ first place — the same underlying gap as
 known_limitation_implements_template_name_collision, just reached through a
 native type hint instead of a second `@implements` source.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class T {

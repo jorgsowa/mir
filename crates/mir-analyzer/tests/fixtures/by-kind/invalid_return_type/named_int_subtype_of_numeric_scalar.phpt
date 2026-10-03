@@ -2,7 +2,12 @@
 negative-int and non-negative-int must be accepted where numeric/scalar/float
 are declared, just like positive-int and plain int already are.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function returns_negative_int_for_numeric(): float {

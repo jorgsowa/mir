@@ -3,7 +3,13 @@
 the receiver's declared TKey (from `@implements ArrayAccess<TKey, TValue>`)
 — previously only the value type was resolved, never the key.
 ===config===
-suppress=UnusedParam,MissingConstructor,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -8,7 +8,12 @@ variable, property, and static-property `::class` receiver; an arm listing
 more than one class (union narrowing, since comma-separated arm conditions
 are OR semantics); and a string-literal arm condition.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ErrorA {

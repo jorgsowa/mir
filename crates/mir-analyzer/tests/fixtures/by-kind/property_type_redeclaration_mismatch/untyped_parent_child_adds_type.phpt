@@ -1,7 +1,11 @@
 ===description===
 Child adds a native type hint where parent had none — PHP allows this, no error
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

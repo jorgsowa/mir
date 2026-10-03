@@ -3,7 +3,11 @@ Negative control for the L27 fix: excluding the synthetic func_get_args()
 `...` param from the comparison must not hide a GENUINE fewer-real-params
 violation — the child here really does drop a required parameter.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

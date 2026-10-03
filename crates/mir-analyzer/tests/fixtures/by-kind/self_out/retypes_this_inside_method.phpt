@@ -2,7 +2,11 @@
 @psalm-self-out also retypes `$this` when a method calls another self-out
 method on itself.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class MaybeString {

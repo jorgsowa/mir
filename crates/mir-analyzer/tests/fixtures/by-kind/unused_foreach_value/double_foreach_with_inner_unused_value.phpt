@@ -1,7 +1,12 @@
 ===description===
 Double foreach with inner unused value
 ===config===
-suppress=PossiblyUndefinedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <PossiblyUndefinedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

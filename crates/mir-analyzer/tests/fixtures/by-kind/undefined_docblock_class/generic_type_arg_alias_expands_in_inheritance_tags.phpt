@@ -10,7 +10,15 @@ shares the identical fix shape. The alias is declared fresh in each
 class-like's own docblock (aliases are scoped per declaring class-like in
 this codebase, not file-global).
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingThrowsDocblock,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

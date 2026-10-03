@@ -2,8 +2,13 @@
 FALSE POSITIVE reproducer. @inheritdoc on a trait method should inherit the
 interface's @return type so callers receive the correct type.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class Entity {}

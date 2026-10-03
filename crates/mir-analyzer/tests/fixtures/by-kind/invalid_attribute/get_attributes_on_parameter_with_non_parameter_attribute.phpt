@@ -1,7 +1,11 @@
 ===description===
 Get attributes on parameter with non parameter attribute
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

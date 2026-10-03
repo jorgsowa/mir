@@ -6,7 +6,13 @@ narrows the argument — only free functions dispatched assertions before;
 silently ignored every `@psalm-assert` docblock. Also covers a
 method-level `@template T` substituting into the assertion's type.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

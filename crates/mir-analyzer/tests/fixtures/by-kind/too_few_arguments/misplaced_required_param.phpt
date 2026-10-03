@@ -1,7 +1,11 @@
 ===description===
 Misplaced required param
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(string $bar = null, int $bat): void {}

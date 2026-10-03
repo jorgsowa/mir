@@ -4,7 +4,11 @@ through a declared `__get()` instead of raising an error — verified live,
 `$b->value`/`$b->secret` below both succeed and call `__get`. mir emitted
 InaccessibleProperty unconditionally, never checking for the magic fallback.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

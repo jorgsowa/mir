@@ -2,7 +2,12 @@
 $x & mask where mask is a non-negative literal returns int<0, mask>.
 $x >> n where $x is non-negative returns non-negative-int.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_and_byte_mask(int $n): void {

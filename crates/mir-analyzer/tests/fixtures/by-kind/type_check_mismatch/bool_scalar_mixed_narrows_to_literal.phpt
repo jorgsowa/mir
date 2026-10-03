@@ -5,7 +5,13 @@ string/int treatment) instead of dropping the atom (scalar, unsound —
 could produce an empty type) or keeping it unnarrowed (mixed, imprecise).
 The non-match branch must keep the wide type unchanged.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param scalar $x */

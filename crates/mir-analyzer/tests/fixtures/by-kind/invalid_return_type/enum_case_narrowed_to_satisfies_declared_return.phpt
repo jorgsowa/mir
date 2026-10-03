@@ -6,7 +6,9 @@ InvalidReturnType path, distinct from the InvalidArgument path already
 covered by the enum-case/bare-enum subtype fix's own fixtures.
 Expected: no issue.
 ===config===
-php_version=8.1
+<mir>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum RoundingMode {

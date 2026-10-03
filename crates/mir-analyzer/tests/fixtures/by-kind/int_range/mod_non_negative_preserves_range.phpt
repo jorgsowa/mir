@@ -1,7 +1,12 @@
 ===description===
 Modulo of non-negative int by a positive literal gives a bounded range: int<0, divisor-1>.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

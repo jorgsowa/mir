@@ -1,7 +1,12 @@
 ===description===
 non-empty-list<Parent> still rejects empty, unrelated, and possibly-empty values
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class Shape {}

@@ -5,7 +5,11 @@ named-type guard originally only inspected top-level atomics, missing
 templates nested inside array/list/keyed-array/intersection/generic type
 arguments — this checks that recursion reaches them.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

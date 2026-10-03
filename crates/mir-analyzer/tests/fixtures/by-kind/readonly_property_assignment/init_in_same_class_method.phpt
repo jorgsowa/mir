@@ -1,7 +1,11 @@
 ===description===
 No ReadonlyPropertyAssignment when initializing readonly in a non-constructor method of the declaring class
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

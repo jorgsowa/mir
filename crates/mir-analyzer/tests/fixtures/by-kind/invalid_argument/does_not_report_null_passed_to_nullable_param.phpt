@@ -1,7 +1,12 @@
 ===description===
 does not report null passed to nullable param
 ===config===
-suppress=UnusedParam,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(?string $x): void {}

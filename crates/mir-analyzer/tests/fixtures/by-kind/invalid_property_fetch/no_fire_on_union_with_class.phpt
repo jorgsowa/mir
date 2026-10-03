@@ -2,7 +2,11 @@
 InvalidPropertyFetch does NOT fire when the union contains a class type alongside a scalar.
 Note: there is no PossiblyInvalidPropertyFetch issue kind, so string|Foo produces no diagnostic.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

@@ -1,7 +1,11 @@
 ===description===
 func_get_args() inside a closure body does not suppress TooManyArguments for the outer function
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function outerFn(string $x): void {

@@ -3,7 +3,12 @@ Passing a plain `int` (not a specific literal) to an int-mask parameter is
 not flagged — the widening heuristic treats an unverified int as potentially
 valid. Only known-wrong literals are rejected.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

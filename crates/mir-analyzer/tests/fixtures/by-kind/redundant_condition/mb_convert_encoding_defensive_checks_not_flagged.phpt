@@ -4,7 +4,11 @@ inferred type (real code rarely checks for it), but code that DOES defensively
 check or cast against it must not get a false ImpossibleIdenticalComparison or
 RedundantCast on its own guard.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

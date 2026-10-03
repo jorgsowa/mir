@@ -4,7 +4,13 @@ by-ref write-back only ever ran for a param declaring `@param-out`, and
 even then only matched `ExprKind::Variable`, so a property argument was
 never checked regardless.
 ===config===
-suppress=MissingPropertyType,MissingConstructor,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

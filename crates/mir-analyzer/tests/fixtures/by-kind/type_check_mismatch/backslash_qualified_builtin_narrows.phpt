@@ -3,7 +3,15 @@ Fully-qualified (leading `\`) builtin calls narrow exactly like the bare
 name: is_*() predicates, array_is_list(), assert(), method_exists(),
 property_exists().
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyInvalidArgument,MixedArgument,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyInvalidArgument errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

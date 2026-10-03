@@ -2,7 +2,11 @@
 while(1) is an infinite loop, same as while(true) — a variable assigned
 before every break is not possibly-undefined after the loop.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(callable $cb, int $i): mixed {

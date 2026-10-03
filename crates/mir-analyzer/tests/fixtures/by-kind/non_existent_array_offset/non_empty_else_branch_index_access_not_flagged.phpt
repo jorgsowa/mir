@@ -3,7 +3,11 @@ Regression guard: the `else`/non-empty branch of `$values === []` (where
 `$values` narrows to `non-empty-list<int>`) still permits indexing at 0 —
 only the proven-empty branch should gain the new `NonExistentArrayOffset`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $values */

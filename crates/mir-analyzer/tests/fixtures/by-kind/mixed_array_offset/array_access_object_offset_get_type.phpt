@@ -10,7 +10,12 @@ is resolved from an `@implements ArrayAccess<TKey, TValue>` annotation
 from `offsetGet()`'s resolved return type, and the object-offset case no
 longer trips the array-key check.
 ===config===
-suppress=MixedArrayOffset,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayOffset errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class IntList implements ArrayAccess {

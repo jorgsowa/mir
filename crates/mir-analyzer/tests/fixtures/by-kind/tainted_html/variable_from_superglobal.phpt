@@ -1,7 +1,12 @@
 ===description===
 variable from superglobal
 ===config===
-suppress=MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

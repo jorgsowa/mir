@@ -1,8 +1,12 @@
 ===description===
 `preg_match($re,$s,$m)` defines `$m` by reference when it returns 1.
 ===config===
-suppress=MixedArgument
-php_version=8.4
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 function run(string $s): void {

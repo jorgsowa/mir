@@ -2,7 +2,11 @@
 A literal string containing '|' is parsed as one type, not split mid-literal
 and collapsed to mixed — a mismatched argument is still checked.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 'a|b'|'c' $x */

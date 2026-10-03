@@ -3,7 +3,11 @@ self::CONST and parent::CONST expressions resolve to their literal types.
 Integer, string, float, bool, and null constants are all inferred from their
 initializer values, not widened to mixed.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Consts {

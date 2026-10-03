@@ -8,7 +8,11 @@ catch, never counted as a use. Modeled on doctrine/instantiator's
 `try { ... } catch (Throwable $e) { throw new Exception($reflectionClass->getName()); }`
 idiom.
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(\ReflectionClass $reflectionClass): void {

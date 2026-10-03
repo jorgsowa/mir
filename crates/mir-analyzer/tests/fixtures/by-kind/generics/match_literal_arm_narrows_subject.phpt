@@ -10,7 +10,11 @@ match rather than whichever side was more specific. `@mir-check` on `$r`
 expressions and can't carry their own doc comment) surfaces the arm-local
 narrowed type of `$x`.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

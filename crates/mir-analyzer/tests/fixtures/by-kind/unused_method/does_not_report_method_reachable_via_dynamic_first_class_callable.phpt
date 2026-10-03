@@ -3,7 +3,9 @@ A private method reachable only via a dynamic first-class-callable
 ($this->$name(...)) must not be reported unused, mirroring the ordinary
 dynamic call ($this->$name()) exemption.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

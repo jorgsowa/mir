@@ -3,7 +3,12 @@ interface_exists($var) narrows the variable from string to the more precise
 interface-string (not the wider class-string) in the true branch, after a
 negative early-exit, and leaves the false branch unchanged.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_true_branch(string $iface): void {

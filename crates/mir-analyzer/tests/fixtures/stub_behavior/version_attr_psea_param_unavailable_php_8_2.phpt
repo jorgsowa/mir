@@ -1,8 +1,12 @@
 ===description===
 PhpStormStubsElementAvailable: strrchr() third param (from 8.3) absent on PHP 8.2 — extra arg is TooManyArguments
 ===config===
-php_version=8.2
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 $x = strrchr("hello", "l", true);

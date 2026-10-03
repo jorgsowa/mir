@@ -1,7 +1,12 @@
 ===description===
 Arrays can never be loosely equal to objects in PHP.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(array $arr, \stdClass $obj): void {

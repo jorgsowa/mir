@@ -7,7 +7,13 @@ itself being nullsafe, `$v?->isPositive($x)`): here the call is a plain
 tried `extract_prop_access` (plain `->` only), missing the nullsafe
 receiver chain `extract_any_prop_access` already handles elsewhere.
 ===config===
-suppress=UnusedVariable,MissingParamType,PossiblyNullMethodCall
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <PossiblyNullMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

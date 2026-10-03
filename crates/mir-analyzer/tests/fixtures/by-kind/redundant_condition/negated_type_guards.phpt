@@ -1,7 +1,11 @@
 ===description===
 Negated type guards narrow correctly
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function testNotNull(string|null $x) {

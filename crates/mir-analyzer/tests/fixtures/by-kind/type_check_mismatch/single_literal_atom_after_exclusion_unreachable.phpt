@@ -7,7 +7,12 @@ empties it entirely wasn't flagged unreachable. Gated on `from_docblock`
 so loop-widening's own single-literal under-approximation (unrelated,
 never docblock-sourced) isn't affected.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 'a'|'b' $s */

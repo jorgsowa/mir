@@ -3,7 +3,12 @@ key($array) narrows to the array's own key type (plus null, since the
 internal pointer's position isn't tracked) instead of the stub's unrefined
 int|string|null.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -3,7 +3,12 @@ Reading $GLOBALS['x'] reaches the same external mutable state as
 `global $x;`, but only the `global` statement was ever checked — a plain
 read through the superglobal array bypassed the purity check entirely.
 ===config===
-suppress=MixedArrayAccess,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @pure */

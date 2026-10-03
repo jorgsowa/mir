@@ -1,7 +1,12 @@
 ===description===
 Promoted properties expand class @psalm-type aliases from their own @var or the ctor @param, including when read from another file
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:holder.php===
 <?php
 namespace App;

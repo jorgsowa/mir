@@ -6,7 +6,12 @@ falls through infers `never`. Both calls here must still be flagged: void
 must not get silently widened to never (the bottom type, which would
 satisfy any parameter and suppress the check entirely).
 ===config===
-suppress=UnusedParam,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

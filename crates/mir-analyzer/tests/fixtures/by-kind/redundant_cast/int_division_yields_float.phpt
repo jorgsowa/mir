@@ -4,8 +4,13 @@ on a division result must not be flagged as RedundantCast, and passing the divis
 result to a float parameter must not emit InvalidArgument. `/=` must also yield
 `int|float`, not `int`. Exact literal division (6 / 2 = 3) still folds to int.
 ===config===
-php_version=8.1
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

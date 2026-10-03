@@ -1,7 +1,12 @@
 ===description===
 arithmetic on plain ints (no range operand) is unchanged — stays `int`, no spurious range
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $a, int $b): void {

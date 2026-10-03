@@ -4,7 +4,11 @@ still be caught — the check runs on the whole union body before it gets
 split into members, since splitting on `|` is itself quote-aware and would
 otherwise swallow the trailing member's unmatched quote silently.
 ===config===
-suppress=UnusedProperty
+<mir>
+  <issueHandlers>
+    <UnusedProperty errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

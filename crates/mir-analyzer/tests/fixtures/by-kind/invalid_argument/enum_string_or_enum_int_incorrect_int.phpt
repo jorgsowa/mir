@@ -1,7 +1,11 @@
 ===description===
 Enum string or enum int incorrect int
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace Ns;

@@ -1,7 +1,11 @@
 ===description===
 A method declared `: self` returns the declaring class, so a subclass-only call on the result is reported against the declaring class.
 ===config===
-suppress=UnusedMethod
+<mir>
+  <issueHandlers>
+    <UnusedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

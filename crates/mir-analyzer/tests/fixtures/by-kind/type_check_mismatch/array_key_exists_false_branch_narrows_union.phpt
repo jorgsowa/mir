@@ -6,7 +6,11 @@ does the same for the true branch in the opposite direction. A single
 (non-union) closed shape stays untouched even when it declares the key
 mandatory, mirroring the true-branch helper's same lone-shape leniency.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

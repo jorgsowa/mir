@@ -1,7 +1,12 @@
 ===description===
 class-string<Handler<R, Q>> accepts implementing classes, and a template only mentioned in another template's bound (Q of Query<R>) is inferred from Q's binding
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template R */

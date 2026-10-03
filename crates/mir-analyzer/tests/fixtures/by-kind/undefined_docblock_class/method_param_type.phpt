@@ -2,7 +2,11 @@
 A method's own `@param` docblock type referencing a nonexistent class must
 report UndefinedDocblockClass, matching a free function's identical tag.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

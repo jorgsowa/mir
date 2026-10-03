@@ -1,7 +1,9 @@
 ===description===
 cross file since 8 0 function available on php 8 0
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file:StringHelper.php===
 <?php
 function check_contains(string $text, string $needle): void {

@@ -4,7 +4,11 @@ fix) so assigning it to a strictly `array<int, A>`-typed property is a
 genuine mismatch — was masked entirely before that fix hardcoded `int`
 as the key.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

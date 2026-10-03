@@ -3,7 +3,11 @@
 both spellings) and must retype the receiver the same way, including
 preserving a method-level template written as `self<U>`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

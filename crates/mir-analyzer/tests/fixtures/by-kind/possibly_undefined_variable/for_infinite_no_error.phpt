@@ -1,7 +1,11 @@
 ===description===
 for(;;) body assigned before break is not possibly-undefined after loop
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(callable $cb, int $i): mixed {

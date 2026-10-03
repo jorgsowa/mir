@@ -1,7 +1,11 @@
 ===description===
 Wrong case method name defined in interface is reported.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Logger {

@@ -2,7 +2,12 @@
 @psalm-self-out substitutes a method-level @template bound from the call's
 argument, same as a normal @return type would.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

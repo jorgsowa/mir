@@ -4,7 +4,11 @@ A `match` over a backed enum is seen as exhaustive when an earlier
 of the cases — without `->value` narrowing, this match looks like it's
 missing the `Hearts` arm.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit: string {

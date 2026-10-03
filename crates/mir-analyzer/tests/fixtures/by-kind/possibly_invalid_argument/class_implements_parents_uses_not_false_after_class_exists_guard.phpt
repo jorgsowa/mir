@@ -6,7 +6,11 @@ models the "class doesn't exist" case. Covers both a guarded variable
 receiver and a guarded identical-literal receiver; a negative control (no
 guard) confirms the fix is scoped, not blanket.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Iterator2 {}

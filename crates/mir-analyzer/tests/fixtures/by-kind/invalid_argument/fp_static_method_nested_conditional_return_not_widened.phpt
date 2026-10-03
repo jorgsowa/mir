@@ -1,7 +1,14 @@
 ===description===
 static method nested conditional return type must be widened at call site — no InvalidArgument (regression guard)
 ===config===
-suppress=UnusedParam,UnusedVariable,UnusedFunction,UnusedClass
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <UnusedClass errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

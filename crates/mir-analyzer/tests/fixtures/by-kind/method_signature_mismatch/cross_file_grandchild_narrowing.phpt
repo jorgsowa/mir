@@ -1,7 +1,11 @@
 ===description===
 cross file grandchild narrowing
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:GrandParent.php===
 <?php
 class GrandParent {

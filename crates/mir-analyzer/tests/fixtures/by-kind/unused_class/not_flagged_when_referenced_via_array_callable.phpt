@@ -2,7 +2,9 @@
 A final class referenced only by name in a `['Foo', 'helper']` array-callable
 literal must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Foo {

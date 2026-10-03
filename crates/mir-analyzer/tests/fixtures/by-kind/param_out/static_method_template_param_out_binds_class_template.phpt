@@ -4,7 +4,12 @@ factory's `@param-out T` must substitute the class template inferred from
 its own arguments (the same binding `@return static` already resolves
 through) before writing back to the caller's variable.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

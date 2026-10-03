@@ -5,7 +5,13 @@ psalm-/phpstan- alias support for `@param`, `@return`, `@assert`, etc.
 Libraries authored against Psalm/PHPStan specifically often use the
 prefixed form instead of the bare PHPDoc standard tag.
 ===config===
-suppress=MissingReturnType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

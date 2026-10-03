@@ -3,7 +3,11 @@ Reading an optional shape key (`array{b?: string}`) must widen the result
 type with null — an optional key may genuinely be absent at runtime, so
 treating it as always-present is unsound.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

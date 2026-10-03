@@ -2,7 +2,12 @@
 `($this->prop ?? FALLBACK) === FALLBACK` narrows `$this->prop` to non-null on
 the false branch, the same way the plain-variable form already does.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Bag {

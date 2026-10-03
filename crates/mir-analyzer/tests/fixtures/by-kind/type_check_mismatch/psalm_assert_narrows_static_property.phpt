@@ -2,7 +2,14 @@
 `@psalm-assert-if-true`/`@psalm-assert-if-false` narrows a static-property
 argument like its var/instance-property counterparts already do.
 ===config===
-suppress=MissingConstructor,UnusedParam,MissingParamType,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

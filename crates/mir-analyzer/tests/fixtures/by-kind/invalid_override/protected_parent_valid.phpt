@@ -1,7 +1,9 @@
 ===description===
 InvalidOverride does NOT fire when #[Override] overrides a protected parent method (only private methods are unoverridable).
 ===config===
-php_version=8.3
+<mir>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file===
 <?php
 class Base {

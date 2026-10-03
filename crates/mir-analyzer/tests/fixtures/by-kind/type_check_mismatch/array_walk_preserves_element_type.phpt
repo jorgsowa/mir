@@ -3,7 +3,13 @@ array_walk()/array_walk_recursive() mutate values in place without adding,
 removing, or reordering keys — the by-ref array keeps its original type
 instead of collapsing to the stub's declared object|array.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

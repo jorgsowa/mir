@@ -1,7 +1,12 @@
 ===description===
 MixedArrayAccess does NOT fire after an instanceof check narrows mixed to a concrete object type.
 ===config===
-suppress=UnusedVariable,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(mixed $a): void {

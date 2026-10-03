@@ -1,7 +1,11 @@
 ===description===
 Magic method overrides parent with different param type
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class C {}

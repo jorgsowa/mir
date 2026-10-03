@@ -4,7 +4,12 @@ DivisionByZeroError as `$a / 0` — the operator check already caught the
 binary form, but intdiv() only narrowed its return type, never reporting
 the same unconditional runtime error for a definite-zero divisor.
 ===config===
-suppress=UnusedParam,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function intdiv_by_zero(int $x): int {

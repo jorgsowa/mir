@@ -2,7 +2,11 @@
 Under strict_types=1, passing int to a string parameter is a genuine type error (no PHP coercion).
 Should emit InvalidArgument (Error), not ArgumentTypeCoercion.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

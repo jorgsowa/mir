@@ -4,7 +4,11 @@
 an unresolved, unexpandable bare atom instead of retyping the receiver
 to the real class it stands for.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Widget {

@@ -2,7 +2,9 @@
 A final class named only in a property's `@var` docblock tag (no native
 property type naming it) must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Money {}

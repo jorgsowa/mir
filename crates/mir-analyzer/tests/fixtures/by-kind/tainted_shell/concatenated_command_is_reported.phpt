@@ -1,7 +1,12 @@
 ===description===
 concatenated command is reported
 ===config===
-suppress=ForbiddenCode,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run(): void {

@@ -1,7 +1,12 @@
 ===description===
 Possibly null return in try
 ===config===
-suppress=MissingThrowsDocblock,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo() : string {

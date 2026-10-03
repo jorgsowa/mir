@@ -2,7 +2,11 @@
 The loop variable is never read because the body checks an outer variable instead.
 Reads of the variable in sibling loops or after the loop do not count.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Access {

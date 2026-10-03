@@ -1,7 +1,9 @@
 ===description===
 `positive-int` is a subtype of `int<0,max>`.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 /** @param int<0,max> $n */

@@ -4,7 +4,12 @@ the same way the strict `!==` form already does — sound because a null $x
 always coalesces to exactly FALLBACK, so `FALLBACK == FALLBACK` is
 trivially true regardless of loose vs strict.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function narrowsOnFalseBranchVar(?string $x): void {

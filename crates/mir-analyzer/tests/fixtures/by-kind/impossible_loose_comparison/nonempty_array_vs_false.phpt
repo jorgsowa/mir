@@ -1,7 +1,12 @@
 ===description===
 A non-empty array is always truthy, so it can never be loosely equal to false.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-array<string> $arr */

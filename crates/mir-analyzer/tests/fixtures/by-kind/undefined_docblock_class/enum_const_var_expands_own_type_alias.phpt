@@ -4,7 +4,11 @@ An enum constant's own `@var` annotation never expanded the enum's own
 constant resolved to the literal, nonexistent class `Payload` instead of
 the aliased shape.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

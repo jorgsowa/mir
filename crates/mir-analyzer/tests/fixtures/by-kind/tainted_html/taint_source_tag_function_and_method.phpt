@@ -5,7 +5,14 @@ existing @taint-sink mechanism from the source side. Previously no
 mechanism existed for this at all -- any function-call result was
 unconditionally untainted.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedReturnStatement,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @taint-source */

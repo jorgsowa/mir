@@ -2,7 +2,13 @@
 `array + array` over keyed shapes keeps left keys and appends right-only keys
 (including class-constant shapes), instead of keeping only the left shape.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

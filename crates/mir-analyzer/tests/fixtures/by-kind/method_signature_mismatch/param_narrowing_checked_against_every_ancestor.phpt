@@ -5,7 +5,11 @@ ancestor, unlike the return-type check which already loops all of them —
 so a contravariance violation against a NON-primary ancestor interface was
 silently missed depending on declaration order.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

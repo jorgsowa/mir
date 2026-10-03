@@ -1,7 +1,12 @@
 ===description===
 A custom class extending PDO is still a SQL sink through inheritance.
 ===config===
-suppress=MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class AppDatabase extends PDO {}

@@ -6,7 +6,11 @@ free function re-parses and re-resolves the raw `@param` docblock in
 body_analysis/functions.rs via crate::db::resolve_docblock_type_name, which
 needed its own exemption for real global builtins).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

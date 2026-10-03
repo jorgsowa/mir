@@ -3,7 +3,12 @@ P22 (mixed docblock): a type-omitted `@param $name` line and a normally-typed `@
 Type $name` line in the same docblock must each resolve to their own name/type — the
 fix to the omitted-type case must not disturb the existing typed-param path.
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

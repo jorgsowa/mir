@@ -2,7 +2,11 @@
 G1: identity-style functions return the same type as their template argument.
 @mir-check verifies the inferred return type at each call site.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

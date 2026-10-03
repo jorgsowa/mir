@@ -1,7 +1,11 @@
 ===description===
 intersection parameter type — InvalidArgument fires when arg violates concrete part, not when it satisfies all parts
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -1,7 +1,11 @@
 ===description===
 Array filter third arg invalid behaves like0
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 array_filter( $arg, "strlen", 3 );

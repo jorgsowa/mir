@@ -5,7 +5,12 @@ the parse_str() precedent, so a caller passing a nullable/uninitialized
 by-ref variable purely to receive the output isn't flagged
 PossiblyNullArgument against the (irrelevant) incoming type.
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function wrap(string $domain, int $options, ?array &$info = []) {

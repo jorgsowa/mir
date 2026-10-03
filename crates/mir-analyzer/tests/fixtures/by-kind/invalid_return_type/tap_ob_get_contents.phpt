@@ -2,7 +2,15 @@
 tap() where first arg is ob_get_contents() (string|false) and declared return is string.
 In non-strict PHP, string|false → string is a scalar coercion, not InvalidReturnType.
 ===config===
-suppress=MixedArgument,MixedAssignment,UnusedParam,MissingReturnType,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

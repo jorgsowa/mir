@@ -6,7 +6,11 @@ as a real bound and silently lost the constraint entirely. Now stops
 once the bound's own brackets are balanced and the next token isn't a
 dangling union/intersection continuation.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

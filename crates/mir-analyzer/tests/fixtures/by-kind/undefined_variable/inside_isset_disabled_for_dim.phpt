@@ -1,7 +1,12 @@
 ===description===
 Inside isset disabled for dim
 ===config===
-suppress=MixedArrayAccess,MixedArrayOffset
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArrayOffset errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 isset($a[$b]);

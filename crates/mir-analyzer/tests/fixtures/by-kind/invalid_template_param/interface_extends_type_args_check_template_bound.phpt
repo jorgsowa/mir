@@ -4,7 +4,13 @@ used for binding substitution elsewhere, but never bound-checked here — only
 the class-level `@implements`/`@extends` counterpart was (see
 implements_extends_check_template_bound.phpt).
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

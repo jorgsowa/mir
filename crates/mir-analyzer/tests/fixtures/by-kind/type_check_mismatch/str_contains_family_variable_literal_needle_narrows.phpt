@@ -3,7 +3,12 @@ str_contains/str_starts_with/str_ends_with resolve a needle argument that's
 a variable already narrowed to a single non-empty literal string, same as
 passing the literal inline.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_str_contains_variable_needle(string $s): void {

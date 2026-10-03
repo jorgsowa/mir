@@ -1,7 +1,11 @@
 ===description===
 Class string properly resolves
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ConfigRegistry {

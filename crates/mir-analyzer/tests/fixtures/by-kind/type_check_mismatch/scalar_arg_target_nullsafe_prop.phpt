@@ -4,7 +4,15 @@ isset()/empty()/array_key_exists() shape narrowing on a property) only
 recognized a plain `->` property receiver, never `?->` — a nullsafe access
 disabled all of that narrowing family entirely.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyNullArgument,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

@@ -2,7 +2,12 @@
 numeric-string can be "0" which is falsy; truthy check on numeric-string must
 not mark the false branch as unreachable.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param numeric-string $s */

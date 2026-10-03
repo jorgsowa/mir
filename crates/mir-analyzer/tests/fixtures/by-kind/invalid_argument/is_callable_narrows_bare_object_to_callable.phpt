@@ -6,7 +6,11 @@ Passing the narrowed value to a `callable`-typed param then flagged
 InvalidArgument ('callable' vs 'object'), even though the runtime check
 just proved it callable.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable $fn */

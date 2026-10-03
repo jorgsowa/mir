@@ -2,7 +2,14 @@
 ParentNotFound does NOT fire when parent:: is used inside an anonymous class
 that has an extends clause.
 ===config===
-suppress=UnusedVariable,MissingParamType,MissingReturnType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -5,7 +5,12 @@ constructor unconditionally assigns a `new` expression to is no longer
 own assignment, the same way method/function return types are inferred from
 body analysis.
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ArrayCache {

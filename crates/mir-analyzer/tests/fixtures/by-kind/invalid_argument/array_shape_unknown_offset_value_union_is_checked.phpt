@@ -1,7 +1,11 @@
 ===description===
 array shape unknown offset value union is checked
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takes_int(int $value): void { var_dump($value); }

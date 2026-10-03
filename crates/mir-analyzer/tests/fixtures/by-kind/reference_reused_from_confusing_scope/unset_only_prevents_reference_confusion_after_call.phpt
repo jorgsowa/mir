@@ -1,7 +1,11 @@
 ===description===
 Unset only prevents reference confusion after call
 ===config===
-suppress=UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $arr = [1, 2, 3];

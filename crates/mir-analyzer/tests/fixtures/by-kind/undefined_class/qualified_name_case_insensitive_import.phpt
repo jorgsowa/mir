@@ -1,7 +1,11 @@
 ===description===
 qualified name resolves against use import case-insensitively
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib.php===
 <?php
 namespace MyApp\Deep;

@@ -1,7 +1,11 @@
 ===description===
 P3: Static method first-class callable preserves all parameter types.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

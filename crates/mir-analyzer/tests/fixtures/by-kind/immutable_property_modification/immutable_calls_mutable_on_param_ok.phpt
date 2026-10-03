@@ -2,7 +2,11 @@
 Calling a mutable method on a parameter (not $this) inside a @psalm-immutable
 class is allowed — the immutability constraint only guards $this, not other objects.
 ===config===
-suppress=ImpurePropertyAssignment
+<mir>
+  <issueHandlers>
+    <ImpurePropertyAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

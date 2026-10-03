@@ -4,7 +4,13 @@ to class-string/interface-string, the property-receiver counterpart of the
 existing plain-variable narrowing — method_exists()/property_exists() right
 below already have this var/prop split, class_exists() family didn't.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

@@ -6,7 +6,14 @@ consumer of `build_class_bindings` left T entirely unbound, which downstream
 treated as an unconstrained wildcard (mixed) instead of the declared
 default.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T = int */

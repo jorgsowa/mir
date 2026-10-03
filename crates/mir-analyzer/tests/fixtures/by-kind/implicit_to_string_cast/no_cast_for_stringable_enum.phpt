@@ -1,7 +1,11 @@
 ===description===
 No ImplicitToStringCast when the enum implements Stringable.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit implements Stringable {

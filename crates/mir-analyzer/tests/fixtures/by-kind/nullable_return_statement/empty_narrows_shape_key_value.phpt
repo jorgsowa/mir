@@ -4,7 +4,11 @@ not just the base array — a shape property typed string|null returns
 provably non-null (and non-empty-string) after the check, matching
 `isset($arr['key'])`'s existing narrowing
 ===config===
-suppress=MissingParamType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a?: string|null} $arr */

@@ -4,7 +4,13 @@ FIRST variadic call-site argument's position — a later variadic argument
 silently bypassed the check entirely, in both the plain-function and
 method-call taint-sink paths.
 ===config===
-suppress=MixedArrayAccess,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @taint-sink ldap $parts */

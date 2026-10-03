@@ -1,7 +1,11 @@
 ===description===
 A union receiver where a sibling atom accepts fewer args does not flag TooFewArguments on the stricter atom
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Strict {

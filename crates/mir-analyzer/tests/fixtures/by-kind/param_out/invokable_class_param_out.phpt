@@ -2,7 +2,12 @@
 Invokable class (__invoke with @param-out): calling via variable uses the
 declared @param-out type, not the in-type (mixed), for the writeback.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Filler {

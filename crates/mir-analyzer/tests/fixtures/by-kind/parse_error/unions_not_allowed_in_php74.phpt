@@ -1,7 +1,9 @@
 ===description===
 Unions not allowed in p h p74
 ===config===
-php_version=7.4
+<mir>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file===
 <?php
 interface A {

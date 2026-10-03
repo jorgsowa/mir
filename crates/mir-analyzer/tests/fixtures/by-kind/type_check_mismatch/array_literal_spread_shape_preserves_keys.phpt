@@ -4,7 +4,12 @@ Spreading a single, closed, string-keyed shape into an array literal
 precise shape instead of widening the whole literal to a generic array.
 An int-keyed spread source still falls back (renumbering isn't modeled).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

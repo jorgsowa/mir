@@ -2,7 +2,12 @@
 interface-string<Child> satisfies a parameter typed interface-string<Parent>
 when Child extends Parent.
 ===config===
-suppress=MissingReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

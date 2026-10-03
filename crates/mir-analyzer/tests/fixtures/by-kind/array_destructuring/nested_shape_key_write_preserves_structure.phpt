@@ -3,7 +3,12 @@ A nested literal-key write (`$arr['a']['b'] = $v`) must update just that
 one inner property, leaving the rest of the outer shape's structure intact
 instead of collapsing the whole outer shape to a generic array.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

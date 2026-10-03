@@ -1,7 +1,11 @@
 ===description===
 Plain string not false positive undefined class
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // This test demonstrates the fix for issue #5:

@@ -2,7 +2,11 @@
 Redundant cast from float literal to float
 
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $x = (float)3.0;

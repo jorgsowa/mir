@@ -5,7 +5,12 @@ mismatch, a non-empty $keys guarantees a non-empty result on the successful-
 return path. The result is never a list — keys come from $keys's arbitrary
 values, not sequential indices.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

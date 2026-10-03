@@ -4,7 +4,12 @@ the receiver non-null too — sibling branches (enum-case, get_class(),
 get_debug_type()) already excluded null on the receiver this way; the
 plain class-string branch didn't.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

@@ -4,7 +4,9 @@ composes a nested trait (`Outer` uses `Inner`) whose own methods reference an
 unrelated private member — the transitive `traituse:` exemption walk must
 not over-exempt.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 trait Inner {

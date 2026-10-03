@@ -1,7 +1,12 @@
 ===description===
 Loop with switch doesnt return first case
 ===config===
-suppress=MissingThrowsDocblock,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function b(): int {

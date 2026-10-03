@@ -1,7 +1,12 @@
 ===description===
 A docblock `Cls::CONST` / `Cls::*` naming another class (resolved through `use`) is a constant, not an object, so comparing it to a literal is not impossible.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Model {

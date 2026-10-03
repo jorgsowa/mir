@@ -4,7 +4,13 @@ through a TWO-level array-index-into-property by-ref argument, but
 `check_byref_arg_purity`'s `ArrayAccess` arm only ever unwrapped one level
 before checking the base, silently skipping deeper nesting.
 ===config===
-suppress=MissingConstructor,MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Frozen {

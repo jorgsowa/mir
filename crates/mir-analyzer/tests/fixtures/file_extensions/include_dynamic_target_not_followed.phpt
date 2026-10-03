@@ -1,8 +1,15 @@
 ===description===
 Targets that depend on a runtime value are not resolved statically
 ===config===
-file_extensions=module,inc
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 function a_fn(string $name): int {

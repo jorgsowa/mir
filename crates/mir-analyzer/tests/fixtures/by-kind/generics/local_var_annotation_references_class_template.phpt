@@ -4,7 +4,12 @@ the enclosing *class's* own `@template` (as opposed to a per-method one)
 must also resolve to a `TTemplateParam`, not an ordinary (and namespace-
 mis-qualified) class reference.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

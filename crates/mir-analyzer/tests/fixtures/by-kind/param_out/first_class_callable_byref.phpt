@@ -2,7 +2,12 @@
 First-class callable syntax `fn(...)` preserves by-ref params in the TClosure,
 so calling through the stored callable correctly pre-marks and writes back.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

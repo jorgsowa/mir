@@ -3,7 +3,11 @@
 inferred. The fixpoint resolves the cycle, so `B::g()` infers `1` from
 `A::h()` instead of degrading to `mixed`.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:A.php===
 <?php
 class A {

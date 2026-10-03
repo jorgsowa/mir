@@ -3,7 +3,13 @@ in_array()/array_search() type-hint the haystack as non-nullable array —
 reaching either branch of the condition proves it wasn't null, regardless
 of which branch, for var/prop/static-prop receivers alike.
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

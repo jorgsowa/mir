@@ -9,7 +9,11 @@ override-covariance level either). Comparing the child's undecorated native
 hint against a substitution it never opted into produced a false
 MethodSignatureMismatch ('Base' is not a subtype of 'Concrete').
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

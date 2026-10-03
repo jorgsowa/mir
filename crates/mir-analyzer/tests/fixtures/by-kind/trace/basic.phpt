@@ -1,7 +1,11 @@
 ===description===
 Trace emits the inferred type of a variable via @trace in a docblock.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $x = 42;

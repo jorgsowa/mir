@@ -4,7 +4,12 @@ existing undefined-variable case: the right-hand side always runs, so the
 result is exactly `$v`'s type — not a union with the `mixed` a plain read of
 a definitely-absent offset would otherwise produce.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

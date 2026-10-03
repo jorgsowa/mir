@@ -4,7 +4,9 @@ a `float` parameter, just as plain `int` does. Regression: `strlen()` returns
 `int<0, max>`, and passing it to `log()` (which takes `float`) was emitting
 `InvalidArgument`.
 ===config===
-php_version=8.1
+<mir>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

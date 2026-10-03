@@ -1,7 +1,11 @@
 ===description===
 A class import must not change a function declaration's canonical FQN.
 ===config===
-suppress=UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Other.php===
 <?php
 namespace Other;

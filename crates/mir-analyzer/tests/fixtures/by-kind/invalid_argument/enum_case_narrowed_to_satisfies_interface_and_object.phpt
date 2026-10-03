@@ -7,8 +7,12 @@ subtype fix only covered the exact bare-enum fqcn match; interface targets
 went through a separate codebase-aware/argument-checking path that had no
 `TLiteralEnumCase` arm at all. Expected: no issue.
 ===config===
-php_version=8.1
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 interface HasLabel {

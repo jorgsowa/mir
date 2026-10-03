@@ -1,7 +1,12 @@
 ===description===
 suppress=MissingThrowsDocblock drops every diagnostic of that kind from the result
 ===config===
-suppress=MissingThrowsDocblock,UnusedFunction
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function riskyOperation(): void {

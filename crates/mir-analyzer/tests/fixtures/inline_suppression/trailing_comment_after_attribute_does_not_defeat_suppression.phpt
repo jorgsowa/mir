@@ -6,7 +6,11 @@ character, so the line matched neither the attribute-skip nor the
 comment-skip predicate and became the wrongly-chosen suppression target
 instead of the class declaration after it.
 ===config===
-suppress=UndefinedAttributeClass
+<mir>
+  <issueHandlers>
+    <UndefinedAttributeClass errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @mir-ignore UndefinedClass */

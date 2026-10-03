@@ -2,7 +2,13 @@
 $argv and $argc are auto-populated by PHP in CLI scripts (register_argc_argv is on
 by default for CLI). Accessing them at global scope must not emit UndefinedVariable.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = $argv[1];

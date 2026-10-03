@@ -3,7 +3,13 @@ The guard on a @mutation-free call chain is dropped when the receiver may
 have changed, and never applies to calls with arguments or to a chain that
 contains an unstable call.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Identity {

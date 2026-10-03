@@ -5,7 +5,11 @@ allows null, but the docblock promises a value that never is. This is the
 mirror image of `docblock_param_contradicts_hint.phpt`, which only catches
 a docblock claiming something the hint disallows.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

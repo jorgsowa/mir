@@ -1,7 +1,9 @@
 ===description===
 Interface property with hooks before php84
 ===config===
-php_version=8.3
+<mir>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file===
 <?php
 interface A {

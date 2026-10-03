@@ -5,7 +5,12 @@ either comparison result proves the receiver was non-null. The helper
 wrongly gated this on the comparison's own truth value instead of always
 applying it.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

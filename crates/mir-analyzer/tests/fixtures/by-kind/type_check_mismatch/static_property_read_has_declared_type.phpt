@@ -6,7 +6,11 @@ entirely. Also covers the companion narrowing gap this fix would otherwise
 expose: an assignment inside a null-check guard (the classic lazy-init
 pattern) must be reflected in later reads of the same static property.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

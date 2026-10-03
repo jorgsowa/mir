@@ -2,7 +2,12 @@
 `$this->prop === []` / `!== []` (and loose `==`/`!=`) narrow a property
 receiver to empty/non-empty the same way a plain variable already does.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Bag {

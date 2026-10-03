@@ -1,7 +1,15 @@
 ===description===
 `map()` preserves the callback's collection value type.
 ===config===
-suppress=MissingReturnType,MissingParamType,MissingPropertyType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

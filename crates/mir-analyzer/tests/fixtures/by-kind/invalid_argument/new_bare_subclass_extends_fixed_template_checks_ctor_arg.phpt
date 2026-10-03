@@ -7,7 +7,12 @@ arg-checking, unlike every other template-consuming call site. A bad
 constructor arg used to also corrupt a later `@return T` call's inferred
 type instead of being caught here.
 ===config===
-suppress=MissingPropertyType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

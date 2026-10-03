@@ -5,7 +5,11 @@ no cross-line heredoc-body tracking at all, so this genuinely bogus
 `@mir-ignore-file` embedded in a shell script silently suppressed
 UndefinedClass for the whole file.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $script = <<<BASH

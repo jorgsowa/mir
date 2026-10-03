@@ -5,7 +5,11 @@ property readonly, the same as tagging each property individually — but
 the per-property `is_readonly` computation never consulted the
 class-level docblock's own `is_readonly` flag.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @readonly */

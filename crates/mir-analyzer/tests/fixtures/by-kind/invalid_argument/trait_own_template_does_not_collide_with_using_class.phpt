@@ -5,7 +5,14 @@ same-letter `@template T` — `inherited_template_bindings` never walked
 to the receiver's own T binding when substituting the trait-owned
 property's type.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

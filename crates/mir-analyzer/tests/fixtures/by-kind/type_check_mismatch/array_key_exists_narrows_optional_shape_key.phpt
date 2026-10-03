@@ -2,7 +2,11 @@
 array_key_exists() clears `optional` but must not strip `null` — it proves
 key presence, not a non-null value.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{name?: string} $data */

@@ -1,7 +1,11 @@
 ===description===
 Undefined trace variable
 ===config===
-suppress=Trace
+<mir>
+  <issueHandlers>
+    <Trace errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @trace $b */

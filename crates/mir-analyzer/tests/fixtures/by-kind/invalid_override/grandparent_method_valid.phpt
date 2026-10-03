@@ -1,7 +1,9 @@
 ===description===
 InvalidOverride does NOT fire when #[Override] refers to a method on a grandparent class (ancestor chain is searched transitively).
 ===config===
-php_version=8.3
+<mir>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file===
 <?php
 class GrandParent {

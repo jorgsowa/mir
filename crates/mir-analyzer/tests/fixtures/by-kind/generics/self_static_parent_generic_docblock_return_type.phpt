@@ -8,7 +8,13 @@ resolution on it to `mixed`. The written `<T>` is dropped (`TSelf`
 carries no `type_params` of its own), matching how a bare `@return self`
 already resolves via the receiver's own concrete binding.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

@@ -1,7 +1,11 @@
 ===description===
 Throw with message call and nested assignment in try and catch and no reference
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function dangerous(): string {

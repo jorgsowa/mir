@@ -1,7 +1,11 @@
 ===description===
 Verify UnusedVariable is reported at the correct line and column.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function example() {

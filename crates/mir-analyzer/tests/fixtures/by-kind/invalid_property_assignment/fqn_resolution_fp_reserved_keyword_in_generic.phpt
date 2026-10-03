@@ -1,7 +1,11 @@
 ===description===
 FP guard: PHP reserved type keywords (array, list) inside generic type params must not be namespace-qualified
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib/Mapper.php===
 <?php
 namespace Lib;

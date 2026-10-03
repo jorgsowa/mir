@@ -2,8 +2,12 @@
 With memoize_method_call_results, `instanceof` on an unannotated getter's
 result narrows the next call of the same getter, directly and through a chain.
 ===config===
-memoize_method_call_results=true
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir memoizeMethodCallResults="true">
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface PropertyType {}

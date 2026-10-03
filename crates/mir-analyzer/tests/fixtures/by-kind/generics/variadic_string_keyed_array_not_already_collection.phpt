@@ -5,7 +5,12 @@ a string-only key means the docblock describes the PER-ARGUMENT type,
 not the aggregate, unlike an int-keyed `array<int,V>`/`list<V>` which IS
 already the aggregate.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string,int> ...$maps */

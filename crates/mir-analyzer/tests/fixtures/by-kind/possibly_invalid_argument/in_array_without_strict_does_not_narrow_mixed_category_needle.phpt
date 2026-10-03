@@ -6,7 +6,11 @@ matches the int 1, so $needle could still be a string here. The call stays
 a `PossiblyInvalidArgument` (int|string is not assignable to string), not a
 coerced `ArgumentTypeCoercion` down to `1|2`.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int|string $x): void {

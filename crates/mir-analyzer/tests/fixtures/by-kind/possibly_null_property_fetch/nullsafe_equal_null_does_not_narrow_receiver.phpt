@@ -5,7 +5,11 @@ non-null — a null receiver is one of the two ways this can be true (the
 other being a non-null receiver with a genuinely null `value`), so `$b`
 is still possibly null inside this branch.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

@@ -4,7 +4,14 @@ call/function.rs, a separate implementation from narrowing.rs's
 apply_docblock_assertions) narrows a property receiver non-null too, and
 now also supports a static-property argument — parity fixes matching R1-1.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {}

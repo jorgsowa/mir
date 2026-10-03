@@ -5,7 +5,12 @@ checks the inherited constructor arg against the fixed type — previously,
 having ANY own template at all made the whole inherited-binding merge skip
 entirely, silently accepting any argument type.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

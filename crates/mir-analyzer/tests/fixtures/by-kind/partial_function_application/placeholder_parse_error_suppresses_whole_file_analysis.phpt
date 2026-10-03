@@ -12,8 +12,12 @@ here. This is not a bug introduced by the `Arg::value: Option<Expr>`
 migration; it's the pre-existing "a hard parse error blanks out the whole
 file's diagnostics" policy, just newly reachable via PHP 8.6 syntax.
 ===config===
-php_version=8.5
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.5</phpVersion>
+</mir>
 ===file===
 <?php
 

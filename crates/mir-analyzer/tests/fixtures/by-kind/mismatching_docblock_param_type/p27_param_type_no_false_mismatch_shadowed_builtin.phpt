@@ -5,7 +5,11 @@ the native param hint bare-name a same-namespace class shadowing a builtin
 iterator-family name — the two are read the same way once the docblock side's bare
 builtin-leniency is reconciled against a confirmed local shadow.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

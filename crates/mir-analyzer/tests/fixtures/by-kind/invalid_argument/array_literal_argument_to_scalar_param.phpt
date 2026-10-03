@@ -3,7 +3,11 @@ An array literal argument passed where a scalar param is expected is
 flagged — previously array_list_compatible treated any TKeyedArray
 argument as compatible with anything, silencing this entirely
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function needsInt(int $x): void {}

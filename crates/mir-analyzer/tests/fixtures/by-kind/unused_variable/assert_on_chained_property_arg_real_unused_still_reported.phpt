@@ -1,7 +1,12 @@
 ===description===
 Skipping synthetic property-chain keys does not hide a genuinely unused local in the same method.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class TestCase {

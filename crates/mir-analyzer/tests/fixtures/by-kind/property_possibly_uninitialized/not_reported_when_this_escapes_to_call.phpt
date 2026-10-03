@@ -6,7 +6,11 @@ or delegating to `parent::__construct()`. Both are common real-world
 patterns (init helpers, constructor delegation) that this pass can't verify
 actually assign the property, so it stays silent rather than guess wrong.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

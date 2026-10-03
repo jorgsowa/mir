@@ -2,7 +2,11 @@
 An optional shape key (`array{a?: T}`) destructured via `['a' => $a] = $arr`
 must widen $a's type with null, same as plain array access ($arr['a']).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -4,7 +4,11 @@ whose return type genuinely violates the template's bound still flags —
 the fix only stops the bare `T` alternative from ALSO absorbing the whole
 closure value, it doesn't loosen the return-type structural bind.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

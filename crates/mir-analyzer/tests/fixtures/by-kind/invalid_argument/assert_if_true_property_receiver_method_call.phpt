@@ -4,7 +4,11 @@ receiver was a bare variable (method_call_receiver_fqcn only tried
 extract_var_name) — a property-access receiver (`$this->validator->isInt`,
 a very common real-world shape) silently no-oped the whole assertion.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Validator {

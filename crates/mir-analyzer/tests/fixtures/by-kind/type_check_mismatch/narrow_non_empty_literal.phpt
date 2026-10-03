@@ -1,7 +1,12 @@
 ===description===
 Narrowing non-empty-string with === 'literal' should yield 'literal' in true branch.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-string $x */

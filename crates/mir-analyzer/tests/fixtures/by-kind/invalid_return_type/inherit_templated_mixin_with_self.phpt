@@ -1,7 +1,12 @@
 ===description===
 Inherit templated mixin with self
 ===config===
-suppress=MissingPropertyType,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

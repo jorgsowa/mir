@@ -3,8 +3,15 @@ Without @inheritdoc, a child method's return type at call sites remains what
 the method itself declares (mixed here), not what the parent's docblock says.
 The @mir-check below would fail if the child silently inherited Cat.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedAssignment,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class Cat {}

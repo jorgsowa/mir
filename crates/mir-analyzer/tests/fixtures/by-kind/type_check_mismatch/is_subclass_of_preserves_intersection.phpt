@@ -5,7 +5,12 @@ fix `narrow_strict_subclass_of` had no `TIntersection` arm at all, so it
 fell through the catch-all and vanished from the narrowed union entirely,
 same soundness bug the `instanceof` sibling already had fixed.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

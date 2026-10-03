@@ -11,7 +11,11 @@ UndefinedMethod. Fixed by adding `resolve_named_objects_in_union_native` and usi
 for closure/arrow-fn return-type hints (`expr/closures.rs`) and closure/arrow-fn
 param-type hints (`expr/helpers.rs::ast_params_to_fn_params_resolved`).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

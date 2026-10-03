@@ -1,7 +1,12 @@
 ===description===
 Null check on the result of a function returning non-nullable string is dead; comparing to '' is fine.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function sanitize(string $s): string { return trim($s); }

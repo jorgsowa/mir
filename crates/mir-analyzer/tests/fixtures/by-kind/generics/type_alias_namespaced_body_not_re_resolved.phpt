@@ -2,7 +2,14 @@
 Class names in a `@psalm-type` body resolve once against the declaring
 namespace (no `A\B\A\B\Item`) in every position that expands the alias.
 ===config===
-suppress=UnusedParam,UnusedVariable,MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace A\B;

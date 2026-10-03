@@ -3,7 +3,12 @@ abs() on a typed int argument infers a tighter return type:
 negative-int → positive-int; non-negative-int → non-negative-int; int → non-negative-int;
 bounded ranges reflect the absolute-value transformation.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param negative-int $n */

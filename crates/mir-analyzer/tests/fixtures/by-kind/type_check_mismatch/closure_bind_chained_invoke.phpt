@@ -1,7 +1,11 @@
 ===description===
 Closure::bind chained with invoke returns correct type (key regression)
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

@@ -4,7 +4,13 @@ same as self::/static::/parent:: — calling a non-static method through it
 must not fire InvalidStaticInvocation, and @psalm-self-out narrowing must
 still apply. An unrelated object-variable receiver (`$g::`) stays flagged.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Greeter {

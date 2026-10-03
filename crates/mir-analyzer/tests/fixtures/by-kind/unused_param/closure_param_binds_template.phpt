@@ -1,7 +1,12 @@
 ===description===
 Closure(T): R parameter binds T and R from a typed closure argument
 ===config===
-suppress=MixedArgument,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

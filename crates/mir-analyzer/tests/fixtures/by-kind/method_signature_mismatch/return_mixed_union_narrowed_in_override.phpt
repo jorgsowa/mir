@@ -3,7 +3,11 @@ A child override narrowing a mixed object+scalar union return type (string|Anima
 is covariance-legal and must not be flagged. Verifies the lifted G5 override skip stays
 false-positive-free for the common narrowing direction.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

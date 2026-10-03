@@ -6,7 +6,12 @@ exempt just because it's docblock-only, once this class's `@extends`
 concretely binds T. A plain, non-generic docblock narrowing (native
 hint unchanged) stays exempt, same as before.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

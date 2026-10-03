@@ -2,7 +2,12 @@
 Chained comparisons with `&&` narrow the type on both ends.
 `$x > 0 && $x < 10` on `int` gives `int<1,9>`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(int $x): void {

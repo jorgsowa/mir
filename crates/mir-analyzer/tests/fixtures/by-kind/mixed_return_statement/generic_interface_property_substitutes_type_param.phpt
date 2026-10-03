@@ -2,7 +2,13 @@
 `@property T $value` on a generic interface substitutes the receiver's own
 concrete type argument, instead of leaking the raw unbound template.
 ===config===
-suppress=UnusedVariable,MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

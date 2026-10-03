@@ -7,7 +7,14 @@ class as the already-fixed positional File/Unserialize sink check, never
 mirrored for conditional returns. Covers all three call sites (function,
 method, static method) since each shares the identical fix.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

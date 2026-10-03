@@ -1,7 +1,12 @@
 ===description===
 Reference assignment to array offset: no issue, type is traceable
 ===config===
-suppress=Trace,UnusedVariable
+<mir>
+  <issueHandlers>
+    <Trace errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var array<string, string> */

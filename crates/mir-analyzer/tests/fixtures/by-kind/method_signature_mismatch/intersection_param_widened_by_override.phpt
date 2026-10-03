@@ -3,7 +3,11 @@ A parent docblock param typed as an intersection (`array<string,mixed>&array{..}
 of bare `array`, so an override widening to `array`/`iterable`/`array|null` is valid contravariance.
 Narrowing to an unrelated type is still flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

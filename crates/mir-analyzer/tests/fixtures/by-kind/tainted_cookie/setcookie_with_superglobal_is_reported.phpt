@@ -1,7 +1,12 @@
 ===description===
 Tainted input in `setcookie()`/`setrawcookie()` reports TaintedCookie.
 ===config===
-suppress=MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

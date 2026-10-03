@@ -1,7 +1,11 @@
 ===description===
 Legacy `resource` return types are not undefined classes.
 ===config===
-suppress=UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function makeHandle(): resource {

@@ -2,7 +2,11 @@
 int-mask-of<static::FLAG_*> resolves the same way as `self::` — both refer
 to the declaring class's own constants for this purpose.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

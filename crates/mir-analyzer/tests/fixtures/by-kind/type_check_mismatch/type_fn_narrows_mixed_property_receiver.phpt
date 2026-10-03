@@ -7,7 +7,12 @@ narrowed nothing. The false branch stays mixed either way (is_string()
 on mixed is false, so the filter is a no-op) — only the true branch gains
 narrowing.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

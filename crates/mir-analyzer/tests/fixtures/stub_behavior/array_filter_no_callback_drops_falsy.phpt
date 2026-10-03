@@ -1,7 +1,11 @@
 ===description===
 array_filter without a callback removes null/falsy from the value type
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string|null $s @param array<int, string|null> $arr */

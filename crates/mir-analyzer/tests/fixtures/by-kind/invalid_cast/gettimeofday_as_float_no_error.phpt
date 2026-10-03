@@ -2,7 +2,11 @@
 gettimeofday(true) returns float, not array|float — casting to int must not emit InvalidCast
 
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $t = gettimeofday(true);

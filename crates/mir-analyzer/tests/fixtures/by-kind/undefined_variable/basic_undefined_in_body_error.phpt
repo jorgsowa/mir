@@ -1,7 +1,11 @@
 ===description===
 Using a variable that was never assigned in the same scope reports UndefinedVariable.
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(): string {

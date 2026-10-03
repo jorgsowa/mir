@@ -1,7 +1,13 @@
 ===description===
 @var generic argument is FQN-resolved through use statement (regression guard: was stored as short name causing type-check FPs)
 ===config===
-suppress=UnusedParam,UnusedProperty,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedProperty errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib/Container.php===
 <?php
 namespace Lib;

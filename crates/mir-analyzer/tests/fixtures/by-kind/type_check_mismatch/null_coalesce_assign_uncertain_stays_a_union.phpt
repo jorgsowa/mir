@@ -6,7 +6,12 @@ result stays the safe union of "kept the old value" and "ran the
 right-hand side" — same for a property that's optional (present in only
 one merged branch).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function nullableNonOptional(): void {

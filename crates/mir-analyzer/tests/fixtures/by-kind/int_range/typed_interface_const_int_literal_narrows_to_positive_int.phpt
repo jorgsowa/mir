@@ -3,7 +3,11 @@ The typed-const literal-narrowing gap was duplicated verbatim in the interface c
 too: a typed constant declared on an interface lost the same literal precision as the
 class case, inherited by any implementing class.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface HasId {

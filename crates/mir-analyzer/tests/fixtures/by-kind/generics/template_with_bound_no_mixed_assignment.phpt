@@ -2,7 +2,13 @@
 G1: a bounded template param (T of Countable) must not trigger MixedAssignment when
 the function iterates over or assigns from a template-typed parameter.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MixedMethodCall
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

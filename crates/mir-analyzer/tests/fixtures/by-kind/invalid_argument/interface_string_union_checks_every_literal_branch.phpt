@@ -4,7 +4,11 @@ ternary) must have every branch validated, not just the first — the second,
 non-interface branch here must still be caught as NotAnInterface even though
 the first branch is a valid interface name.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

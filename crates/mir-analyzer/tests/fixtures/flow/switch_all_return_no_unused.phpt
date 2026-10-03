@@ -3,7 +3,13 @@ Variables written before a switch(true) statement where every arm returns must n
 be reported as UnusedVariable. The reads inside diverging case bodies (e.g. passed
 to `new ClassName(...)`) must propagate out even when all arms diverge.
 ===config===
-suppress=UndefinedClass,MixedArgument,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UndefinedClass errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function parseArgument(string $token): object {

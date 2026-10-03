@@ -1,7 +1,9 @@
 ===description===
 does not report function called via call user func
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function helper(): void {}

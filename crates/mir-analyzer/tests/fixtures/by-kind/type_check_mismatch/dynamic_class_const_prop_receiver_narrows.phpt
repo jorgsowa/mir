@@ -6,7 +6,12 @@ side, never a property access, so a property receiver fell through
 unnarrowed. Covers both operand orders, the string-literal comparison
 form, and the loose `==` form.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

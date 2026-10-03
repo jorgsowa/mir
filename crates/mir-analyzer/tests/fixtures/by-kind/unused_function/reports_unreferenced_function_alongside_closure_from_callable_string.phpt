@@ -1,7 +1,9 @@
 ===description===
 a function not passed to Closure::fromCallable is still reported unused even when another function is
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function helper(): void {}

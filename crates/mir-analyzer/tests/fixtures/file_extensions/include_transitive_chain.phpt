@@ -1,8 +1,17 @@
 ===description===
 A chain of includes across four different extensions is followed to its end
 ===config===
-file_extensions=module,inc,install,theme
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+    <extension name="install"/>
+    <extension name="theme"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 require_once __DIR__ . '/b.inc';

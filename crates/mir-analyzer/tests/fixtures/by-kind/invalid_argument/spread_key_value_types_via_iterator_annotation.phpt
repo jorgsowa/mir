@@ -7,7 +7,14 @@ with the key fixed to `int` by the interface annotation itself, so a
 positional guess over `Bag`'s own type_params would misread the single
 `T` as the key instead of the value.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

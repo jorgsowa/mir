@@ -4,7 +4,12 @@ removed from the !is_callable false branch and kept in the is_callable true
 branch. Uses type-check assertions instead of argument diagnostics so the
 narrowing result is directly observable without side-effect calls.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

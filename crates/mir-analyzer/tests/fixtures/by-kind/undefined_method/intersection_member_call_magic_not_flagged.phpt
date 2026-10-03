@@ -2,7 +2,13 @@
 A `__call` on any intersection member answers an otherwise-unknown method
 for the whole intersection, whichever position the member is in.
 ===config===
-suppress=UnusedParam,UnusedVariable,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A { public function a(): int; }

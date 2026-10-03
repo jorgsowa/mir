@@ -2,7 +2,11 @@
 Positive test: TKeyedArray should satisfy TIntersection supertype without errors.
 This test should have NO expect errors - it verifies the fix works correctly.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

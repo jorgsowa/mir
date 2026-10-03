@@ -5,7 +5,13 @@ and a class forwarding its own template param positionally to its parent
 (`class TypedList<T> implements Collection<T>`) is not mistaken for a
 reference to an undefined class named "T".
 ===config===
-suppress=UnusedParam,MissingReturnType,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

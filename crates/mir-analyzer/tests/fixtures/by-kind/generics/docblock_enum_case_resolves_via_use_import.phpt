@@ -1,7 +1,13 @@
 ===description===
 `Enum::Case` in a docblock generic arg resolves the enum through `use` imports, not the current namespace.
 ===config===
-suppress=MissingThrowsDocblock,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App\Data {

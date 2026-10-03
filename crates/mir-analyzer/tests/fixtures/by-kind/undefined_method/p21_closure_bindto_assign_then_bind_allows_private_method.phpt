@@ -2,7 +2,11 @@
 FP-P21: the assign-then-rebind idiom also applies to the instance form
 `$closure->bindTo($newThis, $newScope)`, not just the static `Closure::bind`.
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class DeepCopy {

@@ -2,7 +2,11 @@
 abs(int) should not produce TypeMismatch when passed to takesInt()
 
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -11,7 +11,11 @@ would need a general union-simplification pass — pinning the improved,
 not-yet-fully-simplified type so a future simplification pass updates this
 fixture deliberately.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A {}

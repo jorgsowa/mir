@@ -1,7 +1,9 @@
 ===description===
 Lists built from subtype elements satisfy their shared base-type return.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 interface Marker

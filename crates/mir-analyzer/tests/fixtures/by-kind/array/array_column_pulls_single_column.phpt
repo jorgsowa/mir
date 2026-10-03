@@ -5,7 +5,12 @@ with an $index_key naming another property, re-keys the result by that
 property's value instead. `$column_key === null` (whole rows) keeps the full
 row shape as the value, with no column-presence exclusion of its own.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

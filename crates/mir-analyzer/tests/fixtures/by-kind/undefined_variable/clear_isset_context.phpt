@@ -1,7 +1,11 @@
 ===description===
 Clear isset context
 ===config===
-suppress=MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function greet(bool $arg): ?string

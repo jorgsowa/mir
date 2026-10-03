@@ -3,7 +3,11 @@ Narrowing an interface-typed value by an instanceof check for one of its
 own implementors replaces (subsumes) rather than forming a redundant
 Interface&Impl intersection
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

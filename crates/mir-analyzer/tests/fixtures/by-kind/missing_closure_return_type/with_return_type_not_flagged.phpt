@@ -1,7 +1,11 @@
 ===description===
 MissingClosureReturnType does NOT fire when the closure has a return type annotation.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = function(): string {

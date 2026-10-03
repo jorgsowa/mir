@@ -4,7 +4,11 @@ annotation must substitute each method template independently — guards the
 `split_generics` call in the self-out parser against only handling the
 single-arg case.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

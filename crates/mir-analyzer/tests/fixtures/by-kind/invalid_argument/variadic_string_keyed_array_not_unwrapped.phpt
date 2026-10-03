@@ -6,7 +6,12 @@ array) got misread as "each argument is an int", producing a
 false-positive InvalidArgument on a well-typed call and missing the real
 mismatch on a badly-typed one.
 ===config===
-suppress=MissingThrowsDocblock,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, int> ...$maps */

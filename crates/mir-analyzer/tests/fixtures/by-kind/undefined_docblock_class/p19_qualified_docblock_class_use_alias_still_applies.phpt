@@ -4,7 +4,12 @@ FP-P19 control: a qualified docblock class name whose first segment IS
 `resolve_type_name` fix accidentally falling through to namespace-relative
 resolution for names the alias branch should have already handled.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Item.php===
 <?php
 namespace Vendor\Lib;

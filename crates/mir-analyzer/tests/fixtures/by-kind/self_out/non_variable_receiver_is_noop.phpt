@@ -3,7 +3,11 @@
 chained call result) is a no-op — there is no variable to retype, and this
 must not crash the analyzer.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

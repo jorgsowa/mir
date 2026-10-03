@@ -3,7 +3,12 @@ array_pop returns the element type directly (without |null) when the array is
 provably non-empty; returns T|null when the array is possibly-empty because
 PHP returns null when the array is empty.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

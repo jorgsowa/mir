@@ -9,7 +9,11 @@ neutralizes any alias-name atom still present after that many passes
 (which can only be cyclic residue) to `mixed` instead of leaving it
 dangling.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -4,7 +4,9 @@ call site lives in a trait composed transitively (`Outer` uses `Inner`,
 `Foo` uses `Outer`) — the class's own direct trait list doesn't include
 `Inner`, so the exemption must still reach it.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 trait Inner {

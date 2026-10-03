@@ -4,7 +4,14 @@ including a nested conditional in the false branch (exercises
 `find_is_marker_at_depth`'s depth tracking across the outer/inner
 parens — no prior fixture covered nesting).
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_conditional($value) {

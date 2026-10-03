@@ -4,7 +4,12 @@ untyped (mixed) static property now narrow it, mirroring the instance-property
 siblings — the static-prop helpers had a leftover `is_mixed()` early return
 these already had removed.
 ===config===
-suppress=MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

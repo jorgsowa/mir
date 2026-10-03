@@ -4,7 +4,14 @@ non-null even when the property's own type is mixed — the receiver-non-null
 call used to sit after an `is_mixed()` early return, so a mixed-typed
 property lost the receiver reasoning entirely.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch,PossiblyNullArgument,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

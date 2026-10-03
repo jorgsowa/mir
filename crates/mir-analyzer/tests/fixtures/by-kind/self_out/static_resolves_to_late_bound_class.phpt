@@ -2,7 +2,11 @@
 @psalm-self-out static resolves to the actual (late-bound) receiver class,
 not the class that declares the method.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

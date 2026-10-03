@@ -3,7 +3,11 @@ Reported at Info severity (Psalm's PropertyNotSetInConstructor level): a propert
 branch, and a readonly property never assigned. Sibling properties that are always assigned stay clean,
 and the assigned value keeps its type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class OneBranch {

@@ -1,7 +1,12 @@
 ===description===
 in_array($needle, ['a', 'b', 'c']) true-branch narrows $needle to the literal union.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

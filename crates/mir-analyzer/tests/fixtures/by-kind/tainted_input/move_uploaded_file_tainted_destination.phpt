@@ -5,7 +5,14 @@ went unchecked. Unlike every other File sink, the dangerous argument is the
 SECOND one ($to), not the first, so the positional fallback needed its own
 override alongside the named-argument resolution.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

@@ -7,7 +7,12 @@ the no-catch fix (scoped to `tc.catches.is_empty()`) doesn't over-correct
 into a false negative when a catch clause genuinely can complete without
 the variable being set.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function encode(mixed $value): void {

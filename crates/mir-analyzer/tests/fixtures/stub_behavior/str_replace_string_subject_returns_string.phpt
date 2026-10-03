@@ -1,7 +1,11 @@
 ===description===
 str_replace and str_ireplace with string subject return string, not string|array
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $parts = ['rgb(100,200,150)', '200', '150'];

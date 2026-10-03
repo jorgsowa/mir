@@ -2,7 +2,9 @@
 A class named only in a class-level `@method` docblock tag's return or
 parameter type must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class OnlyUsedInMagicMethodReturn {}

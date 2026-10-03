@@ -5,7 +5,15 @@ other narrowing arm in this file — `apply_docblock_assertions` set the
 property's own refined type but never proved the receiver itself wasn't
 null.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyNullPropertyFetch,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {}

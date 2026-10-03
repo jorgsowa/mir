@@ -5,7 +5,12 @@ here (`T` from `$this->seedProp`) is decoupled from the narrowed target
 (`$target`, a plain variable) so only assertion_arg_type's own
 property-access gap is under test.
 ===config===
-suppress=UnusedParameter,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParameter errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

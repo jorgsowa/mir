@@ -5,7 +5,11 @@ fatal). analyze_property_access previously never widened for this,
 missing real bugs like returning `$obj->prop` from a `string`-declared
 function when `$obj` could be null.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

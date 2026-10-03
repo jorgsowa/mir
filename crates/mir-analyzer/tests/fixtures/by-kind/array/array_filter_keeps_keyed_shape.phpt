@@ -3,7 +3,11 @@ array_filter on a keyed shape keeps the keys, each made optional; falsy dropped;
 predicate callback still narrows values, key/both modes leave them alone,
 open shapes stay open, and list shapes keep the generic result.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{code: int|null, key: string|null} $s */

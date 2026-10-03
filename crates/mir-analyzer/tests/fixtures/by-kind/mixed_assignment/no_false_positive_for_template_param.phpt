@@ -2,7 +2,13 @@
 FP: MixedAssignment must not fire for template-param-typed variables — T is an
 intentionally parameterised slot, not a lost-type-information mixed.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

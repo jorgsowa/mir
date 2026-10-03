@@ -9,6 +9,7 @@ because that entry sits earlier in the fixed table. The leftmost keyword
 in the text must win: foo() (this line) should be suppressed, bar() (the
 next line) should not.
 ===config===
+<mir/>
 ===file===
 <?php
 foo(); // @mir-ignore-line UndefinedFunction @phpstan-ignore-next-line

@@ -3,7 +3,11 @@ Each level of a three-level inheritance chain may narrow the @param docblock
 further without emitting MethodSignatureMismatch. Only docblock types change;
 native hints remain at the base type throughout.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Node {}

@@ -10,7 +10,13 @@ Comparison diagnostics fire regardless (an unrelated, always-on static
 check) — the `@mir-check $_ is never` reachability probe is what
 isolates this specific fix (see the `RedundantCondition` presence).
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param "a"|"b" $s */

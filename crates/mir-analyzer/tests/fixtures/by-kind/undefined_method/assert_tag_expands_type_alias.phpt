@@ -4,7 +4,13 @@ An assertion tag's type never got local type-alias expansion, unlike
 an unresolved, unexpandable bare atom instead of narrowing to the real
 class it stands for.
 ===config===
-suppress=MissingParamType,MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

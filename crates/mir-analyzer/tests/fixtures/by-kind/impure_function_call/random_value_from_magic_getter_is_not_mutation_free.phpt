@@ -1,7 +1,12 @@
 ===description===
 Random value from magic getter is not mutation free
 ===config===
-suppress=MissingThrowsDocblock,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -1,7 +1,11 @@
 ===description===
 spread list element type is checked
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takes_ints(int ...$xs): void { var_dump($xs); }

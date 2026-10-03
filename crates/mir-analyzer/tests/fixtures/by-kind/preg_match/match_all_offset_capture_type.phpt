@@ -2,8 +2,14 @@
 preg_match_all with PREG_OFFSET_CAPTURE writes list<list<array{0: string, 1: int}>>
 to $matches. Each leaf is [matched_text, byte_offset].
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

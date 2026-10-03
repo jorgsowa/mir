@@ -1,7 +1,11 @@
 ===description===
 method_exists() guard suppresses UndefinedMethod inside the true branch
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Notification {}

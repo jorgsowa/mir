@@ -2,7 +2,13 @@
 G1: method call on an unconstrained template param must not emit MixedMethodCall —
 T is an intentionally parameterised placeholder, not truly mixed.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

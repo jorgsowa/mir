@@ -2,7 +2,12 @@
 `$x === 5` on `int<0,10>` narrows to `TLiteralInt(5)` in the true branch.
 The false branch keeps the range unchanged.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<0,10> $x */

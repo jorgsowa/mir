@@ -1,7 +1,11 @@
 ===description===
 DeprecatedConstant fires when static:: is used to access a deprecated constant from within the declaring class.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Config {

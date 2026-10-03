@@ -3,7 +3,13 @@ Generic-argument forms: two-arg `array<K, V>`, the one-arg shorthand
 (defaults the key to `array-key`), `non-empty-array<K, V>`, `list<T>`,
 `non-empty-list<T>`, and a plain user-class generic.
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {}

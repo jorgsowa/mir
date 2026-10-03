@@ -4,7 +4,14 @@ Regression (laravel/framework): a foreach value used as an array key in
 the dimension key counts as a read and UnusedForeachValue is no longer emitted
 (e.g. Container::forgetScopedInstances).
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Container {

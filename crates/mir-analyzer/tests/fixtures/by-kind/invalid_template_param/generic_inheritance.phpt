@@ -1,7 +1,12 @@
 ===description===
 Subclasses at various inheritance levels satisfy template bounds - inheritance-aware checking
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

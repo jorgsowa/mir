@@ -1,7 +1,12 @@
 ===description===
 Empty array unions fold into generic arrays (Bug 7 secondary)
 ===config===
-suppress=MixedAssignment,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

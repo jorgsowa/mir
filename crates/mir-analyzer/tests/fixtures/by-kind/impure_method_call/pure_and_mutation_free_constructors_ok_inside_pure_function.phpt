@@ -4,7 +4,11 @@ declared @pure, and one declared @mutation-free (which may still
 initialize $this's own properties — not an external mutation), must both
 stay unflagged when called via `new` inside a @pure function.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class PureBox {

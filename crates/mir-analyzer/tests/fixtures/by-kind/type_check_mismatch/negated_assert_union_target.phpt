@@ -4,7 +4,11 @@ A negated assertion whose target is a union of 2+ types (`@psalm-assert
 whenever the asserted type had more than one atom, instead of subtracting
 each atom in turn the way a single-atom negated target already does.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

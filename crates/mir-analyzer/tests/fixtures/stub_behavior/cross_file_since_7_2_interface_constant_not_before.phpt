@@ -1,7 +1,9 @@
 ===description===
 cross file since 7 2 interface constant not before
 ===config===
-php_version=7.1
+<mir>
+  <phpVersion>7.1</phpVersion>
+</mir>
 ===file:DateHelper.php===
 <?php
 function get_atom_format(): void {

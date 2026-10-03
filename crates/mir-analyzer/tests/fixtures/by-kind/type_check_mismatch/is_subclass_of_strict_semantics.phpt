@@ -3,7 +3,13 @@ is_subclass_of() uses strict-subclass semantics: the exact class is NOT a
 subclass of itself. True branch keeps known subclasses; false branch must NOT
 remove the exact class (doing so would wrongly mark Foo uses as diverging).
 ===config===
-suppress=UnusedVariable,UnusedParam,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

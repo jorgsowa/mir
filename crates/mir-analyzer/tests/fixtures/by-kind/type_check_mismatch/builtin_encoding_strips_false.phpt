@@ -3,8 +3,13 @@ FP-C: encoding builtins (mb_convert_encoding, iconv) return string|false in stub
 but false only occurs on programming errors (invalid encoding). Normal usage should
 not emit InvalidPropertyAssignment or NullableReturnStatement.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

@@ -1,7 +1,11 @@
 ===description===
 A class without @psalm-immutable can freely assign to $this properties — no error.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -5,7 +5,13 @@ unresolvable-receiver check only ever gated on `is_in_pure_fn`, unlike
 the resolved-callee checks a few lines below it which also cover
 `is_in_external_mutation_free_method` for the same parameter-receiver shape.
 ===config===
-suppress=MissingParamType,MixedMethodCall,MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Runner {

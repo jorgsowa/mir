@@ -1,7 +1,12 @@
 ===description===
 (float) cast on a union that includes array but also scalar-safe atoms does not emit InvalidCast
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function option(string $key): string|array|bool|null {

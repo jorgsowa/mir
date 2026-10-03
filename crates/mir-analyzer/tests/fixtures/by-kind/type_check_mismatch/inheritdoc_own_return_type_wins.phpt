@@ -2,8 +2,12 @@
 FALSE POSITIVE reproducer. When a method has @inheritdoc AND its own @return type,
 the own type must win — the parent's type must not override it.
 ===config===
-suppress=UnusedVariable
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class Animal {}

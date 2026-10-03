@@ -3,7 +3,11 @@ Narrowing must survive a call to a method proven not to touch `$this`
 (`@pure` or `@psalm-mutation-free`) — only calls we can't prove safe should
 invalidate a previously narrowed property.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Session {

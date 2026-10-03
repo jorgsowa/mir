@@ -1,8 +1,15 @@
 ===description===
 dirname(__FILE__, 2) does not resolve to the including file's own directory
 ===config===
-file_extensions=module,inc
-include_seed=deep/a.module
+<mir>
+  <projectFiles>
+    <file name="deep/a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:deep/a.module===
 <?php
 require dirname(__FILE__, 2) . '/sibling.inc';

@@ -2,7 +2,11 @@
 FN: property declarations never consulted #[LanguageLevelTypeAware], so
 Exception::$file/$line lost their PHP-8.1+ refined string/int type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class MyException extends Exception {

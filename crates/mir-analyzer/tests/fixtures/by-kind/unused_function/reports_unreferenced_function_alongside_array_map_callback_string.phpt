@@ -1,7 +1,9 @@
 ===description===
 a function not passed to array_map is still reported unused even when another function is
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function formatRow(int $row): string { return (string) $row; }

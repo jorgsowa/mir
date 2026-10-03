@@ -1,7 +1,11 @@
 ===description===
 Valid method in [Foo::class, 'method'] callable array is not flagged
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Handler {

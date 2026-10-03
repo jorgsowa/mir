@@ -4,7 +4,12 @@ cannot be evaluated statically. When the source is a list and preserve_keys is
 false (the default), the result is still a list (re-indexed), just never non-empty.
 When preserve_keys is true, the result is a plain array preserving key types.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

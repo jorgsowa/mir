@@ -6,7 +6,12 @@ which only proved the true-branch (`$arr['a']['b']` present). Previously the
 false branch only handled a plain-variable or single-level-property array
 argument, not a nested-path one (`$arr['a']`).
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a: array{b: int}|array{c: string}} $arr */

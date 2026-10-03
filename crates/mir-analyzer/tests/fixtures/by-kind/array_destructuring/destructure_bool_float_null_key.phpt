@@ -4,7 +4,12 @@ key resolution instead of reusing `literal_array_key_of_kind` — a
 bool/float/null destructure key fell back to `mixed` instead of resolving
 the canonical slot.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function destructureBoolKeyResolvesToCanonicalSlot(): void {

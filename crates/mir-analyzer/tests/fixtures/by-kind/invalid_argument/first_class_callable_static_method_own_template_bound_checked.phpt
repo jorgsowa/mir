@@ -4,7 +4,11 @@ unchecked template placeholder inside its first-class-callable closure —
 calling the closure with an argument that violates T's bound is now caught,
 matching what a direct `Box::make(new NotBase())` call already catches.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

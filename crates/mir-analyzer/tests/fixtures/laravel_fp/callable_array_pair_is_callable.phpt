@@ -3,7 +3,15 @@ Regression (laravel/framework): the `[$this, 'method']` callable-array form is
 valid `callable`. mir now accepts a 2-element `[object|string, string]` shape
 against a callable parameter (array_walk), so it no longer emits InvalidArgument.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,MixedArgument,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class TagSet {

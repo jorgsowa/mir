@@ -1,7 +1,11 @@
 ===description===
 FN: prefix -- never checked its operand, unlike postfix --.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = "hello";

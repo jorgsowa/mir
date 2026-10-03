@@ -3,7 +3,12 @@ A plain `break;` (level 1) only exits the innermost `foreach`; the outer
 `while (true)` still never exits normally, so code after it is still
 correctly unreachable.
 ===config===
-suppress=MixedArgument,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function foo(array $matrix): void {

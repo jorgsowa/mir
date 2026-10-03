@@ -6,7 +6,11 @@ name. A `@param` naming a genuinely different, unrelated class must still
 store that class's own type — and calling a method that class doesn't have
 must still be a real, caught `UndefinedMethod`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -3,7 +3,12 @@
 taint_var/taint_prop, unlike the plain `=` arm right above it. This is one
 of the most common HTML-building idioms.
 ===config===
-suppress=MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

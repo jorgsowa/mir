@@ -3,7 +3,12 @@ FP: `class-string<X>` was rejected by a bare `class-string` template bound
 (InvalidTemplateParam) on `new`, function, method and static calls, though it
 is strictly narrower than the bound.
 ===config===
-suppress=UnusedParameter,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParameter errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class X {}

@@ -1,7 +1,9 @@
 ===description===
 mysqli_init() returns mysqli (not mysqli|false) on PHP >= 8.0
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file:Database.php===
 <?php
 class Database {

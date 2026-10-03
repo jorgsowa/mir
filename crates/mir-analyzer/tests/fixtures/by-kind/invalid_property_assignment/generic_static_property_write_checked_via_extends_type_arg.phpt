@@ -3,7 +3,11 @@ Writing to an inherited `@template T`-typed static property through a
 subclass that binds `T` via `@extends Box<int>` must be checked against
 the bound concrete type.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

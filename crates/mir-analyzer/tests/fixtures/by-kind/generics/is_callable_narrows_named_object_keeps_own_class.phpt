@@ -4,7 +4,13 @@ class (not bare `object`) must keep its own class through `is_callable()`
 narrowing, not get widened to a generic callable — only a bare `object`
 lacks enough information to do better.
 ===config===
-suppress=UnusedParam,MissingConstructor,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Handler {

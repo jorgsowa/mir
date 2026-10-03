@@ -1,7 +1,9 @@
 ===description===
 Intersections not allowed in p h p80
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 interface A {

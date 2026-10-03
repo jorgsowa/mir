@@ -2,7 +2,11 @@
 $this->__construct() inside the legacy Serializable::unserialize() method is a valid
 re-initialization pattern and must not emit DirectConstructorCall.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Connection {

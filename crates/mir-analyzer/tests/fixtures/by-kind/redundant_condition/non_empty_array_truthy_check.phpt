@@ -1,7 +1,12 @@
 ===description===
 non-empty-array is always truthy; truthy-check on it is a RedundantCondition
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-array<string, int> $arr */

@@ -1,7 +1,11 @@
 ===description===
 Generic arguments reject backslash-qualified keywords case-insensitively.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

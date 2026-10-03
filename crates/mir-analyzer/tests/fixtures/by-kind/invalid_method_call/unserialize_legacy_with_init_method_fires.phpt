@@ -1,7 +1,11 @@
 ===description===
 $this->__construct() in a helper called from the legacy Serializable::unserialize() still fires (exemption is method-direct only)
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

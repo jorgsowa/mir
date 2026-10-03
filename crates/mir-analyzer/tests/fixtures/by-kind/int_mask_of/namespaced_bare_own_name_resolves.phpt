@@ -3,7 +3,11 @@ int-mask-of<Flags::*> resolves a bare (unqualified) reference to the
 declaring class's own short name, even when that class lives in a
 namespace — not just `self`/`static`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

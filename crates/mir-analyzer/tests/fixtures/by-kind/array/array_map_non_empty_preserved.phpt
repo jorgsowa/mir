@@ -1,7 +1,13 @@
 ===description===
 array_map on a non-empty array returns a non-empty array; array_map on a possibly-empty array returns a possibly-empty array
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

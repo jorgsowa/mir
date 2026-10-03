@@ -4,7 +4,17 @@ Regression (laravel/framework): stdClass permits arbitrary dynamic properties
 is valid. mir no longer treats stdClass as sealed for property-fetch and so no
 longer emits UndefinedProperty.
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement,MixedAssignment,MixedPropertyFetch
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function rulesOf(\stdClass $compiled): mixed {

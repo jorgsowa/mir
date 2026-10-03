@@ -5,7 +5,11 @@ class binding (ReflectionClass<Foo>::getAttributes(Attr::class) pattern).
 The trailing description containing " of " must not be misparsed as the
 template's bound.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T of object */

@@ -5,7 +5,19 @@ so a literal string satisfies the `string` alternative and is always valid —
 no class-existence check required. Fixed by skipping `validate_class_string_argument`
 when the parameter also accepts a plain `string`.
 ===config===
-suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,MixedMethodCall,MixedArgument,MixedReturnStatement,UndefinedMethod,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+    <UndefinedMethod errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

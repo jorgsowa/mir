@@ -1,7 +1,11 @@
 ===description===
 date(), gmdate(), and date_format() always return non-empty-string.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_date(): void {

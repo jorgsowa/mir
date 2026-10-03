@@ -1,7 +1,12 @@
 ===description===
 Null comparisons on nested generic array reads are allowed.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array<string, array<string, int>> $matrix */

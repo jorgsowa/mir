@@ -5,7 +5,13 @@ checked — only @pure gated free-function calls at all; `new X(...)` and
 method calls already had the identical check for the same object-argument
 shape.
 ===config===
-suppress=MissingConstructor,MixedArgument,MixedArrayAssignment
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

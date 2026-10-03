@@ -5,7 +5,13 @@ expand_aliases_in_atomic had no TCallable/TClosure arm, so the alias
 name inside the signature stayed unexpanded and the closure's return
 type stayed mixed.
 ===config===
-suppress=UnusedParam,MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-type IntList = array<int> */

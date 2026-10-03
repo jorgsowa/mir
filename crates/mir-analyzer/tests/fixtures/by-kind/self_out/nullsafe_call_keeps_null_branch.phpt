@@ -3,7 +3,11 @@
 — the call never ran if the receiver was null, so it's still possibly null
 afterward.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

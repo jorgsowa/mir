@@ -2,7 +2,13 @@
 (string) cast returns non-empty-string when the source type guarantees a non-empty output.
 Ints, floats, and true all stringify to non-empty results.
 ===config===
-suppress=UnusedVariable,UnusedParam,RedundantCast
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <RedundantCast errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

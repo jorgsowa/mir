@@ -7,7 +7,12 @@ bare truthy (`if (self::$prop)`), loose bool (`== true`/`== false`),
 instanceof/is_a/array_key_exists static-property recipe set already
 present in this file.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

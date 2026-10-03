@@ -2,7 +2,12 @@
 str_contains/str_starts_with/str_ends_with with a non-empty literal needle narrows
 the haystack to non-empty-string in the true branch.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_str_contains(string $s): void {

@@ -2,7 +2,12 @@
 interface-string<Parent> does NOT satisfy a parameter typed interface-string<Child>
 (the reverse of the covariant-safe direction) — Parent is not necessarily a Child.
 ===config===
-suppress=MissingReturnType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

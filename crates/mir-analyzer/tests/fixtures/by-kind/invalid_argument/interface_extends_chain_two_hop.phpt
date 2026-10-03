@@ -7,7 +7,12 @@ resolves what a concrete class supplies for a distant ancestor's template
 params stopped after the first hop and fell back to unconditionally
 accepting the argument.
 ===config===
-suppress=MissingPropertyType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template-covariant E */

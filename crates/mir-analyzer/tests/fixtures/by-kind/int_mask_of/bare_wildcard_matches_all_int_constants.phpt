@@ -2,7 +2,11 @@
 int-mask-of<self::*> (no name prefix before the wildcard) matches every
 literal-int constant on the class, not just ones sharing a common prefix.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

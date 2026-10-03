@@ -7,7 +7,12 @@ stayed nullable afterwards. A return type that admits null (`maybeVal`)
 must not narrow, since the null could then come from the method's own
 result instead of the receiver.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {

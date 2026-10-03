@@ -5,7 +5,12 @@ type parameter" — `{}` is the shape-literal delimiter, not a generic
 argument list, so an empty one is meaningful (no known properties /
 definitely-empty array), unlike an empty `<>` or `()`.
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param object{} $a */

@@ -1,7 +1,11 @@
 ===description===
 P3: Static method first-class callable Cls::method(...) produces a typed Closure.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

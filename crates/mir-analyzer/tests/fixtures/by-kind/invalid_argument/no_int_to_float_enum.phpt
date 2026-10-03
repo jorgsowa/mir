@@ -1,7 +1,11 @@
 ===description===
 No int to float enum
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 0.3|0.5 $p */

@@ -1,7 +1,9 @@
 ===description===
 InvalidOverride does NOT fire when #[Override] implements a method declared in an interface.
 ===config===
-php_version=8.3
+<mir>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file===
 <?php
 interface Renderable {

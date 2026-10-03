@@ -3,7 +3,11 @@ int-mask-of<self::FLAG_*> resolves constants declared with a bit-shift
 expression (`1 << 0`), the idiomatic way to declare bitflags, not just bare
 integer literals.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

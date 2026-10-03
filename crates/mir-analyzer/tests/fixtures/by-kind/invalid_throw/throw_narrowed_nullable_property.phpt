@@ -3,7 +3,9 @@ FP-N (broader): `throw $this->exception` guarded by `if ($this->exception !== nu
 the null check narrows the Throwable|null property to Throwable, so InvalidThrow
 must not be emitted.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

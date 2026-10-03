@@ -5,7 +5,13 @@ part's own type params onto the new subclass, mirroring the
 non-intersection case — previously it always appended a raw,
 empty-type-params atom to the intersection.
 ===config===
-suppress=UnusedVariable,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

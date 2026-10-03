@@ -3,7 +3,11 @@ FP-C6: `ast\AST_*` node-kind constants and the separate `ast\flags\*`
 namespace's flag constants must both resolve — same missing-stub root cause
 as the parse_code/Node repro, but for the CONSTANTS section of the stub map.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

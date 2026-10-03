@@ -1,7 +1,12 @@
 ===description===
 is_scalar() narrowing handles string/int subtypes correctly — no false RedundantCondition
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-string|array $x */

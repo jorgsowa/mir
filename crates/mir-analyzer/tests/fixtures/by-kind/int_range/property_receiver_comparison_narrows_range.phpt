@@ -2,7 +2,12 @@
 `$this->prop < N` / `N < $this->prop` (and `<=`/`>`/`>=`) narrow a property
 receiver's integer range the same way a plain variable already does.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Counter {

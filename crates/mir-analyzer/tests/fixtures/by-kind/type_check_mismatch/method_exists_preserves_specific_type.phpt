@@ -2,7 +2,14 @@
 method_exists()/property_exists() true branch keeps the specific object class
 and string atoms instead of collapsing everything to bare object.
 ===config===
-suppress=UnusedVariable,UnusedParam,MixedMethodCall,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedMethodCall errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

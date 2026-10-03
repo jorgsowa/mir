@@ -5,7 +5,11 @@ receiver — sibling of the method_exists()/property_exists() free-function
 guards, but for Reflection's own instance API. An unguarded call on a
 different receiver, or the same receiver without the guard, still flags.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function guardedMethod(string $c, string $n): void {

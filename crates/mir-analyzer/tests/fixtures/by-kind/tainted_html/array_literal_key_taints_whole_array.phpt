@@ -3,7 +3,12 @@
 the array, not just its values, but the array-literal taint check only
 ever inspected `el.value`, never `el.key`.
 ===config===
-suppress=MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

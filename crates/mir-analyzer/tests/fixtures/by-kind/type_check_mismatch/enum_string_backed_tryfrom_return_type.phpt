@@ -2,8 +2,12 @@
 String-backed enum ::tryFrom() returns enum|null, not mixed.
 Expected: no issue.
 ===config===
-php_version=8.1
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum Status: string {

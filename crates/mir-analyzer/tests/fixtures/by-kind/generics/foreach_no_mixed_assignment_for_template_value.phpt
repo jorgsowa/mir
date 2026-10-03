@@ -2,7 +2,13 @@
 G1: foreach over array<K,V> inside a generic function must not emit MixedAssignment for the
 value variable — V is a template param (an intentionally parameterised slot), not truly mixed.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

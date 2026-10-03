@@ -4,7 +4,11 @@ type (real code rarely checks for it), but code that DOES defensively check for 
 the vlucas/phpdotenv `Util\Regex::split()` pattern — must not get a false
 ImpossibleIdenticalComparison on its own guard.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

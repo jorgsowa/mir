@@ -1,7 +1,11 @@
 ===description===
 DeprecatedMethod fires when calling a deprecated parent method on a child instance that does not override it.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

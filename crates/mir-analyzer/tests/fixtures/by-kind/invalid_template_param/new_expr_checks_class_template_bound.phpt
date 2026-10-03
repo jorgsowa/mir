@@ -3,7 +3,13 @@ G1: a class-level `@template T of Bound` must be enforced on `new`
 (constructor-argument inference), not just at method-call sites — this is
 the dominant real-world generics workflow and was previously never checked.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

@@ -7,7 +7,12 @@ resolve — a false `UndefinedDocblockClass`. Modeled on doctrine/instantiator's
 `Instantiator::get()`, which stores heterogeneous cached values in a
 `static array` and casts back to `T` on read via `@phpstan-var`.
 ===config===
-suppress=UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

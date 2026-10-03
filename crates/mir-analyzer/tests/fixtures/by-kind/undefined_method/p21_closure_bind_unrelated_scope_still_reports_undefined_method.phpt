@@ -4,7 +4,11 @@ own class must still report UndefinedMethod — the scope-override fix must
 not blanket-suppress private-method visibility checks inside a rebound
 closure, only apply the actually-resolved scope.
 ===config===
-suppress=MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class DeepCopy {

@@ -1,7 +1,11 @@
 ===description===
 A callee without a declared return type is re-inferred after its body changes.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib.php===
 <?php
 function lib() { return 1; }

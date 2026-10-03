@@ -3,7 +3,12 @@
 key/value type params, including when the delegate is an unannotated
 function in the same file whose type is inferred on demand.
 ===config===
-suppress=UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function inner() {

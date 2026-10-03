@@ -1,7 +1,11 @@
 ===description===
 Array-destructuring targets used in if branch that always returns/diverges not reported as unused
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @return array{string, string, string} */

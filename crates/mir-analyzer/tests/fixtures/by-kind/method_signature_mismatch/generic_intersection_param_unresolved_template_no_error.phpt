@@ -4,7 +4,12 @@ no concrete `@extends` binding) wasn't recognized as template-containing, so
 overriding it with a different intersection member ran the strict structural
 param-narrowing check instead of being skipped like a bare `@param T` is.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Countable2 {}

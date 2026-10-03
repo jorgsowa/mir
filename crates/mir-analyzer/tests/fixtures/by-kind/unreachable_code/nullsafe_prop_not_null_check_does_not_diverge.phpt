@@ -9,7 +9,13 @@ marks divergence on an impossible property-null comparison — but applied
 that same logic unconditionally to the nullsafe case too, producing a
 false RedundantCondition here.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

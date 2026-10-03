@@ -4,7 +4,12 @@
 (TNonEmptyString, TIntRange, ...) — every atom in the union can be proven to
 be exactly that literal, the same reasoning the narrower siblings already use.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function narrowsWideStringToLiteral(string $x): void {

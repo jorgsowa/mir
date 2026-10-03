@@ -2,7 +2,9 @@
 A final class named only in an `is_subclass_of($x, 'Foo')` string-literal
 check must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Foo {}

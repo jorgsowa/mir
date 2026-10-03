@@ -1,7 +1,11 @@
 ===description===
 $this->__construct() in __wakeup is not flagged even when the class extends another.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

@@ -1,8 +1,18 @@
 ===description===
 require, require_once, include, dirname(__FILE__), bare relative literal and dotted __DIR__ paths all resolve
 ===config===
-file_extensions=module,inc,install,theme,profile
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+    <extension name="install"/>
+    <extension name="theme"/>
+    <extension name="profile"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 require __DIR__ . '/r1.inc';

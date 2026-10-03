@@ -4,7 +4,14 @@ non-empty-string when the needle is a static property already narrowed to
 a single non-empty string literal — expr_is_nonempty_string_literal only
 had var/instance-prop arms via ScalarArgTarget, no static-prop arm.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

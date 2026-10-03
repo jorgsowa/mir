@@ -5,7 +5,12 @@ docblock/param annotation (no constructor call in sight) sailed through
 every instance-method and `$var::` static call unchecked, even though the
 called method itself declares no template params of its own.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

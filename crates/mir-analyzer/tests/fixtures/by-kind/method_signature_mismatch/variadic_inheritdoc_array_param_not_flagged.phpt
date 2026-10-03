@@ -1,7 +1,11 @@
 ===description===
 Variadic `int ...$ids` against a parent `@param int[] $ids` compares element types; a non-variadic or mismatched element still flags.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Reader {

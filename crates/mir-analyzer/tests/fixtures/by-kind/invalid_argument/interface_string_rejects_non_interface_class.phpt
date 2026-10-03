@@ -2,7 +2,11 @@
 Passing a concrete class name (that exists but is not an interface) to an
 interface-string parameter emits NotAnInterface
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class ConcreteThing {}

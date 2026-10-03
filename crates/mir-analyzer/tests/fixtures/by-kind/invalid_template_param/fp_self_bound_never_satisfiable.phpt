@@ -4,7 +4,13 @@ fqcn placeholder that was never filled in with the declaring class, so no
 argument — not even an instance of the declaring class itself — could ever
 satisfy the bound. A real violation on the same bound must still be caught.
 ===config===
-suppress=UnusedVariable,MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

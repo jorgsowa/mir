@@ -1,7 +1,11 @@
 ===description===
 Partial namespace import with alias and wrong-case last segment is reported.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace MyApp\Service;

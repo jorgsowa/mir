@@ -1,7 +1,12 @@
 ===description===
 array_map(null, ...) zip mode is not modeled — the generic stub array is kept
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

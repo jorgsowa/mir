@@ -3,7 +3,11 @@ Regression control for the `T|callable():T` double-binding fix: passing a
 plain `T` value (not a closure) through the same union-typed param must
 still bind the bare `T` alternative normally.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

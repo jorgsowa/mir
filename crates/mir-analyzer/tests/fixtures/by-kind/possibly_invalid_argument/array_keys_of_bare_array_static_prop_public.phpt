@@ -1,7 +1,11 @@
 ===description===
 Public static arrays do not retain key types inferred from literal defaults.
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class PublicHolder

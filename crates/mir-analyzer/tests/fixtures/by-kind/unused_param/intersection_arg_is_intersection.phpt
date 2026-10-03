@@ -1,7 +1,11 @@
 ===description===
 arg is itself an intersection type satisfying the concrete part — no false positive
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Taggable {}

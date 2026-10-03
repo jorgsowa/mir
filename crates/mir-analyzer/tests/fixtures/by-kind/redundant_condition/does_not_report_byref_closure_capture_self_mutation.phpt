@@ -7,7 +7,12 @@ a bogus RedundantCondition. A by-value capture of the same variable keeps
 its precise literal type, since it can never be observed after the
 closure-literal site.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $flag = false;

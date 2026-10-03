@@ -2,7 +2,12 @@
 Negative control for the J1 refined-string-scalar-subtype fix: a genuinely
 non-scalar value (array) must still be rejected by a `scalar`-typed param.
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -1,7 +1,11 @@
 ===description===
 does not report this when var-annotated in global scope (template/view pattern)
 ===config===
-suppress=UndefinedDocblockClass
+<mir>
+  <issueHandlers>
+    <UndefinedDocblockClass errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var \yii\web\View $this */

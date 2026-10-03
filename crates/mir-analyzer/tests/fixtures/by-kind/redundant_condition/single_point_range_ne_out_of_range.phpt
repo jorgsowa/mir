@@ -2,7 +2,12 @@
 When a variable has a single-point int range, a !== check against a value
 outside that range is always true (the false branch is unreachable).
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<5, 5> $n */

@@ -3,7 +3,11 @@ Negative control: a `float`-hinted constant initialized with an int literal (PHP
 it to a real float value at runtime) must keep the `float` type, not narrow to the int
 literal — narrowing only applies when the hint is the literal's own base scalar kind.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {

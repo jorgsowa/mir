@@ -4,7 +4,11 @@ assignment does, but only `assign_to_target`'s own PropertyAccess arm ever
 checked `is_readonly` -- `++`/`--` routed through a separate purity-only
 helper that never looked at readonly at all.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

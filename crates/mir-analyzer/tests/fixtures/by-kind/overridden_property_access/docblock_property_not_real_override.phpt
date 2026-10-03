@@ -4,7 +4,9 @@ FP-J(b): A child class declaring a real property with the same name as a parent
 @property declarations carry no PHP native type and are not real inherited
 properties, so PHP enforces no visibility rules against them.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

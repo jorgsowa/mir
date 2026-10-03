@@ -5,7 +5,14 @@ function, method, static method) -- each has its own near-identical
 extract_prop_access call site (call/function.rs, call/method.rs,
 call/static_call.rs), none of which accepted the nullsafe (`?->`) form.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bar {}

@@ -1,7 +1,11 @@
 ===description===
 A `method_exists()` guard on a different receiver does not suppress a variable-held array callable.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Notification {}

@@ -1,7 +1,11 @@
 ===description===
 sscanf output vars are defined
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function parse(string $s): int {

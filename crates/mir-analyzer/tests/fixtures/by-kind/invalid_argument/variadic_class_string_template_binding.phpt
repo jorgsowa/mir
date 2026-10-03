@@ -4,7 +4,12 @@ Template binds through an aggregate-style variadic docblock param
 ::class argument, and the sibling bare T must not also absorb the
 class-string (T would become Conn|class-string<Conn>)
 ===config===
-suppress=MissingThrowsDocblock,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface MockInterface {}

@@ -6,7 +6,12 @@ function's body is a single expression, so the proof here is the
 call-site RESULT type: `$r['ok']` on the resolved shape yields `bool`;
 on the still-unresolved literal class atom `Result` it would not.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @psalm-type Result = array{ok: bool, value: mixed} */

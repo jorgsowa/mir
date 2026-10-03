@@ -4,7 +4,12 @@ class_exists(null) can never be true, so a true result also proves $obj
 itself wasn't null. The property was already narrowed to class-string but
 the receiver var was left untouched.
 ===config===
-suppress=UnusedVariable,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

@@ -3,7 +3,11 @@
 as much as a plain assignment does, but the array-index-write arm only
 ever ran the purity-only helper, never the readonly check.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

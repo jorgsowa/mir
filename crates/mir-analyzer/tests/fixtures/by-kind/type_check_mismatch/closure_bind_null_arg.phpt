@@ -1,7 +1,11 @@
 ===description===
 Closure::bind with null newThis still preserves return type (unbinds closure)
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $closure = function(): bool { return true; };

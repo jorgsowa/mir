@@ -1,7 +1,12 @@
 ===description===
 `@phpstan-assert =Type $x` (strict equality) narrows like `Type` for variables, properties and property chains, with a concrete or template type.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 abstract class TestCase {

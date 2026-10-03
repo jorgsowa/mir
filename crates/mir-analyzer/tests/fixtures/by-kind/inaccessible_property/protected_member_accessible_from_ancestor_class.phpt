@@ -6,7 +6,12 @@ tested caller-extends-owner. A method on an ANCESTOR class reaching into a
 protected property/constant declared only on a DESCENDANT (via a
 descendant-typed parameter) was wrongly flagged inaccessible.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

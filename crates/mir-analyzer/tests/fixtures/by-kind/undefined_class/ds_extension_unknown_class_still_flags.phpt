@@ -4,7 +4,11 @@ real stub file must not turn `Ds\*` into a wildcard-resolved namespace — a
 class that isn't actually part of the extension must still be flagged
 undefined.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(Ds\NotARealClass $x): void {}

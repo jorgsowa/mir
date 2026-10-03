@@ -4,7 +4,12 @@ non-final class atom entirely — a subclass instance still reaches that
 branch. A `final` class has no subclass, so exact-match elimination stays
 sound there.
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

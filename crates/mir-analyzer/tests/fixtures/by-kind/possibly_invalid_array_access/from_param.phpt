@@ -2,7 +2,11 @@
 PossiblyInvalidArrayAccess fires when a function parameter has a union type
 that includes an int alongside an array.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function process(int|array $data): void {

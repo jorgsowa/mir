@@ -5,7 +5,11 @@ mode 0/1/2 always returns an array — narrow to the precise type when $mode
 is a literal int, mirroring the preg_split/filter_var literal-argument
 narrowing pattern.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function needs_string(string $s): void {}

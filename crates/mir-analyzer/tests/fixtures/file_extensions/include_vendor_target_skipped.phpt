@@ -1,8 +1,15 @@
 ===description===
 A project include reaching into a vendor directory is not followed
 ===config===
-file_extensions=module,inc
-include_seed=a.module
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 require_once __DIR__ . '/vendor/lib/x.inc';

@@ -8,8 +8,14 @@ pre-existing gap unrelated to preg_match), so `PREG_UNMATCHED_AS_NULL |
 PREG_OFFSET_CAPTURE` still resolves to a generic int and would not exercise the
 combined-flags branch under test here.
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

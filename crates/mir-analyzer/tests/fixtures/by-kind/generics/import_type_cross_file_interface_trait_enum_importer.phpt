@@ -2,7 +2,12 @@
 Interfaces, traits and enums can import a cross-file `@psalm-type` alias; it expands
 in method return/param types, properties and constants.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:lib.php===
 <?php
 namespace Lib;

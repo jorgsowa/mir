@@ -2,7 +2,12 @@
 Truthy check on `bool` narrows to `true`; falsy check narrows to `false`.
 Both branches of `if ($boolVar)` should produce the literal type, not the wide bool.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param bool $x */

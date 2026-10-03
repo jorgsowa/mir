@@ -2,7 +2,9 @@
 A final class named only in a local `@var` docblock assertion must not be
 reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Money {}

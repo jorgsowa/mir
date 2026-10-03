@@ -1,7 +1,11 @@
 ===description===
 Unguarded array callables report undefined methods.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Other {}

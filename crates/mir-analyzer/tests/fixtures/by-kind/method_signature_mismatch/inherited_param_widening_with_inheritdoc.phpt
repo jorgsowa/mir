@@ -1,8 +1,12 @@
 ===description===
 `{@inheritDoc}` should inherit the parent docblock; parameter widening is contravariant-legal anyway.
 ===config===
-suppress=UnusedParam
-php_version=8.4
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 interface Manager {

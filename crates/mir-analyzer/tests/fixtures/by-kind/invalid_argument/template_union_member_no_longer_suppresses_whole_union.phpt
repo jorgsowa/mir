@@ -9,7 +9,12 @@ class (mirroring how the `TIntersection` arm already forgave only the
 templated part while still enforcing the concrete parts) — a bare string
 now correctly mismatches both `Foo` and any instantiation of `Bar<T>`.
 ===config===
-suppress=UnusedParam,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

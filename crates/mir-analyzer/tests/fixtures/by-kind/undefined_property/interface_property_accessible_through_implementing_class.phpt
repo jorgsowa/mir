@@ -4,7 +4,12 @@ that `implements` it, not just when the variable is typed as the interface
 directly — `ClassLike::own_properties()` dropped `InterfaceDef.own_properties`
 entirely, so the ancestor-chain lookup used for the class case never saw it.
 ===config===
-suppress=MissingConstructor,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @property-read int $count */

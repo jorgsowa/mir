@@ -6,7 +6,11 @@ this pins the namespaced case. Also confirms an override correctly
 narrowing away the parent's real declared @throws (via `@throws void`)
 doesn't inherit it back as a phantom throw.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

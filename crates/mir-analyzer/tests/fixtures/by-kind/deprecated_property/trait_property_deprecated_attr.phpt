@@ -2,7 +2,11 @@
 FN: trait properties never checked the #[Deprecated] attribute fallback,
 unlike class properties — only the @deprecated docblock tag worked.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait HasServer {

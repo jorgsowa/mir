@@ -4,7 +4,12 @@ distinct value) but drops the list guarantee: deduplication can leave gaps in
 integer keys, so the result is a plain array (not list), though non-empty when
 the source is non-empty. Key and value types from the source are preserved.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

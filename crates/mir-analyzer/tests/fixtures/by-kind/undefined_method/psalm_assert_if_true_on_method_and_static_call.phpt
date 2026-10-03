@@ -6,7 +6,13 @@ call, so the same docblock form G6 already fixed for bare statements was
 still silently ignored inside a condition. Also covers a method-level
 `@template T` substituting into the assertion's type.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class User {

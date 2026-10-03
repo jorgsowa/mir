@@ -2,7 +2,12 @@
 `TReturn` (the 4th Generator type param) is inferred from the generator's own
 `return $expr;` statements, same as a normal function's return type.
 ===config===
-suppress=UnusedVariable,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function gen() {

@@ -1,7 +1,12 @@
 ===description===
 InvalidCatch does NOT fire for \Error or its subclasses, which implement Throwable via the Error hierarchy.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 try {

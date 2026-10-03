@@ -1,7 +1,12 @@
 ===description===
 extension class via use alias
 ===config===
-suppress=UnusedParam,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 use Swoole\Coroutine;

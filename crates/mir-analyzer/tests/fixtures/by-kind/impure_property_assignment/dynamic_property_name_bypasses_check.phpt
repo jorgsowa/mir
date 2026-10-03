@@ -4,7 +4,11 @@ check on a parameter write, same gap as the immutable-write check —
 falls back to the property expression's own source text as a display
 name instead of quietly no-oping.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Bag {

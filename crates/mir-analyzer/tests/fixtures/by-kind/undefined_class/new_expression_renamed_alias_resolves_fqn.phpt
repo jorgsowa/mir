@@ -2,7 +2,12 @@
 new LocalAlias() where the import is renamed (use X\Y as Z) resolves to the
 original FQN — the ClassReference carries X\Y, not the local alias Z.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:RequestGuard.php===
 <?php
 namespace Illuminate\Auth;

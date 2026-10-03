@@ -4,7 +4,12 @@ attribute between a suppression comment and a method declaration defeated
 the suppression, since next_code_line stopped on the attribute line
 instead of continuing to the method itself.
 ===config===
-suppress=UndefinedAttributeClass,UnusedParam
+<mir>
+  <issueHandlers>
+    <UndefinedAttributeClass errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

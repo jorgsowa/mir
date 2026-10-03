@@ -1,7 +1,11 @@
 ===description===
 @psalm-type alias with a class type in a namespace resolves the class correctly
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

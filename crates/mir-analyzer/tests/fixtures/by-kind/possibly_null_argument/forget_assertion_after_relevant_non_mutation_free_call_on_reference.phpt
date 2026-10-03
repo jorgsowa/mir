@@ -1,7 +1,11 @@
 ===description===
 Forget assertion after relevant non mutation free call on reference
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo

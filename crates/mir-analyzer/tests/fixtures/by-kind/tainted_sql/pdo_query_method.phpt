@@ -1,7 +1,12 @@
 ===description===
 $pdo->query($sql) is a SQL sink, same as the procedural mysqli_query().
 ===config===
-suppress=MixedArgument,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function run_query(PDO $pdo): void {

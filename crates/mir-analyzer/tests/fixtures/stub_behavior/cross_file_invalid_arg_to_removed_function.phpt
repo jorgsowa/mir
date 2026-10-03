@@ -1,7 +1,9 @@
 ===description===
 cross file invalid arg to removed function
 ===config===
-php_version=7.4
+<mir>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file:TextHelper.php===
 <?php
 function test_wrong_type(int $n): void {

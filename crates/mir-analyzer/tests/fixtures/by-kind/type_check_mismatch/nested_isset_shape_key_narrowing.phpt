@@ -9,7 +9,11 @@ sibling PossiblyInvalidArrayAccess check it never respected
 in_existence_check — isset() never triggers PHP runtime warnings for its
 own argument chain.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{address?: array{city?: string}} $data */

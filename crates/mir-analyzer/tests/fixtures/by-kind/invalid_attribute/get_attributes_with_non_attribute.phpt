@@ -1,7 +1,11 @@
 ===description===
 Get attributes with non attribute
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class NonAttr {}

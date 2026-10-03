@@ -3,7 +3,13 @@ Foo::class is a PHP compile-time string constant — the class need not be loade
 defined. UndefinedClass must never fire for ::class expressions regardless of context:
 inside class_exists(), on the false branch of a ternary, or as a plain argument.
 ===config===
-suppress=UnusedVariable,MissingParamType,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // Direct class_exists() argument

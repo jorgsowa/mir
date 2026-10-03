@@ -2,7 +2,11 @@
 P3: First-class callable on an unknown method reports UndefinedMethod (like
 the ordinary call form) instead of silently falling back to untyped callable.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

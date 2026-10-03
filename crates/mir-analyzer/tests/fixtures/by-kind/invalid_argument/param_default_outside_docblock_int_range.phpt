@@ -2,7 +2,11 @@
 A parameter default that the `@param` int range excludes is reported for
 functions, methods and promoted constructor parameters.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<1,255> $v */

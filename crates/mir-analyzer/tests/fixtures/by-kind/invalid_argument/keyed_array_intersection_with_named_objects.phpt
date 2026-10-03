@@ -2,7 +2,11 @@
 Test TKeyedArray against TIntersection that includes both array types and named objects.
 This covers the case where an intersection has multiple array bounds plus interface bounds.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Loggable {

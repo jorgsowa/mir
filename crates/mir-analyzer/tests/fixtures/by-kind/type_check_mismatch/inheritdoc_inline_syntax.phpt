@@ -2,8 +2,13 @@
 FALSE POSITIVE reproducer. The inline {@inheritdoc} syntax (curly-brace form)
 should also trigger docblock inheritance, the same as the tag form.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 class Item {}

@@ -6,7 +6,12 @@ left the whole array param treated as fully concrete, so an argument that
 doesn't structurally look like an array at all got a false InvalidArgument
 instead of being forgiven the same way a value-side template already was.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

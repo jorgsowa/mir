@@ -8,7 +8,12 @@ readonly property silently bypassed the check entirely, even though the
 identical write through a concrete-class-typed parameter was already
 caught.
 ===config===
-suppress=MissingConstructor,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

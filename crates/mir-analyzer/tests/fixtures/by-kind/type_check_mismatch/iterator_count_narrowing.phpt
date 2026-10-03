@@ -2,7 +2,12 @@
 `iterator_count($it)` narrows arrays/lists to non-empty variants the same
 way `count()`/`strlen()` already do, for both relational and equality forms.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

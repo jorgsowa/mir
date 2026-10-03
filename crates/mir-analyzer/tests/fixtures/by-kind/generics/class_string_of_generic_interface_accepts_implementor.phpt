@@ -1,7 +1,11 @@
 ===description===
 class-string<Handler<R, Q>> accepts an implementing class and still rejects an unrelated one
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template R */

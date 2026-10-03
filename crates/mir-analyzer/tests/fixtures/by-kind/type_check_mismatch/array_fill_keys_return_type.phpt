@@ -1,7 +1,12 @@
 ===description===
 array_fill_keys uses the values of $keys as result keys and $value as each result value; non-empty $keys produces a non-empty result.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

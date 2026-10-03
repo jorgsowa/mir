@@ -2,7 +2,12 @@
 When both @param (in-type) and @param-out (out-type) are declared, the out-type
 takes effect for the variable after the call. The in-type is unaffected.
 ===config===
-suppress=UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -5,7 +5,12 @@ Arithmetic on named int types preserves bounds:
 - positive-int + positive-int yields int<2, max>
 - negative-int - 1 yields int<min, -2>
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $a */

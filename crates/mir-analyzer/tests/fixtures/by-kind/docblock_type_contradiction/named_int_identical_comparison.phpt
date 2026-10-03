@@ -2,7 +2,12 @@
 `positive-int === 0` and `negative-int === 1` are statically impossible;
 `can_equal` knows the named int subtypes' bounds.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param positive-int $n */

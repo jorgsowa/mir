@@ -2,7 +2,11 @@
 variable-variable should mark operand as read, but other vars should still be reported as unused
 
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test() {

@@ -2,8 +2,12 @@
 `new Wrap([])` infers `Wrap<array{}>`; an empty array literal is a valid empty
 list, so it must satisfy a declared `Wrap<list<AssetId>>` return type.
 ===config===
-php_version=8.4
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file:AssetId.php===
 <?php
 namespace Demo\Ids;

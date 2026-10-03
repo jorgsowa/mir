@@ -5,7 +5,11 @@ empty branch narrows to the same closed, zero-property shape an empty `[]`
 literal itself has, rather than leaving the pre-narrow element type
 (and its now-stale index) in place.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $values */

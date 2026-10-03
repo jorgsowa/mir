@@ -4,7 +4,9 @@ exclude false in the continuation. Previously only `$x === false` was handled.
 The assignment-in-condition form `false === ($x = expr)` is common in intl/normalizer
 patterns (UnicodeString-style).
 ===config===
-php_version=8.1
+<mir>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 declare(strict_types=1);

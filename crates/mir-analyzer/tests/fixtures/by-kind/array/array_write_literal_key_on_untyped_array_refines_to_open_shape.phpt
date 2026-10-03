@@ -2,7 +2,12 @@
 Writing a literal key to a bare `array` refines it to an open shape holding that key, so it
 satisfies a declared shape; other bases and loops keep their existing behavior.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

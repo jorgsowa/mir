@@ -1,7 +1,11 @@
 ===description===
 Addition with class in weak mode
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = "hi" + (new stdClass);

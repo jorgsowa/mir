@@ -2,7 +2,12 @@
 array_pop/array_shift return the value type (not mixed) for typed collections;
 null-free for non-empty inputs.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

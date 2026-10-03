@@ -1,7 +1,11 @@
 ===description===
 cross file wrong class passed
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:User.php===
 <?php
 class User {}

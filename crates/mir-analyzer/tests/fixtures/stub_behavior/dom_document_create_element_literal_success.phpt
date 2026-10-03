@@ -1,7 +1,13 @@
 ===description===
 DOMDocument::createElement() returns DOMElement for valid literal XML names.
 ===config===
-suppress=MissingThrowsDocblock,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

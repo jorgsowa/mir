@@ -1,7 +1,12 @@
 ===description===
 `exit`/`die` print a string operand, so it is an HTML sink.
 ===config===
-suppress=MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

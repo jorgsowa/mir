@@ -4,7 +4,13 @@ a generic receiver's own type params on the narrowed exact-class atom,
 mirroring how `instanceof` narrowing already does — previously these
 always built a bare, raw `Foo` atom, discarding `Foo<int>`'s own `int`.
 ===config===
-suppress=UnusedVariable,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

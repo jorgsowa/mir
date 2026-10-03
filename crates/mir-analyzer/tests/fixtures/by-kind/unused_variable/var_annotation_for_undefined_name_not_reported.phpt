@@ -2,7 +2,12 @@
 A @var naming a variable that is never assigned documents an externally
 provided variable; it is not a dead write.
 ===config===
-suppress=MissingReturnType,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo { public function m(): int { return 1; } }

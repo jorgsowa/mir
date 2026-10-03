@@ -1,7 +1,12 @@
 ===description===
 does not report destructure of only false
 ===config===
-suppress=ForbiddenCode,MixedAssignment
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

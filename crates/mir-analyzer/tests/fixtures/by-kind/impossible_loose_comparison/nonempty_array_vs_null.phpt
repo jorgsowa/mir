@@ -2,7 +2,12 @@
 A non-empty array is always truthy, so it can never be loosely equal to null
 either — null converts to an empty array for the comparison.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-array<string> $arr */

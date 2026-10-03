@@ -5,7 +5,12 @@ strict when every atom is already int-like). A mixed-category value
 (e.g. int|string) is left unnarrowed — a string like "42" could loosely
 equal the same value in a way strict comparison wouldn't.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function eqNarrowsToLiteral(int $x): void {

@@ -2,7 +2,12 @@
 array_search($needle, $haystack) !== false narrows $needle like in_array()
 does; === false (not found) removes matched literals from a finite union.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

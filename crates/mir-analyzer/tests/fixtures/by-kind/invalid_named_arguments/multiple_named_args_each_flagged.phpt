@@ -1,7 +1,11 @@
 ===description===
 InvalidNamedArguments fires once for each named argument passed to a @no-named-arguments function.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

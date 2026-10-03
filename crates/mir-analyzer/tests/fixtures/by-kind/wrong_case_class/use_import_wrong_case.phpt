@@ -1,7 +1,11 @@
 ===description===
 A use import with wrong class name casing is reported.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib.php===
 <?php
 

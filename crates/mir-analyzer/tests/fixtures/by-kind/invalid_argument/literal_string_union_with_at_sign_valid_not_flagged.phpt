@@ -1,7 +1,11 @@
 ===description===
 A valid member of a literal-string union containing '@' is not flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param 'admin@example.com'|'guest@example.com' $email */

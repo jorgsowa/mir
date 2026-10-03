@@ -4,7 +4,14 @@ null/false from the property container itself, the property-receiver
 counterpart of the existing plain-variable `isset($base['key'])` handling
 — `array_access_base_var` only ever recognized a plain variable base.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyAccess,PossiblyInvalidArrayAccess,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyAccess errorLevel="suppress"/>
+    <PossiblyInvalidArrayAccess errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

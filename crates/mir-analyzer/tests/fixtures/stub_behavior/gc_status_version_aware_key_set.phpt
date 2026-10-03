@@ -6,8 +6,13 @@ were only added in PHP 8.3.0 — targeting an older version via
 reading 'running' on that target is a genuine NonExistentArrayOffset, not
 a bool.
 ===config===
-php_version=8.0
-suppress=UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file===
 <?php
 function needsBool(bool $x): void {}

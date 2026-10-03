@@ -3,7 +3,11 @@ array_map's element type through an opaque `callable $cb` parameter is the
 union of every caller's concrete callback return type, not just the first
 one found.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function apply(callable $cb, array $nums): array {

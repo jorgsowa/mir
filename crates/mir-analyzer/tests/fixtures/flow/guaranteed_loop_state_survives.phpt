@@ -3,7 +3,12 @@ Loop-state merging must not invent a zero-iteration path for loops that are
 known to execute. Assignments and nullability refinements made by a do-while
 or non-empty foreach body remain valid after the loop.
 ===config===
-suppress=ImpossibleIdenticalComparison,RedundantCondition
+<mir>
+  <issueHandlers>
+    <ImpossibleIdenticalComparison errorLevel="suppress"/>
+    <RedundantCondition errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

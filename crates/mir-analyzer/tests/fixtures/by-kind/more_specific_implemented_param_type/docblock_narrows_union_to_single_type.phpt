@@ -3,7 +3,11 @@ A docblock @param may narrow a multi-class union to a single concrete subclass
 without emitting MethodSignatureMismatch. The native type hint (the common
 supertype) is unchanged; only the docblock refines the expected type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Vehicle {}

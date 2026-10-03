@@ -1,7 +1,13 @@
 ===description===
 new catch via use alias missing
 ===config===
-suppress=MissingThrowsDocblock,UnusedVariable,UnusedFunction
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 use App\Model\MissingEntity;

@@ -4,7 +4,11 @@ also resolve to the receiver's concrete class. static_call.rs's out-write-back
 loop only substituted the merged template bindings, never `TSelf`/
 `TStaticObject`, so the bare `static` atom leaked to the caller unresolved.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Factory {

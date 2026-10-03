@@ -2,7 +2,11 @@
 While loop appending to a list must converge: widen_array_as_list must not produce
 unbounded union growth across fixpoint iterations.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

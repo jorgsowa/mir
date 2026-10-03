@@ -5,7 +5,11 @@ they fell through to the named-class fallback, producing a bogus
 literal value passed as the bound-checked argument then always failed
 the (nonsensical) bound.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

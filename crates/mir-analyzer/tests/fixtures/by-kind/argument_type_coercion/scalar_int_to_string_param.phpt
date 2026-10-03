@@ -3,8 +3,12 @@ FALSE POSITIVE reproducer. Valid PHP: passing a literal int to a `string`-typed 
 coercion in non-strict mode. Example from Laravel ManagesFrequencies::spliceIntoPosition(1, 0).
 mir previously emitted InvalidArgument (Error); should be ArgumentTypeCoercion (Info).
 ===config===
-suppress=UnusedParam
-php_version=8.4
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 /**

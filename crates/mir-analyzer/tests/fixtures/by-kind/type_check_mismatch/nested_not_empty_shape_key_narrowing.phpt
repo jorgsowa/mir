@@ -6,7 +6,11 @@ nested `!empty()` bailed via that check as soon as the array was itself an
 ArrayAccess, so it narrowed nothing at any level, unlike its `isset()`
 sibling.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param array{a: array{b: ?string}} $x */

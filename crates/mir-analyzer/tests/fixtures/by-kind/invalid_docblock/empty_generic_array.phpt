@@ -1,7 +1,11 @@
 ===description===
 empty generic array parameter
 ===config===
-suppress=MissingParamType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

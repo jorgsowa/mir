@@ -3,7 +3,11 @@ interface_exists($x) narrowing a known class-string<T> keeps the class name,
 producing interface-string<T> — not a bare, unparameterized interface-string
 that would then fail to satisfy a interface-string<T>-typed parameter.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

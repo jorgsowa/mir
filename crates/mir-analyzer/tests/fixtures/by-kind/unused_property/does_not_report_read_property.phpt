@@ -1,7 +1,9 @@
 ===description===
 does not report read property
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

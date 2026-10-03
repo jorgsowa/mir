@@ -2,7 +2,9 @@
 A private static method used only through the `['Foo', 'helper']`
 class-string array-callable literal must not be reported unused.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

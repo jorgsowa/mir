@@ -4,7 +4,12 @@ expand through to that alias's own definition instead of stopping one
 level short (`type UserId = Id; type Id = int;` should make `UserId`
 resolve all the way to `int`, not stop at the unexpanded `Id`).
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

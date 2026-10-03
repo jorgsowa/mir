@@ -2,7 +2,11 @@
 `use A { A::foo as bar; }` where `foo` is a real method on `A` must not be
 flagged UndefinedTraitAliasMethod.
 ===config===
-suppress=UnusedMethod
+<mir>
+  <issueHandlers>
+    <UnusedMethod errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait A {

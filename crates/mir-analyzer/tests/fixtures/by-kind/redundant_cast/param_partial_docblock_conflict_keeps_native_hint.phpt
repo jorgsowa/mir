@@ -6,7 +6,12 @@ widening $x to include the foreign `string` atom. That hid a real
 RedundantCast: `(int) $x` on a native `int $x` is redundant regardless of
 what the docblock (wrongly) also claims.
 ===config===
-suppress=UnusedVariable,MismatchingDocblockParamType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MismatchingDocblockParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

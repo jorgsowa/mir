@@ -1,7 +1,11 @@
 ===description===
 Correct case class name in catch clause is not reported.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class AppException extends \RuntimeException {}

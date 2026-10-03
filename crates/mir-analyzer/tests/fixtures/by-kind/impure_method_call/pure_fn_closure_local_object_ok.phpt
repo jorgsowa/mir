@@ -2,7 +2,12 @@
 A closure inside a @pure function mutating a LOCALLY-created object (not a
 captured param) is allowed — only externally-owned captures are guarded.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

@@ -1,7 +1,12 @@
 ===description===
 Wrong-case call to synthesized backed-enum tryFrom() is reported with canonical camelCase name, not the lowercased key.
 ===config===
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Color: string {

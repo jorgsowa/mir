@@ -5,7 +5,9 @@ bare-enum-typed property assignment and a bare-enum-typed array element,
 via the same enum-case/bare-enum subtype arm exercised by the return-type
 fixtures. Expected: no issue.
 ===config===
-php_version=8.1
+<mir>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum RoundingMode {

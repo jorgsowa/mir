@@ -1,7 +1,11 @@
 ===description===
 Tainted input in `header()` reports TaintedHeader, not TaintedHtml.
 ===config===
-suppress=MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function redirect(): void {

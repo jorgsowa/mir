@@ -1,7 +1,11 @@
 ===description===
 number_format() always returns a non-empty string (even for 0).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test_number_format_zero(): void {

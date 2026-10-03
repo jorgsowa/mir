@@ -1,7 +1,11 @@
 ===description===
 static call via bare FQN on a PSR-4 lazy-loaded class produces no error
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:composer.json===
 {"autoload":{"psr-4":{"Util\\":"lib/"}}}
 ===file:lib/Formatter.php===

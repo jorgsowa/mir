@@ -2,7 +2,12 @@
 `interface-string` and `interface-string<T>` parse from docblocks into
 Atomic::TInterfaceString, matching class-string's parsing shape.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {}

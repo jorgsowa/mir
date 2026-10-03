@@ -1,7 +1,11 @@
 ===description===
 Backslash-qualified docblock keywords are not undefined classes and are invalid types.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

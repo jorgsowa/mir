@@ -1,7 +1,11 @@
 ===description===
 Date time null first arg
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $date = new DateTime(null);

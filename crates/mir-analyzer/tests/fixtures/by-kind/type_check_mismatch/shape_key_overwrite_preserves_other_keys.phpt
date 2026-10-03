@@ -2,7 +2,11 @@
 FN: assigning to an existing shape key widened the entire shape into a
 generic array, discarding the precise types of all its OTHER keys.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(): void {

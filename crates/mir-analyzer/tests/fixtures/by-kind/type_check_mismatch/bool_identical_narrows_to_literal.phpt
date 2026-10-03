@@ -2,7 +2,12 @@
 === true/false on a `bool` narrows to the specific literal, not the wide bool type.
 `$x: bool; if ($x === false)` true-branch → `false`; `$x !== false` true-branch → `true`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param bool $x */

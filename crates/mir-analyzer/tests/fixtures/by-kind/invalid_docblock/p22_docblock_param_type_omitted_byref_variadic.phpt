@@ -4,7 +4,12 @@ P22 (composite forms): the type-omitted `@param $name` form must also resolve wh
 stripped before checking for the leading `$`, same as the typed-prefix path already does
 for the whitespace-preceded case.
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

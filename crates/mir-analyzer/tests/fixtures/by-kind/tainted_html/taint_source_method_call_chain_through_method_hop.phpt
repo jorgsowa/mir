@@ -7,7 +7,14 @@ variable/property/array chain) fell through to `None`, so the chain
 walk died at the intermediate call and the whole expression was
 untainted.
 ===config===
-suppress=UnusedParam,MissingConstructor,MixedArrayAccess,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Param {

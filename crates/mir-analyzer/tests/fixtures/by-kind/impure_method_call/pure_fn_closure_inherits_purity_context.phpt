@@ -4,7 +4,12 @@ and by-value-captured objects were never added to param_names, so mutating
 a captured object through an immediately-invoked closure went unflagged —
 smuggling an observable side effect out of a function claimed to be pure.
 ===config===
-suppress=UnusedVariable,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Counter {

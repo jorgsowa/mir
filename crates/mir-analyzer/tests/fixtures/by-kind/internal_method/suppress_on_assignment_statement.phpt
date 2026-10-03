@@ -1,7 +1,11 @@
 ===description===
 @psalm-suppress / @mir-ignore InternalMethod on the statement covers instance and static calls; unsuppressed siblings still report.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib.php===
 <?php
 namespace Vendor\Lib;

@@ -2,7 +2,13 @@
 Only the bare (unbound) instantiation is lenient: an inferred mismatching
 binding or a subclass that fixes the ancestor's template still errors.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

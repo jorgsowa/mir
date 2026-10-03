@@ -3,7 +3,11 @@ A bare `@var` annotation referencing a class-scoped `@psalm-type` alias whose
 target class doesn't exist must flag the target's name, not the alias name
 itself (proves alias expansion runs before the UndefinedDocblockClass check).
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

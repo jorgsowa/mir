@@ -3,7 +3,11 @@ Dividing or taking the modulo of a value by a literal `0` is an
 unconditional runtime DivisionByZeroError — the constant-folder already
 detects a zero divisor (to skip folding) but never reported it.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function div_by_zero(int $x): float {

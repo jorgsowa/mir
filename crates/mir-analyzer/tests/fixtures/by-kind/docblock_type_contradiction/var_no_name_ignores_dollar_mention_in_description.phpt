@@ -5,7 +5,11 @@ would silently stop the bare-form annotation from applying to the real LHS
 below it, since `apply_post_narrow`'s named-form only applies on an exact
 name match).
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

@@ -3,7 +3,14 @@ A variable known to be one of a closed literal union can never === a value
 outside the union; both branches become known (true is always-true for !==,
 always-false for ===).
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingParamType,DocblockTypeContradiction
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <DocblockTypeContradiction errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

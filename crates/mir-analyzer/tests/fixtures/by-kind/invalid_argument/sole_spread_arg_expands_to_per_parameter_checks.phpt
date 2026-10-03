@@ -4,7 +4,11 @@ expanded into one binding per element so every parameter is checked
 individually, not just the first — a single merged spread element type
 previously bound only to the first parameter and silently skipped the rest.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function needsTwoInts(int $a, int $b): void {}

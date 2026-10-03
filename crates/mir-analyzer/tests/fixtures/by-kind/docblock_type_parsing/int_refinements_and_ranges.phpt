@@ -3,7 +3,13 @@ Int refinement pseudo-types, `int<min, max>` bounded ranges, and the
 `int-mask`/`int-mask-of` flag-set expansion (literal members OR-combined,
 including 0 for "no flags").
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function check_positive_int($x) {

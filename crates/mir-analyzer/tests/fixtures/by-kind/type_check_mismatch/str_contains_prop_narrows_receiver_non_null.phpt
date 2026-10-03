@@ -4,7 +4,13 @@ true (with a non-empty literal needle) narrows the receiver non-null — a
 null receiver reads the property as null, which coerces to "", and a
 non-empty needle can never be found in "".
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

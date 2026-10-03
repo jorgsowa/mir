@@ -1,7 +1,12 @@
 ===description===
 Class method parameter violation in post assignment
 ===config===
-suppress=MissingPropertyType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {

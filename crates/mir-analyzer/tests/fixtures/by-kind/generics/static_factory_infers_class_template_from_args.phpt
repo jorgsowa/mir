@@ -7,7 +7,12 @@ resolved to a bare, unparameterized `Box` instead of `Box<int>`, because
 template had any chance to be inferred from the arguments (unlike `new
 Box(42)`, which already infers class templates from constructor args).
 ===config===
-suppress=MissingPropertyType,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

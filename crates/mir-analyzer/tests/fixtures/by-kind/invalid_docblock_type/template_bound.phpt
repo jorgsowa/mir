@@ -1,7 +1,11 @@
 ===description===
 Template bounds reject backslash-qualified keywords.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

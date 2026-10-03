@@ -1,7 +1,14 @@
 ===description===
 Arbitrary string no resolution
 ===config===
-suppress=MissingParamType,MissingReturnType,MixedArgument,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 // A plain string literal that happens to match a function name

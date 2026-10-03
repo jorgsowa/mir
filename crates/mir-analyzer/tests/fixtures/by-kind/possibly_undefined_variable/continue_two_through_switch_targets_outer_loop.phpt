@@ -4,7 +4,12 @@ loop (skips straight to the next iteration), not the switch — so the
 code after the switch is only ever reached via the `default` arm, which
 always sets $x.
 ===config===
-suppress=UnusedParam,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(array $items): void {

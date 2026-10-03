@@ -5,7 +5,16 @@ branch narrows the property via the same relationship a direct
 narrow_receiver_non_null_on_prop_match like the direct instanceof arm
 does — the receiver itself stayed nullable.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType,PossiblyInvalidArgument,PossiblyNullArgument,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <PossiblyInvalidArgument errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Loggable {}

@@ -1,7 +1,11 @@
 ===description===
 No missing-return error when try body returns and all catch blocks also diverge
 ===config===
-suppress=MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function alwaysReturns(): bool {

@@ -2,7 +2,9 @@
 A class named only in a `get_class_methods('Foo')` string-literal call
 must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Foo {

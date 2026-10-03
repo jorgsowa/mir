@@ -4,7 +4,13 @@ the property-receiver counterpart of get_class narrowing a plain variable —
 gettype()/get_debug_type()/get_parent_class() already had this via
 ScalarArgTarget, get_class() was the one left var-only.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

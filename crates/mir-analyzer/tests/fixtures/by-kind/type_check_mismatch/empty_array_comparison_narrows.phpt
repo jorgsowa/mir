@@ -2,7 +2,12 @@
 $arr !== [] narrows to non-empty in the true branch (and === [] in the
 false branch); === [] also narrows to empty in its own true branch.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

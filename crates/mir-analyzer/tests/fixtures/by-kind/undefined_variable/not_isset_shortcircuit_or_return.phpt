@@ -2,7 +2,12 @@
 !isset short-circuit with || operator — guard clause pattern
 Common PHP idiom: !isset($x) || call($x) should not error on UndefinedVariable in RHS
 ===config===
-suppress=MissingParamType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function doSomething($x): void { echo $x; }

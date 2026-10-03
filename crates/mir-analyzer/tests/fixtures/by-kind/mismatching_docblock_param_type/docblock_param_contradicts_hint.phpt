@@ -2,7 +2,11 @@
 MismatchingDocblockParamType fires when a docblock @param contradicts the
 native hint; narrowing or matching docblock params stay silent.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

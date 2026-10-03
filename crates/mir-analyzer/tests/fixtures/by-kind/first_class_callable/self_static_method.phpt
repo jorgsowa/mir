@@ -5,7 +5,12 @@ concrete receiver class (`Factory`), the same way a direct `self::create()`
 call already does via substitute_static_in_return — not the raw, unresolved
 `self(Factory)` wrapper the FCC path used to leave in place.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

@@ -6,7 +6,12 @@ idiom (`namespace App; function json_encode() { return \json_encode(...); }`).
 The bare call from another function still resolves to (and flags) the local
 namespaced wrapper.
 ===config===
-suppress=UnusedParam,MissingParamType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

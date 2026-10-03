@@ -3,7 +3,13 @@ Bare truthy `if ($this->prop)` narrows the property, the property-receiver
 counterpart of the plain-variable truthy/falsy fallback — `narrow_prop_loose_bool`
 already existed for `==`/`!=` but was never wired into this catch-all arm.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

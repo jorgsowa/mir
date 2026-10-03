@@ -1,7 +1,12 @@
 ===description===
 Null comparisons on list and non-empty array reads are allowed when the offset may be absent.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<string> $list */

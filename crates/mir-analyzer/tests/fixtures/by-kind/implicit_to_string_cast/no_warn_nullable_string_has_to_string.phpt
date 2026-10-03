@@ -1,7 +1,11 @@
 ===description===
 No warning when __toString object is passed to a nullable string (?string) parameter
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Name {

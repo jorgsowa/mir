@@ -4,7 +4,11 @@ docblock scalar type from a genuinely DIFFERENT family than the native
 hint (`@param bool` on a native `int` hint) still defers to the native
 hint, same as the ordinary (non-promoted) `@param` scalar-family guard.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Wrong {

@@ -1,7 +1,11 @@
 ===description===
 method call on instance created via bare FQN without use statement produces no error; class is discovered via PSR-4 lazy loading, not pre-loaded
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Builder.php===

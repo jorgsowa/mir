@@ -2,7 +2,11 @@
 int-mask<1, 2, 4> rejects a literal integer that cannot be formed by OR-ing
 any subset of {1, 2, 4}: 8 is out of range.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -1,7 +1,11 @@
 ===description===
 Interface method docblock reaches an undocumented implementation
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

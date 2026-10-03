@@ -7,7 +7,12 @@ in the same file, which already treats `TNamedObject`/`TSelf`/
 false branch and `get_class() !== 'X'`'s exact-class exclusion both
 silently no-op'd when the receiver was a `self`/`static`-typed atom.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class OtherThing {}

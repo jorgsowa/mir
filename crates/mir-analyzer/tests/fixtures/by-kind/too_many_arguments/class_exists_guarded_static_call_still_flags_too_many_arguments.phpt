@@ -4,7 +4,12 @@ TooManyArguments for the static call in the guarded branch: the guard is
 true in the snapshot's own environment, so the branch is live and the
 snapshot signature is authoritative.
 ===config===
-suppress=MissingReturnType,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class NewApi {

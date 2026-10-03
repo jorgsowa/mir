@@ -1,7 +1,9 @@
 ===description===
 magic methods not reported
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Magic {

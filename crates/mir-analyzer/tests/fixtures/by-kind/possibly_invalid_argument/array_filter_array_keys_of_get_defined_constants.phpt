@@ -1,7 +1,11 @@
 ===description===
 `array_filter(array_keys(get_defined_constants()))` keeps string values.
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function dump(): void

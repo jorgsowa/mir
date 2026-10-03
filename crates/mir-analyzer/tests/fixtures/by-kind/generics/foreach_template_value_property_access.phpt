@@ -2,7 +2,13 @@
 G1: iterating over an array whose value type is a template param and accessing properties
 on the values must not emit MixedPropertyFetch or MixedAssignment.
 ===config===
-suppress=UnusedVariable,MissingPropertyType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

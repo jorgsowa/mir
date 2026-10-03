@@ -1,7 +1,11 @@
 ===description===
 MixedArrayOffset fires even when the array access is guarded by null-coalesce — the offset is still mixed at the access point
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @var mixed $key */

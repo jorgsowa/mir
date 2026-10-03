@@ -3,7 +3,11 @@ Negative control for the enum-`->value`-match-exhaustiveness fix: a
 genuinely missing case must still be flagged, naming exactly the
 uncovered case.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Kind: string {

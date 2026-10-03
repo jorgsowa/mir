@@ -2,7 +2,12 @@
 Without memoize_method_call_results an unannotated getter is not assumed
 stable, so the guarded read keeps its nullable declared type.
 ===config===
-suppress=UnusedVariable,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Identity {

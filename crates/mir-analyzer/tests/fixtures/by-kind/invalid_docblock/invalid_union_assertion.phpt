@@ -1,7 +1,12 @@
 ===description===
 Invalid union assertion
 ===config===
-suppress=MissingParamType,MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingParamType errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface I {

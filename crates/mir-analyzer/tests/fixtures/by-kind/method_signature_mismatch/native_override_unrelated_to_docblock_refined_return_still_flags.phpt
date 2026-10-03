@@ -2,7 +2,11 @@
 Negative control: a native-only override whose hint cannot hold the parent's docblock-refined
 return type is still a mismatch.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Item {}

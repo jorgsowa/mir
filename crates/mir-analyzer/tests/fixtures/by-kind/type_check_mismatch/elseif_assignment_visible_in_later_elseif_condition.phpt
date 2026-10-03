@@ -4,7 +4,13 @@ the false edge — each elseif re-branched from the pre-if context and only
 ever re-narrowed the PRIMARY if's condition, discarding every earlier
 elseif's condition (both its assignment and its narrowing) entirely.
 ===config===
-suppress=UnusedVariable,MixedAssignment,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

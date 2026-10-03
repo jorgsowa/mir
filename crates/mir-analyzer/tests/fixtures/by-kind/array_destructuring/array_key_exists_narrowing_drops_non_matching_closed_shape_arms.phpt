@@ -6,7 +6,11 @@ value type. A single (non-union) closed shape lacking the key must still
 fall back to the lenient add-as-mixed behavior, since a lone docblock shape
 isn't proof the underlying array holds no other keys.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

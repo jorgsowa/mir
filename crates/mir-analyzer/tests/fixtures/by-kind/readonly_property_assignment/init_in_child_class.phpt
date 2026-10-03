@@ -1,7 +1,11 @@
 ===description===
 ReadonlyPropertyAssignment when child class method tries to set parent's readonly property
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

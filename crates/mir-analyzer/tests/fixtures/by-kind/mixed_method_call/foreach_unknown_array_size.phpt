@@ -1,7 +1,11 @@
 ===description===
 Foreach unknown array size
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function getItems(): array {

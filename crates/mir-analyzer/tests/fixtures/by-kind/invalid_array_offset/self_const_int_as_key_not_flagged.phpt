@@ -2,7 +2,11 @@
 self::INT_CONST used as array key does not emit InvalidArrayOffset or MixedArrayOffset.
 After the fix, self::CONST returns the literal int type instead of mixed.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Flags {

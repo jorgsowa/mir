@@ -4,7 +4,14 @@ only ever matched a plain-variable base (`$arr['k'] = ...`), silently
 dropping taint for a property-rooted array, even though the read side
 already resolves taint through a property chain.
 ===config===
-suppress=MissingPropertyType,MixedArrayAccess,MixedAssignment,MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Cache {

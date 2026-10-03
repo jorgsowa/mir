@@ -7,7 +7,11 @@ template params to decide arity, which is always empty for a bare
 subclass, so the passthrough branch was unreachable and the ancestor's
 type args were silently dropped.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

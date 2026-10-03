@@ -2,7 +2,9 @@
 A variable-variable assignment (`${"$key"} = ...`) defines variables whose names
 are not statically known, so later reads must not be reported as UndefinedVariable.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 function run(array $opts): void {

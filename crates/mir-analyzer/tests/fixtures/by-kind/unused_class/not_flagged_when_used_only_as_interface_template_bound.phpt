@@ -1,7 +1,9 @@
 ===description===
 A class named only as an interface's own `@template T of Bound` bound must not be reported UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class Bound {

@@ -4,7 +4,11 @@ are statically known (from a constructor call) must be checked against the
 bound concrete type, not waved through just because the docblock type
 mentions a template name.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

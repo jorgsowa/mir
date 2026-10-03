@@ -6,7 +6,11 @@ narrowing.rs's Instanceof arm previously only checked extract_var_name and
 extract_prop_access, never extract_static_prop_access, so the guard had no
 effect and the property stayed at its declared (nullable) type.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

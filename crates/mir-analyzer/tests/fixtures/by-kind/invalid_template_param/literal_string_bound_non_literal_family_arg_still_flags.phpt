@@ -4,7 +4,11 @@ argument from a genuinely different type family still violates the bound
 — the fix only recognizes the keyword, it doesn't loosen the bound check
 itself.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Wrong {}

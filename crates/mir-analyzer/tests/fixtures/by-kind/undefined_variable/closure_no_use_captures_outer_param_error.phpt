@@ -1,7 +1,11 @@
 ===description===
 closure no use captures outer param error
 ===config===
-suppress=MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function outer(string $x): callable {

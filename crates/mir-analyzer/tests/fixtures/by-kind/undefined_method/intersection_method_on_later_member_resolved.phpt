@@ -2,7 +2,12 @@
 A method declared only on a later intersection member (directly, via an
 inherited interface, or via a trait) resolves with that member's return type.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface A { public function a(): int; }

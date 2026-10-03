@@ -4,8 +4,14 @@ offset) must not emit NonExistentArrayOffset. Before the fix, $matches was typed
 list<string>, so subscripting $matches[0] returned string and $matches[0][1] emitted
 NonExistentArrayOffset (string has no int-keyed index 1).
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedArgument
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

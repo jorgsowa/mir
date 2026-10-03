@@ -6,7 +6,12 @@ previously proved `SubBox<Cat>` compatible with a declared `Box<Animal>`
 purely from `SubBox extends Box`, ignoring that `Box`'s invariant `T` makes
 `Cat` and `Animal` incompatible.
 ===config===
-suppress=UnusedParam,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

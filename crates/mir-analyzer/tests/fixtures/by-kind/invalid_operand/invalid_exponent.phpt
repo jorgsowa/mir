@@ -1,7 +1,11 @@
 ===description===
 XOR with an array operand is invalid; string literals are valid (PHP allows string bitwise ops)
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = [1, 2] ^ 1;

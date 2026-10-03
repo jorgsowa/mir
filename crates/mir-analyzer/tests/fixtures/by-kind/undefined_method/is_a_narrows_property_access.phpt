@@ -2,7 +2,12 @@
 `is_a($obj->prop, X::class)` must narrow the property receiver like the
 already-correct `$obj->prop instanceof X` sibling.
 ===config===
-suppress=MissingConstructor,PossiblyNullArgument
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <PossiblyNullArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

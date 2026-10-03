@@ -4,7 +4,12 @@ global `Closure` class, not get namespace-qualified — regression guard for
 the same-namespace class-name qualification fix, which now qualifies most
 bare docblock class names but must still exempt real global builtins.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

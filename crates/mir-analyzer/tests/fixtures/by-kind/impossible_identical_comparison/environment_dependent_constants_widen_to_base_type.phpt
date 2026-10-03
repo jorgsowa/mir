@@ -6,7 +6,11 @@ ImpossibleIdenticalComparison. PHP_OS_FAMILY reproduced independently in both
 phpunit-phpunit's Util/ExcludeList.php and guzzlehttp/guzzle's
 Handler/ProxyEnvironment.php via harness/.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

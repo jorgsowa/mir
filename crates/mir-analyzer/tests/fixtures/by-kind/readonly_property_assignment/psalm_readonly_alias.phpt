@@ -2,7 +2,11 @@
 @psalm-readonly must be recognized as an alias of @readonly, the same way
 other psalm-/phpstan- prefixed tags already alias their bare form.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

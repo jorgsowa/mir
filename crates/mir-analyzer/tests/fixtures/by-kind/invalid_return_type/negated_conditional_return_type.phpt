@@ -4,7 +4,11 @@ negated form PHPStan/Psalm both support, previously unrecognized by the
 conditional-type parser (which only matched the bare `is` form) so the whole
 `@return` tag silently failed to parse into a conditional type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

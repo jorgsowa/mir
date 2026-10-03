@@ -2,7 +2,9 @@
 A class named only in an `@mixin` docblock tag must not be reported
 UnusedClass.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 final class OnlyUsedViaMixin {}

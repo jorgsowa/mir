@@ -1,7 +1,14 @@
 ===description===
 a param type referencing a use import with different case resolves to the real FQCN, not the raw written name
 ===config===
-suppress=UnusedVariable,UnusedClass,UnusedMethod,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedClass errorLevel="suppress"/>
+    <UnusedMethod errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Lib.php===
 <?php
 namespace MyApp\Deep;

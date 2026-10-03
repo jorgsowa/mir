@@ -5,7 +5,12 @@ comparison must be recognized as unreachable — the already-correct
 instance-property and variable behavior, never wired for a static
 property.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

@@ -2,7 +2,11 @@
 int-mask-of<self::*> resolves against an enum's own literal-int `const`
 declarations, the same way it does for classes and traits.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Flags {

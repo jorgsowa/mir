@@ -4,7 +4,11 @@ foreach-bound element used as a :: receiver — nesting the class-string one
 level deeper than a bare parameter must not change whether the interface
 check fires.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

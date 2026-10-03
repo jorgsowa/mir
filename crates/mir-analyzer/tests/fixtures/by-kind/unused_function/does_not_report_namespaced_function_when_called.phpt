@@ -1,7 +1,9 @@
 ===description===
 does not report namespaced function when called
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 namespace App;

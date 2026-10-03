@@ -3,7 +3,13 @@ count()/strlen()/array_key_first()/array_key_last() narrowing on a
 property receiver (`$this->prop`), the property-access counterpart of the
 already-existing plain-variable narrowing for the same builtins.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Holder {

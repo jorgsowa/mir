@@ -5,7 +5,11 @@ necessarily a C too, so it can't survive the negation, the same way the
 positive branch already keeps an intersection's other parts instead of
 dropping them.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Cnt3 {

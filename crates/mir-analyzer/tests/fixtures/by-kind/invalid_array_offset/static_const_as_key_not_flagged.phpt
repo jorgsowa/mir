@@ -2,7 +2,11 @@
 static::INT_CONST used as array key does not emit InvalidArrayOffset.
 static:: resolves to the current class and returns the literal type.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Registry {

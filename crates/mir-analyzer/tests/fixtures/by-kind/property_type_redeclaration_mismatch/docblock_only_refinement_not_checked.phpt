@@ -3,7 +3,11 @@ Child redeclares parent property with the same native type hint but a more speci
 `@var` docblock — PHP's redeclaration-invariance rule only checks the native hint, so
 this is valid and must not raise PropertyTypeRedeclarationMismatch.
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Animal {}

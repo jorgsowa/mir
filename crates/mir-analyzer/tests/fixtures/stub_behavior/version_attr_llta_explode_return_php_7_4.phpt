@@ -1,8 +1,13 @@
 ===description===
 LanguageLevelTypeAware return: explode() returns string[]|false (default) on PHP 7.4
 ===config===
-php_version=7.4
-suppress=UnusedVariable,PossiblyInvalidArrayAccess
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyInvalidArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file===
 <?php
 $parts = explode(",", "a,b,c");

@@ -3,7 +3,11 @@ Encapsed concat with string creates string. Previously baked in the
 `literal-string` docblock-keyword bug: expected `UndefinedDocblockClass`
 since the keyword wasn't recognized at all.
 ===config===
-suppress=ImplicitToStringCast
+<mir>
+  <issueHandlers>
+    <ImplicitToStringCast errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -2,7 +2,13 @@
 G1: assigning a template-typed expression to a variable must not emit MixedAssignment —
 a template param V is an intentionally parameterised placeholder, not truly mixed.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

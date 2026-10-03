@@ -1,7 +1,11 @@
 ===description===
 InvalidArrayAssignment fires for literal true.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $a = true;

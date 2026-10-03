@@ -8,7 +8,11 @@ behavior. The match arm passes the narrowed property straight to a
 strictly-typed `int|string` parameter (rather than an `@mir-check` inside a
 closure) since a nested closure doesn't inherit property-refinement state.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class HasScalarProp {

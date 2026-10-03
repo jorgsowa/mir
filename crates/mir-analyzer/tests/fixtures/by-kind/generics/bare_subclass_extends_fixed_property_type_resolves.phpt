@@ -5,7 +5,14 @@ through a `@extends Box<int>`-fixed ancestor template — the own-type-args
 substitution path early-returned the raw property type before reaching
 `inherited_template_bindings` whenever the receiver itself had zero args.
 ===config===
-suppress=UnusedParam,UnusedVariable,MissingConstructor,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

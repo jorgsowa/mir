@@ -4,7 +4,13 @@ checked against Target's own declared `@template T of Bound` — this was
 previously never checked anywhere (only call-site/constructor-site bindings
 were), so a class could declare a bound-violating type arg with no diagnostic.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

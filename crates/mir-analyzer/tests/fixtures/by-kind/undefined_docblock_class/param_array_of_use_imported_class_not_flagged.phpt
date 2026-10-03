@@ -1,7 +1,11 @@
 ===description===
 A `use`-imported short class name nested inside `array<int, ShortName>` in a @param docblock must resolve against the import, not fire UndefinedDocblockClass.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Item.php===
 <?php
 namespace App\Model;

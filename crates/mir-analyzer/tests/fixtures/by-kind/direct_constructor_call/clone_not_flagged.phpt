@@ -1,7 +1,12 @@
 ===description===
 $this->__construct() inside __clone is a valid re-initialization pattern and must not emit DirectConstructorCall.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Registry {

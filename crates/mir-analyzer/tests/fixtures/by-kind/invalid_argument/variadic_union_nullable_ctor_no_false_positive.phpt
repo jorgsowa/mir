@@ -1,7 +1,11 @@
 ===description===
 variadic union nullable ctor args do not panic or cause false positive
 ===config===
-suppress=MissingPropertyType
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:Coll.php===
 <?php
 class Base {}

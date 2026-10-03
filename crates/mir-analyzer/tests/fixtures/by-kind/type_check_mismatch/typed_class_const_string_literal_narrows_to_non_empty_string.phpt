@@ -3,7 +3,11 @@ Same root cause as the typed-int-const case, on the `string` sibling: a native `
 hint on a class constant discarded literal inference, so a non-empty literal never
 narrowed to `non-empty-string`.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 final class Foo {

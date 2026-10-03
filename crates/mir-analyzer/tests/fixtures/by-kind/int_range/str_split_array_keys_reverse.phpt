@@ -3,7 +3,12 @@ str_split() on a non-empty string returns non-empty-list<non-empty-string>.
 array_keys() on a non-empty array returns a non-empty list.
 array_reverse() preserves non-emptiness.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param non-empty-string $s */

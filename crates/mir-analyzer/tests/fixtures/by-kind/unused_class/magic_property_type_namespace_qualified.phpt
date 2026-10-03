@@ -7,7 +7,9 @@ class's FQCN and every check against it (existence, reference recording)
 silently failed, including making `Money` look unused since its only
 reference was recorded under the wrong (unqualified) key.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 namespace App;

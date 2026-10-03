@@ -1,7 +1,13 @@
 ===description===
 `vfprintf()` writes formatted output like `fprintf()`.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MissingParamType
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test($out): void {

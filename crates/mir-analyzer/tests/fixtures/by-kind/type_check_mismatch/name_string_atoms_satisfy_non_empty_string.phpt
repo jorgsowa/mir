@@ -4,7 +4,12 @@ trait-string are all always non-empty in real PHP (a class/interface/
 callable/enum/trait name can never be "") — each must satisfy a
 non-empty-string param.
 ===config===
-suppress=UnusedParam,UndefinedClass
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UndefinedClass errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Greeter {}

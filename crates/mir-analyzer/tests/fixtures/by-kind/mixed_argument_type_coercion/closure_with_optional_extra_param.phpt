@@ -3,7 +3,12 @@ A closure with one required param and one optional param satisfies callable(stri
 — optional params do not count toward the required-arity comparison, so no error
 is emitted.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(string):void $c */

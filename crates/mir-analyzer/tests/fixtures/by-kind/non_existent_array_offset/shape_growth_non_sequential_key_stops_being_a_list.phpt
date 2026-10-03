@@ -4,7 +4,11 @@ still grows the shape to `array{5: int}`, but the result is no longer
 list-shaped — indexing `$arr[0]` afterward is flagged as a non-existent
 offset instead of silently being treated as in-bounds.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param list<int> $arr */

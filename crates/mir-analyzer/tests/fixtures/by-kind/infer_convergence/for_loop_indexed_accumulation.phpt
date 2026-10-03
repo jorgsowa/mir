@@ -3,7 +3,11 @@ For loop building an indexed array must converge: widen_array_with_value_and_key
 must not produce unbounded union growth when integer indices are assigned in a
 classic for loop.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

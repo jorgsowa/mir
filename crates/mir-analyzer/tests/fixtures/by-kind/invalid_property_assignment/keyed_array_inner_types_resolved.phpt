@@ -4,7 +4,13 @@ The resolve_atomic_inner fix adds a TKeyedArray arm so that class-string<T> and 
 types inside array{...} properties are properly resolved and no spurious
 InvalidPropertyAssignment is raised for a correct assignment.
 ===config===
-suppress=MissingPropertyType,MixedAssignment,UnusedParam
+<mir>
+  <issueHandlers>
+    <MissingPropertyType errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

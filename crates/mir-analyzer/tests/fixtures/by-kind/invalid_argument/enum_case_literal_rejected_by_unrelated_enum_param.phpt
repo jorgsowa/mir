@@ -3,8 +3,12 @@ Negative control for the enum-case/bare-enum subtype fix: an enum-case
 literal from one enum must still be rejected when passed to a parameter
 typed as a completely unrelated enum.
 ===config===
-php_version=8.1
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.1</phpVersion>
+</mir>
 ===file===
 <?php
 enum RoundingMode {

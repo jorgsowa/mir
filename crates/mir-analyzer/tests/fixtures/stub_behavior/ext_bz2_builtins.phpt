@@ -1,7 +1,9 @@
 ===description===
 `bzcompress`/`bzdecompress` are ext-bz2 built-in functions (a required extension); stubs are missing.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 function pack_(string $data): void {

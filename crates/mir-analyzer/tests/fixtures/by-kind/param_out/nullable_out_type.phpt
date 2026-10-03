@@ -1,7 +1,13 @@
 ===description===
 @param-out with a nullable type: after the call the variable is nullable.
 ===config===
-suppress=UnusedVariable,UnusedFunction,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedFunction errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

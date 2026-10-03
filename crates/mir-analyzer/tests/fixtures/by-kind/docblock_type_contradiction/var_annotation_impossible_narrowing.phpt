@@ -4,7 +4,11 @@ known type before overwriting it — asserting a disjoint, impossible type
 (here `string` on a variable known to be the literal int `1`) was silently
 accepted instead of flagged as a contradiction.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(): void {

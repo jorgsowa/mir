@@ -3,7 +3,13 @@ str_contains/str_starts_with/str_ends_with with a non-empty literal needle
 narrow a property-access haystack to non-empty-string too, not just a plain
 variable.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingThrowsDocblock
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Holder {

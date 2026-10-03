@@ -1,7 +1,11 @@
 ===description===
 class-string<T> argument binds T to the named class, not the bound
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

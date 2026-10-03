@@ -2,7 +2,12 @@
 No UnsupportedReferenceUsage for well-formed lvalue reference assignments.
 $x = &$y, $x = &$arr[0], and $x = &$obj->prop are all legal PHP and must not fire.
 ===config===
-suppress=UnusedVariable,MixedAssignment
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** Simple variable reference — the canonical FP-L case */

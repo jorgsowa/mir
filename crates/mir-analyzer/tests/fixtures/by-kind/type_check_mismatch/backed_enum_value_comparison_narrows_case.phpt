@@ -4,7 +4,12 @@ backing value equals the literal (and excludes that case on the false
 branch) — sound because PHP requires distinct backing values across a
 backed enum's cases, so the value uniquely identifies the case.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Suit: string {

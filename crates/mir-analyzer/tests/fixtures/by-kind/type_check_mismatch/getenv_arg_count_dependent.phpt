@@ -5,7 +5,12 @@ branch (never the whole-environment array); a bare or null $name can only
 take the array|false branch. Only an unresolvable (e.g. nullable) $name
 falls back to the stub's full union.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

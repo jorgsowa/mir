@@ -4,7 +4,13 @@ in place, the same way a by-ref call argument (`sort($f->items)`, already
 checked) does — but the foreach statement never routed the iterable
 expression through the readonly check at all.
 ===config===
-suppress=MissingConstructor,UnusedForeachValue,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Frozen {

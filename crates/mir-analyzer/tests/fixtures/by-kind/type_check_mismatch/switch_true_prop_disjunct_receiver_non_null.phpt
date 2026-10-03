@@ -7,7 +7,12 @@ includes an `is_null($x->prop)` leaf must NOT propagate receiver
 non-null (matching a bare `if (A || B)` of the same shape), regardless
 of case order.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Value {}

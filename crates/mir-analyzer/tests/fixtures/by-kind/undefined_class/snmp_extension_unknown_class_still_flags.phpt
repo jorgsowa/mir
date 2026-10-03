@@ -4,7 +4,11 @@ real stub file must not wildcard-resolve unrelated top-level class names —
 a class that isn't actually part of the extension must still be flagged
 undefined.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function f(NotARealSNMPClass $x): void {}

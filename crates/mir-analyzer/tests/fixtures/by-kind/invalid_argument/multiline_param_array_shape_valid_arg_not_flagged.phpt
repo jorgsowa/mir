@@ -1,7 +1,11 @@
 ===description===
 A valid array literal matching a multi-line @param array shape is not flagged.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

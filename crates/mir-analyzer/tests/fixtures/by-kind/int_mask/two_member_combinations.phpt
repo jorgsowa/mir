@@ -2,7 +2,11 @@
 int-mask<2, 4> expands to {0, 2, 4, 6}. Values 1 and 3 are not combinations
 of flags 2 and 4, so they are rejected.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

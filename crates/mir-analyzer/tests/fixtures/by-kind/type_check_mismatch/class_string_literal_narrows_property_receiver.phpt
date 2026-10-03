@@ -4,7 +4,13 @@ case) narrows the property, the property-receiver counterpart of the
 existing plain-variable narrow_var_to_class_string. Also covers the
 symmetric `Foo::class === $this->prop` form.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

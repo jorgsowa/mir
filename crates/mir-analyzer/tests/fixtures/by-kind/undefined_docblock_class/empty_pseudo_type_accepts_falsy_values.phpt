@@ -3,7 +3,11 @@
 bogus named class; all falsy literals satisfy it as both a param and a
 return type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param empty $x */

@@ -1,7 +1,11 @@
 ===description===
 Sibling of deprecated_enum_as_param: a plain enum stays silent.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 enum Status { case A; case B; }

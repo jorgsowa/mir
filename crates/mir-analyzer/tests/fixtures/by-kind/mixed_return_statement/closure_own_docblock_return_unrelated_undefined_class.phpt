@@ -6,7 +6,11 @@ qualified) class reference, same as before the fix — so the resulting
 declared/actual mismatch is still flagged, exactly as it would be for any
 other non-existent docblock class.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace PhpOption;

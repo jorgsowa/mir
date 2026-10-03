@@ -4,7 +4,12 @@ once, so a variable first assigned in the body is definitely defined
 afterward — no PossiblyUndefinedVariable, unlike a possibly-empty source
 (see foreach_body_error.phpt, which correctly still flags it).
 ===config===
-suppress=MixedAssignment,MixedReturnStatement
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedReturnStatement errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function literal_array_guaranteed(): int {

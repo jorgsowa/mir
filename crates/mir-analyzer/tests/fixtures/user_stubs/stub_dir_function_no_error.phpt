@@ -1,8 +1,15 @@
 ===description===
 stub dir function no error
 ===config===
-stub_dir=stubs
-suppress=MixedAssignment,UnusedVariable
+<mir>
+  <stubs>
+    <directory name="stubs"/>
+  </stubs>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:stubs/auth.php===
 <?php
 function auth_check(string $token): bool { return strlen($token) > 0; }

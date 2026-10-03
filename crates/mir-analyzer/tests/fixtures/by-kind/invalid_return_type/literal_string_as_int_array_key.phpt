@@ -1,7 +1,13 @@
 ===description===
 Literal string as int array key
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class a {

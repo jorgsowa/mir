@@ -7,7 +7,11 @@ function always returns an int regardless of what the docblock claims, so
 `return 1;` is valid. MismatchingDocblockReturnType still separately flags
 the contradiction itself.
 ===config===
-suppress=MismatchingDocblockReturnType
+<mir>
+  <issueHandlers>
+    <MismatchingDocblockReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

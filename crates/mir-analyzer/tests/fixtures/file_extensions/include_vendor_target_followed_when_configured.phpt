@@ -1,9 +1,16 @@
 ===description===
-With include_vendor_targets=follow an include target under vendor joins the closure
+When vendor is listed in projectFiles an include target under vendor joins the closure
 ===config===
-file_extensions=module,inc
-include_seed=a.module
-include_vendor_targets=follow
+<mir>
+  <projectFiles>
+    <file name="a.module"/>
+    <directory name="vendor"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:a.module===
 <?php
 require __DIR__ . '/vendor/pkg/helper.inc';

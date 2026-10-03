@@ -2,7 +2,11 @@
 In non-strict PHP, passing int/float to a string-typed parameter is a benign coercion.
 Should emit ArgumentTypeCoercion (Info), not InvalidArgument (Error).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param string $s */

@@ -5,7 +5,12 @@ the receiver non-null, the `is_null`-specific counterpart of
 comparison arms — `narrow_prop_from_type_fn` narrowed the property's own
 value but never the receiver.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

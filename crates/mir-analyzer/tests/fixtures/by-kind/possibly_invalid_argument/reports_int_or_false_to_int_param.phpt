@@ -1,7 +1,11 @@
 ===description===
 reports int or false to int param
 ===config===
-suppress=ForbiddenCode
+<mir>
+  <issueHandlers>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

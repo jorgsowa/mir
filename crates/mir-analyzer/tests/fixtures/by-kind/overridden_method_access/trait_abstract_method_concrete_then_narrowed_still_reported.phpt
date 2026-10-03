@@ -5,7 +5,11 @@ own abstract declaration. Once a class provides the CONCRETE implementation
 concrete method is a normal override and PHP fatal-errors on it (verified
 live) — mir must keep flagging it.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 trait PublicRequirement {

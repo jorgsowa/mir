@@ -1,7 +1,9 @@
 ===description===
 cross file since 8 1 constant not defined on php 8 0
 ===config===
-php_version=8.0
+<mir>
+  <phpVersion>8.0</phpVersion>
+</mir>
 ===file:ImageHelper.php===
 <?php
 function is_avif(int $type): void {

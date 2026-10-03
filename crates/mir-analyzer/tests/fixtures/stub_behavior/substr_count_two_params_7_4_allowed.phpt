@@ -1,8 +1,12 @@
 ===description===
 substr count two params 7 4 allowed
 ===config===
-php_version=7.4
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file===
 <?php
 $output = 'some text with info here';

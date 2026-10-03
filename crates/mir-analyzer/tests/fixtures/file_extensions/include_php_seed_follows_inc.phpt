@@ -1,8 +1,16 @@
 ===description===
 A plain .php file including a .inc file follows it
 ===config===
-file_extensions=php,module,inc
-include_seed=index.php
+<mir>
+  <projectFiles>
+    <file name="index.php"/>
+  </projectFiles>
+  <fileExtensions>
+    <extension name="php"/>
+    <extension name="module"/>
+    <extension name="inc"/>
+  </fileExtensions>
+</mir>
 ===file:index.php===
 <?php
 require_once __DIR__ . '/core.inc';

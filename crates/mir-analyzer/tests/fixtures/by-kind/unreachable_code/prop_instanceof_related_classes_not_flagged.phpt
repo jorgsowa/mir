@@ -2,7 +2,11 @@
 `$h->prop instanceof A && $h->prop instanceof B` is NOT flagged when B extends A
 (a compatible, non-empty narrowing) — negative counterpart to the unrelated-finals case.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

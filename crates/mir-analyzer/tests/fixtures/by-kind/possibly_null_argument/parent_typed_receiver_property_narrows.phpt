@@ -6,7 +6,12 @@ as equivalent receiver atoms. A `parent`-typed receiver (from a `@return
 parent` docblock) silently resolved every property to `mixed`, so
 `isset()`/property narrowing on it was inert.
 ===config===
-suppress=UnusedVariable,MissingConstructor
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

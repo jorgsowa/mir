@@ -1,7 +1,11 @@
 ===description===
 Override without docblock inherits the parent's generic @return and callable param
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

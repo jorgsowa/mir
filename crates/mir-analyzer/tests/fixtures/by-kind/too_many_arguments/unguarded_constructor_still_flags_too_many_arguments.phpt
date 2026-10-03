@@ -2,7 +2,11 @@
 Without an existence guard, `new` on a class with no constructor is
 checked normally and TooManyArguments is reported.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class NewApi {}

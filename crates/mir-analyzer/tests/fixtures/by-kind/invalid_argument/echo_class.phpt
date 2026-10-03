@@ -1,7 +1,11 @@
 ===description===
 Echo class
 ===config===
-suppress=ImplicitToStringCast
+<mir>
+  <issueHandlers>
+    <ImplicitToStringCast errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class A {}

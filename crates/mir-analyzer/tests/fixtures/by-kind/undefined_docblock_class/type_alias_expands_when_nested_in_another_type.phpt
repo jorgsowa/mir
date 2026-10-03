@@ -6,7 +6,13 @@ expand_aliases_only only ever substituted a top-level atom, never
 recursing into type_params/array value-types, so both stayed unexpanded
 (mixed) even though the bare, non-nested alias usage already worked.
 ===config===
-suppress=UnusedParam,MixedAssignment,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

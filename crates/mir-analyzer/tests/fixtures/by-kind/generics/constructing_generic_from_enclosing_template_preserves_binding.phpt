@@ -6,7 +6,14 @@ enclosing, still-unbound class template (e.g. `new Box($child)` where
 check used `is_mixed()`, which treats an unconstrained template as mixed —
 the same conflation `is_mixed_not_template()` exists to avoid elsewhere.
 ===config===
-suppress=MissingReturnType,MissingPropertyType,UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @template T */

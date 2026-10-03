@@ -2,7 +2,13 @@
 G1: function with two template params — both are correctly inferred from the argument types
 and substituted into the return type.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

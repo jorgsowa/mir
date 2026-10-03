@@ -2,7 +2,11 @@
 A function with @return T (template, effectively mixed) does NOT fire MixedReturnStatement — the declared type T
 is itself mixed, so the condition !declared.is_mixed() is false
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

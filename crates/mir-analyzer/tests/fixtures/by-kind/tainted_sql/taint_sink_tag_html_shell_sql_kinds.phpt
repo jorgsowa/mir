@@ -3,7 +3,12 @@
 llm_prompt), reusing the same issue their built-in-function sinks raise.
 Each is on its own function so the location pinpoints its own call.
 ===config===
-suppress=MixedArrayAccess,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @taint-sink html $out */

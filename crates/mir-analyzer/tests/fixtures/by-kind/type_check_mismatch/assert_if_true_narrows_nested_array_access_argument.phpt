@@ -5,7 +5,12 @@ the `$arr` parameter — `split_array_key_suffix` used to bail on a second
 could never match a real declared parameter name, so the whole assertion
 silently no-oped for a nested path even though the single-key case worked.
 ===config===
-suppress=MissingReturnType,MixedArgument
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

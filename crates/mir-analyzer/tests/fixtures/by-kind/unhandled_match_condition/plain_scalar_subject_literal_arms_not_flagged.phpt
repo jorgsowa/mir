@@ -1,7 +1,11 @@
 ===description===
 A plain int/string subject matched only against literal arms (inline or resolved class constants) is not reported; a non-literal arm, an unresolvable constant or a large bounded range still is.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Kind {

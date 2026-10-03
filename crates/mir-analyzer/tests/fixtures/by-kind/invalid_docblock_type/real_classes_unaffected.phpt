@@ -1,7 +1,11 @@
 ===description===
 Fully qualified classes and unqualified keywords remain valid docblock types.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

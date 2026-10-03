@@ -4,7 +4,11 @@ DOES restate its own (wrong) docblock refinement, the mismatch must still be
 flagged — the fix only excuses a child that never opted into a narrower
 promise in the first place.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {}

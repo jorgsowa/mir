@@ -7,7 +7,12 @@ These tests detect wrong diverge by putting an ArgumentTypeCoercion inside the
 is_callable true branch. The diagnostic fires only when the branch is alive; if
 the branch is wrongly diverged it is suppressed and the test fails.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

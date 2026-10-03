@@ -6,7 +6,14 @@ audit), so an unconstrained property template was treated as real mixed
 and the instanceof narrowing was skipped entirely, leaving the property at
 its bare, unrefined declared type instead of narrowing it to T&Countable.
 ===config===
-suppress=UnusedVariable,MissingReturnType,MixedArgument,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <MissingReturnType errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -4,8 +4,13 @@ declaration using extends/implements should suppress UndefinedClass. Without
 the fix, the analyzer unconditionally checks the parent/interface name regardless
 of the preceding guard.
 ===config===
-suppress=UnusedVariable,UnusedParam
-php_version=8.2
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

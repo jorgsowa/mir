@@ -4,7 +4,12 @@ in any preceding condition must still be flagged undefined in a later
 elseif/else — the fix only carries forward REAL assignments, it doesn't
 suppress checking altogether.
 ===config===
-suppress=UnusedParam,MixedArgument
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

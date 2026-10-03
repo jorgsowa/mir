@@ -2,7 +2,9 @@
 A compound concat assign to one property does not exempt an unrelated unused
 property on the same class.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 class Foo {

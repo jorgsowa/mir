@@ -6,7 +6,12 @@ diagnostic, even though none of these functions removes arbitrary
 attacker-controlled content. Genuine sanitizers/encoders like
 htmlspecialchars are deliberately excluded and stay unflagged.
 ===config===
-suppress=MixedArrayAccess,MixedArgument
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedArgument errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function viaStrReplace(): void {

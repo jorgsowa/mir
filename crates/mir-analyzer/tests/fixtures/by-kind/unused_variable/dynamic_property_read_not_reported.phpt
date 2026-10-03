@@ -1,7 +1,13 @@
 ===description===
 variable used as dynamic property name in read is not reported
 ===config===
-suppress=MixedAssignment,MixedPropertyFetch,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedPropertyFetch errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class HasOneOrMany {

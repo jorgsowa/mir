@@ -1,7 +1,9 @@
 ===description===
 does not report function called from another file
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file:helpers.php===
 <?php
 function helper(): void {}

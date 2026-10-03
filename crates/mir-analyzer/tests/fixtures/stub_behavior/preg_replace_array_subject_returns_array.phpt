@@ -3,7 +3,12 @@ preg_replace with an array subject returns array<int, string>, not array|null.
 Null is only returned on pattern error (programming mistake), not modeled as
 part of the happy-path return type.
 ===config===
-suppress=UnusedVariable,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 $inputs = ['hello', 'world'];

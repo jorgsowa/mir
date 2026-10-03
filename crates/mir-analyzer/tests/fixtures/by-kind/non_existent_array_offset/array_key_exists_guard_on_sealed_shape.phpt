@@ -1,7 +1,9 @@
 ===description===
 The `array_key_exists('favicon', ...)` guard proves the offset exists before access.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 class Renderer {

@@ -4,7 +4,14 @@
 the taint state of the referenced variable are resolvable when the name
 is a literal string, so this narrow case is no longer treated as opaque.
 ===config===
-suppress=MixedArgument,UnusedVariable,MixedAssignment,MixedArrayAccess
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function typeIsResolved(): void {

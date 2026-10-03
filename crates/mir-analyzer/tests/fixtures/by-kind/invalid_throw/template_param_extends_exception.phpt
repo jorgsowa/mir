@@ -1,7 +1,11 @@
 ===description===
 Throwing a @template T of Exception does not fire InvalidThrow
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

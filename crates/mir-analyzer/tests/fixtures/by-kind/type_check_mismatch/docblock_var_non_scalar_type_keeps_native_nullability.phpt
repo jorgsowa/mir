@@ -4,7 +4,12 @@ must not drop the native hint's own nullability — PHP enforces `?Foo`
 regardless of what the docblock says. Property analogue of the fixed
 param-side E2 (`docblock_param_non_scalar_type_keeps_native_nullability`).
 ===config===
-suppress=MissingConstructor,UnusedVariable
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}

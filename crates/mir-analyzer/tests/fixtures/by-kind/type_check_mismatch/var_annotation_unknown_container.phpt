@@ -1,7 +1,12 @@
 ===description===
 Regression: @var annotation should narrow variable type even when RHS is from an unknown/mixed source
 ===config===
-suppress=MixedAssignment,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class UserRepository {

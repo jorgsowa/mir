@@ -3,7 +3,9 @@ FP-C: substr_replace returns string|array in stubs. When $string is a scalar
 string, the return is always string. Strip the array case so callers don't
 get InvalidReturnType or NullableReturnStatement.
 ===config===
-php_version=8.2
+<mir>
+  <phpVersion>8.2</phpVersion>
+</mir>
 ===file===
 <?php
 

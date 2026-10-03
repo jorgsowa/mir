@@ -1,7 +1,9 @@
 ===description===
 A get-only hook parent still requires the child type to be a subtype of the parent's.
 ===config===
-php_version=8.4
+<mir>
+  <phpVersion>8.4</phpVersion>
+</mir>
 ===file===
 <?php
 abstract class Id {

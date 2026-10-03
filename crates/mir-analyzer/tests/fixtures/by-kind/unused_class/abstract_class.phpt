@@ -3,7 +3,9 @@ UnusedClass does NOT fire for abstract classes — only final non-abstract class
 are checked, since abstract classes can be referenced via type hints or inheritance
 in ways the reference tracker may not capture.
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 /** @psalm-internal */

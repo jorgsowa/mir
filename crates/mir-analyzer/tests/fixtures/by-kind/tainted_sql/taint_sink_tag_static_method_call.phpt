@@ -3,7 +3,12 @@
 instance ($obj->method()) calls checked taint_sink_params, never a static
 method call reached via an explicit class name.
 ===config===
-suppress=MixedArrayAccess,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Db {

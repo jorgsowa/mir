@@ -3,7 +3,13 @@ array_filter strips the non-empty guarantee and the list re-indexing guarantee:
 filtering can remove all entries (→ possibly-empty) and leaves gaps in integer keys
 (→ plain array, not list). Key and value types from the source are preserved.
 ===config===
-suppress=UnusedVariable,UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

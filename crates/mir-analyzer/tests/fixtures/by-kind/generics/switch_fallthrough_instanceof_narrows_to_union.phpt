@@ -6,7 +6,11 @@ the last label's class (B). Each case started narrowing from a fresh branch
 of the pre-switch state, discarding the earlier fallen-through label's
 narrowing entirely.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Foo {}

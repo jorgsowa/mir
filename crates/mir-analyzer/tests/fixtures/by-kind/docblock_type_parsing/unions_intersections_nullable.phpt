@@ -2,7 +2,13 @@
 Union (`A|B|C`), pure intersection (`A&B`), nullable shorthand (`?T`), and
 parenthesized combinations (`(A&B)|null`).
 ===config===
-suppress=MissingReturnType,MissingParamType,ForbiddenCode
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+    <ForbiddenCode errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Alpha {}

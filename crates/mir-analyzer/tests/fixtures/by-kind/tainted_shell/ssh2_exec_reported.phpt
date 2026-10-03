@@ -1,7 +1,13 @@
 ===description===
 `ssh2_exec()` runs a remote command and is a shell sink.
 ===config===
-suppress=MixedArgument,MixedArrayAccess,MissingParamType
+<mir>
+  <issueHandlers>
+    <MixedArgument errorLevel="suppress"/>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MissingParamType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test($conn): void {

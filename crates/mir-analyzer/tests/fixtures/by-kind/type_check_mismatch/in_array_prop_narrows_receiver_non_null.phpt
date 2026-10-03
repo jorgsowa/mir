@@ -5,7 +5,13 @@ property (the haystack never contains a literal null element), and a
 loose match only can when the haystack contains a falsy literal (0, "",
 "0"), which the fix excludes.
 ===config===
-suppress=UnusedVariable,PossiblyNullPropertyFetch,MissingPropertyType
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <PossiblyNullPropertyFetch errorLevel="suppress"/>
+    <MissingPropertyType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Box {

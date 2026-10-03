@@ -1,7 +1,9 @@
 ===description===
 a function used only as a bare string argument to Closure::fromCallable must not be reported unused
 ===config===
-suppress=
+<mir>
+  <findUnusedCode>true</findUnusedCode>
+</mir>
 ===file===
 <?php
 function helper(): void {}

@@ -3,7 +3,11 @@ NoInterfaceProperties fires on a property write through a plain interface type
 without @seal-properties too — the write-side check (expr/assignment.rs) mirrors
 the read-side one.
 ===config===
-suppress=MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 interface Shape {

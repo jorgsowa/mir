@@ -2,7 +2,12 @@
 count()/strlen() comparisons that prove length === 0 narrow arrays/strings
 to their empty variants, symmetric with the non-empty direction.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

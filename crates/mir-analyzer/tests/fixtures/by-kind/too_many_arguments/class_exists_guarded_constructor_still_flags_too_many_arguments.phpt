@@ -4,7 +4,11 @@ constructor-arity check for new in the guarded branch: the guard is true
 in the snapshot's own environment, so the branch is live and the
 no-arg snapshot constructor is authoritative.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class NewApi {}

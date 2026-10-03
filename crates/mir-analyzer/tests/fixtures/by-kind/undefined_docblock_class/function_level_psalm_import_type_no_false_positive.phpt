@@ -1,7 +1,11 @@
 ===description===
 @psalm-import-type on a standalone function imports a class-level alias without false positives
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 namespace App;

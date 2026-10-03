@@ -1,7 +1,12 @@
 ===description===
 in_array false-branch narrows a finite literal-union needle by removing matched values from the union.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

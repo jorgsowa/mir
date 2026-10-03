@@ -2,7 +2,12 @@
 Inside a function body, a parameter annotated @param int-mask<1, 2, 4> is
 inferred as the full literal-int union 0|1|2|3|4|5|6|7.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

@@ -1,7 +1,9 @@
 ===description===
 cross file removed 7 2 class constant accessible via interface
 ===config===
-php_version=7.2
+<mir>
+  <phpVersion>7.2</phpVersion>
+</mir>
 ===file:DateHelper.php===
 <?php
 function get_atom_format(): void {

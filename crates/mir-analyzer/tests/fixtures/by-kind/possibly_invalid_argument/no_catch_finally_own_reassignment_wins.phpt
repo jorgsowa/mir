@@ -6,7 +6,12 @@ plain string) rather than json_encode()'s pre-finally type (string|false)
 or the exception-can-happen-anywhere merge — so passing $str to a
 strict `string` parameter afterward must not flag PossiblyInvalidArgument.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function needsString(string $s): void {}

@@ -6,7 +6,11 @@ required params than an optional-trailing-param marker implies; mir previously f
 as InvalidArgument by comparing against only the non-`=` param count instead of the full
 declared signature.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param Closure(mixed, array=, string=):mixed $cb */

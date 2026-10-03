@@ -3,7 +3,9 @@ FP-I: `use Foo as Bar` alias not resolved for override checks. A class that
 extends an aliased parent and marks a method with #[\Override] must not emit
 InvalidOverride when the method exists on the aliased parent.
 ===config===
-php_version=8.3
+<mir>
+  <phpVersion>8.3</phpVersion>
+</mir>
 ===file:base.php===
 <?php
 

@@ -5,7 +5,12 @@ array-key notice) is an extremely common defensive idiom, but
 untainted catch-all — the `@` operator only silences a notice, it
 doesn't sanitize the value.
 ===config===
-suppress=MixedArrayAccess,MixedAssignment
+<mir>
+  <issueHandlers>
+    <MixedArrayAccess errorLevel="suppress"/>
+    <MixedAssignment errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 function test(): void {

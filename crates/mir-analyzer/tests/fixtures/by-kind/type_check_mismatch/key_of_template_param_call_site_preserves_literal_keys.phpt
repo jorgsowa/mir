@@ -1,7 +1,12 @@
 ===description===
 `key-of<T>` preserves caller-inferred literal keys through template calls.
 ===config===
-suppress=UnusedParam,UnusedForeachValue
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

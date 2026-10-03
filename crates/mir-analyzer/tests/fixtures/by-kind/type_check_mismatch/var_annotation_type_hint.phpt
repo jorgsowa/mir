@@ -1,7 +1,12 @@
 ===description===
 Regression: @var ClassName $var docblock annotation should narrow variable type after assignment
 ===config===
-suppress=MixedAssignment,UnusedParam
+<mir>
+  <issueHandlers>
+    <MixedAssignment errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class UserRepository {

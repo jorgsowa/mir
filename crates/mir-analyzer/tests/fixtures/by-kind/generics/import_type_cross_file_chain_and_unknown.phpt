@@ -2,7 +2,12 @@
 Imports chain through intermediate classes (A from B, B from C), mutual
 imports don't loop, and an alias the source lacks degrades to mixed.
 ===config===
-suppress=UnusedParam,UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file:c.php===
 <?php
 namespace N;

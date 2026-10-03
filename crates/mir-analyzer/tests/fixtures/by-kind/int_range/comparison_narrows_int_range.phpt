@@ -2,7 +2,12 @@
 Comparison operators intersect with an existing int<a, b> range.
 `$x >= 3` on `int<0, 10>` narrows to `int<3, 10>`.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int<0, 10> $x */

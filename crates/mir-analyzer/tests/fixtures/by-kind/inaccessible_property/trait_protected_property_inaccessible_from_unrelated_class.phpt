@@ -3,7 +3,11 @@ Negative control for the K1 trait-composition fix: a protected trait
 property must still be denied to a wholly unrelated class that neither
 uses the trait nor extends a class that does.
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

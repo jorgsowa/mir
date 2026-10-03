@@ -3,7 +3,12 @@ $arr == [] / != [] narrow array emptiness just like the strict === []/
 !== [] case — loose array equality requires identical key/value pairs, so
 it's exactly as sound.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 

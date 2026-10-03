@@ -6,7 +6,11 @@ site, so passing a plain `Base` (not a `Sub`) violates the bound — even
 though `Base` satisfies `T of static` when called through a `Base`
 instance directly (see the companion `does_not_report_*` fixture).
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Base {

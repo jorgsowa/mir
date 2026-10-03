@@ -1,7 +1,11 @@
 ===description===
 `method_exists()` suppresses undefined methods for guarded class-string callables.
 ===config===
-suppress=MissingReturnType
+<mir>
+  <issueHandlers>
+    <MissingReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Other {}

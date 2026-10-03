@@ -8,7 +8,11 @@ half of the union — so a later `$x !== null` check was wrongly reported as alw
 true. Fixed by letting the scan continue across a depth-0 whitespace that borders a
 `|`/`&` (on either side), not just stop at the first non-`$name` token.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {

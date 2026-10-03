@@ -6,7 +6,11 @@ internally even though the raw atom has no literal `TNull` — the check
 must stay silent rather than treating every alias as a nullability
 contradiction.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

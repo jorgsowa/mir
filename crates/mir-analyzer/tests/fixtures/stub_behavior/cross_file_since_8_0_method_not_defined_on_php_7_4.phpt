@@ -1,7 +1,9 @@
 ===description===
 cross file since 8 0 method not defined on php 7 4
 ===config===
-php_version=7.4
+<mir>
+  <phpVersion>7.4</phpVersion>
+</mir>
 ===file:DateHelper.php===
 <?php
 function from_interface(\DateTimeInterface $dt): void {

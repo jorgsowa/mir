@@ -3,7 +3,12 @@ A closure with a variadic parameter satisfies callable(string, int):void — the
 variadic flag prevents it from being counted as an extra required parameter, so
 no InvalidArgument is emitted.
 ===config===
-suppress=UnusedParam,MissingClosureReturnType
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+    <MissingClosureReturnType errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param callable(string, int):void $c */

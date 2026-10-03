@@ -5,7 +5,12 @@ a bare `string` to `non-empty-string`, both as a direct guard and via
 covering the leaked-atom shape that surfaces as PossiblyInvalidArgument on a
 real `int|non-empty-string`-typed callee.
 ===config===
-suppress=UnusedVariable,UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /** @param int|non-empty-string $key */

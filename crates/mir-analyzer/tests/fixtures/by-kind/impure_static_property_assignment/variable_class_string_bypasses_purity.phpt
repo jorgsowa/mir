@@ -5,7 +5,11 @@ purity/readonly check entirely — `resolve_static_prop_target` only
 matched a literal class-name `Identifier`, never a variable holding a
 resolved class-string type.
 ===config===
-suppress=UnusedParam
+<mir>
+  <issueHandlers>
+    <UnusedParam errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Registry {

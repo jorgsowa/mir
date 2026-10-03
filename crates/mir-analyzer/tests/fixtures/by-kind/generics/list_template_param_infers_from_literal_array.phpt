@@ -3,7 +3,11 @@ G1: a `list<T>` docblock param must bind T from a literal array argument
 (which types as a list-shaped TKeyedArray, not TList) and, symmetrically, an
 `array<K,V>` param must bind K/V from a genuine list-typed argument.
 ===config===
-suppress=UnusedVariable
+<mir>
+  <issueHandlers>
+    <UnusedVariable errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 /**

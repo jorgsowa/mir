@@ -3,7 +3,11 @@ is_a($obj->prop, X::class, true)'s allow_string branch must not collapse
 an unrelated-but-still-valid property type to empty; mark_diverges=false
 means "leave untouched", not "narrow to bottom".
 ===config===
-suppress=MissingConstructor
+<mir>
+  <issueHandlers>
+    <MissingConstructor errorLevel="suppress"/>
+  </issueHandlers>
+</mir>
 ===file===
 <?php
 class Foo {}
