@@ -108,11 +108,14 @@ impl<'a> DefinitionCollector<'a> {
                             .map(|tp| {
                                 // Template-aware: `T1` in `@extends Base<T1>` is
                                 // this interface's own template param, not a class.
-                                self.resolve_union_doc_with_templates(
-                                    super::expand_aliases_only(tp.clone(), &type_aliases),
-                                    &iface_template_names,
+                                Self::fill_self_static_parent(
+                                    self.resolve_union_doc_with_templates(
+                                        super::expand_aliases_only(tp.clone(), &type_aliases),
+                                        &iface_template_names,
+                                        &fqcn,
+                                        &iface_template_params,
+                                    ),
                                     &fqcn,
-                                    &iface_template_params,
                                 )
                             })
                             .collect(),

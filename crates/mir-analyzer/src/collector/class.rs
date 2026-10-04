@@ -538,11 +538,14 @@ impl<'a> DefinitionCollector<'a> {
                         type_params
                             .iter()
                             .map(|tp| {
-                                self.resolve_union_doc_with_templates(
-                                    super::expand_aliases_only(tp.clone(), &type_aliases),
-                                    &class_template_names,
+                                Self::fill_self_static_parent(
+                                    self.resolve_union_doc_with_templates(
+                                        super::expand_aliases_only(tp.clone(), &type_aliases),
+                                        &class_template_names,
+                                        &fqcn,
+                                        &template_params,
+                                    ),
                                     &fqcn,
-                                    &template_params,
                                 )
                             })
                             .collect(),
@@ -567,11 +570,14 @@ impl<'a> DefinitionCollector<'a> {
                         type_params
                             .iter()
                             .map(|tp| {
-                                self.resolve_union_doc_with_templates(
-                                    super::expand_aliases_only(tp.clone(), &type_aliases),
-                                    &class_template_names,
+                                Self::fill_self_static_parent(
+                                    self.resolve_union_doc_with_templates(
+                                        super::expand_aliases_only(tp.clone(), &type_aliases),
+                                        &class_template_names,
+                                        &fqcn,
+                                        &template_params,
+                                    ),
                                     &fqcn,
-                                    &template_params,
                                 )
                             })
                             .collect(),
@@ -596,11 +602,14 @@ impl<'a> DefinitionCollector<'a> {
                         type_params
                             .iter()
                             .map(|tp| {
-                                self.resolve_union_doc_with_templates(
-                                    super::expand_aliases_only(tp.clone(), &type_aliases),
-                                    &class_template_names,
+                                Self::fill_self_static_parent(
+                                    self.resolve_union_doc_with_templates(
+                                        super::expand_aliases_only(tp.clone(), &type_aliases),
+                                        &class_template_names,
+                                        &fqcn,
+                                        &template_params,
+                                    ),
                                     &fqcn,
-                                    &template_params,
                                 )
                             })
                             .collect(),
