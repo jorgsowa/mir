@@ -5,6 +5,21 @@ use mir_types::{Atomic, Type};
 use php_ast::owned::{ArrayAccessExpr, ArrayElement, Expr, ExprKind};
 use std::sync::Arc;
 
+/// A read of a key the shape doesn't list: an open shape may hold anything there.
+fn merge_unknown_key_read(
+    result: &mut Type,
+    properties: &indexmap::IndexMap<mir_types::atomic::ArrayKey, mir_types::atomic::KeyedProperty>,
+    is_open: bool,
+) {
+    if is_open {
+        result.merge_with(&Type::mixed());
+    } else {
+        for prop in properties.values() {
+            result.merge_with(&prop.ty);
+        }
+    }
+}
+
 /// For a spread (`...`) element in an array literal, return the union of key types
 /// across all array atomics. Mirrors [`crate::call::spread_element_type`], which does
 /// the same for value types. E.g. `array<string, int>` → `string`, `list<int>` → `int`.
@@ -22,6 +37,7 @@ fn spread_key_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
             Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => {
                 result.add_type(Atomic::TInt);
             }
+            Atomic::TKeyedArray { is_open: true, .. } => return Type::mixed(),
             Atomic::TKeyedArray { properties, .. } => {
                 // Widen to the base scalar type, same as the `Int` arm just
                 // above — a spread's key domain is "any key this array has",
@@ -794,9 +810,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                         return Type::mixed();
                     } else {
-                        for prop in properties.values() {
-                            result.merge_with(&prop.ty);
-                        }
+                        merge_unknown_key_read(&mut result, properties, *is_open);
                     }
                 }
                 return if result.types.is_empty() {
@@ -854,14 +868,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                             return Type::mixed();
                         } else {
-                            for prop in properties.values() {
-                                result.merge_with(&prop.ty);
-                            }
+                            merge_unknown_key_read(&mut result, properties, *is_open);
                         }
                     } else {
-                        for prop in properties.values() {
-                            result.merge_with(&prop.ty);
-                        }
+                        merge_unknown_key_read(&mut result, properties, *is_open);
                     }
                 }
                 Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {

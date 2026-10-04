@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An open shape (a bare `array` after a literal-key write, or a `...` docblock shape) now yields `mixed` for unlisted keys, iteration, `array_values` and spreads instead of the union of its known values, removing false `ImpossibleIdenticalComparison`, `InvalidArgument`, `InvalidOperand` and `InvalidReturnType`.
 - A closure with a native `: int`/`: string` return now keeps a narrower body-inferred type (`positive-int`, `non-empty-string`, int ranges), removing false `InvalidArgument` against `Closure(): positive-int` and similar under strict types. Literal returns widen to their sign / non-emptiness class.
 - Returning a shape that nests `class-string<Sub>` or subclass objects inside another shape (`array<string, array{Throwable, class-string<Throwable>}>`) no longer reports a false `InvalidReturnType`.
 - `preg_match()` with a literal pattern containing named groups now types `$matches` as a shape keyed by group name and number, removing a false `InvalidReturnType` when it is returned as `array{name: string, ...}`.

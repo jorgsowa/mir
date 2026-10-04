@@ -41,6 +41,7 @@ class A {
         /** @var array<string, int> $x */
         $o = ['un_c' => 3] + $x;
         return $o['un_c'] + $o['anything'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
     }
 }
 

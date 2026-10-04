@@ -101,6 +101,7 @@ pub fn spread_element_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Ty
                     result.add_type(t.clone());
                 }
             }
+            Atomic::TKeyedArray { is_open: true, .. } => return Type::mixed(),
             Atomic::TKeyedArray { properties, .. } => {
                 for (_key, prop) in properties.iter() {
                     for t in prop.ty.types.iter() {

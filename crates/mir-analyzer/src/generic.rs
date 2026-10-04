@@ -778,7 +778,11 @@ fn infer_from_pair(
                             );
                             infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
-                        Atomic::TKeyedArray { properties, .. } => {
+                        Atomic::TKeyedArray {
+                            properties,
+                            is_open,
+                            ..
+                        } => {
                             let mut key_union = Type::empty();
                             let mut val_union = Type::empty();
                             for (k, prop) in properties.iter() {
@@ -788,6 +792,11 @@ fn infer_from_pair(
                                 };
                                 key_union.add_type(key_atomic);
                                 val_union.merge_with(&prop.ty);
+                            }
+                            // An open shape may hold any other entry.
+                            if *is_open {
+                                key_union.merge_with(&Type::mixed());
+                                val_union.merge_with(&Type::mixed());
                             }
                             if !key_union.types.is_empty() {
                                 infer_from_pair(
@@ -834,7 +843,11 @@ fn infer_from_pair(
                             );
                             infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
-                        Atomic::TKeyedArray { properties, .. } => {
+                        Atomic::TKeyedArray {
+                            properties,
+                            is_open,
+                            ..
+                        } => {
                             let mut key_union = Type::empty();
                             let mut val_union = Type::empty();
                             for (k, prop) in properties.iter() {
@@ -844,6 +857,11 @@ fn infer_from_pair(
                                 };
                                 key_union.add_type(key_atomic);
                                 val_union.merge_with(&prop.ty);
+                            }
+                            // An open shape may hold any other entry.
+                            if *is_open {
+                                key_union.merge_with(&Type::mixed());
+                                val_union.merge_with(&Type::mixed());
                             }
                             if !key_union.types.is_empty() {
                                 infer_from_pair(

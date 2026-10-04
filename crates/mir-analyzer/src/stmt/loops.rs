@@ -181,6 +181,7 @@ pub(crate) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
                 keys.merge_with(&Type::single(Atomic::TInt));
                 values.merge_with(value);
             }
+            Atomic::TKeyedArray { is_open: true, .. } => return (Type::mixed(), Type::mixed()),
             Atomic::TKeyedArray { properties, .. } => {
                 matched = true;
                 for (k, prop) in properties.iter() {
