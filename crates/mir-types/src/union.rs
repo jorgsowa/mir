@@ -1362,6 +1362,18 @@ impl Type {
             .all(|a| other.types.iter().any(|b| atomic_subtype(a, b)))
     }
 
+    /// Like `is_subtype_structural`, but a template atom is judged by its bound
+    /// (an unbound one is `mixed` and fits anything).
+    pub fn is_subtype_by_template_bounds(&self, other: &Type) -> bool {
+        self.is_subtype_structural(other)
+            || self.types.iter().all(|a| match a {
+                Atomic::TTemplateParam { as_type, .. } => {
+                    as_type.is_subtype_by_template_bounds(other)
+                }
+                _ => other.accepts_atomic_structural(a),
+            })
+    }
+
     /// `sub <: self`, structurally, for a single atomic — equivalent to
     /// `Type::single(sub.clone()).is_subtype_structural(self)` without the
     /// clone and the temporary single-atomic union.
@@ -2237,7 +2249,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                                     | Atomic::TTemplateParam { .. }
                             )
                         });
-                        has_named_obj || sub_prop.ty.is_subtype_structural(&sup_prop.ty)
+                        has_named_obj || sub_prop.ty.is_subtype_by_template_bounds(&sup_prop.ty)
                     }
                     None => sup_prop.optional || *sub_open,
                 });
@@ -2281,7 +2293,8 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                                                 | Atomic::TTemplateParam { .. }
                                         )
                                     });
-                                    has_named_obj || sub_prop.ty.is_subtype_structural(&sup_prop.ty)
+                                    has_named_obj
+                                        || sub_prop.ty.is_subtype_by_template_bounds(&sup_prop.ty)
                                 }
                                 None => *is_open || sup_prop.optional,
                             });

@@ -1253,6 +1253,10 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                     _ => *is_open,
                 });
             }
+            // A nested template is judged by its bound: an unbound one is `mixed` and fits anything.
+            Atomic::TTemplateParam { as_type, .. } => {
+                return union_compatible(as_type, param_ty, ea)
+            }
             // class-string<Child> fits class-string<Parent>, including inside shapes/lists.
             Atomic::TClassString(Some(_)) | Atomic::TInterfaceString(Some(_)) => {
                 let single = Type::single(av.clone());

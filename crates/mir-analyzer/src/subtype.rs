@@ -181,6 +181,16 @@ pub(crate) fn named_object_type_params_ok(
         )
 }
 
+/// `is_subtype`, but a template atom is judged by its bound (an unbound one is `mixed`).
+fn shape_value_fits(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
+    is_subtype(db, sub, sup)
+        || (sub.contains(|a| matches!(a, Atomic::TTemplateParam { .. }))
+            && sub.types.iter().all(|a| match a {
+                Atomic::TTemplateParam { as_type, .. } => shape_value_fits(db, as_type, sup),
+                _ => is_subtype(db, &Type::single(a.clone()), sup),
+            }))
+}
+
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
 /// class-hierarchy graph (`extends` / `implements`) on top of structural
 /// matches.
@@ -314,7 +324,7 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                                                 )
                                             });
                                             has_named_obj
-                                                || is_subtype(db, &sub_prop.ty, &sup_prop.ty)
+                                                || shape_value_fits(db, &sub_prop.ty, &sup_prop.ty)
                                         }
                                         None => *is_open || sup_prop.optional,
                                     });
