@@ -370,6 +370,10 @@ const CLASS_ABSTRACT = 64;
 const CLASS_ANONYMOUS = 4;
 /** Marks a `ast\AST_CLASS` (class-like declaration) as being final */
 const CLASS_FINAL = 32;
+/** Marks a `ast\AST_CLASS` (class-like declaration) as being an enum */
+const CLASS_ENUM = 268435456;
+/** Marks a `ast\AST_CLASS` (class-like declaration) as being readonly */
+const CLASS_READONLY = 65536;
 /** Marks a `ast\AST_CLASS` (class-like declaration) as being an interface */
 const CLASS_INTERFACE = 1;
 /** Marks a `ast\AST_CLASS` (class-like declaration) as being a trait */
