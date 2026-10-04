@@ -508,7 +508,7 @@ impl CallAnalyzer {
                     super::callback_param_hints(ea, params.get(arg_index)?, bindings)
                 });
             }
-            let ty = ea.analyze(value, ctx);
+            let ty = ea.analyze_arg(value, ctx);
             ea.callback_param_hints = None;
             super::consume_arg_assignment(value, ctx);
             if arg.unpack && call.args.len() == 1 {

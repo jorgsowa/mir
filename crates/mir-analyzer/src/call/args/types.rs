@@ -926,7 +926,6 @@ fn generic_type_params_compatible(
             .unwrap_or(mir_types::Variance::Invariant);
 
         let compatible = static_arg_fits_param(arg_p, param_p, ea)
-            || crate::subtype::bare_enum_fits_single_case(ea.db, arg_p, param_p)
             || match variance {
                 mir_types::Variance::Covariant => {
                     scalar_arg_fits_param(arg_p, param_p)
@@ -943,6 +942,7 @@ fn generic_type_params_compatible(
                 mir_types::Variance::Invariant => {
                     arg_p == param_p
                         || arg_p.is_never()
+                        || crate::subtype::single_case_fits_bare_enum(arg_p, param_p)
                         || arg_p.is_mixed()
                         || param_p.is_mixed()
                         || (scalar_arg_fits_param(arg_p, param_p)

@@ -350,6 +350,34 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
     }
 
+    /// `analyze` for a call argument: `Enum::Case` keeps its case so template inference binds the
+    /// case, not the whole enum.
+    pub(crate) fn analyze_arg(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
+        let ty = self.analyze(expr, ctx);
+        let ExprKind::ClassConstAccess(cca) = &expr.kind else {
+            return ty;
+        };
+        let (ExprKind::Identifier(case), [Atomic::TNamedObject { fqcn, type_params }]) =
+            (&cca.member.kind, ty.types.as_slice())
+        else {
+            return ty;
+        };
+        if !type_params.is_empty() {
+            return ty;
+        }
+        let is_case = matches!(
+            crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn)),
+            Some(crate::db::ClassLike::Enum(e)) if e.cases.contains_key(case.as_ref())
+        );
+        if !is_case {
+            return ty;
+        }
+        Type::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: *fqcn,
+            case_name: case.as_ref().into(),
+        })
+    }
+
     pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
         let ty = crate::recursion::ensure_stack(|| self.analyze_inner(expr, ctx));
         if let Some(plugins) = self.plugins.clone() {

@@ -292,7 +292,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 arg_types.push(Type::mixed());
                 continue;
             };
-            let ty = self.analyze(value, ctx);
+            let ty = self.analyze_arg(value, ctx);
             crate::call::consume_arg_assignment(value, ctx);
             if a.unpack {
                 if n.args.len() == 1 {

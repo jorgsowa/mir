@@ -241,27 +241,27 @@ fn return_type_params_compatible(
             .map(|tp| tp.variance)
             .unwrap_or(mir_types::Variance::Invariant);
 
-        let compatible = crate::subtype::bare_enum_fits_single_case(db, actual_p, declared_p)
-            || match variance {
-                mir_types::Variance::Covariant => {
-                    crate::subtype::is_subtype(db, actual_p, declared_p)
-                        || declared_p.is_mixed()
-                        || actual_p.is_mixed()
-                }
-                mir_types::Variance::Contravariant => {
-                    crate::subtype::is_subtype(db, declared_p, actual_p)
-                        || actual_p.is_mixed()
-                        || declared_p.is_mixed()
-                }
-                mir_types::Variance::Invariant => {
-                    actual_p == declared_p
-                        || actual_p.is_never()
-                        || actual_p.is_mixed()
-                        || declared_p.is_mixed()
-                        || (crate::subtype::is_subtype(db, actual_p, declared_p)
-                            && crate::subtype::is_subtype(db, declared_p, actual_p))
-                }
-            };
+        let compatible = match variance {
+            mir_types::Variance::Covariant => {
+                crate::subtype::is_subtype(db, actual_p, declared_p)
+                    || declared_p.is_mixed()
+                    || actual_p.is_mixed()
+            }
+            mir_types::Variance::Contravariant => {
+                crate::subtype::is_subtype(db, declared_p, actual_p)
+                    || actual_p.is_mixed()
+                    || declared_p.is_mixed()
+            }
+            mir_types::Variance::Invariant => {
+                actual_p == declared_p
+                    || actual_p.is_never()
+                    || crate::subtype::single_case_fits_bare_enum(actual_p, declared_p)
+                    || actual_p.is_mixed()
+                    || declared_p.is_mixed()
+                    || (crate::subtype::is_subtype(db, actual_p, declared_p)
+                        && crate::subtype::is_subtype(db, declared_p, actual_p))
+            }
+        };
 
         if !compatible {
             return false;

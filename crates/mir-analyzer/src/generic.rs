@@ -958,12 +958,15 @@ fn infer_from_pair(
                         .merge_with(bind);
                     continue;
                 }
+                let no_params = empty_type_params();
                 for a_atomic in &arg_ty.types {
-                    if let Atomic::TNamedObject {
-                        fqcn: afqcn,
-                        type_params: ap,
-                    } = a_atomic
-                    {
+                    // An enum case matches through its enum's `@implements` chain.
+                    let arg_class = match a_atomic {
+                        Atomic::TNamedObject { fqcn, type_params } => Some((fqcn, type_params)),
+                        Atomic::TLiteralEnumCase { enum_fqcn, .. } => Some((enum_fqcn, &no_params)),
+                        _ => None,
+                    };
+                    if let Some((afqcn, ap)) = arg_class {
                         if pfqcn == afqcn {
                             for (p_param, a_param) in pp.iter().zip(ap.iter()) {
                                 infer_from_pair(

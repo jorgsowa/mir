@@ -382,10 +382,10 @@ impl CallAnalyzer {
             let ty = if i == 0 {
                 match &bind_scope {
                     Some(scope) => analyze_with_scope_override(ea, value, ctx, scope),
-                    None => ea.analyze(value, ctx),
+                    None => ea.analyze_arg(value, ctx),
                 }
             } else {
-                ea.analyze(value, ctx)
+                ea.analyze_arg(value, ctx)
             };
             super::consume_arg_assignment(value, ctx);
             if arg.unpack {

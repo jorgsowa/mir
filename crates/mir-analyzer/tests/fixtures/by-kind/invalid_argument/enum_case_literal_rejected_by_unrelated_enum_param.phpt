@@ -25,6 +25,6 @@ function needsSuit(Suit $suit): void {}
 
 function test(): void {
     needsSuit(RoundingMode::Unnecessary);
-//            ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $suit of needsSuit() expects 'Suit', got 'RoundingMode'
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $suit of needsSuit() expects 'Suit', got 'RoundingMode::Unnecessary'
 }
 ===expect===

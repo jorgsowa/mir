@@ -152,7 +152,7 @@ impl CallAnalyzer {
                         inner_arg_types.push(Type::mixed());
                         continue;
                     };
-                    let ty = ea.analyze(value, ctx);
+                    let ty = ea.analyze_arg(value, ctx);
                     super::consume_arg_assignment(value, ctx);
                     if arg.unpack {
                         if call.args.len() == 1 {
@@ -503,7 +503,7 @@ impl CallAnalyzer {
                 arg_types.push(Type::mixed());
                 continue;
             };
-            let ty = ea.analyze(value, ctx);
+            let ty = ea.analyze_arg(value, ctx);
             super::consume_arg_assignment(value, ctx);
             if arg.unpack {
                 if call.args.len() == 1 {
