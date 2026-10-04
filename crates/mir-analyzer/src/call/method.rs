@@ -50,11 +50,13 @@ fn receiver_class_bindings(
         // Inherited method: the owner's template scope wins.
         bindings.extend(inherited_bindings);
         // Same-named templates of unrelated ancestors must not shadow the scope class's.
-        if let Some(scoped) =
-            crate::db::template_bindings_for_ancestor(db, fqcn, &receiver_bindings, template_scope)
-        {
-            bindings.extend(scoped);
-        }
+        crate::db::rebind_scope_templates(
+            db,
+            fqcn,
+            &receiver_bindings,
+            template_scope,
+            &mut bindings,
+        );
     }
     bindings
 }

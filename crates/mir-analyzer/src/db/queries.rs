@@ -402,43 +402,95 @@ pub fn template_bindings_for_ancestor(
     own_bindings: &FxHashMap<Name, Type>,
     target: &str,
 ) -> Option<FxHashMap<Name, Type>> {
+    ancestor_path_bindings(db, fqcn, own_bindings, target, false)
+}
+
+/// Rebinds `scope`'s own templates in `bindings` along the path from `fqcn` to
+/// `scope`, so a same-named template of an unrelated ancestor can't shadow them.
+/// A path made only of bare edges leaves `scope`'s templates unbound.
+pub fn rebind_scope_templates(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    own_bindings: &FxHashMap<Name, Type>,
+    scope: &str,
+    bindings: &mut FxHashMap<Name, Type>,
+) {
+    if let Some(scoped) = template_bindings_for_ancestor(db, fqcn, own_bindings, scope) {
+        bindings.extend(scoped);
+    } else if let Some(scoped) = ancestor_path_bindings(db, fqcn, own_bindings, scope, true) {
+        for tp in class_template_params(db, scope)
+            .iter()
+            .flat_map(|tps| tps.iter())
+        {
+            bindings.remove(&tp.name);
+        }
+        bindings.extend(scoped);
+    }
+}
+
+fn ancestor_path_bindings(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    own_bindings: &FxHashMap<Name, Type>,
+    target: &str,
+    allow_bare: bool,
+) -> Option<FxHashMap<Name, Type>> {
     fn walk(
         db: &dyn MirDatabase,
         current: &str,
         substitution: &FxHashMap<Name, Type>,
         target: &str,
+        allow_bare: bool,
         path: &mut Vec<Arc<str>>,
     ) -> Option<FxHashMap<Name, Type>> {
         let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, current))?;
-        let typed = class
+        let mut edges = class
             .implements_type_args()
             .iter()
             .chain(class.interface_extends_type_args())
-            .map(|(iface, args)| (iface, args.as_slice()))
+            .map(|(iface, args)| (iface.clone(), args.as_slice()))
             .chain(
                 class
                     .parent()
                     .filter(|_| !class.extends_type_args().is_empty())
-                    .map(|p| (p, class.extends_type_args())),
+                    .map(|p| (p.clone(), class.extends_type_args())),
             )
             .collect::<Vec<_>>();
-        for (next, args) in typed {
-            if path.contains(next) {
+        if allow_bare {
+            let bare = class
+                .interfaces()
+                .iter()
+                .chain(class.extends())
+                .chain(class.parent())
+                .filter(|next| !edges.iter().any(|(typed, _)| typed == *next))
+                .map(|next| (next.clone(), &[][..]))
+                .collect::<Vec<_>>();
+            edges.extend(bare);
+        }
+        for (next, args) in edges {
+            if path.contains(&next) {
                 continue;
             }
             let next_subst: FxHashMap<Name, Type> = class_template_params(db, next.as_ref())
                 .map(|tps| {
-                    tps.iter()
-                        .zip(args)
-                        .map(|(tp, ty)| (tp.name, ty.substitute_templates(substitution)))
-                        .collect()
+                    if args.is_empty() {
+                        // Bare edge: templates inherited through a pass-through class keep their binding by name.
+                        tps.iter()
+                            .filter_map(|tp| Some((tp.name, substitution.get(&tp.name)?.clone())))
+                            .collect()
+                    } else {
+                        tps.iter()
+                            .zip(args)
+                            .map(|(tp, ty)| (tp.name, ty.substitute_templates(substitution)))
+                            .collect()
+                    }
                 })
                 .unwrap_or_default();
             if next.as_ref() == target {
                 return Some(next_subst);
             }
             path.push(next.clone());
-            let found = walk(db, next, &next_subst, target, path);
+            let found = walk(db, &next, &next_subst, target, allow_bare, path);
             path.pop();
             if found.is_some() {
                 return found;
@@ -446,7 +498,14 @@ pub fn template_bindings_for_ancestor(
         }
         None
     }
-    walk(db, fqcn, own_bindings, target, &mut vec![Arc::from(fqcn)])
+    walk(
+        db,
+        fqcn,
+        own_bindings,
+        target,
+        allow_bare,
+        &mut vec![Arc::from(fqcn)],
+    )
 }
 
 pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
