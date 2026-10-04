@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `strlen(...)`-style first-class callables of an unqualified global function inside a namespace now resolve to that function's signature instead of a bare `Closure`, so template and return types flow through.
 - A closure or callable parameter type no longer widens a template another argument already bound (a `?string` closure parameter against `array<string, V>`), removing false `InvalidTemplateParam`.
 - `ast\flags\CLASS_ENUM` and `CLASS_READONLY` resolve instead of reporting `UndefinedConstant`.
 - `str_replace` accepts scalar, `Stringable` and `null` elements in an array `$replace`, as PHP casts them, removing false `InvalidArgument`.

@@ -804,8 +804,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let resolved_fqn =
                         crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
                     let db = self.db;
-                    let here = crate::db::Fqcn::from_str(db, &resolved_fqn);
-                    if let Some(f) = crate::db::find_function(db, here) {
+                    let lookup =
+                        |n: &str| crate::db::find_function(db, crate::db::Fqcn::from_str(db, n));
+                    // An unqualified name falls back to the global function, as a call does.
+                    let found = lookup(&resolved_fqn)
+                        .map(|f| (resolved_fqn.clone(), f))
+                        .or_else(|| {
+                            let bare = name.as_ref();
+                            (!bare.contains('\\'))
+                                .then(|| lookup(bare).map(|f| (bare.to_string(), f)))
+                                .flatten()
+                        });
+                    if let Some((resolved_fqn, f)) = found {
                         self.record_function_ref(&f.fqn, name_expr.span);
                         if let Some((used, canonical)) =
                             crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
