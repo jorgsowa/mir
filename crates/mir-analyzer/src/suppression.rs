@@ -108,6 +108,9 @@ const ISSUE_NAME_ALIASES: &[(&str, &[&str])] = &[
         "PropertyNotSetInConstructor",
         &["PropertyPossiblyUninitialized"],
     ),
+    // Psalm reports a read of an undeclared key on a closed shape as
+    // `InvalidArrayOffset`; mir names it `NonExistentArrayOffset`.
+    ("InvalidArrayOffset", &["NonExistentArrayOffset"]),
 ];
 
 /// Mir `IssueKind` names that `name` (a third-party identifier) should also
