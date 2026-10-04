@@ -666,43 +666,60 @@ fn real_class_shadowed_by_stub(db: &dyn MirDatabase, stub: &ClassDef) -> Option<
 /// Stub members win; members only the real class declares are added.
 fn merge_stub_over_real(stub: &ClassDef, real: &ClassDef) -> ClassDef {
     let mut merged = stub.clone();
-    for (name, method) in real.own_methods.iter() {
-        merged
-            .own_methods
-            .entry(name.clone())
-            .or_insert_with(|| method.clone());
-    }
-    for (name, property) in real.own_properties.iter() {
-        merged
-            .own_properties
-            .entry(name.clone())
-            .or_insert_with(|| property.clone());
-    }
-    for (name, constant) in real.own_constants.iter() {
-        merged
-            .own_constants
-            .entry(name.clone())
-            .or_insert_with(|| constant.clone());
-    }
+    add_missing_members(&mut merged.own_methods, &real.own_methods);
+    add_missing_members(&mut merged.own_properties, &real.own_properties);
+    add_missing_members(&mut merged.own_constants, &real.own_constants);
     if merged.parent.is_none() {
         merged.parent = real.parent.clone();
     }
-    for list in [
-        (&mut merged.interfaces, &real.interfaces),
-        (&mut merged.traits, &real.traits),
-        (&mut merged.mixins, &real.mixins),
-    ] {
-        for item in list.1 {
-            if !list
-                .0
-                .iter()
-                .any(|existing| existing.eq_ignore_ascii_case(item))
-            {
-                list.0.push(item.clone());
-            }
+    add_missing_names(&mut merged.interfaces, &real.interfaces);
+    add_missing_names(&mut merged.traits, &real.traits);
+    add_missing_names(&mut merged.mixins, &real.mixins);
+    merged
+}
+
+/// [`real_class_shadowed_by_stub`] for an interface.
+fn real_interface_shadowed_by_stub(
+    db: &dyn MirDatabase,
+    stub: &InterfaceDef,
+) -> Option<Arc<InterfaceDef>> {
+    let fqcn = Fqcn::from_str(db, stub.fqcn.as_ref());
+    let real_file = resolver_file_on_demand(db, fqcn)?;
+    let key = stub.fqcn.to_ascii_lowercase();
+    let defs = collect_file_definitions(db, real_file);
+    let real = defs
+        .slice
+        .interfaces
+        .iter()
+        .find(|i| i.fqcn.to_ascii_lowercase() == key)?;
+    Some(resolve_interface_cross_file_imports(db, real.clone()))
+}
+
+/// [`merge_stub_over_real`] for an interface.
+fn merge_interface_stub_over_real(stub: &InterfaceDef, real: &InterfaceDef) -> InterfaceDef {
+    let mut merged = stub.clone();
+    add_missing_members(&mut merged.own_methods, &real.own_methods);
+    add_missing_members(&mut merged.own_properties, &real.own_properties);
+    add_missing_members(&mut merged.own_constants, &real.own_constants);
+    add_missing_names(&mut merged.extends, &real.extends);
+    merged
+}
+
+fn add_missing_members<V: Clone>(
+    into: &mut mir_codebase::definitions::MemberMap<V>,
+    from: &mir_codebase::definitions::MemberMap<V>,
+) {
+    for (name, member) in from.iter() {
+        into.entry(name.clone()).or_insert_with(|| member.clone());
+    }
+}
+
+fn add_missing_names(into: &mut Vec<Arc<str>>, from: &[Arc<str>]) {
+    for name in from {
+        if !into.iter().any(|n| n.eq_ignore_ascii_case(name)) {
+            into.push(name.clone());
         }
     }
-    merged
 }
 
 /// Alias body declared on `from_class`, read from the raw collected slice (not
@@ -878,7 +895,13 @@ pub fn interface_def_at(
 ) -> Option<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
     let def = def_at(&defs.slice.interfaces, idx)?;
-    Some(resolve_interface_cross_file_imports(db, def))
+    let def = resolve_interface_cross_file_imports(db, def);
+    if db.user_stub_source_files().contains(&file) {
+        if let Some(real) = real_interface_shadowed_by_stub(db, &def) {
+            return Some(Arc::new(merge_interface_stub_over_real(&def, &real)));
+        }
+    }
+    Some(def)
 }
 
 #[salsa::tracked]
