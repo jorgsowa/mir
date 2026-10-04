@@ -324,8 +324,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // that a spread or a non-literal key partway through only falls back
         // to the generic TArray shape below — it never re-analyzes any
         // element's value/key expression a second time.
-        let mut all_value_types = Type::empty();
-        let mut key_union = Type::empty();
+        let mut all_value_types = mir_types::UnionBuilder::new();
+        let mut key_union = mir_types::UnionBuilder::new();
         // Keys whose current `keyed_props` entry came from a spread rather
         // than an explicit literal key — a later literal key overriding one
         // of these is the common, intentional `[...$defaults, 'k' => $v]`
@@ -337,8 +337,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         for elem in elements.iter() {
             if elem.unpack {
                 let value_ty = self.analyze(&elem.value, ctx);
-                all_value_types.merge_with(&crate::call::spread_element_type(self.db, &value_ty));
-                key_union.merge_with(&spread_key_type(self.db, &value_ty));
+                all_value_types.merge(&crate::call::spread_element_type(self.db, &value_ty));
+                key_union.merge(&spread_key_type(self.db, &value_ty));
                 // A spread of a single, closed, string-keyed shape (the common
                 // `[...$defaults, ...$overrides]` config-merge idiom) can still
                 // contribute precise per-key properties instead of forcing the
@@ -389,7 +389,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // a bool/float/null key literal (or constant expression
                 // folded to one) casts the same way a real write would.
                 let key_ty = super::helpers::coerce_array_key_type(&key_ty);
-                key_union.merge_with(&key_ty);
+                key_union.merge(&key_ty);
                 match key_ty.types.as_slice() {
                     [Atomic::TLiteralString(s)] => Some(ArrayKey::String(s.clone())),
                     [Atomic::TLiteralInt(i)] => {
@@ -404,10 +404,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             } else {
                 let k = ArrayKey::Int(next_int_key);
                 next_int_key = next_int_key.saturating_add(1);
-                key_union.add_type(Atomic::TInt);
+                key_union.add(Atomic::TInt);
                 Some(k)
             };
-            all_value_types.merge_with(&value_ty);
+            all_value_types.merge(&value_ty);
 
             // Once a prior element already forced the generic-array fallback
             // (a spread, or a key that didn't resolve to a single literal),
@@ -475,11 +475,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         // expression is analyzed exactly once regardless of which shape
         // (keyed or generic) ends up being returned.
         if key_union.is_empty() {
-            key_union.add_type(Atomic::TInt);
+            key_union.add(Atomic::TInt);
         }
         Type::single(Atomic::TArray {
-            key: Box::new(key_union),
-            value: Box::new(all_value_types),
+            key: Box::new(key_union.build()),
+            value: Box::new(all_value_types.build()),
         })
     }
 

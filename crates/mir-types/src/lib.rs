@@ -13,3 +13,4 @@ pub use location::Location;
 pub use symbol::Name;
 pub use union::CloneValidity;
 pub use union::Type;
+pub use union::UnionBuilder;

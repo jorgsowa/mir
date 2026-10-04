@@ -2384,6 +2384,97 @@ fn is_array_like(t: &Type) -> bool {
 // Tests
 // ---------------------------------------------------------------------------
 
+/// Accumulates a union with hash-based dedup of literal strings/ints, so large
+/// literal sets build in linear time. Equivalent to repeated [`Type::add_type`].
+pub struct UnionBuilder {
+    ty: Type,
+    strings: std::collections::HashSet<std::sync::Arc<str>>,
+    ints: std::collections::HashSet<i64>,
+    // No atom present can subsume a new literal (`mixed`, `string`, int ranges).
+    literals_independent: bool,
+}
+
+impl Default for UnionBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UnionBuilder {
+    pub fn new() -> Self {
+        Self {
+            ty: Type::empty(),
+            strings: Default::default(),
+            ints: Default::default(),
+            literals_independent: true,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ty.is_empty()
+    }
+
+    pub fn merge(&mut self, other: &Type) {
+        for a in &other.types {
+            self.add(a.clone());
+        }
+        self.ty.possibly_undefined |= other.possibly_undefined;
+    }
+
+    pub fn add(&mut self, atomic: Atomic) {
+        // A lone `never` is dropped by add_type once anything else arrives.
+        let lone_never = matches!(self.ty.types.first(), Some(Atomic::TNever));
+        if self.literals_independent && !lone_never {
+            match &atomic {
+                Atomic::TLiteralString(s) => {
+                    if self.strings.insert(s.clone()) {
+                        self.ty.types.push(atomic);
+                    }
+                    return;
+                }
+                Atomic::TLiteralInt(n) => {
+                    if self.ints.insert(*n) {
+                        self.ty.types.push(atomic);
+                    }
+                    return;
+                }
+                _ => {}
+            }
+        }
+        let disturbs_literals = matches!(
+            atomic,
+            Atomic::TString | Atomic::TMixed | Atomic::TConditional { .. }
+        ) || int_bounds(&atomic).is_some();
+        self.ty.add_type(atomic);
+        if disturbs_literals || lone_never {
+            self.resync();
+        }
+    }
+
+    fn resync(&mut self) {
+        self.strings.clear();
+        self.ints.clear();
+        self.literals_independent = true;
+        for t in &self.ty.types {
+            match t {
+                Atomic::TLiteralString(s) => {
+                    self.strings.insert(s.clone());
+                }
+                Atomic::TLiteralInt(n) => {
+                    self.ints.insert(*n);
+                }
+                Atomic::TMixed | Atomic::TString => self.literals_independent = false,
+                other if int_bounds(other).is_some() => self.literals_independent = false,
+                _ => {}
+            }
+        }
+    }
+
+    pub fn build(self) -> Type {
+        self.ty
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
