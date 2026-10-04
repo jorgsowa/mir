@@ -771,7 +771,7 @@ function rtrim(string $string, string $characters = " \n\r\t\v\0"): string {}
  * The value being searched for, otherwise known as the needle.
  * An array may be used to designate multiple needles.
  * </p>
- * @param string|string[] $replace <p>
+ * @param string|array<array-key, scalar|\Stringable|null> $replace <p>
  * The replacement value that replaces found search
  * values. An array may be used to designate multiple replacements.
  * </p>
