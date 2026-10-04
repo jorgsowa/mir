@@ -203,6 +203,20 @@ pub(crate) fn analyze_with_scope_override(
     ty
 }
 
+/// Reads the arguments of a call whose callee can't be resolved, so their
+/// variables still count as used.
+fn analyze_args_unresolved(
+    ea: &mut ExpressionAnalyzer<'_>,
+    call: &StaticMethodCallExpr,
+    ctx: &mut FlowState,
+) -> Type {
+    for value in call.args.iter().filter_map(|a| a.value.as_ref()) {
+        ea.analyze_arg(value, ctx);
+        super::consume_arg_assignment(value, ctx);
+    }
+    Type::mixed()
+}
+
 impl CallAnalyzer {
     pub fn analyze_static_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
@@ -212,7 +226,7 @@ impl CallAnalyzer {
     ) -> Type {
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),
-            _ => return Type::mixed(),
+            _ => return analyze_args_unresolved(ea, call, ctx),
         };
 
         let mut receiver_type_params: Vec<Type> = Vec::new();
@@ -266,7 +280,7 @@ impl CallAnalyzer {
                             call.class.span,
                         );
                     }
-                    return Type::mixed();
+                    return analyze_args_unresolved(ea, call, ctx);
                 }
             }
         };

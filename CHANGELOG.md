@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Arguments of `$var::method()` on a union-of-classes receiver are read, removing false `UnusedVariable`.
 - `isset($a['k']->prop)` narrows `$a['k']` as present and non-null, removing false `NonExistentArrayOffset`.
 - `array_merge` over arrays with string keys returns `array<K, V>` (non-empty if any argument is) instead of a bare `array`, removing false `InvalidPropertyAssignment` and `InvalidReturnType`.
 - `strlen(...)`-style first-class callables of an unqualified global function inside a namespace now resolve to that function's signature instead of a bare `Closure`, so template and return types flow through.
