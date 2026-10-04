@@ -62,9 +62,9 @@ pub(crate) use core::{
     resolve_prop_current_type, resolve_static_prop_current_type, MatchSubject,
 };
 use core::{
-    extract_class_name, extract_null_coalesce, extract_nullsafe_prop_access, extract_var_name,
-    narrow_count_or_strlen_equality, promote_assignment_effects, same_literal, set_narrowed,
-    ScalarArgTarget, UnionNarrowExt,
+    array_access_under_prop_hops, extract_class_name, extract_null_coalesce,
+    extract_nullsafe_prop_access, extract_var_name, narrow_count_or_strlen_equality,
+    promote_assignment_effects, same_literal, set_narrowed, ScalarArgTarget, UnionNarrowExt,
 };
 use enum_class::{
     extract_enum_value_case, narrow_prop_to_specific_class, narrow_static_prop_to_specific_class,
@@ -2003,7 +2003,11 @@ pub fn narrow_from_condition(
                     // value — remove null/false from the base (variable or
                     // property receiver) so a guarded access (`preg_split()`
                     // returns array|false) does not report PossiblyInvalidArrayAccess.
-                    if let Some(target) = array_access_base_target(var_expr, ctx, db, file) {
+                    // `isset($a['k']->prop)` proves `$a['k']` is set and non-null
+                    // as well, so the array-access layers under the property
+                    // hops are narrowed like a plain `isset($a['k'])`.
+                    let array_expr = array_access_under_prop_hops(var_expr).unwrap_or(var_expr);
+                    if let Some(target) = array_access_base_target(array_expr, ctx, db, file) {
                         narrow_container_non_null_non_false(ctx, &target, db, file);
                     }
                     // For a single-level `isset($arr['key'])` on a shape-typed
@@ -2011,7 +2015,7 @@ pub fn narrow_from_condition(
                     // and mark it no longer optional, so a later `$arr['key']`
                     // read inside the guard isn't reported as possibly-null (the
                     // isset check just proved the key is present and non-null).
-                    narrow_isset_shape_key(var_expr, ctx, db, file);
+                    narrow_isset_shape_key(array_expr, ctx, db, file);
                     // `isset($this->prop)` implies the property is non-null too
                     // — the property-receiver counterpart of the bare-variable
                     // case above, since `isset()` is false for both an unset

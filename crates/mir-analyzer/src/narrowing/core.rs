@@ -515,6 +515,27 @@ pub(super) fn extract_static_prop_access_parts(
     }
 }
 
+/// The array access beneath one or more `->`/`?->` hops: `$a['k']->p->q` →
+/// `$a['k']`. `None` when the expression has no property hop or no array
+/// access under it.
+pub(super) fn array_access_under_prop_hops(
+    expr: &php_ast::owned::Expr,
+) -> Option<&php_ast::owned::Expr> {
+    let mut cur = expr;
+    let mut hopped = false;
+    loop {
+        match &cur.kind {
+            ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+                hopped = true;
+                cur = &pa.object;
+            }
+            ExprKind::Parenthesized(inner) => cur = inner,
+            ExprKind::ArrayAccess(_) if hopped => return Some(cur),
+            _ => return None,
+        }
+    }
+}
+
 pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
