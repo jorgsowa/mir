@@ -191,6 +191,36 @@ fn shape_value_fits(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
             }))
 }
 
+/// Widest bounded `int<min, max>` expanded into literal ints for subtype checks.
+const MAX_EXPANDED_INT_RANGE_SPAN: i64 = 16;
+
+/// Rewrites small bounded int ranges as literal ints so `int<-1, 1>` fits `-1|0|1`.
+fn expand_small_int_ranges(ty: &Type) -> Option<Type> {
+    let small = |a: &Atomic| match a {
+        Atomic::TIntRange {
+            min: Some(lo),
+            max: Some(hi),
+        } => hi
+            .checked_sub(*lo)
+            .is_some_and(|d| (0..MAX_EXPANDED_INT_RANGE_SPAN).contains(&d)),
+        _ => false,
+    };
+    if !ty.types.iter().any(small) {
+        return None;
+    }
+    let mut out = Type::empty();
+    for a in &ty.types {
+        match a {
+            Atomic::TIntRange {
+                min: Some(lo),
+                max: Some(hi),
+            } if small(a) => (*lo..=*hi).for_each(|n| out.add_type(Atomic::TLiteralInt(n))),
+            _ => out.add_type(a.clone()),
+        }
+    }
+    Some(out)
+}
+
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
 /// class-hierarchy graph (`extends` / `implements`) on top of structural
 /// matches.
@@ -207,6 +237,9 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
     }
     if sub.is_never() {
         return true;
+    }
+    if let Some(expanded) = expand_small_int_ranges(sub) {
+        return is_subtype(db, &expanded, sup);
     }
 
     sub.types.iter().all(|a| {
