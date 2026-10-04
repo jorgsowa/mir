@@ -164,7 +164,7 @@
 //! - `===config===` must appear **at most once** per fixture.
 //! - The `===config===` body must be a `<mir>` document using only supported options:
 //!   root attribute `memoizeMethodCallResults`, and the children `<phpVersion>` (also
-//!   accepted as a root attribute), `<findUnusedCode>`, `<fileExtensions>`, `<issueHandlers>`,
+//!   accepted as a root attribute), `<findUnusedCode>`, `<findUnusedVariables>`, `<fileExtensions>`, `<issueHandlers>`,
 //!   `<stubs>` and `<projectFiles>`. Anything else fails the test.
 //! - `<phpVersion>` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
 //!   real CLI config); invalid values fail the test.
@@ -241,6 +241,9 @@ struct FixtureConfig {
     follow_vendor_targets: bool,
     /// `<findUnusedCode>true</findUnusedCode>`: dead-code kinds are reported.
     find_unused_code: bool,
+    /// `<findUnusedVariables>`: `false` hides the unused-variable kinds unless
+    /// `findUnusedCode` is set; absent leaves them reported.
+    find_unused_variables: Option<bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -723,9 +726,9 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                     }
                 }
                 (None, other) => panic!("fixture {path}: root element must be <mir>, got <{other}>"),
-                (Some("mir"), "phpVersion" | "findUnusedCode" | "fileExtensions" | "issueHandlers" | "stubs" | "projectFiles") => {}
+                (Some("mir"), "phpVersion" | "findUnusedCode" | "findUnusedVariables" | "fileExtensions" | "issueHandlers" | "stubs" | "projectFiles") => {}
                 (Some("mir"), other) => panic!(
-                    "fixture {path}: unsupported <{other}> — supported: phpVersion, findUnusedCode, fileExtensions, issueHandlers, stubs, projectFiles"
+                    "fixture {path}: unsupported <{other}> — supported: phpVersion, findUnusedCode, findUnusedVariables, fileExtensions, issueHandlers, stubs, projectFiles"
                 ),
                 (Some("issueHandlers"), kind) => {
                     let level = attr(e, "errorLevel").unwrap_or_default();
@@ -763,6 +766,9 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                     (Some("findUnusedCode"), Some("mir")) => {
                         config.find_unused_code = text_buf.trim() == "true";
                     }
+                    (Some("findUnusedVariables"), Some("mir")) => {
+                        config.find_unused_variables = Some(text_buf.trim() == "true");
+                    }
                     _ => {}
                 }
                 text_buf.clear();
@@ -784,6 +790,15 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
         config
             .suppressed_issue_kinds
             .get_or_insert_with(Default::default);
+    } else if config.find_unused_variables == Some(false) {
+        config
+            .suppressed_issue_kinds
+            .get_or_insert_with(Default::default)
+            .extend(
+                crate::batch::unused_variable_issue_kinds()
+                    .iter()
+                    .map(|k| (*k).to_string()),
+            );
     }
     config
 }

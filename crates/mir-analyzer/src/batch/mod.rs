@@ -45,6 +45,11 @@ pub fn dead_code_issue_kinds() -> &'static [&'static str] {
     ]
 }
 
+/// Issue kinds Psalm only reports under `findUnusedVariables`/`findUnusedCode`.
+pub fn unused_variable_issue_kinds() -> &'static [&'static str] {
+    &["UnusedVariable", "UnusedForeachValue"]
+}
+
 /// Per-batch options for [`AnalysisSession::analyze_paths`] and friends.
 ///
 /// Configuration that only makes sense for full-project (batch) analysis

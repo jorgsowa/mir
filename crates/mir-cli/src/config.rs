@@ -162,6 +162,8 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                         attr_value(&e, "memoizeMethodCallResults").as_deref(),
                         Some("true" | "1")
                     );
+                    config.find_unused_code |= is_true_attr(&e, "findUnusedCode");
+                    config.find_unused_variables |= is_true_attr(&e, "findUnusedVariables");
                 }
 
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
@@ -373,6 +375,10 @@ fn attr_value(e: &quick_xml::events::BytesStart<'_>, name: &str) -> Option<Strin
     e.attributes().flatten().find_map(|attr| {
         (bytes_to_string(attr.key.as_ref()) == name).then(|| bytes_to_string(&attr.value))
     })
+}
+
+fn is_true_attr(e: &quick_xml::events::BytesStart<'_>, name: &str) -> bool {
+    matches!(attr_value(e, name).as_deref(), Some("true" | "1"))
 }
 
 // ---------------------------------------------------------------------------
@@ -596,6 +602,15 @@ mod tests {
     fn parses_php_version_root_attribute() {
         let cfg = Config::parse(r#"<mir phpVersion="8.2"></mir>"#).unwrap();
         assert_eq!(cfg.php_version.as_deref(), Some("8.2"));
+    }
+
+    #[test]
+    fn parses_unused_code_root_attributes() {
+        let cfg = Config::parse(r#"<psalm findUnusedCode="true" findUnusedVariables="1"></psalm>"#)
+            .unwrap();
+        assert!(cfg.find_unused_code && cfg.find_unused_variables);
+        let cfg = Config::parse(r#"<psalm findUnusedCode="false"></psalm>"#).unwrap();
+        assert!(!cfg.find_unused_code && !cfg.find_unused_variables);
     }
 
     #[test]

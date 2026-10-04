@@ -8,3 +8,4 @@ mod psalm_error_level;
 mod relative_config_ignore_files;
 mod require_once_outside_autoload;
 mod stale_baseline;
+mod unused_variables_opt_in;

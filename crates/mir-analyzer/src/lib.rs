@@ -52,7 +52,7 @@ pub(crate) mod util;
 
 pub use batch::{
     analyze_source, analyze_source_with_options, dead_code_issue_kinds, discover_files,
-    discover_files_with_extensions, AnalysisResult, BatchOptions,
+    discover_files_with_extensions, unused_variable_issue_kinds, AnalysisResult, BatchOptions,
 };
 pub use file_analyzer::{FileAnalysis, FileAnalyzer};
 pub use file_extensions::PhpFileExtensions;

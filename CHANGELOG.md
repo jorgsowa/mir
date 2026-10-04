@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `mir_analyzer::recursion::STACK_SIZE` (16 MiB), the worker stack size analysis is sized for; embedders building their own rayon pool can use it.
 
+### Changed
+
+- `UnusedVariable` and `UnusedForeachValue` are reported only with `findUnusedVariables`, `findUnusedCode` or `--find-dead-code`, as in Psalm. `findUnusedCode`/`findUnusedVariables` are now also read as root attributes.
+
 ### Fixed
 
 - `self`/`static` as a type argument of `@template-implements`, `@template-extends` and `@template-use` now resolves to the declaring class, so an override returning `self` no longer raises `MethodSignatureMismatch`.

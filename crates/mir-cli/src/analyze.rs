@@ -6,8 +6,9 @@ use std::time::{Duration, Instant};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use mir_analyzer::{
-    dead_code_issue_kinds, discover_files_with_extensions, AnalysisResult, AnalysisSession,
-    BatchOptions, IndexCancel, IndexParallelism, PhpFileExtensions, PhpVersion,
+    dead_code_issue_kinds, discover_files_with_extensions, unused_variable_issue_kinds,
+    AnalysisResult, AnalysisSession, BatchOptions, IndexCancel, IndexParallelism,
+    PhpFileExtensions, PhpVersion,
 };
 
 use crate::config::Config;
@@ -56,7 +57,7 @@ pub fn run_composer_flow(
     );
     session = session.with_psr4(Arc::new(map.clone()));
 
-    let opts = build_batch_opts(cli.find_dead_code);
+    let opts = build_batch_opts(cli.find_dead_code, config);
 
     // Lazy vendor by default: only eagerly load `autoload.files` entries.
     // Set `MIR_EAGER_VENDOR=1` to parse every vendor file upfront.
@@ -222,7 +223,7 @@ pub fn run_plain_flow(
         stub_files,
         stub_dirs,
     );
-    let opts = build_batch_opts(cli.find_dead_code);
+    let opts = build_batch_opts(cli.find_dead_code, config);
 
     session.ensure_all_stubs();
 
@@ -352,7 +353,7 @@ fn build_session(
     session
 }
 
-fn build_batch_opts(find_dead_code: bool) -> BatchOptions {
+fn build_batch_opts(find_dead_code: bool, config: &Config) -> BatchOptions {
     // The CLI only reports diagnostics; per-expression symbols (hover /
     // go-to-definition data for LSP consumers) would be collected and never
     // read — a Laravel-scale run retains ~600k of them.
@@ -360,6 +361,14 @@ fn build_batch_opts(find_dead_code: bool) -> BatchOptions {
     if !find_dead_code {
         opts.suppressed_issue_kinds
             .extend(dead_code_issue_kinds().iter().map(|s| (*s).to_string()));
+    }
+    // Like Psalm, dead-code analysis implies unused-variable reporting.
+    if !(find_dead_code || config.find_unused_variables || config.find_unused_code) {
+        opts.suppressed_issue_kinds.extend(
+            unused_variable_issue_kinds()
+                .iter()
+                .map(|s| (*s).to_string()),
+        );
     }
     opts
 }
