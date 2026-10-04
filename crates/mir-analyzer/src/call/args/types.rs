@@ -1213,6 +1213,10 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         | Atomic::TNonEmptyArray { value, .. }
                         | Atomic::TList { value }
                         | Atomic::TNonEmptyList { value } => value,
+                        // A broad array may hold the expected shape (a coercion, as at top level).
+                        Atomic::TKeyedArray { .. } => {
+                            return mir_types::union::atomic_subtype(pv, av)
+                        }
                         _ => return false,
                     };
                     let param_key = array_key_of(pv).unwrap_or_else(Type::mixed);
