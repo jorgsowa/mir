@@ -178,6 +178,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             arg_types,
             arg_names,
         );
+        let mut risky_only = unchecked.clone();
         // A subclass that fixes a generic ancestor via `@extends Box<int>`
         // already determines T=int for every instance of this class,
         // regardless of what this particular constructor call's arguments
@@ -205,6 +206,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 |a| matches!(a, Atomic::TTemplateParam { name, .. } if own_template_names.contains(name)),
             );
             if !self_referential {
+                risky_only.remove(&name);
                 bindings.insert(name, ty);
             }
         }
@@ -257,7 +259,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut params: Vec<Type> = Vec::with_capacity(class_tps.len());
         let mut any_concrete = false;
         for tp in class_tps.iter() {
-            match bindings.get(&mir_types::Name::from(tp.name.as_ref())) {
+            let name = mir_types::Name::from(tp.name.as_ref());
+            match bindings.get(&name) {
+                // Bound only by a `T|null` param matching a `null` arg: says nothing about T.
+                Some(_) if risky_only.contains(&name) => params.push(Type::mixed()),
                 Some(ty) if !ty.is_mixed_not_template() => {
                     // Widen scalar literals to their base type so the receiver
                     // does not carry an over-narrow type param (e.g. `new Box(5)`
