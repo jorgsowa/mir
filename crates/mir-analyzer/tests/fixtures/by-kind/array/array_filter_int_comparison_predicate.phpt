@@ -52,6 +52,6 @@ function keyModeUntouched(int $u): void {
 
 function stillRejectsUnfiltered(int $u): void {
     takesPositive([$u]);
-//                ^^^^ InvalidArgument: Argument $ids of takesPositive() expects 'list<positive-int>', got 'array{0: int}'
+//                ^^^^ ArgumentTypeCoercion: Argument $ids of takesPositive() expects 'list<positive-int>', got 'array{0: int}' — coercion may fail at runtime
 }
 ===expect===

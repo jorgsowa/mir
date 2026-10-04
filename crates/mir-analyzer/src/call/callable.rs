@@ -1079,6 +1079,14 @@ fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAna
     is_int_or_float(expected) && is_int_or_float(actual)
 }
 
+/// True when `broad` is a plain `int`/`string` and `narrow` refines it (`positive-int`,
+/// `non-empty-string`): a value typed `broad` may or may not satisfy `narrow`, so it is a
+/// coercion, not a mismatch. Other supertypes (`float`, `int|null`, partial classes) stay errors.
+pub(crate) fn narrows_to(broad: &Type, narrow: &Type) -> bool {
+    matches!(broad.types.as_slice(), [Atomic::TInt] | [Atomic::TString])
+        && narrow.is_subtype_structural(broad)
+}
+
 /// Rewrites docblock `Enum::Case` references (parsed as an opaque named type) to enum-case
 /// literals so they subtype their enum. References that don't name an enum case pass through.
 pub(crate) fn resolve_enum_case_refs(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> Type {
@@ -1258,16 +1266,30 @@ pub(crate) fn check_typed_callable_arg(
                     continue;
                 }
                 if !expected_fits_actual_param(&actual_ret, expected_ret, ea) {
-                    ea.emit(
-                        IssueKind::InvalidArgument {
-                            param: param_name.to_string(),
-                            fn_name: fn_name.to_string(),
-                            expected: format!("callable returning {expected_ret}"),
-                            actual: format!("callable returning {actual_ret}"),
-                        },
-                        Severity::Error,
-                        arg_span,
-                    );
+                    let expected = format!("callable returning {expected_ret}");
+                    let actual = format!("callable returning {actual_ret}");
+                    let (kind, severity) = if narrows_to(&actual_ret, expected_ret) {
+                        (
+                            IssueKind::ArgumentTypeCoercion {
+                                param: param_name.to_string(),
+                                fn_name: fn_name.to_string(),
+                                expected,
+                                actual,
+                            },
+                            Severity::Info,
+                        )
+                    } else {
+                        (
+                            IssueKind::InvalidArgument {
+                                param: param_name.to_string(),
+                                fn_name: fn_name.to_string(),
+                                expected,
+                                actual,
+                            },
+                            Severity::Error,
+                        )
+                    };
+                    ea.emit(kind, severity, arg_span);
                     return;
                 }
             }

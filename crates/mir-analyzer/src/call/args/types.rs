@@ -269,6 +269,7 @@ pub(crate) fn check_one(
             );
         } else if is_named_object_coercion(arg_ty, param_ty, ea)
             || scalar_coercion_ok(arg_ty, param_ty, ea)
+            || array_element_coercion(arg_ty, param_ty, ea)
         {
             ea.emit(
                 IssueKind::ArgumentTypeCoercion {
@@ -1289,6 +1290,26 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
 }
 
 fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    array_list_compatible_with(arg_ty, param_ty, ea, false)
+}
+
+/// Like `array_list_compatible`, but elements that are broader than the param's
+/// (`array{0: int}` vs `list<positive-int>`) also count; the call may fail at runtime.
+fn array_element_coercion(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    !array_list_compatible(arg_ty, param_ty, ea)
+        && array_list_compatible_with(arg_ty, param_ty, ea, true)
+}
+
+fn array_list_compatible_with(
+    arg_ty: &Type,
+    param_ty: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+    allow_narrowing: bool,
+) -> bool {
+    let elem_ok = |arg: &Type, param: &Type| {
+        union_compatible(arg, param, ea)
+            || (allow_narrowing && super::super::callable::narrows_to(arg, param))
+    };
     arg_ty.types.iter().all(|a_atomic| {
         let arg_value: &Type = match a_atomic {
             Atomic::TArray { value, .. }
@@ -1329,26 +1350,22 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                         return false;
                     }
                     match param_atomic {
-                        Atomic::TArray { value, .. } | Atomic::TList { value } => properties
-                            .values()
-                            .all(|p| union_compatible(&p.ty, value, ea)),
+                        Atomic::TArray { value, .. } | Atomic::TList { value } => {
+                            properties.values().all(|p| elem_ok(&p.ty, value))
+                        }
                         Atomic::TNonEmptyArray { value, .. } | Atomic::TNonEmptyList { value } => {
                             // A closed shape whose only properties are optional (e.g.
                             // `array{a?: int}`) can still be `[]` at runtime — a
                             // non-empty properties map alone doesn't guarantee that.
                             (*is_open || properties.values().any(|p| !p.optional))
-                                && properties
-                                    .values()
-                                    .all(|p| union_compatible(&p.ty, value, ea))
+                                && properties.values().all(|p| elem_ok(&p.ty, value))
                         }
                         Atomic::TKeyedArray {
                             properties: param_properties,
                             ..
                         } => param_properties.iter().all(|(key, param_prop)| {
                             match properties.get(key) {
-                                Some(arg_prop) => {
-                                    union_compatible(&arg_prop.ty, &param_prop.ty, ea)
-                                }
+                                Some(arg_prop) => elem_ok(&arg_prop.ty, &param_prop.ty),
                                 None => param_prop.optional || *is_open,
                             }
                         }),
@@ -1383,7 +1400,7 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
             let param_key = array_key_of(param_atomic).unwrap_or_else(Type::mixed);
 
             !array_key_definitely_mismatched(&arg_key, &param_key)
-                && union_compatible(arg_value, param_value, ea)
+                && elem_ok(arg_value, param_value)
         })
     })
 }

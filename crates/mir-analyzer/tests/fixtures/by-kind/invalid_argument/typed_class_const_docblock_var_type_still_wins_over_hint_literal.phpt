@@ -15,7 +15,7 @@ final class Foo {
     private const int ID = 5;
     public function bar(): void {
         baz([self::ID]);
-//          ^^^^^^^^^^ InvalidArgument: Argument $ids of baz() expects 'list<positive-int>', got 'array{0: int}'
+//          ^^^^^^^^^^ ArgumentTypeCoercion: Argument $ids of baz() expects 'list<positive-int>', got 'array{0: int}' — coercion may fail at runtime
     }
 }
 

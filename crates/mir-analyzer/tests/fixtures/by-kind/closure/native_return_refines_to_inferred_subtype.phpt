@@ -1,5 +1,5 @@
 ===description===
-Under strict types, a closure's native `int`/`string` return is refined by a body that provably returns a narrower int/string class, so it satisfies a narrower declared callable return. Literals widen to their sign / non-emptiness class; non-subtype and non-family bodies keep the declared type.
+Under strict types, a closure's native `int`/`string` return is refined by a body that provably returns a narrower int/string class, so it satisfies a narrower declared callable return. Literals widen to their sign / non-emptiness class; a plain int/string body is a coercion; partial-range and non-family bodies stay errors.
 ===config===
 <mir>
   <issueHandlers>
@@ -69,9 +69,9 @@ function recorded(int $n, string $s, ?int $maybe, mixed $m): void {
     /** @mir-check $open is Closure(): 5 */
 }
 ===expect===
-InvalidArgument@29:18-29:33: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int'
+ArgumentTypeCoercion@29:18-29:33: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int' — coercion may fail at runtime
 InvalidArgument@30:18-30:32: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning non-negative-int'
 InvalidArgument@31:18-31:33: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning negative-int'
-InvalidArgument@32:18-32:36: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string'
-InvalidArgument@33:18-33:36: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string'
-InvalidArgument@34:18-34:46: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int'
+ArgumentTypeCoercion@32:18-32:36: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string' — coercion may fail at runtime
+ArgumentTypeCoercion@33:18-33:36: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string' — coercion may fail at runtime
+ArgumentTypeCoercion@34:18-34:46: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int' — coercion may fail at runtime
