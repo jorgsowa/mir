@@ -824,6 +824,58 @@ pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atomic))
 }
 
+/// `array_merge` over arrays with string keys: every key survives (a later
+/// duplicate only overrides the value) and int keys are renumbered to `int`.
+pub(crate) fn merge_keyed_arrays(arg_types: &[Type]) -> Option<Type> {
+    let mut keys = Type::empty();
+    let mut values = Type::empty();
+    for arg in arg_types {
+        let all_arrays = arg.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TArray { .. }
+                    | Atomic::TNonEmptyArray { .. }
+                    | Atomic::TList { .. }
+                    | Atomic::TNonEmptyList { .. }
+                    | Atomic::TKeyedArray { is_open: false, .. }
+            )
+        });
+        if arg.types.is_empty() || !all_arrays {
+            return None;
+        }
+        if matches!(arg.types.as_slice(), [Atomic::TKeyedArray { properties, .. }] if properties.is_empty())
+        {
+            continue;
+        }
+        let (k, v) = crate::stmt::infer_foreach_types(arg);
+        if k.is_mixed() || v.is_mixed() {
+            return None;
+        }
+        for atomic in &k.types {
+            let renumbered = if atomic.is_int() {
+                Atomic::TInt
+            } else {
+                atomic.clone()
+            };
+            keys.merge_with(&Type::single(renumbered));
+        }
+        values.merge_with(&v);
+    }
+    if keys.is_empty() || values.is_empty() {
+        return None;
+    }
+    let (key, value) = (Box::new(keys), Box::new(values));
+    let atomic = if arg_types
+        .iter()
+        .any(super::callable::is_non_empty_collection)
+    {
+        Atomic::TNonEmptyArray { key, value }
+    } else {
+        Atomic::TArray { key, value }
+    };
+    Some(Type::single(atomic))
+}
+
 /// Infer the return type of `array_merge_recursive($arr1, $arr2, ...)`.
 ///
 /// For int keys, `array_merge_recursive` behaves exactly like `array_merge`
