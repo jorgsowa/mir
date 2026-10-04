@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Conditional returns now resolve enum-case subjects (`T is Key::A ? X : Y`, including chains) and a `true`/`false`/`null` default of an omitted argument, instead of widening to every branch.
 - Interpolating, concatenating or echoing a docblock `Class::*` type no longer reports a false `ImplicitToStringCast`.
 - `@psalm-type Name array{...}` without `=`, `array { a: int }` with a space, a `callable(string): object` shape item and a chained `A ? x : B ? y : z` conditional now parse as written instead of as a class name, removing false `InvalidArgument`/`InvalidReturnType`.
 - A class template with no binding at the call site (`(new Box)->get()` returning `T`) nested in an array, list or shape argument is now judged by its bound, so `mixed` fits optional and required shape keys, removing false `InvalidArgument` and `InvalidPropertyAssignment`.

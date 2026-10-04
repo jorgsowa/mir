@@ -44,6 +44,29 @@ pub(crate) fn resolve_named_arg_type_index(
         .map(|(i, _)| i)
 }
 
+/// The type a conditional return's `$param` discriminates on: the call-site
+/// argument, or a `true`/`false`/`null` default when the argument is omitted.
+pub(crate) fn conditional_param_type(
+    params: &[mir_codebase::definitions::DeclaredParam],
+    call_args: &[php_ast::owned::Arg],
+    arg_types: &[mir_types::Type],
+    param_name: &str,
+) -> Option<mir_types::Type> {
+    use mir_types::Atomic;
+    let idx = params.iter().position(|p| p.name.as_ref() == param_name)?;
+    if let Some(arg_idx) = resolve_named_arg_type_index(params, call_args, idx) {
+        return arg_types.get(arg_idx).cloned();
+    }
+    let default = params[idx].default_text.as_deref()?.trim();
+    let atomic = match default.to_ascii_lowercase().as_str() {
+        "true" => Atomic::TTrue,
+        "false" => Atomic::TFalse,
+        "null" => Atomic::TNull,
+        _ => return None,
+    };
+    Some(mir_types::Type::single(atomic))
+}
+
 /// `@return ($this is X ? A : B)` / `@return ($param is X ? A : B)` /
 /// `@return (T is X ? A : B)` where
 /// `X` is a CLASS name: `Type::resolve_conditional_returns` alone can never
@@ -67,16 +90,25 @@ pub(crate) fn resolve_conditional_return<F>(
 where
     F: Fn(&str) -> Option<mir_types::Type>,
 {
+    resolve_conditional_dyn(ty, db, templates, &lookup)
+}
+
+fn resolve_conditional_dyn(
+    ty: mir_types::Type,
+    db: &dyn crate::db::MirDatabase,
+    templates: Option<&rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>>,
+    lookup: &dyn Fn(&str) -> Option<mir_types::Type>,
+) -> mir_types::Type {
     let mut resolved = mir_types::Type::empty();
     for atomic in ty.types {
         let mir_types::Atomic::TConditional { data } = &atomic else {
             resolved.add_type(atomic);
             continue;
         };
-        match resolve_class_subject_branch(data, db, templates, &lookup) {
+        match resolve_class_subject_branch(data, db, templates, lookup) {
             Some(branch) => resolved.merge_with(&branch),
             None => resolved
-                .merge_with(&mir_types::Type::single(atomic).resolve_conditional_returns(&lookup)),
+                .merge_with(&mir_types::Type::single(atomic).resolve_conditional_returns(lookup)),
         }
     }
     resolved
@@ -84,39 +116,47 @@ where
 
 /// The chosen branch of a conditional whose subject and discriminant are both
 /// object types, resolved through `is_subtype`.
-fn resolve_class_subject_branch<F>(
+fn resolve_class_subject_branch(
     data: &mir_types::atomic::ConditionalData,
     db: &dyn crate::db::MirDatabase,
     templates: Option<&rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>>,
-    lookup: &F,
-) -> Option<mir_types::Type>
-where
-    F: Fn(&str) -> Option<mir_types::Type>,
-{
-    let is_object = |ty: &mir_types::Type, allow_case: bool| {
+    lookup: &dyn Fn(&str) -> Option<mir_types::Type>,
+) -> Option<mir_types::Type> {
+    use mir_types::Atomic;
+    let is_object = |ty: &mir_types::Type| {
         !ty.types.is_empty()
             && ty.types.iter().all(|a| {
-                a.named_object_fqcn()
-                    .is_some_and(|f| allow_case || !f.contains("::"))
+                matches!(a, Atomic::TLiteralEnumCase { .. })
+                    || a.named_object_fqcn().is_some_and(|f| !f.contains("::"))
             })
     };
-    // `Class::CASE` subjects are enum cases, which arg types do not track.
-    if !is_object(&data.subject, false) {
+    let subject = crate::subtype::canonical_enum_cases(db, &data.subject);
+    if !is_object(&subject) {
         return None;
     }
     let param_name = data.param_name.as_ref()?;
     // `T is X`: `T` is a template, bound rather than a parameter.
     let arg_ty = lookup(param_name.as_ref())
         .or_else(|| templates.and_then(|t| t.get(param_name).cloned()))?;
-    if !is_object(&arg_ty, true) {
+    let arg_ty = crate::subtype::canonical_enum_cases(db, &arg_ty);
+    if !is_object(&arg_ty) {
         return None;
     }
-    let branch = if crate::subtype::is_subtype(db, &arg_ty, &data.subject) {
+    let branch = if crate::subtype::is_subtype(db, &arg_ty, &subject) {
         data.if_true.clone()
     } else {
+        // An enum-case subject only excludes other single cases; a wider arg may still match.
+        let is_case = |a: &Atomic| matches!(a, Atomic::TLiteralEnumCase { .. });
+        let disjoint = arg_ty
+            .types
+            .iter()
+            .all(|a| is_case(a) && !subject.types.contains(a));
+        if subject.types.iter().any(is_case) && !disjoint {
+            return None;
+        }
         data.if_false.clone()
     };
-    Some(branch.resolve_conditional_returns(lookup))
+    Some(resolve_conditional_dyn(branch, db, templates, lookup))
 }
 
 /// An assignment expression in argument position (`f($x = expr)`,

@@ -1783,15 +1783,12 @@ fn resolve_method_return<'a>(
                         type_params: receiver_type_params.to_vec().into(),
                     }));
                 }
-                resolved
-                    .params
-                    .iter()
-                    .position(|p| p.name.as_ref() == param_name)
-                    .and_then(|idx| {
-                        crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, idx)
-                    })
-                    .and_then(|idx| arg_types.get(idx))
-                    .cloned()
+                crate::call::conditional_param_type(
+                    &resolved.params,
+                    &call.args,
+                    arg_types,
+                    param_name,
+                )
             },
         );
         if dom_create_element_has_valid_literal_name {
