@@ -56,9 +56,8 @@ fn per_argument_variadic_doc_type(
         && doc_raw.is_some_and(|r| r.ends_with("[]"))
         && matches!(doc_ty.types.as_slice(), [Atomic::TArray { .. }])
         && native_ty.is_none_or(|n| n.types.iter().any(|a| a.is_array()));
-    let scalar_elements_on_array_hint = is_variadic
-        && native_ty.is_some_and(|n| n.types.iter().all(|a| a.is_array()))
-        && {
+    let scalar_elements_on_array_hint =
+        is_variadic && native_ty.is_some_and(|n| n.types.iter().all(|a| a.is_array())) && {
             let element = crate::generic::variadic_element_type(&doc_ty);
             !std::ptr::eq(element, &doc_ty)
                 && element
@@ -1366,7 +1365,7 @@ impl<'a> DefinitionCollector<'a> {
                         .iter()
                         .map(|a| match a {
                             mir_types::Atomic::TNamedObject { fqcn, .. } => {
-                                Some(Arc::from(fqcn.as_str()))
+                                Some(Arc::from(fqcn.trim_start_matches('\\')))
                             }
                             _ => None,
                         })
@@ -1559,7 +1558,25 @@ impl<'a> DefinitionCollector<'a> {
         }
 
         self.expand_type_aliases_fixpoint(&mut aliases);
+        // Bodies are already resolved; marking keeps the post-expansion
+        // resolution pass from re-prefixing the consumer's namespace.
+        for ty in aliases.values_mut() {
+            *ty = resolution::mark_resolved(ty.clone(), &self.namespace, &self.use_aliases);
+        }
         aliases
+    }
+
+    /// Alias map as stored on definitions, without resolution marks.
+    fn stored_type_aliases(aliases: &FxHashMap<String, Type>) -> FxHashMap<Arc<str>, Type> {
+        aliases
+            .iter()
+            .map(|(k, v)| {
+                (
+                    Arc::from(k.as_str()),
+                    resolution::unmark_resolved(v.clone()),
+                )
+            })
+            .collect()
     }
 
     fn slice_declares(&self, fqcn: &str) -> bool {

@@ -648,10 +648,7 @@ impl<'a> DefinitionCollector<'a> {
             is_immutable: class_doc.is_immutable,
             attribute_flags: parse_attribute_flags(&decl.attributes),
             location: Some(self.location(stmt_span.start, stmt_span.end)),
-            type_aliases: type_aliases
-                .iter()
-                .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
-                .collect(),
+            type_aliases: Self::stored_type_aliases(&type_aliases),
             pending_import_types: class_doc
                 .import_types
                 .iter()

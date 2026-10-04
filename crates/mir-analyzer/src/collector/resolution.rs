@@ -122,59 +122,28 @@ pub(super) fn resolve_type_name(
         .into()
 }
 
-pub(super) fn resolve_union_inner(
-    union: Type,
-    full_qualify: bool,
-    allow_builtin_shortcut: bool,
-    namespace: &Option<String>,
-    use_aliases: &FxHashMap<String, String>,
-) -> Type {
+/// Rewrites every class name in `union` through `rename`.
+pub(super) fn map_class_names(union: Type, rename: &dyn Fn(&str) -> Name) -> Type {
     let from_docblock = union.from_docblock;
     let types: Vec<Atomic> = union
         .types
         .into_iter()
-        .map(|a| {
-            resolve_atomic_inner(
-                a,
-                full_qualify,
-                allow_builtin_shortcut,
-                namespace,
-                use_aliases,
-            )
-        })
+        .map(|a| map_class_names_atomic(a, rename))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result
 }
 
-pub(super) fn resolve_atomic_inner(
-    atomic: Atomic,
-    full_qualify: bool,
-    allow_builtin_shortcut: bool,
-    namespace: &Option<String>,
-    use_aliases: &FxHashMap<String, String>,
-) -> Atomic {
+fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atomic {
     macro_rules! ru {
         ($t:expr) => {
-            resolve_union_inner(
-                $t,
-                full_qualify,
-                allow_builtin_shortcut,
-                namespace,
-                use_aliases,
-            )
+            map_class_names($t, rename)
         };
     }
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
-            let resolved = resolve_type_name(
-                fqcn.as_str(),
-                full_qualify,
-                allow_builtin_shortcut,
-                namespace,
-                use_aliases,
-            );
+            let resolved = rename(fqcn.as_str());
             if type_params.is_empty() {
                 Atomic::TNamedObject {
                     fqcn: resolved,
@@ -189,23 +158,11 @@ pub(super) fn resolve_atomic_inner(
             }
         }
         Atomic::TClassString(Some(cls)) => {
-            let resolved = resolve_type_name(
-                cls.as_str(),
-                full_qualify,
-                allow_builtin_shortcut,
-                namespace,
-                use_aliases,
-            );
+            let resolved = rename(cls.as_str());
             Atomic::TClassString(Some(resolved))
         }
         Atomic::TInterfaceString(Some(iface)) => {
-            let resolved = resolve_type_name(
-                iface.as_str(),
-                full_qualify,
-                allow_builtin_shortcut,
-                namespace,
-                use_aliases,
-            );
+            let resolved = rename(iface.as_str());
             Atomic::TInterfaceString(Some(resolved))
         }
         Atomic::TArray { key, value } => Atomic::TArray {
@@ -419,7 +376,9 @@ pub(super) fn resolve_union(
     // Native type hints resolve exactly like any other real code reference
     // (`extends`, `instanceof`, …): no builtin-name leniency — a same-namespace
     // class named e.g. `Generator` must win over the global builtin.
-    resolve_union_inner(union, true, false, namespace, use_aliases)
+    map_class_names(union, &|n| {
+        resolve_type_name(n, true, false, namespace, use_aliases)
+    })
 }
 
 pub(super) fn resolve_union_doc(
@@ -432,7 +391,9 @@ pub(super) fn resolve_union_doc(
     // native type hint does. `resolve_type_name` exempts real global builtins
     // on its own (`allow_builtin_shortcut=true` here) for docblocks, since
     // they're commonly written without imports.
-    resolve_union_inner(union, true, true, namespace, use_aliases)
+    map_class_names(union, &|n| {
+        resolve_type_name(n, true, true, namespace, use_aliases)
+    })
 }
 
 pub(super) fn resolve_union_doc_with_aliases(
@@ -452,6 +413,28 @@ pub(super) fn resolve_union_doc_with_aliases(
     // expands too.
     let expanded = super::expand_aliases_only(union, aliases);
     resolve_union_doc(expanded, namespace, use_aliases)
+}
+
+/// Prefixes already-resolved class names that a second resolution pass would
+/// rewrite with `\`, which `resolve_type_name` leaves untouched.
+pub(super) fn mark_resolved(
+    union: Type,
+    namespace: &Option<String>,
+    use_aliases: &FxHashMap<String, String>,
+) -> Type {
+    map_class_names(union, &|n| {
+        let again = resolve_type_name(n, true, true, namespace, use_aliases);
+        if again.as_str() == n {
+            Name::from(n)
+        } else {
+            Name::from(format!("\\{n}"))
+        }
+    })
+}
+
+/// Inverse of [`mark_resolved`].
+pub(super) fn unmark_resolved(union: Type) -> Type {
+    map_class_names(union, &|n| Name::from(n.trim_start_matches('\\')))
 }
 
 pub(super) fn resolve_union_opt(

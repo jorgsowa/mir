@@ -336,10 +336,7 @@ impl<'a> DefinitionCollector<'a> {
                 ),
                 own_properties,
                 seal_properties,
-                type_aliases: type_aliases
-                    .iter()
-                    .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
-                    .collect(),
+                type_aliases: Self::stored_type_aliases(&type_aliases),
             }));
 
         ControlFlow::Continue(())
