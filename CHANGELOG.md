@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A small bounded int range such as the `<=>` result `int<-1, 1>` is accepted where the equal literal union `-1|0|1` is expected, removing false `InvalidPropertyAssignment` and `InvalidArgument`.
+- Constants declared in a trait keep their inferred type instead of evaluating to `mixed`, removing false `InvalidArgument`.
 - `*=` keeps the int range like `+=` and `-=`, removing false `InvalidPropertyAssignment` and `InvalidReturnType`.
 - A closure parameter declared as a non-null union is no longer narrowed to the callee's bound callback type, so `instanceof` on the other members is not rejected.
 - Arguments of `$var::method()` on a union-of-classes receiver are read, removing false `UnusedVariable`.
