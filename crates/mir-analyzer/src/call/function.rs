@@ -1498,7 +1498,11 @@ impl CallAnalyzer {
                             })
                             .unwrap_or(0);
                         let new_type = if resolved_fn_name.as_str() == "preg_match" {
-                            super::callable::preg_match_matches_type(flags)
+                            let pattern = match arg_types.first().map(|t| t.types.as_slice()) {
+                                Some([Atomic::TLiteralString(p)]) => Some(p.as_ref()),
+                                _ => None,
+                            };
+                            super::callable::preg_match_matches_type(flags, pattern)
                         } else {
                             super::callable::preg_match_all_matches_type(flags)
                         };

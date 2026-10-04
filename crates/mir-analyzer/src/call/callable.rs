@@ -1433,10 +1433,117 @@ pub(crate) fn count_chars_return_type(arg_types: &[Type], return_ty: &Type) -> O
 /// bit 512 (`PREG_UNMATCHED_AS_NULL`) is set, unmatched subpatterns are `null`
 /// instead of `""`, so the text position of the leaf (or the array shape's `0`
 /// entry, when both flags are combined) additionally admits `null`.
-pub(crate) fn preg_match_matches_type(flags: i64) -> Type {
-    Type::single(Atomic::TList {
-        value: Box::new(preg_match_leaf(flags)),
+///
+/// A literal `pattern` with named groups yields a shape keyed by group name and
+/// number instead (see [`capture_group_names`]).
+pub(crate) fn preg_match_matches_type(flags: i64, pattern: Option<&str>) -> Type {
+    let leaf = preg_match_leaf(flags);
+    let names = pattern.and_then(capture_group_names);
+    if names.as_ref().is_none_or(|n| n.iter().all(Option::is_none)) {
+        return Type::single(Atomic::TList {
+            value: Box::new(leaf),
+        });
+    }
+    let prop = |ty: &Type| mir_types::atomic::KeyedProperty {
+        ty: ty.clone(),
+        optional: false,
+    };
+    let mut props = indexmap::IndexMap::new();
+    props.insert(mir_types::atomic::ArrayKey::Int(0), prop(&leaf));
+    for (i, name) in names.into_iter().flatten().enumerate() {
+        if let Some(name) = name {
+            props.insert(
+                mir_types::atomic::ArrayKey::String(name.into()),
+                prop(&leaf),
+            );
+        }
+        props.insert(mir_types::atomic::ArrayKey::Int(i as i64 + 1), prop(&leaf));
+    }
+    Type::single(Atomic::TKeyedArray {
+        properties: Box::new(props),
+        is_open: false,
+        is_list: false,
     })
+}
+
+/// Name of each capture group (in group-number order) of a delimited PCRE
+/// pattern literal; `None` when the pattern can't be numbered reliably
+/// (`x` flag, branch reset, duplicate names, malformed delimiters).
+fn capture_group_names(pattern: &str) -> Option<Vec<Option<String>>> {
+    let pattern = pattern.trim_start();
+    let open = pattern.chars().next()?;
+    if open.is_alphanumeric() || open == '\\' {
+        return None;
+    }
+    let close = match open {
+        '(' => ')',
+        '[' => ']',
+        '{' => '}',
+        '<' => '>',
+        c => c,
+    };
+    let end = pattern.rfind(close).filter(|&e| e > 0)?;
+    let (body, modifiers) = (
+        &pattern[open.len_utf8()..end],
+        &pattern[end + close.len_utf8()..],
+    );
+    if modifiers.contains('x') {
+        return None;
+    }
+
+    let b = body.as_bytes();
+    let mut groups: Vec<Option<String>> = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'\\' => i += 1,
+            b'[' => {
+                i += 1;
+                if b.get(i) == Some(&b'^') {
+                    i += 1;
+                }
+                if b.get(i) == Some(&b']') {
+                    i += 1;
+                }
+                while i < b.len() && b[i] != b']' {
+                    if b[i] == b'\\' {
+                        i += 1;
+                    } else if b[i] == b'[' && b.get(i + 1) == Some(&b':') {
+                        i += body[i..].find(":]").map_or(0, |p| p + 1);
+                    }
+                    i += 1;
+                }
+            }
+            b'(' => match b.get(i + 1) {
+                Some(b'*') => {}
+                Some(b'?') => {
+                    let rest = &body[i + 2..];
+                    if rest.starts_with('|') {
+                        return None;
+                    }
+                    let named = rest
+                        .strip_prefix("P<")
+                        .or_else(|| {
+                            rest.strip_prefix('<')
+                                .filter(|r| !r.starts_with(['=', '!']))
+                        })
+                        .map(|r| (r, '>'))
+                        .or_else(|| rest.strip_prefix('\'').map(|r| (r, '\'')));
+                    if let Some((r, terminator)) = named {
+                        let name = &r[..r.find(terminator)?];
+                        if groups.iter().flatten().any(|n| n == name) {
+                            return None;
+                        }
+                        groups.push(Some(name.to_string()));
+                    }
+                }
+                _ => groups.push(None),
+            },
+            _ => {}
+        }
+        i += 1;
+    }
+    Some(groups)
 }
 
 /// Build `list<list<string>>` or `list<list<array{0: string, 1: int}>>` for `preg_match_all`.

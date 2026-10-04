@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `preg_match()` with a literal pattern containing named groups now types `$matches` as a shape keyed by group name and number, removing a false `InvalidReturnType` when it is returned as `array{name: string, ...}`.
 - A `[]` after a callable's return type (`Closure(): string[]`, `callable(): int[]`) now belongs to the return type instead of wrapping the whole callable in an array, removing false `InvalidArgument` on closures passed to such parameters.
 - A `@psalm-type` alias that references another alias (`Pairs = array<int, Value>`) now expands fully in namespaced files, including when imported with `@psalm-import-type`, instead of treating the inner alias as a class.
 - An `Enum::Case` call argument now binds its template to the case instead of the whole enum, so `Result::failure(Enum::Case)` fits a declared `Result<Enum::Case, T>`, while a different case is still reported. `never` is accepted in invariant template slots.
