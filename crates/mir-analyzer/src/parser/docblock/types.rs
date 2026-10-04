@@ -276,7 +276,11 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
     // `array<array-key, Type>`, not `array<int, Type>`: it makes no claim about
     // key shape, so a string-keyed array (e.g. `array_column`'s output, a
     // PSR-3 `$context` array) must still satisfy it.
-    if let Some(value_str) = s.strip_suffix("[]") {
+    // A `[]` after a callable's `: ret` belongs to the return type
+    // (`Closure(): string[]` returns `string[]`), so it is not an array-of-callable.
+    let callable_return_suffix =
+        split_callable_signature(s).is_some_and(|(_, _, after)| after.starts_with(':'));
+    if let Some(value_str) = s.strip_suffix("[]").filter(|_| !callable_return_suffix) {
         let value = parse_type_string(value_str);
         return Type::single(Atomic::TArray {
             key: Box::new(Type::array_key()),
@@ -1009,7 +1013,8 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     })
 }
 
-pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
+/// Splits `Closure(params): ret` / `callable(params)` into (is_closure, params, text after `)`).
+fn split_callable_signature(s: &str) -> Option<(bool, &str, &str)> {
     let s = s.trim_start_matches('\\');
     // `pure-callable(...)` / `pure-Closure(...)` — mir does not track purity
     // on the type itself, so parse the structural shape and drop the
@@ -1026,8 +1031,11 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
         return None;
     }
     let close = find_matching_paren(rest)?;
-    let params_str = &rest[1..close];
-    let after = rest[close + 1..].trim();
+    Some((is_closure, &rest[1..close], rest[close + 1..].trim()))
+}
+
+pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
+    let (is_closure, params_str, after) = split_callable_signature(s)?;
     let return_type = after
         .strip_prefix(':')
         .map(|ret_str| Box::new(parse_type_string(ret_str.trim())));
