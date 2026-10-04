@@ -174,12 +174,16 @@ fn refined_closure_return(
         }
         _ => inferred_return,
     };
+    let inferred_return = if return_ty_hint.is_some() {
+        widen_scalar_literals(inferred_return)
+    } else {
+        inferred_return
+    };
     let refines = return_ty_hint
         .as_ref()
         .filter(|declared| {
-            let same_family = (is_string_family(declared)
-                && is_string_family(&inferred_return)
-                && !inferred_return.contains(|a| matches!(a, Atomic::TLiteralString(_))))
+            let same_family = (is_string_family(declared) && is_string_family(&inferred_return))
+                || (is_int_family(declared) && is_int_family(&inferred_return))
                 || (is_bare_array(declared)
                     && inferred_return
                         .types
@@ -240,6 +244,47 @@ fn is_string_family(ty: &Type) -> bool {
             .types
             .iter()
             .all(|a| a.is_string() || matches!(a, Atomic::TNull))
+}
+
+/// Literal ints/strings widen to one sign / non-emptiness class, so a literal never leaks into the signature.
+fn widen_scalar_literals(ty: Type) -> Type {
+    let int_bounds = ty
+        .types
+        .iter()
+        .filter_map(|a| match a {
+            Atomic::TLiteralInt(n) => Some(*n),
+            _ => None,
+        })
+        .fold(None, |acc: Option<(i64, i64)>, n| {
+            Some(acc.map_or((n, n), |(lo, hi)| (lo.min(n), hi.max(n))))
+        });
+    let has_empty_string = ty
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TLiteralString(s) if s.is_empty()));
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    for a in ty.types {
+        out.add_type(match (a, int_bounds) {
+            (Atomic::TLiteralInt(_), Some((lo, _))) if lo > 0 => Atomic::TPositiveInt,
+            (Atomic::TLiteralInt(_), Some((lo, _))) if lo >= 0 => Atomic::TNonNegativeInt,
+            (Atomic::TLiteralInt(_), Some((_, hi))) if hi < 0 => Atomic::TNegativeInt,
+            (Atomic::TLiteralInt(_), _) => Atomic::TInt,
+            (Atomic::TLiteralString(_), _) if has_empty_string => Atomic::TString,
+            (Atomic::TLiteralString(_), _) => Atomic::TNonEmptyString,
+            (other, _) => other,
+        });
+    }
+    out
+}
+
+/// Int family: every atom is an int variant (`null` tolerated, as in the string family).
+fn is_int_family(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty
+            .types
+            .iter()
+            .all(|a| a.is_int() || matches!(a, Atomic::TNull))
 }
 
 /// Native `array`: key and value are unconstrained.

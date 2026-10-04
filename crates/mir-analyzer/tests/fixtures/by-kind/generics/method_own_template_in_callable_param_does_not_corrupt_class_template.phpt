@@ -36,7 +36,7 @@ class Animal {}
 /** @param Box<Animal> $b */
 function test(Box $b): void {
     $r = $b->apply(fn(Animal $a): string => "x");
-    /** @mir-check $r is array{0: Animal, 1: string} */
+    /** @mir-check $r is array{0: Animal, 1: non-empty-string} */
     echo 1;
 }
 ===expect===

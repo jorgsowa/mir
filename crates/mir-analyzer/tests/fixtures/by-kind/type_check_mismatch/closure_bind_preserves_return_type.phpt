@@ -12,11 +12,11 @@ class A {}
 class B {}
 
 $closure = function(): string { return "hello"; };
-/** @mir-check $closure is Closure(): string */
+/** @mir-check $closure is Closure(): non-empty-string */
 
 $bound = Closure::bind($closure, new B());
 // bound() should return string (or null if bind failed), not mixed
-/** @mir-check $bound is Closure(): string|null */
+/** @mir-check $bound is Closure(): non-empty-string|null */
 
 if ($bound) {
     $result = $bound();
