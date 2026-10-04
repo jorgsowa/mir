@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A bare enum (what `Enum::Case` evaluates to) is accepted in a template-argument slot declared as that single case, and `never` is accepted in invariant slots, removing false `InvalidReturnType`/`InvalidArgument` on generic values such as `Result<Enum, never>` against `Result<Enum::Case, T>`.
 - By-reference writes are now tracked: a by-ref parameter without `@param-out` widens the caller's variable to its declared type after a method or static call, and a by-ref closure capture written conditionally or with a new key no longer leaves a sealed array shape behind, removing false `NonExistentArrayOffset` on later reads.
 - Analyzing very large or deeply nested projects (e.g. the full Symfony tree including its test fixtures) no longer aborts with a stack overflow. Deep recursion (method chains, nested statements, cross-file return-type inference, parsing, AST drop) now continues on heap-grown stack segments, and the CLI's worker threads get a 16 MiB stack.
 - An array literal with an explicit `PHP_INT_MAX` key followed by an implicit key no longer overflows the next-key counter.

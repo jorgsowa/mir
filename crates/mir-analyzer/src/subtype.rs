@@ -527,6 +527,23 @@ fn atomic_mentions_enum_case(a: &Atomic) -> bool {
     }
 }
 
+/// `E::Case` expressions are typed as the bare enum `E`, so a type-argument slot declared as that
+/// single case (`E::Case`) accepts a bare `E`. Partial case unions stay distinct from the enum.
+pub(crate) fn bare_enum_fits_single_case(
+    db: &dyn MirDatabase,
+    actual: &Type,
+    declared: &Type,
+) -> bool {
+    let declared = canonical_enum_cases(db, declared);
+    match (actual.types.as_slice(), declared.types.as_slice()) {
+        (
+            [Atomic::TNamedObject { fqcn, type_params }],
+            [Atomic::TLiteralEnumCase { enum_fqcn, .. }],
+        ) => type_params.is_empty() && fqcn == enum_fqcn,
+        _ => false,
+    }
+}
+
 fn mentions_enum_case(ty: &Type) -> bool {
     ty.types.iter().any(atomic_mentions_enum_case)
 }
