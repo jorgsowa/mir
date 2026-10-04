@@ -632,6 +632,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let range_op = match a.op {
                     AssignOp::Plus => Some(BinaryOp::Add),
                     AssignOp::Minus => Some(BinaryOp::Sub),
+                    AssignOp::Mul => Some(BinaryOp::Mul),
                     AssignOp::Div => Some(BinaryOp::Div),
                     _ => None,
                 };
