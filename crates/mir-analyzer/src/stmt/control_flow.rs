@@ -226,8 +226,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // `while (1)` (and any other nonzero int literal) is just as much an
         // idiomatic infinite loop as `while (true)` — PHP truthiness treats
         // every nonzero int as true, only `0` is falsy.
-        let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true))
-            || matches!(w.condition.kind, ExprKind::Int(n) if n != 0);
+        let is_infinite = is_always_true_literal(&w.condition);
         let condition = w.condition.clone();
         let mut passes = 0;
         let post = self.analyze_loop_widened(
@@ -334,7 +333,8 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
 
-        let is_infinite = f.condition.is_empty();
+        // Only the last condition decides whether the loop continues.
+        let is_infinite = f.condition.last().is_none_or(is_always_true_literal);
         let post = self.analyze_loop_widened(
             &pre,
             entry,
@@ -1324,6 +1324,15 @@ impl<'a> StatementsAnalyzer<'a> {
 
         *ctx = result;
     }
+}
+
+/// Literal conditions that never terminate a loop: `true` or any nonzero int.
+fn is_always_true_literal(condition: &php_ast::owned::Expr) -> bool {
+    let mut cond = condition;
+    while let ExprKind::Parenthesized(inner) = &cond.kind {
+        cond = inner;
+    }
+    matches!(cond.kind, ExprKind::Bool(true)) || matches!(cond.kind, ExprKind::Int(n) if n != 0)
 }
 
 /// The variable of a plain `if ($var)` condition.
