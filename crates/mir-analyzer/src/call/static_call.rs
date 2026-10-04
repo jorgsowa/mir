@@ -1077,7 +1077,7 @@ impl CallAnalyzer {
                     .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
             });
             for (i, param) in resolved.params.iter().enumerate() {
-                let Some(out_ty) = param.out_ty.as_ref() else {
+                let Some(out_ty) = super::byref_written_type(param) else {
                     continue;
                 };
                 // `@param-out self`/`@param-out static` must resolve to the receiver's
@@ -1093,6 +1093,9 @@ impl CallAnalyzer {
                 } else {
                     out_ty.substitute_templates(&out_bindings)
                 };
+                if param.out_ty.is_none() && super::has_unbound_template(&out_ty) {
+                    continue;
+                }
                 if param.is_variadic {
                     for arg in call.args.iter().skip(i) {
                         let Some(value) = &arg.value else { continue };

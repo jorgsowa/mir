@@ -211,6 +211,32 @@ pub(crate) fn premark_byref_arg_vars(
     }
 }
 
+/// Type a by-ref argument holds after the call: `@param-out`, else the declared
+/// param type (the callee may have written anything the type admits).
+pub(crate) fn byref_written_type(
+    param: &mir_codebase::definitions::DeclaredParam,
+) -> Option<&std::sync::Arc<mir_types::Type>> {
+    param.out_ty.as_ref().or(if param.is_byref {
+        param.ty.as_ref()
+    } else {
+        None
+    })
+}
+
+/// True when `ty` still names an unbound template param.
+pub(crate) fn has_unbound_template(ty: &mir_types::Type) -> bool {
+    use mir_types::Atomic;
+    ty.types.iter().any(|a| match a {
+        Atomic::TTemplateParam { .. } => true,
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            has_unbound_template(key) || has_unbound_template(value)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => has_unbound_template(value),
+        Atomic::TNamedObject { type_params, .. } => type_params.iter().any(has_unbound_template),
+        _ => false,
+    })
+}
+
 // Reusable per-thread buffer for arg_types collection. The Option lets
 // reentrant calls (foo(bar(baz()))) detect they can't borrow the same buffer
 // and fall back to a fresh allocation.

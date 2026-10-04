@@ -37,7 +37,9 @@ fn widen_byref_capture(ty: Type) -> Type {
 }
 
 /// Parent type after a closure writes a by-ref capture. An empty array is
-/// dropped once the closure has written an array, so keys it adds are readable.
+/// dropped once the closure has written an array. If several array types
+/// remain, the closure may or may not have run, so shapes are opened and keys
+/// either shape adds stay readable.
 fn merge_byref_write(pre: Type, written: &Type) -> Type {
     let writes_array = written
         .types
@@ -51,7 +53,40 @@ fn merge_byref_write(pre: Type, written: &Type) -> Type {
             base.add_type(atomic);
         }
     }
-    Type::merge(&base, written)
+    let merged = Type::merge(&base, written);
+    let arrays = merged
+        .types
+        .iter()
+        .filter(|a| {
+            matches!(
+                a,
+                Atomic::TArray { .. }
+                    | Atomic::TList { .. }
+                    | Atomic::TNonEmptyArray { .. }
+                    | Atomic::TNonEmptyList { .. }
+                    | Atomic::TKeyedArray { .. }
+            )
+        })
+        .count();
+    if arrays < 2 {
+        return merged;
+    }
+    let mut out = Type::empty();
+    for atomic in merged.types {
+        out.add_type(match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_list,
+                ..
+            } => Atomic::TKeyedArray {
+                properties,
+                is_open: true,
+                is_list,
+            },
+            other => other,
+        });
+    }
+    out
 }
 
 fn param_name_span(source: &str, p: &Param) -> Span {
