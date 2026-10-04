@@ -39,7 +39,7 @@ function appendWrite(): void {
         $items[] = $i;
     };
     $add(1);
-    /** @mir-check $items is array{0: int} */
+    /** @mir-check $items is list<int> */
     $_ = $items;
 }
 

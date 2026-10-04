@@ -39,8 +39,10 @@ fn widen_byref_capture(ty: Type) -> Type {
 /// Parent type after a closure writes a by-ref capture. An empty array is
 /// dropped once the closure has written an array. If several array types
 /// remain, the closure may or may not have run, so shapes are opened and keys
-/// either shape adds stay readable.
+/// either shape adds stay readable. A written list shape becomes `list<V>`,
+/// since the closure may append any number of times.
 fn merge_byref_write(pre: Type, written: &Type) -> Type {
+    let written = &generalise_written_lists(written);
     let writes_array = written
         .types
         .iter()
@@ -85,6 +87,29 @@ fn merge_byref_write(pre: Type, written: &Type) -> Type {
             },
             other => other,
         });
+    }
+    out
+}
+
+fn generalise_written_lists(written: &Type) -> Type {
+    let mut out = Type::empty();
+    for atomic in &written.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_list: true,
+                ..
+            } if !properties.is_empty() => {
+                let mut value = Type::empty();
+                for prop in properties.values() {
+                    value = Type::merge(&value, &prop.ty);
+                }
+                out.add_type(Atomic::TList {
+                    value: Box::new(value),
+                });
+            }
+            other => out.add_type(other.clone()),
+        }
     }
     out
 }
