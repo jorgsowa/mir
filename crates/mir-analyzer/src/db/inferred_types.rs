@@ -45,6 +45,18 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
     inferred.functions.get(fqn).cloned()
 }
 
+/// [`inferred_function_return_type_demand`] as seen from `file`: resolves the
+/// declaration the same way [`crate::db::find_function_from`] does.
+pub fn inferred_function_return_type_from(
+    db: &dyn MirDatabase,
+    file: &str,
+    fqn: &str,
+) -> Option<Arc<Type>> {
+    let sf = crate::db::function_loc_from(db, file, Fqcn::from_str(db, fqn))?.file();
+    let inferred = crate::db::infer_file_return_types(db, sf);
+    inferred.functions.get(fqn).cloned()
+}
+
 /// Demand-driven inferred return type lookup for a method.
 ///
 /// Locates the file that declares the class (the symbol index, else on

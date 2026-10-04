@@ -51,7 +51,7 @@ pub(crate) fn record_callable_string_ref(
             let fqn = name.as_ref().trim_start_matches('\\');
             let here = crate::db::Fqcn::from_str(ea.db, fqn);
             let canonical_fqn: Option<Arc<str>> =
-                crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
+                crate::db::find_function_from(ea.db, &ea.file, here).map(|f| f.fqn.clone());
             if let Some(canonical_fqn) = canonical_fqn {
                 ea.record_function_ref(
                     &canonical_fqn,
@@ -121,7 +121,7 @@ fn extract_all_callable_candidates(
                 // Try to resolve the function name. Only collect params if found (don't fail for unknown strings).
                 // This allows arity checking for both documented callables and literal function names in code.
                 let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
-                if let Some(f) = crate::db::find_function(ea.db, here) {
+                if let Some(f) = crate::db::find_function_from(ea.db, &ea.file, here) {
                     out.push(
                         f.params
                             .iter()
@@ -173,7 +173,7 @@ fn extract_all_callable_return_types(union: &Type, ea: &ExpressionAnalyzer<'_>) 
                     continue;
                 }
                 let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
-                if let Some(f) = crate::db::find_function(ea.db, here) {
+                if let Some(f) = crate::db::find_function_from(ea.db, &ea.file, here) {
                     if let Some(ret) = f.return_type.as_deref() {
                         out.push(ret.clone());
                     }

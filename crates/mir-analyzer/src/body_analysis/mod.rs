@@ -335,7 +335,7 @@ fn lookup_function_node_for_decl(
         })?;
 
     let fqn = Arc::clone(&definition.fqn);
-    crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn.as_ref()))
+    crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, fqn.as_ref()))
         .map(|definition| (fqn, definition))
 }
 

@@ -345,8 +345,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
                 .map(|cl| cl.type_aliases().clone())
         } else if let Some(fqn) = ctx.current_function_fqn.as_deref() {
-            crate::db::find_function(self.db, crate::db::Fqcn::from_str(self.db, fqn))
-                .map(|f| f.type_aliases.clone())
+            crate::db::find_function_from(
+                self.db,
+                &self.file,
+                crate::db::Fqcn::from_str(self.db, fqn),
+            )
+            .map(|f| f.type_aliases.clone())
         } else {
             None
         };
@@ -409,9 +413,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         } else if let Some(fqn) = ctx.current_function_fqn.as_deref() {
-            if let Some(function) =
-                crate::db::find_function(self.db, crate::db::Fqcn::from_str(self.db, fqn))
-            {
+            if let Some(function) = crate::db::find_function_from(
+                self.db,
+                &self.file,
+                crate::db::Fqcn::from_str(self.db, fqn),
+            ) {
                 template_names.extend(
                     function
                         .template_params

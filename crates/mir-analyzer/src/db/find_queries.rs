@@ -963,6 +963,41 @@ pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Ar
     function_def_at(db, file, idx as u32).clone()
 }
 
+/// Where function `fqn` is declared as seen from `file`: a declaration in
+/// `file` itself wins over the workspace-wide one, since standalone scripts
+/// reuse function names.
+pub(crate) fn function_loc_from(
+    db: &dyn MirDatabase,
+    file: &str,
+    fqn: Fqcn<'_>,
+) -> Option<SymbolLoc> {
+    let global = function_loc(db, fqn)?;
+    let Some(here) = db
+        .lookup_source_file(file)
+        .filter(|sf| *sf != global.file())
+    else {
+        return Some(global);
+    };
+    let key = fqn.name(db).ascii_lowercase();
+    let own = crate::db::collect_file_declarations(db, here)
+        .functions()
+        .find(|d| d.lookup_key() == key)
+        .map(|d| d.loc);
+    Some(own.unwrap_or(global))
+}
+
+/// [`find_function`] as seen from `file` (see [`function_loc_from`]).
+pub fn find_function_from<'db>(
+    db: &'db dyn MirDatabase,
+    file: &str,
+    fqn: Fqcn<'db>,
+) -> Option<Arc<FunctionDef>> {
+    let SymbolLoc::Function { file, idx } = function_loc_from(db, file, fqn)? else {
+        return None;
+    };
+    function_def_at(db, file, idx as u32).clone()
+}
+
 /// Composite: resolve `fqn` to its defining file, then locate a global
 /// constant within it.
 pub fn find_global_constant<'db>(

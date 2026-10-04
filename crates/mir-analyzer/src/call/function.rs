@@ -42,7 +42,7 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let here = crate::db::Fqcn::from_str(db, fqn);
-    if let Some(f) = crate::db::find_function(db, here) {
+    if let Some(f) = crate::db::find_function_from(db, &ea.file, here) {
         let param_file = f
             .location
             .as_ref()
@@ -52,11 +52,11 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             .return_type
             .clone()
             .map(|native| {
-                crate::db::inferred_function_return_type_demand(db, fqn)
+                crate::db::inferred_function_return_type_from(db, &ea.file, fqn)
                     .filter(|t| super::method::inferred_literals_refine_native(&native, t))
                     .unwrap_or(native)
             })
-            .or_else(|| crate::db::inferred_function_return_type_demand(db, fqn))
+            .or_else(|| crate::db::inferred_function_return_type_from(db, &ea.file, fqn))
             .map(|t| (*t).clone())
             .unwrap_or_else(Type::mixed);
         return Some(ResolvedFn {
@@ -602,7 +602,8 @@ impl CallAnalyzer {
                         let fqn = name.as_ref().trim_start_matches('\\');
                         let here = crate::db::Fqcn::from_str(ea.db, fqn);
                         let canonical_fqn: Option<Arc<str>> =
-                            crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
+                            crate::db::find_function_from(ea.db, &ea.file, here)
+                                .map(|f| f.fqn.clone());
                         if let Some(canonical_fqn) = canonical_fqn {
                             ea.record_function_ref(&canonical_fqn, value.span);
                         }
@@ -1675,7 +1676,7 @@ fn literal_named_function(
         return None;
     };
     let fqn = name.trim_start_matches('\\');
-    crate::db::find_function(ea.db, crate::db::Fqcn::from_str(ea.db, fqn))
+    crate::db::find_function_from(ea.db, &ea.file, crate::db::Fqcn::from_str(ea.db, fqn))
 }
 
 fn typed_params_from_callee(

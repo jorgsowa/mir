@@ -243,17 +243,19 @@ pub use self::find_queries::{
     analyzed_class_defs, analyzed_enum_defs, analyzed_interface_defs, analyzed_trait_defs,
     class_ancestors_by_fqcn, class_array_property_defaults, class_in_file, class_like_decl_file,
     class_like_indexed, enum_in_file, find_class_constant_in_chain, find_class_constant_in_class,
-    find_class_like, find_function, find_global_constant, find_implicit_doc_parent,
-    find_inheritdoc_parent, find_method_in_chain, find_method_in_class,
+    find_class_like, find_function, find_function_from, find_global_constant,
+    find_implicit_doc_parent, find_inheritdoc_parent, find_method_in_chain, find_method_in_class,
     find_method_respecting_precedence, find_property_in_chain, find_property_in_class,
     function_in_file, global_constant_in_file, has_method_in_chain, interface_in_file,
     is_method_concretely_implemented, method_is_pure_in_chain, property_in_own_composition,
     trait_in_file, ClassLike,
 };
-pub(crate) use self::find_queries::{class_like_loc, function_loc, indexed_symbol_loc, symbol_loc};
+pub(crate) use self::find_queries::{
+    class_like_loc, function_loc, function_loc_from, indexed_symbol_loc, symbol_loc,
+};
 pub use self::inferred_types::{
-    inferred_function_return_type_demand, inferred_method_return_type_demand,
-    inferred_property_type_demand,
+    inferred_function_return_type_demand, inferred_function_return_type_from,
+    inferred_method_return_type_demand, inferred_property_type_demand,
 };
 #[allow(unused_imports)]
 pub use self::mirdb::MirDbStorage;

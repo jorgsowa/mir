@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A function name declared in several standalone scripts is checked against the calling file's own declaration, removing false `InvalidArgument` and `TooManyArguments`.
 - `self` nested in a property docblock type (`@var list<self>`) resolves to the declaring class, removing false `InvalidArgument` and `InvalidReturnType` when the property is read.
 - A class constant initialised by a concatenation with a non-empty literal (`self::PREFIX . '.'`) is `non-empty-string`, and two literals fold to a literal, removing false `InvalidArgument` where a `non-empty-string` key is expected.
 - An array literal whose elements are plain `int`/`string` passed to a `list<positive-int>`/`list<non-empty-string>` param, and a closure returning plain `int`/`string` passed where a narrower return (`positive-int`, `-1|0|1`) is documented, now report `ArgumentTypeCoercion` (Info) instead of `InvalidArgument` (Error).

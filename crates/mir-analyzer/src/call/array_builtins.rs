@@ -241,7 +241,7 @@ fn callable_return_type(
             }
             Atomic::TLiteralString(fn_name) if !fn_name.is_empty() => {
                 let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
-                if let Some(f) = crate::db::find_function(ea.db, here) {
+                if let Some(f) = crate::db::find_function_from(ea.db, &ea.file, here) {
                     if let Some(rt) = &f.return_type {
                         return Some((**rt).clone());
                     }
@@ -276,7 +276,7 @@ fn resolve_opaque_callback_via_callers(
     };
     let var_name = name.trim_start_matches('$');
     let fqn = ctx.current_function_fqn.as_ref()?;
-    let f = crate::db::find_function(ea.db, crate::db::Fqcn::from_str(ea.db, fqn))?;
+    let f = crate::db::find_function_from(ea.db, &ea.file, crate::db::Fqcn::from_str(ea.db, fqn))?;
     let index = f.params.iter().position(|p| p.name.as_ref() == var_name)?;
     // Only meaningful when the *declared* param type is itself a bare opaque
     // callable — if it already carries a signature, the arms above already
