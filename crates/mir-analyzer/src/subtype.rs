@@ -512,7 +512,7 @@ fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
 
 fn atomic_mentions_enum_case(a: &Atomic) -> bool {
     match a {
-        Atomic::TLiteralEnumCase { .. } => true,
+        Atomic::TLiteralEnumCase { .. } | Atomic::TValueOf { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
             fqcn.contains("::") || type_params.iter().any(mentions_enum_case)
         }
@@ -572,6 +572,14 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
                 continue;
             }
         }
+        if let Atomic::TValueOf { target } = atomic {
+            if let Some(values) = enum_backing_values(db, target) {
+                for a in values.types {
+                    out.add_type(a);
+                }
+                continue;
+            }
+        }
         out.add_type(match atomic {
             Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::") => {
                 docblock_case_literal(db, fqcn).unwrap_or_else(|| atomic.clone())
@@ -619,6 +627,43 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
         });
     }
     collapse_complete_enums(db, out)
+}
+
+/// `value-of<E>` for backed enums: the case values, or the backing scalar when a case value is
+/// not a literal. `None` unless every atom of `target` is a backed enum.
+pub(crate) fn enum_backing_values(db: &dyn MirDatabase, target: &Type) -> Option<Type> {
+    let mut result = Type::empty();
+    for atomic in &target.types {
+        let Atomic::TNamedObject { fqcn, type_params } = atomic else {
+            return None;
+        };
+        if !type_params.is_empty() {
+            return None;
+        }
+        let crate::db::ClassLike::Enum(e) =
+            crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn))?
+        else {
+            return None;
+        };
+        let scalar = e.scalar_type.as_ref()?;
+        let literals: Option<Vec<Atomic>> = e
+            .cases
+            .values()
+            .map(|c| {
+                let v = c.value.as_ref()?;
+                v.types
+                    .iter()
+                    .all(|a| matches!(a, Atomic::TLiteralInt(_) | Atomic::TLiteralString(_)))
+                    .then(|| v.types.clone())
+            })
+            .collect::<Option<Vec<_>>>()
+            .map(|vs| vs.into_iter().flatten().collect());
+        match literals {
+            Some(atoms) if !atoms.is_empty() => atoms.into_iter().for_each(|a| result.add_type(a)),
+            _ => scalar.types.iter().for_each(|a| result.add_type(a.clone())),
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
 }
 
 /// Union of the constant types a docblock `Cls::NAME` / `Cls::PREFIX*` names. `None` for enums

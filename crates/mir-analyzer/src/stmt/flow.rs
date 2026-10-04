@@ -20,6 +20,7 @@ pub(crate) fn return_type_is_invalid(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> bool {
+    let declared = &*crate::subtype::canonical_enum_cases(db, declared);
     if projected_template_return_compatible(actual, declared) {
         return false;
     }
