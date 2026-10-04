@@ -1,5 +1,5 @@
 ===description===
-A plain int/string subject matched only against literal arms (inline or resolved class constants) is not reported; a non-literal arm, an unresolvable constant or a large bounded range still is.
+A plain int/string subject matched only against literal arms (inline or class constants, even non-literal ones) is not reported; a runtime arm or a large bounded range still is.
 ===config===
 <mir>
   <issueHandlers>
@@ -35,7 +35,7 @@ class Kind {
         };
     }
 
-    public static function unresolvedConst(string $kind): int {
+    public static function nonLiteralConst(string $kind): int {
         return match ($kind) {
             self::DYNAMIC => 1,
         };
@@ -77,7 +77,6 @@ function literalUnionStillFlagged(string $kind): int {
     };
 }
 ===expect===
-UnhandledMatchCondition@30:15-32:9: Unhandled match condition: possibly-unmatched value of type 'string'
 UnhandledMatchCondition@36:15-39:9: Unhandled match condition: possibly-unmatched value of type 'string'
 UnhandledMatchCondition@58:11-61:5: Unhandled match condition: possibly-unmatched value of type 'int<0, 100000>'
 UnhandledMatchCondition@66:11-68:5: Unhandled match condition: "b"

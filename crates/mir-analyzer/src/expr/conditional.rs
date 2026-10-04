@@ -375,6 +375,19 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// covered-literal set as inline `'a'`/`1` conditions instead of leaving the
     /// match looking non-exhaustive.
     fn resolve_class_const_literal(&self, cond: &Expr, ctx: &FlowState) -> Option<Atomic> {
+        let cdef = self.find_arm_class_constant(cond, ctx)?;
+        match cdef.ty.types.as_slice() {
+            [Atomic::TLiteralString(s)] => Some(Atomic::TLiteralString(s.clone())),
+            [Atomic::TLiteralInt(n)] => Some(Atomic::TLiteralInt(*n)),
+            _ => None,
+        }
+    }
+
+    fn find_arm_class_constant(
+        &self,
+        cond: &Expr,
+        ctx: &FlowState,
+    ) -> Option<mir_codebase::definitions::ConstantDef> {
         let ExprKind::ClassConstAccess(cca) = &cond.kind else {
             return None;
         };
@@ -398,10 +411,34 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
         let here = crate::db::Fqcn::interned(self.db, mir_types::Name::new(&resolved_class));
         let (_, cdef) = crate::db::find_class_constant_in_chain(self.db, here, member)?;
-        match cdef.ty.types.as_slice() {
-            [Atomic::TLiteralString(s)] => Some(Atomic::TLiteralString(s.clone())),
-            [Atomic::TLiteralInt(n)] => Some(Atomic::TLiteralInt(*n)),
-            _ => None,
+        Some(cdef)
+    }
+
+    /// A match arm whose value is fixed at compile time even when its literal
+    /// isn't known: a resolvable class constant of any type, an enum case's
+    /// `->value`/`->name`, or an element of such a constant.
+    fn is_constant_arm(&self, cond: &Expr, ctx: &FlowState) -> bool {
+        match &cond.kind {
+            ExprKind::String(_) => true,
+            ExprKind::ClassConstAccess(_) => self.find_arm_class_constant(cond, ctx).is_some(),
+            ExprKind::PropertyAccess(pa) => {
+                matches!(pa.object.kind, ExprKind::ClassConstAccess(_))
+                    && matches!(
+                        extract_string_from_expr(&pa.property).as_deref(),
+                        Some("value" | "name")
+                    )
+            }
+            ExprKind::ArrayAccess(aa) => {
+                matches!(
+                    aa.array.kind,
+                    ExprKind::ClassConstAccess(_) | ExprKind::ArrayAccess(_)
+                ) && self.is_constant_arm(&aa.array, ctx)
+                    && aa
+                        .index
+                        .as_deref()
+                        .is_some_and(|i| self.is_constant_arm(i, ctx))
+            }
+            _ => extract_literal_int(cond).is_some(),
         }
     }
 
@@ -804,11 +841,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .iter()
             .filter_map(|a| a.conditions.as_deref())
             .flatten()
-            .all(|cond| {
-                matches!(cond.kind, ExprKind::String(_))
-                    || extract_literal_int(cond).is_some()
-                    || self.resolve_class_const_literal(cond, ctx).is_some()
-            });
+            .all(|cond| self.is_constant_arm(cond, ctx));
         let int_or_string_subject = subject_ty.types.iter().all(|a| {
             matches!(
                 a,
