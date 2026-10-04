@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `self`/`static` as a type argument of `@template-implements`, `@template-extends` and `@template-use` now resolves to the declaring class, so an override returning `self` no longer raises `MethodSignatureMismatch`.
+- `array + mixed` (either order) is no longer reported as `InvalidOperand`; the `mixed` operand may be an array.
 - A literal array key present on only some union arms or paths (conditional append, ternary shapes) is no longer a hard `NonExistentArrayOffset`; it is reported only when every closed arm lacks the key.
 - An unbounded `class-string`/`interface-string` argument no longer binds `object` to a bounded template, removing false `InvalidTemplateParam`.
 - A function name declared in several standalone scripts is checked against the calling file's own declaration, removing false `InvalidArgument` and `TooManyArguments`.
