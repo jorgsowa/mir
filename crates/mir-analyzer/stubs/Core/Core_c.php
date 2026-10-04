@@ -23,7 +23,7 @@ interface iterable {}
  * Instead it must be implemented by either {@see IteratorAggregate} or {@see Iterator}.
  *
  * @link https://php.net/manual/en/class.traversable.php
- * @template TKey
+ * @template-covariant TKey
  * @template-covariant TValue
  *
  * @template-extends iterable<TKey, TValue>
@@ -33,7 +33,7 @@ interface Traversable extends iterable {}
 /**
  * Interface to create an external Iterator.
  * @link https://php.net/manual/en/class.iteratoraggregate.php
- * @template TKey
+ * @template-covariant TKey
  * @template-covariant TValue
  * @template-extends Traversable<TKey, TValue>
  */
@@ -54,7 +54,7 @@ interface IteratorAggregate extends Traversable
  * Interface for external iterators or objects that can be iterated
  * themselves internally.
  * @link https://php.net/manual/en/class.iterator.php
- * @template TKey
+ * @template-covariant TKey
  * @template-covariant TValue
  * @template-extends Traversable<TKey, TValue>
  */

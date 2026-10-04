@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Traversable<int, X>` (and `Iterator`, `IteratorAggregate`, `Generator`) now satisfies a wider `iterable` parameter; the key template is covariant, removing false `InvalidArgument`.
 - Conditional returns now resolve enum-case subjects (`T is Key::A ? X : Y`, including chains) and a `true`/`false`/`null` default of an omitted argument, instead of widening to every branch.
 - Interpolating, concatenating or echoing a docblock `Class::*` type no longer reports a false `ImplicitToStringCast`.
 - `@psalm-type Name array{...}` without `=`, `array { a: int }` with a space, a `callable(string): object` shape item and a chained `A ? x : B ? y : z` conditional now parse as written instead of as a class name, removing false `InvalidArgument`/`InvalidReturnType`.
