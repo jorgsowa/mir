@@ -154,11 +154,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // else requires numeric operands. Flag an operand only when it is
                 // *definitely* non-numeric (a non-numeric literal string, array,
                 // object, or enum case) so unions / general strings never FP.
-                let both_arrays = b.op == BinaryOp::Add
-                    && !left_ty.types.is_empty()
-                    && left_ty.types.iter().all(Atomic::is_array)
-                    && !right_ty.types.is_empty()
-                    && right_ty.types.iter().all(Atomic::is_array);
+                // `mixed` may itself be an array, so `array + mixed` is not definite.
+                let array_or_mixed = |t: &Type| {
+                    t.is_mixed() || (!t.types.is_empty() && t.types.iter().all(Atomic::is_array))
+                };
+                let both_arrays =
+                    b.op == BinaryOp::Add && array_or_mixed(&left_ty) && array_or_mixed(&right_ty);
                 if !both_arrays {
                     if operand_is_non_numeric(&left_ty) || operand_is_non_numeric(&right_ty) {
                         self.emit(
