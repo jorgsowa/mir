@@ -3,7 +3,11 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use mir_codebase::definitions::{DeclaredParam, TemplateParam};
-use mir_types::{atomic::ArrayKey, union::empty_type_params, Atomic, Name, Type};
+use mir_types::{
+    atomic::{ArrayKey, FnParam},
+    union::empty_type_params,
+    Atomic, Name, Type,
+};
 
 use crate::db::MirDatabase;
 use crate::subtype::is_subtype;
@@ -93,7 +97,10 @@ pub fn infer_arg_template_bindings(
         .map(|tp| Name::from(tp.name.as_ref()))
         .collect();
 
-    for (param, arg_ty) in bind_args_to_params(params, arg_types, arg_names) {
+    let mut bound_pairs = bind_args_to_params(params, arg_types, arg_names);
+    // Callable params only fill templates no other argument bound.
+    bound_pairs.sort_by_key(|(param, _)| param.ty.as_deref().is_some_and(has_callable_atomic));
+    for (param, arg_ty) in bound_pairs {
         if let Some(param_ty) = &param.ty {
             if param.is_variadic {
                 // Variadic docblock types are written aggregate-style
@@ -703,6 +710,46 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
         )
 }
 
+fn has_callable_atomic(ty: &Type) -> bool {
+    ty.types
+        .iter()
+        .any(|a| matches!(a, Atomic::TClosure { .. } | Atomic::TCallable { .. }))
+}
+
+/// A callable's parameter types are contravariant evidence: they bind a
+/// template only when nothing bound it before, never widen an existing binding.
+fn infer_from_callable_params(
+    db: &dyn MirDatabase,
+    p_params: &[FnParam],
+    a_params: &[FnParam],
+    template_names: &FxHashSet<Name>,
+    bindings: &mut FxHashMap<Name, Type>,
+    risky_fallback: &mut FxHashMap<Name, Type>,
+) {
+    let already_bound: FxHashSet<Name> = bindings.keys().copied().collect();
+    let mut from_params: FxHashMap<Name, Type> = FxHashMap::default();
+    for (pp, ap) in p_params.iter().zip(a_params.iter()) {
+        if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
+            infer_from_pair(
+                db,
+                &pt.to_union(),
+                &at.to_union(),
+                template_names,
+                &mut from_params,
+                risky_fallback,
+            );
+        }
+    }
+    for (name, ty) in from_params {
+        if !already_bound.contains(&name) {
+            bindings
+                .entry(name)
+                .or_insert_with(Type::empty)
+                .merge_with(&ty);
+        }
+    }
+}
+
 fn infer_from_pair(
     db: &dyn MirDatabase,
     param_ty: &Type,
@@ -1025,18 +1072,14 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TClosure { data: a_data } => {
                             let (a_params, a_ret) = (&a_data.params, &a_data.return_type);
-                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
-                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
-                                    infer_from_pair(
-                                        db,
-                                        &pt.to_union(),
-                                        &at.to_union(),
-                                        template_names,
-                                        bindings,
-                                        risky_fallback,
-                                    );
-                                }
-                            }
+                            infer_from_callable_params(
+                                db,
+                                p_params,
+                                a_params,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                             infer_from_pair(
                                 db,
                                 p_ret,
@@ -1050,18 +1093,14 @@ fn infer_from_pair(
                             params: Some(a_params),
                             return_type: Some(a_ret),
                         } => {
-                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
-                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
-                                    infer_from_pair(
-                                        db,
-                                        &pt.to_union(),
-                                        &at.to_union(),
-                                        template_names,
-                                        bindings,
-                                        risky_fallback,
-                                    );
-                                }
-                            }
+                            infer_from_callable_params(
+                                db,
+                                p_params,
+                                a_params,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                             infer_from_pair(
                                 db,
                                 p_ret,
@@ -1087,18 +1126,14 @@ fn infer_from_pair(
                             params: Some(a_params),
                             return_type: Some(a_ret),
                         } => {
-                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
-                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
-                                    infer_from_pair(
-                                        db,
-                                        &pt.to_union(),
-                                        &at.to_union(),
-                                        template_names,
-                                        bindings,
-                                        risky_fallback,
-                                    );
-                                }
-                            }
+                            infer_from_callable_params(
+                                db,
+                                p_params,
+                                a_params,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                             infer_from_pair(
                                 db,
                                 p_ret,
@@ -1110,18 +1145,14 @@ fn infer_from_pair(
                         }
                         Atomic::TClosure { data: a_data } => {
                             let (a_params, a_ret) = (&a_data.params, &a_data.return_type);
-                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
-                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
-                                    infer_from_pair(
-                                        db,
-                                        &pt.to_union(),
-                                        &at.to_union(),
-                                        template_names,
-                                        bindings,
-                                        risky_fallback,
-                                    );
-                                }
-                            }
+                            infer_from_callable_params(
+                                db,
+                                p_params,
+                                a_params,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                             infer_from_pair(
                                 db,
                                 p_ret,
