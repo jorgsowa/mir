@@ -564,6 +564,14 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
     out.possibly_undefined = ty.possibly_undefined;
     out.from_docblock = ty.from_docblock;
     for atomic in &ty.types {
+        if let Atomic::TNamedObject { fqcn, .. } = atomic {
+            if let Some(constants) = class_constant_ref_type(db, fqcn) {
+                for a in constants.types {
+                    out.add_type(a);
+                }
+                continue;
+            }
+        }
         out.add_type(match atomic {
             Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::") => {
                 docblock_case_literal(db, fqcn).unwrap_or_else(|| atomic.clone())
@@ -611,6 +619,40 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
         });
     }
     collapse_complete_enums(db, out)
+}
+
+/// Union of the constant types a docblock `Cls::NAME` / `Cls::PREFIX*` names. `None` for enums
+/// (their cases are handled separately) and when no constant matches.
+fn class_constant_ref_type(db: &dyn MirDatabase, name: &str) -> Option<Type> {
+    let (class_name, pattern) = name.split_once("::")?;
+    let fqcn = crate::db::Fqcn::from_str(db, class_name);
+    if matches!(
+        crate::db::find_class_like(db, fqcn)?,
+        crate::db::ClassLike::Enum(_)
+    ) {
+        return None;
+    }
+    let prefix = pattern.strip_suffix('*');
+    let mut seen: Vec<std::sync::Arc<str>> = Vec::new();
+    let mut result = Type::empty();
+    for ancestor in crate::db::class_ancestors_by_fqcn(db, fqcn).iter() {
+        let here = crate::db::Fqcn::interned(db, Name::new(ancestor.as_ref()));
+        let Some(class) = crate::db::find_class_like(db, here) else {
+            continue;
+        };
+        for (const_name, def) in class.own_constants().iter() {
+            let matches = prefix.map_or(const_name.as_ref() == pattern, |p| {
+                const_name.starts_with(p)
+            });
+            if matches && !seen.contains(const_name) {
+                seen.push(const_name.clone());
+                for a in def.ty.types.iter() {
+                    result.add_type(a.clone());
+                }
+            }
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
 }
 
 fn docblock_case_literal(db: &dyn MirDatabase, name: &str) -> Option<Atomic> {

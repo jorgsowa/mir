@@ -593,6 +593,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         });
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
+            let idx_ty = crate::subtype::canonical_enum_cases(self.db, &idx_ty).into_owned();
             if receiver_is_array_access {
                 // The array-key rule below is plain-PHP-array-only; skip it —
                 // but the offset must still satisfy the receiver's own

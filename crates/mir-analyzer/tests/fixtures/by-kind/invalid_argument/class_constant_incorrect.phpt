@@ -17,5 +17,5 @@ class C {
 /** @param "foo"|"bar"|C::A|C::B $s */
 function foo($s) : void {}
 foo("for");
-//  ^^^^^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"|Ns\C::A|Ns\C::B', got '"for"'
+//  ^^^^^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"|"bat"|"baz"', got '"for"'
 ===expect===

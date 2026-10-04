@@ -207,6 +207,8 @@ pub(crate) fn check_one(
     if !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()
         && !arg_ty.is_mixed()
+        // An unresolved `Cls::CONST` has an unknown value, so a mismatch can't be proven.
+        && !arg_ty.contains(|t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::")))
         && !named_object_subtype(arg_ty, param_ty, ea)
         && !super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
         && !super::param_contains_template_or_unknown(arg_ty, arg_ty, ea, template_params)
