@@ -45,9 +45,7 @@ use std::collections::HashSet;
 use std::ops::ControlFlow;
 
 use mir_types::{Atomic, Type};
-use php_ast::owned::visitor::{
-    walk_owned_block, walk_owned_expr, walk_owned_program, walk_owned_stmt, OwnedVisitor,
-};
+use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
 use php_ast::owned::{ArrayElement, Expr, ExprKind, Name, NamespaceBody, Program, Stmt, StmtKind};
 
 /// Every static-property write target found in one source file, keyed by
@@ -100,7 +98,7 @@ impl OwnedVisitor for WriteScanner {
                         // A namespaced body does not inherit the surrounding
                         // static scope.
                         self.class = None;
-                        let flow = walk_owned_block(self, block);
+                        let flow = crate::recursion::walk_block(self, block);
                         self.ns = old_ns;
                         self.class = old_class;
                         return flow;
@@ -120,32 +118,32 @@ impl OwnedVisitor for WriteScanner {
                         .and_then(|n| n.as_deref())
                         .map(str::to_owned),
                 );
-                let flow = walk_owned_stmt(self, stmt);
+                let flow = crate::recursion::walk_stmt(self, stmt);
                 self.exit_static_scope();
                 return flow;
             }
             StmtKind::Trait(decl) => {
                 self.enter_static_scope(decl.name.as_deref().map(str::to_owned));
-                let flow = walk_owned_stmt(self, stmt);
+                let flow = crate::recursion::walk_stmt(self, stmt);
                 self.exit_static_scope();
                 return flow;
             }
             StmtKind::Enum(decl) => {
                 self.enter_static_scope(decl.name.as_deref().map(str::to_owned));
-                let flow = walk_owned_stmt(self, stmt);
+                let flow = crate::recursion::walk_stmt(self, stmt);
                 self.exit_static_scope();
                 return flow;
             }
             _ => {}
         }
-        walk_owned_stmt(self, stmt)
+        crate::recursion::walk_stmt(self, stmt)
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::Assign(a) = &expr.kind {
             self.classify_assign_target(&a.target);
         }
-        walk_owned_expr(self, expr)
+        crate::recursion::walk_expr(self, expr)
     }
 }
 

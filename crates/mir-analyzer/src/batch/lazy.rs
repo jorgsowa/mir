@@ -209,7 +209,7 @@ impl AnalysisSession {
                     .map_with(db_full, |db, (file, src)| {
                         let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                         let parsed =
-                            php_rs_parser::parse_versioned(src, php_version.parser_version());
+                            crate::recursion::parse_versioned(src, php_version.parser_version());
                         let (issues, symbols) = driver.analyze_bodies(
                             &parsed.program,
                             file.clone(),

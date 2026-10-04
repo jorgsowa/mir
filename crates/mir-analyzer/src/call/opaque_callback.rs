@@ -26,7 +26,7 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use mir_types::Type;
-use php_ast::owned::visitor::{walk_owned_expr, OwnedVisitor};
+use php_ast::owned::visitor::OwnedVisitor;
 use php_ast::owned::{CallableCreateKind, Expr, ExprKind};
 
 use crate::db::{MirDatabase, SourceFile};
@@ -144,7 +144,7 @@ impl OwnedVisitor for OpaqueCallScanner<'_> {
                 }
             }
         }
-        walk_owned_expr(self, expr)
+        crate::recursion::walk_expr(self, expr)
     }
 }
 

@@ -40,6 +40,7 @@ aho-corasick = "1"
 
 # Concurrency
 rayon      = "1"
+stacker    = "0.1"
 boxcar     = "0.2"
 dashmap    = "6"
 parking_lot = "0.12"

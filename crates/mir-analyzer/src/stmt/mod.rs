@@ -411,6 +411,10 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     pub fn analyze_stmt(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut FlowState) {
+        crate::recursion::ensure_stack(|| self.analyze_stmt_inner(stmt, ctx));
+    }
+
+    fn analyze_stmt_inner(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut FlowState) {
         let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();

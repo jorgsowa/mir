@@ -351,7 +351,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
-        let ty = self.analyze_inner(expr, ctx);
+        let ty = crate::recursion::ensure_stack(|| self.analyze_inner(expr, ctx));
         if let Some(plugins) = self.plugins.clone() {
             if plugins.hooks().after_expression_analysis {
                 let file = self.file.clone();

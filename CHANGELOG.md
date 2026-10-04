@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `mir_analyzer::recursion::STACK_SIZE` (16 MiB), the worker stack size analysis is sized for; embedders building their own rayon pool can use it.
+
 ### Fixed
 
+- Analyzing very large or deeply nested projects (e.g. the full Symfony tree including its test fixtures) no longer aborts with a stack overflow. Deep recursion (method chains, nested statements, cross-file return-type inference, parsing, AST drop) now continues on heap-grown stack segments, and the CLI's worker threads get a 16 MiB stack.
+- An array literal with an explicit `PHP_INT_MAX` key followed by an implicit key no longer overflows the next-key counter.
 - A native-only override of a method whose `@return T` is bound by `@extends`/`@implements` is no longer flagged when its hint admits the bound type (e.g. the declaring interface).
 - An override with no `@param` docblock of its own now inherits a refining `@param` type from the nearest ancestor (e.g. `positive-int` for a native `int`) inside its body, instead of the bare native hint.
 - An intersection of array types (`array<string, mixed>&array{...}`) is accepted for a plain `array` parameter.

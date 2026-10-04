@@ -25,7 +25,7 @@ pub struct AnalyzerDb {
 
 pub(crate) struct CollectedIngest {
     pub file_defs: crate::db::FileDefinitions,
-    pub parsed: Option<php_rs_parser::ParseResult>,
+    pub parsed: Option<crate::recursion::GuardedParse>,
 }
 
 /// Output of [`AnalyzerDb::prepare_ingest`], registered by [`AnalyzerDb::commit_ingest`].
@@ -265,7 +265,7 @@ impl AnalyzerDb {
         }
         crate::metrics::record_stub_cache_miss();
 
-        let parsed = php_rs_parser::parse_versioned(source, php_version.parser_version());
+        let parsed = crate::recursion::parse_versioned(source, php_version.parser_version());
 
         let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 

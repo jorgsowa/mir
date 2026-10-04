@@ -125,12 +125,13 @@ impl BatchOptions {
 struct ParsedProjectFile {
     file: Arc<str>,
     source: Arc<str>,
-    parsed: php_rs_parser::ParseResult,
+    parsed: crate::recursion::GuardedParse,
 }
 
 impl ParsedProjectFile {
     fn new(file: Arc<str>, source: Arc<str>, php_version: PhpVersion) -> Self {
-        let parsed = php_rs_parser::parse_versioned(source.as_ref(), php_version.parser_version());
+        let parsed =
+            crate::recursion::parse_versioned(source.as_ref(), php_version.parser_version());
         Self {
             file,
             source,
@@ -380,7 +381,7 @@ pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> Analysi
     // file's own functions/methods/classes and degrades every parameter to
     // `mixed` via the `ast_derived_fn_params` fallback.
     db.upsert_source_file(file.clone(), Arc::from(source));
-    let parsed = php_rs_parser::parse_versioned(source, php_version.parser_version());
+    let parsed = crate::recursion::parse_versioned(source, php_version.parser_version());
     let mut collected_issues: Vec<Issue> = parsed
         .errors
         .iter()

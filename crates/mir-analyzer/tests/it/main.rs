@@ -3,6 +3,7 @@
 
 mod analysis_snapshot;
 mod api_phase1_phase2;
+mod array_literal_int_key_overflow;
 mod autoload_files_lazy;
 mod batch_index_resolution;
 mod benchmark_noop_save;
@@ -14,6 +15,7 @@ mod class_mention_gate;
 mod collector_issues;
 mod common;
 mod cross_vendor_lazy_load;
+mod deep_recursion;
 mod deferred_revision_bumps;
 mod definition_positions;
 mod file_analyzer;
@@ -50,6 +52,7 @@ mod snapshot_reference_prelude;
 mod source_provider_prefetch;
 mod stub_cache_correctness;
 mod symbol_at;
+mod symfony_full_project;
 mod tag_descriptions;
 mod type_env;
 mod user_stubs;

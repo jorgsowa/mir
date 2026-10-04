@@ -150,13 +150,12 @@ fn main() {
         config.php_version = Some(ver.clone());
     }
 
+    let mut pool = rayon::ThreadPoolBuilder::new().stack_size(mir_analyzer::recursion::STACK_SIZE);
     if let Some(n) = cli.threads {
-        if let Err(e) = rayon::ThreadPoolBuilder::new()
-            .num_threads(n)
-            .build_global()
-        {
-            eprintln!("mir: failed to set thread pool size: {e}");
-        }
+        pool = pool.num_threads(n);
+    }
+    if let Err(e) = pool.build_global() {
+        eprintln!("mir: failed to set thread pool: {e}");
     }
 
     let composer_root = resolve_composer_root(&cli, &cwd)

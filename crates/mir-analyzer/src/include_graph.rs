@@ -2,7 +2,7 @@
 //! resolvable `require`/`include` targets.
 
 use php_ast::ast::{BinaryOp, MagicConstKind};
-use php_ast::owned::visitor::{walk_owned_expr, OwnedVisitor};
+use php_ast::owned::visitor::OwnedVisitor;
 use php_ast::owned::{Expr, ExprKind};
 use std::ops::ControlFlow;
 use std::path::{Component, Path, PathBuf};
@@ -123,7 +123,7 @@ impl OwnedVisitor for IncludeTargetScanner<'_> {
                 self.targets.push(target);
             }
         }
-        walk_owned_expr(self, expr)
+        crate::recursion::walk_expr(self, expr)
     }
 }
 

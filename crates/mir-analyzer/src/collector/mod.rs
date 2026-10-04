@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::ops::ControlFlow;
 
 use php_ast::ast::Visibility as AstVisibility;
-use php_ast::owned::visitor::{walk_owned_program, walk_owned_stmt, OwnedVisitor};
+use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
 use php_ast::owned::{Program, StmtKind};
 
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
@@ -899,7 +899,11 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    pub fn collect_slice(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
+    pub fn collect_slice(self, program: &Program) -> (StubSlice, Vec<Issue>) {
+        crate::recursion::ensure_phase_stack(|| self.collect_slice_inner(program))
+    }
+
+    fn collect_slice_inner(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
         // Scan before the main pass — property refinement in
         // `collect_class` consults the result.
         self.static_writes = literal_types::scan_static_property_writes(program);
@@ -2040,7 +2044,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
             // Closures and anonymous classes live in expressions, which `visit_expr`
             // (below) deliberately does not descend into — so a function declared
             // inside a closure is not wrongly registered at file scope.
-            _ => return walk_owned_stmt(self, stmt),
+            _ => return crate::recursion::walk_stmt(self, stmt),
         }
         ControlFlow::Continue(())
     }

@@ -52,9 +52,7 @@ pub fn hash_content(content: &str) -> String {
 /// dependent needlessly) — never serves a stale result — so this is sound by
 /// construction even if a future callable form is missed here.
 pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> String {
-    use php_ast::owned::visitor::{
-        walk_owned_class_member, walk_owned_program, walk_owned_stmt, OwnedVisitor,
-    };
+    use php_ast::owned::visitor::{walk_owned_class_member, walk_owned_program, OwnedVisitor};
     use php_ast::owned::{ClassMember, ClassMemberKind, Stmt, StmtKind};
     use std::ops::ControlFlow;
 
@@ -68,7 +66,7 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
                     self.spans.push((f.body.span.start, f.body.span.end));
                 }
             }
-            walk_owned_stmt(self, stmt)
+            crate::recursion::walk_stmt(self, stmt)
         }
         fn visit_class_member(&mut self, member: &ClassMember) -> ControlFlow<()> {
             if let ClassMemberKind::Method(m) = &member.kind {

@@ -663,7 +663,7 @@ impl AnalysisSession {
         let (symbols, surface_hash) = {
             let db = &mut self.db.salsa;
             let parsed = collected.parsed.unwrap_or_else(|| {
-                php_rs_parser::parse_versioned(new_content, php_version.parser_version())
+                crate::recursion::parse_versioned(new_content, php_version.parser_version())
             });
             let surface_hash = surface_fingerprint(new_content, &parsed.program);
 

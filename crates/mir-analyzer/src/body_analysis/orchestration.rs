@@ -10,6 +10,18 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
     ) -> (Vec<Issue>, Vec<ResolvedSymbol>) {
+        crate::recursion::ensure_phase_stack(|| {
+            self.analyze_bodies_inner(program, file, source, source_map)
+        })
+    }
+
+    fn analyze_bodies_inner(
+        &self,
+        program: &php_ast::owned::Program,
+        file: Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+    ) -> (Vec<Issue>, Vec<ResolvedSymbol>) {
         let mut all_issues = Vec::new();
         let mut all_symbols = Vec::new();
 
@@ -136,6 +148,27 @@ impl<'a> BodyAnalyzer<'a> {
 
     /// Like `analyze_bodies` but also populates `type_envs` with per-scope type environments.
     pub(crate) fn analyze_bodies_typed(
+        &self,
+        program: &php_ast::owned::Program,
+        file: Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) -> Vec<Issue> {
+        crate::recursion::ensure_phase_stack(|| {
+            self.analyze_bodies_typed_inner(
+                program,
+                file,
+                source,
+                source_map,
+                type_envs,
+                all_symbols,
+            )
+        })
+    }
+
+    fn analyze_bodies_typed_inner(
         &self,
         program: &php_ast::owned::Program,
         file: Arc<str>,

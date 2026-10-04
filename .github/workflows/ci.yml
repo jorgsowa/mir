@@ -98,6 +98,44 @@ jobs:
       - name: Run baseline harness
         run: harness/run.php
 
+  symfony-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2.9.2
+
+      - name: Cache Symfony fixture
+        id: symfony-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: crates/mir-analyzer/benches/fixtures/symfony
+          key: symfony-fixture-${{ hashFiles('crates/mir-analyzer/benches/download-symfony-fixture.sh') }}
+
+      - name: Download Symfony fixture
+        if: steps.symfony-cache.outputs.cache-hit != 'true'
+        run: bash crates/mir-analyzer/benches/download-symfony-fixture.sh
+
+      # Whole tree incl. Tests fixtures on 2 MiB rayon workers (debug frames are the largest).
+      - name: Full Symfony tree on default worker stacks
+        run: cargo test -p mir-analyzer --test it symfony_full -- --ignored
+
+      # Run from outside the fixture so its psalm.xml exclusions don't narrow the file set.
+      - name: Full Symfony tree through the release CLI
+        shell: bash
+        run: |
+          cargo build --release -p mir-php
+          set +e
+          "$PWD/target/release/mir" "$PWD/crates/mir-analyzer/benches/fixtures/symfony/src" --no-progress --no-cache > /dev/null
+          code=$?
+          # 0/1 mean "analyzed, with/without issues"; anything else is a crash.
+          if [ "$code" -gt 1 ]; then echo "mir crashed with exit code $code"; exit 1; fi
+
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

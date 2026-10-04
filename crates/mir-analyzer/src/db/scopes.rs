@@ -155,6 +155,14 @@ pub fn infer_scope(
     file: SourceFile,
     scope: ScopeKey,
 ) -> Arc<ScopeInferenceResult> {
+    crate::recursion::ensure_phase_stack(|| infer_scope_body(db, file, scope))
+}
+
+fn infer_scope_body(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    scope: ScopeKey,
+) -> Arc<ScopeInferenceResult> {
     let prepared = super::queries::prepare_analysis_file(db, file);
     let path = &prepared.path;
     let text = &prepared.text;

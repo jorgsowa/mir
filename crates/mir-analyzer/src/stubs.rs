@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
 use mir_codebase::definitions::StubSlice;
-use php_ast::owned::visitor::{walk_owned_expr, walk_owned_program, OwnedVisitor};
+use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
 use php_ast::owned::ExprKind;
 use php_lexer::TokenKind;
 use rayon::prelude::*;
@@ -208,7 +208,7 @@ impl OwnedVisitor for BuiltinRefVisitor {
             }
             _ => {}
         }
-        walk_owned_expr(self, expr)
+        crate::recursion::walk_expr(self, expr)
     }
 }
 

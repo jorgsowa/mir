@@ -566,7 +566,7 @@ fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &
 /// Equality is pointer identity — salsa uses it to decide whether
 /// downstream queries need re-running after a re-parse.
 #[derive(Clone)]
-pub struct TrackedParseResult(pub Arc<php_rs_parser::ParseResult>);
+pub struct TrackedParseResult(pub Arc<crate::recursion::GuardedParse>);
 
 impl std::fmt::Debug for TrackedParseResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -607,7 +607,7 @@ impl Eq for TrackedParseResult {}
 #[salsa::tracked(lru = 256)]
 pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult {
     let text = file.text(db);
-    TrackedParseResult(Arc::new(php_rs_parser::parse(text.as_ref())))
+    TrackedParseResult(Arc::new(crate::recursion::parse(text.as_ref())))
 }
 
 // collect_file_definitions tracked query (S1)

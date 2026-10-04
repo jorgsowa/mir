@@ -638,7 +638,7 @@ fn param_names(params: &[php_ast::owned::Param]) -> Vec<String> {
 }
 
 fn collect_variable_scopes(program: &Program) -> Vec<VariableScope> {
-    use php_ast::owned::visitor::{walk_owned_class_member, walk_owned_expr, walk_owned_stmt};
+    use php_ast::owned::visitor::walk_owned_class_member;
     use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
     use php_ast::owned::{ClassMember, ClassMemberKind, Expr, ExprKind};
     use std::ops::ControlFlow;
@@ -652,7 +652,7 @@ fn collect_variable_scopes(program: &Program) -> Vec<VariableScope> {
                     kind: VariableScopeKind::Isolated,
                 });
             }
-            walk_owned_stmt(self, stmt)
+            crate::recursion::walk_stmt(self, stmt)
         }
         fn visit_class_member(&mut self, member: &ClassMember) -> ControlFlow<()> {
             if matches!(member.kind, ClassMemberKind::Method(_)) {
@@ -680,7 +680,7 @@ fn collect_variable_scopes(program: &Program) -> Vec<VariableScope> {
                 }),
                 _ => {}
             }
-            walk_owned_expr(self, expr)
+            crate::recursion::walk_expr(self, expr)
         }
     }
 

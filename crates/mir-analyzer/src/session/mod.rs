@@ -550,9 +550,7 @@ fn file_outgoing_dependencies(
 /// imports — callers run the raw string through `resolve_name`.
 fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String> {
     use php_ast::ast::BinaryOp;
-    use php_ast::owned::visitor::{
-        walk_owned_class_member, walk_owned_expr, walk_owned_program, walk_owned_stmt, OwnedVisitor,
-    };
+    use php_ast::owned::visitor::{walk_owned_class_member, walk_owned_program, OwnedVisitor};
     use php_ast::owned::{ClassMemberKind, ExprKind};
     use std::ops::ControlFlow;
 
@@ -612,7 +610,7 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
             if let Some(doc) = stmt.leading_doc_comment() {
                 collect_from_docblock(&doc.text, &mut self.names);
             }
-            walk_owned_stmt(self, stmt)
+            crate::recursion::walk_stmt(self, stmt)
         }
 
         fn visit_class_member(&mut self, member: &php_ast::owned::ClassMember) -> ControlFlow<()> {
@@ -661,7 +659,7 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
                 }
                 _ => {}
             }
-            walk_owned_expr(self, expr)
+            crate::recursion::walk_expr(self, expr)
         }
 
         // Walker routes every class/type-position Name here: type hints, catch types, extends/implements, trait use, attributes.

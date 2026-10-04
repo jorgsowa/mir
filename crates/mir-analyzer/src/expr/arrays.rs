@@ -393,7 +393,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match key_ty.types.as_slice() {
                     [Atomic::TLiteralString(s)] => Some(ArrayKey::String(s.clone())),
                     [Atomic::TLiteralInt(i)] => {
-                        next_int_key = *i + 1;
+                        next_int_key = i.saturating_add(1);
                         Some(ArrayKey::Int(*i))
                     }
                     _ => {
@@ -403,7 +403,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             } else {
                 let k = ArrayKey::Int(next_int_key);
-                next_int_key += 1;
+                next_int_key = next_int_key.saturating_add(1);
                 key_union.add_type(Atomic::TInt);
                 Some(k)
             };

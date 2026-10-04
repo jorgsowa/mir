@@ -1718,7 +1718,7 @@ fn push_unresolved_import_fact(
 /// NOT descending into nested function/closure/arrow-function bodies (those
 /// are separate generators with their own contexts).
 pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
-    use php_ast::owned::visitor::{walk_owned_expr, walk_owned_stmt, OwnedVisitor};
+    use php_ast::owned::visitor::OwnedVisitor;
     use php_ast::owned::{ExprKind, StmtKind};
     use std::ops::ControlFlow;
 
@@ -1733,7 +1733,7 @@ pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
                 | StmtKind::Interface(_)
                 | StmtKind::Trait(_)
                 | StmtKind::Enum(_) => ControlFlow::Continue(()),
-                _ => walk_owned_stmt(self, stmt),
+                _ => crate::recursion::walk_stmt(self, stmt),
             }
         }
 
@@ -1742,7 +1742,7 @@ pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
                 ExprKind::Yield(_) => ControlFlow::Break(()),
                 // Closures and arrow functions are separate function scopes.
                 ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => ControlFlow::Continue(()),
-                _ => walk_owned_expr(self, expr),
+                _ => crate::recursion::walk_expr(self, expr),
             }
         }
     }
