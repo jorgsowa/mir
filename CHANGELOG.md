@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A closure parameter declared as a non-null union is no longer narrowed to the callee's bound callback type, so `instanceof` on the other members is not rejected.
 - Arguments of `$var::method()` on a union-of-classes receiver are read, removing false `UnusedVariable`.
 - `isset($a['k']->prop)` narrows `$a['k']` as present and non-null, removing false `NonExistentArrayOffset`.
 - `array_merge` over arrays with string keys returns `array<K, V>` (non-empty if any argument is) instead of a bare `array`, removing false `InvalidPropertyAssignment` and `InvalidReturnType`.

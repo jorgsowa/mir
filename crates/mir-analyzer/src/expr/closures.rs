@@ -426,7 +426,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// Narrows natively-typed params to the types the callee actually passes in
     /// (`callable(Err::NotFound)` for a closure declared `Err $e`). Docblock
-    /// `@param` types win.
+    /// `@param` types win. Non-null unions stay as declared: the closure may
+    /// still be handed the other members.
     fn narrow_params_to_callback_hints(&mut self, params: &mut [mir_codebase::DeclaredParam]) {
         let Some(hints) = self.callback_param_hints.take() else {
             return;
@@ -437,6 +438,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             };
             if param.is_byref
                 || param.is_variadic
+                || !declared.remove_null().is_single()
                 || declared.from_docblock
                 || hint.is_never()
                 || hint == **declared
