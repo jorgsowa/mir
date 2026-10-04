@@ -174,11 +174,14 @@ impl<'a> DefinitionCollector<'a> {
                                         .clone()
                                         .or_else(|| ctor_doc.get_param_type(param_name).cloned())
                                         .map(|u| {
-                                            self.resolve_union_doc_with_templates(
-                                                super::expand_aliases_only(u, &type_aliases),
-                                                &ctor_template_names,
+                                            Self::fill_self_static_parent(
+                                                self.resolve_union_doc_with_templates(
+                                                    super::expand_aliases_only(u, &type_aliases),
+                                                    &ctor_template_names,
+                                                    &fqcn,
+                                                    &class_template_params,
+                                                ),
                                                 &fqcn,
-                                                &class_template_params,
                                             )
                                         })
                                 };
@@ -290,11 +293,14 @@ impl<'a> DefinitionCollector<'a> {
                         .map(|s| crate::parser::docblock::parse_type_string(&s))
                         .or_else(|| {
                             prop_doc.var_type.map(|t| {
-                                let resolved = self.resolve_union_doc_with_templates(
-                                    super::expand_aliases_only(t, &type_aliases),
-                                    &class_template_names,
+                                let resolved = Self::fill_self_static_parent(
+                                    self.resolve_union_doc_with_templates(
+                                        super::expand_aliases_only(t, &type_aliases),
+                                        &class_template_names,
+                                        &fqcn,
+                                        &class_template_params,
+                                    ),
                                     &fqcn,
-                                    &class_template_params,
                                 );
                                 // A `@var` refining a nullable native hint but
                                 // omitting `|null` must not erase that
