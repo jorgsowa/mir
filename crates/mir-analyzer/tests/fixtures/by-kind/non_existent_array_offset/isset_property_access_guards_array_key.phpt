@@ -1,6 +1,6 @@
 ===description===
 `isset($a['k']->prop)` proves `$a['k']` is present and non-null, so reads of
-that key inside the guard are not reported. The key stays unproven outside it.
+that key inside the guard are not reported. Outside it the key is only possibly absent.
 ===file===
 <?php
 final class Inner {
@@ -74,7 +74,5 @@ function unguarded(bool $f): void {
         $d['cfg'] = new Config();
     }
     echo $d['cfg']->name;
-//          ^^^^^ NonExistentArrayOffset: Array offset 'cfg' does not exist
-//       ^^^^^^^^^^^^^^^ MixedPropertyFetch: Property $name fetched on mixed type
 }
 ===expect===

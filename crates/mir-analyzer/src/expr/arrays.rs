@@ -20,6 +20,24 @@ fn merge_unknown_key_read(
     }
 }
 
+/// Whether some array-like union member can hold `key`: a shape listing it, an open shape, or a generic array/list with a compatible key type.
+fn key_possible_in_some_arm(arr_ty: &Type, key: &mir_types::atomic::ArrayKey) -> bool {
+    arr_ty.types.iter().any(|a| match a {
+        Atomic::TKeyedArray {
+            properties,
+            is_open,
+            ..
+        } => *is_open || properties.contains_key(key),
+        Atomic::TArray { key: k, .. } | Atomic::TNonEmptyArray { key: k, .. } => {
+            literal_key_matches_declared_key_type(key, k)
+        }
+        Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => {
+            matches!(key, mir_types::atomic::ArrayKey::Int(_))
+        }
+        _ => false,
+    })
+}
+
 /// For a spread (`...`) element in an array literal, return the union of key types
 /// across all array atomics. Mirrors [`crate::call::spread_element_type`], which does
 /// the same for value types. E.g. `array<string, int>` → `string`, `list<int>` → `int`.
@@ -777,6 +795,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .all(|a| matches!(a, Atomic::TKeyedArray { .. }))
             {
                 let mut result = Type::empty();
+                let mut absent_on_some_arm = false;
                 for atomic in &arr_ty.types {
                     let Atomic::TKeyedArray {
                         properties,
@@ -799,22 +818,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                             result.merge_with(&prop.ty);
                         }
                     } else if !is_open && !self.in_existence_check {
-                        let key_str = match key {
-                            mir_types::atomic::ArrayKey::String(s) => s.to_string(),
-                            mir_types::atomic::ArrayKey::Int(i) => i.to_string(),
-                        };
-                        self.emit(
-                            IssueKind::NonExistentArrayOffset { key: key_str },
-                            Severity::Error,
-                            idx_span,
-                        );
-                        return Type::mixed();
+                        if !key_possible_in_some_arm(&arr_ty, key) {
+                            let key_str = match key {
+                                mir_types::atomic::ArrayKey::String(s) => s.to_string(),
+                                mir_types::atomic::ArrayKey::Int(i) => i.to_string(),
+                            };
+                            self.emit(
+                                IssueKind::NonExistentArrayOffset { key: key_str },
+                                Severity::Error,
+                                idx_span,
+                            );
+                            return Type::mixed();
+                        }
+                        // Present only on some paths.
+                        absent_on_some_arm = true;
                     } else {
                         merge_unknown_key_read(&mut result, properties, *is_open);
                     }
                 }
                 return if result.types.is_empty() {
                     Type::mixed()
+                } else if absent_on_some_arm {
+                    result.possibly_absent_offset()
                 } else {
                     result
                 };
@@ -857,16 +882,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 result.merge_with(&prop.ty);
                             }
                         } else if !is_open && !self.in_existence_check {
-                            let key_str = match key {
-                                mir_types::atomic::ArrayKey::String(s) => s.to_string(),
-                                mir_types::atomic::ArrayKey::Int(i) => i.to_string(),
-                            };
-                            self.emit(
-                                IssueKind::NonExistentArrayOffset { key: key_str },
-                                Severity::Error,
-                                idx_span,
-                            );
-                            return Type::mixed();
+                            if !key_possible_in_some_arm(&arr_ty, key) {
+                                let key_str = match key {
+                                    mir_types::atomic::ArrayKey::String(s) => s.to_string(),
+                                    mir_types::atomic::ArrayKey::Int(i) => i.to_string(),
+                                };
+                                self.emit(
+                                    IssueKind::NonExistentArrayOffset { key: key_str },
+                                    Severity::Error,
+                                    idx_span,
+                                );
+                                return Type::mixed();
+                            }
+                            uncertain_offset = true;
                         } else {
                             merge_unknown_key_read(&mut result, properties, *is_open);
                         }

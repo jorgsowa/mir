@@ -1,5 +1,5 @@
 ===description===
-`count($a) === N` drops closed shapes that can't have N entries, in both branches.
+`count($a) === N` drops closed shapes that can't have N entries, in both branches. Without a guard the key is only possibly absent.
 ===file===
 <?php
 /** @param array{0: int}|array{0: int, 1: int} $a */
@@ -23,7 +23,5 @@ function ne(array $a): int {
 /** @param array{0: int}|array{0: int, 1: int} $a */
 function noGuard(array $a): int {
     return $a[1];
-//            ^ NonExistentArrayOffset: Array offset '1' does not exist
-//  ^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 }
 ===expect===
