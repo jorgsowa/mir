@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A class constant initialised by a concatenation with a non-empty literal (`self::PREFIX . '.'`) is `non-empty-string`, and two literals fold to a literal, removing false `InvalidArgument` where a `non-empty-string` key is expected.
 - An array literal whose elements are plain `int`/`string` passed to a `list<positive-int>`/`list<non-empty-string>` param, and a closure returning plain `int`/`string` passed where a narrower return (`positive-int`, `-1|0|1`) is documented, now report `ArgumentTypeCoercion` (Info) instead of `InvalidArgument` (Error).
 - `new Box(null)` against `@param T|null` leaves the receiver unparameterized instead of `Box<null>`, removing false `InvalidArgument` where a `Box<string>` is expected.
 - A method inherited from a generic parent resolves its templates from that parent's own type arguments when another ancestor names a template the same, removing wrong return types and false `InvalidArgument`.

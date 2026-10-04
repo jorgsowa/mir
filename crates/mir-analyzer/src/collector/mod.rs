@@ -14,6 +14,7 @@ use php_ast::ast::Visibility as AstVisibility;
 use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
 use php_ast::owned::{Program, StmtKind};
 
+use crate::expr::helpers::{as_concat_str, is_non_empty_when_concat};
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use crate::php_version::PhpVersion;
 use mir_codebase::definitions::{
@@ -589,6 +590,25 @@ pub(super) fn infer_const_value(
         // literal-int arithmetic. Only evaluated when both operands are
         // themselves literal ints, so `self::OTHER_CONST | 1` still falls
         // through to `None` rather than guessing.
+        php_ast::owned::ExprKind::Binary(b) if b.op == BinaryOp::Concat => {
+            let left = infer_const_value(collector, &b.left.kind);
+            let right = infer_const_value(collector, &b.right.kind);
+            if let (Some(l), Some(r)) = (
+                left.as_ref().and_then(as_concat_str),
+                right.as_ref().and_then(as_concat_str),
+            ) {
+                let combined = format!("{l}{r}");
+                if combined.len() <= 1000 {
+                    return Some(Type::single(Atomic::TLiteralString(combined.into())));
+                }
+            }
+            // One non-empty side suffices even when the other is unresolvable.
+            [left, right]
+                .iter()
+                .flatten()
+                .any(is_non_empty_when_concat)
+                .then(|| Type::single(Atomic::TNonEmptyString))
+        }
         php_ast::owned::ExprKind::Binary(b) => {
             let as_int = |t: Type| -> Option<i64> {
                 (t.types.len() == 1)
@@ -694,7 +714,8 @@ pub(super) fn const_type_with_literal_narrowing(
         literal_ty.as_ref().map(|t| t.types.as_slice()),
     ) {
         (Some([Atomic::TInt]), Some([Atomic::TLiteralInt(_)]))
-        | (Some([Atomic::TString]), Some([Atomic::TLiteralString(_)])) => true,
+        | (Some([Atomic::TString]), Some([Atomic::TLiteralString(_)]))
+        | (Some([Atomic::TString]), Some([Atomic::TNonEmptyString])) => true,
         // A bare `array` hint (key/value both unannotated `mixed`) narrows to
         // the literal's own keyed-shape/list type the same way — an explicitly
         // narrower hint (`array<int, string>`) is left as-is, since the
