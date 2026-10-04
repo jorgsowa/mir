@@ -269,7 +269,9 @@ pub(crate) fn check_one(
             );
         } else if is_named_object_coercion(arg_ty, param_ty, ea)
             || scalar_coercion_ok(arg_ty, param_ty, ea)
+            || super::super::callable::narrows_to(&arg_ty.remove_null(), param_ty)
             || array_element_coercion(arg_ty, param_ty, ea)
+            || array_intersection_coercion(arg_ty, param_ty)
         {
             ea.emit(
                 IssueKind::ArgumentTypeCoercion {
@@ -1298,6 +1300,32 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
 fn array_element_coercion(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     !array_list_compatible(arg_ty, param_ty, ea)
         && array_list_compatible_with(arg_ty, param_ty, ea, true)
+}
+
+/// An array argument broader than every part of an array-intersection param
+/// (`array` vs `array<string, mixed>&array{id: int}`) may or may not satisfy it.
+fn array_intersection_coercion(arg_ty: &Type, param_ty: &Type) -> bool {
+    let is_array_like = |t: &Type| {
+        matches!(
+            t.types.as_slice(),
+            [Atomic::TArray { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }]
+        )
+    };
+    is_array_like(arg_ty)
+        && param_ty.types.iter().any(|p| match p {
+            Atomic::TIntersection { parts } => {
+                parts.iter().all(|part| {
+                    is_array_like(part)
+                        && (part.is_subtype_structural(arg_ty)
+                            || arg_ty.is_subtype_structural(part))
+                }) && parts.iter().any(|part| part.is_subtype_structural(arg_ty))
+            }
+            _ => false,
+        })
 }
 
 fn array_list_compatible_with(

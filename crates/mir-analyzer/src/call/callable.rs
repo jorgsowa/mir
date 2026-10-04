@@ -1079,11 +1079,18 @@ fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAna
     is_int_or_float(expected) && is_int_or_float(actual)
 }
 
-/// True when `broad` is a plain `int`/`string` and `narrow` refines it (`positive-int`,
-/// `non-empty-string`): a value typed `broad` may or may not satisfy `narrow`, so it is a
-/// coercion, not a mismatch. Other supertypes (`float`, `int|null`, partial classes) stay errors.
+/// True when `broad` is plain `int`/`string` (or a union of them) and `narrow` refines it
+/// (`positive-int`, `non-empty-string`): a value typed `broad` may or may not satisfy
+/// `narrow`, so it is a coercion, not a mismatch. A nullable `narrow` is refined by its
+/// non-null part. Other supertypes (`float`, `int|null`, partial classes) stay errors.
 pub(crate) fn narrows_to(broad: &Type, narrow: &Type) -> bool {
-    matches!(broad.types.as_slice(), [Atomic::TInt] | [Atomic::TString])
+    let narrow = narrow.remove_null();
+    !broad.types.is_empty()
+        && !narrow.types.is_empty()
+        && broad
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TInt | Atomic::TString))
         && narrow.is_subtype_structural(broad)
 }
 
