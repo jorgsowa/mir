@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A literal array key present on only some union arms or paths (conditional append, ternary shapes) is no longer a hard `NonExistentArrayOffset`; it is reported only when every closed arm lacks the key.
+- An unbounded `class-string`/`interface-string` argument no longer binds `object` to a bounded template, removing false `InvalidTemplateParam`.
 - A function name declared in several standalone scripts is checked against the calling file's own declaration, removing false `InvalidArgument` and `TooManyArguments`.
 - `self` nested in a property docblock type (`@var list<self>`) resolves to the declaring class, removing false `InvalidArgument` and `InvalidReturnType` when the property is read.
 - A class constant initialised by a concatenation with a non-empty literal (`self::PREFIX . '.'`) is `non-empty-string`, and two literals fold to a literal, removing false `InvalidArgument` where a `non-empty-string` key is expected.

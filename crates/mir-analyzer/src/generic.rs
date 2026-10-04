@@ -1222,7 +1222,15 @@ fn infer_from_pair(
                                 type_params: empty_type_params(),
                             }))
                         }
-                        Atomic::TClassString(None) => Some(Type::single(Atomic::TObject)),
+                        // An unbounded class-string says nothing about T: bind
+                        // `object` only as an unchecked fallback.
+                        Atomic::TClassString(None) => {
+                            risky_fallback
+                                .entry(*param_name)
+                                .or_insert_with(Type::empty)
+                                .merge_with(&Type::single(Atomic::TObject));
+                            None
+                        }
                         // A class-name-shaped string literal coerces to
                         // class-string (Psalm-style): `m::mock('Foo\Bar')`.
                         Atomic::TLiteralString(s) if literal_is_class_like(s) => {
@@ -1253,7 +1261,11 @@ fn infer_from_pair(
                             }))
                         }
                         Atomic::TInterfaceString(None) | Atomic::TClassString(None) => {
-                            Some(Type::single(Atomic::TObject))
+                            risky_fallback
+                                .entry(*param_name)
+                                .or_insert_with(Type::empty)
+                                .merge_with(&Type::single(Atomic::TObject));
+                            None
                         }
                         Atomic::TLiteralString(s) if literal_is_class_like(s) => {
                             Some(Type::single(Atomic::TNamedObject {
