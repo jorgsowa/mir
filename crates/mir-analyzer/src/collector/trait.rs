@@ -247,11 +247,33 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let const_name = c.name.as_deref().unwrap_or_default();
+                    let hint_ty = self.resolve_union_opt(
+                        c.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    let const_ty = const_doc
+                        .var_type
+                        .map(|t| {
+                            self.resolve_union_doc_with_templates(
+                                super::expand_aliases_only(t, &type_aliases),
+                                &trait_template_names,
+                                &fqcn,
+                                &trait_template_params,
+                            )
+                        })
+                        .or_else(|| {
+                            super::const_type_with_literal_narrowing(
+                                hint_ty,
+                                super::infer_const_value(self, &c.value.kind),
+                            )
+                        })
+                        .unwrap_or_else(Type::mixed);
                     own_constants.insert(
                         Arc::from(const_name),
                         ConstantDef {
                             name: Arc::from(const_name),
-                            ty: Type::mixed(),
+                            ty: const_ty,
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
