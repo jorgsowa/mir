@@ -41,10 +41,11 @@ pub(crate) static SCALAR_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static COMPLEX_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static PARAM_WITH_DEFAULT: AtomicUsize = AtomicUsize::new(0);
 
-/// Check if a Type is a simple scalar type (for profiling).
-/// `@param X[] ...$p` on an untyped (or `array`) variadic describes each argument,
+/// `@param X[] ...$x` on an untyped (or `array`) variadic describes each argument,
 /// so store the collected `list<X[]>`. With a non-array native hint, `X[]` is the
-/// legacy spelling of the collected array and stays as-is.
+/// legacy spelling of the collected array and stays as-is. Likewise `list<S>` on a
+/// native `array ...$x` describes each argument when `S` is a non-array scalar, since
+/// the aggregate reading would contradict the native hint.
 fn per_argument_variadic_doc_type(
     is_variadic: bool,
     native_ty: Option<&Type>,
@@ -55,7 +56,17 @@ fn per_argument_variadic_doc_type(
         && doc_raw.is_some_and(|r| r.ends_with("[]"))
         && matches!(doc_ty.types.as_slice(), [Atomic::TArray { .. }])
         && native_ty.is_none_or(|n| n.types.iter().any(|a| a.is_array()));
-    if !shorthand {
+    let scalar_elements_on_array_hint = is_variadic
+        && native_ty.is_some_and(|n| n.types.iter().all(|a| a.is_array()))
+        && {
+            let element = crate::generic::variadic_element_type(&doc_ty);
+            !std::ptr::eq(element, &doc_ty)
+                && element
+                    .types
+                    .iter()
+                    .all(|a| a.is_definitely_non_object() && !a.is_array())
+        };
+    if !shorthand && !scalar_elements_on_array_hint {
         return doc_ty;
     }
     Type::single(Atomic::TList {
@@ -63,6 +74,7 @@ fn per_argument_variadic_doc_type(
     })
 }
 
+/// Check if a Type is a simple scalar type (for profiling).
 fn is_simple_scalar(u: &Type) -> bool {
     if u.possibly_undefined || u.from_docblock || u.types.len() != 1 {
         return false;
