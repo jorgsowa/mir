@@ -448,34 +448,10 @@ impl DocblockParser {
                 }
                 "psalm-type" | "phpstan-type" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        // Real Psalm's `@psalm-type Name = Expr` requires the `=`;
-                        // real PHPStan's `@phpstan-type Name Expr` doesn't — split
-                        // on the first whitespace instead when there's no `=` and
-                        // this is the PHPStan spelling. A `phpstan-type` written
-                        // WITH `=` (some codebases mix conventions) still works via
-                        // the primary split.
-                        let split = body_str.split_once('=').or_else(|| {
-                            (tag.name == "phpstan-type")
-                                .then(|| body_str.split_once(char::is_whitespace))
-                                .flatten()
-                        });
-                        if let Some((name, type_expr)) = split {
-                            // Strip a generic alias name's `<T>` suffix
-                            // (`ListOf<T> = array<int, T>`) so bare use sites
-                            // (`ListOf`) resolve. Substituting T at a
-                            // parameterized use site (`ListOf<int>`) isn't
-                            // modeled: the template parameter list is
-                            // discarded here.
-                            let raw_name = name.trim();
-                            let name = raw_name
-                                .split('<')
-                                .next()
-                                .unwrap_or(raw_name)
-                                .trim()
-                                .to_string();
+                        if let Some((name, type_expr)) = split_type_alias_decl(&body_str) {
                             result.type_aliases.push(DocTypeAlias {
-                                name,
-                                type_expr: type_expr.trim().to_string(),
+                                name: name.to_string(),
+                                type_expr: type_expr.to_string(),
                             });
                         }
                     }

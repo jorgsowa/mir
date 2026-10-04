@@ -296,7 +296,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
     // Array shape: `array{key: Type, ...}` or `list{Type, ...}`
     if s.ends_with('}') {
         if let Some(open) = s.find('{') {
-            let prefix = s[..open].to_lowercase();
+            let prefix = s[..open].trim_end().to_lowercase();
             let inner = &s[open + 1..s.len() - 1];
             if prefix == "array" {
                 return parse_keyed_array(inner, false);
@@ -972,7 +972,8 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
                 match ch {
                     '<' | '(' | '{' => depth += 1,
                     '>' | ')' | '}' => depth -= 1,
-                    ':' if depth == 0 => {
+                    // A colon after `)` is a callable's return-type separator.
+                    ':' if depth == 0 && !item[..i].trim_end().ends_with(')') => {
                         found = Some(i);
                         break;
                     }
@@ -1222,6 +1223,25 @@ pub(super) fn extract_description(text: &str) -> String {
         }
     }
     desc_lines.join(" ")
+}
+
+/// Splits `@psalm-type` / `@phpstan-type` as `Name = Expr` or `Name Expr`. A generic
+/// name's `<T>` suffix is dropped so bare use sites resolve; T is not substituted.
+pub(super) fn split_type_alias_decl(body: &str) -> Option<(&str, &str)> {
+    let mut depth = 0i32;
+    let end = body.char_indices().find_map(|(i, ch)| {
+        match ch {
+            '<' => depth += 1,
+            '>' => depth -= 1,
+            _ if depth == 0 && (ch == '=' || ch.is_whitespace()) => return Some(i),
+            _ => {}
+        }
+        None
+    })?;
+    let name = body[..end].split('<').next().unwrap_or_default().trim();
+    let expr = body[end..].trim_start();
+    let expr = expr.strip_prefix('=').unwrap_or(expr).trim();
+    (!name.is_empty() && !expr.is_empty()).then_some((name, expr))
 }
 
 /// Parse `@psalm-import-type` body.
@@ -1710,7 +1730,9 @@ pub(super) fn parse_conditional_type(s: &str) -> Option<Type> {
             param_name,
             subject: parse_type_string(subject_str),
             if_true: parse_type_string(if_true_str),
-            if_false: parse_type_string(if_false_str),
+            // `A ? x : B ? y : z` chains in the else-branch.
+            if_false: parse_conditional_type(if_false_str)
+                .unwrap_or_else(|| parse_type_string(if_false_str)),
         }),
     }))
 }
