@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `@psalm-type` alias that references another alias (`Pairs = array<int, Value>`) now expands fully in namespaced files, including when imported with `@psalm-import-type`, instead of treating the inner alias as a class.
 - An `Enum::Case` call argument now binds its template to the case instead of the whole enum, so `Result::failure(Enum::Case)` fits a declared `Result<Enum::Case, T>`, while a different case is still reported. `never` is accepted in invariant template slots.
 - By-reference writes are now tracked: a by-ref parameter without `@param-out` widens the caller's variable to its declared type after a method or static call, and a by-ref closure capture written conditionally or with a new key no longer leaves a sealed array shape behind, removing false `NonExistentArrayOffset` on later reads.
 - Analyzing very large or deeply nested projects (e.g. the full Symfony tree including its test fixtures) no longer aborts with a stack overflow. Deep recursion (method chains, nested statements, cross-file return-type inference, parsing, AST drop) now continues on heap-grown stack segments, and the CLI's worker threads get a 16 MiB stack.

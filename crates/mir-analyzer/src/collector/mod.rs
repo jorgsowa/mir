@@ -1569,7 +1569,7 @@ impl<'a> DefinitionCollector<'a> {
     /// forever.
     fn expand_type_aliases_fixpoint(&self, aliases: &mut FxHashMap<String, Type>) {
         for _ in 0..aliases.len() {
-            let snapshot = aliases.clone();
+            let snapshot = self.with_qualified_alias_keys(aliases);
             for ty in aliases.values_mut() {
                 *ty = expand_aliases_only(ty.clone(), &snapshot);
             }
@@ -1586,13 +1586,30 @@ impl<'a> DefinitionCollector<'a> {
         // was NOT part of a cycle contains no atom
         // matching an alias name at all (it was already fully expanded away
         // above), so this only ever touches genuinely-cyclic residue.
-        let neutralize_cycles: FxHashMap<String, Type> = aliases
-            .keys()
-            .map(|name| (name.clone(), Type::mixed()))
+        let neutralize_cycles: FxHashMap<String, Type> = self
+            .with_qualified_alias_keys(aliases)
+            .into_keys()
+            .map(|name| (name, Type::mixed()))
             .collect();
         for ty in aliases.values_mut() {
             *ty = expand_aliases_only(ty.clone(), &neutralize_cycles);
         }
+    }
+
+    /// Alias bodies are namespace-resolved before expansion, so a reference to
+    /// alias `Value` appears as `Ns\Value`; key each alias by that name too.
+    fn with_qualified_alias_keys(
+        &self,
+        aliases: &FxHashMap<String, Type>,
+    ) -> FxHashMap<String, Type> {
+        let mut keyed = aliases.clone();
+        for (name, ty) in aliases {
+            let qualified = self.resolve_type_name(name, true);
+            keyed
+                .entry(qualified.as_ref().to_string())
+                .or_insert_with(|| ty.clone());
+        }
+        keyed
     }
 
     #[allow(clippy::too_many_arguments)]
