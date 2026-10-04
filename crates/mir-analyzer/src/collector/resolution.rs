@@ -158,10 +158,16 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
             }
         }
         Atomic::TClassString(Some(cls)) => {
+            if is_self_static_parent_keyword(&cls) {
+                return Atomic::TClassString(Some(cls));
+            }
             let resolved = rename(cls.as_str());
             Atomic::TClassString(Some(resolved))
         }
         Atomic::TInterfaceString(Some(iface)) => {
+            if is_self_static_parent_keyword(&iface) {
+                return Atomic::TInterfaceString(Some(iface));
+            }
             let resolved = rename(iface.as_str());
             Atomic::TInterfaceString(Some(resolved))
         }
