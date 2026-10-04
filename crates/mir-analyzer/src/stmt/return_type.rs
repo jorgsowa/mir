@@ -6,6 +6,60 @@ fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
 }
 
+/// Value of a shape property: object/class-string leaves need hierarchy awareness, and a
+/// nested shape recurses so those leaves are reached.
+fn shape_property_compatible(
+    actual: &Type,
+    declared: &Type,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    named_object_return_compatible(actual, declared, db, file)
+        || actual.types.iter().all(|a| {
+            let Atomic::TKeyedArray {
+                properties: sub_props,
+                is_open: sub_open,
+                ..
+            } = a
+            else {
+                return declared.accepts_atomic_structural(a);
+            };
+            declared.types.iter().any(|d| match d {
+                Atomic::TKeyedArray {
+                    properties: sup_props,
+                    is_open: sup_open,
+                    ..
+                } => {
+                    (*sup_open || sub_props.keys().all(|k| sup_props.contains_key(k)))
+                        && sup_props
+                            .iter()
+                            .all(|(key, sup_prop)| match sub_props.get(key) {
+                                Some(sub_prop) => {
+                                    (sup_prop.optional || !sub_prop.optional)
+                                        && shape_property_compatible(
+                                            &sub_prop.ty,
+                                            &sup_prop.ty,
+                                            db,
+                                            file,
+                                        )
+                                }
+                                None => sup_prop.optional || *sub_open,
+                            })
+                }
+                Atomic::TArray { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. } => return_arrays_compatible(
+                    &Type::single(a.clone()),
+                    &Type::single(d.clone()),
+                    db,
+                    file,
+                ),
+                _ => false,
+            })
+        })
+}
+
 // ---------------------------------------------------------------------------
 // Named-object return type compatibility check
 // ---------------------------------------------------------------------------
@@ -822,7 +876,7 @@ pub(crate) fn return_arrays_compatible(
                         };
                         Type::single(key_atomic).is_subtype_structural(dk)
                             && (prop.ty.is_subtype_structural(dv)
-                                || named_object_return_compatible(&prop.ty, dv, db, file))
+                                || shape_property_compatible(&prop.ty, dv, db, file))
                     })
                 };
                 return declared.types.iter().any(|d_atomic| {
@@ -840,7 +894,7 @@ pub(crate) fn return_arrays_compatible(
                     let list_values_compatible = |dv: &Type| {
                         properties.values().all(|prop| {
                             prop.ty.is_subtype_structural(dv)
-                                || named_object_return_compatible(&prop.ty, dv, db, file)
+                                || shape_property_compatible(&prop.ty, dv, db, file)
                         })
                     };
                     match declared_atomic {
