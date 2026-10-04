@@ -392,6 +392,63 @@ pub fn inherited_template_bindings(
     bindings
 }
 
+/// Bindings for `target`'s own templates as seen from `fqcn`, following only the
+/// ancestor path that reaches `target`. Unlike `inherited_template_bindings`, two
+/// unrelated ancestors that both name a template `T` can't clobber each other.
+/// `None` when no typed path (or only a bare edge) leads to `target`.
+pub fn template_bindings_for_ancestor(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    own_bindings: &FxHashMap<Name, Type>,
+    target: &str,
+) -> Option<FxHashMap<Name, Type>> {
+    fn walk(
+        db: &dyn MirDatabase,
+        current: &str,
+        substitution: &FxHashMap<Name, Type>,
+        target: &str,
+        path: &mut Vec<Arc<str>>,
+    ) -> Option<FxHashMap<Name, Type>> {
+        let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, current))?;
+        let typed = class
+            .implements_type_args()
+            .iter()
+            .chain(class.interface_extends_type_args())
+            .map(|(iface, args)| (iface, args.as_slice()))
+            .chain(
+                class
+                    .parent()
+                    .filter(|_| !class.extends_type_args().is_empty())
+                    .map(|p| (p, class.extends_type_args())),
+            )
+            .collect::<Vec<_>>();
+        for (next, args) in typed {
+            if path.contains(next) {
+                continue;
+            }
+            let next_subst: FxHashMap<Name, Type> = class_template_params(db, next.as_ref())
+                .map(|tps| {
+                    tps.iter()
+                        .zip(args)
+                        .map(|(tp, ty)| (tp.name, ty.substitute_templates(substitution)))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if next.as_ref() == target {
+                return Some(next_subst);
+            }
+            path.push(next.clone());
+            let found = walk(db, next, &next_subst, target, path);
+            path.pop();
+            if found.is_some() {
+                return found;
+            }
+        }
+        None
+    }
+    walk(db, fqcn, own_bindings, target, &mut vec![Arc::from(fqcn)])
+}
+
 pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     if crate::db::find_class_like(db, here).is_none() {

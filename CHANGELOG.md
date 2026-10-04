@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `new Box(null)` against `@param T|null` leaves the receiver unparameterized instead of `Box<null>`, removing false `InvalidArgument` where a `Box<string>` is expected.
+- A method inherited from a generic parent resolves its templates from that parent's own type arguments when another ancestor names a template the same, removing wrong return types and false `InvalidArgument`.
 - A small bounded int range such as the `<=>` result `int<-1, 1>` is accepted where the equal literal union `-1|0|1` is expected, removing false `InvalidPropertyAssignment` and `InvalidArgument`.
 - Constants declared in a trait keep their inferred type instead of evaluating to `mixed`, removing false `InvalidArgument`.
 - `*=` keeps the int range like `+=` and `-=`, removing false `InvalidPropertyAssignment` and `InvalidReturnType`.

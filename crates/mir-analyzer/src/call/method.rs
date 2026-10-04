@@ -35,11 +35,12 @@ fn receiver_class_bindings(
     fqcn: &str,
     receiver_type_params: &[Type],
     class_tps: &[TemplateParam],
-    owner_fqcn: &str,
+    template_scope: &str,
 ) -> rustc_hash::FxHashMap<Name, Type> {
     let mut bindings = build_class_bindings(class_tps, receiver_type_params);
+    let receiver_bindings = bindings.clone();
     let inherited_bindings = crate::db::inherited_template_bindings(db, fqcn, &bindings);
-    if owner_fqcn == fqcn {
+    if template_scope == fqcn {
         // Declared on the receiver's own class: its own template wins over a
         // same-named ancestor template.
         for (k, v) in inherited_bindings {
@@ -48,6 +49,12 @@ fn receiver_class_bindings(
     } else {
         // Inherited method: the owner's template scope wins.
         bindings.extend(inherited_bindings);
+        // Same-named templates of unrelated ancestors must not shadow the scope class's.
+        if let Some(scoped) =
+            crate::db::template_bindings_for_ancestor(db, fqcn, &receiver_bindings, template_scope)
+        {
+            bindings.extend(scoped);
+        }
     }
     bindings
 }
@@ -71,6 +78,8 @@ fn namespace_root(ns: Option<&str>) -> Option<&str> {
 
 pub(crate) struct ResolvedMethod {
     pub(crate) owner_fqcn: Arc<str>,
+    /// Class whose `@template` names `return_ty_raw`/`params` are written in (the `@inheritDoc` source when inherited).
+    pub(crate) template_scope: Arc<str>,
     pub(crate) name: Arc<str>,
     pub(crate) visibility: Visibility,
     pub(crate) deprecated: Option<Arc<str>>,
@@ -324,8 +333,14 @@ pub(crate) fn resolve_method_from_db(
         };
         let param_file = return_type_file;
 
+        let template_scope: Arc<str> = match parent.as_ref() {
+            Some(p) if !own_has_docblock_return => p.fqcn.clone(),
+            _ => owner_fqcn.clone(),
+        };
+
         return Some(ResolvedMethod {
             owner_fqcn: owner_fqcn.clone(),
+            template_scope,
             name,
             visibility: storage.visibility,
             deprecated: storage.deprecated.clone(),
@@ -487,7 +502,7 @@ impl CallAnalyzer {
                 &fqcn,
                 type_params,
                 &class_tps,
-                &resolved.owner_fqcn,
+                &resolved.template_scope,
             );
             Some((resolved.params.clone(), bindings))
         });
@@ -1294,7 +1309,7 @@ fn resolve_method_return<'a>(
             fqcn,
             receiver_type_params,
             &class_tps,
-            &resolved.owner_fqcn,
+            &resolved.template_scope,
         );
 
         // Check class-level `@template T of Bound` here too, not only at
