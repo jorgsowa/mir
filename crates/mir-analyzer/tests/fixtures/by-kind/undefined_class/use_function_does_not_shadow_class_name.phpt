@@ -17,8 +17,8 @@ use function App\Helpers\foo;
 class Widget {
     public function make(): foo
 //                          ^^^ UndefinedClass: Class App\foo does not exist
+//                          ^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'App\foo'
     {
-//  ^ +1:5 InvalidReturnType: Return type 'void' is not compatible with declared 'App\foo'
     }
 }
 ===expect===

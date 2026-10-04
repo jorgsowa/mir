@@ -10,7 +10,7 @@ function a(int $n, int $limit): int {
     }
 }
 function b(int $n, int $limit): int {
-//                                  ^ +7:1 InvalidReturnType: Return type 'void' is not compatible with declared 'int'
+//                              ^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'int'
     for ($i = 0; true, $i < $n; ++$i) {
         if ($i > $limit) {
             return $i;

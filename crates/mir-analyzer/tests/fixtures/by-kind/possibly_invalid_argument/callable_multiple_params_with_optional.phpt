@@ -15,7 +15,7 @@ Callable multiple params with optional
 function foo($arg) {}
 
 function bar(string $a, string $b, string $c): bool {}
-//                                                  ^^ InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
+//                                             ^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
 
 foo("bar");
 ===expect===

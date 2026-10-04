@@ -6,11 +6,11 @@ A properly-diverging `: never` body must NOT be flagged.
 <?php
 
 function falls_through(): never {
-//                              ^ +1:1 InvalidReturnType: Return type 'void' is not compatible with declared 'never'
+//                        ^^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'never'
 }
 
 function also_falls_through(): never {
-//                                   ^ +2:1 InvalidReturnType: Return type 'void' is not compatible with declared 'never'
+//                             ^^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'never'
     echo "doing work";
 }
 
@@ -20,7 +20,7 @@ function properly_diverges(): never {
 
 class Foo {
     public function method_falls_through(): never {
-//                                                ^ +1:5 InvalidReturnType: Return type 'void' is not compatible with declared 'never'
+//                                          ^^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'never'
     }
 
     public function method_diverges(): never {

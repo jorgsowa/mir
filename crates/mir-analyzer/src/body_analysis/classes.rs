@@ -1406,7 +1406,10 @@ impl<'a> BodyAnalyzer<'a> {
             crate::diagnostics::check_missing_return(
                 declared_return.as_ref(),
                 body_diverges,
-                &body.span,
+                method
+                    .return_type
+                    .as_ref()
+                    .map_or(&body.span, |hint| &hint.span),
                 file,
                 source,
                 source_map,

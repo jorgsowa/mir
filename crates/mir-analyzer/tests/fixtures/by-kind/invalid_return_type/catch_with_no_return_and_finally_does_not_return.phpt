@@ -9,7 +9,7 @@ Catch with no return and finally does not return
 ===file===
 <?php
 function foo() : bool {
-//                    ^ +10:1 InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
+//               ^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
     try {
         if (rand(0, 1)) throw new Exception("bad");
         return true;

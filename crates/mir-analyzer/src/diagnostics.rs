@@ -643,12 +643,13 @@ fn return_requires_value(t: &mir_types::Type) -> bool {
 
 /// Emit `InvalidReturnType` when a value-returning function/method can reach the
 /// end of its body without returning. `diverges` is the flow flag after body
-/// analysis: `true` means every path already returned/threw/exited.
+/// analysis: `true` means every path already returned/threw/exited. `span` is
+/// the native return type hint, or the body when only a docblock declares it.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_missing_return(
     declared_return: Option<&mir_types::Type>,
     diverges: bool,
-    body_span: &php_ast::Span,
+    span: &php_ast::Span,
     file: &Arc<str>,
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
@@ -663,8 +664,8 @@ pub(crate) fn check_missing_return(
     if !return_requires_value(declared) {
         return;
     }
-    let (line, col_start) = offset_to_line_col(source, body_span.start, source_map);
-    let (line_end, col_end) = offset_to_line_col(source, body_span.end, source_map);
+    let (line, col_start) = offset_to_line_col(source, span.start, source_map);
+    let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
     issues.push(mir_issues::Issue::new(
         mir_issues::IssueKind::InvalidReturnType {
             expected: format!("{declared}"),

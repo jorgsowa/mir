@@ -10,7 +10,7 @@ Loop with switch doesnt return first case
 ===file===
 <?php
 function b(): int {
-//                ^ +11:1 InvalidReturnType: Return type 'void' is not compatible with declared 'int'
+//            ^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'int'
     switch (random_int(1, 10)) {
         case 1:
             foreach([1,2] as $i) {
