@@ -106,6 +106,7 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     fn check_echo_implicit_to_string_cast(&mut self, ty: &mir_types::Type, span: php_ast::Span) {
+        let ty = crate::subtype::canonical_enum_cases(self.db, ty);
         for atomic in &ty.types {
             // Mirrors expr::binary's implicit-to-string check: a non-Stringable
             // enum is just as fatal to `echo` as any other bare object.

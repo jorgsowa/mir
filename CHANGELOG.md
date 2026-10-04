@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Interpolating, concatenating or echoing a docblock `Class::*` type no longer reports a false `ImplicitToStringCast`.
 - `@psalm-type Name array{...}` without `=`, `array { a: int }` with a space, a `callable(string): object` shape item and a chained `A ? x : B ? y : z` conditional now parse as written instead of as a class name, removing false `InvalidArgument`/`InvalidReturnType`.
 - A class template with no binding at the call site (`(new Box)->get()` returning `T`) nested in an array, list or shape argument is now judged by its bound, so `mixed` fits optional and required shape keys, removing false `InvalidArgument` and `InvalidPropertyAssignment`.
 - An open shape (a bare `array` after a literal-key write, or a `...` docblock shape) now yields `mixed` for unlisted keys, iteration, `array_values` and spreads instead of the union of its known values, removing false `ImpossibleIdenticalComparison`, `InvalidArgument`, `InvalidOperand` and `InvalidReturnType`.

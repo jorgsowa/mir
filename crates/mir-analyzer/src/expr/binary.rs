@@ -366,6 +366,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn check_implicit_to_string_cast(&mut self, ty: &Type, span: Span) {
+        let ty = crate::subtype::canonical_enum_cases(self.db, ty);
         for atomic in &ty.types {
             // A non-Stringable enum concatenated implicitly is a guaranteed PHP
             // fatal ("Object of class X could not be converted to string"),

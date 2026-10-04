@@ -1776,6 +1776,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn check_interpolation_implicit_to_string_cast(&mut self, ty: &Type, span: php_ast::Span) {
+        // Expands docblock `Class::*` refs into their constant types.
+        let ty = crate::subtype::canonical_enum_cases(self.db, ty);
         for atomic in &ty.types {
             // Mirrors expr::binary's implicit-to-string check: a non-Stringable
             // enum is just as fatal to `print`/interpolation as any other bare
