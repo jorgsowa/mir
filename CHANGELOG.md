@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An int-literal class constant (`self::MAX`, `parent::MAX`, `Foo::MAX`) in a `<`/`<=`/`>`/`>=` comparison narrows the integer range like a literal, removing false `InvalidPropertyAssignment`.
 - Partial-overlap arguments are reported as `ArgumentTypeCoercion` instead of an `InvalidArgument` error: `int|string` (or nullable) to `positive-int`/`non-empty-string`, `list<int|string>` to `array<int|string, int>`, and a bare `array` to an array-intersection param.
 - `self`/`static` as a type argument of `@template-implements`, `@template-extends` and `@template-use` now resolves to the declaring class, so an override returning `self` no longer raises `MethodSignatureMismatch`.
 - `array + mixed` (either order) is no longer reported as `InvalidOperand`; the `mixed` operand may be an array.

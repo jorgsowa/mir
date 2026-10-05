@@ -85,13 +85,13 @@ pub(crate) use instanceof_disjuncts::{
 use instanceof_disjuncts::{narrow_or_instanceof_true, narrow_or_isset_true};
 use literals::{
     atom_safe_for_loose_int_narrowing, bool_narrow_type, expr_is_nonempty_string_literal,
-    extract_int_literal, flip_comparison_op, is_truthy_bool_literal, literal_int_narrow_type,
-    literal_string_narrow_type, narrow_prop_bool, narrow_prop_int_comparison,
-    narrow_prop_literal_int, narrow_prop_literal_string, narrow_prop_loose_bool,
-    narrow_prop_loose_int, narrow_prop_loose_null, narrow_static_prop_int_comparison,
-    narrow_string_to_non_empty, narrow_var_bool, narrow_var_int_comparison, narrow_var_literal_int,
-    narrow_var_literal_string, narrow_var_loose_bool, narrow_var_loose_int, narrow_var_loose_null,
-    narrow_var_null,
+    extract_int_bound, extract_int_literal, flip_comparison_op, is_truthy_bool_literal,
+    literal_int_narrow_type, literal_string_narrow_type, narrow_prop_bool,
+    narrow_prop_int_comparison, narrow_prop_literal_int, narrow_prop_literal_string,
+    narrow_prop_loose_bool, narrow_prop_loose_int, narrow_prop_loose_null,
+    narrow_static_prop_int_comparison, narrow_string_to_non_empty, narrow_var_bool,
+    narrow_var_int_comparison, narrow_var_literal_int, narrow_var_literal_string,
+    narrow_var_loose_bool, narrow_var_loose_int, narrow_var_loose_null, narrow_var_null,
 };
 use strings::{
     extract_strlen_arg, extract_strlen_static_prop_arg, narrow_prop_string_strlen_comparison,
@@ -799,19 +799,19 @@ pub fn narrow_from_condition(
             // normalize so the variable/property is always on the left,
             // flipping the operator when the literal was on the left instead.
             if let Some(var_name) = extract_var_name(&b.left) {
-                if let Some(n) = extract_int_literal(&b.right) {
+                if let Some(n) = extract_int_bound(&b.right, ctx, db, file) {
                     narrow_var_int_comparison(ctx, &var_name, b.op, n, is_true);
                 }
             } else if let Some(var_name) = extract_var_name(&b.right) {
-                if let Some(n) = extract_int_literal(&b.left) {
+                if let Some(n) = extract_int_bound(&b.left, ctx, db, file) {
                     narrow_var_int_comparison(ctx, &var_name, flip_comparison_op(b.op), n, is_true);
                 }
             } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
-                if let Some(n) = extract_int_literal(&b.right) {
+                if let Some(n) = extract_int_bound(&b.right, ctx, db, file) {
                     narrow_prop_int_comparison(ctx, &obj, &prop, db, file, b.op, n, is_true);
                 }
             } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
-                if let Some(n) = extract_int_literal(&b.left) {
+                if let Some(n) = extract_int_bound(&b.left, ctx, db, file) {
                     narrow_prop_int_comparison(
                         ctx,
                         &obj,
@@ -824,11 +824,11 @@ pub fn narrow_from_condition(
                     );
                 }
             } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
-                if let Some(n) = extract_int_literal(&b.right) {
+                if let Some(n) = extract_int_bound(&b.right, ctx, db, file) {
                     narrow_static_prop_int_comparison(ctx, &fqcn, &prop, db, b.op, n, is_true);
                 }
             } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.right, ctx, db, file) {
-                if let Some(n) = extract_int_literal(&b.left) {
+                if let Some(n) = extract_int_bound(&b.left, ctx, db, file) {
                     narrow_static_prop_int_comparison(
                         ctx,
                         &fqcn,

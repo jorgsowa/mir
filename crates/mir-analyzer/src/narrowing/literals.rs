@@ -77,6 +77,40 @@ pub(super) fn extract_int_literal(expr: &php_ast::owned::Expr) -> Option<i64> {
     }
 }
 
+/// An int literal, or a `self::`/`parent::`/`Foo::` constant whose type is a single int literal.
+/// `static::` is excluded: a subclass may override the constant.
+pub(super) fn extract_int_bound(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<i64> {
+    if let Some(n) = extract_int_literal(expr) {
+        return Some(n);
+    }
+    let ExprKind::ClassConstAccess(cca) = &peel_parens(expr).kind else {
+        return None;
+    };
+    let (ExprKind::Identifier(class), ExprKind::Identifier(name)) =
+        (&cca.class.kind, &cca.member.kind)
+    else {
+        return None;
+    };
+    let resolved = crate::db::resolve_name(db, file, class.as_ref());
+    let owner = match resolved.as_str() {
+        "static" => return None,
+        "self" => ctx.self_fqcn.as_deref()?,
+        "parent" => ctx.parent_fqcn.as_deref()?,
+        other => other,
+    };
+    let owner = crate::db::Fqcn::from_str(db, owner);
+    let (_, constant) = crate::db::find_class_constant_in_chain(db, owner, name.as_ref())?;
+    match constant.ty.types.as_slice() {
+        [Atomic::TLiteralInt(n)] => Some(*n),
+        _ => None,
+    }
+}
+
 /// Flip a comparison operator for when operands are swapped (`5 > $x` → `$x < 5`).
 pub(super) fn flip_comparison_op(op: BinaryOp) -> BinaryOp {
     match op {
