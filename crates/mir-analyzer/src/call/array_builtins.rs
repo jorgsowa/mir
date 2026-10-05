@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use php_ast::owned::{Expr, ExprKind};
+use php_ast::owned::{CallableCreateKind, Expr, ExprKind};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -678,11 +678,36 @@ fn callback_predicate_narrowed(
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
 ) -> Option<Type> {
-    let (param_name, body) = super::callable::single_param_predicate_body(callback_expr?)?;
+    let callback_expr = callback_expr?;
+    if let Some(fn_name) = type_guard_callable_name(callback_expr) {
+        return crate::narrowing::type_fn_narrowed(value, fn_name, db, true);
+    }
+    let (param_name, body) = super::callable::single_param_predicate_body(callback_expr)?;
     if let Some((fn_name, is_true)) = crate::narrowing::classify_var_predicate(body, param_name) {
         return crate::narrowing::type_fn_narrowed(value, fn_name.as_ref(), db, is_true);
     }
     crate::narrowing::int_comparison_predicate_narrowed(value, body, param_name)
+}
+
+/// The global single-argument type guard named by a `'is_string'` string
+/// callable or an `is_string(...)` first-class callable.
+fn type_guard_callable_name(callback_expr: &Expr) -> Option<&str> {
+    let name = match &callback_expr.kind {
+        ExprKind::String(s) => s.as_ref(),
+        ExprKind::CallableCreate(cc) => {
+            let CallableCreateKind::Function(target) = &cc.kind else {
+                return None;
+            };
+            let ExprKind::Identifier(name) = &target.kind else {
+                return None;
+            };
+            name.as_ref()
+        }
+        _ => return None,
+    };
+    let name = name.strip_prefix('\\').unwrap_or(name);
+    let is_guard = name.starts_with("is_") || name.starts_with("ctype_") || name == "array_is_list";
+    (is_guard && !name.contains('\\')).then_some(name)
 }
 
 /// Infer the result type of `array_slice($array, $offset, $length, $preserve_keys)`.
