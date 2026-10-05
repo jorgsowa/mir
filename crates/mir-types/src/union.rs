@@ -2366,6 +2366,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                                     });
                                     has_named_obj
                                         || sub_prop.ty.is_subtype_by_template_bounds(&sup_prop.ty)
+                                        || bare_array_may_fit(&sub_prop.ty, &sup_prop.ty)
                                 }
                                 None => *is_open || sup_prop.optional,
                             });
@@ -2434,6 +2435,28 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
 
         _ => false,
     }
+}
+
+/// A bare `array` carries no key/value info, so it may hold any array-shaped `sup`.
+fn bare_array_may_fit(sub: &Type, sup: &Type) -> bool {
+    fn array_like(t: &Atomic) -> bool {
+        match t {
+            Atomic::TArray { .. }
+            | Atomic::TNonEmptyArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TNonEmptyList { .. }
+            | Atomic::TKeyedArray { .. } => true,
+            Atomic::TIntersection { parts } => parts.iter().all(|p| p.types.iter().all(array_like)),
+            _ => false,
+        }
+    }
+    matches!(
+        sub.types.as_slice(),
+        [Atomic::TArray { key, value }]
+            if value.is_mixed()
+                && (key.is_mixed()
+                    || matches!(key.types.as_slice(), [Atomic::TInt, Atomic::TString] | [Atomic::TString, Atomic::TInt]))
+    ) && sup.types.iter().all(array_like)
 }
 
 /// Whether each generic type-argument in `sub` is compatible with the

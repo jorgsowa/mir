@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A bare `array` nested in a shape argument is accepted for an array-intersection or array-typed shape property, removing a false `InvalidArgument`.
 - An inline `@var` with an imported class nested in a `non-empty-array` or an intersection resolves the name, removing a false `InvalidReturnType`.
 - A list nested in an array value (`array<string, list<Sub>>`) is accepted for an array of its parent class, removing a false `InvalidReturnType`.
 - A bare `array` template argument (a `: array` closure return) is accepted for an invariant parameter typed with a more specific array, removing a false `InvalidPropertyAssignment`.

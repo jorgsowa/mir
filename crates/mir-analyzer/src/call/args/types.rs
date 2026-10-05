@@ -1220,6 +1220,13 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         Atomic::TKeyedArray { .. } => {
                             return mir_types::union::atomic_subtype(pv, av)
                         }
+                        // Same coercion the top-level check accepts for an array-intersection param.
+                        Atomic::TIntersection { .. } => {
+                            return array_intersection_coercion(
+                                &Type::single(av.clone()),
+                                &Type::single(pv.clone()),
+                            )
+                        }
                         _ => return false,
                     };
                     let param_key = array_key_of(pv).unwrap_or_else(Type::mixed);
