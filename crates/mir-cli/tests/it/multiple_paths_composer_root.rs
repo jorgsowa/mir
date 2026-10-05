@@ -115,7 +115,10 @@ fn project_root_among_paths_analyzes_whole_project() {
     );
     let out = run(dir.path(), &[".", "src/Models"]);
     assert!(!out.contains("UndefinedClass"), "{out}");
-    assert!(out.contains("Support/Broken.php"), "{out}");
+    assert!(
+        out.replace('\\', "/").contains("Support/Broken.php"),
+        "{out}"
+    );
 }
 
 #[test]
