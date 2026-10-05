@@ -760,6 +760,26 @@ fn resolve_atomic_for_file(
                 allow_builtin_shortcut,
             )),
         },
+        Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
+            key: Box::new(resolve_union_for_file_inner(
+                *key,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
+            value: Box::new(resolve_union_for_file_inner(
+                *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
+        },
+        Atomic::TIntersection { parts } => Atomic::TIntersection {
+            parts: parts
+                .iter()
+                .map(|p| resolve_union_for_file_inner(p.clone(), db, file, allow_builtin_shortcut))
+                .collect(),
+        },
         Atomic::TKeyOf { target } => Atomic::TKeyOf {
             target: Box::new(resolve_union_for_file_inner(
                 *target,
