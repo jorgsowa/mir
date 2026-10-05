@@ -1177,6 +1177,9 @@ impl<'a> BodyAnalyzer<'a> {
             method.is_static,
             templates,
         );
+        if let Some(class_templates) = crate::db::declared_template_params(self.db, fqcn) {
+            ctx.add_class_templates(&class_templates);
+        }
         ctx.current_method_name = Some(Arc::from(method_name));
 
         // Set is_in_pure_fn if the method is annotated @pure,

@@ -732,6 +732,15 @@ impl FlowState {
         ctx
     }
 
+    /// Registers the enclosing class's `@template` names as in-scope templates.
+    pub fn add_class_templates(&mut self, templates: &[mir_codebase::TemplateParam]) {
+        if templates.is_empty() {
+            return;
+        }
+        let names = Arc::make_mut(&mut self.template_param_names);
+        names.extend(templates.iter().map(|tp| Name::from(tp.name.as_ref())));
+    }
+
     /// The concrete class named by a `class-string<X>` atom; `None` when `X` is
     /// an in-scope `@template` (an unknown class, not a literal one).
     pub fn class_string_target<'a>(&self, atomic: &'a mir_types::Atomic) -> Option<&'a str> {

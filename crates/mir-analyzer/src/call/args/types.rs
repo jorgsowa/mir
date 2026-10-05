@@ -1776,7 +1776,9 @@ fn validate_callable_type(
                             Atomic::TNamedObject { fqcn, .. } => {
                                 Some(crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref()))
                             }
-                            Atomic::TClassString(Some(fqcn)) => Some(fqcn.to_string()),
+                            Atomic::TClassString(Some(_)) => {
+                                ctx.class_string_target(obj_atomic).map(str::to_string)
+                            }
                             _ => None,
                         };
                         if let Some(resolved_class) = resolved_class {
