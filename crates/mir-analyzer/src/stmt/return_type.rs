@@ -22,7 +22,8 @@ fn shape_property_compatible(
                 ..
             } = a
             else {
-                return declared.accepts_atomic_structural(a);
+                return declared.accepts_atomic_structural(a)
+                    || return_arrays_compatible(&Type::single(a.clone()), declared, db, file);
             };
             declared.types.iter().any(|d| match d {
                 Atomic::TKeyedArray {
@@ -857,6 +858,14 @@ fn associative_array_intersection_part(atomic: &Atomic) -> Option<&Atomic> {
     })
 }
 
+fn array_key_type(atomic: &Atomic) -> Option<Type> {
+    match atomic {
+        Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => Some((**key).clone()),
+        Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => Some(Type::single(Atomic::TInt)),
+        _ => None,
+    }
+}
+
 fn actual_is_definite_list(atomic: &Atomic) -> bool {
     matches!(
         atomic,
@@ -971,6 +980,10 @@ pub(crate) fn return_arrays_compatible(
                 _ => return false,
             };
 
+            let outer_keys_fit = array_key_type(a_atomic)
+                .zip(array_key_type(declared_atomic))
+                .is_none_or(|(ak, dk)| crate::subtype::is_subtype(db, &ak, &dk));
+
             act_val.types.iter().all(|av| {
                 match av {
                     Atomic::TNever => return true,
@@ -990,7 +1003,24 @@ pub(crate) fn return_arrays_compatible(
                     Atomic::TNamedObject { fqcn, .. } => fqcn,
                     Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => fqcn,
                     Atomic::TClosure { .. } => return true,
-                    _ => return scalar_array_element_compatible(av, dec_val),
+                    // Nested arrays recurse through the hierarchy-aware subtype check so
+                    // `list<Child>` fits `list<Base>` at any depth.
+                    _ => {
+                        return scalar_array_element_compatible(av, dec_val)
+                            || (matches!(
+                                av,
+                                Atomic::TArray { .. }
+                                    | Atomic::TNonEmptyArray { .. }
+                                    | Atomic::TList { .. }
+                                    | Atomic::TNonEmptyList { .. }
+                                    | Atomic::TKeyedArray { .. }
+                            ) && outer_keys_fit
+                                && crate::subtype::is_subtype(
+                                    db,
+                                    &Type::single(av.clone()),
+                                    dec_val,
+                                ));
+                    }
                 };
                 dec_val.types.iter().any(|dv| {
                     let dv_fqcn: &Name = match dv {

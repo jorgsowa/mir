@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A returned nested array (`array<string, list<Cat>>`, `array{k: list<Cat>}`) is checked through the class hierarchy at every depth, removing false `InvalidReturnType` for a more specific element class.
 - An intersection return type (`Out&Kind`) is satisfied by a class or intersection whose hierarchy covers every part, removing false `InvalidReturnType`.
 - An int-literal class constant (`self::MAX`, `parent::MAX`, `Foo::MAX`) in a `<`/`<=`/`>`/`>=` comparison narrows the integer range like a literal, removing false `InvalidPropertyAssignment`.
 - Partial-overlap arguments are reported as `ArgumentTypeCoercion` instead of an `InvalidArgument` error: `int|string` (or nullable) to `positive-int`/`non-empty-string`, `list<int|string>` to `array<int|string, int>`, and a bare `array` to an array-intersection param.
