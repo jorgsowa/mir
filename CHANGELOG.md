@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A literal-key write with deeper steps on an empty array (`$d['k'][] = 1`) builds the nested shape instead of widening to `array<string, …>`.
+- An inline `@var class-string<T>` inside a closure or arrow function resolves the enclosing method's or function's `@template T`.
 - A class-subject conditional return (`$x is Foo ? A : B`) takes the else branch only when the argument is provably disjoint from `Foo`; a supertype or overlapping interface yields both branches.
 - `array<0, T>` (e.g. `array_filter([$x])`) is accepted as `list<T>`.
 - `is_subclass_of()` and `is_a(..., true)` narrow a `class-string` to `class-string<Target>`.

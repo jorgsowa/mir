@@ -324,7 +324,7 @@ fn fresh_path_value(steps: &[WriteStep], leaf: &Type) -> Type {
 /// Apply a nested write `$v[s0][s1]… = leaf` to `current`: literal keys descend
 /// into shape properties, and the first dynamic key or push turns an empty or
 /// generic array into `array<widen(k), …>` / `list<…>` around the rest. `None`
-/// (an unsupported atom or a literal key missing before the last step) leaves
+/// (an unsupported atom, or a literal key missing from an open shape before the last step) leaves
 /// the caller on its generic widening.
 pub fn set_nested_write_path(current: &Type, steps: &[WriteStep], leaf: &Type) -> Option<Type> {
     let Some((step, rest)) = steps.split_first() else {
@@ -350,6 +350,8 @@ pub fn set_nested_write_path(current: &Type, steps: &[WriteStep], leaf: &Type) -
                 let new_inner = match existing {
                     Some(prop) => set_nested_write_path(&prop.ty, rest, leaf)?,
                     None if rest.is_empty() => leaf.clone(),
+                    // An open shape may already hold the key with an unknown type.
+                    None if !*is_open => fresh_path_value(rest, leaf),
                     None => return None,
                 };
                 let mut new_properties = properties.clone();
