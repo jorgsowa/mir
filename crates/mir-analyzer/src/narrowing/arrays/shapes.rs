@@ -981,6 +981,8 @@ pub(crate) fn narrow_array_emptiness_condition(
                 narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
             } else if let Some((fqcn, prop)) = extract_static_prop_access(left, ctx, db, file) {
                 narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
+            } else {
+                narrow_offset_empty_collection_by_path(left, ctx, db, file, effective_true);
             }
         }
         true
@@ -1001,12 +1003,85 @@ pub(crate) fn narrow_array_emptiness_condition(
                 narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
             } else if let Some((fqcn, prop)) = extract_static_prop_access(right, ctx, db, file) {
                 narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
+            } else {
+                narrow_offset_empty_collection_by_path(right, ctx, db, file, effective_true);
             }
         }
         true
     } else {
         false
     }
+}
+
+/// `$base['a']['b'] === []` / `!== []` on a shaped base: narrows the addressed value to an
+/// empty / non-empty collection. An empty match also proves every level on the path is present.
+fn narrow_offset_empty_collection_by_path(
+    expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_empty: bool,
+) {
+    let Some((base, path)) = collect_array_access_path(expr, ctx, db, file) else {
+        return;
+    };
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+    if let Some(narrowed) = narrow_shape_path_empty_collection(&current, &path, is_empty) {
+        set_shape_base_narrowed(ctx, &base, current, narrowed);
+    }
+}
+
+fn narrow_shape_path_empty_collection(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    is_empty: bool,
+) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        let narrowed_prop = match atomic {
+            Atomic::TKeyedArray { properties, .. } => properties.get(key).and_then(|prop| {
+                if rest.is_empty() {
+                    let narrowed = if is_empty {
+                        prop.ty.narrow_to_empty_collection()
+                    } else {
+                        prop.ty.narrow_to_non_empty_collection()
+                    };
+                    (!narrowed.is_empty() && narrowed != prop.ty).then_some(narrowed)
+                } else {
+                    narrow_shape_path_empty_collection(&prop.ty, rest, is_empty)
+                }
+            }),
+            _ => None,
+        };
+        let (
+            Some(narrowed),
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            },
+        ) = (narrowed_prop, atomic)
+        else {
+            result.add_type(atomic.clone());
+            continue;
+        };
+        let mut new_props = properties.clone();
+        if let Some(p) = new_props.get_mut(key) {
+            p.ty = narrowed;
+            if is_empty {
+                p.optional = false;
+            }
+        }
+        changed = true;
+        result.add_type(Atomic::TKeyedArray {
+            properties: new_props,
+            is_open: *is_open,
+            is_list: *is_list,
+        });
+    }
+    (changed && !result.types.is_empty()).then_some(result)
 }
 
 /// For `empty($base['a']['b']...)` where `$base` is (partly) a known shape,
