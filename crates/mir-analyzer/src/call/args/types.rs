@@ -272,6 +272,8 @@ pub(crate) fn check_one(
             || super::super::callable::narrows_to(&arg_ty.remove_null(), param_ty)
             || array_element_coercion(arg_ty, param_ty, ea)
             || array_intersection_coercion(arg_ty, param_ty)
+            || empty_array_to_non_empty_coercion(arg_ty, param_ty)
+            || generic_narrowing_coercion(arg_ty, param_ty)
         {
             ea.emit(
                 IssueKind::ArgumentTypeCoercion {
@@ -1307,6 +1309,51 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
 fn array_element_coercion(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     !array_list_compatible(arg_ty, param_ty, ea)
         && array_list_compatible_with(arg_ty, param_ty, ea, true)
+}
+
+/// A literal `[]` passed where a `non-empty-*` array is expected.
+fn empty_array_to_non_empty_coercion(arg_ty: &Type, param_ty: &Type) -> bool {
+    matches!(
+        arg_ty.types.as_slice(),
+        [Atomic::TKeyedArray { properties, is_open: false, .. }] if properties.is_empty()
+    ) && param_ty.types.iter().any(|p| {
+        matches!(
+            p,
+            Atomic::TNonEmptyList { .. } | Atomic::TNonEmptyArray { .. }
+        )
+    })
+}
+
+/// `G<int|null>` passed to `G<positive-int|null>`: same class, every type argument equal or
+/// refined (`positive-int`, `non-empty-string`) from the argument's, and at least one refined.
+fn generic_narrowing_coercion(arg_ty: &Type, param_ty: &Type) -> bool {
+    let [Atomic::TNamedObject {
+        fqcn: arg_fqcn,
+        type_params: arg_params,
+    }] = arg_ty.types.as_slice()
+    else {
+        return false;
+    };
+    param_ty.types.iter().any(|p| {
+        let Atomic::TNamedObject { fqcn, type_params } = p else {
+            return false;
+        };
+        let refines = |a: &Type, p: &Type| {
+            super::super::callable::narrows_to(&a.remove_null(), p)
+                && (!a.is_nullable() || p.is_nullable())
+        };
+        fqcn.eq_ignore_ascii_case(arg_fqcn)
+            && !arg_params.is_empty()
+            && arg_params.len() == type_params.len()
+            && arg_params
+                .iter()
+                .zip(type_params.iter())
+                .all(|(a, p)| a == p || refines(a, p))
+            && arg_params
+                .iter()
+                .zip(type_params.iter())
+                .any(|(a, p)| a != p)
+    })
 }
 
 /// An array argument broader than every part of an array-intersection param

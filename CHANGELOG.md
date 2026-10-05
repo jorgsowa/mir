@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A generic argument whose type arguments are only broader than the parameter's refined ones (`Box<int|null>` for `Box<positive-int|null>`), and a literal `[]` for a `non-empty-list`/`non-empty-array` parameter, report `ArgumentTypeCoercion` instead of `InvalidArgument`.
 - A bare `array` nested in a shape argument is accepted for an array-intersection or array-typed shape property, removing a false `InvalidArgument`.
 - An inline `@var` with an imported class nested in a `non-empty-array` or an intersection resolves the name, removing a false `InvalidReturnType`.
 - A list nested in an array value (`array<string, list<Sub>>`) is accepted for an array of its parent class, removing a false `InvalidReturnType`.

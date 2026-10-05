@@ -28,6 +28,6 @@ function makeEmptyList(): array {
 
 useList([1]);
 useList([]);
-//      ^^ InvalidArgument: Argument $xs of useList() expects 'non-empty-array', got 'array{}'
+//      ^^ ArgumentTypeCoercion: Argument $xs of useList() expects 'non-empty-array', got 'array{}' — coercion may fail at runtime
 
 ===expect===
