@@ -83,6 +83,7 @@ pub(crate) fn return_type_is_invalid(
     // (declared is more specific — widening is not an error at this level).
     if declared.is_subtype_structural(actual)
         || declared.remove_null().is_subtype_structural(actual)
+        || declared.is_subtype_structural(&actual.widen_nested_non_empty())
     {
         return false;
     }

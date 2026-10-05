@@ -697,6 +697,74 @@ impl Type {
         )
     }
 
+    /// Keeps the outer collection kind but turns every nested `non-empty-list`/`non-empty-array`
+    /// into `list`/`array`, for comparisons that ignore element emptiness.
+    pub fn widen_nested_non_empty(&self) -> Type {
+        fn relax_all(ty: &Type) -> Type {
+            map_atoms(ty, |a| match a {
+                Atomic::TNonEmptyList { value } => Atomic::TList {
+                    value: Box::new(relax_all(value)),
+                },
+                Atomic::TNonEmptyArray { key, value } => Atomic::TArray {
+                    key: key.clone(),
+                    value: Box::new(relax_all(value)),
+                },
+                other => map_values(other, relax_all),
+            })
+        }
+        fn map_values(atomic: &Atomic, f: fn(&Type) -> Type) -> Atomic {
+            match atomic {
+                Atomic::TArray { key, value } => Atomic::TArray {
+                    key: key.clone(),
+                    value: Box::new(f(value)),
+                },
+                Atomic::TList { value } => Atomic::TList {
+                    value: Box::new(f(value)),
+                },
+                Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
+                    key: key.clone(),
+                    value: Box::new(f(value)),
+                },
+                Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
+                    value: Box::new(f(value)),
+                },
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                } => Atomic::TKeyedArray {
+                    properties: Box::new(
+                        properties
+                            .iter()
+                            .map(|(k, p)| {
+                                (
+                                    k.clone(),
+                                    crate::atomic::KeyedProperty {
+                                        ty: f(&p.ty),
+                                        optional: p.optional,
+                                    },
+                                )
+                            })
+                            .collect(),
+                    ),
+                    is_open: *is_open,
+                    is_list: *is_list,
+                },
+                other => other.clone(),
+            }
+        }
+        fn map_atoms(ty: &Type, f: impl Fn(&Atomic) -> Atomic) -> Type {
+            let mut result = Type::empty();
+            result.possibly_undefined = ty.possibly_undefined;
+            result.from_docblock = ty.from_docblock;
+            for atomic in &ty.types {
+                result.add_type(f(atomic));
+            }
+            result
+        }
+        map_atoms(self, |a| map_values(a, relax_all))
+    }
+
     /// Narrow array/list types to their non-empty variants (for `count() > 0` etc.),
     /// dropping the closed empty shape `array{}`.
     pub fn narrow_to_non_empty_collection(&self) -> Type {
@@ -2100,6 +2168,9 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         }
         (Atomic::TNonEmptyList { value }, Atomic::TList { value: lv }) => {
             value.is_subtype_structural(lv)
+        }
+        (Atomic::TNonEmptyList { value: v1 }, Atomic::TNonEmptyList { value: v2 }) => {
+            v1.is_subtype_structural(v2)
         }
         // array<int, X> is accepted where list<X> or non-empty-list<X> expected
         (Atomic::TArray { key, value: av }, Atomic::TList { value: lv }) => {
