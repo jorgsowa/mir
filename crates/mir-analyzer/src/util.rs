@@ -338,3 +338,17 @@ fn reconcile_prop_shadow_name(
     });
     shadow.unwrap_or(fqcn)
 }
+
+/// True for a named object whose class doesn't exist (`self`/`static`/`parent` excluded).
+pub(crate) fn is_unresolved_class(
+    db: &dyn crate::db::MirDatabase,
+    atomic: &mir_types::Atomic,
+) -> bool {
+    let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic else {
+        return false;
+    };
+    !matches!(
+        php_ident_lowercase(fqcn.as_ref()).as_str(),
+        "self" | "static" | "parent"
+    ) && !crate::db::class_exists(db, crate::diagnostics::docblock_class_part(fqcn.as_ref()))
+}

@@ -1474,6 +1474,7 @@ pub(crate) fn property_assign_compatible(
     }
     value_ty.types.iter().all(|a| match a {
         Atomic::TTemplateParam { .. } => true,
+        a if crate::util::is_unresolved_class(db, a) => true,
         Atomic::TClosure { .. } | Atomic::TCallable { .. } => prop_ty.types.iter().any(|p| {
             matches!(p, Atomic::TClosure { .. } | Atomic::TCallable { .. })
                 || matches!(p, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Closure")

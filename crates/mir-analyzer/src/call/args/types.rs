@@ -236,6 +236,7 @@ pub(crate) fn check_one(
         && !arg_ty.is_mixed()
         // An unresolved `Cls::CONST` has an unknown value, so a mismatch can't be proven.
         && !arg_ty.contains(|t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::")))
+        && !has_unresolved_class(ea, arg_ty)
         && !named_object_subtype(arg_ty, param_ty, ea)
         && !super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
         && !super::param_contains_template_or_unknown(arg_ty, arg_ty, ea, template_params)
@@ -431,6 +432,14 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
 // ---------------------------------------------------------------------------
 // Subtype helpers
 // ---------------------------------------------------------------------------
+
+/// A type naming a non-existent class (already reported as `UndefinedClass` /
+/// `UndefinedDocblockClass`) can't be proven incompatible with the parameter.
+fn has_unresolved_class(ea: &ExpressionAnalyzer<'_>, ty: &Type) -> bool {
+    ty.types
+        .iter()
+        .any(|a| crate::util::is_unresolved_class(ea.db, a))
+}
 
 fn invalid_argument_actual_type(
     arg_ty: &Type,
