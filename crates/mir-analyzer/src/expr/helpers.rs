@@ -1501,6 +1501,48 @@ pub(crate) fn property_assign_compatible(
     })
 }
 
+/// A generic array narrows to a keyed shape the same way a parent narrows to a child.
+fn is_generic_array_coercion(
+    atom: &Atomic,
+    prop_ty: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> bool {
+    matches!(atom, Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. })
+        && prop_ty.types.iter().any(|p| {
+            matches!(p, Atomic::TKeyedArray { .. })
+                && is_subtype(db, &Type::single(p.clone()), &Type::single(atom.clone()))
+        })
+}
+
+fn is_array_like(atom: &Atomic) -> bool {
+    matches!(
+        atom,
+        Atomic::TArray { .. }
+            | Atomic::TNonEmptyArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TNonEmptyList { .. }
+            | Atomic::TKeyedArray { .. }
+    )
+}
+
+fn is_atom_property_coercion(
+    atom: &Atomic,
+    prop_ty: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> bool {
+    let val_fqcn = match atom {
+        Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => fqcn,
+        a => return is_generic_array_coercion(a, prop_ty, db),
+    };
+    prop_ty.types.iter().any(|p| {
+        let prop_fqcn = match p {
+            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => fqcn,
+            _ => return false,
+        };
+        crate::db::extends_or_implements(db, prop_fqcn.as_ref(), val_fqcn.as_ref())
+    })
+}
+
 pub(crate) fn is_property_type_coercion(
     value_ty: &Type,
     prop_ty: &Type,
@@ -1510,27 +1552,24 @@ pub(crate) fn is_property_type_coercion(
         return false;
     }
     let value_core = value_ty.core_type();
-    if value_core.types.is_empty() || !value_core.is_single() {
-        return false;
+    let mut atoms: Vec<&Atomic> = value_core.types.iter().collect();
+    // `array{k: T}|array` is just `array`: every other array-like atom is a subtype of it.
+    if atoms.iter().any(|a| is_untyped_array(a)) {
+        atoms.retain(|a| is_untyped_array(a) || !is_array_like(a));
     }
-    let val_fqcn = match value_core.types.first().unwrap() {
-        Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => *fqcn,
-        // A generic array narrows to a keyed shape the same way a parent narrows to a child.
-        Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. } => {
-            return prop_ty.types.iter().any(|p| {
-                matches!(p, Atomic::TKeyedArray { .. })
-                    && is_subtype(db, &Type::single(p.clone()), &value_core)
-            });
+    match atoms.as_slice() {
+        [] => false,
+        [atom] => is_atom_property_coercion(atom, prop_ty, db),
+        _ => {
+            atoms
+                .iter()
+                .any(|a| is_generic_array_coercion(a, prop_ty, db))
+                && atoms.iter().all(|a| {
+                    is_generic_array_coercion(a, prop_ty, db)
+                        || is_subtype(db, &Type::single((*a).clone()), prop_ty)
+                })
         }
-        _ => return false,
-    };
-    prop_ty.types.iter().any(|p| {
-        let prop_fqcn = match p {
-            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => fqcn,
-            _ => return false,
-        };
-        crate::db::extends_or_implements(db, prop_fqcn.as_ref(), val_fqcn.as_ref())
-    })
+    }
 }
 
 #[cfg(test)]
