@@ -499,6 +499,15 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     is_subtype(db, &Type::single(Atomic::TNonNegativeInt), dk)
                         && is_subtype(db, sv, dv)
                 }
+                // array<0,V> holds at most the entry [0 => V], which is a list.
+                (
+                    Atomic::TArray { key: sk, value: sv },
+                    Atomic::TList { value: dv },
+                ) if is_only_key_zero(sk) => is_subtype(db, sv, dv),
+                (
+                    Atomic::TNonEmptyArray { key: sk, value: sv },
+                    Atomic::TNonEmptyList { value: dv },
+                ) if is_only_key_zero(sk) => is_subtype(db, sv, dv),
                 // list<V1>/non-empty-list<V1> satisfies list<V2> the same way.
                 (
                     Atomic::TList { value: sv } | Atomic::TNonEmptyList { value: sv },
@@ -566,6 +575,10 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
             }
         })
     })
+}
+
+fn is_only_key_zero(key: &Type) -> bool {
+    matches!(key.types.as_slice(), [Atomic::TLiteralInt(0)])
 }
 
 fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {

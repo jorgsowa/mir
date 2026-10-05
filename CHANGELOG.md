@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A class-subject conditional return (`$x is Foo ? A : B`) takes the else branch only when the argument is provably disjoint from `Foo`; a supertype or overlapping interface yields both branches.
+- `array<0, T>` (e.g. `array_filter([$x])`) is accepted as `list<T>`.
 - `is_subclass_of()` and `is_a(..., true)` narrow a `class-string` to `class-string<Target>`.
 - An enum case's `->value` used as an array index (`$a[Suit::Hearts->value] = 1`) keeps its literal key on write and read.
 - A closure parameter narrower than the documented callable parameter (`int` for `int|string`, a subclass for its parent) reports `ArgumentTypeCoercion` instead of `InvalidArgument`.
