@@ -100,6 +100,12 @@ pub struct FlowState {
     /// this function (`call::opaque_callback`).
     pub current_function_fqn: Option<Arc<str>>,
 
+    /// Enclosing method/function inherited by closures and arrow functions,
+    /// for resolving `@template` names. Separate from `current_*` so lifecycle
+    /// and opaque-callback checks keep treating closures as their own scope.
+    pub template_scope_method: Option<Arc<str>>,
+    pub template_scope_function: Option<Arc<str>>,
+
     /// Whether we are inside a @pure function/method body.
     pub is_in_pure_fn: bool,
 
@@ -454,6 +460,24 @@ impl ScopeOverrideGuard {
 }
 
 impl FlowState {
+    pub fn template_method(&self) -> Option<&Arc<str>> {
+        self.current_method_name
+            .as_ref()
+            .or(self.template_scope_method.as_ref())
+    }
+
+    pub fn template_function(&self) -> Option<&Arc<str>> {
+        self.current_function_fqn
+            .as_ref()
+            .or(self.template_scope_function.as_ref())
+    }
+
+    /// Lets a closure/arrow-function body resolve the enclosing `@template`s.
+    pub fn inherit_template_scope(&mut self, parent: &FlowState) {
+        self.template_scope_method = parent.template_method().cloned();
+        self.template_scope_function = parent.template_function().cloned();
+    }
+
     pub fn new() -> Self {
         Self {
             vars: Arc::clone(superglobal_vars()),
@@ -474,6 +498,8 @@ impl FlowState {
             inside_constructor: false,
             current_method_name: None,
             current_function_fqn: None,
+            template_scope_method: None,
+            template_scope_function: None,
             is_in_pure_fn: false,
             is_in_immutable_method: false,
             is_in_external_mutation_free_method: false,

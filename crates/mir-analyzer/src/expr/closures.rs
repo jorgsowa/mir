@@ -344,7 +344,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let aliases = if let Some(fqcn) = ctx.self_fqcn.as_deref() {
             crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
                 .map(|cl| cl.type_aliases().clone())
-        } else if let Some(fqn) = ctx.current_function_fqn.as_deref() {
+        } else if let Some(fqn) = ctx.template_function().map(|f| &**f) {
             crate::db::find_function_from(
                 self.db,
                 &self.file,
@@ -389,7 +389,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let defining_entity = ctx
             .self_fqcn
             .as_deref()
-            .or(ctx.current_function_fqn.as_deref())
+            .or(ctx.template_function().map(|f| &**f))
             .unwrap_or_default()
             .to_string();
         if let Some(fqcn) = ctx.self_fqcn.as_deref() {
@@ -403,7 +403,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .map(|tp| tp.name.to_string()),
                 );
                 template_params.extend(class_like.template_params().iter().cloned());
-                if let Some(method_name) = ctx.current_method_name.as_deref() {
+                if let Some(method_name) = ctx.template_method().map(|m| &**m) {
                     let method_name = crate::util::php_ident_lowercase(method_name);
                     if let Some(method) = class_like.own_methods().get(method_name.as_str()) {
                         template_names
@@ -412,7 +412,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-        } else if let Some(fqn) = ctx.current_function_fqn.as_deref() {
+        } else if let Some(fqn) = ctx.template_function().map(|f| &**f) {
             if let Some(function) = crate::db::find_function_from(
                 self.db,
                 &self.file,
@@ -557,6 +557,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // checks against an empty set and treats the value as a concrete type,
         // producing spurious InvalidPropertyAssignment/instanceof narrowing bugs.
         closure_ctx.template_param_names = Arc::clone(&ctx.template_param_names);
+        closure_ctx.inherit_template_scope(ctx);
         // A closure invoked from inside a @pure/@psalm-immutable/
         // @psalm-external-mutation-free body can still smuggle out an
         // observable side effect, so it must inherit that purity context
@@ -861,6 +862,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // See analyze_closure: propagate the enclosing scope's template params
         // so captured template-typed variables aren't misjudged as concrete.
         arrow_ctx.template_param_names = Arc::clone(&ctx.template_param_names);
+        arrow_ctx.inherit_template_scope(ctx);
         // See analyze_closure: an arrow function invoked from inside a
         // @pure/@psalm-immutable/@psalm-external-mutation-free body can still
         // smuggle out a side effect through an implicitly-captured variable —

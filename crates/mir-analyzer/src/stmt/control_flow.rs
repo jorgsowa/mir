@@ -377,8 +377,8 @@ impl<'a> StatementsAnalyzer<'a> {
             let annotations = self.extract_var_annotations_from(
                 doc.as_deref(),
                 ctx.self_fqcn.as_deref(),
-                ctx.current_method_name.as_deref(),
-                ctx.current_function_fqn.as_deref(),
+                ctx.template_method().map(|m| &**m),
+                ctx.template_function().map(|f| &**f),
             );
             if let Some(ann) = annotations
                 .into_iter()
