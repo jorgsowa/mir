@@ -73,6 +73,37 @@ pub(crate) fn named_object_return_compatible(
     file: &str,
 ) -> bool {
     actual.types.iter().all(|actual_atom| {
+        // A declared `A&B` needs every part satisfied; an actual `A&B` satisfies a
+        // requirement when any of its parts does.
+        let is_object_atom = matches!(
+            actual_atom,
+            Atomic::TNamedObject { .. }
+                | Atomic::TSelf { .. }
+                | Atomic::TStaticObject { .. }
+                | Atomic::TParent { .. }
+                | Atomic::TIntersection { .. }
+        );
+        if is_object_atom
+            && declared.types.iter().any(|d| match d {
+                Atomic::TIntersection { parts } => {
+                    let single = Type::single(actual_atom.clone());
+                    parts
+                        .iter()
+                        .all(|part| named_object_return_compatible(&single, part, db, file))
+                }
+                _ => false,
+            })
+        {
+            return true;
+        }
+        if let Atomic::TIntersection { parts } = actual_atom {
+            return parts.iter().any(|part| {
+                part.types
+                    .iter()
+                    .all(|a| matches!(a, Atomic::TNamedObject { .. }))
+                    && named_object_return_compatible(part, declared, db, file)
+            }) || declared.accepts_atomic_structural(actual_atom);
+        }
         // Extract the actual FQCN — handles TNamedObject, TSelf, TStaticObject, TParent
         let actual_fqcn: &Name = match actual_atom {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
