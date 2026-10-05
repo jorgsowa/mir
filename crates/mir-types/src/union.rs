@@ -1757,7 +1757,7 @@ fn atomic_may_contain_templates(atomic: &Atomic) -> bool {
     }
 }
 
-fn eval_key_of_type(t: &Type) -> Option<Type> {
+pub fn eval_key_of_type(t: &Type) -> Option<Type> {
     let mut result = Type::empty();
     for atomic in &t.types {
         match atomic {
@@ -1785,7 +1785,7 @@ fn eval_key_of_type(t: &Type) -> Option<Type> {
     (!result.types.is_empty()).then_some(result)
 }
 
-fn eval_value_of_type(t: &Type) -> Option<Type> {
+pub fn eval_value_of_type(t: &Type) -> Option<Type> {
     let mut result = Type::empty();
     for atomic in &t.types {
         match atomic {

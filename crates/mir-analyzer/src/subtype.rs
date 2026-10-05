@@ -587,7 +587,7 @@ fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
 
 fn atomic_mentions_enum_case(a: &Atomic) -> bool {
     match a {
-        Atomic::TLiteralEnumCase { .. } | Atomic::TValueOf { .. } => true,
+        Atomic::TLiteralEnumCase { .. } | Atomic::TKeyOf { .. } | Atomic::TValueOf { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
             fqcn.contains("::") || type_params.iter().any(mentions_enum_case)
         }
@@ -655,6 +655,12 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
                 continue;
             }
         }
+        if let Some(projected) = const_array_projection(db, atomic) {
+            for a in projected.types {
+                out.add_type(a);
+            }
+            continue;
+        }
         out.add_type(match atomic {
             Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::") => {
                 docblock_case_literal(db, fqcn).unwrap_or_else(|| atomic.clone())
@@ -702,6 +708,27 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
         });
     }
     collapse_complete_enums(db, out)
+}
+
+/// `key-of<Cls::CONST>` / `value-of<Cls::CONST>` over the constant's array type.
+fn const_array_projection(db: &dyn MirDatabase, atomic: &Atomic) -> Option<Type> {
+    let (target, project): (_, fn(&Type) -> Option<Type>) = match atomic {
+        Atomic::TKeyOf { target } => (target, mir_types::union::eval_key_of_type),
+        Atomic::TValueOf { target } => (target, mir_types::union::eval_value_of_type),
+        _ => return None,
+    };
+    let [Atomic::TNamedObject { fqcn, .. }] = target.types.as_slice() else {
+        return None;
+    };
+    if !fqcn.contains("::") {
+        return None;
+    }
+    // An unresolvable constant accepts anything rather than guess.
+    Some(
+        class_constant_ref_type(db, fqcn)
+            .and_then(|constants| project(&constants))
+            .unwrap_or_else(Type::mixed),
+    )
 }
 
 /// `value-of<E>` for backed enums: the case values, or the backing scalar when a case value is

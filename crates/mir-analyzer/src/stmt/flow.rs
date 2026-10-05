@@ -21,6 +21,7 @@ pub(crate) fn return_type_is_invalid(
     file: &str,
 ) -> bool {
     let declared = &*crate::subtype::canonical_enum_cases(db, declared);
+    let actual = &*crate::subtype::canonical_enum_cases(db, actual);
     if projected_template_return_compatible(actual, declared) {
         return false;
     }
