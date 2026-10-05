@@ -22,6 +22,19 @@ pub fn is_superglobal(name: &str) -> bool {
     SUPERGLOBALS.contains(&name)
 }
 
+/// `$_FILES[x]['tmp_name'|'size'|'error']` are set by PHP, not the client.
+fn is_server_generated_upload_field(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
+    let is_server_field = matches!(
+        aa.index.as_deref().map(|i| &i.kind),
+        Some(ExprKind::String(f)) if matches!(&**f, "tmp_name" | "size" | "error")
+    );
+    let ExprKind::ArrayAccess(file_entry) = &aa.array.kind else {
+        return false;
+    };
+    is_server_field
+        && matches!(&file_entry.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_FILES")
+}
+
 // ---------------------------------------------------------------------------
 // Sink classification
 // ---------------------------------------------------------------------------
@@ -311,7 +324,7 @@ pub fn is_expr_tainted(
 
         ExprKind::ArrayAccess(aa) => {
             // $_GET['key'] — tainted if the array is tainted/superglobal
-            is_expr_tainted(&aa.array, ctx, db, file)
+            !is_server_generated_upload_field(aa) && is_expr_tainted(&aa.array, ctx, db, file)
         }
 
         ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx, db, file),
