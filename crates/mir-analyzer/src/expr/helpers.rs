@@ -1331,6 +1331,13 @@ pub(crate) fn is_property_type_coercion(
     }
     let val_fqcn = match value_core.types.first().unwrap() {
         Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => *fqcn,
+        // A generic array narrows to a keyed shape the same way a parent narrows to a child.
+        Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. } => {
+            return prop_ty.types.iter().any(|p| {
+                matches!(p, Atomic::TKeyedArray { .. })
+                    && is_subtype(db, &Type::single(p.clone()), &value_core)
+            });
+        }
         _ => return false,
     };
     prop_ty.types.iter().any(|p| {

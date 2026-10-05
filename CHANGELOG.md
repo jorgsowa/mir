@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `iterator_to_array()` keeps the iterator's key and value types (`array<K, V>`, `list<V>` with `$preserve_keys = false`), removing false `InvalidPropertyAssignment`/`InvalidArgument` on its result. Non-generic implementers of generic iterator interfaces and the one-arg `Generator<V>` shorthand no longer leak template names.
+- A generic `array` assigned to a keyed-shape property is reported as `PropertyTypeCoercion` (info) instead of an `InvalidPropertyAssignment` warning.
 - A class-level `@template` named in `class-string<T>` is no longer treated as a real class in methods (`T::make()`, `[$c, 'make']`), removing false `UndefinedMethod`/`UndefinedClass`.
 - A `mixed` value assigned to a nullable property refines it to its non-null declared type, removing false `NullableReturnStatement`.
 - A nested append (`$out[$k][] = $v`) types the inner list as `non-empty-list`, removing false `InvalidReturnType` against a `non-empty-list` value type.
