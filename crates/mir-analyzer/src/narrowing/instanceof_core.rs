@@ -627,11 +627,9 @@ pub(super) fn partition_is_a_string_like(
     string_part.from_docblock = current.from_docblock;
     let mut obj_part = Type::empty();
     for atom in &current.types {
-        if let Atomic::TClassString(Some(name)) = atom {
-            if named_object_matches_instanceof(name, class_name, db)
-                || classes_can_coexist(name, class_name, db)
-            {
-                string_part.add_type(atom.clone());
+        if let Atomic::TClassString(name) = atom {
+            if class_string_may_match(name.as_deref(), class_name, db) {
+                string_part.add_type(narrow_class_string(name.as_deref(), class_name, db));
             }
         } else if atom.is_string() {
             string_part.add_type(atom.clone());
@@ -640,6 +638,27 @@ pub(super) fn partition_is_a_string_like(
         }
     }
     (string_part, obj_part)
+}
+
+fn class_string_may_match(name: Option<&str>, class_name: &str, db: &dyn MirDatabase) -> bool {
+    name.is_none_or(|name| {
+        named_object_matches_instanceof(name, class_name, db)
+            || crate::db::extends_or_implements(db, class_name, name)
+            || classes_can_coexist(name, class_name, db)
+    })
+}
+
+/// `class-string` / `class-string<Parent>` narrowed by an `is_a`/`is_subclass_of` check against
+/// `class_name`; an unrelated or already-narrower `class-string<C>` is returned unchanged.
+fn narrow_class_string(name: Option<&str>, class_name: &str, db: &dyn MirDatabase) -> Atomic {
+    let narrower = name.is_none_or(|name| {
+        name != class_name && crate::db::extends_or_implements(db, class_name, name)
+    });
+    Atomic::TClassString(if narrower {
+        Some(class_name.into())
+    } else {
+        name.map(Into::into)
+    })
 }
 
 /// `filter_out_instanceof_match`, extended for the `allow_string: true`
@@ -694,6 +713,12 @@ pub(super) fn narrow_strict_subclass_of(
                     && fqcn.as_ref() != class_name =>
             {
                 result.add_type(atomic.clone());
+            }
+            // `class-string<X>` whose X is unrelated and cannot coexist is dropped like an object.
+            Atomic::TClassString(name)
+                if class_string_may_match(name.as_deref(), class_name, db) =>
+            {
+                result.add_type(narrow_class_string(name.as_deref(), class_name, db));
             }
             // Template parameter — intersect with the named class rather than replacing it,
             // so the value is still known to be a T as well as a strict subclass of it.

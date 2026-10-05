@@ -44,10 +44,10 @@ function test_false_branch_drops_matching_class_string(string $cls): void {
 }
 
 /** @param class-string $cls */
-function test_generic_class_string_still_preserved(string $cls): void {
-    // No specific name to check — must not be erased or narrowed further.
+function test_generic_class_string_narrowed_to_checked_class(string $cls): void {
+    // Not erased: narrowed to the checked class.
     if (is_a($cls, 'Foo', true)) {
-        /** @mir-check $cls is class-string */
+        /** @mir-check $cls is class-string<Foo> */
         $_ = $cls;
     }
 }

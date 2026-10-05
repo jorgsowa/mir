@@ -20,8 +20,8 @@ function needs_int(int $i): void {}
 function test_class_string_preserved(string $cls): void {
     if (is_a($cls, 'Foo', true)) {
         // $cls is a class-string; the true branch must NOT narrow it away to
-        // an object type — it should remain a class-string type.
-        /** @mir-check $cls is class-string */
+        // an object type — it stays a class-string, narrowed to the checked class.
+        /** @mir-check $cls is class-string<Foo> */
         $_ = $cls;
     }
 }
