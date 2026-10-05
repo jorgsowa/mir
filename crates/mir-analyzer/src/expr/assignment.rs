@@ -2111,6 +2111,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 let dynamic_outer_nested_update = if nested_update.is_none()
                                     && key_chain.len() > 1
                                     && literal_key_chain.last().is_some_and(Option::is_none)
+                                    && key_chain[..key_chain.len() - 1]
+                                        .iter()
+                                        .zip(&literal_key_chain)
+                                        .all(|(key, literal)| key.is_none() || literal.is_some())
                                 {
                                     let mut leaf = ty.clone();
                                     for key in key_chain[..key_chain.len() - 1].iter() {
@@ -2132,9 +2136,34 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 } else {
                                     None
                                 };
+                                let nested_write_path = if nested_update.is_none()
+                                    && dynamic_outer_nested_update.is_none()
+                                    && key_chain.len() > 1
+                                {
+                                    let steps: Vec<_> = key_chain
+                                        .iter()
+                                        .zip(&literal_key_chain)
+                                        .rev()
+                                        .map(|(key, literal)| match (key, literal) {
+                                            (None, _) => super::helpers::WriteStep::Push,
+                                            (Some(_), Some(k)) => {
+                                                super::helpers::WriteStep::Literal(k.clone())
+                                            }
+                                            (Some(k), None) => {
+                                                super::helpers::WriteStep::Dynamic(k.clone())
+                                            }
+                                        })
+                                        .collect();
+                                    super::helpers::set_nested_write_path(&current, &steps, &ty)
+                                } else {
+                                    None
+                                };
                                 let declared_ceiling =
                                     ctx.declared_var_types.get(&mir_types::Name::from(name_str));
-                                let updated = match nested_update.or(dynamic_outer_nested_update) {
+                                let updated = match nested_update
+                                    .or(dynamic_outer_nested_update)
+                                    .or(nested_write_path)
+                                {
                                     Some(updated) => updated,
                                     None => match &key_chain.last().unwrap() {
                                         None => widen_array_as_list(

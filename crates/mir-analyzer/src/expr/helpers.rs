@@ -262,6 +262,147 @@ pub fn set_nested_value_through_generic_array_key(
     Some(result)
 }
 
+/// One index of a nested write, in source order.
+pub enum WriteStep {
+    Literal(ArrayKey),
+    Dynamic(Type),
+    Push,
+}
+
+/// Type created by writing `leaf` through `steps` into a not-yet-existing slot.
+fn fresh_path_value(steps: &[WriteStep], leaf: &Type) -> Type {
+    let Some((step, rest)) = steps.split_first() else {
+        return leaf.clone();
+    };
+    let inner = fresh_path_value(rest, leaf);
+    match step {
+        WriteStep::Literal(key) => {
+            let mut properties = IndexMap::new();
+            properties.insert(
+                key.clone(),
+                mir_types::atomic::KeyedProperty {
+                    ty: inner,
+                    optional: false,
+                },
+            );
+            Type::single(Atomic::TKeyedArray {
+                properties: Box::new(properties),
+                is_open: false,
+                is_list: false,
+            })
+        }
+        WriteStep::Dynamic(key) => Type::single(Atomic::TArray {
+            key: Box::new(widen_key_type(key)),
+            value: Box::new(inner),
+        }),
+        WriteStep::Push => Type::single(Atomic::TNonEmptyList {
+            value: Box::new(inner),
+        }),
+    }
+}
+
+/// Apply a nested write `$v[s0][s1]… = leaf` to `current`: literal keys descend
+/// into shape properties, and the first dynamic key or push turns an empty or
+/// generic array into `array<widen(k), …>` / `list<…>` around the rest. `None`
+/// (an unsupported atom or a literal key missing before the last step) leaves
+/// the caller on its generic widening.
+pub fn set_nested_write_path(current: &Type, steps: &[WriteStep], leaf: &Type) -> Option<Type> {
+    let Some((step, rest)) = steps.split_first() else {
+        return Some(leaf.clone());
+    };
+    if current.types.is_empty() {
+        return None;
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+    for atomic in &current.types {
+        match (step, atomic) {
+            (
+                WriteStep::Literal(key),
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                },
+            ) => {
+                let existing = properties.get(key);
+                let new_inner = match existing {
+                    Some(prop) => set_nested_write_path(&prop.ty, rest, leaf)?,
+                    None if rest.is_empty() => leaf.clone(),
+                    None => return None,
+                };
+                let mut new_properties = properties.clone();
+                new_properties.insert(
+                    key.clone(),
+                    mir_types::atomic::KeyedProperty {
+                        ty: new_inner,
+                        optional: false,
+                    },
+                );
+                let still_list = *is_list
+                    && (existing.is_some() || *key == ArrayKey::Int(properties.len() as i64));
+                result.add_type(Atomic::TKeyedArray {
+                    properties: new_properties,
+                    is_open: *is_open,
+                    is_list: still_list,
+                });
+            }
+            (
+                WriteStep::Dynamic(_) | WriteStep::Push,
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open: false,
+                    ..
+                },
+            ) if properties.is_empty() => {
+                for a in fresh_path_value(steps, leaf).types {
+                    result.add_type(a);
+                }
+            }
+            (WriteStep::Dynamic(key), Atomic::TArray { key: k, value }) => {
+                let mut new_key = (**k).clone();
+                new_key.merge_with(&widen_key_type(key));
+                result.add_type(Atomic::TArray {
+                    key: Box::new(new_key),
+                    value: Box::new(nested_element(value, rest, leaf)?),
+                });
+            }
+            (WriteStep::Dynamic(key), Atomic::TNonEmptyArray { key: k, value }) => {
+                let mut new_key = (**k).clone();
+                new_key.merge_with(&widen_key_type(key));
+                result.add_type(Atomic::TNonEmptyArray {
+                    key: Box::new(new_key),
+                    value: Box::new(nested_element(value, rest, leaf)?),
+                });
+            }
+            (WriteStep::Push, Atomic::TList { value }) => {
+                result.add_type(Atomic::TList {
+                    value: Box::new(nested_element(value, rest, leaf)?),
+                });
+            }
+            (WriteStep::Push, Atomic::TNonEmptyList { value }) => {
+                result.add_type(Atomic::TNonEmptyList {
+                    value: Box::new(nested_element(value, rest, leaf)?),
+                });
+            }
+            _ => return None,
+        }
+    }
+    Some(result)
+}
+
+/// Element type after writing `leaf` through `rest` into a generic array's value.
+fn nested_element(value: &Type, rest: &[WriteStep], leaf: &Type) -> Option<Type> {
+    if rest.is_empty() {
+        return Some(Type::merge(value, leaf));
+    }
+    Some(
+        set_nested_write_path(value, rest, leaf)
+            .unwrap_or_else(|| Type::merge(value, &fresh_path_value(rest, leaf))),
+    )
+}
+
 /// Remove `key` from every `TKeyedArray` atomic in `ty`'s union that has it,
 /// leaving all other atoms and properties unchanged. Used for
 /// `unset($arr['key'])`, which genuinely removes the key from the array
@@ -358,7 +499,7 @@ pub fn definite_key_state(current: &Type, key: &ArrayKey) -> Option<DefiniteKeyS
 const MAX_SHAPE_KEYS: usize = 8;
 
 /// A bare `array`: native hints carry a `mixed` key, docblocks an `array-key` one.
-fn is_untyped_array(a: &Atomic) -> bool {
+pub(crate) fn is_untyped_array(a: &Atomic) -> bool {
     matches!(a, Atomic::TArray { key, value }
         if value.is_mixed()
             && (key.is_mixed()
@@ -366,19 +507,25 @@ fn is_untyped_array(a: &Atomic) -> bool {
 }
 
 /// Try to extend every `TKeyedArray` atom in `current` with a brand-new
-/// `key: new_value` property in place, instead of collapsing the shape to a
-/// generic array. `None` means the caller should fall back to the generic
-/// accumulator: some atom isn't a shape, already has `key`, or is already at
+/// `key: new_value` property in place (overwriting it where already present,
+/// so a union of shapes from a loop back-edge stays a union of shapes),
+/// instead of collapsing to a generic array. `None` means the caller should
+/// fall back to the generic accumulator: some atom isn't a shape, or is at
 /// [`MAX_SHAPE_KEYS`]. An untyped `array` base becomes an open shape holding
 /// just the written key.
-fn try_insert_new_shape_key(current: &Type, key: &ArrayKey, new_value: &Type) -> Option<Type> {
+fn try_insert_new_shape_key(
+    current: &Type,
+    key: &ArrayKey,
+    new_value: &Type,
+    grow_untyped: bool,
+) -> Option<Type> {
     if current.types.is_empty() {
         return None;
     }
     let all_growable = current.types.iter().all(|a| {
-        is_untyped_array(a)
+        (grow_untyped && is_untyped_array(a))
             || matches!(a, Atomic::TKeyedArray { properties, .. }
-                if !properties.contains_key(key) && properties.len() < MAX_SHAPE_KEYS)
+                if properties.contains_key(key) || properties.len() < MAX_SHAPE_KEYS)
     });
     if !all_growable {
         return None;
@@ -387,7 +534,7 @@ fn try_insert_new_shape_key(current: &Type, key: &ArrayKey, new_value: &Type) ->
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
     for atomic in &current.types {
-        if is_untyped_array(atomic) {
+        if grow_untyped && is_untyped_array(atomic) {
             let mut properties = IndexMap::new();
             properties.insert(
                 key.clone(),
@@ -414,8 +561,9 @@ fn try_insert_new_shape_key(current: &Type, key: &ArrayKey, new_value: &Type) ->
         // A list stays a list only if the new key continues the 0, 1, 2, …
         // sequence; any other key (a string, or an int that skips ahead)
         // makes it a plain keyed shape from here on.
-        let next_is_list =
-            *is_list && matches!(key, ArrayKey::Int(i) if *i == properties.len() as i64);
+        let next_is_list = *is_list
+            && (properties.contains_key(key)
+                || matches!(key, ArrayKey::Int(i) if *i == properties.len() as i64));
         let mut new_properties = properties.clone();
         new_properties.insert(
             key.clone(),
@@ -545,14 +693,11 @@ pub fn widen_array_with_value_and_key(
             return result;
         }
 
-        // A brand-new key on a shape: grow it in place rather than
-        // generalizing, as long as we're not inside a loop (where the shape
-        // would otherwise grow a fresh property every fixed-point pass and
-        // never converge).
-        if !inside_loop {
-            if let Some(grown) = try_insert_new_shape_key(current, key, new_value) {
-                return grown;
-            }
+        // A brand-new literal key grows the shape in place. A literal key
+        // is fixed by the source, so the loop fixpoint converges once the
+        // key exists. A bare `array` base only becomes a shape outside loops.
+        if let Some(grown) = try_insert_new_shape_key(current, key, new_value, !inside_loop) {
+            return grown;
         }
     }
 

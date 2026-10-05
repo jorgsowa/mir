@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A bare `array` template argument (a `: array` closure return) is accepted for an invariant parameter typed with a more specific array, removing a false `InvalidPropertyAssignment`.
+- Nested index writes through a dynamic key (`$r[$p]['u'][$id] = $v`, `$x['g'][$a][$b] = $v`) keep the surrounding keyed-shape levels instead of overwriting a level or widening to `array<string, …>`, removing false `InvalidReturnType`.
+- A new literal key written in a loop, or after a branch that added it, keeps the keyed shape instead of generalizing to `array<string, …>`.
 - `iterator_to_array()` keeps the iterator's key and value types (`array<K, V>`, `list<V>` with `$preserve_keys = false`), removing false `InvalidPropertyAssignment`/`InvalidArgument` on its result. Non-generic implementers of generic iterator interfaces and the one-arg `Generator<V>` shorthand no longer leak template names.
 - A generic `array` assigned to a keyed-shape property is reported as `PropertyTypeCoercion` (info) instead of an `InvalidPropertyAssignment` warning.
 - A class-level `@template` named in `class-string<T>` is no longer treated as a real class in methods (`T::make()`, `[$c, 'make']`), removing false `UndefinedMethod`/`UndefinedClass`.

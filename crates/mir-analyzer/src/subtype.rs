@@ -70,6 +70,10 @@ pub(crate) fn variance_compatible(
             Variance::Invariant => {
                 // `mixed` is lenient in both directions, so it never counts as equivalent.
                 sub_p == sup_p
+                    // A bare `array` argument (a `: array` closure return) carries no
+                    // key/value info, so any array-typed parameter may refine it.
+                    || (matches!(sub_p.types.as_slice(), [a] if crate::expr::helpers::is_untyped_array(a))
+                        && is_subtype(db, sup_p, sub_p))
                     || (!sub_p.is_mixed()
                         && !sup_p.is_mixed()
                         && is_subtype(db, sub_p, sup_p)

@@ -16,14 +16,14 @@ kept its raw type instead.
 function nestedBoolKeyCoercesToInt(bool $flag): void {
     $arr = [];
     $arr[$flag]['x'] = 1;
-    /** @mir-check $arr is array<int, array<"x", 1>> */
+    /** @mir-check $arr is array<int, array{x: 1}> */
     $_ = $arr;
 }
 
 function nestedFloatKeyCoercesToInt(float $f): void {
     $arr = [];
     $arr[$f]['x'] = 1;
-    /** @mir-check $arr is array<int, array<"x", 1>> */
+    /** @mir-check $arr is array<int, array{x: 1}> */
     $_ = $arr;
 }
 
@@ -31,7 +31,7 @@ function nestedNullKeyCoercesToEmptyString(): void {
     $arr = [];
     $n = null;
     $arr[$n]['x'] = 1;
-    /** @mir-check $arr is array<string, array<"x", 1>> */
+    /** @mir-check $arr is array<string, array{x: 1}> */
     $_ = $arr;
 }
 ===expect===
