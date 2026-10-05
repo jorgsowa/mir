@@ -1,10 +1,9 @@
 ===description===
 Regression guard for the class-template/method-template gating fix: a
 `callable(T): R` parameter where T is bound to `Animal` from the receiver
-still correctly rejects a closure whose own parameter only accepts the
-narrower `Dog` — the callback must accept ANY `Animal` since `apply()` may
-invoke it with a plain (non-Dog) Animal, so this is a real contravariance
-violation, not something the class-template-corruption fix should suppress.
+still flags (as a coercion) a closure whose own parameter only accepts the
+narrower `Dog` — `apply()` may invoke it with a plain (non-Dog) Animal, so the
+contravariance gap must stay reported, not suppressed.
 ===config===
 <mir>
   <issueHandlers>
@@ -35,6 +34,6 @@ class Dog extends Animal {}
 /** @param Box<Animal> $b */
 function test(Box $b): void {
     $r = $b->apply(fn(Dog $d): string => "x");
-//                 ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $fn of apply() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Dog'
+//                 ^^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $fn of apply() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Dog' — coercion may fail at runtime
 }
 ===expect===

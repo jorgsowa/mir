@@ -34,7 +34,7 @@ class Plain {
 function load(): Result { return new Result(); }
 
 load()->getOrThrow(static function (Pet $e): NotFound {
-//                 ^ +3:1 InvalidArgument: Argument $f of getOrThrow() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Pet'
+//                 ^ +3:1 ArgumentTypeCoercion: Argument $f of getOrThrow() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Pet' — coercion may fail at runtime
     /** @mir-check $e is Pet */
     return new NotFound();
 });

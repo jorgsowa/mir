@@ -1202,6 +1202,7 @@ pub(crate) fn check_typed_callable_arg(
     // whatever the documented signature promises to pass it. Only fires for simple,
     // fully-resolved types on both sides — templates/unresolved docblock types are
     // skipped entirely to avoid false positives on generic callable signatures.
+    let mut param_coerced = false;
     for params in &candidates {
         for (i, expected) in expected_params.iter().enumerate() {
             let Some(actual) = params.get(i) else {
@@ -1233,18 +1234,34 @@ pub(crate) fn check_typed_callable_arg(
                 continue;
             }
             if !expected_fits_actual_param(&expected_ty, actual_ty, ea) {
+                let expected = format!("callable whose parameter #{} accepts {expected_ty}", i + 1);
+                let actual = format!(
+                    "callable whose parameter #{} only accepts {actual_ty}",
+                    i + 1
+                );
+                if crate::subtype::is_subtype(ea.db, actual_ty, &expected_ty) {
+                    // A narrower closure param may still accept what the caller passes.
+                    if !param_coerced {
+                        param_coerced = true;
+                        ea.emit(
+                            IssueKind::ArgumentTypeCoercion {
+                                param: param_name.to_string(),
+                                fn_name: fn_name.to_string(),
+                                expected,
+                                actual,
+                            },
+                            Severity::Info,
+                            arg_span,
+                        );
+                    }
+                    continue;
+                }
                 ea.emit(
                     IssueKind::InvalidArgument {
                         param: param_name.to_string(),
                         fn_name: fn_name.to_string(),
-                        expected: format!(
-                            "callable whose parameter #{} accepts {expected_ty}",
-                            i + 1
-                        ),
-                        actual: format!(
-                            "callable whose parameter #{} only accepts {actual_ty}",
-                            i + 1
-                        ),
+                        expected,
+                        actual,
                     },
                     Severity::Error,
                     arg_span,
