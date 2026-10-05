@@ -484,6 +484,21 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     Atomic::TNonEmptyArray { key: sk, value: sv },
                     Atomic::TNonEmptyArray { key: dk, value: dv },
                 ) => is_subtype(db, sk, dk) && is_subtype(db, sv, dv),
+                // A list is an array keyed by non-negative ints.
+                (
+                    Atomic::TList { value: sv } | Atomic::TNonEmptyList { value: sv },
+                    Atomic::TArray { key: dk, value: dv },
+                ) => {
+                    is_subtype(db, &Type::single(Atomic::TNonNegativeInt), dk)
+                        && is_subtype(db, sv, dv)
+                }
+                (
+                    Atomic::TNonEmptyList { value: sv },
+                    Atomic::TNonEmptyArray { key: dk, value: dv },
+                ) => {
+                    is_subtype(db, &Type::single(Atomic::TNonNegativeInt), dk)
+                        && is_subtype(db, sv, dv)
+                }
                 // list<V1>/non-empty-list<V1> satisfies list<V2> the same way.
                 (
                     Atomic::TList { value: sv } | Atomic::TNonEmptyList { value: sv },
