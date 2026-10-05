@@ -735,7 +735,11 @@ pub fn widen_array_with_value_and_key(
     let mut acc_list: Option<Type> = None;
     for atomic in &current.types {
         match atomic {
-            Atomic::TKeyedArray { properties, .. } => {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => {
                 let mut all_values = new_value.clone();
                 // A generalized array's key domain is widened to its base
                 // scalar type rather than kept as each property's own
@@ -748,6 +752,11 @@ pub fn widen_array_with_value_and_key(
                 }
                 for k in properties.keys() {
                     all_keys.add_type(widen_key_to_base(k));
+                }
+                // An open shape may hold further unknown keys and values.
+                if *is_open {
+                    all_keys.merge_with(&Type::array_key());
+                    all_values.merge_with(&Type::mixed());
                 }
                 fold_into(&mut acc_key, all_keys);
                 fold_into(&mut acc_value, all_values);
@@ -826,9 +835,16 @@ pub fn widen_array_as_list(
     let mut found_array = false;
     for atomic in &current.types {
         match atomic {
-            Atomic::TKeyedArray { properties, .. } => {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => {
                 for prop in properties.values() {
                     fold_into(&mut acc, prop.ty.clone());
+                }
+                if *is_open {
+                    fold_into(&mut acc, Type::mixed());
                 }
                 found_array = true;
             }
