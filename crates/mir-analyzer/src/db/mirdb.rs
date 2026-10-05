@@ -139,6 +139,8 @@ pub struct MirDbStorage {
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
     /// Seed for [`crate::db::AnalyzeFileInput::memoize_method_call_results`].
     memoize_method_call_results: Arc<std::sync::atomic::AtomicBool>,
+    /// Seed for [`crate::db::AnalyzeFileInput::forbidden_functions`].
+    forbidden_functions: Arc<parking_lot::RwLock<Arc<[Arc<str>]>>>,
     /// Lazily-created [`crate::db::AnalyzeFileInput`] singleton input (see
     /// [`MirDatabase::analyze_config`]). Holds the PHP version as a tracked
     /// field so `analyze_file` / `infer_function` memos invalidate on
@@ -359,6 +361,7 @@ impl Default for MirDbStorage {
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
             memoize_method_call_results: Arc::default(),
+            forbidden_functions: Arc::new(parking_lot::RwLock::new(Arc::from([]))),
             analyze_config_input: Arc::default(),
             stub_cache: Arc::default(),
             parse_cache: Arc::default(),
@@ -400,6 +403,13 @@ impl MirDatabase for MirDbStorage {
 
     fn memoize_method_call_results(&self) -> bool {
         *self.analyze_config().memoize_method_call_results(self)
+    }
+
+    fn is_forbidden_function(&self, name: &str) -> bool {
+        self.analyze_config()
+            .forbidden_functions(self)
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case(name))
     }
 
     fn note_workspace_index_walk(&self) {
@@ -633,6 +643,7 @@ impl MirDatabase for MirDbStorage {
             self.php_version.read().clone(),
             self.memoize_method_call_results
                 .load(std::sync::atomic::Ordering::Relaxed),
+            self.forbidden_functions.read().clone(),
         );
         *slot = Some(cfg);
         cfg
@@ -1437,6 +1448,20 @@ impl MirDbStorage {
         if let Some(cfg) = existing {
             use salsa::Setter as _;
             cfg.set_memoize_method_call_results(self).to(enabled);
+        }
+    }
+
+    /// Set the functions whose calls are reported as `ForbiddenCode`.
+    pub fn set_forbidden_functions(&mut self, names: Vec<String>) {
+        let names: Arc<[Arc<str>]> = names
+            .into_iter()
+            .map(|n| Arc::from(n.trim_start_matches('\\').to_ascii_lowercase()))
+            .collect();
+        *self.forbidden_functions.write() = names.clone();
+        let existing = *self.analyze_config_input.read();
+        if let Some(cfg) = existing {
+            use salsa::Setter as _;
+            cfg.set_forbidden_functions(self).to(names);
         }
     }
 

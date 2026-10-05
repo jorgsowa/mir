@@ -51,6 +51,7 @@ pub fn run_composer_flow(
     let mut session = build_session(
         version,
         config.memoize_method_call_results,
+        config.forbidden_functions.clone(),
         cache_dir,
         stub_files,
         stub_dirs,
@@ -228,6 +229,7 @@ pub fn run_plain_flow(
     let mut session = build_session(
         version,
         config.memoize_method_call_results,
+        config.forbidden_functions.clone(),
         cache_dir,
         stub_files,
         stub_dirs,
@@ -345,12 +347,14 @@ fn resolve_php_version(config: &Config) -> PhpVersion {
 fn build_session(
     version: PhpVersion,
     memoize_method_call_results: bool,
+    forbidden_functions: Vec<String>,
     cache_dir: Option<PathBuf>,
     stub_files: Vec<PathBuf>,
     stub_dirs: Vec<PathBuf>,
 ) -> AnalysisSession {
-    let mut session =
-        AnalysisSession::new(version).with_memoize_method_call_results(memoize_method_call_results);
+    let mut session = AnalysisSession::new(version)
+        .with_memoize_method_call_results(memoize_method_call_results)
+        .with_forbidden_functions(forbidden_functions);
     // User stubs must be configured BEFORE the cache is opened: the cache epoch
     // folds in the user-stub fingerprint, so it has to see them at open time.
     if !stub_files.is_empty() || !stub_dirs.is_empty() {

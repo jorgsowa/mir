@@ -462,13 +462,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::is_expr_tainted(expr, ctx, self.db, &self.file) {
                     self.emit(IssueKind::TaintedShell, Severity::Error, expr.span);
                 }
-                self.emit(
-                    IssueKind::ForbiddenCode {
-                        message: "Use of shell_exec (backtick) is forbidden".to_string(),
-                    },
-                    Severity::Warning,
-                    expr.span,
-                );
+                if self.db.is_forbidden_function("shell_exec") {
+                    self.emit(
+                        IssueKind::ForbiddenCode {
+                            message: "Use of shell_exec (backtick) is forbidden".to_string(),
+                        },
+                        Severity::Warning,
+                        expr.span,
+                    );
+                }
                 Type::single(Atomic::TString)
             }
 

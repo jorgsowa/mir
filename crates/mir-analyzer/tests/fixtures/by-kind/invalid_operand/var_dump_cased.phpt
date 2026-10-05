@@ -1,5 +1,11 @@
 ===description===
 Var dump cased
+===config===
+<mir>
+  <forbiddenFunctions>
+    <function name="var_dump"/>
+  </forbiddenFunctions>
+</mir>
 ===file===
 <?php
 vAr_dUMp("hello");

@@ -1,10 +1,10 @@
 ===description===
-ForbiddenCode fires for backtick shell_exec.
+ForbiddenCode fires for backtick shell_exec when shell_exec is configured as forbidden.
 ===config===
 <mir>
-  <issueHandlers>
-    <UnusedParam errorLevel="suppress"/>
-  </issueHandlers>
+  <forbiddenFunctions>
+    <function name="shell_exec"/>
+  </forbiddenFunctions>
 </mir>
 ===file===
 <?php

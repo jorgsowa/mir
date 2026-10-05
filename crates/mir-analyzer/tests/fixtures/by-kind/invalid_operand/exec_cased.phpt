@@ -1,5 +1,11 @@
 ===description===
 Exec cased
+===config===
+<mir>
+  <forbiddenFunctions>
+    <function name="shell_exec"/>
+  </forbiddenFunctions>
+</mir>
 ===file===
 <?php
 sHeLl_EXeC("rm -rf");

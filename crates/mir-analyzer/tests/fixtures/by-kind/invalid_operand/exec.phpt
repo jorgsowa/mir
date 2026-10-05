@@ -1,5 +1,11 @@
 ===description===
 Exec
+===config===
+<mir>
+  <forbiddenFunctions>
+    <function name="shell_exec"/>
+  </forbiddenFunctions>
+</mir>
 ===file===
 <?php
 shell_exec("rm -rf");

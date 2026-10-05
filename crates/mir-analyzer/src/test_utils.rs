@@ -232,6 +232,8 @@ struct FixtureConfig {
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
     stub_dirs: Vec<String>,
     memoize_method_call_results: bool,
+    /// `<forbiddenFunctions><function name="..."/>` entries.
+    forbidden_functions: Vec<String>,
     /// Raw `<fileExtensions>` entries; normalized by `PhpFileExtensions::new`.
     file_extensions: Vec<String>,
     /// `<projectFiles><file>` entries (relative to temp dir). When set, the analyzed
@@ -726,9 +728,9 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                     }
                 }
                 (None, other) => panic!("fixture {path}: root element must be <mir>, got <{other}>"),
-                (Some("mir"), "phpVersion" | "findUnusedCode" | "findUnusedVariables" | "fileExtensions" | "issueHandlers" | "stubs" | "projectFiles") => {}
+                (Some("mir"), "phpVersion" | "findUnusedCode" | "findUnusedVariables" | "fileExtensions" | "issueHandlers" | "stubs" | "projectFiles" | "forbiddenFunctions") => {}
                 (Some("mir"), other) => panic!(
-                    "fixture {path}: unsupported <{other}> — supported: phpVersion, findUnusedCode, findUnusedVariables, fileExtensions, issueHandlers, stubs, projectFiles"
+                    "fixture {path}: unsupported <{other}> — supported: phpVersion, findUnusedCode, findUnusedVariables, fileExtensions, issueHandlers, stubs, projectFiles, forbiddenFunctions"
                 ),
                 (Some("issueHandlers"), kind) => {
                     let level = attr(e, "errorLevel").unwrap_or_default();
@@ -743,6 +745,9 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                 }
                 (Some("fileExtensions"), "extension") => {
                     config.file_extensions.extend(attr(e, "name"));
+                }
+                (Some("forbiddenFunctions"), "function") => {
+                    config.forbidden_functions.extend(attr(e, "name"));
                 }
                 (Some("stubs"), "file") => config.stub_files.extend(attr(e, "name")),
                 (Some("stubs"), "directory") => config.stub_dirs.extend(attr(e, "name")),
@@ -1461,6 +1466,7 @@ fn with_fixture_session<R>(
         && stub_dirs.is_empty()
         && !has_composer
         && !config.memoize_method_call_results
+        && config.forbidden_functions.is_empty()
         && session_pool_enabled();
 
     let result = if reusable {
@@ -1473,7 +1479,8 @@ fn with_fixture_session<R>(
         result
     } else {
         let mut session = AnalysisSession::new(version)
-            .with_memoize_method_call_results(config.memoize_method_call_results);
+            .with_memoize_method_call_results(config.memoize_method_call_results)
+            .with_forbidden_functions(config.forbidden_functions.clone());
         if std::env::var_os("MIR_TEST_NO_STUB_CACHE").is_none() {
             session = session.with_cache_dir(&fixture_stub_cache_dir());
         }

@@ -29,6 +29,9 @@ pub trait MirDatabase: salsa::Database {
     /// value (Psalm's `memoizeMethodCallResults`).
     fn memoize_method_call_results(&self) -> bool;
 
+    /// Whether `name` (case-insensitive, no leading `\`) is in the configured forbidden-functions list.
+    fn is_forbidden_function(&self, name: &str) -> bool;
+
     /// Return this file's first declared namespace, if any.
     fn file_namespace(&self, file: &str) -> Option<Arc<str>>;
 

@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `<forbiddenFunctions>` config and `AnalysisSession::with_forbidden_functions`.
 - `mir_analyzer::recursion::STACK_SIZE` (16 MiB), the worker stack size analysis is sized for; embedders building their own rayon pool can use it.
 
 ### Changed
 
+- `ForbiddenCode` is reported only for functions listed in `<forbiddenFunctions><function name="..."/>`, as in Psalm; `var_dump`, `shell_exec` and the backtick operator are no longer forbidden by default. The backtick operator follows `shell_exec`.
 - `UnusedVariable` and `UnusedForeachValue` are reported only with `findUnusedVariables`, `findUnusedCode` or `--find-dead-code`, as in Psalm. `findUnusedCode`/`findUnusedVariables` are now also read as root attributes.
 
 ### Fixed

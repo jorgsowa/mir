@@ -1,5 +1,11 @@
 ===description===
 Var dump
+===config===
+<mir>
+  <forbiddenFunctions>
+    <function name="var_dump"/>
+  </forbiddenFunctions>
+</mir>
 ===file===
 <?php
 var_dump("hello");

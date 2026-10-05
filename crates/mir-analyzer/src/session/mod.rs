@@ -38,6 +38,7 @@ pub struct AnalysisSession {
     resolver: Option<Arc<dyn crate::ClassResolver>>,
     pub(crate) php_version: PhpVersion,
     memoize_method_call_results: bool,
+    forbidden_functions: Vec<String>,
     pub(crate) user_stub_files: Vec<PathBuf>,
     pub(crate) user_stub_dirs: Vec<PathBuf>,
     /// Tracks symbols that were previously defined in a file but have since
@@ -206,6 +207,7 @@ impl AnalysisSession {
             resolver: None,
             php_version,
             memoize_method_call_results: false,
+            forbidden_functions: Vec::new(),
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
             stale_defined_symbols: HashMap::default(),
@@ -415,11 +417,25 @@ impl AnalysisSession {
         if self.memoize_method_call_results {
             user_stub_fp ^= 0x6d65_6d6f_697a_6531;
         }
+        for name in &self.forbidden_functions {
+            user_stub_fp = user_stub_fp.rotate_left(5)
+                ^ name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+                    (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+                });
+        }
         self.cache = Some(Arc::new(AnalysisCache::open(
             cache_dir,
             self.php_version.cache_byte(),
             user_stub_fp,
         )));
+        self
+    }
+
+    /// Report calls to these functions as `ForbiddenCode` (Psalm's
+    /// `<forbiddenFunctions>`). Call before [`Self::with_cache_dir`].
+    pub fn with_forbidden_functions(mut self, names: Vec<String>) -> Self {
+        self.db.salsa.set_forbidden_functions(names.clone());
+        self.forbidden_functions = names;
         self
     }
 

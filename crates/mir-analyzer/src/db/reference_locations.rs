@@ -50,6 +50,8 @@ pub struct AnalyzeFileInput {
     /// Psalm's `memoizeMethodCallResults`: repeated zero-arg method calls on
     /// the same receiver are assumed to return the same value.
     pub memoize_method_call_results: bool,
+    /// Lowercased names from `<forbiddenFunctions>`; calling one emits `ForbiddenCode`.
+    pub forbidden_functions: Arc<[Arc<str>]>,
 }
 
 /// Everything `analyze_file` produces for one file: diagnostics plus the

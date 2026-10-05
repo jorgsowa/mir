@@ -436,10 +436,7 @@ impl CallAnalyzer {
             .strip_prefix('\\')
             .map(|s: &str| s.to_string())
             .unwrap_or(fn_name);
-        if matches!(
-            fn_name.to_ascii_lowercase().as_str(),
-            "var_dump" | "shell_exec"
-        ) {
+        if ea.db.is_forbidden_function(&fn_name) {
             ea.emit(
                 IssueKind::ForbiddenCode {
                     message: format!("Use of {} is forbidden", fn_name),

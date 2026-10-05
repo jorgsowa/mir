@@ -65,6 +65,8 @@ pub struct Config {
     pub stub_files: Vec<String>,
     /// External stub directories to load (from `<stubs><directory name="..."/>`).
     pub stub_dirs: Vec<String>,
+    /// Function names from `<forbiddenFunctions><function name="..."/>`.
+    pub forbidden_functions: Vec<String>,
     /// Psalm PHP plugins (from `<plugins><pluginClass class="..."/>`).
     pub psalm_plugins: Vec<PsalmPluginEntry>,
     /// File-based Psalm plugins (from `<plugins><plugin filename="..."/>`).
@@ -188,6 +190,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 if name == "file" || name == "directory" {
                     collect_stub_entry(&e, &path, &mut config);
                 }
+                collect_forbidden_function_entry(&e, &path, &mut config);
 
                 // <pluginClass class="..."> inside <plugins>: consume the whole
                 // element (its inner XML is the plugin's own config, passed
@@ -251,6 +254,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 if name == "file" || name == "directory" {
                     collect_stub_entry(&e, &path, &mut config);
                 }
+                collect_forbidden_function_entry(&e, &path, &mut config);
 
                 if path.last().is_some_and(|s: &String| s == "plugins") {
                     if name == "pluginClass" {
@@ -359,6 +363,19 @@ fn collect_stub_entry<'a>(
                 _ => {}
             }
         }
+    }
+}
+
+/// Handle `<function name="..."/>` inside `<forbiddenFunctions>`.
+fn collect_forbidden_function_entry(
+    e: &quick_xml::events::BytesStart<'_>,
+    path: &[String],
+    config: &mut Config,
+) {
+    if path.last().is_some_and(|s| s == "forbiddenFunctions")
+        && bytes_to_string(e.name().as_ref()) == "function"
+    {
+        config.forbidden_functions.extend(attr_value(e, "name"));
     }
 }
 
@@ -632,6 +649,24 @@ mod tests {
         // The XML parser itself should accept the attribute form.
         let cfg = Config::parse(r#"<psalm phpVersion="7.4"></psalm>"#).unwrap();
         assert_eq!(cfg.php_version.as_deref(), Some("7.4"));
+    }
+
+    #[test]
+    fn parses_forbidden_functions() {
+        let cfg = Config::parse(
+            r#"<psalm>
+                <forbiddenFunctions>
+                    <function name="var_dump"/>
+                    <function name="shell_exec"/>
+                </forbiddenFunctions>
+            </psalm>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.forbidden_functions, vec!["var_dump", "shell_exec"]);
+        assert!(Config::parse("<psalm></psalm>")
+            .unwrap()
+            .forbidden_functions
+            .is_empty());
     }
 
     #[test]
