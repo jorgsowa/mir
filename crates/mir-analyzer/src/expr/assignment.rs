@@ -1668,15 +1668,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // correctly surfaces a possibly-null diagnostic
                         // instead of losing the narrowing entirely.
                         ctx.clear_prop_refined_chain(&obj_key, &prop_name);
-                        let should_refine = !ty.is_mixed()
-                            && declared_opt
-                                .as_deref()
-                                .map(|declared| {
-                                    crate::subtype::is_subtype(self.db, &ty.remove_null(), declared)
-                                })
-                                .unwrap_or(true);
-                        if should_refine {
-                            ctx.set_prop_refined(&obj_key, &prop_name, ty.clone());
+                        if let Some(refined) =
+                            property_refinement(self.db, &ty, declared_opt.as_deref())
+                        {
+                            ctx.set_prop_refined(&obj_key, &prop_name, refined);
                         } else {
                             // Assignment with incompatible or unknown (mixed) type: discard
                             // any stale guard-based narrowing so reads fall back to declared.
@@ -1857,15 +1852,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .and_then(|(_, p)| p.ty.clone());
                         // Same non-null comparison as the instance-property
                         // path above — see the comment there.
-                        let should_refine = !ty.is_mixed()
-                            && declared_opt
-                                .as_deref()
-                                .map(|declared| {
-                                    crate::subtype::is_subtype(self.db, &ty.remove_null(), declared)
-                                })
-                                .unwrap_or(true);
-                        if should_refine {
-                            ctx.set_prop_refined(fqcn.as_ref(), &prop_name, ty.clone());
+                        if let Some(refined) =
+                            property_refinement(self.db, &ty, declared_opt.as_deref())
+                        {
+                            ctx.set_prop_refined(fqcn.as_ref(), &prop_name, refined);
                         } else {
                             ctx.clear_prop_refined(fqcn.as_ref(), &prop_name);
                         }
@@ -2289,4 +2279,21 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => {}
         }
     }
+}
+
+/// The type a property holds after assigning `assigned`; `None` when the
+/// assignment leaves no usable refinement.
+fn property_refinement(
+    db: &dyn MirDatabase,
+    assigned: &Type,
+    declared: Option<&Type>,
+) -> Option<Type> {
+    if assigned.is_mixed() {
+        // Unknown value: trust it to be non-null rather than flag the declared `T|null`.
+        return declared
+            .filter(|d| !d.is_mixed() && d.is_nullable())
+            .map(Type::remove_null);
+    }
+    let fits = declared.is_none_or(|d| crate::subtype::is_subtype(db, &assigned.remove_null(), d));
+    fits.then(|| assigned.clone())
 }
