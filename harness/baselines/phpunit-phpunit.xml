@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/Event/Value/Runtime/PHP.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->extensions = $extensions]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Framework/Constraint/Operator/LogicalNot.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$negatedString !== null]]></code>
@@ -15,41 +10,12 @@
       <code><![CDATA[$this->serializableTrace = $this->getTrace()]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Framework/MockObject/Generator/DoubledMethod.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$deprecation]]></code>
-    </PossiblyUndefinedVariable>
-  </file>
   <file src="src/Framework/TestCase.php">
-    <InvalidArgument>
-      <code><![CDATA[$hookMethods]]></code>
-      <code><![CDATA[$hookMethods]]></code>
-      <code><![CDATA[$hookMethods]]></code>
-      <code><![CDATA[$hookMethods]]></code>
-      <code><![CDATA[$hookMethods]]></code>
-      <code><![CDATA[$hookMethods]]></code>
-    </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->backupEnvironmentVariables = [...$this->backupEnvironmentVariables, ...BackedUpEnvironmentVariable::create($environmentVariableName)]]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$testResult]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="src/Framework/TestCase/GlobalStateCapture.php">
-    <UnusedForeachValue>
-      <code><![CDATA[]]></code>
-    </UnusedForeachValue>
-  </file>
-  <file src="src/Framework/TestRunner/TestRunner.php">
-    <UnusedVariable>
-      <code><![CDATA[]]></code>
-    </UnusedVariable>
-  </file>
   <file src="src/Framework/TestSuite.php">
-    <InvalidArgument>
-      <code><![CDATA[$iterator]]></code>
-    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $this->providedTests;]]></code>
     </NullableReturnStatement>
@@ -67,33 +33,6 @@
       <code><![CDATA[$this->constraint->asString()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Runner/CodeCoverage.php">
-    <UnusedVariable>
-      <code><![CDATA[]]></code>
-    </UnusedVariable>
-  </file>
-  <file src="src/Runner/ErrorHandler.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->issueTriggerResolvers = [new DefaultIssueTriggerResolver]]]></code>
-    </InvalidPropertyAssignment>
-    <UnusedForeachValue>
-      <code><![CDATA[]]></code>
-    </UnusedForeachValue>
-  </file>
-  <file src="src/Runner/Filter/GroupFilterIterator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->groupTests = $groupTests]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Runner/Phpt/TestCase.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$sideEffect === SideEffect::STANDARD_OUTPUT]]></code>
-      <code><![CDATA[$sideEffect === SideEffect::INPUT_OUTPUT]]></code>
-    </ImpossibleIdenticalComparison>
-    <InvalidArgument>
-      <code><![CDATA[$this->coverageFiles()]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Runner/TestResult/Issue.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->triggeringTests = [
@@ -103,32 +42,5 @@
             ],
         ]]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Runner/TestResult/PassedTests.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->passedTestMethods = array_merge(
-            $this->passedTestMethods,
-            $other->passedTestMethods,
-        )]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/TextUI/Configuration/Cli/Builder.php">
-    <UnusedVariable>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </UnusedVariable>
-  </file>
-  <file src="src/TextUI/Configuration/Merger.php">
-    <UnusedVariable>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </UnusedVariable>
-  </file>
-  <file src="src/Util/PHP/JobRunner.php">
-    <UnusedForeachValue>
-      <code><![CDATA[]]></code>
-    </UnusedForeachValue>
   </file>
 </files>

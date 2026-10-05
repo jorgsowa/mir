@@ -15,12 +15,6 @@
       <code><![CDATA[false === $multiHandle]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Handler/StreamHandler.php">
-    <NonExistentArrayOffset>
-      <code><![CDATA['header']]></code>
-      <code><![CDATA['header']]></code>
-    </NonExistentArrayOffset>
-  </file>
   <file src="src/RetryMiddleware.php">
     <TooManyArguments>
       <code><![CDATA[$response]]></code>

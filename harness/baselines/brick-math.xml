@@ -35,10 +35,6 @@
       <code><![CDATA[preg_match(self::PARSE_REGEXP_RATIONAL, $value, $matches, PREG_UNMATCHED_AS_NULL)]]></code>
       <code><![CDATA[preg_match(self::PARSE_REGEXP_NUMERICAL, $value, $matches, PREG_UNMATCHED_AS_NULL)]]></code>
     </ImpureFunctionCall>
-    <InvalidArgument>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/BigRational.php">
     <ImpureStaticVariable>
