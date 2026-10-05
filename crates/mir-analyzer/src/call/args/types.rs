@@ -45,7 +45,34 @@ fn scalar_arg_fits_param(arg: &Type, param: &Type) -> bool {
 /// Returns true when `param` is structurally less specific than `arg` (a supertype),
 /// meaning the call is a deliberate widening — not an error.
 fn param_accepts_wider_than_arg(param: &Type, arg: &Type) -> bool {
-    param.is_subtype_structural(arg)
+    param.is_subtype_structural(arg) || shape_param_fits_non_empty_arg(param, arg)
+}
+
+/// `non-empty-array<K, V>` passed to an all-optional shape: the shape is only wider than the
+/// arg's possibly-empty form, as long as it can hold an element at all.
+fn shape_param_fits_non_empty_arg(param: &Type, arg: &Type) -> bool {
+    let holds_element = |p: &Atomic| matches!(p, Atomic::TKeyedArray { properties, is_open, .. } if *is_open || !properties.is_empty());
+    if !param.types.iter().all(holds_element) {
+        return false;
+    }
+    let mut broad = Type::empty();
+    for a in &arg.types {
+        broad.add_type(possibly_empty(a));
+    }
+    param.is_subtype_structural(&broad)
+}
+
+fn possibly_empty(atomic: &Atomic) -> Atomic {
+    match atomic {
+        Atomic::TNonEmptyArray { key, value } => Atomic::TArray {
+            key: key.clone(),
+            value: value.clone(),
+        },
+        Atomic::TNonEmptyList { value } => Atomic::TList {
+            value: value.clone(),
+        },
+        other => other.clone(),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1221,6 +1248,10 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         // A broad array may hold the expected shape (a coercion, as at top level).
                         Atomic::TKeyedArray { .. } => {
                             return mir_types::union::atomic_subtype(pv, av)
+                                || shape_param_fits_non_empty_arg(
+                                    &Type::single(pv.clone()),
+                                    &Type::single(av.clone()),
+                                )
                         }
                         // Same coercion the top-level check accepts for an array-intersection param.
                         Atomic::TIntersection { .. } => {
