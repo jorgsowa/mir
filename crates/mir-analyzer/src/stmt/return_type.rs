@@ -2,6 +2,16 @@ use mir_types::{Atomic, Name, Type};
 
 use crate::db::{extends_or_implements, MirDatabase};
 
+/// Bare `object` (e.g. an anonymous class instance) fits a named-class element, as it
+/// does in a non-nested return position.
+fn bare_object_fits(actual: &Atomic, declared: &Type) -> bool {
+    matches!(actual, Atomic::TObject)
+        && declared
+            .types
+            .iter()
+            .any(|d| matches!(d, Atomic::TNamedObject { .. }))
+}
+
 fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
 }
@@ -16,6 +26,9 @@ fn shape_property_compatible(
 ) -> bool {
     named_object_return_compatible(actual, declared, db, file)
         || actual.types.iter().all(|a| {
+            if bare_object_fits(a, declared) {
+                return true;
+            }
             let Atomic::TKeyedArray {
                 properties: sub_props,
                 is_open: sub_open,
@@ -1007,6 +1020,7 @@ pub(crate) fn return_arrays_compatible(
                     // `list<Child>` fits `list<Base>` at any depth.
                     _ => {
                         return scalar_array_element_compatible(av, dec_val)
+                            || bare_object_fits(av, dec_val)
                             || (matches!(
                                 av,
                                 Atomic::TArray { .. }

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An anonymous class inside an array literal (`[new class extends Foo {}]`) fits a `list<Foo>`/`array<K, Foo>` return, removing false `InvalidReturnType`.
 - A returned nested array (`array<string, list<Cat>>`, `array{k: list<Cat>}`) is checked through the class hierarchy at every depth, removing false `InvalidReturnType` for a more specific element class.
 - An intersection return type (`Out&Kind`) is satisfied by a class or intersection whose hierarchy covers every part, removing false `InvalidReturnType`.
 - An int-literal class constant (`self::MAX`, `parent::MAX`, `Foo::MAX`) in a `<`/`<=`/`>`/`>=` comparison narrows the integer range like a literal, removing false `InvalidPropertyAssignment`.
