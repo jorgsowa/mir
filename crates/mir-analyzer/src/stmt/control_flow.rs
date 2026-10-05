@@ -271,7 +271,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let entry = ctx.branch();
         // Do-while always executes at least once (body before condition check)
         let mut first_pass = true;
-        let mut post = self.analyze_loop_widened(
+        let post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
@@ -299,9 +299,6 @@ impl<'a> StatementsAnalyzer<'a> {
             false,
             Some(&dw.condition),
         );
-        // Since the body always executes at least once, variables introduced
-        // inside the body are definitely defined after the loop.
-        super::loops::promote_new_loop_vars_when_guaranteed(&pre, &mut post);
         *ctx = post;
     }
 
@@ -486,11 +483,6 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
-        // Snapshot after the key/value binding vars are set on `entry` but before
-        // the body runs — used below as the "new since" baseline so the loop's
-        // own iteration variables (always bound at the header, not first-assigned
-        // inside the body) aren't mistaken for body-introduced variables.
-        let header_bound = entry.clone();
         let mut post = self.analyze_loop_widened(
             &pre,
             entry,
@@ -553,12 +545,6 @@ impl<'a> StatementsAnalyzer<'a> {
                     writes.push(loc);
                 }
             }
-        }
-        // A foreach proven to iterate at least once (loop_guaranteed) makes
-        // variables first assigned in the body definitely defined afterward,
-        // same as do-while's identical guarantee.
-        if loop_guaranteed {
-            super::loops::promote_new_loop_vars_when_guaranteed(&header_bound, &mut post);
         }
         *ctx = post;
     }

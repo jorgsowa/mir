@@ -23,41 +23,6 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Type) -> bool {
         })
 }
 
-/// After a loop body proven to always execute at least once, variables first
-/// assigned inside the body are definitely defined afterward — strip any
-/// `possibly_undefined` flag and promote `possibly_assigned_vars` → `assigned_vars`
-/// for names new since `pre`. Shared by do-while (always executes) and a
-/// foreach proven non-empty (`loop_guaranteed_to_execute`).
-pub(super) fn promote_new_loop_vars_when_guaranteed(
-    pre: &crate::flow_state::FlowState,
-    post: &mut crate::flow_state::FlowState,
-) {
-    let new_names: Vec<Name> = post
-        .vars
-        .keys()
-        .filter(|n| !pre.vars.contains_key(*n))
-        .copied()
-        .collect();
-    let post_vars = Arc::make_mut(&mut post.vars);
-    for name in &new_names {
-        if let Some(ty) = post_vars.get_mut(name) {
-            if ty.possibly_undefined {
-                let mut stripped = (**ty).clone();
-                stripped.possibly_undefined = false;
-                *ty = mir_codebase::definitions::wrap_var_type(stripped);
-            }
-        }
-    }
-    let assigned = Arc::make_mut(&mut post.assigned_vars);
-    let possibly = Arc::make_mut(&mut post.possibly_assigned_vars);
-    for name in &new_names {
-        if possibly.contains(name) {
-            possibly.remove(name);
-            assigned.insert(*name);
-        }
-    }
-}
-
 /// Narrows `iter` (the back-edge state) by `narrow`, then re-adds the initial
 /// type of every variable the narrowing changed: the first iteration enters
 /// the body without the condition having been checked.
