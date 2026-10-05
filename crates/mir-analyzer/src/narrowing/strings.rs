@@ -96,7 +96,7 @@ pub(super) fn narrow_string_strlen_comparison(
     };
     // Same rationale as the array case above: don't collapse to an empty union.
     if !narrowed.is_empty() && narrowed != current {
-        ctx.set_var(str_var, narrowed);
+        ctx.narrow_var(str_var, narrowed);
     }
 }
 
@@ -210,7 +210,7 @@ pub(super) fn narrow_string_false_comparable_condition(
             if !current.is_mixed() {
                 let narrowed = narrow_string_to_non_empty(&current);
                 if narrowed != current {
-                    ctx.set_var(&var_name, narrowed);
+                    ctx.narrow_var(&var_name, narrowed);
                 }
             }
         }

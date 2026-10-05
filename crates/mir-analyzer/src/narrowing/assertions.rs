@@ -216,7 +216,7 @@ pub(crate) fn apply_one_assertion(
             } else {
                 ty
             };
-            ctx.set_var(&obj_key, ty);
+            ctx.narrow_var(&obj_key, ty);
             return true;
         }
     }
@@ -325,7 +325,7 @@ pub(crate) fn apply_one_assertion(
             } else {
                 ty
             };
-            ctx.set_var(&var_name, ty);
+            ctx.narrow_var(&var_name, ty);
             applied = true;
         } else if let Some((obj, prop)) = extract_chained_prop_access(arg_value) {
             let ty = match template_bindings {

@@ -796,10 +796,16 @@ impl FlowState {
 
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: &str, ty: Type) {
+        self.narrow_var(name, ty);
+        self.drop_guarded_defs_of(Name::from(name.trim_start_matches('$')));
+    }
+
+    /// [`Self::set_var`] for a type refinement: the value is unchanged, so
+    /// guarded definitions that involve `name` stay valid.
+    pub fn narrow_var(&mut self, name: &str, ty: Type) {
         let name = Name::from(name.trim_start_matches('$'));
         Arc::make_mut(&mut self.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
         Arc::make_mut(&mut self.assigned_vars).insert(name);
-        self.drop_guarded_defs_of(name);
     }
 
     fn drop_guarded_defs_of(&mut self, name: Name) {

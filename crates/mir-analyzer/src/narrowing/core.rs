@@ -32,7 +32,7 @@ pub(super) fn set_narrowed(
     mark_diverges: bool,
 ) {
     if !narrowed.is_empty() {
-        ctx.set_var(name, narrowed);
+        ctx.narrow_var(name, narrowed);
     } else if mark_diverges && !current.is_empty() && !current.is_mixed() {
         ctx.diverges = true;
     }
@@ -714,7 +714,7 @@ pub(super) fn promote_assignment_effects(
                 let sym = mir_types::Name::from(var_name.as_str());
                 if ctx.possibly_assigned_vars.contains(&sym) {
                     let ty = ctx.get_var(&var_name);
-                    ctx.set_var(&var_name, ty);
+                    ctx.narrow_var(&var_name, ty);
                     std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&sym);
                 }
             }
@@ -746,7 +746,7 @@ pub(super) fn promote_assignment_effects(
                                         let sym = mir_types::Name::from(var_name);
                                         if ctx.possibly_assigned_vars.contains(&sym) {
                                             let ty = ctx.get_var(var_name);
-                                            ctx.set_var(var_name, ty);
+                                            ctx.narrow_var(var_name, ty);
                                             std::sync::Arc::make_mut(
                                                 &mut ctx.possibly_assigned_vars,
                                             )

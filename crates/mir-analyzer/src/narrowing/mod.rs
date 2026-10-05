@@ -195,7 +195,7 @@ pub fn narrow_from_condition(
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
                         let current = ctx.get_var(&var_name);
-                        ctx.set_var(&var_name, current.remove_null());
+                        ctx.narrow_var(&var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
@@ -223,7 +223,7 @@ pub fn narrow_from_condition(
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
                         let current = ctx.get_var(&var_name);
-                        ctx.set_var(&var_name, current.remove_null());
+                        ctx.narrow_var(&var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
@@ -904,7 +904,7 @@ pub fn narrow_from_condition(
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
                         let current = ctx.get_var(&var_name);
-                        ctx.set_var(&var_name, current.remove_null());
+                        ctx.narrow_var(&var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
@@ -926,7 +926,7 @@ pub fn narrow_from_condition(
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
                         let current = ctx.get_var(&var_name);
-                        ctx.set_var(&var_name, current.remove_null());
+                        ctx.narrow_var(&var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
@@ -1627,7 +1627,7 @@ pub fn narrow_from_condition(
                                         if !current.is_mixed() {
                                             let narrowed = narrow_string_to_non_empty(&current);
                                             if narrowed != current {
-                                                ctx.set_var(&var_name, narrowed);
+                                                ctx.narrow_var(&var_name, narrowed);
                                             }
                                         }
                                     }
@@ -1989,7 +1989,7 @@ pub fn narrow_from_condition(
                     if is_true {
                         // remove null; mark as definitely assigned
                         let current = ctx.get_var(&var_name);
-                        ctx.set_var(&var_name, current.remove_null());
+                        ctx.narrow_var(&var_name, current.remove_null());
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars)
                             .insert(mir_types::Name::from(var_name.as_str()));
                     } else if ctx.var_is_defined(&var_name) {
@@ -2069,7 +2069,7 @@ pub fn narrow_from_condition(
                     current.narrow_to_truthy()
                 };
                 if !narrowed.is_empty() {
-                    ctx.set_var(&var_name, narrowed);
+                    ctx.narrow_var(&var_name, narrowed);
                 }
             } else {
                 if !is_true {
@@ -2120,7 +2120,7 @@ pub fn narrow_from_condition(
                     narrowed.possibly_undefined = false;
                 }
                 if !narrowed.is_empty() {
-                    ctx.set_var(&var_name, narrowed);
+                    ctx.narrow_var(&var_name, narrowed);
                 } else if !current.is_empty() && !current.is_mixed() {
                     ctx.diverges = true;
                 }
@@ -2173,7 +2173,7 @@ pub fn narrow_from_condition(
                     current.narrow_to_falsy()
                 };
                 if !narrowed.is_empty() {
-                    ctx.set_var(&var_name, narrowed);
+                    ctx.narrow_var(&var_name, narrowed);
                 } else if !current.is_empty()
                     && !current.is_mixed()
                     && ctx.var_is_defined(&var_name)
@@ -2187,7 +2187,7 @@ pub fn narrow_from_condition(
                 }
                 for var in guarded {
                     let ty = ctx.get_var_sym(var);
-                    ctx.set_var(var.as_ref(), ty);
+                    ctx.narrow_var(var.as_ref(), ty);
                     std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
                 }
             } else if let Some((obj_var, prop)) = extract_prop_path_access(expr) {
@@ -2305,7 +2305,7 @@ fn narrow_from_false_comparable_call(
                         };
                         if let Some(narrowed) = narrowed {
                             match target {
-                                ScalarArgTarget::Var(name) => ctx.set_var(&name, narrowed),
+                                ScalarArgTarget::Var(name) => ctx.narrow_var(&name, narrowed),
                                 ScalarArgTarget::Prop(obj, prop) => {
                                     apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false)
                                 }

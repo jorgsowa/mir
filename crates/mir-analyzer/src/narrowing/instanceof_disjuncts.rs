@@ -520,12 +520,12 @@ pub(crate) fn narrow_type_fn_disjuncts(
     let mut union_ty = Type::empty();
     for fn_name in &fn_names {
         let mut scratch = ctx.branch();
-        scratch.set_var(&vn, original.clone());
+        scratch.narrow_var(&vn, original.clone());
         narrow_from_type_fn(&mut scratch, fn_name, &vn, db, true);
         union_ty.merge_with(&scratch.get_var(&vn));
     }
     if !union_ty.is_empty() {
-        ctx.set_var(&vn, union_ty);
+        ctx.narrow_var(&vn, union_ty);
     }
     Some(vn)
 }
@@ -745,12 +745,12 @@ pub(crate) fn narrow_mixed_disjuncts(
     let mut union_ty = Type::empty();
     for cond in conditions {
         let mut scratch = ctx.branch();
-        scratch.set_var(&vn, original.clone());
+        scratch.narrow_var(&vn, original.clone());
         narrow_from_condition(cond, &mut scratch, true, db, file);
         union_ty.merge_with(&scratch.get_var(&vn));
     }
     if !union_ty.is_empty() {
-        ctx.set_var(&vn, union_ty);
+        ctx.narrow_var(&vn, union_ty);
     }
     Some(vn)
 }
