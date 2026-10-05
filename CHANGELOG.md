@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An enum case's `->value` used as an array index (`$a[Suit::Hearts->value] = 1`) keeps its literal key on write and read.
 - A closure parameter narrower than the documented callable parameter (`int` for `int|string`, a subclass for its parent) reports `ArgumentTypeCoercion` instead of `InvalidArgument`.
 - A generic argument whose type arguments are only broader than the parameter's refined ones (`Box<int|null>` for `Box<positive-int|null>`), and a literal `[]` for a `non-empty-list`/`non-empty-array` parameter, report `ArgumentTypeCoercion` instead of `InvalidArgument`.
 - A bare `array` nested in a shape argument is accepted for an array-intersection or array-typed shape property, removing a false `InvalidArgument`.

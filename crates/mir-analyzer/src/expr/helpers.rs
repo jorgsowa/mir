@@ -57,6 +57,26 @@ pub fn literal_array_key_of_kind(kind: &ExprKind) -> Option<ArrayKey> {
     }
 }
 
+/// [`literal_array_key_of_kind`], additionally folding an enum case's `->value`
+/// (`Suit::Hearts->value`) from the literal type the caller already analyzed.
+pub fn literal_array_key_of_index(kind: &ExprKind, key_ty: Option<&Type>) -> Option<ArrayKey> {
+    literal_array_key_of_kind(kind).or_else(|| {
+        let ExprKind::PropertyAccess(pa) = kind else {
+            return None;
+        };
+        if !matches!(pa.object.kind, ExprKind::ClassConstAccess(_))
+            || extract_string_from_expr(&pa.property).as_deref() != Some("value")
+        {
+            return None;
+        }
+        match coerce_array_key_type(key_ty?).types.as_slice() {
+            [Atomic::TLiteralString(s)] => Some(ArrayKey::String(s.clone())),
+            [Atomic::TLiteralInt(i)] => Some(ArrayKey::Int(*i)),
+            _ => None,
+        }
+    })
+}
+
 /// Coerce a general index-expression type to PHP's canonical array-key
 /// representation: bools cast to `0`/`1`, floats truncate toward zero, `null`
 /// casts to `""`, and a numeric string canonicalizes to int — mirroring

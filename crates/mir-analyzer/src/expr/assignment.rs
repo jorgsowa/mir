@@ -1873,15 +1873,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .index
                     .as_ref()
                     .map(|idx| super::helpers::coerce_array_key_type(&self.analyze(idx, ctx)));
-                let mut key_chain: Vec<Option<Type>> = vec![outer_key];
                 // Parallel chain of literal array keys (same order as key_chain),
                 // used to route a fully-literal nested write (`$arr['a']['b'] = $v`)
                 // through a precise per-property update instead of widening the
                 // whole outer shape.
-                let mut literal_key_chain: Vec<Option<mir_types::ArrayKey>> = vec![aa
-                    .index
-                    .as_ref()
-                    .and_then(|idx| super::helpers::literal_array_key_of_kind(&idx.kind))];
+                let mut literal_key_chain: Vec<Option<mir_types::ArrayKey>> =
+                    vec![aa.index.as_ref().and_then(|idx| {
+                        super::helpers::literal_array_key_of_index(&idx.kind, outer_key.as_ref())
+                    })];
+                let mut key_chain: Vec<Option<Type>> = vec![outer_key];
                 let mut base: &Expr = &aa.array;
                 loop {
                     match &base.kind {
@@ -2196,7 +2196,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 super::helpers::coerce_array_key_type(&self.analyze(idx, ctx))
                             });
                             literal_key_chain.push(inner.index.as_ref().and_then(|idx| {
-                                super::helpers::literal_array_key_of_kind(&idx.kind)
+                                super::helpers::literal_array_key_of_index(
+                                    &idx.kind,
+                                    inner_key.as_ref(),
+                                )
                             }));
                             key_chain.push(inner_key);
                             base = &inner.array;

@@ -625,9 +625,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             });
             is_array_access
         });
+        let mut analyzed_index_ty: Option<Type> = None;
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
             let idx_ty = crate::subtype::canonical_enum_cases(self.db, &idx_ty).into_owned();
+            analyzed_index_ty = Some(idx_ty.clone());
             if receiver_is_array_access {
                 // The array-key rule below is plain-PHP-array-only; skip it —
                 // but the offset must still satisfy the receiver's own
@@ -775,10 +777,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
         }
 
-        let literal_key: Option<mir_types::atomic::ArrayKey> = aa
-            .index
-            .as_ref()
-            .and_then(|idx| super::helpers::literal_array_key_of_kind(&idx.kind));
+        let literal_key: Option<mir_types::atomic::ArrayKey> = aa.index.as_ref().and_then(|idx| {
+            super::helpers::literal_array_key_of_index(&idx.kind, analyzed_index_ty.as_ref())
+        });
 
         let idx_span = aa.index.as_ref().map(|i| i.span).unwrap_or(expr.span);
 
