@@ -15,7 +15,7 @@ function buildGrouped(array $listeners): array
     foreach ($listeners as $cls => $callback) {
         $out[$cls][] = $callback;
     }
-    /** @mir-check $out is array<class-string<Event>, list<callable>> */
+    /** @mir-check $out is array<class-string<Event>, non-empty-list<callable>> */
     return $out;
 }
 ===expect===

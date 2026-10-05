@@ -1990,7 +1990,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let mut wrapped_value = ty.clone();
                             for k_opt in key_chain[..key_chain.len() - 1].iter() {
                                 wrapped_value = match k_opt {
-                                    None => Type::single(Atomic::TList {
+                                    None => Type::single(Atomic::TNonEmptyList {
                                         value: Box::new(wrapped_value),
                                     }),
                                     Some(k) => Type::single(Atomic::TArray {
