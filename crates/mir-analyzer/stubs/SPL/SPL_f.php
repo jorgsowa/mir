@@ -148,11 +148,11 @@ function spl_object_hash(object $object): string {}
  * </p>
  * @return (
  *     $preserve_keys is true ? array<TKey, TValue> : (
- *     $preserve_keys is false ? TValue[] :
- *     array<TKey, TValue>|TValue[])
+ *     $preserve_keys is false ? list<TValue> :
+ *     array<TKey, TValue>|list<TValue>)
  * ) An array containing the elements of the iterator.
  */
-function iterator_to_array(#[LanguageLevelTypeAware(['8.2' => 'Traversable|array'], default: 'Traversable')] $iterator, bool $preserve_keys = true): array {}
+function iterator_to_array($iterator, bool $preserve_keys = true): array {}
 
 /**
  * Count the elements in an iterator

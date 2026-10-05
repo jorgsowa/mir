@@ -1033,6 +1033,7 @@ fn infer_from_pair(
                     };
                     if let Some((afqcn, ap)) = arg_class {
                         if pfqcn == afqcn {
+                            let ap = iteration_shorthand_args(afqcn, ap);
                             for (p_param, a_param) in pp.iter().zip(ap.iter()) {
                                 infer_from_pair(
                                     db,
@@ -1326,16 +1327,32 @@ fn infer_from_generic_ancestor(
         return;
     }
     let afqcn_tps = crate::db::class_template_params(db, afqcn).unwrap_or_default();
-    let own_bindings: FxHashMap<Name, Type> = afqcn_tps
+    let ap = iteration_shorthand_args(afqcn, ap);
+    let mut own_bindings: FxHashMap<Name, Type> = afqcn_tps
         .iter()
-        .zip(ap)
+        .zip(ap.iter())
         .map(|(tp, ty)| (tp.name, ty.clone()))
         .collect();
+    // An explicit but short arg list leaves the remaining params unbound.
+    if !ap.is_empty() {
+        for tp in afqcn_tps.iter().skip(ap.len()) {
+            own_bindings.insert(
+                tp.name,
+                tp.default
+                    .as_deref()
+                    .or(tp.bound.as_deref())
+                    .cloned()
+                    .unwrap_or_else(Type::mixed),
+            );
+        }
+    }
     let ancestor_bindings = crate::db::inherited_template_bindings(db, afqcn, &own_bindings);
+    let unbound = unbound_ancestor_templates(db, afqcn, &own_bindings);
     for (p_param, tp) in pp.iter().zip(pfqcn_tps.iter()) {
         let Some(resolved) = ancestor_bindings.get(&tp.name) else {
             continue;
         };
+        let resolved = &resolved.substitute_templates(&unbound);
         infer_from_pair(
             db,
             p_param,
@@ -1344,5 +1361,40 @@ fn infer_from_generic_ancestor(
             bindings,
             risky_fallback,
         );
+    }
+}
+
+/// Templates of `afqcn`'s ancestors that `own_bindings` doesn't supply (a
+/// non-generic class implementing a generic interface), mapped to their
+/// bound or `mixed` so the raw template atoms don't leak into inferred bindings.
+fn unbound_ancestor_templates(
+    db: &dyn MirDatabase,
+    afqcn: &str,
+    own_bindings: &FxHashMap<Name, Type>,
+) -> FxHashMap<Name, Type> {
+    let ancestors = crate::db::class_ancestors_by_fqcn(db, crate::db::Fqcn::from_str(db, afqcn));
+    let mut unbound = FxHashMap::default();
+    for ancestor in ancestors.iter().filter(|a| a.as_ref() != afqcn) {
+        let Some(tps) = crate::db::declared_template_params(db, ancestor) else {
+            continue;
+        };
+        for tp in tps.iter().filter(|tp| !own_bindings.contains_key(&tp.name)) {
+            unbound
+                .entry(tp.name)
+                .or_insert_with(|| tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed));
+        }
+    }
+    unbound
+}
+
+/// The one-arg `Generator<V>` / `Iterator<V>` shorthand names the value type; the key is `mixed`.
+fn iteration_shorthand_args<'a>(fqcn: &str, args: &'a [Type]) -> std::borrow::Cow<'a, [Type]> {
+    let bare = fqcn.trim_start_matches('\\');
+    let is_iteration_type = ["Generator", "Iterator", "IteratorAggregate", "Traversable"]
+        .iter()
+        .any(|n| bare.eq_ignore_ascii_case(n));
+    match args {
+        [value] if is_iteration_type => std::borrow::Cow::Owned(vec![Type::mixed(), value.clone()]),
+        _ => std::borrow::Cow::Borrowed(args),
     }
 }
