@@ -782,7 +782,14 @@ impl<'a> ClassAnalyzer<'a> {
                             false
                         }
                     } else {
-                        Self::scalar_param_type_narrowed(parent_ty, child_ty)
+                        // A docblock narrowing of an array param keeps the same native `array` hint.
+                        let docblock_array_refinement = (parent_ty.from_docblock
+                            || child_ty.from_docblock)
+                            && Self::is_array_only(parent_ty)
+                            && Self::is_array_only(child_ty)
+                            && child_ty.is_subtype_structural(parent_ty);
+                        !docblock_array_refinement
+                            && Self::scalar_param_type_narrowed(parent_ty, child_ty)
                     };
 
                     if narrowed {
@@ -1068,6 +1075,11 @@ impl<'a> ClassAnalyzer<'a> {
             })
             .collect();
         Arc::new(m_clone)
+    }
+
+    fn is_array_only(ty: &mir_types::Type) -> bool {
+        let ty = ty.remove_null();
+        !ty.types.is_empty() && ty.types.iter().all(|a| a.is_array())
     }
 
     fn is_native_array(ty: &mir_types::Type) -> bool {
