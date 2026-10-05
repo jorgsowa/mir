@@ -868,7 +868,7 @@ impl CallAnalyzer {
 
             // Validate callbacks for built-in PHP functions with special callback requirements.
             // Functions with dynamic or mode-dependent arity use specialized handlers.
-            // Functions with a fixed minimum arity are declared in callback_min_arity_spec.
+            // Functions with a fixed callback arity are declared in callback_max_arity_spec.
             match resolved_fn_name.as_str() {
                 "array_map" => {
                     super::array_builtins::check_array_map_callback(ea, &arg_types, &arg_spans)
@@ -877,11 +877,11 @@ impl CallAnalyzer {
                     super::array_builtins::check_array_filter_callback(ea, &arg_types, &arg_spans)
                 }
                 fn_name => {
-                    if let Some((cb_idx, min_arity)) =
-                        super::callable::callback_min_arity_spec(fn_name)
+                    if let Some((cb_idx, max_arity)) =
+                        super::callable::callback_max_arity_spec(fn_name)
                     {
-                        super::callable::check_min_arity_callback(
-                            ea, fn_name, cb_idx, min_arity, &arg_types, &arg_spans,
+                        super::callable::check_max_arity_callback(
+                            ea, fn_name, cb_idx, max_arity, &arg_types, &arg_spans,
                         );
                     }
                 }

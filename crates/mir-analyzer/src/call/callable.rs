@@ -850,14 +850,15 @@ pub(crate) fn range_return_type(arg_types: &[Type]) -> Option<Type> {
     }))
 }
 
-/// Returns `(callback_arg_index, min_required_arity)` for built-in functions that enforce a
-/// minimum callback arity via `check_min_arity_callback`. Functions with more complex rules
-/// (array_map, array_filter) use their own specialized handlers instead.
-pub(crate) fn callback_min_arity_spec(fn_name: &str) -> Option<(usize, usize)> {
+/// Returns `(callback_arg_index, max_passed_arity)` for built-in functions whose callback
+/// is invoked with a fixed number of arguments, checked by `check_max_arity_callback`.
+/// Functions with more complex rules (array_map, array_filter) use their own handlers.
+pub(crate) fn callback_max_arity_spec(fn_name: &str) -> Option<(usize, usize)> {
     match fn_name {
         "array_reduce" => Some((1, 2)),
         "usort" | "uasort" | "uksort" => Some((1, 2)),
-        "array_walk" | "array_walk_recursive" => Some((1, 1)),
+        // value, key, optional userdata
+        "array_walk" | "array_walk_recursive" => Some((1, 3)),
         _ => None,
     }
 }
@@ -896,12 +897,13 @@ pub(crate) fn single_param_predicate_body(callback_expr: &Expr) -> Option<(&str,
     Some((param_name, unwrap_parens(body)))
 }
 
-/// Validate a callback argument against a minimum required arity.
-pub(crate) fn check_min_arity_callback(
+/// Validate a callback argument: PHP drops surplus arguments, so only a callback
+/// requiring more than `max_arity` parameters is invalid.
+pub(crate) fn check_max_arity_callback(
     ea: &mut ExpressionAnalyzer<'_>,
     fn_name: &str,
     callback_idx: usize,
-    min_arity: usize,
+    max_arity: usize,
     arg_types: &[Type],
     arg_spans: &[Span],
 ) {
@@ -933,16 +935,16 @@ pub(crate) fn check_min_arity_callback(
             .iter()
             .filter(|p| !p.is_optional && !p.is_variadic)
             .count();
-        if required_count < min_arity {
-            let expected_plural = if min_arity == 1 { "" } else { "s" };
+        if required_count > max_arity {
+            let expected_plural = if max_arity == 1 { "" } else { "s" };
             let actual_plural = if required_count == 1 { "" } else { "s" };
             ea.emit(
                 IssueKind::InvalidArgument {
                     param: "callback".to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!(
-                        "callable accepting at least {} argument{}",
-                        min_arity, expected_plural
+                        "callable accepting at most {} argument{}",
+                        max_arity, expected_plural
                     ),
                     actual: format!(
                         "callable accepting {} argument{}",
