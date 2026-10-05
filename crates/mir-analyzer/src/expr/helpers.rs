@@ -727,6 +727,7 @@ pub fn widen_array_with_value_and_key(
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
     let mut found_array = false;
+    let mut vivified = false;
     // Merge ALL array-like variants from current into a single accumulated TArray/TList.
     // Without this, each TArray variant in a growing union independently emits a new TArray,
     // causing unbounded union growth across salsa fixpoint iterations (infinite recursion).
@@ -779,17 +780,18 @@ pub fn widen_array_with_value_and_key(
             Atomic::TMixed => {
                 return Type::mixed();
             }
-            // An array-index write auto-vivifies: `$data['k'] = $v;` turns a
-            // null base into a fresh array at runtime (silently — unlike
-            // most other operations on null), so `TNull` must not survive a
-            // write the way every other non-array atom does below (e.g. an
-            // already-invalid `int`, kept as-is so the surrounding
-            // InvalidArrayOffset-family checks still see it).
-            Atomic::TNull => {}
+            // An array-index write auto-vivifies a null or false base into a
+            // fresh array; other scalars stay so InvalidArrayAssignment still sees them.
+            Atomic::TNull | Atomic::TFalse => vivified = true,
             other => {
                 result.add_type(other.clone());
             }
         }
+    }
+    if vivified && !found_array {
+        acc_key = Some(widen_key_type(new_key));
+        acc_value = Some(new_value.clone());
+        found_array = true;
     }
     if let (Some(mut key), Some(mut value)) = (acc_key, acc_value) {
         if let Some((declared_key, declared_value)) = declared_array_key_value(declared_ceiling) {
@@ -833,6 +835,7 @@ pub fn widen_array_as_list(
     result.from_docblock = current.from_docblock;
     let mut acc: Option<Type> = Some(new_value.clone());
     let mut found_array = false;
+    let mut vivified = false;
     for atomic in &current.types {
         match atomic {
             Atomic::TKeyedArray {
@@ -856,14 +859,12 @@ pub fn widen_array_as_list(
                 found_array = true;
             }
             Atomic::TMixed => return Type::mixed(),
-            // Same auto-vivification reasoning as widen_array_with_value_and_key:
-            // `$data[] = $v;` on a null base creates a fresh array, so `TNull`
-            // must not survive a push either.
-            Atomic::TNull => {}
+            // Same auto-vivification as widen_array_with_value_and_key.
+            Atomic::TNull | Atomic::TFalse => vivified = true,
             other => result.add_type(other.clone()),
         }
     }
-    if !found_array {
+    if !found_array && !vivified {
         return current.clone();
     }
     if let Some(mut v) = acc {
