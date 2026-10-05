@@ -544,6 +544,25 @@ fn next_code_line(
             paren_depth += paren_delta(cont_line.trim());
             cont_idx += 1;
         }
+        // A statement continued by an operator-leading line (`? a`, `: b`,
+        // `->c()`) or an open bracket is one statement; later issues on those
+        // lines belong to the same directive.
+        if skip_comments && !is_function_like(trimmed) && paren_depth <= 0 {
+            let mut depth = bracket_delta(trimmed);
+            let mut last = cont_idx - 1;
+            while depth > 0 || !ends_statement(raw_lines[last].trim()) {
+                let Some(next) = (last + 1..raw_lines.len())
+                    .find(|&i| !raw_lines[i].trim().is_empty())
+                    .filter(|&i| depth > 0 || continues_statement(raw_lines[i].trim()))
+                else {
+                    break;
+                };
+                let line = raw_lines[next].trim();
+                depth += paren_delta(line) + bracket_delta(line);
+                extra_covered_lines.extend(last as u32 + 2..=next as u32 + 1);
+                last = next;
+            }
+        }
         // A "documents the following element" directive above a function or
         // method covers its whole body in real Psalm/PHPStan semantics, not
         // just the signature line — extend coverage to every line spanned by
@@ -557,6 +576,20 @@ fn next_code_line(
         return (target, extra_covered_lines);
     }
     (idx as u32 + 2, extra_covered_lines)
+}
+
+/// Whether a trimmed line ends a statement or opens/closes a block.
+fn ends_statement(trimmed: &str) -> bool {
+    trimmed.ends_with([';', '{', '}'])
+}
+
+/// Whether a trimmed line starts with an operator that continues the
+/// previous line's expression.
+fn continues_statement(trimmed: &str) -> bool {
+    ["?", ":", "->", "&&", "||", ".", "+", "- ", "* "]
+        .iter()
+        .any(|op| trimmed.starts_with(op))
+        && !trimmed.starts_with("?>")
 }
 
 /// Whether a trimmed line is itself a function/method DECLARATION (after
