@@ -682,6 +682,12 @@ fn resolve_atomic_for_file_with_templates(
                 defining_entity,
             )),
         },
+        // `class-string<T>` names a template by its bare name, never a class.
+        Atomic::TClassString(Some(cls)) | Atomic::TInterfaceString(Some(cls))
+            if template_names.contains(cls.as_ref()) =>
+        {
+            atomic
+        }
         other => resolve_atomic_for_file(other, db, file, true),
     }
 }

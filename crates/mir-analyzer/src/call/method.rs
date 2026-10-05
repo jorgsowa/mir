@@ -180,6 +180,30 @@ fn positional_arity_fits(
     Some(given >= required && (variadic || given <= method.params.len()))
 }
 
+/// Whether `ty` references one of `templates` — directly or nested in a
+/// generic argument, array element or `class-string<T>`.
+fn mentions_template(ty: &Type, templates: &[TemplateParam]) -> bool {
+    let is_template = |name: &str| templates.iter().any(|t| t.name.as_ref() == name);
+    ty.types.iter().any(|a| match a {
+        Atomic::TTemplateParam { name, .. } => is_template(name),
+        Atomic::TNamedObject { fqcn, type_params } => {
+            (type_params.is_empty() && !fqcn.contains('\\') && is_template(fqcn))
+                || type_params.iter().any(|p| mentions_template(p, templates))
+        }
+        Atomic::TClassString(Some(n)) | Atomic::TInterfaceString(Some(n)) => is_template(n),
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            mentions_template(key, templates) || mentions_template(value, templates)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            mentions_template(value, templates)
+        }
+        Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+            mentions_template(target, templates)
+        }
+        _ => false,
+    })
+}
+
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
 pub(crate) fn resolve_method_from_db(
     db: &dyn crate::db::MirDatabase,
@@ -276,11 +300,20 @@ pub(crate) fn resolve_method_from_db(
                                 own_ty.types.iter().all(is_bare_callable_hint)
                             })
                     };
+                    // The inherited templates are only bound through the parent's
+                    // docblock param types, so those must be inherited too.
+                    let parent_binds_inherited_template = |parent_ty: &Type| {
+                        storage.template_params.is_empty()
+                            && parent_ty.from_docblock
+                            && mentions_template(parent_ty, &p.template_params)
+                    };
                     if !own_ty_is_docblock {
                         if let Some(parent_param) = parent_param.filter(|pp| {
                             pp.ty.is_some()
                                 && (own_is_mixed_or_absent
-                                    || pp.ty.as_deref().is_some_and(parent_refines_own))
+                                    || pp.ty.as_deref().is_some_and(|t| {
+                                        parent_refines_own(t) || parent_binds_inherited_template(t)
+                                    }))
                         }) {
                             return DeclaredParam {
                                 ty: parent_param.ty.clone(),
