@@ -31,7 +31,7 @@ function checkDog(Dog $d): void {
 
 function checkAnimal(Animal $a): void {
     $y = isDog($a);
-    /** @mir-check $y is false */
+    /** @mir-check $y is bool */
     $_ = 1;
 }
 ===expect===

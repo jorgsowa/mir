@@ -29,7 +29,7 @@ function checkNonEmpty(NonEmptyBox $b): void {
 
 function checkPlain(Box $b): void {
     $y = $b->isNonEmpty();
-    /** @mir-check $y is false */
+    /** @mir-check $y is bool */
     $_ = 1;
 }
 ===expect===

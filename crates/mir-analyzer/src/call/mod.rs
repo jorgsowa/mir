@@ -145,18 +145,43 @@ fn resolve_class_subject_branch(
     let branch = if crate::subtype::is_subtype(db, &arg_ty, &subject) {
         data.if_true.clone()
     } else {
-        // An enum-case subject only excludes other single cases; a wider arg may still match.
-        let is_case = |a: &Atomic| matches!(a, Atomic::TLiteralEnumCase { .. });
         let disjoint = arg_ty
             .types
             .iter()
-            .all(|a| is_case(a) && !subject.types.contains(a));
-        if subject.types.iter().any(is_case) && !disjoint {
+            .all(|a| subject.types.iter().all(|s| provably_disjoint(db, a, s)));
+        if !disjoint {
             return None;
         }
         data.if_false.clone()
     };
     Some(resolve_conditional_dyn(branch, db, templates, lookup))
+}
+
+/// True when no value can be both `a` and `s`, given `a` is not a subtype of `s`.
+/// Unknown or enum-vs-class pairs are not provably disjoint.
+fn provably_disjoint(
+    db: &dyn crate::db::MirDatabase,
+    a: &mir_types::Atomic,
+    s: &mir_types::Atomic,
+) -> bool {
+    use mir_types::Atomic;
+    if let (Atomic::TLiteralEnumCase { .. }, Atomic::TLiteralEnumCase { .. }) = (a, s) {
+        return a != s;
+    }
+    let (Some(a), Some(s)) = (a.named_object_fqcn(), s.named_object_fqcn()) else {
+        return false;
+    };
+    let kind = |f: &str| crate::db::class_kind(db, f);
+    let (Some(ak), Some(sk)) = (kind(a), kind(s)) else {
+        return false;
+    };
+    if a == s || crate::db::extends_or_implements(db, s, a) {
+        return false;
+    }
+    // A subclass of a non-final class or interface may also implement an interface.
+    crate::db::is_final(db, a)
+        || crate::db::is_final(db, s)
+        || !(ak.is_interface || sk.is_interface)
 }
 
 /// An assignment expression in argument position (`f($x = expr)`,
