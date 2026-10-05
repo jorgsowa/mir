@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A nested literal-key write (`$a['fields']['k'] = $v`) adds the key to the inner shape instead of widening the whole array to `array<string, …>`, removing false `InvalidReturnType` and `InvalidArgument`.
 - `$a['k'] === []` / `!== []` (and `==`/`!=`) narrows the shape offset to an empty / non-empty collection, removing false `InvalidPropertyAssignment` and `InvalidArgument` after a guard.
 - An anonymous class inside an array literal (`[new class extends Foo {}]`) fits a `list<Foo>`/`array<K, Foo>` return, removing false `InvalidReturnType`.
 - A returned nested array (`array<string, list<Cat>>`, `array{k: list<Cat>}`) is checked through the class hierarchy at every depth, removing false `InvalidReturnType` for a more specific element class.

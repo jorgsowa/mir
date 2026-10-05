@@ -144,6 +144,9 @@ fn widen_key_type(ty: &Type) -> Type {
 /// key directly on `current`, then progressively outer keys) and `leaf_value`
 /// is the value being assigned at the final (outermost) key.
 ///
+/// The outermost key may be new to its inner shape (`$a['fields']['k'] = $v`
+/// on `array{fields: array{}}`); every key before it must already exist.
+///
 /// Returns `None` when the shape at any level doesn't cleanly resolve (an
 /// unknown key, a non-uniform union, a non-shape atom, …) so the caller can
 /// fall back to the existing generic accumulator.
@@ -152,14 +155,25 @@ pub fn set_nested_keyed_value(
     path: &[ArrayKey],
     leaf_value: &Type,
 ) -> Option<Type> {
+    set_nested_keyed_value_at(current, path, leaf_value, false)
+}
+
+fn set_nested_keyed_value_at(
+    current: &Type,
+    path: &[ArrayKey],
+    leaf_value: &Type,
+    may_insert_key: bool,
+) -> Option<Type> {
     let (key, rest) = path.split_first()?;
     if current.types.is_empty() {
         return None;
     }
-    let all_shapes_have_key = current.types.iter().all(
-        |a| matches!(a, Atomic::TKeyedArray { properties, .. } if properties.contains_key(key)),
-    );
-    if !all_shapes_have_key {
+    let inserts_key = may_insert_key && rest.is_empty();
+    let all_shapes_ok = current.types.iter().all(|a| match a {
+        Atomic::TKeyedArray { properties, .. } => inserts_key || properties.contains_key(key),
+        _ => false,
+    });
+    if !all_shapes_ok {
         return None;
     }
     let mut result = Type::empty();
@@ -175,12 +189,14 @@ pub fn set_nested_keyed_value(
             unreachable!("filtered to TKeyedArray above")
         };
         let mut new_properties = properties.clone();
-        let existing = properties.get(key).expect("checked by all_shapes_have_key");
+        let existing = properties.get(key);
         let new_inner = if rest.is_empty() {
             leaf_value.clone()
         } else {
-            set_nested_keyed_value(&existing.ty, rest, leaf_value)?
+            set_nested_keyed_value_at(&existing?.ty, rest, leaf_value, true)?
         };
+        let still_list =
+            *is_list && (existing.is_some() || *key == ArrayKey::Int(properties.len() as i64));
         new_properties.insert(
             key.clone(),
             mir_types::atomic::KeyedProperty {
@@ -191,7 +207,7 @@ pub fn set_nested_keyed_value(
         result.add_type(Atomic::TKeyedArray {
             properties: new_properties,
             is_open: *is_open,
-            is_list: *is_list,
+            is_list: still_list,
         });
     }
     Some(result)
