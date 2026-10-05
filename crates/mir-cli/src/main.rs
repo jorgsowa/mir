@@ -285,9 +285,24 @@ fn resolve_composer_root(cli: &Cli, cwd: &std::path::Path) -> Option<PathBuf> {
         } else {
             None
         }
-    } else if cli.paths.len() == 1 {
-        composer::find_composer_root_for_path(&cli.paths[0])
     } else {
-        None
+        composer::find_composer_root_for_path(&common_ancestor(&cli.paths))
     }
+}
+
+/// Deepest directory containing every path (falls back to the first path).
+fn common_ancestor(paths: &[PathBuf]) -> PathBuf {
+    let resolved: Vec<PathBuf> = paths
+        .iter()
+        .map(|p| p.canonicalize().unwrap_or_else(|_| p.clone()))
+        .collect();
+    let mut common = resolved[0].clone();
+    for p in &resolved[1..] {
+        while !p.starts_with(&common) {
+            if !common.pop() {
+                return paths[0].clone();
+            }
+        }
+    }
+    common
 }

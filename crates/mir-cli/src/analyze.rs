@@ -67,13 +67,12 @@ pub fn run_composer_flow(
 
     let ignore_dirs = resolve_ignore_dirs(config, config_base);
 
-    let analyze_whole_composer_project = cli.paths.is_empty()
-        || cli
-            .paths
-            .first()
-            .is_some_and(|p| normalize_for_compare(p) == normalize_for_compare(composer_root));
+    let is_composer_root =
+        |p: &PathBuf| normalize_for_compare(p) == normalize_for_compare(composer_root);
+    let analyze_whole_composer_project =
+        cli.paths.is_empty() || cli.paths.iter().any(is_composer_root);
 
-    let discovered: Vec<PathBuf> = if analyze_whole_composer_project {
+    let mut discovered: Vec<PathBuf> = if analyze_whole_composer_project {
         let all = map.project_files();
         if config.project_dirs.is_empty() {
             all
@@ -89,8 +88,18 @@ pub fn run_composer_flow(
             filter_to_dirs(all, &project_roots, composer_root)
         }
     } else {
-        discover_files_with_extensions(&cli.paths[0], &extensions)
+        Vec::new()
     };
+    if !cli.paths.is_empty() {
+        let mut seen: std::collections::HashSet<PathBuf> = discovered.iter().cloned().collect();
+        for path in cli.paths.iter().filter(|p| !is_composer_root(p)) {
+            for file in discover_files_with_extensions(path, &extensions) {
+                if seen.insert(file.clone()) {
+                    discovered.push(file);
+                }
+            }
+        }
+    }
 
     let files = filter_ignore(discovered, &ignore_dirs, composer_root);
 
