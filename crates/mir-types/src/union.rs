@@ -357,6 +357,12 @@ impl Type {
                 return;
             }
         }
+        // TNonEmptyString is subsumed by TString.
+        if matches!(atomic, Atomic::TNonEmptyString)
+            && self.types.iter().any(|t| matches!(t, Atomic::TString))
+        {
+            return;
+        }
         // TTrue / TFalse are subsumed by TBool.
         if matches!(atomic, Atomic::TTrue | Atomic::TFalse)
             && self.types.iter().any(|t| matches!(t, Atomic::TBool))
@@ -377,10 +383,10 @@ impl Type {
             self.types.push(Atomic::TBool);
             return;
         }
-        // Adding TString widens away all TLiteralString variants.
+        // Adding TString widens away all TLiteralString and TNonEmptyString variants.
         if matches!(atomic, Atomic::TString) {
             self.types
-                .retain(|t| !matches!(t, Atomic::TLiteralString(_)));
+                .retain(|t| !matches!(t, Atomic::TLiteralString(_) | Atomic::TNonEmptyString));
         }
         // Adding TBool widens away TTrue/TFalse.
         if matches!(atomic, Atomic::TBool) {
