@@ -121,8 +121,8 @@
 //! **Annotations** (diagnostic fixtures): a `// ^^^ Kind: message` comment line
 //! under a source line expects that issue on the line above, starting at the
 //! first caret's column and spanning the carets. `//<^^^` starts at column 0.
-//! A `+N:C` token after the carets (`// ^ +2:1 Kind`) ends the span at column
-//! `C` of the source line `N` lines below (annotation lines don't count). A column 1 start needs `===expect===`.
+//! A `+N:C` token after the carets (`// ^ +2:1 Kind`, `N` ≥ 1) ends the span at
+//! column `C` of the source line `N` lines below (annotation lines don't count). A column 1 start needs `===expect===`.
 //! Annotations combine with `===expect===`; `UPDATE_FIXTURES=1` leaves matched
 //! ones out of the rewritten section.
 //! ```text
@@ -518,11 +518,18 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                 )
             });
             let (line_end, col_end, rest) = match parse_span_end(rest) {
-                Some((lines_below, end_col, rest)) => (
-                    nth_source_line_after(&lines, line, lines_below),
-                    end_col,
-                    rest,
-                ),
+                Some((lines_below, end_col, rest)) => {
+                    assert!(
+                        lines_below > 0,
+                        "fixture {path}: annotation on line {} spans one line; use carets instead of `+0:C`",
+                        idx + 1
+                    );
+                    (
+                        nth_source_line_after(&lines, line, lines_below),
+                        end_col,
+                        rest,
+                    )
+                }
                 None => (line, col + len, rest),
             };
             let (kind, message) = match rest.split_once(": ") {
