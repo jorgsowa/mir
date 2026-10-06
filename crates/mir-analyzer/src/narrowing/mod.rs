@@ -54,7 +54,7 @@ use class_introspection::{
     narrow_static_prop_from_gettype_literal,
 };
 pub(crate) use core::{
-    apply_prop_narrowed, chained_prop_receiver_key, extract_any_prop_access,
+    apply_prop_narrowed, chained_prop_receiver_key, established_guard, extract_any_prop_access,
     extract_chained_prop_access, extract_class_fqcn_from_expr, extract_expr_guard_key,
     extract_prop_access, extract_prop_path_access, extract_static_prop_access, is_numeric_string,
     memoized_receiver_key, method_call_key, narrow_receiver_non_null,
@@ -118,6 +118,13 @@ pub fn narrow_from_condition(
     db: &dyn MirDatabase,
     file: &str,
 ) {
+    if let Some(guard) = established_guard(expr, is_true) {
+        for var in ctx.vars_guarded_by(guard) {
+            let ty = ctx.get_var_sym(var);
+            ctx.narrow_var(var.as_ref(), ty);
+            std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
+        }
+    }
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {
@@ -2161,11 +2168,6 @@ pub fn narrow_from_condition(
         // if ($x)  — truthy/falsy narrowing
         _ => {
             if let Some(var_name) = extract_var_name(expr) {
-                let guarded = if is_true {
-                    ctx.vars_guarded_by(mir_types::Name::from(var_name.as_str()))
-                } else {
-                    Vec::new()
-                };
                 let current = ctx.get_var(&var_name);
                 let narrowed = if is_true {
                     current.narrow_to_truthy()
@@ -2184,11 +2186,6 @@ pub fn narrow_from_condition(
                     // variable reads as null (falsy), so the branch stays
                     // reachable at runtime.
                     ctx.diverges = true;
-                }
-                for var in guarded {
-                    let ty = ctx.get_var_sym(var);
-                    ctx.narrow_var(var.as_ref(), ty);
-                    std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
                 }
             } else if let Some((obj_var, prop)) = extract_prop_path_access(expr) {
                 // `if ($this->prop)` — property-receiver counterpart of the

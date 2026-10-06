@@ -37,6 +37,29 @@ fn extend_dead_writes_dedup(dst: &mut Vec<DeadWrite>, src: Vec<DeadWrite>) {
 // FlowState
 // ---------------------------------------------------------------------------
 
+/// A condition on a plain variable that guarded definitions are keyed on.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Guard {
+    pub var: Name,
+    pub kind: GuardKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GuardKind {
+    /// `$v`, `!empty($v)`
+    Truthy,
+    /// `isset($v)`, `$v !== null`
+    NotNull,
+}
+
+impl Guard {
+    /// Truthy implies not-null, never the reverse.
+    fn implied_by(self, established: Guard) -> bool {
+        self.var == established.var
+            && (self.kind == established.kind || established.kind == GuardKind::Truthy)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FlowState {
     /// Types of variables at this point in execution.
@@ -281,9 +304,9 @@ pub struct FlowState {
     /// `@throws` declaration, not the generic helper.
     pub template_typed_params: Arc<FxHashSet<Name>>,
 
-    /// Variables defined only under `if ($guard)` that stay defined wherever
-    /// `$guard` is truthy again. Key: variable, value: guard variable.
-    pub guarded_defs: Arc<FxHashMap<Name, Name>>,
+    /// Variables defined only under a guard condition that stay defined wherever
+    /// the same condition holds again. Key: variable, value: the guard.
+    pub guarded_defs: Arc<FxHashMap<Name, Guard>>,
 
     /// FQCNs proven to exist in this branch via a `class_exists()` /
     /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
@@ -812,10 +835,10 @@ impl FlowState {
         if self
             .guarded_defs
             .iter()
-            .any(|(var, guard)| *var == name || *guard == name)
+            .any(|(var, guard)| *var == name || guard.var == name)
         {
             Arc::make_mut(&mut self.guarded_defs)
-                .retain(|var, guard| *var != name && *guard != name);
+                .retain(|var, guard| *var != name && guard.var != name);
         }
     }
 
@@ -823,17 +846,19 @@ impl FlowState {
         Arc::make_mut(&mut self.guarded_defs).remove(&var);
     }
 
-    /// Record that `var` is defined whenever `guard` is truthy.
-    pub fn add_guarded_def(&mut self, var: Name, guard: Name) {
+    /// Record that `var` is defined whenever `guard` holds.
+    pub fn add_guarded_def(&mut self, var: Name, guard: Guard) {
         Arc::make_mut(&mut self.guarded_defs).insert(var, guard);
     }
 
-    /// Variables defined whenever `guard` is truthy and still only possibly assigned.
-    pub fn vars_guarded_by(&self, guard: Name) -> Vec<Name> {
+    /// Variables defined whenever `established` holds and still only possibly assigned.
+    pub fn vars_guarded_by(&self, established: Guard) -> Vec<Name> {
         self.guarded_defs
             .iter()
             .filter(|(var, g)| {
-                **g == guard && **var != guard && self.possibly_assigned_vars.contains(*var)
+                g.implied_by(established)
+                    && **var != established.var
+                    && self.possibly_assigned_vars.contains(*var)
             })
             .map(|(var, _)| *var)
             .collect()

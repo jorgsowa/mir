@@ -12,7 +12,7 @@ use super::StatementsAnalyzer;
 use crate::db;
 use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
-use crate::narrowing::narrow_from_condition;
+use crate::narrowing::{established_guard, narrow_from_condition};
 use crate::parser;
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -27,16 +27,16 @@ impl<'a> StatementsAnalyzer<'a> {
         narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
         let then_unreachable_from_narrowing = then_ctx.diverges;
         // Sentinel entry: any write to the guard inside the branch drops it.
-        let guard = guard_variable(&if_stmt.condition);
+        let guard = established_guard(&if_stmt.condition, true);
         if let Some(g) = guard {
-            then_ctx.add_guarded_def(g, g);
+            then_ctx.add_guarded_def(g.var, g);
         }
         if !then_ctx.diverges {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
         }
-        let guard_unwritten = guard.is_some_and(|g| then_ctx.guarded_defs.get(&g) == Some(&g));
+        let guard_unwritten = guard.is_some_and(|g| then_ctx.guarded_defs.get(&g.var) == Some(&g));
         if let Some(g) = guard {
-            then_ctx.drop_guarded_def(g);
+            then_ctx.drop_guarded_def(g.var);
         }
 
         // Chained "every condition seen so far evaluated false" state, threaded
@@ -1321,31 +1321,19 @@ fn is_always_true_literal(condition: &php_ast::owned::Expr) -> bool {
     matches!(cond.kind, ExprKind::Bool(true)) || matches!(cond.kind, ExprKind::Int(n) if n != 0)
 }
 
-/// The variable of a plain `if ($var)` condition.
-fn guard_variable(condition: &php_ast::owned::Expr) -> Option<Name> {
-    let mut cond = condition;
-    while let ExprKind::Parenthesized(inner) = &cond.kind {
-        cond = inner;
-    }
-    match &cond.kind {
-        ExprKind::Variable(v) => Some(Name::from(v.trim_start_matches('$'))),
-        _ => None,
-    }
-}
-
-/// After `if ($guard) { $x = ...; }` (no else/elseif), `$x` is defined wherever
-/// `$guard` is truthy again.
+/// After `if (<guard>) { $x = ...; }` (no else/elseif), `$x` is defined wherever
+/// the same guard holds again.
 fn record_guarded_defs(pre: &FlowState, if_stmt: &IfStmt, post: &mut FlowState) {
     if !if_stmt.elseif_branches.is_empty() || if_stmt.else_branch.is_some() {
         return;
     }
-    let Some(guard) = guard_variable(&if_stmt.condition) else {
+    let Some(guard) = established_guard(&if_stmt.condition, true) else {
         return;
     };
     let newly_possible: Vec<Name> = post
         .possibly_assigned_vars
         .iter()
-        .filter(|v| !pre.var_possibly_defined_sym(**v) && **v != guard)
+        .filter(|v| !pre.var_possibly_defined_sym(**v) && **v != guard.var)
         .copied()
         .collect();
     for var in newly_possible {

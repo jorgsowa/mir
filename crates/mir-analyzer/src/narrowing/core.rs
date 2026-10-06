@@ -1,13 +1,13 @@
 //! Shared kernel for the narrowing submodules: expression-shape extractors,
 //! property-refinement helpers, and small cross-cutting utilities used by
 //! multiple narrowing arms.
-use php_ast::ast::{AssignOp, BinaryOp};
+use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
-use mir_types::{Atomic, Type};
+use mir_types::{Atomic, Name, Type};
 
 use crate::db::MirDatabase;
-use crate::flow_state::FlowState;
+use crate::flow_state::{FlowState, Guard, GuardKind};
 
 use super::arrays::{
     collect_array_access_path, extract_count_arg, extract_count_static_prop_arg,
@@ -534,6 +534,46 @@ pub(super) fn array_access_under_prop_hops(
             _ => return None,
         }
     }
+}
+
+/// The guard that holds when `expr` evaluates to `is_true`, for conditions on a plain variable.
+pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> Option<Guard> {
+    let plain_var = |e: &php_ast::owned::Expr| match &strip_parens(e).kind {
+        ExprKind::Variable(v) => Some(Name::from(v.trim_start_matches('$'))),
+        _ => None,
+    };
+    let (var, kind) = match &expr.kind {
+        ExprKind::Parenthesized(inner) => return established_guard(inner, is_true),
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
+            return established_guard(&u.operand, !is_true)
+        }
+        ExprKind::Variable(_) if is_true => (plain_var(expr)?, GuardKind::Truthy),
+        ExprKind::Empty(inner) if !is_true => (plain_var(inner)?, GuardKind::Truthy),
+        ExprKind::Isset(vars) if is_true && vars.len() == 1 => {
+            (plain_var(&vars[0])?, GuardKind::NotNull)
+        }
+        ExprKind::Binary(b) if matches!(b.op, BinaryOp::Identical | BinaryOp::NotIdentical) => {
+            let proves_not_null = (b.op == BinaryOp::NotIdentical) == is_true;
+            let var = match (&strip_parens(&b.left).kind, &strip_parens(&b.right).kind) {
+                (_, ExprKind::Null) => plain_var(&b.left)?,
+                (ExprKind::Null, _) => plain_var(&b.right)?,
+                _ => return None,
+            };
+            if !proves_not_null {
+                return None;
+            }
+            (var, GuardKind::NotNull)
+        }
+        _ => return None,
+    };
+    Some(Guard { var, kind })
+}
+
+fn strip_parens(mut e: &php_ast::owned::Expr) -> &php_ast::owned::Expr {
+    while let ExprKind::Parenthesized(inner) = &e.kind {
+        e = inner;
+    }
+    e
 }
 
 pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
