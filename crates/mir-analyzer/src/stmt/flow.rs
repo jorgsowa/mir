@@ -290,7 +290,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         mir_issues::Issue::new(
                             IssueKind::NullableReturnStatement {
                                 expected: format!("{declared}"),
-                                actual: format!("{ret_ty}"),
+                                actual: format!("{}", super::erase_templates_to_bounds(&ret_ty)),
                             },
                             Location {
                                 file: self.file.clone(),

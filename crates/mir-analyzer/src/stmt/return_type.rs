@@ -442,7 +442,7 @@ fn array_part_has_template_or_unknown_class(part: &Type, db: &dyn MirDatabase) -
 /// value that is not even a subtype of the bound is a genuine error; returning a
 /// subtype-of-bound stays compatible (we cannot prove it is the *specific* `T`, so we
 /// stay lenient and never emit a false positive). (G1)
-pub(super) fn erase_templates_to_bounds(ty: &Type) -> Type {
+pub(crate) fn erase_templates_to_bounds(ty: &Type) -> Type {
     let mut out = Type::empty();
     out.possibly_undefined = ty.possibly_undefined;
     out.from_docblock = ty.from_docblock;

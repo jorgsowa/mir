@@ -1011,7 +1011,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             {
                 let kind = IssueKind::NullableReturnStatement {
                     expected: format!("{declared}"),
-                    actual: format!("{inferred_return}"),
+                    actual: format!(
+                        "{}",
+                        crate::stmt::erase_templates_to_bounds(&inferred_return)
+                    ),
                 };
                 let severity = kind.default_severity();
                 self.emit(kind, severity, check_target.span);

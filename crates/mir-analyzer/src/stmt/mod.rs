@@ -6,6 +6,7 @@ mod expressions;
 mod flow;
 mod loops;
 mod return_type;
+pub(crate) use return_type::erase_templates_to_bounds;
 
 pub(crate) use flow::return_type_is_invalid;
 pub(crate) use loops::infer_foreach_types;
