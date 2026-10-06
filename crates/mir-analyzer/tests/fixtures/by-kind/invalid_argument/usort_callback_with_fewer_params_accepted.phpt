@@ -28,8 +28,8 @@ function exact_params(): void {
 function too_many_required_params(): void {
     $items = [3, 1, 2];
     usort($items, static fn(int $a, int $b, int $c): int => 0);
-//                ^ +0:61 InvalidArgument: Argument $callback of usort() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
+//                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of usort() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
     array_reduce($items, static fn(int $a, int $b, int $c): int => 0, 0);
-//                       ^ +0:68 InvalidArgument: Argument $callback of array_reduce() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
+//                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of array_reduce() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
 }
 ===expect===

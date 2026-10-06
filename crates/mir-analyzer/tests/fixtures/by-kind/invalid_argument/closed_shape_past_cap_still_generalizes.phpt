@@ -16,6 +16,6 @@ function closed_shape(): void {
     $row['k8'] = 's';
     $row['k9'] = 's';
     take($row['k9']);
-//       ^ +0:19 PossiblyInvalidArgument: Argument $id of take() expects 'int', possibly different type '"s"|1' provided
+//       ^^^^^^^^^^ PossiblyInvalidArgument: Argument $id of take() expects 'int', possibly different type '"s"|1' provided
 }
 ===expect===
