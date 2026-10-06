@@ -2,7 +2,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-use mir_types::{Name, Type};
+use mir_types::{Atomic, Name, Type};
 
 /// FQCNs known to exist in the current branch due to a `class_exists()` /
 /// `interface_exists()` / `trait_exists()` guard.  Not Arc-wrapped — it is
@@ -42,6 +42,8 @@ fn extend_dead_writes_dedup(dst: &mut Vec<DeadWrite>, src: Vec<DeadWrite>) {
 pub struct Guard {
     pub var: Name,
     pub kind: GuardKind,
+    /// Recorded from a flag assignment: holds trivially wherever the flag can't satisfy `kind`.
+    pub from_flag: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -50,13 +52,75 @@ pub enum GuardKind {
     Truthy,
     /// `isset($v)`, `$v !== null`
     NotNull,
+    /// `$v === 'x'`, `$v === 1`, `$v === true`
+    Identical(FlagValue),
+}
+
+/// A literal a flag variable is compared against or assigned.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FlagValue {
+    Str(Name),
+    Int(i64),
+    True,
+}
+
+impl FlagValue {
+    fn of_type(ty: &Type) -> Option<Self> {
+        match ty.types.as_slice() {
+            [Atomic::TLiteralString(s)] => Some(Self::Str(Name::from(s.as_ref()))),
+            [Atomic::TLiteralInt(n)] => Some(Self::Int(*n)),
+            [Atomic::TTrue] => Some(Self::True),
+            _ => None,
+        }
+    }
+
+    fn is_truthy(self) -> bool {
+        match self {
+            Self::Str(s) => !matches!(s.as_ref(), "" | "0"),
+            Self::Int(n) => n != 0,
+            Self::True => true,
+        }
+    }
 }
 
 impl Guard {
-    /// Truthy implies not-null, never the reverse.
+    /// Truthy implies not-null, and a non-null literal implies not-null (and truthy if it is).
     fn implied_by(self, established: Guard) -> bool {
         self.var == established.var
-            && (self.kind == established.kind || established.kind == GuardKind::Truthy)
+            && (self.kind == established.kind
+                || match established.kind {
+                    GuardKind::Truthy => self.kind == GuardKind::NotNull,
+                    GuardKind::Identical(v) => {
+                        self.kind == GuardKind::NotNull
+                            || (self.kind == GuardKind::Truthy && v.is_truthy())
+                    }
+                    GuardKind::NotNull => false,
+                })
+    }
+
+    fn excludes(self, atom: &Atomic) -> bool {
+        match (self.kind, atom) {
+            (_, Atomic::TNull) => true,
+            (GuardKind::NotNull, _) => false,
+            (GuardKind::Truthy, Atomic::TFalse | Atomic::TLiteralInt(0)) => true,
+            (GuardKind::Truthy, Atomic::TLiteralString(s)) => matches!(s.as_ref(), "" | "0"),
+            (GuardKind::Identical(v), Atomic::TFalse) => v != FlagValue::True,
+            (GuardKind::Identical(v), Atomic::TTrue) => v != FlagValue::True,
+            (GuardKind::Identical(v), Atomic::TLiteralInt(n)) => v != FlagValue::Int(*n),
+            (GuardKind::Identical(v), Atomic::TLiteralString(s)) => {
+                v != FlagValue::Str(Name::from(s.as_ref()))
+            }
+            _ => false,
+        }
+    }
+
+    /// The guard's variable can never satisfy it in `ctx`, so any claim keyed on it holds there.
+    fn vacuous_in(self, ctx: &FlowState) -> bool {
+        self.from_flag
+            && ctx
+                .vars
+                .get(&self.var)
+                .is_none_or(|ty| ty.types.iter().all(|a| self.excludes(a)))
     }
 }
 
@@ -306,7 +370,7 @@ pub struct FlowState {
 
     /// Variables defined only under a guard condition that stay defined wherever
     /// the same condition holds again. Key: variable, value: the guard.
-    pub guarded_defs: Arc<FxHashMap<Name, Guard>>,
+    pub guarded_defs: Arc<FxHashMap<Name, Vec<Guard>>>,
 
     /// FQCNs proven to exist in this branch via a `class_exists()` /
     /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
@@ -833,8 +897,12 @@ impl FlowState {
 
     /// Drops guarded defs whose guard condition involves `name`.
     fn drop_guards_on(&mut self, name: Name) {
-        if self.guarded_defs.values().any(|guard| guard.var == name) {
-            Arc::make_mut(&mut self.guarded_defs).retain(|_, guard| guard.var != name);
+        if self.guarded_defs.values().flatten().any(|g| g.var == name) {
+            let defs = Arc::make_mut(&mut self.guarded_defs);
+            for guards in defs.values_mut() {
+                guards.retain(|g| g.var != name);
+            }
+            defs.retain(|_, guards| !guards.is_empty());
         }
     }
 
@@ -856,17 +924,73 @@ impl FlowState {
 
     /// Record that `var` is defined whenever `guard` holds.
     pub fn add_guarded_def(&mut self, var: Name, guard: Guard) {
-        Arc::make_mut(&mut self.guarded_defs).insert(var, guard);
+        let guards = Arc::make_mut(&mut self.guarded_defs)
+            .entry(var)
+            .or_default();
+        if !guards.contains(&guard) {
+            guards.push(guard);
+        }
+    }
+
+    pub fn has_guarded_def(&self, var: Name, guard: Guard) -> bool {
+        self.guarded_defs
+            .get(&var)
+            .is_some_and(|guards| guards.contains(&guard))
+    }
+
+    /// For a branch of `pre` that sets a flag to a literal, records the variables it newly
+    /// defines as guarded by that flag, when only this branch can give the flag that value.
+    pub fn record_flag_guarded_defs(&mut self, pre: &FlowState) {
+        if self.diverges {
+            return;
+        }
+        let defs: Vec<Name> = self
+            .assigned_vars
+            .iter()
+            .filter(|v| !pre.assigned_vars.contains(*v))
+            .copied()
+            .collect();
+        let mut flags: Vec<(Name, FlagValue)> = self
+            .assigned_vars
+            .iter()
+            .filter(|v| pre.var_possibly_defined_sym(**v))
+            .filter_map(|v| Some((*v, FlagValue::of_type(self.vars.get(v)?)?)))
+            .collect();
+        flags.sort_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()));
+        for def in defs {
+            let guards: Vec<Guard> = flags
+                .iter()
+                .filter(|(flag, _)| *flag != def)
+                .flat_map(|(flag, value)| {
+                    [
+                        (GuardKind::NotNull, true),
+                        (GuardKind::Truthy, value.is_truthy()),
+                        (GuardKind::Identical(*value), true),
+                    ]
+                    .into_iter()
+                    .filter(|(_, applies)| *applies)
+                    .map(|(kind, _)| Guard {
+                        var: *flag,
+                        kind,
+                        from_flag: true,
+                    })
+                })
+                .filter(|g| g.vacuous_in(pre) || pre.has_guarded_def(def, *g))
+                .collect();
+            for guard in guards {
+                self.add_guarded_def(def, guard);
+            }
+        }
     }
 
     /// Variables defined whenever `established` holds and still only possibly assigned.
     pub fn vars_guarded_by(&self, established: Guard) -> Vec<Name> {
         self.guarded_defs
             .iter()
-            .filter(|(var, g)| {
-                g.implied_by(established)
-                    && **var != established.var
+            .filter(|(var, guards)| {
+                **var != established.var
                     && self.possibly_assigned_vars.contains(*var)
+                    && guards.iter().any(|g| g.implied_by(established))
             })
             .map(|(var, _)| *var)
             .collect()
@@ -1489,14 +1613,24 @@ impl FlowState {
         // path.  In the common case (only the then-branch has the guard) the
         // intersection is empty, which is correct: after the if/else the guard no
         // longer applies.
-        result.guarded_defs = Arc::new(
-            if_ctx
-                .guarded_defs
+        let kept_from = |from: &FlowState, other: &FlowState| {
+            from.guarded_defs
                 .iter()
-                .filter(|(var, guard)| else_ctx.guarded_defs.get(*var) == Some(*guard))
-                .map(|(var, guard)| (*var, *guard))
-                .collect(),
-        );
+                .flat_map(|(var, guards)| guards.iter().map(move |g| (*var, *g)))
+                .filter(|(var, g)| other.has_guarded_def(*var, *g) || g.vacuous_in(other))
+                .collect::<Vec<_>>()
+        };
+        let mut merged = FxHashMap::default();
+        for (var, guard) in kept_from(&if_ctx, &else_ctx)
+            .into_iter()
+            .chain(kept_from(&else_ctx, &if_ctx))
+        {
+            let guards: &mut Vec<Guard> = merged.entry(var).or_default();
+            if !guards.contains(&guard) {
+                guards.push(guard);
+            }
+        }
+        result.guarded_defs = Arc::new(merged);
         result.class_exists_guards = if_ctx
             .class_exists_guards
             .intersection(&else_ctx.class_exists_guards)

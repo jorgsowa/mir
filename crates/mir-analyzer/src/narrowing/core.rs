@@ -7,7 +7,7 @@ use php_ast::owned::ExprKind;
 use mir_types::{Atomic, Name, Type};
 
 use crate::db::MirDatabase;
-use crate::flow_state::{FlowState, Guard, GuardKind};
+use crate::flow_state::{FlagValue, FlowState, Guard, GuardKind};
 
 use super::arrays::{
     collect_array_access_path, extract_count_arg, extract_count_static_prop_arg,
@@ -553,20 +553,31 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
             (plain_var(&vars[0])?, GuardKind::NotNull)
         }
         ExprKind::Binary(b) if matches!(b.op, BinaryOp::Identical | BinaryOp::NotIdentical) => {
-            let proves_not_null = (b.op == BinaryOp::NotIdentical) == is_true;
-            let var = match (&strip_parens(&b.left).kind, &strip_parens(&b.right).kind) {
-                (_, ExprKind::Null) => plain_var(&b.left)?,
-                (ExprKind::Null, _) => plain_var(&b.right)?,
+            let holds = (b.op == BinaryOp::NotIdentical) != is_true;
+            let (var_side, lit_side) =
+                match (&strip_parens(&b.left).kind, &strip_parens(&b.right).kind) {
+                    (ExprKind::Variable(_), _) => (&b.left, &b.right),
+                    (_, ExprKind::Variable(_)) => (&b.right, &b.left),
+                    _ => return None,
+                };
+            let kind = match &strip_parens(lit_side).kind {
+                ExprKind::Null if !holds => GuardKind::NotNull,
+                ExprKind::String(s) if holds => {
+                    GuardKind::Identical(FlagValue::Str(Name::from(&**s)))
+                }
+                ExprKind::Int(n) if holds => GuardKind::Identical(FlagValue::Int(*n)),
+                ExprKind::Bool(true) if holds => GuardKind::Identical(FlagValue::True),
                 _ => return None,
             };
-            if !proves_not_null {
-                return None;
-            }
-            (var, GuardKind::NotNull)
+            (plain_var(var_side)?, kind)
         }
         _ => return None,
     };
-    Some(Guard { var, kind })
+    Some(Guard {
+        var,
+        kind,
+        from_flag: false,
+    })
 }
 
 fn strip_parens(mut e: &php_ast::owned::Expr) -> &php_ast::owned::Expr {

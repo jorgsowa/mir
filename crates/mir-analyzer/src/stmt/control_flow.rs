@@ -34,10 +34,11 @@ impl<'a> StatementsAnalyzer<'a> {
         if !then_ctx.diverges {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
         }
-        let guard_unwritten = guard.is_some_and(|g| then_ctx.guarded_defs.get(&g.var) == Some(&g));
+        let guard_unwritten = guard.is_some_and(|g| then_ctx.has_guarded_def(g.var, g));
         if let Some(g) = guard {
             then_ctx.drop_guarded_def(g.var);
         }
+        then_ctx.record_flag_guarded_defs(&pre_ctx);
 
         // Chained "every condition seen so far evaluated false" state, threaded
         // through the whole elseif ladder (and reused below for the final
