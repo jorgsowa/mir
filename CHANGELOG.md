@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `DOMXPath::query` returns `DOMNodeList<DOMNode>|false`, so its nodes can be passed where a `DOMNode` is required.
 - A variable assigned under `if (!empty($g))`, `if (isset($g))` or `if ($g !== null)` is no longer reported as `PossiblyUndefinedVariable` under the same condition later.
 - A variable assigned on only some paths of a loop that always runs (non-empty `foreach`, `do-while`) is reported as `PossiblyUndefinedVariable` after the loop.
 - A type naming a non-existent class (e.g. an unresolvable docblock `@return`/`@param`/`@var`) no longer cascades into `InvalidArgument` or `InvalidPropertyAssignment`.

@@ -2496,7 +2496,7 @@ class DOMXPath
      * </p>
      * @param bool $registerNodeNS [optional] <p>The optional registerNodeNS can be specified to
      * disable automatic registration of the context node.</p>
-     * @return DOMNodeList<DOMNode|DOMNameSpaceNode>|false a DOMNodeList containing all nodes matching
+     * @return DOMNodeList<DOMNode>|false a DOMNodeList containing all nodes matching
      * the given XPath expression. Any expression which does not return nodes
      * will return an empty DOMNodeList. The return is false if the expression
      * is malformed or the contextnode is invalid.
