@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.86.0] - 2026-10-06
+
 ### Added
 
 - `<forbiddenFunctions>` config and `AnalysisSession::with_forbidden_functions`.
@@ -19,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `value-of<>` and `key-of<>` over a class-constant array resolve to its value and key types.
+- `$_FILES[...]['tmp_name']`, `['size']` and `['error']` are untainted; `name` and `type` stay tainted.
+- `usort`/`array_reduce` reject only callbacks that require more parameters than they pass.
+- An open shape past the literal-key cap keeps `mixed` instead of narrowing to its known values.
+- Array writes on a `null` or `false` base auto-vivify an array, as PHP does.
+- An open shape unioned with a bare `array` is accepted for a property as a coercion instead of `InvalidPropertyAssignment`.
+- Narrowing a variable (e.g. `$g !== null`) no longer drops its guarded definitions.
+- A native `array` parameter may be narrowed by a docblock in an override.
+- A non-empty `array` is accepted for a shape parameter whose keys are all optional.
+- Inline suppression covers statements continued over multiple lines after an operator or an open bracket.
+- `array_filter` narrows values for string and first-class type-guard callables.
+- A method inheriting its docblock through `@inheritDoc` keeps the parent's template-bound parameter types.
+- Several CLI paths resolve the composer root from their common ancestor and analyze every path.
 - `DOMXPath::query` returns `DOMNodeList<DOMNode>|false`, so its nodes can be passed where a `DOMNode` is required.
 - A variable assigned under `if (!empty($g))`, `if (isset($g))` or `if ($g !== null)` is no longer reported as `PossiblyUndefinedVariable` under the same condition later.
 - A variable assigned on only some paths of a loop that always runs (non-empty `foreach`, `do-while`) is reported as `PossiblyUndefinedVariable` after the loop.
