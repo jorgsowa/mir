@@ -194,6 +194,9 @@ impl DocblockParser {
                                 result.invalid_annotations.push(msg);
                             }
                         }
+                        result
+                            .template_spans
+                            .push(tag_head_span(text, tag.span.start, tag.span.end));
                         result.templates.push((
                             name,
                             bound.map(|b| parse_type_string(&b)),
@@ -223,6 +226,9 @@ impl DocblockParser {
                                 result.invalid_annotations.push(msg);
                             }
                         }
+                        result
+                            .template_spans
+                            .push(tag_head_span(text, tag.span.start, tag.span.end));
                         result.templates.push((
                             name,
                             bound.map(|b| parse_type_string(&b)),
@@ -252,6 +258,9 @@ impl DocblockParser {
                                 result.invalid_annotations.push(msg);
                             }
                         }
+                        result
+                            .template_spans
+                            .push(tag_head_span(text, tag.span.start, tag.span.end));
                         result.templates.push((
                             name,
                             bound.map(|b| parse_type_string(&b)),
@@ -841,6 +850,8 @@ pub struct ParsedDocblock {
     /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
     /// The last element is the optional `@template T = Default` default type.
     pub templates: Vec<(String, Option<Type>, Variance, Option<Type>)>,
+    /// Byte range within the docblock text of each `templates` entry's tag.
+    pub template_spans: Vec<(u32, u32)>,
     /// `@extends ClassName<T>` — a class has at most one entry (its single
     /// parent); an interface may have several, one per base interface named
     /// in its native `extends A, B` clause.

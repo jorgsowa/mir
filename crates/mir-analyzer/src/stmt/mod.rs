@@ -609,9 +609,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 ) {
                     if let Some(raw_doc) = doc.as_deref() {
                         let parsed = crate::parser::DocblockParser::parse(raw_doc);
-                        if !parsed.templates.is_empty() {
-                            let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                            let line = lc.line + 1;
+                        if let Some(&(tag_start, tag_end)) = parsed.template_spans.first() {
+                            let doc_start = self.source[..stmt.span.start as usize]
+                                .rfind(raw_doc)
+                                .unwrap_or(0) as u32;
+                            let (line, line_end, col_start, col_end) = self.span_to_location(
+                                php_ast::Span::new(doc_start + tag_start, doc_start + tag_end),
+                            );
                             self.issues.add(Issue::new(
                                 IssueKind::InvalidDocblock {
                                     message: "@template annotations are not supported on closures or arrow functions".to_string(),
@@ -619,9 +623,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                 Location {
                                     file: self.file.clone(),
                                     line,
-                                    line_end: line,
-                                    col_start: 0,
-                                    col_end: 0,
+                                    line_end,
+                                    col_start,
+                                    col_end,
                                 },
                             ));
                         }
