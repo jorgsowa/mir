@@ -7,5 +7,5 @@ UndefinedFunction, not WrongCaseFunction. The exact-match spelling is not report
 function fñoo(): void {}
 fñoo();
 fÑoo();
+//<^^^^^^ UndefinedFunction: Function fÑoo() is not defined
 ===expect===
-UndefinedFunction@4:0-4:6: Function fÑoo() is not defined

@@ -22,5 +22,5 @@ function f($type_val, $t): void {
 
 f(new Type(), new Both());      // Both extends Type & implements Named — OK
 f(new Type(), new OnlyNamed()); // OnlyNamed does not extend Type — should error
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'App\OnlyNamed' does not satisfy bound 'App\Type&App\Named'
 ===expect===
-InvalidTemplateParam@21:0-21:30: Template type 'T' inferred as 'App\OnlyNamed' does not satisfy bound 'App\Type&App\Named'

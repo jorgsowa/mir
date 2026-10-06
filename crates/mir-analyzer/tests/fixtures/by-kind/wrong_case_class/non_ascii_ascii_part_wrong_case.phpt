@@ -11,5 +11,5 @@ checks: only the ASCII letters must match the declaration's casing.
 <?php
 class GrüBar {}
 $x = new grübar();
+//       ^^^^^^ WrongCaseClass: Class name 'grübar' has incorrect casing; use 'GrüBar'
 ===expect===
-WrongCaseClass@3:9-3:15: Class name 'grübar' has incorrect casing; use 'GrüBar'

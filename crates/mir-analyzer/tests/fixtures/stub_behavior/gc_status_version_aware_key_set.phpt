@@ -19,5 +19,5 @@ function needsBool(bool $x): void {}
 
 $status = gc_status();
 needsBool($status['running']);
+//                ^^^^^^^^^ NonExistentArrayOffset: Array offset 'running' does not exist
 ===expect===
-NonExistentArrayOffset@5:18-5:27: Array offset 'running' does not exist

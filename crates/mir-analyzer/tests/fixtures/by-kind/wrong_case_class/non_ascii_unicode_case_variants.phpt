@@ -13,5 +13,5 @@ UndefinedClass, not WrongCaseClass. The exact-match spelling is not reported.
 class Ñoño {}
 $a = new Ñoño();
 $b = new ñoño();
+//       ^^^^ UndefinedClass: Class ñoño does not exist
 ===expect===
-UndefinedClass@4:9-4:13: Class ñoño does not exist

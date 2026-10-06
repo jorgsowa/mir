@@ -18,7 +18,7 @@ interface Greeter {
 $obj = new class implements Greeter {
     public function greet(): string {
         return parent::greet(); // No parent class — should error
+//             ^^^^^^ ParentNotFound: Cannot use parent:: when current class has no parent
     }
 };
 ===expect===
-ParentNotFound@9:15-9:21: Cannot use parent:: when current class has no parent

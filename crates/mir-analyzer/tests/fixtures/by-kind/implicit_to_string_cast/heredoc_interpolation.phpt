@@ -12,6 +12,6 @@ class Foo {}
 $f = new Foo();
 $s = <<<EOT
 Value: {$f}
+//      ^^ ImplicitToStringCast: Class Foo is implicitly cast to string
 EOT;
 ===expect===
-ImplicitToStringCast@5:8-5:10: Class Foo is implicitly cast to string

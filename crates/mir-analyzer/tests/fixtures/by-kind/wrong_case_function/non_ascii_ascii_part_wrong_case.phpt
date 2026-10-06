@@ -5,5 +5,5 @@ checks: only the ASCII letters must match the declaration's casing.
 <?php
 function grüFunc(): void {}
 GRüFunc();
+//<^^^^^^^ WrongCaseFunction: Function name 'GRüFunc' has incorrect casing; use 'grüFunc'
 ===expect===
-WrongCaseFunction@3:0-3:7: Function name 'GRüFunc' has incorrect casing; use 'grüFunc'

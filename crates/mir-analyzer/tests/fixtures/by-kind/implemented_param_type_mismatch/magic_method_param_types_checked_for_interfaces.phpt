@@ -9,8 +9,8 @@ interface A
 
 /**
  * @method int a(int $a)
+// ^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::a() signature mismatch: parameter $a type 'int' is incompatible with parent type 'string'
  */
 interface B extends A {}
 
 ===expect===
-MethodSignatureMismatch@8:3-8:24: Method B::a() signature mismatch: parameter $a type 'int' is incompatible with parent type 'string'

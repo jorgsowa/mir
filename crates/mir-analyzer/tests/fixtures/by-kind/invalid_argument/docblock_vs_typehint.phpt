@@ -20,5 +20,5 @@ class Foo {
 }
 Foo::convert(true);  // bool → bool hint: OK
 Foo::convert(1);     // int → bool hint: InvalidArgument
+//           ^ InvalidArgument: Argument $x of convert() expects 'bool', got '1'
 ===expect===
-InvalidArgument@11:13-11:14: Argument $x of convert() expects 'bool', got '1'

@@ -6,8 +6,8 @@ Repeat non repeatable attribute
 class Foo {}
 
 #[Foo, Foo]
+//^^^ InvalidAttribute: Attribute Foo is not repeatable
 //     ^^^ InvalidAttribute: Attribute Foo is not repeatable
 class Baz {}
 
 ===expect===
-InvalidAttribute@5:2-5:5: Attribute Foo is not repeatable
