@@ -5,6 +5,7 @@ undefinedMixinClassWithPropertyAssignment_WithMagicMethod
 /**
  * @property string $baz
  * @mixin B
+// ^^^^^^^^ UndefinedDocblockClass: Docblock type 'B' does not exist
  */
 class A {
     public function __set(string $name, string $value) {}
@@ -12,4 +13,3 @@ class A {
 
 (new A)->foo = "bar";
 ===expect===
-UndefinedDocblockClass@2:0-5:3: Docblock type 'B' does not exist

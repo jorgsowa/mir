@@ -394,6 +394,13 @@ impl ClassLike {
         }
     }
 
+    pub fn mixin_locations(&self) -> &[mir_types::Location] {
+        match self {
+            ClassLike::Class(c) => &c.mixin_locations,
+            _ => &[],
+        }
+    }
+
     /// `@psalm-import-type`/`@phpstan-import-type` declarations not resolved
     /// against a same-file source (class only). Each entry is `(local_name,
     /// original_name, from_fqcn)`.

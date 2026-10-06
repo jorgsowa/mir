@@ -362,6 +362,9 @@ impl DocblockParser {
                         let base_class =
                             body_str.split('<').next().unwrap_or(&body_str).to_string();
                         result.mixins.push(base_class);
+                        result
+                            .mixin_spans
+                            .push(tag_head_span(text, tag.span.start, tag.span.end));
                     }
                 }
                 "property" => {
@@ -891,6 +894,8 @@ pub struct ParsedDocblock {
     pub see: Vec<String>,
     /// `@mixin ClassName`
     pub mixins: Vec<String>,
+    /// Byte range within the docblock text of each `mixins` entry's tag.
+    pub mixin_spans: Vec<(u32, u32)>,
     /// `@property`, `@property-read`, `@property-write`
     pub properties: Vec<DocProperty>,
     /// `@method [static] ReturnType name([params])`

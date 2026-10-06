@@ -645,6 +645,11 @@ impl<'a> DefinitionCollector<'a> {
                 .iter()
                 .map(|m| self.resolve_type_name(m.as_str(), true).into())
                 .collect(),
+            mixin_locations: class_doc
+                .mixin_spans
+                .iter()
+                .filter_map(|&span| self.tag_location(Some(class_doc_span), span))
+                .collect(),
             template_params,
             extends_type_args,
             implements_type_args,

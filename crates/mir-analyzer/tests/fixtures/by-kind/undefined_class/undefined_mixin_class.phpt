@@ -3,6 +3,6 @@ Undefined mixin class
 ===file===
 <?php
 /** @mixin B */
+//  ^^^^^^^^ UndefinedDocblockClass: Docblock type 'B' does not exist
 class A {}
 ===expect===
-UndefinedDocblockClass@2:0-2:15: Docblock type 'B' does not exist

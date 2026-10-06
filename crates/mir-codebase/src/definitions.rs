@@ -648,6 +648,9 @@ pub struct ClassDef {
     pub own_constants: MemberMap<ConstantDef>,
     #[serde(default)]
     pub mixins: Vec<Arc<str>>,
+    /// Source of each `mixins` tag, same order; empty when unknown.
+    #[serde(default)]
+    pub mixin_locations: Vec<Location>,
     pub template_params: Vec<TemplateParam>,
     /// Type arguments from `@extends ParentClass<T1, T2>` — maps parent's template params to concrete types.
     pub extends_type_args: Vec<Type>,

@@ -4,6 +4,6 @@ tag's parameter type does not exist.
 ===file===
 <?php
 /** @method void setThing(NonExistentParamType $thing) */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentParamType' does not exist
 class A {}
 ===expect===
-UndefinedDocblockClass@2:0-2:57: Docblock type 'NonExistentParamType' does not exist

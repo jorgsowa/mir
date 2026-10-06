@@ -5,6 +5,7 @@ undefinedMixinClassWithMethodCall_WithMagicMethod
 /**
  * @method baz()
  * @mixin B
+// ^^^^^^^^ UndefinedDocblockClass: Docblock type 'B' does not exist
  */
 class A {
     public function __call(string $name, array $arguments) {}
@@ -12,4 +13,3 @@ class A {
 
 (new A)->foo();
 ===expect===
-UndefinedDocblockClass@2:0-5:3: Docblock type 'B' does not exist

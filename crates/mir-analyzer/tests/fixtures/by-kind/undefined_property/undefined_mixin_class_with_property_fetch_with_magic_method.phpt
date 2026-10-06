@@ -5,6 +5,7 @@ undefinedMixinClassWithPropertyFetch_WithMagicMethod
 /**
  * @property string $baz
  * @mixin B
+// ^^^^^^^^ UndefinedDocblockClass: Docblock type 'B' does not exist
  */
 class A {
     public function __get(string $name): string {
@@ -14,4 +15,3 @@ class A {
 
 (new A)->foo;
 ===expect===
-UndefinedDocblockClass@2:0-5:3: Docblock type 'B' does not exist

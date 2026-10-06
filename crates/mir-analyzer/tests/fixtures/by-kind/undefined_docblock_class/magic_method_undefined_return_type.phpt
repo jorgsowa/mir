@@ -4,6 +4,6 @@ tag's return type does not exist.
 ===file===
 <?php
 /** @method NonExistentReturnType getThing() */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentReturnType' does not exist
 class A {}
 ===expect===
-UndefinedDocblockClass@2:0-2:47: Docblock type 'NonExistentReturnType' does not exist

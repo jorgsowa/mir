@@ -691,8 +691,12 @@ impl<'a> BodyAnalyzer<'a> {
             col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
         };
 
+        let check_class_name_at =
+            |cls_fqcn: &str, at: &mir_issues::Location, all_issues: &mut Vec<Issue>| {
+                self.check_and_record_docblock_class_at(cls_fqcn, at, all_issues)
+            };
         let check_class_name = |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
-            self.check_and_record_docblock_class_at(cls_fqcn, &location, all_issues)
+            check_class_name_at(cls_fqcn, &location, all_issues)
         };
 
         let type_class_names = |ty: &mir_types::Type| -> Vec<mir_types::Name> {
@@ -710,8 +714,10 @@ impl<'a> BodyAnalyzer<'a> {
             return;
         };
 
-        for mixin_fqcn in class.mixins() {
-            check_class_name(mixin_fqcn.as_ref(), all_issues);
+        let mixin_locations = class.mixin_locations();
+        for (i, mixin_fqcn) in class.mixins().iter().enumerate() {
+            let at = mixin_locations.get(i).unwrap_or(&location);
+            check_class_name_at(mixin_fqcn.as_ref(), at, all_issues);
         }
 
         for (_local, _original, from_fqcn) in class.pending_import_types() {
@@ -723,16 +729,18 @@ impl<'a> BodyAnalyzer<'a> {
                 let Some(ty) = prop.ty.as_deref() else {
                     continue;
                 };
+                let at = prop.location.as_ref().unwrap_or(&location);
                 for cls_fqcn in type_class_names(ty) {
-                    check_class_name(cls_fqcn.as_ref(), all_issues);
+                    check_class_name_at(cls_fqcn.as_ref(), at, all_issues);
                 }
             }
         }
 
         for method in class.own_methods().values().filter(|m| m.is_virtual) {
+            let at = method.location.as_ref().unwrap_or(&location);
             if let Some(ret) = method.return_type.as_deref() {
                 for cls_fqcn in type_class_names(ret) {
-                    check_class_name(cls_fqcn.as_ref(), all_issues);
+                    check_class_name_at(cls_fqcn.as_ref(), at, all_issues);
                 }
             }
             for param in method.params.iter() {
@@ -740,7 +748,7 @@ impl<'a> BodyAnalyzer<'a> {
                     continue;
                 };
                 for cls_fqcn in type_class_names(ty) {
-                    check_class_name(cls_fqcn.as_ref(), all_issues);
+                    check_class_name_at(cls_fqcn.as_ref(), at, all_issues);
                 }
             }
         }
