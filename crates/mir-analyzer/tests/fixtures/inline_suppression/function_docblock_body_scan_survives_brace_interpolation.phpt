@@ -12,4 +12,4 @@ function f(): void {
 new NoSuchClassOutside();
 //  ^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NoSuchClassOutside does not exist
 ===expect===
-UnusedSuppress@3:0-3:0: Suppress annotation for 'UndefinedClass' is never used
+UnusedSuppress@2:20-2:34: Suppress annotation for 'UndefinedClass' is never used

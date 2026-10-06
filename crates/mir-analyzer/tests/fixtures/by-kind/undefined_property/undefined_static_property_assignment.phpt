@@ -10,4 +10,4 @@ class A {
     }
 }
 ===expect===
-UnusedSuppress@6:0-6:0: Suppress annotation for 'UndefinedPropertyFetch' is never used
+UnusedSuppress@5:22-5:44: Suppress annotation for 'UndefinedPropertyFetch' is never used

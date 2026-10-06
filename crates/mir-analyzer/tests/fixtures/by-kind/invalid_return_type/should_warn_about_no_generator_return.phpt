@@ -20,4 +20,4 @@ function notagenerator() : Generator {
     return generator2();
 }
 ===expect===
-UnusedSuppress@12:0-12:0: Suppress annotation for 'InvalidNullableReturnType' is never used
+UnusedSuppress@10:13-10:38: Suppress annotation for 'InvalidNullableReturnType' is never used

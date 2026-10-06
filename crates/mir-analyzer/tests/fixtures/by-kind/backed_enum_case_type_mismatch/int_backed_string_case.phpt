@@ -8,4 +8,4 @@ enum Priority: int {
     case High = 1;
 }
 ===expect===
-BackedEnumCaseTypeMismatch@3:0-3:0: Backed enum case Priority::Low has value of type "low", but backing type is int
+BackedEnumCaseTypeMismatch@3:15-3:20: Backed enum case Priority::Low has value of type "low", but backing type is int

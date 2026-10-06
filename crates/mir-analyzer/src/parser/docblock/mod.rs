@@ -20,7 +20,10 @@ impl DocblockParser {
             ..Default::default()
         };
 
+        let mut prev_tag_span = (0, 0);
         for tag in &doc.tags {
+            result.fill_invalid_annotation_spans(prev_tag_span);
+            prev_tag_span = tag_head_span(text, tag.span.start, tag.span.end);
             match tag.name.as_str() {
                 "param-out" | "psalm-param-out" | "phpstan-param-out" => {
                     if let Some(body_str) = body_text(&tag.body) {
@@ -636,6 +639,7 @@ impl DocblockParser {
                 _ => {}
             }
         }
+        result.fill_invalid_annotation_spans(prev_tag_span);
 
         if text.to_ascii_lowercase().contains("{@inheritdoc}") {
             result.is_inherit_doc = true;
@@ -905,6 +909,8 @@ pub struct ParsedDocblock {
     pub removed: Option<String>,
     /// Malformed type annotations detected during parsing.
     pub invalid_annotations: Vec<String>,
+    /// Byte range within the docblock text of the tag behind each `invalid_annotations` entry.
+    pub invalid_annotation_spans: Vec<(u32, u32)>,
     /// Docblock type spellings that use a leading `\` (the fully-qualified
     /// class qualifier) on a non-class type keyword (`\int`, `?\string`, …);
     /// the collector emits an `InvalidDocblockType` warning for each, anchored
@@ -937,6 +943,11 @@ pub struct ParsedDocblock {
 }
 
 impl ParsedDocblock {
+    fn fill_invalid_annotation_spans(&mut self, span: (u32, u32)) {
+        self.invalid_annotation_spans
+            .resize(self.invalid_annotations.len(), span);
+    }
+
     /// Returns the type for a given parameter name (strips leading `$`).
     ///
     /// Uses the **last** match so that `@psalm-param` / `@phpstan-param` (which

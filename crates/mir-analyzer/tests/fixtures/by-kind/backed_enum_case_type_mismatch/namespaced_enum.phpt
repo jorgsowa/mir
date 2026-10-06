@@ -9,4 +9,4 @@ enum Severity: int {
     case High = 3;
 }
 ===expect===
-BackedEnumCaseTypeMismatch@5:0-5:0: Backed enum case App\Enums\Severity::Low has value of type "low", but backing type is int
+BackedEnumCaseTypeMismatch@5:15-5:20: Backed enum case App\Enums\Severity::Low has value of type "low", but backing type is int

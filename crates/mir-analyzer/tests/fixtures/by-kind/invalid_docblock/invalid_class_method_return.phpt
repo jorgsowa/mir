@@ -11,4 +11,4 @@ class C {
     }
 }
 ===expect===
-InvalidDocblock@3:0-3:0: Invalid docblock: @return contains variable `$thus` in type position
+InvalidDocblock@4:7-4:20: Invalid docblock: @return contains variable `$thus` in type position

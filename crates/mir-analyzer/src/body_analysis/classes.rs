@@ -2168,9 +2168,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         // `use T { T::missing as alias; }` (or an unqualified `as` naming no
         // method any used trait declares) — PHP fatals at class-declaration
-        // time. Trait aliases carry no span of their own in storage, so the
-        // diagnostic falls back to the class's own location, mirroring
-        // `make_loc`'s fallback for a trait use with no recorded location.
+        // time.
         if let crate::db::ClassLike::Class(c) = &class {
             let fallback_loc = mir_issues::Location {
                 file: file.clone(),
@@ -2179,8 +2177,8 @@ impl<'a> BodyAnalyzer<'a> {
                 col_start: 0,
                 col_end: 0,
             };
-            for (trait_name_opt, orig_lower, _vis_override, _alias_cased) in
-                c.trait_aliases.values()
+            for (alias_lower, (trait_name_opt, orig_lower, _vis_override, _alias_cased)) in
+                c.trait_aliases.iter()
             {
                 let candidates: &[Arc<str>] = match trait_name_opt {
                     Some(t) => std::slice::from_ref(t),
@@ -2199,7 +2197,10 @@ impl<'a> BodyAnalyzer<'a> {
                                 .map(|t| t.rsplit('\\').next().unwrap_or(t.as_ref()).to_string()),
                             method: orig_lower.to_string(),
                         },
-                        fallback_loc.clone(),
+                        c.trait_alias_locations
+                            .get(alias_lower)
+                            .cloned()
+                            .unwrap_or_else(|| fallback_loc.clone()),
                     ));
                 }
             }

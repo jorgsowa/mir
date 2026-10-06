@@ -15,4 +15,4 @@ Invalid array key type
  */
 function foo($arg) {}
 ===expect===
-InvalidDocblock@2:0-2:0: Invalid docblock: @param has invalid array key type `float`: must be a subtype of int|string
+InvalidDocblock@3:3-3:35: Invalid docblock: @param has invalid array key type `float`: must be a subtype of int|string

@@ -12,4 +12,4 @@ $r = new ReflectionFunction("foo");
 $r->getAttributes(Attr::class);
 
 ===expect===
-UnusedSuppress@8:0-8:0: Suppress annotation for 'InvalidArgument' is never used
+UnusedSuppress@7:14-7:29: Suppress annotation for 'InvalidArgument' is never used

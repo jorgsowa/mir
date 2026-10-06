@@ -158,6 +158,10 @@ pub struct NamedSuppression {
     pub report_line: u32,
     pub covered_lines: Vec<u32>,
     pub kind: String,
+    /// Where the kind name is written: 1-based line, 0-based char columns.
+    pub tag_line: u32,
+    pub col_start: u16,
+    pub col_end: u16,
 }
 
 /// Per-file map of suppressed lines, built from source comments.
@@ -221,10 +225,14 @@ impl SuppressionMap {
                     if track_named {
                         if let KindSet::Named(ref names) = directive.kinds {
                             for name in names {
+                                let (col_start, col_end) = kind_columns(raw, name);
                                 map.named_suppressions.push(NamedSuppression {
                                     report_line: line_no,
                                     covered_lines: vec![line_no],
                                     kind: name.clone(),
+                                    tag_line: line_no,
+                                    col_start,
+                                    col_end,
                                 });
                             }
                         }
@@ -251,10 +259,14 @@ impl SuppressionMap {
                             let mut covered_lines = extra_covered_lines.clone();
                             covered_lines.push(target);
                             for name in names {
+                                let (col_start, col_end) = kind_columns(raw, name);
                                 map.named_suppressions.push(NamedSuppression {
                                     report_line: target,
                                     covered_lines: covered_lines.clone(),
                                     kind: name.clone(),
+                                    tag_line: idx as u32 + 1,
+                                    col_start,
+                                    col_end,
                                 });
                             }
                         }
@@ -277,7 +289,7 @@ impl SuppressionMap {
     }
 
     /// Returns unused named suppressions: those that did not match any issue
-    /// in `all_issues`. The returned vec contains `(target_line, kind_name)`.
+    /// in `all_issues`.
     ///
     /// `pre_suppressed` is the subset of `all_issues` that arrived already
     /// suppressed (via the `IssueBuffer` mechanism in collector/body analysis).
@@ -289,7 +301,7 @@ impl SuppressionMap {
         &self,
         all_issues: &[&mir_issues::Issue],
         pre_suppressed: &[&mir_issues::Issue],
-    ) -> Vec<(u32, String)> {
+    ) -> Vec<&NamedSuppression> {
         self.named_suppressions
             .iter()
             .filter(|ns| {
@@ -333,7 +345,6 @@ impl SuppressionMap {
                 });
                 !covered_by_pre_suppressed
             })
-            .map(|ns| (ns.report_line, ns.kind.clone()))
             .collect()
     }
 }
@@ -822,6 +833,26 @@ fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
         },
         track_named,
     ))
+}
+
+/// Char columns of `kind` in the directive comment `raw`; the whole trimmed
+/// line when the name can't be located.
+fn kind_columns(raw: &str, kind: &str) -> (u16, u16) {
+    let from = find_ci(raw, "suppress")
+        .or_else(|| find_ci(raw, "ignore"))
+        .unwrap_or(0);
+    let is_word = |c: char| c.is_alphanumeric() || c == '_' || c == '\\';
+    let found = raw[from..].match_indices(kind).find(|&(i, _)| {
+        let before = raw[..from + i].chars().next_back();
+        let after = raw[from + i + kind.len()..].chars().next();
+        !before.is_some_and(is_word) && !after.is_some_and(is_word)
+    });
+    let (start, end) = match found {
+        Some((i, _)) => (from + i, from + i + kind.len()),
+        None => (raw.len() - raw.trim_start().len(), raw.trim_end().len()),
+    };
+    let cols = |byte: usize| raw[..byte].chars().count().min(u16::MAX as usize) as u16;
+    (cols(start), cols(end))
 }
 
 /// Case-insensitive `str::find` for an ASCII directive keyword. Kind names

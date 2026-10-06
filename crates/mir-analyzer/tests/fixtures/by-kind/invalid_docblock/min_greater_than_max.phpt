@@ -15,4 +15,4 @@ function scope(int $a){
     return $a;
 }
 ===expect===
-InvalidDocblock@2:0-2:0: Invalid docblock: @param has invalid int range: min (4) must not be greater than max (3)
+InvalidDocblock@3:3-3:22: Invalid docblock: @param has invalid int range: min (4) must not be greater than max (3)

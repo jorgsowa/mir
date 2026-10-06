@@ -10,4 +10,4 @@ class Foo {
 //                  ^^^ UndefinedDocblockClass: Docblock type 'array<' does not exist
 }
 ===expect===
-InvalidDocblock@3:0-3:0: Invalid docblock: @return has unclosed generic type `array<`
+InvalidDocblock@4:7-4:21: Invalid docblock: @return has unclosed generic type `array<`

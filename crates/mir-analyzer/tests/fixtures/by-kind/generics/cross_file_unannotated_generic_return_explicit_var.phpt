@@ -29,4 +29,4 @@ function app(): void {
     echo $result;
 }
 ===expect===
-holder.php: UnusedSuppress@12:0-12:0: Suppress annotation for 'UnusedParam' is never used
+holder.php: UnusedSuppress@10:17-10:28: Suppress annotation for 'UnusedParam' is never used

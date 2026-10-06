@@ -40,6 +40,11 @@ impl<'a> DefinitionCollector<'a> {
         let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
         let mut trait_insteadof = mir_codebase::definitions::MemberMap::<Vec<Arc<str>>>::default();
         #[allow(clippy::type_complexity)]
+        let mut trait_alias_locations: rustc_hash::FxHashMap<
+            Arc<str>,
+            mir_types::Location,
+        > = rustc_hash::FxHashMap::default();
+        #[allow(clippy::type_complexity)]
         let mut trait_aliases: rustc_hash::FxHashMap<
             Arc<str>,
             (
@@ -496,6 +501,10 @@ impl<'a> DefinitionCollector<'a> {
                                 let vis_override =
                                     new_modifier.map(|v| Self::convert_visibility(Some(v)));
                                 if new_name.is_some() || vis_override.is_some() {
+                                    trait_alias_locations.insert(
+                                        new_lower.clone(),
+                                        self.location(adaptation.span.start, adaptation.span.end),
+                                    );
                                     trait_aliases.insert(
                                         new_lower,
                                         (trait_fqcn, orig_lower, vis_override, alias_cased),
@@ -679,6 +688,7 @@ impl<'a> DefinitionCollector<'a> {
                 .collect(),
             trait_insteadof,
             trait_aliases,
+            trait_alias_locations,
         };
 
         self.slice.classes.push(std::sync::Arc::new(storage));

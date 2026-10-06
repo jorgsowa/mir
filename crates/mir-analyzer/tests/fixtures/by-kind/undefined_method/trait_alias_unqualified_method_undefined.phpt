@@ -13,4 +13,4 @@ class C {
     }
 }
 ===expect===
-UndefinedTraitAliasMethod@1:0-1:0: An alias was defined for missingmethod but this method does not exist
+UndefinedTraitAliasMethod@8:8-8:35: An alias was defined for missingmethod but this method does not exist

@@ -29,4 +29,4 @@ $foo =
         return $bar;
     };
 ===expect===
-UnusedSuppress@13:0-13:0: Suppress annotation for 'MixedFunctionCall' is never used
+UnusedSuppress@11:17-11:34: Suppress annotation for 'MixedFunctionCall' is never used

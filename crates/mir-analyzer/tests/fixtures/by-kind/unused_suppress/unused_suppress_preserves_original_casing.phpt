@@ -10,4 +10,4 @@ class Foo {
     public string $bar = "baz";
 }
 ===expect===
-UnusedSuppress@6:0-6:0: Suppress annotation for 'undefinedclass' is never used
+UnusedSuppress@4:17-4:31: Suppress annotation for 'undefinedclass' is never used

@@ -23,4 +23,4 @@ class A
     }
 }
 ===expect===
-UnusedSuppress@3:0-3:0: Suppress annotation for 'UndefinedClass' is never used
+UnusedSuppress@2:14-2:28: Suppress annotation for 'UndefinedClass' is never used

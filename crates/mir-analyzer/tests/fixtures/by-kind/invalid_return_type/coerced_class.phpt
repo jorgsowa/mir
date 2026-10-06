@@ -24,4 +24,4 @@ class NullableBug {
     }
 }
 ===expect===
-UnusedSuppress@20:0-20:0: Suppress annotation for 'ArgumentTypeCoercion' is never used
+UnusedSuppress@19:22-19:42: Suppress annotation for 'ArgumentTypeCoercion' is never used

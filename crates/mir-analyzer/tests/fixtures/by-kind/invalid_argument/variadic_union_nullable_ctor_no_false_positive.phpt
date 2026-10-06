@@ -36,4 +36,4 @@ function app(): void {
     $c->setValue(new Other());
 }
 ===expect===
-Coll.php: UnusedSuppress@15:0-15:0: Suppress annotation for 'UnusedParam' is never used
+Coll.php: UnusedSuppress@13:17-13:28: Suppress annotation for 'UnusedParam' is never used

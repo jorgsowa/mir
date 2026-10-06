@@ -8,4 +8,4 @@ reports unclosed generic param
 function foo(mixed $items): void {}
 //           ^^^^^^^^^^^^ UnusedParam: Parameter $items is never used
 ===expect===
-InvalidDocblock@2:0-2:0: Invalid docblock: @param has unclosed generic type `array< $items`
+InvalidDocblock@3:3-3:23: Invalid docblock: @param has unclosed generic type `array< $items`

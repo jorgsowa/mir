@@ -25,5 +25,5 @@ class Foo {
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$baz has no type annotation
 }
 ===expect===
-InvalidDocblock@4:0-4:0: Invalid docblock: @var has an unterminated string literal in `'`
-InvalidDocblock@8:0-8:0: Invalid docblock: @var has an unterminated string literal in `"`
+InvalidDocblock@4:8-4:14: Invalid docblock: @var has an unterminated string literal in `'`
+InvalidDocblock@8:8-8:14: Invalid docblock: @var has an unterminated string literal in `"`

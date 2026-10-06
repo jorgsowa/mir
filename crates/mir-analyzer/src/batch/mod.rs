@@ -287,10 +287,19 @@ impl AnalysisSession {
                 // also have suppressed=true. Pass all file issues for exact-line
                 // matching; pre_suppressed enables the docblock-range fallback.
                 let unused = map.unused_named(file_issues, &pre_suppressed);
-                for (line, kind) in unused {
-                    let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
-                    let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
-                    if map.is_suppressed(line, issue.kind.display_name(), issue.kind.code()) {
+                for ns in unused {
+                    let loc = unused_suppress_location(&file, ns);
+                    let mut issue = Issue::new(
+                        mir_issues::IssueKind::UnusedSuppress {
+                            kind: ns.kind.clone(),
+                        },
+                        loc,
+                    );
+                    if map.is_suppressed(
+                        ns.report_line,
+                        issue.kind.display_name(),
+                        issue.kind.code(),
+                    ) {
                         issue.suppressed = true;
                     }
                     new_issues.push(issue);
@@ -477,14 +486,33 @@ fn emit_unused_suppressions(
     let all_refs: Vec<&Issue> = all_issues.iter().collect();
     let pre_suppressed: Vec<&Issue> = all_refs.iter().filter(|i| i.suppressed).copied().collect();
     let unused = suppressions.unused_named(&all_refs, &pre_suppressed);
-    for (line, kind) in unused {
-        let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
-        let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
-        if suppressions.is_suppressed(line, issue.kind.display_name(), issue.kind.code()) {
+    for ns in unused {
+        let loc = unused_suppress_location(file, ns);
+        let mut issue = Issue::new(
+            mir_issues::IssueKind::UnusedSuppress {
+                kind: ns.kind.clone(),
+            },
+            loc,
+        );
+        if suppressions.is_suppressed(ns.report_line, issue.kind.display_name(), issue.kind.code())
+        {
             issue.suppressed = true;
         }
         all_issues.push(issue);
     }
+}
+
+fn unused_suppress_location(
+    file: &std::sync::Arc<str>,
+    ns: &crate::suppression::NamedSuppression,
+) -> mir_types::Location {
+    mir_types::Location::new(
+        file.clone(),
+        ns.tag_line,
+        ns.tag_line,
+        ns.col_start,
+        ns.col_end,
+    )
 }
 
 /// Discover all `.php` files under a directory, recursively.

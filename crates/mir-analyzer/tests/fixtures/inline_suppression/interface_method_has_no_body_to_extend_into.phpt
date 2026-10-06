@@ -12,4 +12,4 @@ interface I {
 //                       ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
 ===expect===
-UnusedSuppress@4:0-4:0: Suppress annotation for 'UndefinedClass' is never used
+UnusedSuppress@3:24-3:38: Suppress annotation for 'UndefinedClass' is never used

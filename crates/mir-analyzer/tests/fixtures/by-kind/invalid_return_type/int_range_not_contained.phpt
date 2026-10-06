@@ -12,4 +12,4 @@ function scope(int $a){
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'int<1, 12>' is not compatible with declared 'int<-1, 11>'
 }
 ===expect===
-UnusedSuppress@7:0-7:0: Suppress annotation for 'InvalidReturnStatement' is never used
+UnusedSuppress@5:13-5:35: Suppress annotation for 'InvalidReturnStatement' is never used

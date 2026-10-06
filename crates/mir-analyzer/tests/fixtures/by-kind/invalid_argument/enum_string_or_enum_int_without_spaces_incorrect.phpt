@@ -20,4 +20,4 @@ function foo($s) : void {}
 //           ^^ MissingParamType: Parameter $s of foo() has no type annotation
 foo(4);
 ===expect===
-InvalidDocblock@4:0-4:0: Invalid docblock: @param has an unterminated string literal in `"foo"with"|"bar"|1|2|3`
+InvalidDocblock@4:4-4:36: Invalid docblock: @param has an unterminated string literal in `"foo"with"|"bar"|1|2|3`

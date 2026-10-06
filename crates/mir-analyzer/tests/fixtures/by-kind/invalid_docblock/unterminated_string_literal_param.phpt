@@ -17,4 +17,4 @@ reported the same way as the lone-quote case.
 function bar($x): void {}
 //           ^^ MissingParamType: Parameter $x of bar() has no type annotation
 ===expect===
-InvalidDocblock@3:0-3:0: Invalid docblock: @param has an unterminated string literal in `'foo`
+InvalidDocblock@4:3-4:17: Invalid docblock: @param has an unterminated string literal in `'foo`

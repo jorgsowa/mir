@@ -20,4 +20,4 @@ class User {
     }
 }
 ===expect===
-UnusedSuppress@6:0-6:0: Suppress annotation for 'MixedArgument' is never used
+UnusedSuppress@4:17-4:30: Suppress annotation for 'MixedArgument' is never used

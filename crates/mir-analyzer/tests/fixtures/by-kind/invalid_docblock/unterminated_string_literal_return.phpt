@@ -13,4 +13,4 @@ function bar() {
     return 'foo';
 }
 ===expect===
-InvalidDocblock@3:0-3:0: Invalid docblock: @return has an unterminated string literal in `'foo`
+InvalidDocblock@4:3-4:15: Invalid docblock: @return has an unterminated string literal in `'foo`

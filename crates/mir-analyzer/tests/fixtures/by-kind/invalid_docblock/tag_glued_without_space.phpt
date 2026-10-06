@@ -7,4 +7,4 @@ A tag glued to the previous one with no separating space is reported as malforme
  */
 class Bar {}
 ===expect===
-InvalidDocblock@2:0-2:0: Invalid docblock: @template has a malformed type `T@extends` — a neighboring tag may be missing a space
+InvalidDocblock@3:3-3:26: Invalid docblock: @template has a malformed type `T@extends` — a neighboring tag may be missing a space

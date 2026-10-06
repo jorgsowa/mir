@@ -12,4 +12,4 @@ class A {
     }
 }
 ===expect===
-UnusedSuppress@6:0-6:0: Suppress annotation for 'MixedMethodCall' is never used
+UnusedSuppress@4:17-4:32: Suppress annotation for 'MixedMethodCall' is never used

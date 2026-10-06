@@ -147,8 +147,7 @@ impl DefinitionCollector<'_> {
                     // Validate the case value's type against the backing scalar type.
                     if let (Some(backing), Some(case_val_ty)) = (&scalar_type, &value_ty) {
                         if !case_val_ty.is_subtype_structural(backing) {
-                            let lc = self.source_map.offset_to_line_col(member.span.start);
-                            let line = lc.line + 1;
+                            let value_span = c.value.as_ref().map_or(member.span, |e| e.span);
                             self.issues.add(Issue::new(
                                 IssueKind::BackedEnumCaseTypeMismatch {
                                     enum_name: fqcn.clone(),
@@ -156,13 +155,7 @@ impl DefinitionCollector<'_> {
                                     expected: backing.to_string(),
                                     actual: case_val_ty.to_string(),
                                 },
-                                mir_issues::Location {
-                                    file: self.file.clone(),
-                                    line,
-                                    line_end: line,
-                                    col_start: 0,
-                                    col_end: 0,
-                                },
+                                self.location(value_span.start, value_span.end),
                             ));
                         }
                     }

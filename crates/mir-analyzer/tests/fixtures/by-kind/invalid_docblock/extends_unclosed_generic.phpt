@@ -11,4 +11,4 @@ class Base {}
  */
 class Derived extends Base {}
 ===expect===
-InvalidDocblock@5:0-5:0: Invalid docblock: @extends has unclosed generic type `Base<T`
+InvalidDocblock@7:3-7:18: Invalid docblock: @extends has unclosed generic type `Base<T`

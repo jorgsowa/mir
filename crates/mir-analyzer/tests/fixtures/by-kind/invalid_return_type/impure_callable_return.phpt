@@ -21,4 +21,4 @@ function foo(): callable {
     };
 }
 ===expect===
-UnusedSuppress@8:0-8:0: Suppress annotation for 'ImpureFunctionCall' is never used
+UnusedSuppress@7:18-7:36: Suppress annotation for 'ImpureFunctionCall' is never used

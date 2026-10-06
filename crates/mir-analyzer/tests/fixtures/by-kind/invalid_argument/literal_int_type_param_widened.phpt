@@ -31,5 +31,5 @@ function app(): void {
     $b->set(6);
 }
 ===expect===
-Box.php: UnusedSuppress@11:0-11:0: Suppress annotation for 'UnusedParam' is never used
-Box.php: UnusedSuppress@16:0-16:0: Suppress annotation for 'UnusedParam' is never used
+Box.php: UnusedSuppress@9:17-9:28: Suppress annotation for 'UnusedParam' is never used
+Box.php: UnusedSuppress@14:17-14:28: Suppress annotation for 'UnusedParam' is never used

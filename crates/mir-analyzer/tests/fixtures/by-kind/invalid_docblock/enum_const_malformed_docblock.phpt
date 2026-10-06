@@ -12,4 +12,4 @@ enum Suit {
     const FOO = 1;
 }
 ===expect===
-InvalidDocblock@5:0-5:0: Invalid docblock: @var has empty generic type parameter in `array<>`
+InvalidDocblock@6:7-6:19: Invalid docblock: @var has empty generic type parameter in `array<>`

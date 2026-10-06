@@ -14,4 +14,4 @@ function test(Foo $f): void {
     new NoSuchClass();
 }
 ===expect===
-UnusedSuppress@6:0-6:0: Suppress annotation for 'UndefinedMethod' is never used
+UnusedSuppress@4:35-4:50: Suppress annotation for 'UndefinedMethod' is never used

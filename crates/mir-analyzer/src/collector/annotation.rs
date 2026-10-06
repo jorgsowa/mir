@@ -217,18 +217,28 @@ pub(super) fn emit_docblock_issues(
     let lc = source_map.offset_to_line_col(span_start);
     let line = lc.line + 1;
     let suppressed = doc.suppressed_issues.iter().any(|s| s == "InvalidDocblock");
-    for msg in &doc.invalid_annotations {
+    let offset_location = |start: u32, end: u32| {
+        let s = source_map.offset_to_line_col(span_start + start);
+        let e = source_map.offset_to_line_col(span_start + end);
+        // Columns are char counts; docblock tag heads rarely hold wide chars, so bytes suffice.
+        mir_issues::Location {
+            file: file.clone(),
+            line: s.line + 1,
+            line_end: e.line + 1,
+            col_start: s.col.min(u16::MAX as u32) as u16,
+            col_end: e.col.min(u16::MAX as u32) as u16,
+        }
+    };
+    for (msg, &(start, end)) in doc
+        .invalid_annotations
+        .iter()
+        .zip(&doc.invalid_annotation_spans)
+    {
         let issue = Issue::new(
             IssueKind::InvalidDocblock {
                 message: msg.clone(),
             },
-            mir_issues::Location {
-                file: file.clone(),
-                line,
-                line_end: line,
-                col_start: 0,
-                col_end: 0,
-            },
+            offset_location(start, end),
         );
         issues.add(if suppressed { issue.suppress() } else { issue });
     }

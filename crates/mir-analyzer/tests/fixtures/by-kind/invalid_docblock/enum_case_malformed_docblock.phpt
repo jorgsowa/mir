@@ -10,4 +10,4 @@ enum Suit {
     case Hearts;
 }
 ===expect===
-InvalidDocblock@3:0-3:0: Invalid docblock: @var has empty generic type parameter in `array<>`
+InvalidDocblock@4:7-4:19: Invalid docblock: @var has empty generic type parameter in `array<>`

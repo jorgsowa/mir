@@ -702,6 +702,9 @@ pub struct ClassDef {
     #[allow(clippy::type_complexity)]
     pub trait_aliases:
         FxHashMap<Arc<str>, (Option<Arc<str>>, Arc<str>, Option<Visibility>, Arc<str>)>,
+    /// Source span of each `trait_aliases` adaptation, keyed the same way.
+    #[serde(default)]
+    pub trait_alias_locations: FxHashMap<Arc<str>, Location>,
 }
 
 impl ClassDef {

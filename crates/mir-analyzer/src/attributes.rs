@@ -842,7 +842,7 @@ fn check_attribute_list(
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
     mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
-    let mut seen_fqcns: Vec<(String, u32)> = Vec::new(); // (fqcn, span.start)
+    let mut seen_fqcns: Vec<(String, u32, u32)> = Vec::new(); // (fqcn, span.start, span.end)
 
     for attr in attrs {
         // Skip the `Attribute` annotation itself — it is validated elsewhere.
@@ -962,15 +962,15 @@ fn check_attribute_list(
 
                         // Check repeat (IS_REPEATABLE = 64).
                         if (flags & ATTR_IS_REPEATABLE) == 0 {
-                            if let Some((_prev_fqcn, prev_start)) =
-                                seen_fqcns.iter().find(|(f, _)| f == &fqcn)
+                            if let Some((_prev_fqcn, prev_start, prev_end)) =
+                                seen_fqcns.iter().find(|(f, _, _)| f == &fqcn)
                             {
                                 let prev_loc = span_to_location(
                                     file,
                                     source,
                                     source_map,
                                     *prev_start,
-                                    *prev_start,
+                                    *prev_end,
                                 );
                                 let short =
                                     attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
@@ -990,7 +990,7 @@ fn check_attribute_list(
                 }
 
                 // Record this attribute to detect future repeats.
-                seen_fqcns.push((fqcn, attr.span.start));
+                seen_fqcns.push((fqcn, attr.span.start, attr.span.end));
             }
         }
     }
