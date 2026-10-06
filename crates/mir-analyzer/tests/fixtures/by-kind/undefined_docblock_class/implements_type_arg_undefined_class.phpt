@@ -20,10 +20,10 @@ interface Collection {
 }
 
 /** @implements Collection<int, NonExistentValueType> */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentValueType' does not exist
 class IntCollection implements Collection {
     public function get($key) {
         return null;
     }
 }
 ===expect===
-UndefinedDocblockClass@10:0-10:56: Docblock type 'NonExistentValueType' does not exist

@@ -10,10 +10,10 @@ Backslash-qualified parameter keywords are invalid; unqualified keywords are val
 <?php
 /**
  * @param \int $a
+//        ^^^^ InvalidDocblockType: Invalid docblock type: @param backslash-qualified non-class type '\int' is not a fully qualified name
  * @param int $b
  */
 function f($a, $b): string {
     return "x";
 }
 ===expect===
-InvalidDocblockType@3:10-3:14: Invalid docblock type: @param backslash-qualified non-class type '\int' is not a fully qualified name

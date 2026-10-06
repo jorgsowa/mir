@@ -4,6 +4,6 @@ class that does not exist, matching a class's identical tag.
 ===file===
 <?php
 /** @template T of NonExistentBoundClass */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentBoundClass' does not exist
 trait Box {}
 ===expect===
-UndefinedDocblockClass@2:0-2:43: Docblock type 'NonExistentBoundClass' does not exist

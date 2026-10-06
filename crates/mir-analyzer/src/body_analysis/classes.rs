@@ -695,9 +695,6 @@ impl<'a> BodyAnalyzer<'a> {
             |cls_fqcn: &str, at: &mir_issues::Location, all_issues: &mut Vec<Issue>| {
                 self.check_and_record_docblock_class_at(cls_fqcn, at, all_issues)
             };
-        let check_class_name = |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
-            check_class_name_at(cls_fqcn, &location, all_issues)
-        };
 
         let type_class_names = |ty: &mir_types::Type| -> Vec<mir_types::Name> {
             ty.types
@@ -721,7 +718,15 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         for (_local, _original, from_fqcn) in class.pending_import_types() {
-            check_class_name(from_fqcn.as_ref(), all_issues);
+            let at = docblock_tag_naming(
+                file,
+                source,
+                source_map,
+                doc_comment.span,
+                from_fqcn.as_ref(),
+            )
+            .unwrap_or_else(|| location.clone());
+            check_class_name_at(from_fqcn.as_ref(), &at, all_issues);
         }
 
         if let Some(props) = class.own_properties() {
@@ -873,7 +878,15 @@ impl<'a> BodyAnalyzer<'a> {
             if own_template_names.contains(cls_fqcn.as_ref()) {
                 continue;
             }
-            self.check_and_record_docblock_class_at(cls_fqcn.as_ref(), &location, all_issues);
+            let at = docblock_tag_naming(
+                file,
+                source,
+                source_map,
+                doc_comment.span,
+                cls_fqcn.as_ref(),
+            )
+            .unwrap_or_else(|| location.clone());
+            self.check_and_record_docblock_class_at(cls_fqcn.as_ref(), &at, all_issues);
         }
     }
 
@@ -2214,4 +2227,47 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
     }
+}
+
+/// Location of the first docblock tag line (`@tag ...`, minus any trailing
+/// `*/`) inside `doc_span` that mentions `fqcn`'s short name as a whole word.
+fn docblock_tag_naming(
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    doc_span: php_ast::Span,
+    fqcn: &str,
+) -> Option<mir_issues::Location> {
+    let short = fqcn.rsplit('\\').next().unwrap_or(fqcn);
+    let doc = source.get(doc_span.start as usize..doc_span.end as usize)?;
+    let mut line_start = 0usize;
+    for line in doc.split_inclusive('\n') {
+        let base = line_start;
+        line_start += line.len();
+        let Some(at) = line.find('@') else { continue };
+        let head = line[at..].trim_end().trim_end_matches("*/").trim_end();
+        if !mentions_word(head, short) {
+            continue;
+        }
+        let start = doc_span.start as usize + base + at;
+        let end = start + head.len();
+        let (l, c) = crate::diagnostics::offset_to_line_col(source, start as u32, source_map);
+        let (l_end, c_end) = crate::diagnostics::offset_to_line_col(source, end as u32, source_map);
+        return Some(mir_issues::Location {
+            file: file.clone(),
+            line: l,
+            line_end: l_end,
+            col_start: c,
+            col_end: c_end,
+        });
+    }
+    None
+}
+
+fn mentions_word(text: &str, word: &str) -> bool {
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+    text.match_indices(word).any(|(i, _)| {
+        !text[..i].chars().next_back().is_some_and(is_ident)
+            && !text[i + word.len()..].chars().next().is_some_and(is_ident)
+    })
 }

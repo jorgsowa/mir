@@ -4,6 +4,6 @@ tag names a source class that does not exist.
 ===file===
 <?php
 /** @psalm-import-type UserId from NonExistentRepository */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentRepository' does not exist
 class A {}
 ===expect===
-UndefinedDocblockClass@2:0-2:59: Docblock type 'NonExistentRepository' does not exist

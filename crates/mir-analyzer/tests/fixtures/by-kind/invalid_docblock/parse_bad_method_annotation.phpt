@@ -8,8 +8,8 @@ Parse bad method annotation
                     class AAA {
                         function __call() {
                             echo $b."
+//                               ^^ UndefinedVariable: Variable $b is not defined
 ";
                         }
                     }
 ===expect===
-UndefinedVariable@7:33-7:35: Variable $b is not defined

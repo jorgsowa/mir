@@ -194,9 +194,11 @@ impl DocblockParser {
                                 result.invalid_annotations.push(msg);
                             }
                         }
-                        result
-                            .template_spans
-                            .push(tag_head_span(text, tag.span.start, tag.span.end));
+                        result.template_spans.push(tag_head_span(
+                            text,
+                            tag.span.start,
+                            tag.span.end,
+                        ));
                         result.templates.push((
                             name,
                             bound.map(|b| parse_type_string(&b)),
@@ -226,9 +228,11 @@ impl DocblockParser {
                                 result.invalid_annotations.push(msg);
                             }
                         }
-                        result
-                            .template_spans
-                            .push(tag_head_span(text, tag.span.start, tag.span.end));
+                        result.template_spans.push(tag_head_span(
+                            text,
+                            tag.span.start,
+                            tag.span.end,
+                        ));
                         result.templates.push((
                             name,
                             bound.map(|b| parse_type_string(&b)),
@@ -258,9 +262,11 @@ impl DocblockParser {
                                 result.invalid_annotations.push(msg);
                             }
                         }
-                        result
-                            .template_spans
-                            .push(tag_head_span(text, tag.span.start, tag.span.end));
+                        result.template_spans.push(tag_head_span(
+                            text,
+                            tag.span.start,
+                            tag.span.end,
+                        ));
                         result.templates.push((
                             name,
                             bound.map(|b| parse_type_string(&b)),

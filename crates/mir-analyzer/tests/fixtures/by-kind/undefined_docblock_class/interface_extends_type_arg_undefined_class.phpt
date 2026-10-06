@@ -7,6 +7,6 @@ UndefinedDocblockClass fires when a class name inside an interface's own
 interface Box {}
 
 /** @extends Box<NonExistentTypeArg> */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentTypeArg' does not exist
 interface IntBox extends Box {}
 ===expect===
-UndefinedDocblockClass@5:0-5:39: Docblock type 'NonExistentTypeArg' does not exist

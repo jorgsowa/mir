@@ -7,6 +7,6 @@ generic type-argument list does not exist.
 class Box {}
 
 /** @extends Box<NonExistentTypeArg> */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentTypeArg' does not exist
 class IntBox extends Box {}
 ===expect===
-UndefinedDocblockClass@5:0-5:39: Docblock type 'NonExistentTypeArg' does not exist
