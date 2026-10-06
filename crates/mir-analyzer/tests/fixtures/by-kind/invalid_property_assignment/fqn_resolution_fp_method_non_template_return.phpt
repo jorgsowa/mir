@@ -14,6 +14,7 @@ class Box {
      * @return Result
      */
     public function info(string $cls): Result {
+//                       ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
         return new Result();
     }
 }
@@ -25,6 +26,7 @@ use Lib\Result;
 use Lib\Box;
 
 class Consumer {
+//<^^^^^^^^^^^^^^^^ MissingConstructor: Class App\Consumer has uninitialized properties but no constructor
     public Result $result;
 
     public function run(): void {
@@ -33,5 +35,3 @@ class Consumer {
     }
 }
 ===expect===
-Types.php: UnusedParam@13:25-13:36: Parameter $cls is never used
-UseIt.php: MissingConstructor@7:0-7:16: Class App\Consumer has uninitialized properties but no constructor

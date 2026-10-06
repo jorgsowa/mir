@@ -17,6 +17,7 @@ class Db {
      * @return (TKey is null ? list<array> : array<array>)
      */
     public function fetch(mixed $key): array {
+//                        ^^^^^^^^^^ UnusedParam: Parameter $key is never used
         return [];
     }
 }
@@ -32,4 +33,3 @@ $db = new Db();
 $result = $db->fetch(null);
 /** @mir-check $result is ($TKey is null ? list<array<mixed, mixed>> : array<int, array<mixed, mixed>>) */
 ===expect===
-Db.php: UnusedParam@10:26-10:36: Parameter $key is never used

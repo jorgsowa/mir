@@ -17,6 +17,7 @@ class Factory {
      * @return Outer<Inner<T>>
      */
     public function make(string $cls): Outer {
+//                       ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
         return new Outer();
     }
 }
@@ -30,6 +31,7 @@ use Lib\Factory;
 class Foo {}
 
 class Consumer {
+//<^^^^^^^^^^^^^^^^ MissingConstructor: Class App\Consumer has uninitialized properties but no constructor
     public Outer $prop;
 
     public function run(): void {
@@ -40,5 +42,3 @@ class Consumer {
     }
 }
 ===expect===
-Types.php: UnusedParam@16:25-16:36: Parameter $cls is never used
-UseNested.php: MissingConstructor@9:0-9:16: Class App\Consumer has uninitialized properties but no constructor

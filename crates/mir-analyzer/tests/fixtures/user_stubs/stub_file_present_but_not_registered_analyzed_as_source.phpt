@@ -17,6 +17,7 @@ regular source file — its symbols are available but its body is checked for er
  * @return list<TKey>
  */
 function array_key_list(array $array): array {}
+//                      ^^^^^^^^^^^^ UnusedParam: Parameter $array is never used
 ===file:App.php===
 <?php
 /**
@@ -28,4 +29,3 @@ function test(array $arr): void {
     $_ = $keys;
 }
 ===expect===
-helpers.php: UnusedParam@8:24-8:36: Parameter $array is never used

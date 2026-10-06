@@ -17,6 +17,7 @@ class Factory {
      * @return ClassA<T>
      */
     public function makeA(string $cls): ClassA {
+//                        ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
         return new ClassA();
     }
 }
@@ -29,15 +30,14 @@ use Lib\ClassB;
 use Lib\Factory;
 
 class Consumer {
+//<^^^^^^^^^^^^^^^^ MissingConstructor: Class App\Consumer has uninitialized properties but no constructor
     public ClassB $holder;
 
     public function run(): void {
         $factory = new Factory();
         $result = $factory->makeA(\stdClass::class);
         $this->holder = $result;
+//      ^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'
     }
 }
 ===expect===
-ClassA.php: UnusedParam@16:26-16:37: Parameter $cls is never used
-Consumer.php: MissingConstructor@8:0-8:16: Class App\Consumer has uninitialized properties but no constructor
-Consumer.php: InvalidPropertyAssignment@14:8-14:31: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'

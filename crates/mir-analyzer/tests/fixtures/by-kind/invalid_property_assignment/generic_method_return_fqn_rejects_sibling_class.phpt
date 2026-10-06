@@ -17,6 +17,7 @@ class Prophet {
      * @return ObjectProphecy<T>
      */
     public function prophesize(string $cls): ObjectProphecy {
+//                             ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
         return new ObjectProphecy();
     }
 }
@@ -29,15 +30,14 @@ use Prophecy\SubjectProphecy;
 use Prophecy\Prophet;
 
 class MyTest {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class App\MyTest has uninitialized properties but no constructor
     public SubjectProphecy $prop;
 
     public function run(): void {
         $prophet = new Prophet();
         $result = $prophet->prophesize(\stdClass::class);
         $this->prop = $result;
+//      ^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
     }
 }
 ===expect===
-MyTest.php: MissingConstructor@8:0-8:14: Class App\MyTest has uninitialized properties but no constructor
-MyTest.php: InvalidPropertyAssignment@14:8-14:29: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
-ObjectProphecy.php: UnusedParam@16:31-16:42: Parameter $cls is never used

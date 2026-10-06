@@ -17,6 +17,7 @@ class Prophet {
      * @return ObjectProphecy<T>
      */
     public function prophesize(string $cls): ObjectProphecy {
+//                             ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
         return new ObjectProphecy();
     }
 }
@@ -33,6 +34,7 @@ use Prophecy\Prophecy\ObjectProphecy;
 use Prophecy\Prophecy\Prophet;
 
 class MyTest {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class MyApp\MyTest has uninitialized properties but no constructor
     public ObjectProphecy $prophecy;
 
     public function setUp(): void {
@@ -43,5 +45,3 @@ class MyTest {
     }
 }
 ===expect===
-MyTest.php: MissingConstructor@7:0-7:14: Class MyApp\MyTest has uninitialized properties but no constructor
-Prophet.php: UnusedParam@10:31-10:42: Parameter $cls is never used

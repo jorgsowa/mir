@@ -16,6 +16,7 @@ namespace App;
 use Lib\Widget;
 
 class Consumer {
+//<^^^^^^^^^^^^^^^^ MissingConstructor: Class App\Consumer has uninitialized properties but no constructor
     public Widget $w;
 
     public function run(): void {
@@ -23,4 +24,3 @@ class Consumer {
     }
 }
 ===expect===
-Consumer.php: MissingConstructor@6:0-6:16: Class App\Consumer has uninitialized properties but no constructor

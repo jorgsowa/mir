@@ -542,7 +542,11 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                 idx + 1
             );
             out.push(ExpectedIssue {
-                file: is_multi.then(|| name.clone()),
+                file: is_multi.then(|| {
+                    Path::new(name)
+                        .file_name()
+                        .map_or_else(|| name.clone(), |n| n.to_string_lossy().into_owned())
+                }),
                 kind_name: kind.to_string(),
                 message: message.to_string(),
                 line: Some(line),
