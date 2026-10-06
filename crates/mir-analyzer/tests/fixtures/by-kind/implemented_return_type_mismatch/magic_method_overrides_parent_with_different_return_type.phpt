@@ -18,6 +18,6 @@ class A {
 }
 
 /** @method D foo(string $s) */
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'D' is not a subtype of parent 'C'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'D' is not a subtype of parent 'C'
 class B extends A {}
 ===expect===

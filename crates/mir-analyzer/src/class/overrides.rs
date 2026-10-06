@@ -220,6 +220,11 @@ impl<'a> ClassAnalyzer<'a> {
             let loc = || {
                 loc_cell
                     .get_or_init(|| {
+                        if own.is_virtual {
+                            return crate::diagnostics::storage_loc_to_location(
+                                own_location.as_ref(),
+                            );
+                        }
                         issue_location(
                             own_location.as_ref(),
                             own_location
