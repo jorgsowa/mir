@@ -288,6 +288,8 @@ pub(crate) struct ExpectedIssue {
 pub(crate) struct ParsedFixture {
     /// `(filename, content)` pairs — always at least one entry.
     pub files: Vec<(String, String)>,
+    /// `files` with annotation lines blanked, so an annotation never alters what the analyzer sees.
+    analyzed_files: Vec<(String, String)>,
     pub expected: Vec<ExpectedIssue>,
     pub is_multi: bool,
     /// Optional human-readable description from `===description===`.
@@ -484,8 +486,13 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         }
     };
 
+    let analyzed_files = files
+        .iter()
+        .map(|(name, src)| (name.clone(), blank_annotation_lines(src)))
+        .collect();
     ParsedFixture {
         files,
+        analyzed_files,
         expected,
         is_multi,
         description,
@@ -554,6 +561,18 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                 line_end: Some(line_end),
                 col_end: Some(col_end),
             });
+        }
+    }
+    out
+}
+
+fn blank_annotation_lines(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    for line in src.split_inclusive('\n') {
+        if split_annotation(line).is_none() {
+            out.push_str(line);
+        } else if line.ends_with('\n') {
+            out.push('\n');
         }
     }
     out
@@ -1295,7 +1314,7 @@ fn fmt_reference_kind(kind: &crate::ReferenceKind) -> String {
 
 fn file_refs(fixture: &ParsedFixture) -> Vec<(&str, &str)> {
     fixture
-        .files
+        .analyzed_files
         .iter()
         .map(|(n, s)| (n.as_str(), s.as_str()))
         .collect()
