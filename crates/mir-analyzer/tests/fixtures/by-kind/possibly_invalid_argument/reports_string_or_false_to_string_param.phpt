@@ -15,4 +15,3 @@ function test(): void {
     takesString(getResult());
 //              ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $s of takesString() expects 'string', possibly different type 'string|false' provided
 }
-===expect===

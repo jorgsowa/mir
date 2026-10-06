@@ -9,5 +9,3 @@ trait ExistingTrait {
 class Foo {
     use ExistingTrait;
 }
-
-===expect===

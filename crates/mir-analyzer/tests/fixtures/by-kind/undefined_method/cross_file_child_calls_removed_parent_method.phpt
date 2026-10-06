@@ -11,4 +11,3 @@ function test(): void {
     $c->foo();
 //  ^^^^^^^^^ UndefinedMethod: Method Child::foo() does not exist
 }
-===expect===

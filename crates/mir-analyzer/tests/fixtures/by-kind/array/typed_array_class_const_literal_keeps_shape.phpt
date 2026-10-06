@@ -13,4 +13,3 @@ final class C {
         return array_key_first(self::D);
     }
 }
-===expect===

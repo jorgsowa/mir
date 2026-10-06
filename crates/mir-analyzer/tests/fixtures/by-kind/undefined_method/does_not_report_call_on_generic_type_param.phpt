@@ -9,4 +9,3 @@ does not report call on generic type param
 function f($obj): void {
     $obj->method();
 }
-===expect===

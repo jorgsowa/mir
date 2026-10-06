@@ -20,4 +20,3 @@ class B extends A {
 
     }
 }
-===expect===

@@ -23,4 +23,3 @@ function impossiblePlatform(): bool {
     return PHP_INT_SIZE === 16;
 //         ^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '4|8' and '16' is always false — these types can never be identical
 }
-===expect===

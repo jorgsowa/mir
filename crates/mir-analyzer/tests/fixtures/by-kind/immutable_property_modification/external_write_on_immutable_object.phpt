@@ -27,4 +27,3 @@ function mutateImmutable(Box $b): void {
 function mutateMutable(MutableBox $b): void {
     $b->x = 1;
 }
-===expect===

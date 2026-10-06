@@ -21,4 +21,3 @@ class Request {
 
 echo Request::getQuery();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
-===expect===

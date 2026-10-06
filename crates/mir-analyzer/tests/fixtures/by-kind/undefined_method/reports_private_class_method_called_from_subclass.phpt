@@ -11,4 +11,3 @@ class Child extends Base {
 //      ^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::secret() does not exist
     }
 }
-===expect===

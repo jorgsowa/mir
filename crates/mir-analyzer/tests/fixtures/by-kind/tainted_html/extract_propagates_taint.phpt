@@ -22,4 +22,3 @@ function safeExtractOnly(): void {
     extract($vars);
     echo $name;
 }
-===expect===

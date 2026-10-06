@@ -37,4 +37,3 @@ function narrowsReceiverFalseBranch(?Holder $h): void {
 function computeName(): string {
     return 'x';
 }
-===expect===

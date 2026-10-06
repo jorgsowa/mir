@@ -13,4 +13,3 @@ function test(): void {
     die($_GET['msg']);
 //  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

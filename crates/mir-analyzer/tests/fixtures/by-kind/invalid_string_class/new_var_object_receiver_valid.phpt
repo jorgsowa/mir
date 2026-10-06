@@ -25,4 +25,3 @@ function wrap(): void {
         throw new $e(enrich($e), $e->getCode(), $e);
     }
 }
-===expect===

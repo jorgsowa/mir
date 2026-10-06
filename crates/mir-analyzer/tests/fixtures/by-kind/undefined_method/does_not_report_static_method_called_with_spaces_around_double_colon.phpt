@@ -9,4 +9,3 @@ function test(): void {
     Math :: sq(3);
     Math  ::  sq(3);
 }
-===expect===

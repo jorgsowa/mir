@@ -64,4 +64,3 @@ function looseEqSymmetric(): void {
         $_ = 1;
     }
 }
-===expect===

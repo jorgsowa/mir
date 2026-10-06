@@ -22,4 +22,3 @@ final class Graph {
         echo 1;
     }
 }
-===expect===

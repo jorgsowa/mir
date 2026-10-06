@@ -11,4 +11,3 @@ PhpStormStubsElementAvailable: strrchr() third param (from 8.3) absent on PHP 8.
 <?php
 $x = strrchr("hello", "l", true);
 //                         ^^^^ TooManyArguments: Too many arguments for strrchr(): expected 2, got 3
-===expect===

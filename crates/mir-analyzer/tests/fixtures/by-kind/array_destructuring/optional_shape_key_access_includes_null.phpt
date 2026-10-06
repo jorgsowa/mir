@@ -18,4 +18,3 @@ function test(array $arr): void {
     /** @mir-check $b is string|null */
     echo 1;
 }
-===expect===

@@ -20,4 +20,3 @@ class C implements I {
         return;
     }
 }
-===expect===

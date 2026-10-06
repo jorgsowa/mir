@@ -45,4 +45,3 @@ function run(array $source): void {
     visit(fn(string $s): string => $s);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'int'
 }
-===expect===

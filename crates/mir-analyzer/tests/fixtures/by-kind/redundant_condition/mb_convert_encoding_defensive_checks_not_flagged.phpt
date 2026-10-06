@@ -23,4 +23,3 @@ function convert_checked(string $s): string {
 function convert_cast(string $s): string {
     return (string) mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1');
 }
-===expect===

@@ -8,4 +8,3 @@ interface HasFooBar {
 class Impl implements HasFooBar {
     public function fooBar(): void {}
 }
-===expect===

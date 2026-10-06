@@ -34,4 +34,3 @@ function handleValue(string|int|null $value): void {
         echo $value * 2;
     }
 }
-===expect===

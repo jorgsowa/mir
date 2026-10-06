@@ -67,4 +67,3 @@ $b_str = branch3('x');
 $b_other = branch3(42);
 /** @mir-check $b_other is array<string, string> */
 echo count($b_null) + count($b_str) + count($b_other);
-===expect===

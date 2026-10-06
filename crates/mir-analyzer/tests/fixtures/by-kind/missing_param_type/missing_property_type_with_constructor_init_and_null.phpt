@@ -14,4 +14,3 @@ class A {
         $this->foo = null;
     }
 }
-===expect===

@@ -13,4 +13,3 @@ function test(?string $s): void {
     if ($s === null) {}
     if ($s === "hello") {}
 }
-===expect===

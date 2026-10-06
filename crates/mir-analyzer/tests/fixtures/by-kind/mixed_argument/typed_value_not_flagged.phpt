@@ -10,5 +10,3 @@ MixedArgument does NOT fire when the argument has a concrete (non-mixed) type.
 <?php
 function foo(int $a): void {}
 foo(42);
-
-===expect===

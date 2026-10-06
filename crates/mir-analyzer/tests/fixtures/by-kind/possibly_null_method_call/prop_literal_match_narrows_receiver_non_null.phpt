@@ -75,4 +75,3 @@ function viaInstanceofFalseBranch(?Foo $foo): void {
 //      ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
     }
 }
-===expect===

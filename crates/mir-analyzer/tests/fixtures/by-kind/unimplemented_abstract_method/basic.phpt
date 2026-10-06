@@ -7,4 +7,3 @@ abstract class Base {
 }
 class Incomplete extends Base {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Incomplete must implement abstract method doWork()
-===expect===

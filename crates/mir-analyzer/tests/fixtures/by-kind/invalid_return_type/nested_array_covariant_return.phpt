@@ -31,4 +31,3 @@ function outerKeyMismatchIsStillRejected(array $x): array { return $x; }
 /** @param array<string, list<string>> $x @return array<string, list<Animal>> */
 function unrelatedLeafIsStillRejected(array $x): array { return $x; }
 //                                                       ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<string>>' is not compatible with declared 'array<string, list<Animal>>'
-===expect===

@@ -26,4 +26,3 @@ $shapeWrapper = make(Shape::class);
 $polygonWrapper = make(Polygon::class);
 /** @mir-check $shapeWrapper is Wrapper<Shape> */
 /** @mir-check $polygonWrapper is Wrapper<Polygon> */
-===expect===

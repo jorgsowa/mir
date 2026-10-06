@@ -13,4 +13,3 @@ function test(): void {
     f("hello");
 //    ^^^^^^^ InvalidArgument: Argument $x of f() expects 'Foo&Bar', got '"hello"'
 }
-===expect===

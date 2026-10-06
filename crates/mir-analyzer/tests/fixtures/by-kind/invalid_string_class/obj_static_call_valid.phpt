@@ -11,4 +11,3 @@ class Foo {
 function test(Foo $obj): void {
     $obj::bar();
 }
-===expect===

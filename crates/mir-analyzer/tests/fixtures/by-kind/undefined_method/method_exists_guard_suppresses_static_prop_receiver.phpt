@@ -35,4 +35,3 @@ class Registry {
         }
     }
 }
-===expect===

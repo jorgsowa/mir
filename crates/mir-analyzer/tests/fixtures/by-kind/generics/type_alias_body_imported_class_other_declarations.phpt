@@ -73,4 +73,3 @@ class C {
         throw new Failure();
     }
 }
-===expect===

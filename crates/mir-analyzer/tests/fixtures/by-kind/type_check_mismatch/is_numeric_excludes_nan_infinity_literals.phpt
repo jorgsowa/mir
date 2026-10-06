@@ -24,4 +24,3 @@ function test_false_branch(string $s): void {
         $_ = $s;
     }
 }
-===expect===

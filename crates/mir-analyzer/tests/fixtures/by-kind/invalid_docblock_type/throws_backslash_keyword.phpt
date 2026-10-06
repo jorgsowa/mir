@@ -9,4 +9,3 @@ Throws annotations reject backslash-qualified keywords but allow class names.
  */
 function risky(): void {
 }
-===expect===

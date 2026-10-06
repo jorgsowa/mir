@@ -30,4 +30,3 @@ function run(Bag $bag): void
     $bag->column->doSomething();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method doSomething() called on mixed type
 }
-===expect===

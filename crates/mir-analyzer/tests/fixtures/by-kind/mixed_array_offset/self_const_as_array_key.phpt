@@ -25,4 +25,3 @@ class Cache {
         $this->store[static::READ] = $value;
     }
 }
-===expect===

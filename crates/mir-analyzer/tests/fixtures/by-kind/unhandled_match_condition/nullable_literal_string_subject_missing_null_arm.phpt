@@ -12,4 +12,3 @@ function label($s): string {
         "b" => "B",
     };
 }
-===expect===

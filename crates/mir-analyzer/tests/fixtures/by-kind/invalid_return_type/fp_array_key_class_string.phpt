@@ -18,4 +18,3 @@ function buildMap(array $listeners): array
     }
     return $result;
 }
-===expect===

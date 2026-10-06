@@ -35,4 +35,3 @@ function testInt(): void {
     /** @mir-check $y is int */
     $_ = 1;
 }
-===expect===

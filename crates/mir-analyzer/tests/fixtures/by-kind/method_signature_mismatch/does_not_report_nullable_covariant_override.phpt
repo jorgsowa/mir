@@ -10,4 +10,3 @@ class Base {
 class Child extends Base {
     public function get(): Cat { return new Cat(); }
 }
-===expect===

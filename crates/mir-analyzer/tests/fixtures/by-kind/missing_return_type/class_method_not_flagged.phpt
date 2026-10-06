@@ -8,4 +8,3 @@ class Foo {
     public static function staticNoReturn() { return 2; }
     protected function protectedNoReturn() { return 3; }
 }
-===expect===

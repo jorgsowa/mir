@@ -5,4 +5,3 @@ Wrong case interface name in implements is reported.
 interface Countable2 {}
 class MyList implements countable2 {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'countable2' has incorrect casing; use 'Countable2'
-===expect===

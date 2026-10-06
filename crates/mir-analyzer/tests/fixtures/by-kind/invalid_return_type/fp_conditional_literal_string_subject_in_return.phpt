@@ -17,4 +17,3 @@ function process(string $input): string
     // studly() widens to ""| string = string; should NOT fire InvalidReturnType
     return studly($input);
 }
-===expect===

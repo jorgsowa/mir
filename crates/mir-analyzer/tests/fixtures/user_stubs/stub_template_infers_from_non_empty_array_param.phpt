@@ -29,4 +29,3 @@ function test(array $arr): void {
     /** @mir-check $val is int */
     $_ = $val;
 }
-===expect===

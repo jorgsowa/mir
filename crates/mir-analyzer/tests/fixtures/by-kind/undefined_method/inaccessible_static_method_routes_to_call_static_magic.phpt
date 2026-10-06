@@ -7,4 +7,3 @@ class WithMagic {
     public static function __callStatic($method, $parameters) { return null; }
 }
 WithMagic::secret();
-===expect===

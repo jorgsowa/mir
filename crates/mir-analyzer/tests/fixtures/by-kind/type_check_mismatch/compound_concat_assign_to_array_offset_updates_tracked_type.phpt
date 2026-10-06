@@ -16,4 +16,3 @@ function run(): void {
     /** @mir-check $x is 'ab' */
     $_ = $x;
 }
-===expect===

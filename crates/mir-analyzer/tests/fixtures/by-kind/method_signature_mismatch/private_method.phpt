@@ -11,5 +11,3 @@ class C2 extends C {
 //  ^^^^^^^^^^^ InvalidOverride: Method C2::f() has #[Override] but parent method C::f() is private
     private function f(): void {}
 }
-
-===expect===

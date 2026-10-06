@@ -26,4 +26,3 @@ array_udiff_assoc($a, $b, $cmp);
 array_diff_uassoc($a, $b, $cmp);
 array_udiff_uassoc($a, $b, $cmp, $cmp);
 array_udiff($a, $b, 'strcmp');
-===expect===

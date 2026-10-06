@@ -10,4 +10,3 @@ function foo() : void {
         try {} catch (Exception $e) {}
     }
 }
-===expect===

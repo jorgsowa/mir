@@ -15,4 +15,3 @@ $getter = function (): int {
 };
 $bound = Closure::bind($getter, new Container(), Container::class);
 echo $bound();
-===expect===

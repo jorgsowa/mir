@@ -23,4 +23,3 @@ function resetSession(): void {
     $_SESSION = [];
 //  ^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $_SESSION in a @pure function
 }
-===expect===

@@ -24,4 +24,3 @@ $fn = Child::create(...);
 $obj = $fn();
 /** @mir-check $obj is Child */
 echo "ok";
-===expect===

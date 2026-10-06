@@ -22,4 +22,3 @@ $p = new Parser();
 $p->tokenize("hello world", $result);
 /** @mir-check $result is list<string> */
 $_ = $result;
-===expect===

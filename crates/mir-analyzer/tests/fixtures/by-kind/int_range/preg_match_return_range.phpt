@@ -20,4 +20,3 @@ function test_preg_match_all_range(string $s): void {
     /** @mir-check $r is non-negative-int|false */
     $_ = $r;
 }
-===expect===

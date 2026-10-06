@@ -43,4 +43,3 @@ namespace App {
         echo $out;
     }
 }
-===expect===

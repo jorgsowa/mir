@@ -13,4 +13,3 @@ class MathUtil {
 function callIt(int $x): int {
     return MathUtil::square($x);
 }
-===expect===

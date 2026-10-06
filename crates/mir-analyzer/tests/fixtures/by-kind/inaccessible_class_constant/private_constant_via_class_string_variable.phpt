@@ -10,4 +10,3 @@ function run(): void {
     echo $cls::SECRET;
 //             ^^^^^^ InaccessibleClassConstant: Cannot access constant Config::SECRET
 }
-===expect===

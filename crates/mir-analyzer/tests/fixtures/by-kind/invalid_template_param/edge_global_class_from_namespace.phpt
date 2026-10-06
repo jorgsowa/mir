@@ -13,4 +13,3 @@ function process($node): void {
 }
 
 process(new \DOMElement('x'));
-===expect===

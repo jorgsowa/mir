@@ -21,4 +21,3 @@ $cb = /** @param A $x */ function($x) {
     takesB($x);
 //         ^^ ArgumentTypeCoercion: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime
 };
-===expect===

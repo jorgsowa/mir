@@ -17,5 +17,3 @@ function run(string $s): string {
     return (string) $m['b'];
 //                     ^^^ NonExistentArrayOffset: Array offset 'b' does not exist
 }
-
-===expect===

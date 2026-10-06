@@ -23,4 +23,3 @@ class Container {
     /** @var \App\Warning\Warning */
     private $warning;
 }
-===expect===

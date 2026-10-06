@@ -10,4 +10,3 @@ function foo($a): void {
     clone $a;
 //  ^^^^^^^^ MixedClone: cannot clone mixed
 }
-===expect===

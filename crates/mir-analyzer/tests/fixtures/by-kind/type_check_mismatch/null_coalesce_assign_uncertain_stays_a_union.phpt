@@ -33,4 +33,3 @@ function optionalKey(): void {
     /** @mir-check $arr is array{'a': 5|99} */
     $_ = $arr;
 }
-===expect===

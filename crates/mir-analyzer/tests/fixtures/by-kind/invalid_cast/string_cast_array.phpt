@@ -11,5 +11,3 @@ Invalid explicit cast from array to string
 <?php
 $x = (string)[];
 //           ^^ InvalidCast: Cannot cast 'array{}' to 'string'
-
-===expect===

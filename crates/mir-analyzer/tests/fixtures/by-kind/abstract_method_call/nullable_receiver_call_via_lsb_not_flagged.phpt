@@ -9,4 +9,3 @@ function run(?Loader $l): string {
     return $l::getType();
 //         ^^ PossiblyNullMethodCall: Cannot call method getType() on possibly null value
 }
-===expect===

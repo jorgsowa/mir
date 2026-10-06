@@ -15,4 +15,3 @@ class Foo {
 $f = new Foo();
 $f->bar(null);
 //      ^^^^ NullArgument: Argument $n of bar() cannot be null
-===expect===

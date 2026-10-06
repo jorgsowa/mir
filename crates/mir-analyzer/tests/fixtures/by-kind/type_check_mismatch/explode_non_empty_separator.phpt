@@ -21,4 +21,3 @@ function test_space_separator(): void {
     /** @mir-check $parts is non-empty-list<string> */
     $_ = $parts;
 }
-===expect===

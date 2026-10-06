@@ -14,4 +14,3 @@ class Foo {
         ($this->helper(...))();
     }
 }
-===expect===

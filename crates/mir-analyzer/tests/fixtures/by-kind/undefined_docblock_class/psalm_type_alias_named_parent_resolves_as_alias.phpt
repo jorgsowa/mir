@@ -18,4 +18,3 @@ class Test {
         return new SomeClass();
     }
 }
-===expect===

@@ -26,4 +26,3 @@ final class AlphaSource implements Source {
         return new Beta();
     }
 }
-===expect===

@@ -20,4 +20,3 @@ function test(A $a, B $b): void {
     $a->fromA();
     $b->fromB();
 }
-===expect===

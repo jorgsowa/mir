@@ -9,4 +9,3 @@ class HelloWorld
         if (substr($s, 0, 6) === "abc") {}
     }
 }
-===expect===

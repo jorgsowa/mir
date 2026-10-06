@@ -36,4 +36,3 @@ class Holder {
         unset($this->store[$k]);
     }
 }
-===expect===

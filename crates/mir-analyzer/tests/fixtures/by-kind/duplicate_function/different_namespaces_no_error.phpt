@@ -7,4 +7,3 @@ function greet(): string { return 'hello'; }
 
 namespace Other;
 function greet(): string { return 'hi'; }
-===expect===

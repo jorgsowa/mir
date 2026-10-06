@@ -32,4 +32,3 @@ function reversePreserveKeysTrueKeepsIntKeys(array $arr): void {
     /** @mir-check $r is non-empty-array<int, int> */
     $_ = $r;
 }
-===expect===

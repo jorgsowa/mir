@@ -38,4 +38,3 @@ class Box {
 $box = new Box('hi');
 $box::checkReplace(42);
 //<^^^^^^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Box::checkReplace() — @if-this-is requires $this to be 'Box<U>', but it is 'Box<string>'
-===expect===

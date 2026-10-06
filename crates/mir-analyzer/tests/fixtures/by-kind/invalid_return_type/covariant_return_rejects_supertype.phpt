@@ -20,4 +20,3 @@ function make(): Box {
     return $b;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'Box<Dog>' is not compatible with declared 'Box<Cat>'
 }
-===expect===

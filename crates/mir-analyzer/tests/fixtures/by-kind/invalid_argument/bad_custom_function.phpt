@@ -19,4 +19,3 @@ function myFunction( string $foo ) : bool {
 
 takesFunction("myFunction");
 //            ^^^^^^^^^^^^ InvalidArgument: Argument $func of takesFunction() expects 'callable whose parameter #1 accepts int', got 'callable whose parameter #1 only accepts string'
-===expect===

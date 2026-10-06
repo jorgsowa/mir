@@ -43,4 +43,3 @@ function push_on_int(int $s): int {
 //  ^^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type 'int'
     return $s;
 }
-===expect===

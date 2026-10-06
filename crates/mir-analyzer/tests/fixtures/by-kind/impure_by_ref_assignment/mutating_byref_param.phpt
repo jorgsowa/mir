@@ -9,4 +9,3 @@ function mutateByRef(int &$x): void {
     $x = 42;
 //  ^^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $x in a @pure function
 }
-===expect===

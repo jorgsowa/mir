@@ -20,4 +20,3 @@ function takesPhanParam($value): void {}
 takesPhanParam(1);
 takesPhanParam('x');
 //             ^^^ InvalidArgument: Argument $value of takesPhanParam() expects 'int', got '"x"'
-===expect===

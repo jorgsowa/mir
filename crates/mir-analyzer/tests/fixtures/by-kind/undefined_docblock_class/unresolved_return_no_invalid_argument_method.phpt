@@ -13,4 +13,3 @@ class Client {
         return json_decode($this->fetch());
     }
 }
-===expect===

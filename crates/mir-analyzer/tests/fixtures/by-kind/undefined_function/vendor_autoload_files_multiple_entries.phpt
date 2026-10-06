@@ -28,4 +28,3 @@ class Consumer {
         return pkg_b_helper((string) $n);
     }
 }
-===expect===

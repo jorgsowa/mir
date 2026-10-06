@@ -23,4 +23,3 @@ $fn = $f->format(...);
 $fn($result, 'hello');
 /** @mir-check $result is string */
 echo $result;
-===expect===

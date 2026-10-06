@@ -26,5 +26,3 @@ class B extends A
         string $email,
     ) {}
 }
-
-===expect===

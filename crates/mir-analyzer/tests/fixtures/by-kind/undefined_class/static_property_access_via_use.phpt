@@ -5,4 +5,3 @@ static property access via use
 use Vendor\Missing\Foo;
 echo Foo::$bar;
 //   ^^^ UndefinedClass: Class Vendor\Missing\Foo does not exist
-===expect===

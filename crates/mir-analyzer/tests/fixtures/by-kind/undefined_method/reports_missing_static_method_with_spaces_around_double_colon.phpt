@@ -7,4 +7,3 @@ function test(): void {
     Math :: missing();
 //  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Math::missing() does not exist
 }
-===expect===

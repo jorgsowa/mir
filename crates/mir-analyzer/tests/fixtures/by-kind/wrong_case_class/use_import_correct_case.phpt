@@ -18,4 +18,3 @@ class MyClass {}
 use Lib\MyClass;
 
 $x = new MyClass();
-===expect===

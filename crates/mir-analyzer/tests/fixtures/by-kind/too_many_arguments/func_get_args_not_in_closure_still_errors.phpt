@@ -19,4 +19,3 @@ function outerFn(string $x): void {
 
 outerFn('hello', 'world');
 //               ^^^^^^^ TooManyArguments: Too many arguments for outerFn(): expected 1, got 2
-===expect===

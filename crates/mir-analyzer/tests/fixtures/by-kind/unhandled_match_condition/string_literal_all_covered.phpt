@@ -10,4 +10,3 @@ function label(string $s): string {
         "c" => "C",
     };
 }
-===expect===

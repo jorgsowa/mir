@@ -18,5 +18,3 @@ class Foo
 }
 
 takesCallableObject(Foo::class);
-
-===expect===

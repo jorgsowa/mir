@@ -12,4 +12,3 @@ MixedArrayOffset does NOT fire after an explicit (string) cast — the cast prod
 $x = 'hello';
 $arr = ['hello' => 1, 'world' => 2];
 $val = $arr[(string) $x];
-===expect===

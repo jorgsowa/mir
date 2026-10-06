@@ -12,5 +12,3 @@ class Foo
 
 $r = new ReflectionMethod("Foo::bar");
 $r->getAttributes(Attr::class);
-
-===expect===

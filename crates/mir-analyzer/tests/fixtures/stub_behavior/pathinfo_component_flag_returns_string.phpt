@@ -11,4 +11,3 @@ function filename(string $path): FileName {
         value: pathinfo($path, PATHINFO_FILENAME),
     );
 }
-===expect===

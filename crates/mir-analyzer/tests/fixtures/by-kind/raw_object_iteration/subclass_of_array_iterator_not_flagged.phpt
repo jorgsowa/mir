@@ -7,4 +7,3 @@ class TypedList extends \ArrayIterator {}
 function gen(TypedList $list): \Generator {
     yield from $list;
 }
-===expect===

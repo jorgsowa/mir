@@ -36,4 +36,3 @@ function test_range_inc(int $n): void {
     /** @mir-check $n is int<6, 11> */
     $_ = $n;
 }
-===expect===

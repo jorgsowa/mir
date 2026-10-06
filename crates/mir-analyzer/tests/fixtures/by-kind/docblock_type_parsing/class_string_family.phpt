@@ -46,4 +46,3 @@ function check_class_string_map_one_arg($x) {
      */
     var_dump($x);
 }
-===expect===

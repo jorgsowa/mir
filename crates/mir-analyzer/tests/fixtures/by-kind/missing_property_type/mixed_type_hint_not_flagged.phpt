@@ -12,4 +12,3 @@ class Container {
         private mixed $cache = null,
     ) {}
 }
-===expect===

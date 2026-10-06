@@ -12,4 +12,3 @@ use App\Status;
 function check(mixed $val): bool {
     return $val instanceof Status;
 }
-===expect===

@@ -15,4 +15,3 @@ switch ($a) {
 //       ^^^ TypeDoesNotContainType: Type '"a"|"b"' can never contain type '"c"'
         echo "impossible";
 }
-===expect===

@@ -23,4 +23,3 @@ function filterOdd(int $i, A $a) : ?int {
 
     return null;
 }
-===expect===

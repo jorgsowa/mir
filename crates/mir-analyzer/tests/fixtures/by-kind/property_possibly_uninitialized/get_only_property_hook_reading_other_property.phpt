@@ -24,4 +24,3 @@ final class View
            $this->bag = $bag;
        }
 }
-===expect===

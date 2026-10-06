@@ -13,4 +13,3 @@ be flagged undefined.
 <?php
 function f(Relay\NotARealClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class Relay\NotARealClass does not exist
-===expect===

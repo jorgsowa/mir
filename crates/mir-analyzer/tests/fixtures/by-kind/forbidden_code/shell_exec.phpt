@@ -12,4 +12,3 @@ function run(string $cmd): string {
     return `$cmd`;
 //         ^^^^^^ ForbiddenCode: Use of shell_exec (backtick) is forbidden
 }
-===expect===

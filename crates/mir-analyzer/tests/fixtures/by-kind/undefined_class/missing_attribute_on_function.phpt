@@ -5,4 +5,3 @@ Missing attribute on function
 #[Pure]
 //^^^^ UndefinedAttributeClass: Attribute class Pure does not exist
 function foo() : void {}
-===expect===

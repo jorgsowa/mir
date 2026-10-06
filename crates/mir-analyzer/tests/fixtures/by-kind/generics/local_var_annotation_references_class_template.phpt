@@ -28,4 +28,3 @@ class Box {
         return $item;
     }
 }
-===expect===

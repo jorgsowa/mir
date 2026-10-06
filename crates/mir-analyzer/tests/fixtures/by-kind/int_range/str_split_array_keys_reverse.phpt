@@ -33,4 +33,3 @@ function test_array_reverse(array $arr): void {
     /** @mir-check $rev is non-empty-list<string> */
     $_ = $rev;
 }
-===expect===

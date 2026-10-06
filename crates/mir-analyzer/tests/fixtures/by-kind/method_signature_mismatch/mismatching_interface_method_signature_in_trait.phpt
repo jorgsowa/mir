@@ -21,4 +21,3 @@ trait T {
 class B implements A {
     use T;
 }
-===expect===

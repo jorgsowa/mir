@@ -7,4 +7,3 @@ function greet(string $name): string {
 }
 
 echo greet('World');
-===expect===

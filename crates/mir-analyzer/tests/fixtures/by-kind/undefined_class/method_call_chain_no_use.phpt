@@ -20,4 +20,3 @@ function requireString(string $s): void { var_dump($s); }
 function make(): void {
     requireString((new \App\Builder())->build());
 }
-===expect===

@@ -24,4 +24,3 @@ class C extends B {
         $x->foo($array);
     }
 }
-===expect===

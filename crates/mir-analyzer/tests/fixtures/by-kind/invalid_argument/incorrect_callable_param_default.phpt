@@ -11,5 +11,3 @@ Incorrect callable param default
 class A {
     public function foo(callable $_a = "strlen"): void {}
 }
-
-===expect===

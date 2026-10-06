@@ -25,4 +25,3 @@ $x = new Sub();
 $x->touch();
 /** @mir-check $x is Ready */
 $_ = 1;
-===expect===

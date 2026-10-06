@@ -11,4 +11,3 @@ class Foo {
     use ToStringTrait;
 }
 new Foo();
-===expect===

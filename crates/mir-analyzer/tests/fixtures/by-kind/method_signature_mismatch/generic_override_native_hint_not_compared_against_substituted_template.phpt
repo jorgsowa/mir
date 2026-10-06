@@ -31,4 +31,3 @@ final class ConcreteContainer extends Container {
         return new Concrete();
     }
 }
-===expect===

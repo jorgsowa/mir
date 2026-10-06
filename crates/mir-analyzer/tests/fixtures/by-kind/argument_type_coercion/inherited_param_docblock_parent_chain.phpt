@@ -24,4 +24,3 @@ final class Leaf extends Base {
         $_b = $flags;
     }
 }
-===expect===

@@ -21,4 +21,3 @@ function route($callback) {
 }
 
 function takes_int(int $i) {}
-===expect===

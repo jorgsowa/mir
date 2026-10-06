@@ -39,4 +39,3 @@ function narrowsIntersection($x): void {
         }
     }
 }
-===expect===

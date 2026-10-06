@@ -21,4 +21,3 @@ class ValueObject {
         $this->name = $name;
     }
 }
-===expect===

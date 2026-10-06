@@ -9,4 +9,3 @@ function greet(string $name, string $suffix): void {}
 <?php
 greet('Ada');
 //<^^^^^^^^^^^^ TooFewArguments: Too few arguments for greet(): expected 2, got 1
-===expect===

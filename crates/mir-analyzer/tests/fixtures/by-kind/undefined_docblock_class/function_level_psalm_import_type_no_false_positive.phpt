@@ -25,4 +25,3 @@ function distanceFromOrigin(array $coord): float {
 }
 
 distanceFromOrigin(['lat' => 3.0, 'lng' => 4.0]);
-===expect===

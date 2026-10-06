@@ -27,4 +27,3 @@ try {
 } catch (NotFoundException $e) {
     echo $e->getMessage();
 }
-===expect===

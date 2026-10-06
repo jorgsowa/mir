@@ -14,4 +14,3 @@ class Child extends Base {
     #[Override]
     protected function render(): void {}
 }
-===expect===

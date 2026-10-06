@@ -15,4 +15,3 @@ class Child extends Base {
     public function f(string $x, int $y): void { var_dump($x, $y); }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Child::f() signature mismatch: parameter $y type 'int' is incompatible with parent type 'string'
 }
-===expect===

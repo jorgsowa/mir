@@ -11,4 +11,3 @@ function buildForeignKey(string $table, string $ref): string {
     }
     return $sql;
 }
-===expect===

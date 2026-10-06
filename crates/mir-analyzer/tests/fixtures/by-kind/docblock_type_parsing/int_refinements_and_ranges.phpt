@@ -105,4 +105,3 @@ class Flags {
         var_dump($mask);
     }
 }
-===expect===

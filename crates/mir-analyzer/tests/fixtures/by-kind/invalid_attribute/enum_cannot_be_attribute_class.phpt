@@ -7,4 +7,3 @@ Enum cannot be attribute class
 enum Foo {
     case Bar;
 }
-===expect===

@@ -12,5 +12,3 @@ function foo(string $bar): int
 }
 
 foo(foo("123") . foo("-456"));
-
-===expect===

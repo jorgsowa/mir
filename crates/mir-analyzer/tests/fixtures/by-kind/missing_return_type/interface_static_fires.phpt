@@ -6,4 +6,3 @@ interface IFoo {
     public static function staticNoReturn();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingReturnType: Function IFoo::staticNoReturn() has no return type annotation
 }
-===expect===

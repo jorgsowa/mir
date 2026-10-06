@@ -26,4 +26,3 @@ class Processor {
         $acc->add($this->factor * $value);
     }
 }
-===expect===

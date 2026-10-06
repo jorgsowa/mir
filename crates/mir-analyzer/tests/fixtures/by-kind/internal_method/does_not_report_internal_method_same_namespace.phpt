@@ -14,4 +14,3 @@ class Foo {
 
 $foo = new Foo();
 $foo->internalHelper();
-===expect===

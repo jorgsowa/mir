@@ -22,4 +22,3 @@ $gen = nextId(...);
 $gen($id);
 // $id is defined — no UndefinedVariable, no PossiblyUndefinedVariable.
 echo $id;
-===expect===

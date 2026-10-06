@@ -32,4 +32,3 @@ function test_compact_dynamic_name_fallback(string $key): void {
     /** @mir-check compact($key) is array */
     $_ = compact($key);
 }
-===expect===

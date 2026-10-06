@@ -20,4 +20,3 @@ class A {
 
 A::foo("for");
 //     ^^^^^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"', got '"for"'
-===expect===

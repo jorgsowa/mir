@@ -25,4 +25,3 @@ class Handler {
         throw $this->exception;
     }
 }
-===expect===

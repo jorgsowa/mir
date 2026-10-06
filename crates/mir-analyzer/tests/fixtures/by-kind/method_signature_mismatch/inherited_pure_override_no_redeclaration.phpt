@@ -14,4 +14,3 @@ class TrimFormatter implements Formatter {
         return $value;
     }
 }
-===expect===

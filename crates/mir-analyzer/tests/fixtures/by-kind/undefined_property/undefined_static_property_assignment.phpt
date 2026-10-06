@@ -10,4 +10,3 @@ class A {
         self::$foo = 5;
     }
 }
-===expect===

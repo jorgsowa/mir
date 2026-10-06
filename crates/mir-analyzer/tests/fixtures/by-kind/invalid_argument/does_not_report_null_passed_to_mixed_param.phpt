@@ -11,4 +11,3 @@ does not report null passed to mixed param
 <?php
 function f(mixed $x): void {}
 function test(): void { f(null); }
-===expect===

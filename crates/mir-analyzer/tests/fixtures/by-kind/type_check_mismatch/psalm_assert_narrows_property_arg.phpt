@@ -38,4 +38,3 @@ class Holder {
         echo $this->prop;
     }
 }
-===expect===

@@ -23,4 +23,3 @@ function wrap(): void {
         throw new \Exception();
     } catch (Entity $e) {}
 }
-===expect===

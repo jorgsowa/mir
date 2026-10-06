@@ -15,4 +15,3 @@ function f(callable $_p): void {}
 
 f("strcmp");
 //^^^^^^^^ InvalidArgument: Argument $_p of f() expects 'callable whose parameter #1 accepts int', got 'callable whose parameter #1 only accepts string'
-===expect===

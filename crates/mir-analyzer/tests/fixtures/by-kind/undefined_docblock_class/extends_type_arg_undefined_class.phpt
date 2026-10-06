@@ -9,4 +9,3 @@ class Box {}
 /** @extends Box<NonExistentTypeArg> */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentTypeArg' does not exist
 class IntBox extends Box {}
-===expect===

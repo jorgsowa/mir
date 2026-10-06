@@ -20,4 +20,3 @@ use Lib\myClass;
 
 $x = new myClass();
 //       ^^^^^^^ WrongCaseClass: Class name 'myClass' has incorrect casing; use 'MyClass'
-===expect===

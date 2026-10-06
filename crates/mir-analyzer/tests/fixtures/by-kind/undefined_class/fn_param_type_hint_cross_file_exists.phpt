@@ -10,4 +10,3 @@ use App\Service;
 function process(Service $svc): void {
     echo get_class($svc);
 }
-===expect===

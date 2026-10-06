@@ -26,4 +26,3 @@ function test_date_format(): void {
     /** @mir-check $r is non-empty-string */
     $_ = $r;
 }
-===expect===

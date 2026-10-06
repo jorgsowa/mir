@@ -9,5 +9,3 @@ function foo(int $n): void {
 
 $x = 3;
 foo($x);
-
-===expect===

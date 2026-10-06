@@ -16,4 +16,3 @@ class Cache {
 //                  ^^^^^^ ImpureStaticPropertyAccess: Reading static property Cache::$store in a @pure function
     }
 }
-===expect===

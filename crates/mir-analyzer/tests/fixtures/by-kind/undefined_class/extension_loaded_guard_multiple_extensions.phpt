@@ -29,4 +29,3 @@ if (extension_loaded('outer_ext')) {
 if (extension_loaded('optional') && class_exists(\OptionalClass::class)) {
     $x = new \OptionalClass();
 }
-===expect===

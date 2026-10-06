@@ -40,4 +40,3 @@ function test_not_equal(Foo|Bar $x): void {
         $_ = $x;
     }
 }
-===expect===

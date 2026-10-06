@@ -11,4 +11,3 @@ foreach ($arr as $key => $v) {
     list($key) = explode(".", $v);
     echo $key;
 }
-===expect===

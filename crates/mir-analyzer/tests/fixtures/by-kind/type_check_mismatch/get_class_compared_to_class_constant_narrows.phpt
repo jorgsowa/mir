@@ -23,4 +23,3 @@ function rightGetClass(object $x): void {
         echo "";
     }
 }
-===expect===

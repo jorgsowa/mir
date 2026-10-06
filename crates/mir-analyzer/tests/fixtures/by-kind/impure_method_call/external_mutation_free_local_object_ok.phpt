@@ -20,4 +20,3 @@ class Factory {
         return $b;
     }
 }
-===expect===

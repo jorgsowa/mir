@@ -20,4 +20,3 @@ class Numeric {
         return 'numeric';
     }
 }
-===expect===

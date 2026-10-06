@@ -16,4 +16,3 @@ class Box {
 
 $b = new Box(new Dog());
 $b->onlyForAnimalBox();
-===expect===

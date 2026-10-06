@@ -12,5 +12,3 @@ class WithConstructor {
 }
 
 new WithConstructor("hello");
-
-===expect===

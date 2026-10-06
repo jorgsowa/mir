@@ -23,4 +23,3 @@ function test(): void {
     echo $c->items['id'];
 //  ^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

@@ -29,4 +29,3 @@ final class Listing {
         return $this->offset;
     }
 }
-===expect===

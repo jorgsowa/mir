@@ -22,5 +22,3 @@ function readDeclared(Sealed $s): string {
 function writeDeclared(Sealed $s): void {
     $s->age = 30;
 }
-
-===expect===

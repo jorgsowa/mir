@@ -17,4 +17,3 @@ function test(): void {
     send_header($_GET['v']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
 }
-===expect===

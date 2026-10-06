@@ -8,4 +8,3 @@ function fñoo(): void {}
 fñoo();
 fÑoo();
 //<^^^^^^ UndefinedFunction: Function fÑoo() is not defined
-===expect===

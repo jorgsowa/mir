@@ -39,4 +39,3 @@ function assign_wrong_type(Box $b): void {
     $b->item = 'x';
 //  ^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $item expects 'Impl', cannot assign '"x"'
 }
-===expect===

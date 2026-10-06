@@ -53,4 +53,3 @@ function test_false_branch_keeps_string(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

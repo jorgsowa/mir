@@ -9,4 +9,3 @@ class Foo {
         $this->name = $name;
     }
 }
-===expect===

@@ -9,4 +9,3 @@ if (!function_exists('grapheme_extract')) {
 }
 
 function helper(int $offset): string { return (string) $offset; }
-===expect===

@@ -36,5 +36,3 @@ if (assertBarNotNull($foo)) {
 }
 
 function requiresString(string $_str): void {}
-
-===expect===

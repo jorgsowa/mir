@@ -6,4 +6,3 @@ enum Suit { case Hearts; case Spades; }
 $s = Suit::Hearts;
 /** @mir-check $s is Suit */
 echo $s->name;
-===expect===

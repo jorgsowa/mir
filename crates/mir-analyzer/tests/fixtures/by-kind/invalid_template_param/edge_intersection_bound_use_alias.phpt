@@ -24,4 +24,3 @@ function f($val): void {
 }
 
 f(new Both());
-===expect===

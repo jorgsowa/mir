@@ -11,4 +11,3 @@ function test(): void {
     oldGreet('Alice');
 //  ^^^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function oldGreet: use newGreet() instead
 }
-===expect===

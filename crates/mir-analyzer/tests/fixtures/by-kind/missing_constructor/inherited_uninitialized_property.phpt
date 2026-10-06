@@ -12,5 +12,3 @@ class Child extends Base {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Child has uninitialized properties but no constructor
 
 new Child();
-
-===expect===

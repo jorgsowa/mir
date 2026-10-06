@@ -28,4 +28,3 @@ class Impl extends Base {
     /** @param T&IteratorLike $x */
     public function accept($x): void {}
 }
-===expect===

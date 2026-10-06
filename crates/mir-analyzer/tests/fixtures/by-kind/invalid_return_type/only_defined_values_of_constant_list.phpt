@@ -12,5 +12,3 @@ class A {
 //      ^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"adams"' is not compatible with declared 'key-of<A::FOO>'
     }
 }
-
-===expect===

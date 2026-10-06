@@ -9,4 +9,3 @@ class Vault
 
 echo (new Vault())->secret;
 //                  ^^^^^^ InaccessibleProperty: Cannot access property Vault::$secret
-===expect===

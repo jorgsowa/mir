@@ -13,4 +13,3 @@ Invalid docblock param default
  * @return void
  */
 function f($p = false) {}
-===expect===

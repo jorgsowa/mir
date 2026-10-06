@@ -8,4 +8,3 @@ is runtime truth regardless of what the docblock (wrongly) claims.
 /** @return bool */
 function boolDocStringHint(): string { return 'x'; }
 //       ^^^^^^^^^^^^^^^^^ MismatchingDocblockReturnType: Docblock return type 'bool' does not match inferred 'string'
-===expect===

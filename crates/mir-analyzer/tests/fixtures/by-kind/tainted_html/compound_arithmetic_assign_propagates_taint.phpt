@@ -19,4 +19,3 @@ function test(): void {
     echo $id;
 //  ^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

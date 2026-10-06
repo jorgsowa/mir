@@ -15,4 +15,3 @@ enum Color: string {
 }
 $x = Color::TRYFROM('red');
 //          ^^^^^^^ WrongCaseMethod: Method name 'Color::TRYFROM' has incorrect casing; use 'tryFrom'
-===expect===

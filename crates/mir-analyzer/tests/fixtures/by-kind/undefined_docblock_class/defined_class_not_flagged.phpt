@@ -19,5 +19,3 @@ function getIt(): mixed {
  * @param MyExistingClass $obj
  */
 function takeIt($obj): void {}
-
-===expect===

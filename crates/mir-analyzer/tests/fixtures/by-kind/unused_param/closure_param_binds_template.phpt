@@ -20,4 +20,3 @@ function apply(callable $fn, mixed $value): mixed { return $fn($value); }
 
 $result = apply(fn(string $s): int => strlen($s), 'hello');
 /** @mir-check $result is int */
-===expect===

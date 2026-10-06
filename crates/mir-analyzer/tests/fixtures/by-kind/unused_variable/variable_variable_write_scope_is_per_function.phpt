@@ -10,4 +10,3 @@ function plain(): void {
     $x = 1;
 //  ^^ UnusedVariable: Variable $x is never read
 }
-===expect===

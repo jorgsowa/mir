@@ -45,4 +45,3 @@ final class Property {
         return $this->id;
     }
 }
-===expect===

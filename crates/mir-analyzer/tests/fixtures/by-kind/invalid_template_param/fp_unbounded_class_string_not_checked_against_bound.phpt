@@ -56,4 +56,3 @@ function result_stays_object(string $cls): void {
     /** @mir-check $o is object */
     echo get_class($o);
 }
-===expect===

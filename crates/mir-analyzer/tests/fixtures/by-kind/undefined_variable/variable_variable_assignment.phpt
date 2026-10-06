@@ -14,4 +14,3 @@ function run(array $opts): void {
     // FP expected: UndefinedVariable $a (variable-variables not tracked)
     echo $a;
 }
-===expect===

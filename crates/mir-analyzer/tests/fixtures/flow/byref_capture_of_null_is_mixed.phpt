@@ -47,4 +47,3 @@ function byValueKeepsNull(): void {
     };
     $chk('a');
 }
-===expect===

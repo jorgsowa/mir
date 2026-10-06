@@ -4,4 +4,3 @@ No NonExistentArrayOffset inside empty()
 <?php
 $a = ["k" => 1];
 empty($a["missing"]);
-===expect===

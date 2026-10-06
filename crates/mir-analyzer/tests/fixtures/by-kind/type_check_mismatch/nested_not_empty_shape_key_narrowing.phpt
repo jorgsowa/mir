@@ -32,4 +32,3 @@ function threeLevels(array $data): string {
     }
     return "none";
 }
-===expect===

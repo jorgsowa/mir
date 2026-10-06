@@ -9,4 +9,3 @@ Builtin functioninvalid argument with declare strict types in class
 //                                      ^ InvalidArgument: Argument $string of substr() expects 'string', got '5'
                         }
                     }
-===expect===

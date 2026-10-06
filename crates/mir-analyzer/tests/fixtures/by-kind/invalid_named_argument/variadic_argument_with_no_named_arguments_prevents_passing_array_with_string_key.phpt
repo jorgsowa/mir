@@ -13,5 +13,3 @@ function foo(int ...$values): array
 
 foo(...["a" => 0]);
 //  ^^^^^^^^^^^^^ InvalidNamedArguments: foo() does not accept named arguments
-
-===expect===

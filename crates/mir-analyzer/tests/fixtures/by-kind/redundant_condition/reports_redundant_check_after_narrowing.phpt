@@ -8,4 +8,3 @@ function f(string|int $x): void {
 //          ^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
     }
 }
-===expect===

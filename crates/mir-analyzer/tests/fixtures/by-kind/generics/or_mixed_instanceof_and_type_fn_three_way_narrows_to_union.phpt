@@ -46,4 +46,3 @@ function differentVariablesStillBail($x, $y): void {
         $_ = 1;
     }
 }
-===expect===

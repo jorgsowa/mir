@@ -19,4 +19,3 @@ if (is_string($result)) {
 //  ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
     echo $result;
 }
-===expect===

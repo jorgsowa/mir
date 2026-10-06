@@ -11,4 +11,3 @@ function withoutTablePrefix(callable $callback): mixed {
         echo $tablePrefix;
     }
 }
-===expect===

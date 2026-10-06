@@ -16,5 +16,3 @@ function getAge(Sealed $s): mixed {
     return $s->age;
 //             ^^^ NoInterfaceProperties: Property $age is not defined on this interface
 }
-
-===expect===

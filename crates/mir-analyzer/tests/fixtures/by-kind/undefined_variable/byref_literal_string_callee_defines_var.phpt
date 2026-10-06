@@ -8,4 +8,3 @@ function a(string $re, string $s): int {
     /** @mir-check $m is array<int|string, string> */
     return count($m);
 }
-===expect===

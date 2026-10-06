@@ -14,4 +14,3 @@ class UserService {}
 namespace Client;
 use MyApp\Service;
 $x = new Service\UserService();
-===expect===

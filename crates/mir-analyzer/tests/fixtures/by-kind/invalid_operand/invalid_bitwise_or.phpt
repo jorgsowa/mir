@@ -10,4 +10,3 @@ Invalid bitwise or
 <?php
 $a = "x" | new stdClass;
 //   ^^^^^^^^^^^^^^^^^^ InvalidOperand: Operator '|' not supported between '"x"' and 'stdClass'
-===expect===

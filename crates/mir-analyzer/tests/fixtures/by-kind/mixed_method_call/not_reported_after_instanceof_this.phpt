@@ -15,4 +15,3 @@ abstract class A
         return false;
     }
 }
-===expect===

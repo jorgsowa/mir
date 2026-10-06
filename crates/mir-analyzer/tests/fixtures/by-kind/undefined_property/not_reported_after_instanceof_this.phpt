@@ -14,4 +14,3 @@ abstract class A
         return $this->value === $other->value;
     }
 }
-===expect===

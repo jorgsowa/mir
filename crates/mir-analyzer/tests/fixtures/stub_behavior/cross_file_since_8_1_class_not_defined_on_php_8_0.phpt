@@ -13,4 +13,3 @@ function make_fiber(callable $fn): void {
 ===file:App.php===
 <?php
 make_fiber(function (): void {});
-===expect===

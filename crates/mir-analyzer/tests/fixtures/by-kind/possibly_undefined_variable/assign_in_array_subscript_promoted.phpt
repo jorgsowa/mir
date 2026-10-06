@@ -29,4 +29,3 @@ function binary_search(array $table, int $target): bool {
     }
     return false;
 }
-===expect===

@@ -13,4 +13,3 @@ $name = 'formatRow';
 array_map(<<<EOT
 {$name}
 EOT, [1, 2, 3]);
-===expect===

@@ -13,4 +13,3 @@ function test_wrong_type(int $n): void {
 ===file:App.php===
 <?php
 test_wrong_type(42);
-===expect===

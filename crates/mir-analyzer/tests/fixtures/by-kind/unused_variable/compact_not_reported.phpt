@@ -7,4 +7,3 @@ function foo(): array {
     $age = 30;
     return compact('name', 'age');
 }
-===expect===

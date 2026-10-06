@@ -14,4 +14,3 @@ function f(): void {
 }
 new NoSuchClassOutside();
 //  ^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NoSuchClassOutside does not exist
-===expect===

@@ -15,4 +15,3 @@ function test(): void {
     if ($s == 3) {}
 //      ^^^^^^^ ImpossibleLooseComparison: '==' between '"foo"' and '3' is always false — these types can never be loosely equal
 }
-===expect===

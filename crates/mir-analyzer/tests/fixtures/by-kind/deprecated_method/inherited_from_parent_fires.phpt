@@ -18,4 +18,3 @@ function test(Child $c): void {
     $c->oldMethod();
 //  ^^^^^^^^^^^^^^^ DeprecatedMethod: Method Child::oldMethod() is deprecated: use newMethod() instead
 }
-===expect===

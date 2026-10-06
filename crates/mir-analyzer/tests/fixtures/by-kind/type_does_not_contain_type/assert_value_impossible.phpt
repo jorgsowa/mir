@@ -16,4 +16,3 @@ function assertFooBar(string $s) : void {
 
 $a = "";
 assertFooBar($a);
-===expect===

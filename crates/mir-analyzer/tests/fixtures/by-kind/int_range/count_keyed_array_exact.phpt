@@ -25,4 +25,3 @@ function test(): void {
     /** @mir-check $z is 0 */
     $_ = $z;
 }
-===expect===

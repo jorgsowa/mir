@@ -24,4 +24,3 @@ function process(callable $cb, array $items): array {
 function useIt(array $items): void {
     process(fn(int $x): string => (string) $x, $items);
 }
-===expect===

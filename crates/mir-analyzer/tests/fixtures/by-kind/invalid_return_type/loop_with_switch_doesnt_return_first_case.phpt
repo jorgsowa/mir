@@ -22,4 +22,3 @@ function b(): int {
             return 2;
     }
 }
-===expect===

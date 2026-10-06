@@ -16,4 +16,3 @@ function buildList(array $items): array
     /** @mir-check $out is list<string> */
     return $out;
 }
-===expect===

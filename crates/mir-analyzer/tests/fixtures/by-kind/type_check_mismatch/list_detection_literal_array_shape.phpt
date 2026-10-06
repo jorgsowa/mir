@@ -37,4 +37,3 @@ function unshiftOntoLiteralListStaysList(): void {
     /** @mir-check $arr is non-empty-list<1|2|3> */
     $_ = $arr;
 }
-===expect===

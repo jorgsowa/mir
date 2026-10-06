@@ -10,4 +10,3 @@ class Foo {
         return null;
     }
 }
-===expect===

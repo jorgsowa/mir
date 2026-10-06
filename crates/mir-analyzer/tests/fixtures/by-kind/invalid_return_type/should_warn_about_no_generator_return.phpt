@@ -20,4 +20,3 @@ function notagenerator() : Generator {
     }
     return generator2();
 }
-===expect===

@@ -15,4 +15,3 @@ function test_null_true_false(): int {
     return $r === 0 ? null : ($r === 1 ? true : false);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'null|bool' is not compatible with declared 'int'
 }
-===expect===

@@ -12,4 +12,3 @@ class QueryBuilder {
         return $this;
     }
 }
-===expect===

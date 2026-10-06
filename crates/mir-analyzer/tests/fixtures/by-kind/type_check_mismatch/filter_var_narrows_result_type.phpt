@@ -57,4 +57,3 @@ function test_with_options_bails_to_stub(string $s): void {
     $_ = $v;
 //  ^^^^^^^ MixedAssignment: Variable $_ is assigned a mixed type
 }
-===expect===

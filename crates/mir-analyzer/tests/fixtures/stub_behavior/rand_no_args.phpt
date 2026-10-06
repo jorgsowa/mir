@@ -12,4 +12,3 @@ rand can be called with zero arguments
 $r = rand();
 // rand with two arguments is also allowed
 $r2 = rand(1, 100);
-===expect===

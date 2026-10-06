@@ -24,4 +24,3 @@ function f(Container $c): void {
         $c->pet->bark();
     }
 }
-===expect===

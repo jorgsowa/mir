@@ -18,4 +18,3 @@ class Tag {
 function format($value): void {}
 
 format(new Tag());
-===expect===

@@ -11,4 +11,3 @@ function run(): void {
     \Validator::check(42);
 //                    ^^ ArgumentTypeCoercion: Argument $value of check() expects 'string', got '42' — coercion may fail at runtime
 }
-===expect===

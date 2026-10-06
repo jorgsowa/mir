@@ -30,4 +30,3 @@ function falseBranchExcludes(Priority $p): void {
     /** @mir-check $p is Priority::Low|Priority::High */
     $_ = 1;
 }
-===expect===

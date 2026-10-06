@@ -10,4 +10,3 @@ function sign(int $n): string {
         0  => "zero",
     };
 }
-===expect===

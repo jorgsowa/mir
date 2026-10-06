@@ -12,4 +12,3 @@ function test(array $config) {
     new $config();
 //      ^^^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'array'
 }
-===expect===

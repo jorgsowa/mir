@@ -13,4 +13,3 @@ function test(): void {
     takesInt(false);
 //           ^^^^^ InvalidArgument: Argument $n of takesInt() expects 'int', got 'false'
 }
-===expect===

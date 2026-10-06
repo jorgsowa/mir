@@ -21,4 +21,3 @@ $a = (new T)->f();
 /** @mir-check $b is mixed */
 $b = n();
 //<^^^^^^^^ MixedAssignment: Variable $b is assigned a mixed type
-===expect===

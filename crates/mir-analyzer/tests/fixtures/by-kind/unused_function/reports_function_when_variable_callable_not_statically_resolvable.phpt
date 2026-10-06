@@ -7,4 +7,3 @@ function helper(): void {}
 
 $fn = 'helper';
 call_user_func($fn);
-===expect===

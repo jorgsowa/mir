@@ -32,4 +32,3 @@ $db = new Db();
 // garbage like Lib\TKey or Lib\array by checking the type display is a proper conditional form.
 $result = $db->fetch(null);
 /** @mir-check $result is ($TKey is null ? list<array<mixed, mixed>> : array<int, array<mixed, mixed>>) */
-===expect===

@@ -11,4 +11,3 @@ class Existing {}
  * @method Existing getThing(Existing $arg)
  */
 class A {}
-===expect===

@@ -13,5 +13,3 @@ function foo(int $a, string $b): void {}
 $x = null;
 foo(a: $x, b: "hello");
 //  ^^^^^ MixedArgument: Argument $a of foo() is mixed
-
-===expect===

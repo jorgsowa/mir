@@ -41,4 +41,3 @@ final class Holder {
 //      ^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $v expects 'Cached<int<0, max>>', cannot assign 'Cached<int>'
     }
 }
-===expect===

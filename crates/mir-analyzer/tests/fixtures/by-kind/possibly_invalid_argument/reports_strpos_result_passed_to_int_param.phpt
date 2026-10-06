@@ -13,4 +13,3 @@ function test(string $haystack, string $needle): void {
     takesInt(strpos($haystack, $needle));
 //           ^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int<0, max>|false' provided
 }
-===expect===

@@ -7,4 +7,3 @@ interface Repository {}
 
 namespace Other;
 interface Repository {}
-===expect===

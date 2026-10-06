@@ -12,4 +12,3 @@ class Dog extends Animal {
     /** @return Box<int> */
     public function make(): mixed { return new Box(); }
 }
-===expect===

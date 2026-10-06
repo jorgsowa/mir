@@ -15,4 +15,3 @@ Max specified as first
 function scope(int $a){
     return $a;
 }
-===expect===

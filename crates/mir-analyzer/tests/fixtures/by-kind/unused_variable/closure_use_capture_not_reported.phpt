@@ -15,4 +15,3 @@ function foo(): array {
         return $item * $config['multiplier'];
     }, $items);
 }
-===expect===

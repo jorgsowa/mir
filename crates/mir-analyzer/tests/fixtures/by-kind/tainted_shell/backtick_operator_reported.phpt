@@ -20,4 +20,3 @@ function test(): void {
     $out = `ls $dir`;
 //         ^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
-===expect===

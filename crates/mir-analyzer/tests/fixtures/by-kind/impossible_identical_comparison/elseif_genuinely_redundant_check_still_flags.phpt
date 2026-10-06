@@ -19,4 +19,3 @@ function process(A|B $cell): void {
         echo $cell->value;
     }
 }
-===expect===

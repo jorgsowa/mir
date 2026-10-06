@@ -15,5 +15,3 @@ class Middle extends GrandBase {
 }
 class Leaf extends Middle {}
 class Logger {}
-
-===expect===

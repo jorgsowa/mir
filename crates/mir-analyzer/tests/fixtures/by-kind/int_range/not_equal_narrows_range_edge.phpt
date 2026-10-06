@@ -41,4 +41,3 @@ function test_range_hi(int $d): void {
         $_ = $d;
     }
 }
-===expect===

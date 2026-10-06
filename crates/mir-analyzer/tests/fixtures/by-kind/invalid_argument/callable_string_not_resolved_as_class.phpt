@@ -24,4 +24,3 @@ function processData() {
 
 // This should NOT emit UndefinedClass for "processData"
 execute("processData");
-===expect===

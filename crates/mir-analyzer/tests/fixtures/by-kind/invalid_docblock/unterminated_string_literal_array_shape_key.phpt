@@ -25,4 +25,3 @@ class Foo {
     public $baz;
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$baz has no type annotation
 }
-===expect===

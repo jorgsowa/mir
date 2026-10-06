@@ -53,4 +53,3 @@ function test(string $c, string $plain): void {
     ident($plain);
 //  ^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'class-string'
 }
-===expect===

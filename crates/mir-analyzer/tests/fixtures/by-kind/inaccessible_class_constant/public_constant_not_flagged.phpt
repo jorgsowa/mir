@@ -14,4 +14,3 @@ class Config {
 }
 
 $v = Config::TIMEOUT;
-===expect===

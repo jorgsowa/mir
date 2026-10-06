@@ -44,4 +44,3 @@ function testMismatchStillFlagged(): void {
     $box->requiresAnimalCollection();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call DogBox::requiresAnimalCollection() — @if-this-is requires $this to be 'Collection<Animal>', but it is 'DogBox<Widget>'
 }
-===expect===

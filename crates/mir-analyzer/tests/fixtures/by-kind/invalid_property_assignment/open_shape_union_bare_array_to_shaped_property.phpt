@@ -60,4 +60,3 @@ final class Box {
 //      ^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign '1|array'
     }
 }
-===expect===

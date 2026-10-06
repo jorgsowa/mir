@@ -18,4 +18,3 @@ function lib_fn(): string { return 'l'; }
 ===file:c.php===
 <?php
 function c_use(): string { return lib_fn(); }
-===expect===

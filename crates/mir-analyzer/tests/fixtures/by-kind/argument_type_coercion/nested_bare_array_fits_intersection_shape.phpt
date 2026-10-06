@@ -33,4 +33,3 @@ function bad(int $i, string $s): void {
     takesShape(['other' => []]);
 //             ^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'other': array{}}'
 }
-===expect===

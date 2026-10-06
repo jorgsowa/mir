@@ -21,4 +21,3 @@ function test(array $arr): void {
         $_ = $n;
     }
 }
-===expect===

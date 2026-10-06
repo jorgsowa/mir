@@ -11,4 +11,3 @@ $a = (new Foo());
 
 $a->barBar();
 //<^^^^^^^^^^^^ MixedMethodCall: Method barBar() called on mixed type
-===expect===

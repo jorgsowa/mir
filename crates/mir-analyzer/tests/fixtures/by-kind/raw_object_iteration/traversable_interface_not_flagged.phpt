@@ -5,4 +5,3 @@ RawObjectIteration does NOT fire when yield-from target is typed as Traversable.
 function gen(\Traversable $t): \Generator {
     yield from $t;
 }
-===expect===

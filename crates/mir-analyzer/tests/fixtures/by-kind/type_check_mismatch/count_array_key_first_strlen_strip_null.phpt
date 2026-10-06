@@ -54,4 +54,3 @@ function strlen_empty_does_not_strip_null(?string $s): void {
         $_ = 1;
     }
 }
-===expect===

@@ -14,4 +14,3 @@ class Child extends Base
         return self::$value;
     }
 }
-===expect===

@@ -10,4 +10,3 @@ use App\Shape;
 function check(mixed $val): bool {
     return $val instanceof Shape;
 }
-===expect===

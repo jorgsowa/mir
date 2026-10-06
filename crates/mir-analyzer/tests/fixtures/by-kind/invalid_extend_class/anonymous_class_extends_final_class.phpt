@@ -8,4 +8,3 @@ final class Base {}
 
 new class extends Base {};
 //                ^^^^ InvalidExtendClass: Class <anonymous> cannot extend final class Base
-===expect===

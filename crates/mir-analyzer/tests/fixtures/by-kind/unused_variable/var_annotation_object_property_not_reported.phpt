@@ -20,4 +20,3 @@ function q(): void {
      */
     echo count($local->prop);
 }
-===expect===

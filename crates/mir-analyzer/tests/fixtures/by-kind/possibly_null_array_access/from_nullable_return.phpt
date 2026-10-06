@@ -9,4 +9,3 @@ function getItems(): ?array {
 $arr = getItems();
 echo $arr[0];
 //   ^^^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
-===expect===

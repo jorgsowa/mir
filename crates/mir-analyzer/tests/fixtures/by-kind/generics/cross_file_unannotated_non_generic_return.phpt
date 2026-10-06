@@ -12,4 +12,3 @@ function app(): void {
     $result = $c->answer();
     echo $result;
 }
-===expect===

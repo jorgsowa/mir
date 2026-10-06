@@ -28,4 +28,3 @@ $b = new Box();
 $val = extract($b);
 /** @mir-check $val is mixed */
 echo $val;
-===expect===

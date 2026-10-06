@@ -47,4 +47,3 @@ function test(): void {
     /** @mir-check $c is Foo */
     echo get_class($c);
 }
-===expect===

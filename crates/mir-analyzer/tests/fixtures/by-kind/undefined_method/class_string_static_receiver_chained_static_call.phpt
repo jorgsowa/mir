@@ -13,4 +13,3 @@ class Box {
 
 Box::factory()::doesNotExist();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Box::doesNotExist() does not exist
-===expect===

@@ -17,4 +17,3 @@ function test(Model $model): void {
     /** @mir-check $title is string */
     echo $title;
 }
-===expect===

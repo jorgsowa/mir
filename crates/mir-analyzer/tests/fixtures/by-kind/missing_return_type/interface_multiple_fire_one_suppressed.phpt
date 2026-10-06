@@ -12,4 +12,3 @@ interface IFoo {
     /** @return int */
     public function withDocblock();
 }
-===expect===

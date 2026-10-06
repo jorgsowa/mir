@@ -7,4 +7,3 @@ namespace Aye {
     function foo(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^ DuplicateFunction: Function Aye\foo() has already been defined
 }
-===expect===

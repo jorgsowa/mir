@@ -13,4 +13,3 @@ class Widget {
     use T;
     public function greet(): string { return 'bye'; }
 }
-===expect===

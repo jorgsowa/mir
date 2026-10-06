@@ -37,4 +37,3 @@ takesArray(Arr::wrap(['a', 'b']));
 /** @var string|null $x */
 $x = rand() ? 'foo' : null;
 takesArray(Arr::wrap($x));
-===expect===

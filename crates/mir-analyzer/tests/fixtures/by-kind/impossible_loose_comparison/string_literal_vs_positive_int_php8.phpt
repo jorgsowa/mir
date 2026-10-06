@@ -17,4 +17,3 @@ function test(int $n): void {
     if ($s == $n) {}
 //      ^^^^^^^^ ImpossibleLooseComparison: '==' between '"foo"' and 'positive-int' is always false — these types can never be loosely equal
 }
-===expect===

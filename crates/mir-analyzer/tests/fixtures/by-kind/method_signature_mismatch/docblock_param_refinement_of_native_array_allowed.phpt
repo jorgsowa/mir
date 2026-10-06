@@ -45,4 +45,3 @@ class Impl implements Shaper {
     /** @param non-empty-list<int> $p */
     public function put(array $p): void {}
 }
-===expect===

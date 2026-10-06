@@ -11,4 +11,3 @@ interface Bar {}
 final class Foo implements Bar {}
 
 class_implements('Foo');
-===expect===

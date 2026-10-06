@@ -15,4 +15,3 @@ function test(Holder $h): void {
     /** @mir-check $x is mixed */
     echo $x;
 }
-===expect===

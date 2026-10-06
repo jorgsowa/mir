@@ -12,4 +12,3 @@ $fn = function (): string {
     return json_decode('{}');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 };
-===expect===

@@ -10,5 +10,3 @@ function twiceImpure(): string {
 //       ^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function mt_rand() in a @pure function
     return (string)($a + $b);
 }
-
-===expect===

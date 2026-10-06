@@ -16,4 +16,3 @@ class Impure implements Calculator {
         return $a + $b;
     }
 }
-===expect===

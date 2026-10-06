@@ -21,4 +21,3 @@ function test(?User $u): void {
     echo $u?->name;
 //  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

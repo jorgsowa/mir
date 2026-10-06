@@ -22,4 +22,3 @@ function test(): void {
     $a = new Sink();
     f($a);
 }
-===expect===

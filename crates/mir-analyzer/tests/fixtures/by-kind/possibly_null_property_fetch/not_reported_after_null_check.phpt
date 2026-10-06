@@ -11,4 +11,3 @@ function test(?Foo $obj): void {
         echo $obj->value;
     }
 }
-===expect===

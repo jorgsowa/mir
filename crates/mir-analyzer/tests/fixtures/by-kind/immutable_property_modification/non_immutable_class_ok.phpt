@@ -20,4 +20,3 @@ class Counter {
         $this->value = 0;
     }
 }
-===expect===

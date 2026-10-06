@@ -5,4 +5,3 @@ Class redefinition
 class Foo {}
 class Foo {}
 //<^^^^^^^^^^^^ DuplicateClass: Class Foo has already been defined
-===expect===

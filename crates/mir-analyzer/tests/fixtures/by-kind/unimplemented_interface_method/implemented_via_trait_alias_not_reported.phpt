@@ -25,4 +25,3 @@ interface Greets {
     public function helloB(string $x): string;
 }
 class D extends C implements Greets {}
-===expect===

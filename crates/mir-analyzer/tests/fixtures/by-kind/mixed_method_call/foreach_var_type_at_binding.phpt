@@ -38,4 +38,3 @@ foreach ($data as $key => $val) {
 //<^ +2:1 TypeCheckMismatch: Type of $val is expected to be 1|2, got mixed
     // Literal key and value types
 }
-===expect===

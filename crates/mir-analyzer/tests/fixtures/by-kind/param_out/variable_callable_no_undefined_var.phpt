@@ -16,4 +16,3 @@ $writer = function(int &$x): void { $x = 42; };
 $writer($fresh);
 /** @mir-check $fresh is int */
 $_ = $fresh;
-===expect===

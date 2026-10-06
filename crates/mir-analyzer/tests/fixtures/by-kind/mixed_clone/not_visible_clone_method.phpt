@@ -8,4 +8,3 @@ class A {
 $a = new A();
 clone $a;
 //<^^^^^^^^ InvalidClone: cannot clone non-object A
-===expect===

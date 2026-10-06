@@ -19,4 +19,3 @@ function readValue(Box $b): string {
     return $b->value;
 //             ^^^^^ InaccessibleProperty: Cannot access property Box::$value
 }
-===expect===

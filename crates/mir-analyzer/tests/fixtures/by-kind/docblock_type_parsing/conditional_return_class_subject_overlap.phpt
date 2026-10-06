@@ -51,4 +51,3 @@ function check(Source $s, DirSource $d, Plain $p, Unrelated $u, Sealed $x, Other
         return;
     }
 }
-===expect===

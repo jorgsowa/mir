@@ -10,5 +10,3 @@ Docblock keywords in `@throws` annotations are not undefined classes.
 function risky(): string {
     return 'x';
 }
-
-===expect===

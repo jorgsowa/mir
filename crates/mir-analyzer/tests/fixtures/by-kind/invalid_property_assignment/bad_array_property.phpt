@@ -19,4 +19,3 @@ class C {
 
 $c = new C;
 $c->bb = [new A, new B];
-===expect===

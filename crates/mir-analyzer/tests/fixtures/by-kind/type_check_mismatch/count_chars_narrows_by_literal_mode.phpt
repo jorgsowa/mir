@@ -51,4 +51,3 @@ function test_dynamic_mode_falls_back_to_stub(string $s, int $mode): void {
     /** @mir-check $v is array<int|string, int>|string */
     $_ = $v;
 }
-===expect===

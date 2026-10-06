@@ -11,4 +11,3 @@ function run(): void {
     new Foo();
 //      ^^^ UndefinedClass: Class App\Service\Foo does not exist
 }
-===expect===

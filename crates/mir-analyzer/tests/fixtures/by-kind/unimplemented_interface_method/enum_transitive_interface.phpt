@@ -22,4 +22,3 @@ enum Color implements PrettyPrintable {
     }
     // Missing print() from Printable (via PrettyPrintable)
 }
-===expect===

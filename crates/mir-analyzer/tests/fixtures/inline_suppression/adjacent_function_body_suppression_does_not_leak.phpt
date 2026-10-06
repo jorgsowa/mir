@@ -12,4 +12,3 @@ function g(): void {
     new NoSuchClass();
 //      ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
-===expect===

@@ -25,4 +25,3 @@ final class BadContainer extends Container {
         return new Other();
     }
 }
-===expect===

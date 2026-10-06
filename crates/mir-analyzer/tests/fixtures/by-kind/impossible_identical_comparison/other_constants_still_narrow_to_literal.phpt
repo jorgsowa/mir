@@ -18,4 +18,3 @@ function f(): bool {
     return MY_CONST === 'bar';
 //         ^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"foo"' and '"bar"' is always false — these types can never be identical
 }
-===expect===

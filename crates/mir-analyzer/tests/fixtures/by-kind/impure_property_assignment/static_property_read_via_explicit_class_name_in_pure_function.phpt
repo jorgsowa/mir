@@ -14,4 +14,3 @@ function peek(): int {
     return Counter::$n;
 //                  ^^ ImpureStaticPropertyAccess: Reading static property Counter::$n in a @pure function
 }
-===expect===

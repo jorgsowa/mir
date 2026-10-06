@@ -27,4 +27,3 @@ function describe(ErrorA|ErrorB $error, string $dynamicClass): string {
         default => 'x',
     };
 }
-===expect===

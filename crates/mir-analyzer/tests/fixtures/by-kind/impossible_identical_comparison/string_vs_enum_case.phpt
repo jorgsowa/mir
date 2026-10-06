@@ -23,4 +23,3 @@ function negated(string $raw): void {
 function safe(string $raw): void {
     if (Kind::tryFrom($raw) === Kind::Admin) {}
 }
-===expect===

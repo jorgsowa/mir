@@ -23,4 +23,3 @@ function make(): Generator
 {
     return new Generator();
 }
-===expect===

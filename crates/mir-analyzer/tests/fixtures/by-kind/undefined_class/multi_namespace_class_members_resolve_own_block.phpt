@@ -17,4 +17,3 @@ namespace B {
 //                                        ^^^^ UndefinedClass: Class B\Base does not exist
     }
 }
-===expect===

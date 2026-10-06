@@ -6,4 +6,3 @@ function f(): UnknownClass {
 //            ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
     return null;
 }
-===expect===

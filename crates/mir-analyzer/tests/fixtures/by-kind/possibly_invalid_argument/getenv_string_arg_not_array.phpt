@@ -20,4 +20,3 @@ function use_setting(): void {
 function get_setting_with_local_only(string $name): string {
     return getenv($name, true) ?: 'default';
 }
-===expect===

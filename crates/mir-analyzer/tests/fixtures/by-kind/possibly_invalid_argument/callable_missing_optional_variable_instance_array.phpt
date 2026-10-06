@@ -23,4 +23,3 @@ class A {
 $a_instance = new A();
 $y = [$a_instance, "bar"];
 foo($y);
-===expect===

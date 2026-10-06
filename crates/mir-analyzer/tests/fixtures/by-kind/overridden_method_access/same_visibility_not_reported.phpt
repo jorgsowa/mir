@@ -8,4 +8,3 @@ class ParentClass {
 class Child extends ParentClass {
     protected function doStuff(): void {}
 }
-===expect===

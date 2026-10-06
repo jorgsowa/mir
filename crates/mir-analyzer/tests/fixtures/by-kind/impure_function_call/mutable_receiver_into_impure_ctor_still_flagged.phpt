@@ -47,4 +47,3 @@ final class Holder {
 //             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function StateIterator::__construct() in a @pure function
     }
 }
-===expect===

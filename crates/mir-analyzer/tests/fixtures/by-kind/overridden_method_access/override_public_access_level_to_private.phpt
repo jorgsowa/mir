@@ -10,4 +10,3 @@ class B extends A {
     private function fooFoo(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method B::foofoo() overrides with less visibility
 }
-===expect===

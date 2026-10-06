@@ -18,4 +18,3 @@ function accept(mixed $value): void {}
 accept('hello');          // satisfies string arm
 accept([1, 2, 3]);        // satisfies list<I> arm (I = int)
 accept(['a' => 1]);       // satisfies array<K, V> arm
-===expect===

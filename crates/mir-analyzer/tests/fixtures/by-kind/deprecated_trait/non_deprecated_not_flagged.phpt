@@ -9,5 +9,3 @@ trait NotDeprecated {
 class UsesIt {
     use NotDeprecated;
 }
-
-===expect===

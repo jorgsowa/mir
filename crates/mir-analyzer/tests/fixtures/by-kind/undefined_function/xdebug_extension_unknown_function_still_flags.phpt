@@ -9,4 +9,3 @@ function f(): void {
     xdebug_break_not_a_real_function();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function xdebug_break_not_a_real_function() is not defined
 }
-===expect===

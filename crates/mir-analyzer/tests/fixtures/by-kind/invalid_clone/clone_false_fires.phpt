@@ -11,4 +11,3 @@ InvalidClone fires when cloning a false literal (bool subtype).
 $x = false;
 clone $x;
 //<^^^^^^^^ InvalidClone: cannot clone non-object false
-===expect===

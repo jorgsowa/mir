@@ -11,4 +11,3 @@ class Foo {
     private function doSomething(array $a): void {}
 //                               ^^^^^^^^ UnusedParam: Parameter $a is never used
 }
-===expect===

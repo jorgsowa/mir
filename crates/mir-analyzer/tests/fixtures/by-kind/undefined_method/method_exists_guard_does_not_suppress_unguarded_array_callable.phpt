@@ -18,4 +18,3 @@ function free(): void {
     register_shutdown([Other::class, 'gateStatic']);
 //                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Other::gateStatic() does not exist
 }
-===expect===

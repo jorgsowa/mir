@@ -10,4 +10,3 @@ function foo(): int {
     return $result;
 //         ^^^^^^^ PossiblyUndefinedVariable: Variable $result might not be defined
 }
-===expect===

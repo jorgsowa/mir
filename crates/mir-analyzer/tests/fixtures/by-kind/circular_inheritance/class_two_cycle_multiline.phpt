@@ -11,4 +11,3 @@ class B extends A
 {
     public function bar(): void {}
 }
-===expect===

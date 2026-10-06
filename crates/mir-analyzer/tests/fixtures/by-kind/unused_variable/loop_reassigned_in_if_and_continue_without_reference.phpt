@@ -15,4 +15,3 @@ while (rand(0, 1)) {
     $a = 3;
 //  ^^ UnusedVariable: Variable $a is never read
 }
-===expect===

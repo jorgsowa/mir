@@ -35,4 +35,3 @@ function check_result(string $s): void {
     /** @mir-check $result is string */
     echo $result;
 }
-===expect===

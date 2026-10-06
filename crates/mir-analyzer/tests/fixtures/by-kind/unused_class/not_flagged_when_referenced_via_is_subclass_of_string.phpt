@@ -14,4 +14,3 @@ function check(object $x): bool {
 }
 
 check(new stdClass());
-===expect===

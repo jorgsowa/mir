@@ -5,4 +5,3 @@
 foreach (ini_get_all(null, false) as $key => $_value) {
     echo strtolower($key);
 }
-===expect===

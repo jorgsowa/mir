@@ -7,4 +7,3 @@ class Config {}
 function copy(Config $c): Config {
     return clone $c;
 }
-===expect===

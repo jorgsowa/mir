@@ -31,4 +31,3 @@ function viaDeclared(H $o, G $h): void {
     $o->take($h);
     $o->takeSelf($h);
 }
-===expect===

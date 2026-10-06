@@ -7,4 +7,3 @@ class Logger {
 }
 Logger::LOGERROR();
 //      ^^^^^^^^ WrongCaseMethod: Method name 'Logger::LOGERROR' has incorrect casing; use 'logError'
-===expect===

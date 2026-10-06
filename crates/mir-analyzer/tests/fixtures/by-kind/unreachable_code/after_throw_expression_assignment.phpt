@@ -7,4 +7,3 @@ function test(): void {
     echo 'unreachable';
 //  ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
-===expect===

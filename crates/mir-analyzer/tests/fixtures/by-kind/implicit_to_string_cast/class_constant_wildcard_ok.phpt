@@ -25,4 +25,3 @@ final class Printer {
         echo $kind;
     }
 }
-===expect===

@@ -12,4 +12,3 @@ function redirect(): void {
     header('Location: ' . $_GET['next']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
 }
-===expect===

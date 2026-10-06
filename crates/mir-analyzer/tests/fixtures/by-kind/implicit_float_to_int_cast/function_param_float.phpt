@@ -9,5 +9,3 @@ function foo(float $n): void {
 
 $x = 3.7;
 foo($x);
-
-===expect===

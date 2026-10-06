@@ -13,4 +13,3 @@ $key = 'a';
 $arr = ['a' => 1, 'b' => 2];
 $val = $arr[$key] ?? 0;
 //          ^^^^ MixedArrayOffset: Mixed type used as array offset
-===expect===

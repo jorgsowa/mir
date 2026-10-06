@@ -23,4 +23,3 @@ class Stream implements ReadWritable {
     public function write(string $data): void { var_dump($data); }
     # read() inherited from Readable is NOT implemented
 }
-===expect===

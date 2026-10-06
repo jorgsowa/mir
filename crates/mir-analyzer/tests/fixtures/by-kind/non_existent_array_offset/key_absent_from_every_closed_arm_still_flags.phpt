@@ -13,4 +13,3 @@ function branches(bool $c): void {
     echo $o['c'];
 //          ^^^ NonExistentArrayOffset: Array offset 'c' does not exist
 }
-===expect===

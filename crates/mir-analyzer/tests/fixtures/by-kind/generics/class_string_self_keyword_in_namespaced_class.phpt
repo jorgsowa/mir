@@ -43,4 +43,3 @@ class Child extends Base {
         return $c::SCHEMA;
     }
 }
-===expect===

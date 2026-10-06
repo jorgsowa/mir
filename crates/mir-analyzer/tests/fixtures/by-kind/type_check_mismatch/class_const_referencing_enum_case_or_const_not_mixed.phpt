@@ -32,4 +32,3 @@ function takesInt(int $i): void {}
 function useDerived(): void {
     takesInt(Derived::COPY);
 }
-===expect===

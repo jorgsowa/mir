@@ -31,4 +31,3 @@ function test(ConcreteRepository $repo): void {
     /** @mir-check $user is User */
     echo get_class($user);
 }
-===expect===

@@ -11,4 +11,3 @@ trait T {
 //                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $howManyTimes is never used
 //                                                  ^^^^^^^^^^^^^^^ UndefinedConstant: Constant UNDEFINED_CONST is not defined
 }
-===expect===

@@ -65,4 +65,3 @@ function cloneOf(Cloner $c) {
 $o = cloneOf(new Order());
 /** @mir-check $o is self(Order) */
 echo "ok";
-===expect===

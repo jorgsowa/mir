@@ -33,4 +33,3 @@ function test_rand_no_args(): void {
     /** @mir-check $r is int */
     $_ = $r;
 }
-===expect===

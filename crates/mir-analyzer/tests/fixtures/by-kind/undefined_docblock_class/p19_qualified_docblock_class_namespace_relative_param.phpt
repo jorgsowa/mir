@@ -25,4 +25,3 @@ class Container {
     /** @param Warning\Warning $warning */
     public function set($warning): void {}
 }
-===expect===

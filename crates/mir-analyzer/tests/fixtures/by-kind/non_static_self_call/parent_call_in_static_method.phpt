@@ -11,4 +11,3 @@ class Child extends Base {
 //             ^^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Base::greet() cannot be called statically
     }
 }
-===expect===

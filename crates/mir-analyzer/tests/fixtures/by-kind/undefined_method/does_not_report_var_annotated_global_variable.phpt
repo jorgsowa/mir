@@ -9,4 +9,3 @@ class Foo {
 /** @var Foo $x */
 global $x;
 $x->bar();
-===expect===

@@ -6,4 +6,3 @@ function decode(): string {
     return json_decode('{"key":"value"}');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 }
-===expect===

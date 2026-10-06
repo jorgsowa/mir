@@ -33,4 +33,3 @@ class InvalidImpl extends Base {
     public function make(): array { return []; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method InvalidImpl::make() signature mismatch: return type 'array<int, Unrelated>' is not a subtype of parent 'array<int, Animal>'
 }
-===expect===

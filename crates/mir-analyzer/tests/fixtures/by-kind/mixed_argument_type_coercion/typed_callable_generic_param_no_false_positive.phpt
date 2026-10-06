@@ -21,4 +21,3 @@ function filterOne($item, callable $callback): bool {
 }
 
 filterOne(42, function (int $x): bool { return $x > 0; });
-===expect===

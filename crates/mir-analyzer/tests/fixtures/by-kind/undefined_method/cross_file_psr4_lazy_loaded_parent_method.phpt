@@ -16,4 +16,3 @@ function test(): void {
     $c->missing();
 //  ^^^^^^^^^^^^^ UndefinedMethod: Method Child::missing() does not exist
 }
-===expect===

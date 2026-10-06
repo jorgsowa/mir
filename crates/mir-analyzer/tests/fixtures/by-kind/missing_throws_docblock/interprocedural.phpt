@@ -13,4 +13,3 @@ function callerNoThrows(): void {
     riskyOperation();
 //  ^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
 }
-===expect===

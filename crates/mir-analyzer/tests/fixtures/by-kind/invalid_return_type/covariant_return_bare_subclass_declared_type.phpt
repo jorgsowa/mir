@@ -33,4 +33,3 @@ function makeBad(): IntBox {
     return $b;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'IntBox<Dog>' is not compatible with declared 'IntBox<Cat>'
 }
-===expect===

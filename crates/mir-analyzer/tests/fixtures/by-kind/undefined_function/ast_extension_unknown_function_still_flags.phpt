@@ -8,4 +8,3 @@ function inspect(string $code): void {
     ast\parse_codee($code, 90);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function ast\parse_codee() is not defined
 }
-===expect===

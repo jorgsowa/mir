@@ -10,4 +10,3 @@ function c(): int {
     $fn($n);
     return $n;
 }
-===expect===

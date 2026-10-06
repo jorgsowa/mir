@@ -19,4 +19,3 @@ function removeString(string $x): string {
     }
     return "bar";
 }
-===expect===

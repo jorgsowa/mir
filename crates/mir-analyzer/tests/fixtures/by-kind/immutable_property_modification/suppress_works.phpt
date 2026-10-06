@@ -17,4 +17,3 @@ class LazyPoint {
         return $this->cachedMag;
     }
 }
-===expect===

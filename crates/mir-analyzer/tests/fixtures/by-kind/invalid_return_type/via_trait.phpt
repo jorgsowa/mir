@@ -27,4 +27,3 @@ class C extends B {
         $this->retStatic()->foo($array);
     }
 }
-===expect===

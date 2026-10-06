@@ -72,4 +72,3 @@ function pureFunctionArgPreserves(Logger $logger): void {
     /** @mir-check $logger->tag is string */
     $_ = 1;
 }
-===expect===

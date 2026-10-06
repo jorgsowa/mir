@@ -17,4 +17,3 @@ function runLdapSearch(string $filter): void {
 
 runLdapSearch((string) $_GET["q"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
-===expect===

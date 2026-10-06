@@ -10,4 +10,3 @@ function test(): void {
 //  ^^^^ UnusedVariable: Variable $obj is never read
 //             ^^^^^^^^ DeprecatedClass: Class OldClass is deprecated: use NewClass instead
 }
-===expect===

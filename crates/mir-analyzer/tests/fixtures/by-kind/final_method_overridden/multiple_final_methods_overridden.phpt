@@ -12,4 +12,3 @@ class Child extends ParentClass {
     public function beta(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::beta() cannot override final method from ParentClass
 }
-===expect===

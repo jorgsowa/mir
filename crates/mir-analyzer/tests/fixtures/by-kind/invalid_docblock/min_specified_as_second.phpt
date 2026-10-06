@@ -15,4 +15,3 @@ Min specified as second
 function scope(int $a){
     return $a;
 }
-===expect===

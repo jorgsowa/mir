@@ -13,4 +13,3 @@ function get_atom_format(): void {
 ===file:App.php===
 <?php
 get_atom_format();
-===expect===

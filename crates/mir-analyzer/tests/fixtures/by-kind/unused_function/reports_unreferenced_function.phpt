@@ -4,4 +4,3 @@ reports unreferenced function
 <?php
 function helper(): void {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function helper() is never called
-===expect===

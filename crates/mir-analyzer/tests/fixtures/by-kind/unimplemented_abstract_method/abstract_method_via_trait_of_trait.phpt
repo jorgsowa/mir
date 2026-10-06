@@ -14,4 +14,3 @@ class Incomplete {
 //<^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Incomplete must implement abstract method foo()
     use Mid;
 }
-===expect===

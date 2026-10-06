@@ -21,4 +21,3 @@ function parseAllOffsets(string $input): array {
     }
     return $result;
 }
-===expect===

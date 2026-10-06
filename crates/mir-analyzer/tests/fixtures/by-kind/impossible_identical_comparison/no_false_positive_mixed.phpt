@@ -16,4 +16,3 @@ function test(mixed $x): void {
     if ($x === null) {}
     if ($x === false) {}
 }
-===expect===

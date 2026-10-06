@@ -22,4 +22,3 @@ function outer() {
 $g = outer();
 /** @mir-check $g is Generator<"k", 1, mixed, void> */
 $_ = 1;
-===expect===

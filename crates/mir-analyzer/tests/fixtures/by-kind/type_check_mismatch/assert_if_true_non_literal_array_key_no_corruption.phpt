@@ -36,4 +36,3 @@ function test(array $c): void {
         $_ = 1;
     }
 }
-===expect===

@@ -29,4 +29,3 @@ function test(array $nums, array $maybe_empty, int $len): void {
     /** @mir-check $maybe is list<string|0> */
     $_ = $maybe;
 }
-===expect===

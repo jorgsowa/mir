@@ -22,4 +22,3 @@ function describeBinaryFlag(int $flag): string {
         default => 'other',
     };
 }
-===expect===

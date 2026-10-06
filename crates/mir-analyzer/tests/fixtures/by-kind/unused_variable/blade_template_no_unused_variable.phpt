@@ -4,4 +4,3 @@ UnusedVariable is suppressed in .blade.php view template files
 <?php
 $name = "World";
 echo "Hello";
-===expect===

@@ -5,4 +5,3 @@ Nullable property assignment
 $a = null;
 
 $a->foo = "hello";
-===expect===

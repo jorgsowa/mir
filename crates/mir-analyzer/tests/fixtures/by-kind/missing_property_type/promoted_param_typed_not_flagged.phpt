@@ -14,4 +14,3 @@ class Point {
         private ?string $label = null,
     ) {}
 }
-===expect===

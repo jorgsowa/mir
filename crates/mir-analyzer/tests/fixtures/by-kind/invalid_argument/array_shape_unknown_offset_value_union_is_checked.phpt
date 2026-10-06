@@ -15,4 +15,3 @@ function test(string $key): void {
     takes_int($row[$key]);
 //            ^^^^^^^^^^ PossiblyInvalidArgument: Argument $value of takes_int() expects 'int', possibly different type '123|"Ada"' provided
 }
-===expect===

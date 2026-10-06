@@ -20,4 +20,3 @@ namespace Webmozart\Assert;
 function passthrough($value): iterable {
     return $value;
 }
-===expect===

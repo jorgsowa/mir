@@ -9,4 +9,3 @@ function test(array $v): void {
 //                      ^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'InvalidArrayOffset' is never used
     echo $v['a'];
 }
-===expect===

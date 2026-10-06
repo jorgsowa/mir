@@ -19,4 +19,3 @@ function test(mysqli $db, $odbc): void {
     oci_parse($odbc, $_GET['q']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
-===expect===

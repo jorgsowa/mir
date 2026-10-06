@@ -7,4 +7,3 @@ class Mailable {
         return isset($this->messageGroup);
     }
 }
-===expect===

@@ -22,4 +22,3 @@ function query(string $host, string $community, string $oid) {
 function handle(SNMPException $e): string {
     return $e->getMessage();
 }
-===expect===

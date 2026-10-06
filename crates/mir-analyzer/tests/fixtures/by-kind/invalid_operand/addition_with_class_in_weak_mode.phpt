@@ -10,4 +10,3 @@ Addition with class in weak mode
 <?php
 $a = "hi" + (new stdClass);
 //   ^^^^^^^^^^^^^^^^^^^^^ InvalidOperand: Operator '+' not supported between '"hi"' and 'stdClass'
-===expect===

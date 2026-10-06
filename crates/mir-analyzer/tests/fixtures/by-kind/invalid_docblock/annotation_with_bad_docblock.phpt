@@ -10,4 +10,3 @@ class ParentClass {
  * @method string getString()
  */
 class Child extends ParentClass {}
-===expect===

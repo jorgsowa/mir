@@ -56,4 +56,3 @@ function nativeArray(array ...$ids): void {
     $_ = $ids;
 }
 nativeArray([1], [2]);
-===expect===

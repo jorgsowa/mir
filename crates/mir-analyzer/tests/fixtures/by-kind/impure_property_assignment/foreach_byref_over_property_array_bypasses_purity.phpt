@@ -24,4 +24,3 @@ function bumpAll(Tally $t): void {
         $v++;
     }
 }
-===expect===

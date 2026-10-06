@@ -189,9 +189,10 @@
 //!   and only together with a `<CURSOR>` marker; `suppress` is rejected there.
 //! - `===edit:name===` must follow every file section and name a declared,
 //!   analyzed project file; it can't be combined with `===cursor===`.
-//! - `===expect===` appears exactly once, except in edit fixtures: there it
-//!   appears twice, between the file and edit sections and after the edits.
-//!   Each edit-fixture section lists issues or holds `<<none>>` alone.
+//! - `===expect===` appears exactly once, and may be omitted in diagnostic
+//!   fixtures whose issues are all annotated. Edit fixtures have it twice,
+//!   between the file and edit sections and after the edits; each lists issues
+//!   or holds `<<none>>` alone.
 //!
 //! # Expect format
 //!
@@ -341,23 +342,30 @@ const NO_ISSUES: &str = "<<none>>";
 
 /// Parse a `.phpt` fixture file.
 pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
-    // --- Locate the final expect (required; edit fixtures also have one before their edits) ---
+    // --- Locate the final expect (edit and cursor fixtures require it; edit fixtures have one before their edits too) ---
     let expect_count = count_occurrences(content, EXPECT_MARKER);
     let edit_fixture = content.contains(EDIT_PREFIX);
+    let cursor_fixture = content.contains(CURSOR_MARKER);
     let wanted = if edit_fixture { 2 } else { 1 };
-    assert_eq!(
-        expect_count,
-        wanted,
+    let optional = !edit_fixture && !cursor_fixture;
+    assert!(
+        expect_count == wanted || (optional && expect_count == 0),
         "fixture {path}: {EXPECT_MARKER} must appear {} (found {expect_count})",
         if edit_fixture {
             "twice: before the first ===edit:name=== and after the edits"
+        } else if optional {
+            "at most once"
         } else {
             "exactly once"
         }
     );
-    let expect_pos = content.rfind(EXPECT_MARKER).unwrap();
-    let header_region = &content[..expect_pos];
-    let expect_content = content[expect_pos + EXPECT_MARKER.len()..].trim();
+    let (header_region, expect_content) = match content.rfind(EXPECT_MARKER) {
+        Some(pos) => (
+            &content[..pos],
+            content[pos + EXPECT_MARKER.len()..].trim(),
+        ),
+        None => (content, ""),
+    };
 
     // --- Validate header sections ---
     // They must appear before any file marker so their text is never silently
@@ -1058,11 +1066,12 @@ fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture)
             .into_iter()
             .filter(|a| !annotated.iter().any(|e| issue_matches(a, e)))
             .collect();
-        rewrite_expect_section(
-            path,
-            content,
-            &fmt_expect_lines(&unannotated, fixture.is_multi),
-        );
+        let lines = fmt_expect_lines(&unannotated, fixture.is_multi);
+        if lines.is_empty() {
+            drop_expect_section(path, content);
+        } else {
+            rewrite_expect_section(path, content, &lines);
+        }
         return;
     }
 
@@ -1676,13 +1685,23 @@ fn fmt_expect_lines(actual: &[Issue], is_multi: bool) -> Vec<String> {
         .collect()
 }
 
+/// Remove the `===expect===` section, leaving the file text before it.
+fn drop_expect_section(path: &str, content: &str) {
+    let end = content.find(EXPECT_MARKER).unwrap_or(content.len());
+    let out = format!("{}\n", content[..end].trim_end());
+    std::fs::write(path, out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
+}
+
 /// Rewrite only the `===expect===` section, preserving everything before it.
 fn rewrite_expect_section(path: &str, content: &str, lines: &[String]) {
     let exp_pos = content
         .find(EXPECT_MARKER)
-        .expect("fixture missing ===expect===");
+        .unwrap_or(content.len());
 
     let mut out = content[..exp_pos].to_string();
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
     out.push_str(EXPECT_MARKER);
     out.push('\n');
     for line in lines {
@@ -2141,9 +2160,20 @@ mod parser_validation {
     }
 
     #[test]
-    #[should_panic(expected = "===expect=== must appear exactly once")]
+    #[should_panic(expected = "===expect=== must appear at most once")]
     fn two_expects_without_edits() {
         p("===file:a.php===\n<?php\n===expect===\n===expect===\n");
+    }
+
+    #[test]
+    fn diagnostic_fixture_may_omit_expect() {
+        p("===file===\n<?php\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===expect=== must appear exactly once")]
+    fn cursor_fixture_requires_expect() {
+        p("===cursor===\nsymbol\n===file===\n<?php\n<CURSOR>");
     }
 
     #[test]

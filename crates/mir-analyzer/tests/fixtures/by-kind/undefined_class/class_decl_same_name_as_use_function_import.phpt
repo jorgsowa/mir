@@ -23,4 +23,3 @@ class Widget
         return new foo();
     }
 }
-===expect===

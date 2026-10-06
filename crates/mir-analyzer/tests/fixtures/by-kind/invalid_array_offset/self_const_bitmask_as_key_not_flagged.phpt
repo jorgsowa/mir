@@ -24,4 +24,3 @@ class Permission {
         $this->labels[$rwx] = 'read-write-execute';
     }
 }
-===expect===

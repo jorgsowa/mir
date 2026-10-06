@@ -34,4 +34,3 @@ function test(Repository $repo): void {
     /** @mir-check $e is Entity */
     echo get_class($e);
 }
-===expect===

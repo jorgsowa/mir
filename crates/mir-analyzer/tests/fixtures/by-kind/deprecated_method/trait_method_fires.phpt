@@ -20,4 +20,3 @@ function test(App $app): void {
     $app->write();
 //  ^^^^^^^^^^^^^ DeprecatedMethod: Method App::write() is deprecated: use log() instead
 }
-===expect===

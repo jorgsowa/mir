@@ -30,5 +30,3 @@ function wrong(): Box {
     return new Box(5);
 //  ^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Box<int>' is not compatible with declared 'Box<string>'
 }
-
-===expect===

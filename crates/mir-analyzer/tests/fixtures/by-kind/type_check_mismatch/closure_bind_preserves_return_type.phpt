@@ -22,4 +22,3 @@ if ($bound) {
     $result = $bound();
     /** @mir-check $result is string */
 }
-===expect===

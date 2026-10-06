@@ -7,4 +7,3 @@ function foo(mixed $a): void {
         echo $a[0];
     }
 }
-===expect===

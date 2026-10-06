@@ -20,4 +20,3 @@ function count_parts(string $s): int {
     $parts = preg_split('/,/', $s);
     return count($parts);
 }
-===expect===

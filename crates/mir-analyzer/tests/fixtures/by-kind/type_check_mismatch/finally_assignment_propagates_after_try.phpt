@@ -12,4 +12,3 @@ function f(mixed $x): void {
     /** @mir-check $x is string */
     echo $x;
 }
-===expect===

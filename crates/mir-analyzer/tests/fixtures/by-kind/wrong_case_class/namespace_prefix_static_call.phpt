@@ -10,4 +10,3 @@ class Greeter {
 namespace Client;
 \myapp\service\Greeter::hello();
 //<^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'myapp\service\Greeter' has incorrect casing; use 'MyApp\Service\Greeter'
-===expect===

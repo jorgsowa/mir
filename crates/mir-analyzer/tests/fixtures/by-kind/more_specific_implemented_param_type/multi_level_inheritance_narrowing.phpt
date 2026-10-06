@@ -27,4 +27,3 @@ class LeafVisitor extends TreeVisitor {
     /** @param LeafNode $node */
     public function visit(Node $node): void {}
 }
-===expect===

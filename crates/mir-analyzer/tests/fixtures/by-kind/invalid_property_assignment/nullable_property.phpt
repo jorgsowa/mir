@@ -8,4 +8,3 @@ class Foo {
 
 $f = new Foo();
 $f->name = null;
-===expect===

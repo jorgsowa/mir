@@ -39,4 +39,3 @@ function test(?Holder $h): void {
     /** @mir-check $h->factory is ReadyFactory|null */
     $_ = 1;
 }
-===expect===

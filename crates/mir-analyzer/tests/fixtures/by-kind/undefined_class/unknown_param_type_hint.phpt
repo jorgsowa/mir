@@ -11,4 +11,3 @@ unknown param type hint
 <?php
 function f(UnknownClass $x): void {}
 //         ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
-===expect===

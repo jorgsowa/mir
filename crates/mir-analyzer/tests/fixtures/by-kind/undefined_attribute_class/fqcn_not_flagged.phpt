@@ -7,4 +7,3 @@ class Route {}
 
 #[\Route]
 class HomeController {}
-===expect===

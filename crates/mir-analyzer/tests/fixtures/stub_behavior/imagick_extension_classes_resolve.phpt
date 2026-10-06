@@ -23,4 +23,3 @@ function filterConstant(): int {
 function handle(ImagickException $e): string {
     return $e->getMessage();
 }
-===expect===

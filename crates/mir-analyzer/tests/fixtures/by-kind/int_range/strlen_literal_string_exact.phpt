@@ -22,4 +22,3 @@ function test(): void {
     /** @mir-check $c is 11 */
     $_ = $c;
 }
-===expect===

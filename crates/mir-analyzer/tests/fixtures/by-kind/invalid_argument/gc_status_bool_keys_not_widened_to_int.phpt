@@ -20,4 +20,3 @@ $status = gc_status();
 needsBool($status['running']);
 needsBool($status['protected']);
 needsBool($status['full']);
-===expect===

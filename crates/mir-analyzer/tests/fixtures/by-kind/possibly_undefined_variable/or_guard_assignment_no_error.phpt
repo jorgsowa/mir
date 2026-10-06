@@ -11,4 +11,3 @@ function loadSchema(mixed $connection): void {
 
     echo $path;
 }
-===expect===

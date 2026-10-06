@@ -9,4 +9,3 @@ function test(): void {
     echo Foo::MISSING;
 //       ^^^^^^^^^^^^ UndefinedConstant: Constant Foo::MISSING is not defined
 }
-===expect===

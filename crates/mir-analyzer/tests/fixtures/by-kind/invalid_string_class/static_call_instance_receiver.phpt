@@ -26,4 +26,3 @@ class Caller extends Base {
         $this->w::make();
     }
 }
-===expect===

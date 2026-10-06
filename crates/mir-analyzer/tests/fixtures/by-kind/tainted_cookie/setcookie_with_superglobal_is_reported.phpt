@@ -15,4 +15,3 @@ function test(): void {
     setrawcookie('name', $_GET['v']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedCookie: Tainted cookie — possible cookie injection
 }
-===expect===

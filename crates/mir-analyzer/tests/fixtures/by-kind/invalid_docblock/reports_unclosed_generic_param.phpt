@@ -8,4 +8,3 @@ reports unclosed generic param
  */
 function foo(mixed $items): void {}
 //           ^^^^^^^^^^^^ UnusedParam: Parameter $items is never used
-===expect===

@@ -12,4 +12,3 @@ $getter = fn (): int => $this->value;
 //                      ^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 $bound = $getter->bindTo(new Container(), Container::class);
 echo $bound();
-===expect===

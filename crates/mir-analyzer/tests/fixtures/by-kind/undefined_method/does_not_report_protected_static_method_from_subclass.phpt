@@ -10,4 +10,3 @@ class Child extends Base {
         parent::secret();
     }
 }
-===expect===

@@ -17,4 +17,3 @@ class UserRepository extends Repository {}
 
 UserRepository::validate(new Post());
 //                       ^^^^^^^^^^ InvalidArgument: Argument $item of validate() expects 'User', got 'Post'
-===expect===

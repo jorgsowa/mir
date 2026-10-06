@@ -10,4 +10,3 @@ class C {
 //                     ^ UndefinedProperty: Property C::$d does not exist
     }
 }
-===expect===

@@ -19,4 +19,3 @@ final class ArraySink implements Sink {
         $_x = $items;
     }
 }
-===expect===

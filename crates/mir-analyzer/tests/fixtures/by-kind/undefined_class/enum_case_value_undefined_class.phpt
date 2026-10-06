@@ -8,4 +8,3 @@ enum Status: string {
     case Active = UndefinedClass::VALUE;
 //                ^^^^^^^^^^^^^^ UndefinedClass: Class UndefinedClass does not exist
 }
-===expect===

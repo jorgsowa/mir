@@ -49,4 +49,3 @@ class Wrapper {
         $logger->record(new Box());
     }
 }
-===expect===

@@ -15,4 +15,3 @@ function test() {
     $key = 'value';
     echo $$key;
 }
-===expect===

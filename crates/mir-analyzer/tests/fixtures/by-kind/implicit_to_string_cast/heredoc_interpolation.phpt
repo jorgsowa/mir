@@ -14,4 +14,3 @@ $s = <<<EOT
 Value: {$f}
 //      ^^ ImplicitToStringCast: Class Foo is implicitly cast to string
 EOT;
-===expect===

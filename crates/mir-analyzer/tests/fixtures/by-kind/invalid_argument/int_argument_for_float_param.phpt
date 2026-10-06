@@ -16,4 +16,3 @@ function roundTrip(float $x): void {
 }
 roundTrip(0);
 roundTrip(100);
-===expect===

@@ -21,4 +21,3 @@ final class Impl implements IntBox {
 }
 
 new Impl();
-===expect===

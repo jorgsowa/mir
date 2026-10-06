@@ -24,4 +24,3 @@ class Processor {
         $_ = 1;
     }
 }
-===expect===

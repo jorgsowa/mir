@@ -15,4 +15,3 @@ class B extends A {
     protected function greet(): string { return 'bye'; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method B::greet() cannot override final method from Greeter
 }
-===expect===

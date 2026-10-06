@@ -19,4 +19,3 @@ function f(Foo $x): void {
         echo get_class($x);
     }
 }
-===expect===

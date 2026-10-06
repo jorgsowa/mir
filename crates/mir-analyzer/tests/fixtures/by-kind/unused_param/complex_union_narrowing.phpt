@@ -49,4 +49,3 @@ function threeWayCheck(Console|File|Memory $obj): void {
         $obj->get("memory");
     }
 }
-===expect===

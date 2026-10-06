@@ -9,4 +9,3 @@ function foo(): array {
 //  ^^^^^^^^^ UnusedVariable: Variable $unlisted is never read
     return compact('name');
 }
-===expect===

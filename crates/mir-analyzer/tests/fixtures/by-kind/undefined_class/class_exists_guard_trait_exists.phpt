@@ -9,4 +9,3 @@ function test(): void {
         };
     }
 }
-===expect===

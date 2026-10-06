@@ -16,4 +16,3 @@ function walk(string $class): bool {
     } while (($class = get_parent_class($class)) !== false);
     return false;
 }
-===expect===

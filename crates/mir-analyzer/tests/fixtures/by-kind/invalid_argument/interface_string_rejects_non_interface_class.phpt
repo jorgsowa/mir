@@ -20,4 +20,3 @@ function describe(string $ifaceName) {
 
 describe("ConcreteThing");
 //       ^^^^^^^^^^^^^^^ NotAnInterface: ConcreteThing is not an interface
-===expect===

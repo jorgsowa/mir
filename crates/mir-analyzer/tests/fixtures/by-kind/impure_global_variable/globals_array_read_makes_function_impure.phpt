@@ -16,4 +16,3 @@ function test(): int {
     return $GLOBALS['x'];
 //         ^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $x in a @pure function
 }
-===expect===

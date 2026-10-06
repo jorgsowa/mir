@@ -16,4 +16,3 @@ function test(): void {
     $first = $items->first();
     $first->getName();
 }
-===expect===

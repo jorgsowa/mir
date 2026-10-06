@@ -13,4 +13,3 @@ function foo(int $i) : bool {
 }
 
 array_filter(["hello"], "foo");
-===expect===

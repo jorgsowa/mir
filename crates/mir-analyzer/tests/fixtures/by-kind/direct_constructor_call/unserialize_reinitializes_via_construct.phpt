@@ -29,4 +29,3 @@ class DbConnection implements \Serializable {
         $this->__construct($this->dsn, $this->user, $this->pass);
     }
 }
-===expect===

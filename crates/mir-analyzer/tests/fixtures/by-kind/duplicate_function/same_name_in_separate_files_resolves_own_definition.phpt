@@ -45,4 +45,3 @@ function unique_helper(int $a): int { return $a; }
 ===file:fourth.php===
 <?php
 $_ = unique_helper(2);
-===expect===

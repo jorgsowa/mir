@@ -24,4 +24,3 @@ takesIntKeyed($bad);
 /** @var array<int, int> $good */
 $good = [0 => 1];
 takesIntKeyed($good);
-===expect===

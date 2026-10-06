@@ -11,4 +11,3 @@ enum Suit {
 
 echo Suit::Hearts->value;
 //                 ^^^^^ UndefinedProperty: Property Suit::$value does not exist
-===expect===

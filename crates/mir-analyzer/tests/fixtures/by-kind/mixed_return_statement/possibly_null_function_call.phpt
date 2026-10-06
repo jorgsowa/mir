@@ -29,4 +29,3 @@ $foo =
 
         return $bar;
     };
-===expect===

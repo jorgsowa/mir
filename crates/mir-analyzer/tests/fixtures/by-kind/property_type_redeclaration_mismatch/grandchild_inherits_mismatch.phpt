@@ -14,4 +14,3 @@ class C extends B {
     public string $x = 'wrong';
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of C::$x must be int (as in parent class), string given
 }
-===expect===

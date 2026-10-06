@@ -23,4 +23,3 @@ function test_int_literal_haystack(int $code): void {
         $_ = $code;
     }
 }
-===expect===

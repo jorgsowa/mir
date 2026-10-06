@@ -13,4 +13,3 @@ class Base {
 class Child extends Base {
     public function greet(): string { return 'hi'; }
 }
-===expect===

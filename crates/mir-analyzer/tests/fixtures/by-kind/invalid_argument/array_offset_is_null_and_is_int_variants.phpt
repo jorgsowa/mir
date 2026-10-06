@@ -23,4 +23,3 @@ function testIsNotNull(array $arr): int {
     }
     return 0;
 }
-===expect===

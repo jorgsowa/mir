@@ -11,4 +11,3 @@ True increment
 $a = true;
 $a++;
 //<^^ InvalidOperand: Operator '++' not supported for operand of type 'true'
-===expect===

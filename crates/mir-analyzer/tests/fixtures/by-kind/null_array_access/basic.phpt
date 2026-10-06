@@ -7,4 +7,3 @@ function test(): void {
     echo $x[0];
 //       ^^^^^ NullArrayAccess: Cannot access array on null
 }
-===expect===

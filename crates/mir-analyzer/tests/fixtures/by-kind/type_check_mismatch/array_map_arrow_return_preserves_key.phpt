@@ -16,4 +16,3 @@ function test(array $arr): void {
     /** @mir-check $r is array<string, positive-int> */
     $_ = $r;
 }
-===expect===

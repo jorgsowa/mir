@@ -47,4 +47,3 @@ function test_named_object_alternative_filters_same_class_arg($x): void {
     /** @mir-check $y is Bar */
     $_ = $y;
 }
-===expect===

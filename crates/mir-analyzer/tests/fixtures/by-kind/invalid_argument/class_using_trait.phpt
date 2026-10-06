@@ -11,5 +11,3 @@ class C {
 
     public function f(): void {}
 }
-
-===expect===

@@ -14,4 +14,3 @@ The string could be "0", "123", or any numeric value that would equal an integer
 function test(string $s, int $n): void {
     if ($s == $n) {}
 }
-===expect===

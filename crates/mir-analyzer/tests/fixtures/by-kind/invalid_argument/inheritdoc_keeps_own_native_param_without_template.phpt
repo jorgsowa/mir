@@ -21,4 +21,3 @@ function call(Impl $impl, string $key): void
 {
     echo $impl->read($key);
 }
-===expect===

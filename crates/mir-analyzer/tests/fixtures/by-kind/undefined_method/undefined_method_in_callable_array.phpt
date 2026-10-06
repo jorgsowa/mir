@@ -27,4 +27,3 @@ $handler = new Handler();
 // SHOULD emit UndefinedMethod because the method doesn't exist
 executeCallback([$handler, "nonExistentMethod"]);
 //              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Handler::nonExistentMethod() does not exist
-===expect===

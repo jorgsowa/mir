@@ -21,4 +21,3 @@ class Flags {
         $this->map[self::FLAG_B] = $v;
     }
 }
-===expect===

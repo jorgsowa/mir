@@ -18,4 +18,3 @@ function getKey() {
 
 $a = [getKey() => 1];
 takesList($a);
-===expect===

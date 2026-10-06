@@ -28,4 +28,3 @@ function withFooOnly(Foo $y): void {
     $y->onlyWithBar();
 //  ^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Foo::onlyWithBar() — @if-this-is requires $this to be 'Foo&HasBar', but it is 'Foo'
 }
-===expect===

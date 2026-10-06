@@ -17,4 +17,3 @@ enum Suit implements Stringable {
 }
 $s = 'Suit: ' . Suit::Hearts;
 echo Suit::Hearts;
-===expect===

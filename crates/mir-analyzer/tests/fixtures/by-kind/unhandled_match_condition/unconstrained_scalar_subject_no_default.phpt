@@ -21,4 +21,3 @@ function float_subject(float $x): string {
     return match ($x) { 1.5 => 'a', 2.5 => 'b' };
 //         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'float'
 }
-===expect===

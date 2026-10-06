@@ -15,4 +15,3 @@ union
 function needsIntArray(array $x): void {}
 needsIntArray(['a' => 'b']);
 //            ^^^^^^^^^^^^ InvalidArgument: Argument $x of needsIntArray() expects 'array<int, int>', got 'array{'a': "b"}'
-===expect===

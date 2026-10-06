@@ -49,4 +49,3 @@ function differentVars(Shape $x, Shape $y): void {
         $_ = $x;
     }
 }
-===expect===

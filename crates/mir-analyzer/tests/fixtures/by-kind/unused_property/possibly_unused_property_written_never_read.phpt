@@ -12,4 +12,3 @@ final class A {
 
 $a = new A();
 $a->foo = "bar";
-===expect===

@@ -8,4 +8,3 @@ function missing_return() : bool {
     } finally {
     }
 }
-===expect===

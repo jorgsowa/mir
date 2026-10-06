@@ -19,4 +19,3 @@ function dispatch(Notification $n): void {
         register_shutdown([$n, 'broadcastOn']);
     }
 }
-===expect===

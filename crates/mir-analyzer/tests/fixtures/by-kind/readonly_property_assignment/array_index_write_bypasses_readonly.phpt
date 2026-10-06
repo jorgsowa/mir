@@ -18,4 +18,3 @@ class Box {
 //      ^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Box::$items outside of constructor
     }
 }
-===expect===

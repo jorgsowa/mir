@@ -17,4 +17,3 @@ function boot(): void {
     $client = new FrameworkClient();
     $client->connect('https://example.com');
 }
-===expect===

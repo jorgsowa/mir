@@ -14,4 +14,3 @@ echo $ok;
 pick('b');
 pick('zzz');
 //   ^^^^^ InvalidArgument: Argument $k of pick() expects '"a"|"b"', got '"zzz"'
-===expect===

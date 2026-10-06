@@ -20,5 +20,3 @@ final class Foo {
 
 /** @param list<positive-int> $ids */
 function baz(array $ids): void {}
-
-===expect===

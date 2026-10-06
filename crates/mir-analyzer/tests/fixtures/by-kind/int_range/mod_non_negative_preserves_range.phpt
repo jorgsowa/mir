@@ -26,4 +26,3 @@ function test_bounded($n): void {
     /** @mir-check $r is int<0, 9> */
     $_ = $r;
 }
-===expect===

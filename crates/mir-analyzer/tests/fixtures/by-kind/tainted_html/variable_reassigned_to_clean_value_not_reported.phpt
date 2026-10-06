@@ -32,4 +32,3 @@ function reassignedToTaintedStaysTainted(): void {
     echo $x;
 //  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

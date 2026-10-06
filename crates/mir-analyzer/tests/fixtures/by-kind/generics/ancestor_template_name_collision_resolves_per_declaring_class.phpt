@@ -64,4 +64,3 @@ $docParent = $d->get();
 /** @mir-check $docParent is A */
 $docInterface = $d->fetch();
 /** @mir-check $docInterface is B */
-===expect===

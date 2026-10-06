@@ -21,4 +21,3 @@ function caller(Repo $r): void {
     $r->names($invalid);
 //            ^^^^^^^^ InvalidArgument: Argument $names of names() expects 'list<"a"|"b">', got 'array{0: "zzz"}'
 }
-===expect===

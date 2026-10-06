@@ -37,4 +37,3 @@ function test(array $list): void {
         echo count($list);
     }
 }
-===expect===

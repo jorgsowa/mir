@@ -13,4 +13,3 @@ enum Status {
 //    ^^^^^^^^^^^ InvalidAttribute: Attribute OnlyMethods cannot be used on this target
     case Active;
 }
-===expect===

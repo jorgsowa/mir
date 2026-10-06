@@ -11,4 +11,3 @@ Variable in assignment RHS of || should be narrowed from !isset() in LHS
 <?php
 $x = !isset($y) || ($y = null);
 // After fix: $y in assignment RHS should be narrowed as defined
-===expect===

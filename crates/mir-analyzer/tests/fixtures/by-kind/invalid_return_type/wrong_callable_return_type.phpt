@@ -15,4 +15,3 @@ function bar(callable $c) : string {
 }
 
 bar($add_one);
-===expect===

@@ -54,4 +54,3 @@ function outsideBranchDoesNotNarrow(?Holder $h): void {
     /** @mir-check $h is Holder|null */
     $_ = 1;
 }
-===expect===

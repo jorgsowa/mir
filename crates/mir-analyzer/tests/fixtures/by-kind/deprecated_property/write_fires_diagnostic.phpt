@@ -12,4 +12,3 @@ class Config {
 $c = new Config();
 $c->server = "new-host";
 //<^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedProperty: Property Config::$server is deprecated: Use $host instead.
-===expect===

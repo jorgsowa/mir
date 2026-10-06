@@ -14,4 +14,3 @@ $key = 'x';
 $matrix = [];
 $val = $matrix['row'][$key];
 //                    ^^^^ MixedArrayOffset: Mixed type used as array offset
-===expect===

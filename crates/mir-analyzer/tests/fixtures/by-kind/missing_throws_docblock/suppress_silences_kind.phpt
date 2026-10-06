@@ -12,4 +12,3 @@ suppress=MissingThrowsDocblock drops every diagnostic of that kind from the resu
 function riskyOperation(): void {
     throw new \Exception('fail');
 }
-===expect===

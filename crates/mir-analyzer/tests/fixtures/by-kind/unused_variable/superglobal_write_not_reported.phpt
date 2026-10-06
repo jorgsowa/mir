@@ -5,4 +5,3 @@ superglobal write not reported
 function test(): void {
     $_GET['debug'] = '1';
 }
-===expect===

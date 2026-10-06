@@ -29,4 +29,3 @@ function testNamedArgs(): void {
 function testSafe(): void {
     move_uploaded_file($_GET['tmp'], '/var/uploads/fixed-name.bin');
 }
-===expect===

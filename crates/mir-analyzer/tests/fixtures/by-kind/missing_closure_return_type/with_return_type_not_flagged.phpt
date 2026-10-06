@@ -11,4 +11,3 @@ MissingClosureReturnType does NOT fire when the closure has a return type annota
 $a = function(): string {
     return "foo";
 };
-===expect===

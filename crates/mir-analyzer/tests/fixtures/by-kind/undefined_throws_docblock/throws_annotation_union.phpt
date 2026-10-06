@@ -10,4 +10,3 @@ final class KnownException extends \RuntimeException {}
 function risky(): void {
 //       ^^^^^ UndefinedThrowsDocblock: @throws class 'MissingException' does not exist
 }
-===expect===

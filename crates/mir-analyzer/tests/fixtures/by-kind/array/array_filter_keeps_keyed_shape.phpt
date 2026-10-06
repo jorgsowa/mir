@@ -51,4 +51,3 @@ function lst(array $l): void {
     /** @mir-check $f is array<int, int> */
     echo 1;
 }
-===expect===

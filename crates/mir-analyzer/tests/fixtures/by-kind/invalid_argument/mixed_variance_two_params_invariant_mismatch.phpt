@@ -23,4 +23,3 @@ function test(): void {
     f($p);
 //    ^^ InvalidArgument: Argument $p of f() expects 'Pair<string, Animal>', got 'Pair<int, Cat>'
 }
-===expect===

@@ -24,4 +24,3 @@ function run(array $any, array $names): void {
     takes_row(['name' => 'a']);
 //            ^^^^^^^^^^^^^^^ InvalidArgument: Argument $row of takes_row() expects 'array<string, mixed>&array{'id': int, 'name'?: string}', got 'array{'name': "a"}'
 }
-===expect===

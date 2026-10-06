@@ -9,4 +9,3 @@ class A {
         $this->__construct();
     }
 }
-===expect===

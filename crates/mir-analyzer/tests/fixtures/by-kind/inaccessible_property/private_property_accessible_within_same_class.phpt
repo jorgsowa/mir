@@ -11,4 +11,3 @@ class Vault
         return $this->secret;
     }
 }
-===expect===

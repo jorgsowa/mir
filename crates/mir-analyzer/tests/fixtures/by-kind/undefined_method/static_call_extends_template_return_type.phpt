@@ -18,4 +18,3 @@ class UserRepository extends Repository {}
 $u = UserRepository::first();
 $u->onlyOnUser();
 //<^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::onlyOnUser() does not exist
-===expect===

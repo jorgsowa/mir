@@ -47,4 +47,3 @@ function orChainKeepsClosureProp(Holder $h): void {
         }
     }
 }
-===expect===

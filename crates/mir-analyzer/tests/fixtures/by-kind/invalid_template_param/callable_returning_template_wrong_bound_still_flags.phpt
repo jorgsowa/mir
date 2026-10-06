@@ -22,4 +22,3 @@ function wrap($item): void {}
 
 wrap(fn(): Unrelated => new Unrelated());
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'
-===expect===

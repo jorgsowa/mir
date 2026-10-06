@@ -19,4 +19,3 @@ function test(array $x, array $y): void {
     /** @mir-check $z is array{a: int, b: string} */
     echo 1;
 }
-===expect===

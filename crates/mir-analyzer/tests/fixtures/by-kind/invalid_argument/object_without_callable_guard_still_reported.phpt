@@ -18,4 +18,3 @@ function test(object $x): void {
     needsCallable($x);
 //                ^^ InvalidArgument: Argument $fn of needsCallable() expects 'callable', got 'object'
 }
-===expect===

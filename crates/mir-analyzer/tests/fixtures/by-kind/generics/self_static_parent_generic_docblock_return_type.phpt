@@ -33,4 +33,3 @@ function test($c): void {
     /** @mir-check $result is IntCollection<int> */
     $_ = 1;
 }
-===expect===

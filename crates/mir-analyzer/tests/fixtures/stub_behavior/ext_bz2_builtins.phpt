@@ -12,4 +12,3 @@ function pack_(string $data): void {
     echo $c;
     echo $d;
 }
-===expect===

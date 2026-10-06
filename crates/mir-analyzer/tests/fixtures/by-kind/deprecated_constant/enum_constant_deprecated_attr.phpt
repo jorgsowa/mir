@@ -19,4 +19,3 @@ enum Suit {
 
 $v = Suit::DEFAULT_SUIT;
 //         ^^^^^^^^^^^^ DeprecatedConstant: Constant Suit::DEFAULT_SUIT is deprecated
-===expect===

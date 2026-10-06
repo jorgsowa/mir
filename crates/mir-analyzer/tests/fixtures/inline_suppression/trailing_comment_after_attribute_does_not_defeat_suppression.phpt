@@ -17,4 +17,3 @@ instead of the class declaration after it.
 #[Bar] // some note
 class Foo extends UndefinedClass {
 }
-===expect===

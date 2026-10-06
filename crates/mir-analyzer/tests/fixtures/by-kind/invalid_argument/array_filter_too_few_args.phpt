@@ -10,4 +10,3 @@ function foo(int $i, string $s) : bool {
 
 array_filter([1, 2, 3], "foo");
 //                      ^^^^^ InvalidArgument: Argument $callback of array_filter() expects 'callable accepting 1 argument', got 'callable accepting 2 arguments'
-===expect===

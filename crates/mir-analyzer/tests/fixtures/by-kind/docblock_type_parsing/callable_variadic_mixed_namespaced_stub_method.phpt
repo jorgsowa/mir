@@ -63,4 +63,3 @@ function check_mixed_tail($x) {
      */
     var_dump($x);
 }
-===expect===

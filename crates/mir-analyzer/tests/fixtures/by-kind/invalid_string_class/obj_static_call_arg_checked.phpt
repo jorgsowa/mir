@@ -10,4 +10,3 @@ function test(Foo $obj): void {
     $obj::bar("wrong");
 //            ^^^^^^^ InvalidArgument: Argument $x of bar() expects 'int', got '"wrong"'
 }
-===expect===

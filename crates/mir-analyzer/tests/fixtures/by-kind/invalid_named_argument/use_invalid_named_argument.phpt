@@ -21,4 +21,3 @@ function foo(array $input) : CustomerData {
         email: $input["email"],
     );
 }
-===expect===

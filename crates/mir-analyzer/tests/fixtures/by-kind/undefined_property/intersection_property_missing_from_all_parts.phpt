@@ -14,4 +14,3 @@ function useIt(object $x): void {
 //               ^^^^^^^^^^^^^^^ UndefinedProperty: Property Foo&CountableIface::$nonexistentProp does not exist
     }
 }
-===expect===

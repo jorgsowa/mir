@@ -55,4 +55,3 @@ function reset_in_conditional_branch(bool $flag): void {
         if ($flag) { $a = null; } else { $a = new Cand(); }
     }
 }
-===expect===

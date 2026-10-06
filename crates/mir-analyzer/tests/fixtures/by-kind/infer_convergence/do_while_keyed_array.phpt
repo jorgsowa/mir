@@ -22,4 +22,3 @@ function buildMapping(int $start, int $end): array {
     } while ($i <= $end);
     return $map;
 }
-===expect===

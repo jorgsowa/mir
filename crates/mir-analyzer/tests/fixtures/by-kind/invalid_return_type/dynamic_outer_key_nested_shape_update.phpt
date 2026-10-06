@@ -28,4 +28,3 @@ function collect(array $entries): array
 
     return array_values($byName);
 }
-===expect===

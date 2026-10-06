@@ -17,4 +17,3 @@ function foo(array $input) : CustomerData {
     return new CustomerData(...$input);
 //                          ^^^^^^^^^ InvalidNamedArgument: CustomerData::__construct() has no parameter named $aage
 }
-===expect===

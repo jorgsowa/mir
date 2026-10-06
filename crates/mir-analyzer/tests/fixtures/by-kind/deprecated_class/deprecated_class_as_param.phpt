@@ -15,4 +15,3 @@ class DeprecatedClass{}
 
 function foo(DeprecatedClass $deprecatedClass): void {}
 //           ^^^^^^^^^^^^^^^ DeprecatedClass: Class DeprecatedClass is deprecated
-===expect===

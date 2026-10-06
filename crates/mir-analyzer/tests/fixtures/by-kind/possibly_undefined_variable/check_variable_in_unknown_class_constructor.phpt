@@ -5,4 +5,3 @@ Check variable in unknown class constructor
 /** @suppress UndefinedClass */
 new Missing($class_arg);
 //          ^^^^^^^^^^ UndefinedVariable: Variable $class_arg is not defined
-===expect===

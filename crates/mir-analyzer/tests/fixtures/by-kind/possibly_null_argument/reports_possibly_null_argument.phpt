@@ -9,4 +9,3 @@ function test(?string $value): void {
     greet($value);
 //        ^^^^^^ PossiblyNullArgument: Argument $name of greet() might be null
 }
-===expect===

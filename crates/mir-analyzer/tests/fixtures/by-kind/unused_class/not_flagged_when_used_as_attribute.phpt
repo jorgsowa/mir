@@ -17,4 +17,3 @@ final class Consumer {
 }
 
 new Consumer();
-===expect===

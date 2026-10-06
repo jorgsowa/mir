@@ -21,4 +21,3 @@ function test(bool $cond): void {
     describe($cond ? 'Shape' : 'ConcreteThing');
 //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NotAnInterface: ConcreteThing is not an interface
 }
-===expect===

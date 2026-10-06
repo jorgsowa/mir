@@ -23,4 +23,3 @@ function normalize(Box $b): void {
     sort($b->items);
 //       ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
-===expect===

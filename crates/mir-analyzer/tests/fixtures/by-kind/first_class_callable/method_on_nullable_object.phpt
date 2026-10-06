@@ -19,4 +19,3 @@ class Parser {
 function makeParser(Parser $p): \Closure {
     return $p->parse(...);
 }
-===expect===

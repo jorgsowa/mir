@@ -15,4 +15,3 @@ function foo(mixed $a): void {
         $v = $a[0];
     }
 }
-===expect===

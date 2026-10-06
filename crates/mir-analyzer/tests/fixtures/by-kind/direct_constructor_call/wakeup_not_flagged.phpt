@@ -13,4 +13,3 @@ class Connection {
         $this->__construct($this->dsn);
     }
 }
-===expect===

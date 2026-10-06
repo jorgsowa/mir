@@ -66,4 +66,3 @@ function test(array $rows, array $mixed_rows, array $boxes): void {
     /** @mir-check $templated is array<array-key, mixed> */
     $_ = $templated;
 }
-===expect===

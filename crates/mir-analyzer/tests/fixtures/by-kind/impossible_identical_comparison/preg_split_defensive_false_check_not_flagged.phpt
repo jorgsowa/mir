@@ -19,4 +19,3 @@ function split_words(string $pattern, string $subject): array {
     }
     return $result;
 }
-===expect===

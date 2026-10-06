@@ -14,4 +14,3 @@ function gen(Stream|Items $source): \Generator {
     yield from $source;
 //             ^^^^^^^ PossiblyRawObjectIteration: Cannot iterate over possibly non-iterable object 'Stream|Items'
 }
-===expect===

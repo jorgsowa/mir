@@ -18,4 +18,3 @@ class Query {
         $this->__constructBase(1);
     }
 }
-===expect===

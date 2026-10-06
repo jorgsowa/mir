@@ -10,4 +10,3 @@ must not be reported unused.
 function helper(): void {}
 
 (helper(...))();
-===expect===

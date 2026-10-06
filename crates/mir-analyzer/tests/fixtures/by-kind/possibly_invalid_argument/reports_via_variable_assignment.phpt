@@ -15,4 +15,3 @@ function test(string $s): void {
     takesInt($pos);
 //           ^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int<0, max>|false' provided
 }
-===expect===

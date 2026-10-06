@@ -15,5 +15,3 @@ $arr = [];
 $foo = ["foo"];
 
 $bar = &$arr[$foo[0]];
-
-===expect===

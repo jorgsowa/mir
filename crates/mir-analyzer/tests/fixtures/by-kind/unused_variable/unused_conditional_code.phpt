@@ -7,4 +7,3 @@ if (rand(0, 1)) {
   $a = $a + 5;
 //^^ UnusedVariable: Variable $a is never read
 }
-===expect===

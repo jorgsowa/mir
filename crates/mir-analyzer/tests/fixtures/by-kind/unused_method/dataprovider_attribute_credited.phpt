@@ -21,4 +21,3 @@ class BarTest {
         return [[1, 2]];
     }
 }
-===expect===

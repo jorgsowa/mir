@@ -52,4 +52,3 @@ function test_positive_range($n): void {
     /** @mir-check $r is int<2, 6> */
     $_ = $r;
 }
-===expect===

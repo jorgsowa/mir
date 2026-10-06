@@ -11,4 +11,3 @@ function f(?string $p): ?int {
     }
     return null;
 }
-===expect===

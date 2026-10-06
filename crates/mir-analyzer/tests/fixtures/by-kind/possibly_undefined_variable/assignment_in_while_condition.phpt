@@ -14,4 +14,3 @@ function run(mixed $resource): void {
         echo strlen($line);
     }
 }
-===expect===

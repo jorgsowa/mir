@@ -29,4 +29,3 @@ function bareGenericReferenceStaysSilent($m): void {}
 
 /** @param TypedMap<string, int> $m */
 function correctArityStaysSilent($m): void {}
-===expect===

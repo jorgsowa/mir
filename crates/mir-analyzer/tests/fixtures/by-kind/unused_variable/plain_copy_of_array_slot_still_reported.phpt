@@ -17,4 +17,3 @@ function group(array $rows): void {
 //      ^^^^^^^ UnusedVariable: Variable $bucket is never read
     }
 }
-===expect===

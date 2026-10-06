@@ -13,4 +13,3 @@ function process(int|array $data): void {
     echo $data[0];
 //       ^^^^^^^^ PossiblyInvalidArrayAccess: Possibly invalid array access: 'int|array' might not support []
 }
-===expect===

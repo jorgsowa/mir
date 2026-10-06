@@ -5,4 +5,3 @@ The call site starts at byte offset 8 on line 2 (0-indexed col 8).
 <?php
         \noSuchFn();
 //      ^^^^^^^^^^^ UndefinedFunction: Function noSuchFn() is not defined
-===expect===

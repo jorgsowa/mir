@@ -5,4 +5,3 @@ Invalid int clone
 $a = 5;
 clone $a;
 //<^^^^^^^^ InvalidClone: cannot clone non-object 5
-===expect===

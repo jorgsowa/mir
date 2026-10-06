@@ -52,4 +52,3 @@ function staysString(array $names): void {
     /** @mir-check $mapped is list<string> */
     $_ = $mapped;
 }
-===expect===

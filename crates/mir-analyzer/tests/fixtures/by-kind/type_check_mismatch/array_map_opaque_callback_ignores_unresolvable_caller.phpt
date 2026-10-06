@@ -23,4 +23,3 @@ function resolvableCaller(array $nums): void {
 function unresolvableCaller(callable $mystery, array $nums): void {
     apply($mystery, $nums);
 }
-===expect===

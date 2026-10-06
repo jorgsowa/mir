@@ -5,4 +5,3 @@ isset with multiple variables — all available in true branch
 if (isset($x, $y, $z) && true) {
     echo $x . $y . $z; // all should be defined
 }
-===expect===

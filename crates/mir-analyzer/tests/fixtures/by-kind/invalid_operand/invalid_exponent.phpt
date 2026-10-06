@@ -10,4 +10,3 @@ XOR with an array operand is invalid; string literals are valid (PHP allows stri
 <?php
 $a = [1, 2] ^ 1;
 //   ^^^^^^^^^^ InvalidOperand: Operator '^' not supported between 'array{0: 1, 1: 2}' and '1'
-===expect===

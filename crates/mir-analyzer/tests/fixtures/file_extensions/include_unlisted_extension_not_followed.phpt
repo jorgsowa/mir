@@ -22,4 +22,3 @@ require_once __DIR__ . '/c.tpl';
 ===file:c.tpl===
 <?php
 function t(): int { return 1; }
-===expect===

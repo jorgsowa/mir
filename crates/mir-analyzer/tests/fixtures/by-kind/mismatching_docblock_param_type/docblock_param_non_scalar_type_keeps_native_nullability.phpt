@@ -22,4 +22,3 @@ function validate(?object ...$objects): void {
         }
     }
 }
-===expect===

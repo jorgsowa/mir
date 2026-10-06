@@ -18,4 +18,3 @@ function replaceInExplode(string $s): float {
 function replaceInExplodeI(string $s): int {
     return (int) str_ireplace('rgb(', '', explode(',', $s)[0]);
 }
-===expect===

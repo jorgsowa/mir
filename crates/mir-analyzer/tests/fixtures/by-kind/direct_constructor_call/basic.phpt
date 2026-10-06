@@ -9,4 +9,3 @@ class Foo {
 $a = new Foo();
 $a->__construct();
 //<^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of Foo directly
-===expect===

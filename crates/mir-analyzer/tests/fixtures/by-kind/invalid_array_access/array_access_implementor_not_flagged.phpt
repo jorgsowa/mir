@@ -18,4 +18,3 @@ class Box implements \ArrayAccess
 }
 $box = new Box();
 echo $box[0];
-===expect===

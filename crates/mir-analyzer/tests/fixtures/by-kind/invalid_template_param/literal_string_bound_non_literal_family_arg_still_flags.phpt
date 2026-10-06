@@ -21,4 +21,3 @@ final class Box {
 }
 new Box(new Wrong());
 //<^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'A' inferred as 'Wrong' does not satisfy bound 'int|string'
-===expect===

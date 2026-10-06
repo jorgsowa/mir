@@ -51,4 +51,3 @@ function isStringFalseBranchDivergesOnNonNullableReceiver(Holder $h): void {
         $_ = 1;
     }
 }
-===expect===

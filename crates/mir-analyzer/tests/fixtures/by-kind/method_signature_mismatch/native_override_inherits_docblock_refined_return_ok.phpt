@@ -42,4 +42,3 @@ $k = D::k();
 /** @mir-check $k is string */
 $n = (new Three())->count();
 /** @mir-check $n is int */
-===expect===

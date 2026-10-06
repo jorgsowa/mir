@@ -32,4 +32,3 @@ function test_zero_based(): void {
     /** @mir-check $r is non-empty-list<int<0, 9>> */
     $_ = $r;
 }
-===expect===

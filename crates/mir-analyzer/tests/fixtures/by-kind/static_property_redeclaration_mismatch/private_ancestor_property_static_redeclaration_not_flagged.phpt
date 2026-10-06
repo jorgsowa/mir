@@ -11,4 +11,3 @@ class Base {
 class Sub extends Base {
     public static int $x = 2;
 }
-===expect===

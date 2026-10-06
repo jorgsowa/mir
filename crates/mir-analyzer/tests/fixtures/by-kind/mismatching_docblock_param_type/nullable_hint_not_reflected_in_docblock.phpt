@@ -23,4 +23,3 @@ function greet(?string $name): void {}
  */
 function takesItems(?array $items): void {}
 //                         ^^^^^^ MismatchingDocblockParamType: Docblock type 'list<int>' for $items does not match inferred 'array|null'
-===expect===

@@ -18,4 +18,3 @@ function processUserDataInvalid(array $data) : User {
 //                ^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'MixedArgument' is never used
     return new User(...$data);
 }
-===expect===

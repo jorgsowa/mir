@@ -14,5 +14,3 @@ sealed to just its declared keys and rejected any extra key.
 function logError(string $msg, array $context = []): void {}
 
 logError('oops', ['requestId' => 42]);
-
-===expect===

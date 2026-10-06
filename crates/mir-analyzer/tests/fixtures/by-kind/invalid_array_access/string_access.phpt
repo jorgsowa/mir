@@ -10,5 +10,3 @@ InvalidArrayAccess fires when attempting array access on a string literal.
 <?php
 $s = "hello";
 $c = $s[0];
-
-===expect===

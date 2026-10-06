@@ -8,4 +8,3 @@ enum Suit {
     case Clubs;
     case Spades;
 }
-===expect===

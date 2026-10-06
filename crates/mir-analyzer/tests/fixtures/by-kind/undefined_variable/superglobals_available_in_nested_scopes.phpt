@@ -21,4 +21,3 @@ function outer(): void {
     $closure();
     $arrow();
 }
-===expect===

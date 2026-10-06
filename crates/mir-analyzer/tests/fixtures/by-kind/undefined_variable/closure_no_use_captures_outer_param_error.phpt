@@ -14,4 +14,3 @@ function outer(string $x): callable {
 //             ^^ UndefinedVariable: Variable $x is not defined
     };
 }
-===expect===

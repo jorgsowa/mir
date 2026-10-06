@@ -7,4 +7,3 @@ function first(): int {
     return $values[0];
 //  ^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"alpha"' is not compatible with declared 'int'
 }
-===expect===

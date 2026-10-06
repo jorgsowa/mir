@@ -43,4 +43,3 @@ function test(): void {
     $complexResult = new Result();
     assertSuccessValue($complexResult);
 }
-===expect===

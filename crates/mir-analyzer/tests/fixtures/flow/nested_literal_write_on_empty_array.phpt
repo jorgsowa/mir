@@ -80,4 +80,3 @@ function generic_array_stays_generic(array $o): void {
     /** @mir-check $o is array<string, int|non-empty-list<1>> */
     echo json_encode($o);
 }
-===expect===

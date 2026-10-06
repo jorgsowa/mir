@@ -25,4 +25,3 @@ class Container {
     /** @var Lib\Item */
     private $item;
 }
-===expect===

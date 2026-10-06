@@ -18,4 +18,3 @@ function use_repo(Repository $r): void {
     $e->missing();
 //  ^^^^^^^^^^^^^ UndefinedMethod: Method Entity::missing() does not exist
 }
-===expect===

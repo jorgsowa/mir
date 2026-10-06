@@ -17,4 +17,3 @@ function takesConfig(array $config): void {}
 
 takesConfig(['host' => 'localhost']);
 takesConfig(['host' => 'localhost', 'port' => 3306]);
-===expect===

@@ -11,4 +11,3 @@ function f(): int {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 //                ^^^^^^^^^ UndefinedConstant: Constant AST_CLASS is not defined
 }
-===expect===

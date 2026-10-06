@@ -13,4 +13,3 @@ if (false) {
 function foo(A $a, B $b) : void {
     if ($a === $b) {}
 }
-===expect===

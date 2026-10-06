@@ -53,4 +53,3 @@ class Wrapper {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method record() in a pure or immutable context
     }
 }
-===expect===

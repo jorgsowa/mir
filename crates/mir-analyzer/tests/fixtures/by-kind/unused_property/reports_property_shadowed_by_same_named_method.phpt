@@ -16,4 +16,3 @@ class Foo {
         return $this->bar();
     }
 }
-===expect===

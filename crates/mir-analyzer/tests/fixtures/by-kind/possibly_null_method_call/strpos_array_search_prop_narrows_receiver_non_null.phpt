@@ -50,4 +50,3 @@ function viaArraySearchNotFound(?Box $b): void {
 //      ^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
     }
 }
-===expect===

@@ -23,4 +23,3 @@ class B extends A {
     private $bar;
 //  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$bar overrides with less visibility
 }
-===expect===

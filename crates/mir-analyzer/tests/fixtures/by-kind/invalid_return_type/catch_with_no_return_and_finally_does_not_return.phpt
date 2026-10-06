@@ -20,4 +20,3 @@ function foo() : bool {
 
     }
 }
-===expect===

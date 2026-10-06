@@ -4,4 +4,3 @@ Bad assignment as well
 <?php
 $a = "hello";
 $a->foo = "bar";
-===expect===

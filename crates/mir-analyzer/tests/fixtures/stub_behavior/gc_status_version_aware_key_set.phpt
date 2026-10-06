@@ -20,4 +20,3 @@ function needsBool(bool $x): void {}
 $status = gc_status();
 needsBool($status['running']);
 //                ^^^^^^^^^ NonExistentArrayOffset: Array offset 'running' does not exist
-===expect===

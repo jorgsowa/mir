@@ -13,4 +13,3 @@ class C {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedTraitAliasMethod: An alias was defined for A::missingmethod but this method does not exist
     }
 }
-===expect===

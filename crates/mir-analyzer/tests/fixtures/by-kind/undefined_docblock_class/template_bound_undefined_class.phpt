@@ -6,4 +6,3 @@ class that does not exist.
 /** @template T of NonExistentBoundClass */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentBoundClass' does not exist
 class Box {}
-===expect===

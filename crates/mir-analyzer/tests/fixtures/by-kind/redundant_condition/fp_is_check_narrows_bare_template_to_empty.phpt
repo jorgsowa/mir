@@ -55,4 +55,3 @@ function checkObject($x): void {
         echo "obj";
     }
 }
-===expect===

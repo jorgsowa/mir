@@ -18,4 +18,3 @@ try {
 } catch (\Throwable $e) {
     reportLike($e);
 }
-===expect===

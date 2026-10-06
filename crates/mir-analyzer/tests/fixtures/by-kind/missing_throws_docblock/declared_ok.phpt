@@ -8,4 +8,3 @@ function declares @throws for thrown exception - no error
 function riskyOperation(): void {
     throw new \RuntimeException('fail');
 }
-===expect===

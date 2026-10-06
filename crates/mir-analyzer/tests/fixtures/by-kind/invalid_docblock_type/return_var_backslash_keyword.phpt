@@ -17,4 +17,3 @@ Return and variable types reject backslash-qualified keywords.
 function f(): string {
     return "x";
 }
-===expect===

@@ -19,4 +19,3 @@ function a_fn(): int { return b_fn(); }
 ===file:b.php===
 <?php
 function b_fn(): int { return 1; }
-===expect===

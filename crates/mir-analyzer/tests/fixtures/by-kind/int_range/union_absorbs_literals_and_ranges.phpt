@@ -44,4 +44,3 @@ function test_literal_outside_range_kept(bool $c): void {
     /** @mir-check $r is int<3, 3>|-5 */
     $_ = $r;
 }
-===expect===

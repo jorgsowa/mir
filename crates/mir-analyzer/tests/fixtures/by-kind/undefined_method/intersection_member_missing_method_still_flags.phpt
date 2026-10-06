@@ -22,4 +22,3 @@ namespace App {
 //      ^^^^^^^^^^^^^ UndefinedMethod: Method App\Foo&Glob::missing() does not exist
     }
 }
-===expect===

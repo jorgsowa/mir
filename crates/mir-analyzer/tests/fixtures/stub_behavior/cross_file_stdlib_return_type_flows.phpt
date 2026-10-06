@@ -15,4 +15,3 @@ function now(): \DateTimeImmutable {
 <?php
 $dt = now();
 $formatted = $dt->format('Y-m-d');
-===expect===

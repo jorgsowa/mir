@@ -8,4 +8,3 @@ class Foo {
     }
     public function baz(): void {}
 }
-===expect===

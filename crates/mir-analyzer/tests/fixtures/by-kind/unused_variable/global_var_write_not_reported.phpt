@@ -7,4 +7,3 @@ function setup(): void {
     global $config;
     $config = loadConfig();
 }
-===expect===

@@ -13,4 +13,3 @@ function wrap(): string
 {
     return tick_helper();
 }
-===expect===

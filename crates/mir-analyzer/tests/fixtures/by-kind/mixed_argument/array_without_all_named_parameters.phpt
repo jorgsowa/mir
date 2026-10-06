@@ -16,4 +16,3 @@ class User {
 function processUserDataInvalid(array $data) : User {
     return new User(...$data);
 }
-===expect===

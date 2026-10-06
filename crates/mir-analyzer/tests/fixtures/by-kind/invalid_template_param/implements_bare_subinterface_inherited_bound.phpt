@@ -28,4 +28,3 @@ class OkRepo implements MidRepository {}
 /** @implements MidRepository<stdClass> */
 class BadRepo implements MidRepository {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'stdClass' does not satisfy bound 'Countable'
-===expect===

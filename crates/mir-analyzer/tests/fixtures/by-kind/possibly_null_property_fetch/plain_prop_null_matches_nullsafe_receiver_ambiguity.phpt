@@ -36,4 +36,3 @@ function receiverNarrowed(?Box $b): void {
         echo $b->other;
     }
 }
-===expect===

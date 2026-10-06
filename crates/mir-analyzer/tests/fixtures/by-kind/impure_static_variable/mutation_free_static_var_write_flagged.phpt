@@ -30,4 +30,3 @@ class Counter {
 //      ^^^^^^ ImpureStaticVariable: Using static variable $m in a @pure function
     }
 }
-===expect===

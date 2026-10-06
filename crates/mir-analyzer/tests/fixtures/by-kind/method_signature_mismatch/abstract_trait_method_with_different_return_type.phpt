@@ -17,4 +17,3 @@ class C {
         return new B();
     }
 }
-===expect===

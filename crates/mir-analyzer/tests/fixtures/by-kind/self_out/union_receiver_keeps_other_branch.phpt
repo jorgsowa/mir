@@ -26,4 +26,3 @@ function test($x): void {
     /** @mir-check $x is AReady|B */
     $_ = 1;
 }
-===expect===

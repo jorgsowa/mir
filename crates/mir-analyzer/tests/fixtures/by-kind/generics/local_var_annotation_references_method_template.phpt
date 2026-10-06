@@ -32,4 +32,3 @@ class Instantiator {
         return $cached;
     }
 }
-===expect===

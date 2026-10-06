@@ -32,4 +32,3 @@ class Processor {
 
 $processor = new Processor();
 array_map_wrapper([$processor, "process"], ["a", "b"]);
-===expect===

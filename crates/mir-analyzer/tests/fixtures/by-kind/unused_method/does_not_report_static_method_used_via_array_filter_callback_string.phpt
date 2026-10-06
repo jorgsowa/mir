@@ -13,4 +13,3 @@ class Filters {
         return array_filter($items, 'Filters::keep');
     }
 }
-===expect===

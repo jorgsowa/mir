@@ -14,5 +14,3 @@ function missing(): mixed {
 //       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentMember' does not exist
     return null;
 }
-
-===expect===

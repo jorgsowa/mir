@@ -19,4 +19,3 @@ final class GlobalBox {
         echo 1;
     }
 }
-===expect===

@@ -16,4 +16,3 @@ function test(): void {
 //           ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|null|false' provided
 //           ^^^^^^^^^^^ PossiblyNullArgument: Argument $n of takesInt() might be null
 }
-===expect===

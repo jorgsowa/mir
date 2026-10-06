@@ -25,4 +25,3 @@ function run(Box $box): void {
     $box->cache->bump();
 //  ^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
 }
-===expect===

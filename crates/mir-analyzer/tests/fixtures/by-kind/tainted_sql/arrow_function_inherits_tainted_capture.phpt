@@ -20,4 +20,3 @@ function run_query(mysqli $db): void {
 //               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     $f();
 }
-===expect===

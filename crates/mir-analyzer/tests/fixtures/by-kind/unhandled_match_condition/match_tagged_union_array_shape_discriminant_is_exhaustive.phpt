@@ -9,4 +9,3 @@ function label(array $x): string {
         'b' => 'right',
     };
 }
-===expect===

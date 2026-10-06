@@ -25,4 +25,3 @@ class Rectangle {
         return "area=" . $this->area() . " perimeter=" . $this->perimeter();
     }
 }
-===expect===

@@ -20,4 +20,3 @@ function f(Countable2&Iterator2 $x): void {
         needsBoth($x);
     }
 }
-===expect===

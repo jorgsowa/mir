@@ -16,4 +16,3 @@ function redact_middle(string $s): string {
 function insert_at(string $s, string $ins, int $pos): string {
     return substr_replace($s, $ins, $pos, 0);
 }
-===expect===

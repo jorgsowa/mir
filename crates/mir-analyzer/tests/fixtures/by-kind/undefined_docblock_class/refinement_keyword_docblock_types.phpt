@@ -21,5 +21,3 @@ class Rec {
     /** @var non-empty-list */
     public array $items = [];
 }
-
-===expect===

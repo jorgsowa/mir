@@ -22,4 +22,3 @@ function enqueue(): void {
 //             ^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Bag::$queue in a @pure function
 //                  ^^^^^^ ImpureStaticPropertyAccess: Reading static property Bag::$queue in a @pure function
 }
-===expect===

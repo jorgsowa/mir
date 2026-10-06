@@ -21,4 +21,3 @@ function parseOffset(string $input): int {
     }
     return -1;
 }
-===expect===

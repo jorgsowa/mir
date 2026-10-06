@@ -10,4 +10,3 @@ function test(): void {
     $c = new Child();
     echo $c->name;
 }
-===expect===

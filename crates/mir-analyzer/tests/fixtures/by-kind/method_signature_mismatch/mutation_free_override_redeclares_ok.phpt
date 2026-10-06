@@ -13,4 +13,3 @@ class StillMutationFree implements Counter {
         return 1;
     }
 }
-===expect===

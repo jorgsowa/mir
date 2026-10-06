@@ -38,4 +38,3 @@ class MaybeString {
     }
 }
 class ReadyString extends MaybeString {}
-===expect===

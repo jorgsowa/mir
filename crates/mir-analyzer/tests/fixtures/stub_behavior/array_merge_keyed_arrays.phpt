@@ -34,4 +34,3 @@ function merge(array $map, array $other, array $untyped, array $full): void {
     $recursive = array_merge_recursive($map, $other);
     /** @mir-check $recursive is array */
 }
-===expect===

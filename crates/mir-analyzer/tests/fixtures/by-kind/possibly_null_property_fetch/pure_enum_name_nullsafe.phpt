@@ -9,4 +9,3 @@ enum Direction {
 function test(?Direction $dir): string {
     return $dir?->name ?? 'none';
 }
-===expect===

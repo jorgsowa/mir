@@ -31,4 +31,3 @@ function stillImpossible(\Closure $c): void {
         echo "unreachable\n";
     }
 }
-===expect===

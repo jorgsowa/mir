@@ -7,4 +7,3 @@ namespace Aye {
     interface Foo {}
 //  ^^^^^^^^^^^^^^^^ DuplicateInterface: Interface Aye\Foo has already been defined
 }
-===expect===

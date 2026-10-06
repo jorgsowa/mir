@@ -9,4 +9,3 @@ class A {
 $q = new A;
 $q->foo(bar());
 //      ^^^^^ UndefinedFunction: Function bar() is not defined
-===expect===

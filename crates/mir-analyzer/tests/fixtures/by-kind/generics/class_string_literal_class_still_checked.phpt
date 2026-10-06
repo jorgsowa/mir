@@ -13,4 +13,3 @@ function f(string $c): void {
     $c::missing();
 //  ^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
 }
-===expect===

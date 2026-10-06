@@ -44,4 +44,3 @@ function test_method_exists_mixed_narrows_to_object(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

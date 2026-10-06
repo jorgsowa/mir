@@ -13,4 +13,3 @@ function test_null_false(): int {
     return rand(0, 1) ? null : false;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'null|false' is not compatible with declared 'int'
 }
-===expect===

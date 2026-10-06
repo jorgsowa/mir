@@ -84,4 +84,3 @@ function check_iterable_generic($x) {
      */
     var_dump($x);
 }
-===expect===

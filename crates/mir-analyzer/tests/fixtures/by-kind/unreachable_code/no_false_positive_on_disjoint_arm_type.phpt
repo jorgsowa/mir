@@ -15,4 +15,3 @@ function test(Foo $x): void {
         new Bar() => $x->fooMethod(),
     };
 }
-===expect===

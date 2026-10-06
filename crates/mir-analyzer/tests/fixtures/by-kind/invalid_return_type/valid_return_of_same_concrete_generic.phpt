@@ -10,4 +10,3 @@ function makeBox(): mixed {
     $b = new Box();
     return $b;
 }
-===expect===

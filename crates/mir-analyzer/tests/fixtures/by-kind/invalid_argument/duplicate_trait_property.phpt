@@ -7,5 +7,3 @@ trait T {
     protected static mixed $foo;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: Cannot redeclare property $foo
 }
-
-===expect===

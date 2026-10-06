@@ -15,4 +15,3 @@ class C implements I {
     public function f(int $x): void { var_dump($x); }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method C::f() signature mismatch: parameter $x type 'int' is incompatible with parent type 'string'
 }
-===expect===

@@ -44,4 +44,3 @@ function mismatchIsCaught(TypedContainer $c): void {
 function matchIsAccepted(TypedContainer $c): void {
     takesBoxOfString($c);
 }
-===expect===

@@ -17,4 +17,3 @@ function test(): void {
         $item->process();
     }
 }
-===expect===

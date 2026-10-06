@@ -4,4 +4,3 @@ UnusedVariable is suppressed for files under resources/views/ path
 <?php
 $pageTitle = "Home";
 echo $content;
-===expect===

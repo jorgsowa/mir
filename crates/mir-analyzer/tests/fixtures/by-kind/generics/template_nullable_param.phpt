@@ -22,4 +22,3 @@ $r = maybe("hello");
 
 $r2 = maybe(null);
 /** @mir-check $r2 is null */
-===expect===

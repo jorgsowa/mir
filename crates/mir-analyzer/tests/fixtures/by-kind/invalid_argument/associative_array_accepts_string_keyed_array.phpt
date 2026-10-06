@@ -14,4 +14,3 @@
 function takesAssociativeArray($items): void {}
 
 takesAssociativeArray(['x' => 1, 'y' => 2]);
-===expect===

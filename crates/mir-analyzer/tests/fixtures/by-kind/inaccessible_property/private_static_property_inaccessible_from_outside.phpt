@@ -9,4 +9,3 @@ class Config
 
 echo Config::$secret;
 //           ^^^^^^^ InaccessibleProperty: Cannot access property Config::$secret
-===expect===

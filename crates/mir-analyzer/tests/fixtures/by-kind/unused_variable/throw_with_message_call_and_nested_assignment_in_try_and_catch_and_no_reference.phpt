@@ -35,4 +35,3 @@ function callDangerous(): void {
         }
     }
 }
-===expect===

@@ -21,4 +21,3 @@ class Registry {
 Registry::build(["a", "b", "c"], $result);
 /** @mir-check $result is array<string, int> */
 $_ = $result;
-===expect===

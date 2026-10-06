@@ -15,4 +15,3 @@ abstract class A
 //                   ^^^^^^^^^^^ UndefinedProperty: Property A::$nonexistent does not exist
     }
 }
-===expect===

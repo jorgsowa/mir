@@ -40,4 +40,3 @@ function methodExistsStillNarrowsObject($x): void {
         $_ = 1;
     }
 }
-===expect===

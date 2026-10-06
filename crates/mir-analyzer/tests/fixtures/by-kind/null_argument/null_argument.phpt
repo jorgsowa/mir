@@ -11,4 +11,3 @@ Null argument
 function fooFoo(int $a): void {}
 fooFoo(null);
 //     ^^^^ NullArgument: Argument $a of fooFoo() cannot be null
-===expect===

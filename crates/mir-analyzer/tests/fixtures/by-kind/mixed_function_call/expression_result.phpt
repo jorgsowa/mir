@@ -8,5 +8,3 @@ function getMixed(): mixed { return null; }
 
 getMixed()();
 //<^^^^^^^^^^^^ MixedFunctionCall: Cannot call mixed type as a function
-
-===expect===

@@ -19,4 +19,3 @@ class Foo {
         echo "hello";
     }
 }
-===expect===

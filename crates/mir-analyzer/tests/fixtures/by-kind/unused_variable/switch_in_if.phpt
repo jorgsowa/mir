@@ -19,4 +19,3 @@ if (rand(0, 1)) {
 }
 
 echo $a;
-===expect===

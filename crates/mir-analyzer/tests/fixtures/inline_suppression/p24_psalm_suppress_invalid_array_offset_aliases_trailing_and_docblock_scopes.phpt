@@ -11,4 +11,3 @@ function test(array $v): void {
     echo $v['missing'];
     new NoSuchClass();
 }
-===expect===

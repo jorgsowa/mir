@@ -18,4 +18,3 @@ function f($x): void {
         foreach ($x as $v) {}
     }
 }
-===expect===

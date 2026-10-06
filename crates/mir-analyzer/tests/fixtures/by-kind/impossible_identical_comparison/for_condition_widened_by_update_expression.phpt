@@ -34,4 +34,3 @@ function last(Node $head): Node {
     /** @mir-check $cur is Node */
     return $cur;
 }
-===expect===

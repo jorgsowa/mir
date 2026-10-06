@@ -14,4 +14,3 @@ function f(X $x): void {
 //      ^^^^^^^^^^^^^^ UndefinedMethod: Method Z::m() does not exist
     }
 }
-===expect===

@@ -27,4 +27,3 @@ function test(array $x, string $dynamicKey): void {
     /** @mir-check $withDynamicKey is array<int|string, 1|"mid"|"z"> */
     $_ = $withDynamicKey;
 }
-===expect===

@@ -26,4 +26,3 @@ $n = new NodeB();
 $n->cloneInto($result);
 /** @mir-check $result is NodeB */
 $_ = $result;
-===expect===

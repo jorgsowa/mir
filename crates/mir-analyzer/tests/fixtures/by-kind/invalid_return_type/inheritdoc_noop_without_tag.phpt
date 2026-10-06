@@ -24,4 +24,3 @@ class Child extends Base {
         return "not a cat";
     }
 }
-===expect===

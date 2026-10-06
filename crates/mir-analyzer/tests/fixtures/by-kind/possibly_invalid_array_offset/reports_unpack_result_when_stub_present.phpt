@@ -14,4 +14,3 @@ function test(): void {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'
     var_dump($a);
 }
-===expect===

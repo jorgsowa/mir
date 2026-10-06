@@ -9,4 +9,3 @@ class Child extends ParentClass {
     public function locked(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::locked() cannot override final method from ParentClass
 }
-===expect===

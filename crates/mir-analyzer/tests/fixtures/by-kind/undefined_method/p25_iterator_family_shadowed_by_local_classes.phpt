@@ -54,4 +54,3 @@ final class Walker
         return $agg->label();
     }
 }
-===expect===

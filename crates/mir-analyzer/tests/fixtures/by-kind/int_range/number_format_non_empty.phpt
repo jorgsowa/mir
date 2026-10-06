@@ -25,4 +25,3 @@ function test_number_format_float(): void {
     /** @mir-check $r is non-empty-string */
     $_ = $r;
 }
-===expect===

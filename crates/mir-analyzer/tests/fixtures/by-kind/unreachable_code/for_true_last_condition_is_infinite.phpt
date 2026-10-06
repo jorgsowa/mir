@@ -17,4 +17,3 @@ function b(int $n, int $limit): int {
         }
     }
 }
-===expect===

@@ -41,4 +41,3 @@ function test_prev_still_includes_false(array $arr): void {
     /** @mir-check prev($arr) is int|false */
     $_ = prev($arr);
 }
-===expect===

@@ -13,4 +13,3 @@ interface Shape {}
 function getShapeClass(): string {
     return Shape::class;
 }
-===expect===

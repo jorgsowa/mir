@@ -11,4 +11,3 @@ function f($x): void { $_ = $x; }
 function test(): void {
     f(null);
 }
-===expect===

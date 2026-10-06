@@ -13,4 +13,3 @@ use function Vendor\Lib\helper;
 function run(): string {
     return helper();
 }
-===expect===

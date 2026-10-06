@@ -7,5 +7,3 @@ Prevent indirect traversable implementation
  */
 interface I extends Traversable {}
 final class C implements I {}
-
-===expect===

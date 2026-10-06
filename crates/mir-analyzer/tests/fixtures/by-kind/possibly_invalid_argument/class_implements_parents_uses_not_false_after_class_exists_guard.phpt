@@ -58,4 +58,3 @@ function unguarded(string $className): void {
         return;
     }
 }
-===expect===

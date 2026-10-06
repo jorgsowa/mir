@@ -22,4 +22,3 @@ function test_explicit_zero_flags(string $pattern, string $subject): void {
     /** @mir-check $parts is non-empty-list<string> */
     $_ = $parts;
 }
-===expect===

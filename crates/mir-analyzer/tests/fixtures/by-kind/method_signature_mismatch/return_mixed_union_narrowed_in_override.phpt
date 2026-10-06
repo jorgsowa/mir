@@ -18,4 +18,3 @@ class Base {
 class Sub extends Base {
     public function make(): string|Cat { return new Cat(); }
 }
-===expect===

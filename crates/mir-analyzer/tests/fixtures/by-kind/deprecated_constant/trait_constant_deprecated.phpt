@@ -20,4 +20,3 @@ class Service {
 
 $v = Service::LIMIT;
 //            ^^^^^ DeprecatedConstant: Constant Service::LIMIT is deprecated: use NEW_LIMIT instead
-===expect===

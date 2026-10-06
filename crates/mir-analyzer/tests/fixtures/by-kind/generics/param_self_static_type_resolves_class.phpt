@@ -26,4 +26,3 @@ $p = new Point();
 $q = new Point();
 $p->distanceTo($q);
 $p->sameClassAs($q);
-===expect===

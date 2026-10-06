@@ -23,4 +23,3 @@ class Sub extends Base {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::subOnly() does not exist
 Sub::make()->subOnly();
 //<^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::subOnly() does not exist
-===expect===

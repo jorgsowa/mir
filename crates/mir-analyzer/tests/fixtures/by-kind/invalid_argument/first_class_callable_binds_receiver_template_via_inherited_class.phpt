@@ -40,4 +40,3 @@ function viaStaticFccThroughReceiver(IntBox $box): void {
     $fn("also-bad");
 //      ^^^^^^^^^^ InvalidArgument: Argument $x of {closure}() expects 'int', got '"also-bad"'
 }
-===expect===

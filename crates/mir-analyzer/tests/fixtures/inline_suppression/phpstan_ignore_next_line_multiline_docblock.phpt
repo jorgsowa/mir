@@ -10,4 +10,3 @@ class C {
      */
     private function bar(): NoSuchClass { return new NoSuchClass(); }
 }
-===expect===

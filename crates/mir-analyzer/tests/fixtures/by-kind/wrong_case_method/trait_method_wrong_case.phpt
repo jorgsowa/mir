@@ -11,4 +11,3 @@ class Model {
 $m = new Model();
 $m->TOJSON();
 //  ^^^^^^ WrongCaseMethod: Method name 'Model::TOJSON' has incorrect casing; use 'toJson'
-===expect===

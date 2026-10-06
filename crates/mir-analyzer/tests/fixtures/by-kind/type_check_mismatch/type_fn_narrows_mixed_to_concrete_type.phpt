@@ -54,4 +54,3 @@ function checkScalar(mixed $x): void {
         echo "";
     }
 }
-===expect===

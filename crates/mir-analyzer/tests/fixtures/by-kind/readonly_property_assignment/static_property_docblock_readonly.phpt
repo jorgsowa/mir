@@ -12,4 +12,3 @@ class Registry {
 
 Registry::$items = ['x'];
 //<^^^^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Registry::$items outside of constructor
-===expect===

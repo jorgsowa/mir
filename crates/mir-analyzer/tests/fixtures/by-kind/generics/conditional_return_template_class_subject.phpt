@@ -38,4 +38,3 @@ function test(): void {
     /** @mir-check $d is string|null */
     $_ = 1;
 }
-===expect===

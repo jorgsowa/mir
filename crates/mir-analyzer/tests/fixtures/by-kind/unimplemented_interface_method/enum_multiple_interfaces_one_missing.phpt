@@ -22,4 +22,3 @@ enum Suit implements Colorful, Labeled {
     }
     // Missing label()
 }
-===expect===

@@ -55,4 +55,3 @@ $v = $real->x;
 //<^^^^^^^^^^^^^ MixedAssignment: Variable $v is assigned a mixed type
 //<^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $real is expected to be T, got int
 //   ^^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type 'int'
-===expect===

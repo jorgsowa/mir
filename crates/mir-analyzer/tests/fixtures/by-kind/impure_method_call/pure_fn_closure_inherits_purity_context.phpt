@@ -27,4 +27,3 @@ function bump(Counter $c): void {
     };
     $fn();
 }
-===expect===

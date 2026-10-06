@@ -108,4 +108,3 @@ function check_false($x) {
      */
     var_dump($x);
 }
-===expect===

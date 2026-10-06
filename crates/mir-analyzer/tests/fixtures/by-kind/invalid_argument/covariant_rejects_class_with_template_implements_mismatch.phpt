@@ -21,4 +21,3 @@ function test(): void {
     acceptsDogSource(new CatSource());
 //                   ^^^^^^^^^^^^^^^ InvalidArgument: Argument $source of acceptsDogSource() expects 'Source<Dog>', got 'Source<Cat>'
 }
-===expect===

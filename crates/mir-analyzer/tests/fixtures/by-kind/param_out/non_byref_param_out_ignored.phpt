@@ -23,4 +23,3 @@ $x = 42;
 noEffect($x);
 /** @mir-check $x is int */
 $_ = $x;
-===expect===

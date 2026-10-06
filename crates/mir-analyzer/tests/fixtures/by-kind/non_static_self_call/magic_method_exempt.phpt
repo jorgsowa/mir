@@ -9,4 +9,3 @@ class Service {
         self::__clone();
     }
 }
-===expect===

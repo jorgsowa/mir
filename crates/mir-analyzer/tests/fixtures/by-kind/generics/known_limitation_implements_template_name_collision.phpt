@@ -61,4 +61,3 @@ $t = new Thing();
 $result = $t->get();
 /** @mir-check $result is Foo */
 echo "ok";
-===expect===

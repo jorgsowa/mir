@@ -15,4 +15,3 @@ class Math {
 }
 
 $result = Math::double(5);
-===expect===

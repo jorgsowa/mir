@@ -15,5 +15,3 @@ process($score);
 
 process(7.3);
 //      ^^^ ImplicitFloatToIntCast: Implicit cast from 7.3 to int truncates the fractional part
-
-===expect===

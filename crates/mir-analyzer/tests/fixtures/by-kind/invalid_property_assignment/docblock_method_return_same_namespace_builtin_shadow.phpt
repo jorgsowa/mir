@@ -29,4 +29,3 @@ final class Adapter {
         $this->generator = $factory->getHighStrengthGenerator();
     }
 }
-===expect===

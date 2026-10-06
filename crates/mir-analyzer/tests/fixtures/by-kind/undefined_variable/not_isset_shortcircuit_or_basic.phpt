@@ -8,4 +8,3 @@ if (!isset($x) || $x->method()) {
     // After fix: should NOT error on UndefinedVariable
     // If !isset($x) is false, then $x IS defined
 }
-===expect===

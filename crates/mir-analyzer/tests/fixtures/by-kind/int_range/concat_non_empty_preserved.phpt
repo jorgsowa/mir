@@ -51,4 +51,3 @@ function test_concat_assign(int $n): void {
     /** @mir-check $r is non-empty-string */
     $_ = $r;
 }
-===expect===

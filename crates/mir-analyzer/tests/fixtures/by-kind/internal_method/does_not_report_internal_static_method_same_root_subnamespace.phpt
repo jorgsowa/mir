@@ -15,4 +15,3 @@ class Output {
 <?php
 namespace Symfony\Component\Console\Helper;
 \Symfony\Component\Console\Output::create();
-===expect===

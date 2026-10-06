@@ -13,4 +13,3 @@ function main(bool $a, string $b, string $c): void {
     b($a ? $b : $c);
 //    ^^^^^^^^^^^^ InvalidPassByReference: Argument $p of b() must be passed by reference
 }
-===expect===

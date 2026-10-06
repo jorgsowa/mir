@@ -16,4 +16,3 @@ function b(int $limit): int {
         }
     }
 }
-===expect===

@@ -17,4 +17,3 @@ function test(): void {
     $s2 = "foo";
     if ($s1 === $s2) {}
 }
-===expect===

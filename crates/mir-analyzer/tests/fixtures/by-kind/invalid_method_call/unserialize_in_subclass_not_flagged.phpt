@@ -11,4 +11,3 @@ class Child extends Base {
         $this->__construct();
     }
 }
-===expect===

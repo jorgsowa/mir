@@ -9,4 +9,3 @@ covers every diagnostic inside that function.
 function f(): void {
     new NoSuchClass();
 }
-===expect===

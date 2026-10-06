@@ -10,4 +10,3 @@ function helper(): void {}
 ===file:main.php===
 <?php
 helper();
-===expect===

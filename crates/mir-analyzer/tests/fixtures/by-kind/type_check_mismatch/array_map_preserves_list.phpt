@@ -22,4 +22,3 @@ function test_non_empty_list(array $strs): void {
     /** @mir-check $result is non-empty-list<string> */
     $_ = $result;
 }
-===expect===

@@ -15,4 +15,3 @@ Template param with no bound does not fire InvalidThrow — unbounded T defaults
 function rethrow($e): never {
     throw $e;
 }
-===expect===

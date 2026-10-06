@@ -24,4 +24,3 @@ class Derived extends Base {
     private int $id = 0;
     protected string $label = '';
 }
-===expect===

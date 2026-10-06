@@ -44,4 +44,3 @@ function takesStrings(string ...$values): void {}
 function spreadIntoArgs(Bag $bag): void {
     takesStrings(...$bag);
 }
-===expect===

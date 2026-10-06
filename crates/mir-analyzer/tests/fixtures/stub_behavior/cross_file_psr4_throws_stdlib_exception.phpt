@@ -41,4 +41,3 @@ try {
 } catch (\InvalidArgumentException $e) {
     echo $e->getMessage();
 }
-===expect===

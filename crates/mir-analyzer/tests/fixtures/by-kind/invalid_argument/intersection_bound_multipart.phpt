@@ -16,4 +16,3 @@ function multi(A&B&C $t): void {
 }
 
 multi(new Impl());
-===expect===

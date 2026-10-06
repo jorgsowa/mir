@@ -34,4 +34,3 @@ function testNullNotEqOnLeft(string|null $x) {
         strlen($x);
     }
 }
-===expect===

@@ -8,4 +8,3 @@ function onlyDocblockReturn() { return 42; }
 
 /** @return string|null */
 function onlyDocblockReturnNullable() { return null; }
-===expect===

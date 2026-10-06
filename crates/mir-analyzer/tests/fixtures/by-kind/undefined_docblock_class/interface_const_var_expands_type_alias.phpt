@@ -26,4 +26,3 @@ class Impl implements HasDefault {
         echo "ok";
     }
 }
-===expect===

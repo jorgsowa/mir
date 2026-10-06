@@ -51,4 +51,3 @@ final class SomeTest extends TestCase
         echo $value;
     }
 }
-===expect===

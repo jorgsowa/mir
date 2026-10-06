@@ -18,4 +18,3 @@ $foo = "A";
 //            ^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'InvalidStringClass' is never used
 $b = $foo::bar();
 //<^^^^^^^^^^^^^^^^ MixedAssignment: Variable $b is assigned a mixed type
-===expect===

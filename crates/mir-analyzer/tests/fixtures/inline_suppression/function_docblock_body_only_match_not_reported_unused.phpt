@@ -10,4 +10,3 @@ function f(): void {
     echo 2;
     new NoSuchClass();
 }
-===expect===

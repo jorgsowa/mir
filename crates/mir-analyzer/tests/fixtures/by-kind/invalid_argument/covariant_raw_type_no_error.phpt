@@ -20,4 +20,3 @@ function test(): void {
     $raw = new Box();
     f($raw);
 }
-===expect===

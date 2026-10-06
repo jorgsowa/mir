@@ -11,4 +11,3 @@ reports named argument wrong type
 function f(int $x): void { var_dump($x); }
 function test(): void { f(x: 'hello'); }
 //                        ^^^^^^^^^^ InvalidArgument: Argument $x of f() expects 'int', got '"hello"'
-===expect===

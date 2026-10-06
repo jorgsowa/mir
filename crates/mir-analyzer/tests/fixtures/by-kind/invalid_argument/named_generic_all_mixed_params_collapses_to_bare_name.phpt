@@ -18,4 +18,3 @@ function test(): void {
     f("hello");
 //    ^^^^^^^ InvalidArgument: Argument $c of f() expects 'Collection', got '"hello"'
 }
-===expect===

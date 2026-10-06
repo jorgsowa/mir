@@ -15,4 +15,3 @@ function test(array $arr, float $n, bool $cond): void {
     $x[0];
 //  ^^^^^ PossiblyInvalidArrayAccess: Possibly invalid array access: 'array|float' might not support []
 }
-===expect===

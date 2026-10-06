@@ -51,4 +51,3 @@ function loosePropClassConst(Box $box): void {
         echo "";
     }
 }
-===expect===

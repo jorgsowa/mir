@@ -12,4 +12,3 @@ isset($obj) && $obj->prop applies narrowing from LHS to property access in RHS
 if (isset($obj) && $obj->prop) {
     // After fix: $obj should be narrowed as defined in RHS
 }
-===expect===

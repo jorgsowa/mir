@@ -34,4 +34,3 @@ use Lib\Mapper;
 $mapper = new Mapper();
 $result = $mapper->toArrays([1, 2, 3]);
 /** @mir-check $result is list<array> */
-===expect===

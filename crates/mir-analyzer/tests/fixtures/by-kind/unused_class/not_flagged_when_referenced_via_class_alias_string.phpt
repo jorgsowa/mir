@@ -10,4 +10,3 @@ must not be reported UnusedClass.
 final class Foo {}
 
 class_alias('Foo', 'Bar');
-===expect===

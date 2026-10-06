@@ -23,4 +23,3 @@ function test(Handler $h): void {
         $x = $h;
     }
 }
-===expect===

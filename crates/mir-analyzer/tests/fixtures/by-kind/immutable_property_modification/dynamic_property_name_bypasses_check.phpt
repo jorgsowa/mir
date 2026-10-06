@@ -30,4 +30,3 @@ class Caller {
 //      ^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property $prop of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
-===expect===

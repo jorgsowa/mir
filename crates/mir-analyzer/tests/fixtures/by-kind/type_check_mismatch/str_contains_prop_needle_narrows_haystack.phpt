@@ -40,4 +40,3 @@ function test_empty_prop_needle_not_narrowed(string $haystack, Holder $h): void 
         $_ = $haystack;
     }
 }
-===expect===

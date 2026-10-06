@@ -17,4 +17,3 @@ function checkInt(array $list): void {
         $_ = $k + 1;
     }
 }
-===expect===

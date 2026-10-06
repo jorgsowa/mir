@@ -19,4 +19,3 @@ $c = new Converter();
 $fn = $c->intToString(...);
 /** @mir-check $fn is Closure(int): string */
 $_ = $fn;
-===expect===

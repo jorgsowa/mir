@@ -23,4 +23,3 @@ $fn = Counter::next(...);
 $fn($out);
 /** @mir-check $out is int */
 echo $out;
-===expect===

@@ -26,4 +26,3 @@ class Box {
         return $this->cat;
     }
 }
-===expect===

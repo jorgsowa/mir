@@ -17,4 +17,3 @@ class Registry {
         $this->mapping = $m;
     }
 }
-===expect===

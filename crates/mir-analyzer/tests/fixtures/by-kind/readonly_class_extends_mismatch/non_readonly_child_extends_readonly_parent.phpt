@@ -12,4 +12,3 @@ class B extends A {
         parent::__construct($x);
     }
 }
-===expect===

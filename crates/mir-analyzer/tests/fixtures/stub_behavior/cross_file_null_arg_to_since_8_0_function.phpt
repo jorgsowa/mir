@@ -13,4 +13,3 @@ function test_null(string $needle): void {
 ===file:App.php===
 <?php
 test_null('hello');
-===expect===

@@ -5,4 +5,3 @@ static const access via use
 use Vendor\Missing\Foo;
 echo Foo::BAR;
 //   ^^^ UndefinedClass: Class Vendor\Missing\Foo does not exist
-===expect===

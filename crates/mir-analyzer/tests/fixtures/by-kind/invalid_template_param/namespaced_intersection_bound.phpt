@@ -18,4 +18,3 @@ function f($t): void {
 }
 
 f(new Both());
-===expect===

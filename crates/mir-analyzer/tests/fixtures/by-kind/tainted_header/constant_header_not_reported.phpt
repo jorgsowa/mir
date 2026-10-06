@@ -5,4 +5,3 @@ A constant header value is clean.
 function test(): void {
     header('Content-Type: text/plain');
 }
-===expect===

@@ -8,4 +8,3 @@ class A {}
 
 A::foo();
 //<^^^^^^^^ UndefinedMethod: Method A::foo() does not exist
-===expect===

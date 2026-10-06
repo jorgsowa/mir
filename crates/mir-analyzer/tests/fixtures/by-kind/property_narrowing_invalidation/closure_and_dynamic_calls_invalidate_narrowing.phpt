@@ -40,4 +40,3 @@ function dynamicStaticCallInvalidates(Holder $h): void {
     /** @mir-check $h->value is string|null */
     $_ = 1;
 }
-===expect===

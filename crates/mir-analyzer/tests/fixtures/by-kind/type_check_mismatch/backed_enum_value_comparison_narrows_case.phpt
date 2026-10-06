@@ -54,4 +54,3 @@ function reversedOperandsNarrows(Suit $s): void {
         $_ = 1;
     }
 }
-===expect===

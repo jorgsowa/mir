@@ -11,4 +11,3 @@ does not report null passed to nullable param
 <?php
 function f(?string $x): void {}
 function test(): void { f(null); }
-===expect===

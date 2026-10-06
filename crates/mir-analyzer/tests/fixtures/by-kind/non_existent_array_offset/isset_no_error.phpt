@@ -4,4 +4,3 @@ No NonExistentArrayOffset inside isset()
 <?php
 $a = ["k" => 1];
 isset($a["missing"]);
-===expect===

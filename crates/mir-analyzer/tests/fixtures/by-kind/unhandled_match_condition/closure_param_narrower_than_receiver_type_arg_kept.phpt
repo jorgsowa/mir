@@ -38,4 +38,3 @@ load()->getOrThrow(static function (Pet $e): NotFound {
     /** @mir-check $e is Pet */
     return new NotFound();
 });
-===expect===

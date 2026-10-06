@@ -14,4 +14,3 @@ class X {
   /** @var T|null */
   public $hm;
 }
-===expect===

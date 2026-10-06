@@ -37,4 +37,3 @@ function test_equal_narrows(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

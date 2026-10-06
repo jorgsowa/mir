@@ -20,4 +20,3 @@ class A {
 /** @method D foo(int $s) */
 //  ^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: parameter $s type 'int' is incompatible with parent type 'string'
 class B extends A {}
-===expect===

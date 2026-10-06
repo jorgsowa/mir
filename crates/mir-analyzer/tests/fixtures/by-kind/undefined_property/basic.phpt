@@ -10,4 +10,3 @@ function test(): void {
     echo $f->nonexistent;
 //           ^^^^^^^^^^^ UndefinedProperty: Property Foo::$nonexistent does not exist
 }
-===expect===

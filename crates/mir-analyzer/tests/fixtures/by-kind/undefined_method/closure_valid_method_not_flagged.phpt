@@ -22,4 +22,3 @@ function test(): void {
     $maker = $f->maker();
     $maker()->render();
 }
-===expect===

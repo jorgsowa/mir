@@ -40,4 +40,3 @@ class Consumer {
 //      ^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'
     }
 }
-===expect===

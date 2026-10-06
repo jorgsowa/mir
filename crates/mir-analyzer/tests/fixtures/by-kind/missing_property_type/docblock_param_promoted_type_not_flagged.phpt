@@ -10,4 +10,3 @@ class Point {
      */
     public function __construct(public $label) {}
 }
-===expect===

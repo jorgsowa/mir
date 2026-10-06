@@ -25,4 +25,3 @@ function reassigned(X $x, X $other): void {
 //      ^^^^^^^^^^^^^^ UndefinedMethod: Method Z::m() does not exist
     }
 }
-===expect===

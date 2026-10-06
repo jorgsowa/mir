@@ -29,4 +29,3 @@ function f($x): void {
         $_ = 1;
     }
 }
-===expect===

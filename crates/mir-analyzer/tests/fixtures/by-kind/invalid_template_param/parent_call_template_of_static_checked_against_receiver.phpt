@@ -26,4 +26,3 @@ class Mid extends Base {
         parent::accept(new Mid());
     }
 }
-===expect===

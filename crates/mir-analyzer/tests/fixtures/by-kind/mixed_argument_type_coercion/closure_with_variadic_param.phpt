@@ -17,4 +17,3 @@ function dispatch(callable $c): void {
 }
 
 dispatch(function (string $a, int ...$rest): void {});
-===expect===

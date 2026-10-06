@@ -31,4 +31,3 @@ class SubBox extends Box {
         $_ = 1;
     }
 }
-===expect===

@@ -18,5 +18,3 @@ final class Foo {
         return self::ID;
     }
 }
-
-===expect===

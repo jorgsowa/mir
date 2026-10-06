@@ -31,4 +31,3 @@ function f($x): void {
 //      ^^^^^^^ TypeCheckMismatch: Type of $x is expected to be C|D, got A&B&C|D|C|D
     }
 }
-===expect===

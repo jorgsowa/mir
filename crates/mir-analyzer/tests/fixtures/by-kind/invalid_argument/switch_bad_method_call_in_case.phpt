@@ -16,4 +16,3 @@ switch (true) {
 //        ^^ InvalidArgument: Argument $p of f() expects 'string', got 'bool'
         break;
 }
-===expect===

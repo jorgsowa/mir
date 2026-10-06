@@ -30,4 +30,3 @@ function nonNullableParamUnreachable(string $x): void {
         $_ = 1;
     }
 }
-===expect===

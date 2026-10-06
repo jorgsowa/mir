@@ -9,5 +9,3 @@ function process(callable $callback): void {
 function processMulti(callable $fn): void {
     $fn('a', 'b', 'c');
 }
-
-===expect===

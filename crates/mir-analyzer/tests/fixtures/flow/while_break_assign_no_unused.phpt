@@ -23,4 +23,3 @@ function test(Ex $exception): void {
         $exception = $previous;
     }
 }
-===expect===

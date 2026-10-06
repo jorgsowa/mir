@@ -17,4 +17,3 @@ function f(?string $p): ?string {
     }
     return null;
 }
-===expect===

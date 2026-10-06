@@ -12,4 +12,3 @@ function g(): Own {
 //      ^^^^ UndefinedClass: Class B\Real does not exist
     return new Own();
 }
-===expect===

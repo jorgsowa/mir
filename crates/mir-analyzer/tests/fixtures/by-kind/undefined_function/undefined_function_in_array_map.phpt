@@ -7,4 +7,3 @@ array_map(
 //  ^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function undefined_function() is not defined
     [1, 2, 3]
 );
-===expect===

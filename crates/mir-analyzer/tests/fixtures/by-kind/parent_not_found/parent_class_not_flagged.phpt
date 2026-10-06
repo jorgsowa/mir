@@ -11,4 +11,3 @@ class Child extends Base {
         parent::build();
     }
 }
-===expect===

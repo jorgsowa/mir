@@ -35,4 +35,3 @@ class Container {
         $this->slot = wrap($item);
     }
 }
-===expect===

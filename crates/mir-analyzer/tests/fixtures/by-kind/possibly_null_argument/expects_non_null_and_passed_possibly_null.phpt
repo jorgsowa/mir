@@ -13,4 +13,3 @@ function foo($mixed, $mixed_or_null): void {
      */
     new Exception($mixed_or_null);
 }
-===expect===

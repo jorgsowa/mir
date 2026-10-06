@@ -16,4 +16,3 @@ class C implements I {
     public function foo(bool $b): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method C::foo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
 }
-===expect===

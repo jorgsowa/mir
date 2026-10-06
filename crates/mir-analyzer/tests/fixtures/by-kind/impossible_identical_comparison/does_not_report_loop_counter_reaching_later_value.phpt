@@ -20,4 +20,3 @@ function find_five(int $n): void {
         }
     }
 }
-===expect===

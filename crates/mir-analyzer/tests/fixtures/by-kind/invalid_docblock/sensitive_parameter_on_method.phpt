@@ -20,5 +20,3 @@ class HelloWorld {
         string $password
     ) {}
 }
-
-===expect===

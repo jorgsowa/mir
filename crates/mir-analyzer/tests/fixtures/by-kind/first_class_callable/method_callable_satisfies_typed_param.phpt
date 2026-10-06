@@ -23,4 +23,3 @@ function apply(callable $fn, int $x): string {
 
 $c = new Converter();
 apply($c->toString(...), 42);
-===expect===

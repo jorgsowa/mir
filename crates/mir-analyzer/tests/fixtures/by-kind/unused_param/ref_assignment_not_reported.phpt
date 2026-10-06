@@ -9,4 +9,3 @@ final class MyClass {
         $this->config = &$config;
     }
 }
-===expect===

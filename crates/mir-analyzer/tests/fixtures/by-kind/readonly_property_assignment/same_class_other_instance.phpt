@@ -15,4 +15,3 @@ class Config {
         $other->value = $this->value;
     }
 }
-===expect===

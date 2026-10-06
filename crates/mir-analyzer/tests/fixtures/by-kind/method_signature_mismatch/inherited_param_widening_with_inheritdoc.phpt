@@ -19,4 +19,3 @@ class ManagerImpl implements Manager {
      */
     public function rename(array $rows): void {}
 }
-===expect===

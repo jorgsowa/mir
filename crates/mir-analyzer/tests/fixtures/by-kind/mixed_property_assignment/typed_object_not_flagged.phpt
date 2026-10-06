@@ -8,5 +8,3 @@ class Foo {
 
 $obj = new Foo();
 $obj->name = "world";
-
-===expect===

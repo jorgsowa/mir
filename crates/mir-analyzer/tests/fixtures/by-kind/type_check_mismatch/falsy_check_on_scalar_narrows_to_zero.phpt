@@ -24,4 +24,3 @@ function test_float(float $f): void {
         $_ = $f;
     }
 }
-===expect===

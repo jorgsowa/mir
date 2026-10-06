@@ -24,4 +24,3 @@ function test($x): void {
     /** @mir-check $x is Named */
     $_ = 1;
 }
-===expect===

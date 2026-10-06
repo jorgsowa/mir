@@ -6,4 +6,3 @@ function e(string $fn): void {
     $fn('/a/', 'b', $m);
 //                  ^^ UndefinedVariable: Variable $m is not defined
 }
-===expect===

@@ -16,4 +16,3 @@ enum Color: string {
 $x = Color::tryFrom('red');
 $y = Color::from('blue');
 $z = Color::cases();
-===expect===

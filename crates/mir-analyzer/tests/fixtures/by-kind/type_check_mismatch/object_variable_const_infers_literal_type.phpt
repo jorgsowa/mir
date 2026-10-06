@@ -23,4 +23,3 @@ function check(Suit $s): void {
     /** @mir-check $m is 100 */
     $_ = $m;
 }
-===expect===

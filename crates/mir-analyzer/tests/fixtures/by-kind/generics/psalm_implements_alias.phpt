@@ -34,4 +34,3 @@ function colorOf(HasColor $c) {
 $x = colorOf(Suit::Hearts);
 /** @mir-check $x is string */
 echo "ok";
-===expect===

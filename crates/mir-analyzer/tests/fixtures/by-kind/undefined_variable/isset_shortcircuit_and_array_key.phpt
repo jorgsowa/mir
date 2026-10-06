@@ -7,4 +7,3 @@ if (isset($data) && $data->method()) {
 //                  ^^^^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     /** @mir-check $data is mixed */
 }
-===expect===

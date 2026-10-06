@@ -17,4 +17,3 @@ function test(string $className) {
     new $className();
 //      ^^^^^^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'interface-string<Shape>'
 }
-===expect===

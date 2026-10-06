@@ -67,4 +67,3 @@ function test_haystack_still_nullable_outside_condition(string $needle, ?array $
     $_ = 1;
     in_array($needle, $haystack);
 }
-===expect===

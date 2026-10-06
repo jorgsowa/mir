@@ -17,4 +17,3 @@ class Holder {
     public $name;
 }
 $f = fn(Holder $h) => $h->name;
-===expect===

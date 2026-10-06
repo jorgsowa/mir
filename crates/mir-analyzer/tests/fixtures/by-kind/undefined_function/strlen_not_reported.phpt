@@ -5,4 +5,3 @@ strlen not reported
 function test(): void {
     strlen('hello');
 }
-===expect===

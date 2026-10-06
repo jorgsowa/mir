@@ -31,4 +31,3 @@ function test_nullable_string(string|null $y): void {
         $_ = $y;
     }
 }
-===expect===

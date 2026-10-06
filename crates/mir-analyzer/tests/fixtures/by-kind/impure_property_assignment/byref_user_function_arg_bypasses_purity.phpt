@@ -26,4 +26,3 @@ function run(Box $b): void {
     bump($b->n);
 //       ^^^^^ ImpurePropertyAssignment: Assigning to property n of a parameter in a pure or external-mutation-free context
 }
-===expect===

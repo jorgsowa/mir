@@ -49,4 +49,3 @@ function pick($items, $s) {
 $r = pick([], ['item' => new \Lib\Item(), 'n' => 1]);
 /** @mir-check $r is array<int, Lib\Item> */
 echo 1;
-===expect===

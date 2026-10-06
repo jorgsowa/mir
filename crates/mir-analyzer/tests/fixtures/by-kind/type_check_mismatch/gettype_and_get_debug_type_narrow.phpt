@@ -68,4 +68,3 @@ function test_get_debug_type_class_const_reversed(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

@@ -56,4 +56,3 @@ function read(Holder $h): void {
     echo 1;
     echo $h->viaVar['port'] + 1;
 }
-===expect===

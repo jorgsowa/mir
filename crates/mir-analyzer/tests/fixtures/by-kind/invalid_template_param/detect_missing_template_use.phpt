@@ -7,5 +7,3 @@ trait A {}
 final class B {
     use A;
 }
-
-===expect===

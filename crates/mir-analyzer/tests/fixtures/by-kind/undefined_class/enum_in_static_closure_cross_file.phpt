@@ -14,4 +14,3 @@ use App\Status;
 function getCallback(): \Closure {
     return static fn() => Status::Active;
 }
-===expect===

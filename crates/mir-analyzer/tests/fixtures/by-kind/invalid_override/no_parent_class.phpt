@@ -11,4 +11,3 @@ class Orphan {
 //  ^^^^^^^^^^^ InvalidOverride: Method Orphan::render() has #[Override] but no parent method exists to override
     public function render(): void {}
 }
-===expect===

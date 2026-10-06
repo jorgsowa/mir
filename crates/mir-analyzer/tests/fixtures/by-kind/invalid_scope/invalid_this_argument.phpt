@@ -4,4 +4,3 @@ Invalid this argument
 <?php
 $this = "hello";
 //<^^^^^^^^^^^^^^^ InvalidScope: $this cannot be used outside of a class
-===expect===

@@ -9,4 +9,3 @@ Interface property with hooks before php84
 interface A {
     public string $value { get; }
 }
-===expect===

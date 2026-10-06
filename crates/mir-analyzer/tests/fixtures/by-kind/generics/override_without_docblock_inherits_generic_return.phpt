@@ -72,4 +72,3 @@ function run(Closure $getPage): void {
     /** @mir-check $inline is Result<Page<Row>, never> */
     sink($ok, $err, $base, $inline);
 }
-===expect===

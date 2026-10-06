@@ -32,4 +32,3 @@ try {
     echo $a;
 //       ^^ PossiblyUndefinedVariable: Variable $a might not be defined
 }
-===expect===

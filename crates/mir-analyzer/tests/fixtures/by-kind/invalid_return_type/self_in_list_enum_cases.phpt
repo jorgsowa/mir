@@ -21,4 +21,3 @@ enum Suit {
 $all = Suit::all();
 //<^^^^^^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $all is expected to be list<Suit>, got mixed
 echo count($all);
-===expect===

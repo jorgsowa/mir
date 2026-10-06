@@ -16,4 +16,3 @@ own declared keys, it doesn't reject unknown arg keys.
 function takesConfig(array $config): void {}
 
 takesConfig(['host' => 'localhost', 'port' => 3306, 'timeout' => 30]);
-===expect===

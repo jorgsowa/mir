@@ -10,4 +10,3 @@ class B extends A {
     public static int $x = 1;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^ StaticPropertyRedeclarationMismatch: Cannot redeclare non-static property A::$x as static B::$x
 }
-===expect===

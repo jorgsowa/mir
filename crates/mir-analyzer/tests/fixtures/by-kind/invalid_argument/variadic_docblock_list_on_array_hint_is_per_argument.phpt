@@ -63,4 +63,3 @@ function stringKeyed(array ...$maps): void {
     $_ = $maps;
 }
 stringKeyed(['a' => 1]);
-===expect===

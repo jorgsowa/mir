@@ -6,4 +6,3 @@ function test(): void {
     // @mir-ignore
     new NoSuchClass();
 }
-===expect===

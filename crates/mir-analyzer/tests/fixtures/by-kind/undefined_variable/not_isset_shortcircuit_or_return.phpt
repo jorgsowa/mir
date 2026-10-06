@@ -15,4 +15,3 @@ function test() {
     !isset($x) || doSomething($x);
     // After fix: $x should be narrowed as defined in RHS
 }
-===expect===

@@ -23,4 +23,3 @@ function openChannel(AMQPConnection $conn): AMQPChannel {
 function handle(AMQPException $e): string {
     return $e->getMessage();
 }
-===expect===

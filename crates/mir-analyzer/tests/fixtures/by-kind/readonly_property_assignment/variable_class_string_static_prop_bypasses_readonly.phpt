@@ -21,4 +21,3 @@ function reset(string $cls): void {
     $cls::$items = [];
 //  ^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Registry::$items outside of constructor
 }
-===expect===

@@ -23,4 +23,3 @@ function test(): void {
     $maker()->undefinedMethod();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Widget::undefinedMethod() does not exist
 }
-===expect===

@@ -21,4 +21,3 @@ $b = new Box();
 $val = extract($b);
 /** @mir-check $val is string */
 echo $val;
-===expect===

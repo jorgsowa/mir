@@ -20,4 +20,3 @@ function test(): void {
     /** @mir-check $key is "user_name" */
     $_ = $key;
 }
-===expect===

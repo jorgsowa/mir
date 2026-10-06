@@ -15,4 +15,3 @@ function adopt($animal): void {
 
 $dog = new Dog();
 adopt($dog);
-===expect===

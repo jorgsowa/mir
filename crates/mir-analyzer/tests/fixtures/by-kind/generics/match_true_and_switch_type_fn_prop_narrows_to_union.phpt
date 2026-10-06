@@ -40,4 +40,3 @@ class HasScalarProp {
         }
     }
 }
-===expect===

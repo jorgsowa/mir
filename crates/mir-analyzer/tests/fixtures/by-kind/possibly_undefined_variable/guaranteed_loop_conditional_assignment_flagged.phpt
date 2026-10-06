@@ -114,4 +114,3 @@ function do_while_unconditional(bool $more): int {
     /** @mir-check $last is 1 */
     return $last;
 }
-===expect===

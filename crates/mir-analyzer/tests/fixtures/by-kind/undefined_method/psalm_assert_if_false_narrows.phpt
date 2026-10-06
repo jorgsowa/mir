@@ -20,4 +20,3 @@ function test(mixed $value): void {
 //      ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
     }
 }
-===expect===

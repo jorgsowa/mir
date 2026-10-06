@@ -16,4 +16,3 @@ native hint; narrowing or matching docblock params stay silent.
  */
 function f(string $a, string $b, string $c): void {}
 //                ^^ MismatchingDocblockParamType: Docblock type 'int' for $a does not match inferred 'string'
-===expect===

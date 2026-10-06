@@ -11,4 +11,3 @@ class Bar {
 //<^^^^^^^^^^^ MissingConstructor: Class Bar has uninitialized properties but no constructor
     public Dep $prop;
 }
-===expect===

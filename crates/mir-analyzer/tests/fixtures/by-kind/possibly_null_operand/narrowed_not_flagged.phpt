@@ -8,4 +8,3 @@ function ratio(int $a, ?int $b): float {
     }
     return $a / $b;
 }
-===expect===

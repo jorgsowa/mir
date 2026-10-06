@@ -8,4 +8,3 @@ function helper(): void {}
 namespace App;
 
 \helper();
-===expect===

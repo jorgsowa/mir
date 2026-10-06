@@ -24,4 +24,3 @@ function handle(): void {
 //           ^^^^^^^^^^^^^^^^ UndefinedClass: Class App\MissingException does not exist
     }
 }
-===expect===

@@ -11,5 +11,3 @@ class A {
 //      ^^^^^^^^^^^^^ InvalidReturnType: Return type '"foo"' is not compatible with declared 'int'
     }
 }
-
-===expect===

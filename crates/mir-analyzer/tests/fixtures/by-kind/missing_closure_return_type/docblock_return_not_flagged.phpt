@@ -14,4 +14,3 @@ $a =
     function() {
         return "foo";
     };
-===expect===

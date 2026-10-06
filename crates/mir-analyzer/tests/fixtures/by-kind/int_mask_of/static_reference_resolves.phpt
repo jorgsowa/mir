@@ -23,4 +23,3 @@ $f = new Flags();
 $f->set(3);   // A|B — valid
 $f->set(4);   // out of range for {1, 2}
 //      ^ InvalidArgument: Argument $flags of set() expects '0|1|2|3', got '4'
-===expect===

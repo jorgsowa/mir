@@ -19,4 +19,3 @@ function create(): void {
 //      ^^^^^^^^^^^^^ TooManyArguments: Too many arguments for NewApi::__construct(): expected 0, got 1
     }
 }
-===expect===

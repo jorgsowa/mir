@@ -58,4 +58,3 @@ echo "ok";
 $r3 = Picker::pickStatic(value: 'x', flag: true);
 /** @mir-check $r3 is int */
 echo "ok";
-===expect===

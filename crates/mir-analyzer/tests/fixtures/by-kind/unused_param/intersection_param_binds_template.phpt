@@ -40,4 +40,3 @@ $tb = new TaggedBox();
 $val2 = extract($tb);
 /** @mir-check $val2 is mixed */
 echo $val2;
-===expect===

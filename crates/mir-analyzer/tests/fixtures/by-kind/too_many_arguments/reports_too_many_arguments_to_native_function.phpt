@@ -4,4 +4,3 @@ reports too many arguments to native function
 <?php
 strlen('hello', 'extra');
 //              ^^^^^^^ TooManyArguments: Too many arguments for strlen(): expected 1, got 2
-===expect===

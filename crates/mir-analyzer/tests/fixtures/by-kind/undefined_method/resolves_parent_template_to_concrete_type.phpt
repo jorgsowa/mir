@@ -17,4 +17,3 @@ $repo = new UserRepo();
 $result = $repo->find();
 $result->nonExistentMethod();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::nonExistentMethod() does not exist
-===expect===

@@ -7,4 +7,3 @@ function d(): void {
     $fn($x);
 //      ^^ UndefinedVariable: Variable $x is not defined
 }
-===expect===

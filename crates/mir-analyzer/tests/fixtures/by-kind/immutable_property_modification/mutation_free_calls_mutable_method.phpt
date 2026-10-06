@@ -17,4 +17,3 @@ class Logger {
         $this->entries = [];
     }
 }
-===expect===

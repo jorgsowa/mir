@@ -47,4 +47,3 @@ function constAndStatic(string $c): void {
 function instanceOfTemplate(object $o, string $c): bool {
     return $o instanceof $c;
 }
-===expect===

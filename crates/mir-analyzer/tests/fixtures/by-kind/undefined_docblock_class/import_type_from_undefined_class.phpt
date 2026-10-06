@@ -6,4 +6,3 @@ tag names a source class that does not exist.
 /** @psalm-import-type UserId from NonExistentRepository */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentRepository' does not exist
 class A {}
-===expect===

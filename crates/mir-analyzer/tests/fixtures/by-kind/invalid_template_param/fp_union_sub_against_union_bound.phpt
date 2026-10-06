@@ -16,4 +16,3 @@ function process($value): void {}
 $cond = true;
 $x = $cond ? 'hello' : new MyCountable();
 process($x); // T = string|MyCountable, should pass - each arm satisfies one arm of bound
-===expect===

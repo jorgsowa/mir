@@ -29,4 +29,3 @@ function unguarded(TestData $data): void {
     needsSpecific($data);
 //                ^^^^^ ArgumentTypeCoercion: Argument $d of needsSpecific() expects 'DataFromDataProvider', got 'TestData' — coercion may fail at runtime
 }
-===expect===

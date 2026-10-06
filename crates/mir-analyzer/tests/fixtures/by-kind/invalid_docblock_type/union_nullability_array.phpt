@@ -20,4 +20,3 @@ Union, nullable, and array types validate each member.
 function f($a) {
     return null;
 }
-===expect===

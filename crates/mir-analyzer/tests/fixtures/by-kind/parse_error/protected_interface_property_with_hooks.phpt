@@ -5,4 +5,3 @@ Protected interface property with hooks
 interface A {
     protected string $value { get; }
 }
-===expect===

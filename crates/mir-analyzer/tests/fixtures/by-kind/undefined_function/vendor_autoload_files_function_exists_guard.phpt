@@ -24,4 +24,3 @@ class Consumer {
         return guarded_helper('Hello');
     }
 }
-===expect===

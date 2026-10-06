@@ -12,4 +12,3 @@ final class A {
 }
 
 new A();
-===expect===

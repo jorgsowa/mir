@@ -17,4 +17,3 @@ function test(): void {
      */
     takesInt(getResult());
 }
-===expect===

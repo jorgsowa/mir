@@ -25,4 +25,3 @@ $repo = new Repo();
 $result = $repo->fetchRows("id");
 /** @mir-check $result is array<int, array<string, mixed>> */
 echo "ok";
-===expect===

@@ -24,4 +24,3 @@ function test4(array $parts): float {
 function test5(string $colorString): float {
     return (float) str_ireplace('rgb(', '', explode(',', $colorString)[0]);
 }
-===expect===

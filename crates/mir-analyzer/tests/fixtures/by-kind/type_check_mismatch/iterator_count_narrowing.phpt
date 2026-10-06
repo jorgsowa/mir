@@ -42,4 +42,3 @@ function test_iterator_count_identical_zero(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

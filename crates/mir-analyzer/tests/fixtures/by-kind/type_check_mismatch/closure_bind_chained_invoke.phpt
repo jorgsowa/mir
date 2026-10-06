@@ -29,4 +29,3 @@ if ($bound !== null) {
     // because $bound is ?Closure (unparam) and $bound() would extract no type info
     /** @mir-check $result is int */
 }
-===expect===

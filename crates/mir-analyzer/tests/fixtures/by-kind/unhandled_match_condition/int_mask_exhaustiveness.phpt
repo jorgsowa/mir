@@ -17,4 +17,3 @@ function describe(int $flags): string {
         1 => "first only",
     };
 }
-===expect===

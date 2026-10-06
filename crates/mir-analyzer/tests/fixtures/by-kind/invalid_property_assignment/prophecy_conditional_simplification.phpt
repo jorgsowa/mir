@@ -20,4 +20,3 @@ $factory = new TestFactory();
 $container = $factory->makeContainer(null);
 /** @mir-check $container is Container<object> */
 $factory->container = $container;
-===expect===

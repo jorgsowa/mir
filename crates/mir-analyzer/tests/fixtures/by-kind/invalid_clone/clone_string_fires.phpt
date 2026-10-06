@@ -12,4 +12,3 @@ function f(string $s): void {
     clone $s;
 //  ^^^^^^^^ InvalidClone: cannot clone non-object string
 }
-===expect===

@@ -17,4 +17,3 @@ function f($t): void {
 }
 
 f(new C());
-===expect===

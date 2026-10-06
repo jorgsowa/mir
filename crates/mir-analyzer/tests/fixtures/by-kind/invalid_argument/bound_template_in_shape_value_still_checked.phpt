@@ -29,4 +29,3 @@ takeString(['k' => (new IntBox)->get()]);
 //         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takeString() expects 'array{'k'?: string}', got 'array{'k': T}'
 takeStringList([(new IntBox)->get()]);
 //             ^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takeStringList() expects 'list<string>', got 'array{0: T}'
-===expect===

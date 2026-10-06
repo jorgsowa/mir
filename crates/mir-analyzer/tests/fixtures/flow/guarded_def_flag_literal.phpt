@@ -81,4 +81,3 @@ function severalFlagsAndBranches(array $names): void {
     if ($mode === 'css') { echo $file; }
     if ($detected) { echo $file; }
 }
-===expect===

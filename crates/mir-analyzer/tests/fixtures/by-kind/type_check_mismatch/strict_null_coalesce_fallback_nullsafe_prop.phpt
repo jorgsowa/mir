@@ -53,4 +53,3 @@ function narrowsReceiverOnLooseComparison(?Box $box): void {
         $_ = 1;
     }
 }
-===expect===

@@ -14,4 +14,3 @@ function test(): void {
     $data = file_get_contents('/etc/hostname');
     $obj = unserialize('a:0:{}');
 }
-===expect===

@@ -15,4 +15,3 @@ no-native-hint case.
  */
 function f(string $value): void {}
 //                ^^^^^^ MismatchingDocblockParamType: Docblock type 'int' for $value does not match inferred 'string'
-===expect===

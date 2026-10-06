@@ -17,4 +17,3 @@ class Child extends Base {
         $this->__construct('restored');
     }
 }
-===expect===

@@ -13,4 +13,3 @@ class ImmutablePoint {
         public readonly float $z = 0.0,
     ) {}
 }
-===expect===

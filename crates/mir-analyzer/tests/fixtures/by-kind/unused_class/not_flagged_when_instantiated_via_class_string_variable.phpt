@@ -14,4 +14,3 @@ function make(): Widget {
 }
 
 make();
-===expect===

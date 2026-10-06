@@ -22,4 +22,3 @@ $child = new Child();
 
 $b = $child->setBool("hello", 5);
 //                            ^ ArgumentTypeCoercion: Argument $bar of setBool() expects 'string|bool', got '5' — coercion may fail at runtime
-===expect===

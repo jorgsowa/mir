@@ -32,4 +32,3 @@ function run(int $i, string $s, ?int $n): void {
     takes_ids([$n]);
 //            ^^^^ InvalidArgument: Argument $ids of takes_ids() expects 'list<positive-int>', got 'array{0: int|null}'
 }
-===expect===

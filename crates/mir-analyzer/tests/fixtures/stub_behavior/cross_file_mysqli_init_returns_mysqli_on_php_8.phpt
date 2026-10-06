@@ -13,4 +13,3 @@ class Database {
         $this->connection = mysqli_init();
     }
 }
-===expect===

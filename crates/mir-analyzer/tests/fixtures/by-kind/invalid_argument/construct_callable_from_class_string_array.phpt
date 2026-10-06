@@ -19,4 +19,3 @@ function takesCallableReturningString(callable $c) : void {
 function foo(string $c) : void {
     takesCallableReturningString([$c, "bar"]);
 }
-===expect===

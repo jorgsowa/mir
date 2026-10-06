@@ -9,4 +9,3 @@ function example() : Generator {
     return null;
 //  ^^^^^^^^^^^^ InvalidReturnType: Return type 'null' is not compatible with declared 'Generator'
 }
-===expect===

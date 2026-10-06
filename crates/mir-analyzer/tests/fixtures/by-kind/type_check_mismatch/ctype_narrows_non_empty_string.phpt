@@ -42,4 +42,3 @@ function test_int_atom_untouched(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

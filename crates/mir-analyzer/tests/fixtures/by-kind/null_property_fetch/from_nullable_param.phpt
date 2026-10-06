@@ -8,4 +8,3 @@ function test(?Obj $obj): void {
     echo $obj->name;
 //       ^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $name on possibly null value
 }
-===expect===

@@ -10,5 +10,3 @@ final class DoctrineA {}
 
 class DoctrineB extends DoctrineA {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class DoctrineB cannot extend final class DoctrineA
-
-===expect===

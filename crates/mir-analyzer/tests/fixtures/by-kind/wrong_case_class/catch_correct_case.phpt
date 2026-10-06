@@ -13,4 +13,3 @@ try {
     throw new AppException("err");
 } catch (AppException $e) {
 }
-===expect===

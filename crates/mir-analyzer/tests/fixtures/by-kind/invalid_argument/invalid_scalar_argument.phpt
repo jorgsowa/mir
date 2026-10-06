@@ -11,4 +11,3 @@ Invalid scalar argument
 function fooFoo(int $a): void {}
 fooFoo("string");
 //     ^^^^^^^^ InvalidArgument: Argument $a of fooFoo() expects 'int', got '"string"'
-===expect===

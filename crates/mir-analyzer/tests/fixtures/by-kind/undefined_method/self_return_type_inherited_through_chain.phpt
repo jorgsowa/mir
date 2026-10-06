@@ -20,4 +20,3 @@ $c = new C();
 /** @mir-check $c->me() is A */
 $c->me()->onlyC();
 //<^^^^^^^^^^^^^^^^^ UndefinedMethod: Method A::onlyC() does not exist
-===expect===

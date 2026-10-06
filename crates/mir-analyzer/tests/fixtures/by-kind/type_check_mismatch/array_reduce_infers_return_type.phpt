@@ -14,4 +14,3 @@ function sumInts(array $ints): void {
     /** @mir-check $r is int */
     $_ = $r;
 }
-===expect===

@@ -11,4 +11,3 @@ enum Suit {
 //                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $howManyTimes is never used
 //                                                  ^^^^^^^^^^^^^^^^^^^ UndefinedConstant: Constant Suit::DEFAULT_TIMES is not defined
 }
-===expect===

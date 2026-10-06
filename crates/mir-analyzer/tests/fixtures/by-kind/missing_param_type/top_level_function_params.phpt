@@ -14,4 +14,3 @@ and docblock @param types both satisfy it.
  */
 function f($a, $b, int $c): void {}
 //         ^^ MissingParamType: Parameter $a of f() has no type annotation
-===expect===

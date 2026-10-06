@@ -15,4 +15,3 @@ $fn = function () {
 
 leaked_from_closure();
 //<^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function leaked_from_closure() is not defined
-===expect===

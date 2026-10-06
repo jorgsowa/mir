@@ -13,4 +13,3 @@ abstract class BaseWriter implements Writer {
     // — interface methods are implicitly abstract)
     abstract public function write(string $s): void;
 }
-===expect===

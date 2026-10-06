@@ -32,4 +32,3 @@ $cb2 = static function () use ($flag2) {
         echo "never\n";
     }
 };
-===expect===

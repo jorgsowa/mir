@@ -9,4 +9,3 @@ function f(): void {
     echo $arr[0];
 //            ^ NonExistentArrayOffset: Array offset '0' does not exist
 }
-===expect===

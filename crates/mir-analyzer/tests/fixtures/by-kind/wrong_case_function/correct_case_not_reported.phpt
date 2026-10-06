@@ -4,4 +4,3 @@ Calling a function with correct casing is not reported.
 <?php
 function myFunc(): void {}
 myFunc();
-===expect===

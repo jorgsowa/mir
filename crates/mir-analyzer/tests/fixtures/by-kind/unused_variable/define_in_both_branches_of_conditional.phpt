@@ -8,4 +8,3 @@ $i = null;
 if (($i = rand(0, 5)) || ($i = rand(0, 3))) {
     echo $i;
 }
-===expect===

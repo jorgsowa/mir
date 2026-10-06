@@ -78,4 +78,3 @@ class F {
     /** @param array<string, Item> $i */
     public static function find(array $i): void {}
 }
-===expect===

@@ -70,4 +70,3 @@ function check_union_of_generics($x) {
      */
     var_dump($x);
 }
-===expect===

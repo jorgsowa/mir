@@ -18,4 +18,3 @@ function test_array_vs_int(array $arr, int $n): void {
     if ($arr === $n) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'array' and 'int' is always false — these types can never be identical
 }
-===expect===

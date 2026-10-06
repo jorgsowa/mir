@@ -35,4 +35,3 @@ function test_key_last_null_reversed(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

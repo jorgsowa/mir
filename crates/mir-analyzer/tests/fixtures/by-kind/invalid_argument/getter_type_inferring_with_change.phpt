@@ -26,4 +26,3 @@ if (is_string($a->getValue())) {
 //              ^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $string of strlen() expects 'string', possibly different type 'int|string|null' provided
 //              ^^^^^^^^^^^^^^ PossiblyNullArgument: Argument $string of strlen() might be null
 }
-===expect===

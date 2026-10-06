@@ -18,4 +18,3 @@ function test(): void {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Item::undefinedMethod() does not exist
     }
 }
-===expect===

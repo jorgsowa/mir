@@ -18,4 +18,3 @@ function app(): void {
     $b = new Bag();
     echo get_class($b);
 }
-===expect===

@@ -27,4 +27,3 @@ function returns_negative_int_for_scalar(): string|int|float|bool {
     $x = -5;
     return $x;
 }
-===expect===

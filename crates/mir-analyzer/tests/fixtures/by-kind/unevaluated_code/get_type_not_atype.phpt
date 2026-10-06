@@ -9,4 +9,3 @@ switch (gettype($a)) {
 //       ^^^^^ UnevaluatedCode: Unevaluated code: gettype() never returns "int" (did you mean "integer"?)
         break;
 }
-===expect===

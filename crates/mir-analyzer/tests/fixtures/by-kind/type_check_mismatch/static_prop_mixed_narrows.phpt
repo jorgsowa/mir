@@ -43,4 +43,3 @@ function literalStringNarrowsMixedStaticProp(): void {
         $_ = 1;
     }
 }
-===expect===

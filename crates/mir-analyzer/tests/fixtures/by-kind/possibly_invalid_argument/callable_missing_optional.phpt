@@ -19,4 +19,3 @@ function bar(): bool {
 }
 
 foo("bar");
-===expect===

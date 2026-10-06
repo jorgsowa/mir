@@ -25,4 +25,3 @@ $c = new Container();
 $wrapper = $factory->make(stdClass::class);
 /** @mir-check $wrapper is GenericWrapper<stdClass> */
 $c->bare = $wrapper;
-===expect===

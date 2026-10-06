@@ -25,4 +25,3 @@ function test(array $items, array $assoc): void {
     /** @mir-check $removed_assoc is array<string, int> */
     $_ = $removed_assoc;
 }
-===expect===

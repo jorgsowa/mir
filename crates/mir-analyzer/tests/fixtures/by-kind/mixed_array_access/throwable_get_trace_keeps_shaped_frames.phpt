@@ -12,4 +12,3 @@ function firstFrameFunction(Throwable $e): string {
 
     return $trace[0]['function'];
 }
-===expect===

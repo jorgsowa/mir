@@ -20,4 +20,3 @@ function test(): void {
     saveUserData("string", new User());
     saveUserData(123, new User());
 }
-===expect===

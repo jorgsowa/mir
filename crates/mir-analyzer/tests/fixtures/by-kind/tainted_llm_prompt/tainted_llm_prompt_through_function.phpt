@@ -22,4 +22,3 @@ function buildPrompt(string $userInput): string {
 
 $agent = new LlmAgent();
 $agent->prompt(buildPrompt((string) $_GET["topic"]));
-===expect===

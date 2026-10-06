@@ -25,4 +25,3 @@ function safeCompactOnly(): void {
     $data = compact('id');
     echo $data['id'];
 }
-===expect===

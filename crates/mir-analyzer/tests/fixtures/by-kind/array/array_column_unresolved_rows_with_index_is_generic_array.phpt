@@ -18,4 +18,3 @@ function test(array $rows, string $idx): void {
     /** @mir-check $keyed_literal is array<array-key, mixed> */
     $_ = $keyed_literal;
 }
-===expect===

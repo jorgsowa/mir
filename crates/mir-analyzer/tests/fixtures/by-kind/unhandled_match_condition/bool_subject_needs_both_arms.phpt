@@ -29,4 +29,3 @@ function match_true_idiom_not_flagged(Foo $foo): int {
         $foo instanceof Foo => 1,
     };
 }
-===expect===

@@ -17,5 +17,3 @@ try {
 } catch (\Exception $e) {
     echo "generic";
 }
-
-===expect===

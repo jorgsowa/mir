@@ -20,4 +20,3 @@ class Child extends Base {
         $this->label = $label;
     }
 }
-===expect===

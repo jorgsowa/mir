@@ -25,4 +25,3 @@ class Repo {
 function fetchSomething(): mixed {
     return null;
 }
-===expect===

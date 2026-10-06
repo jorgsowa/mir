@@ -23,4 +23,3 @@ class A
 //      ^^^^ UndefinedClass: Class Foo does not exist
     }
 }
-===expect===

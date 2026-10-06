@@ -8,4 +8,3 @@ function throws subclass of declared @throws exception - no error
 function riskyOperation(): void {
     throw new \LogicException('fail');
 }
-===expect===

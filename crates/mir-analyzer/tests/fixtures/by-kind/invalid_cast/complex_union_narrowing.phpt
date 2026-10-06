@@ -44,4 +44,3 @@ function multiNullRemoval(int|float|string|null|bool|array $value) {
 //                             ^^^^^^ InvalidCast: Cannot cast 'int|float|string|bool|array' to 'string'
     }
 }
-===expect===

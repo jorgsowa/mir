@@ -42,4 +42,3 @@ function check(): void {
     /** @mir-check $enum is Box<Suit> */
     echo 1;
 }
-===expect===

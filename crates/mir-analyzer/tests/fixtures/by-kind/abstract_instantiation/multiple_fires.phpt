@@ -8,4 +8,3 @@ new Alpha();
 //  ^^^^^ AbstractInstantiation: Cannot instantiate abstract class Alpha
 new Beta();
 //  ^^^^ AbstractInstantiation: Cannot instantiate abstract class Beta
-===expect===

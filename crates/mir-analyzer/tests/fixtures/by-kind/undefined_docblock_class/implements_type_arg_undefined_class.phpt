@@ -26,4 +26,3 @@ class IntCollection implements Collection {
         return null;
     }
 }
-===expect===

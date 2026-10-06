@@ -9,4 +9,3 @@ enum Color: string {
 //               ^ BackedEnumCaseTypeMismatch: Backed enum case Color::Green has value of type 2, but backing type is string
     case Blue = 'blue';
 }
-===expect===

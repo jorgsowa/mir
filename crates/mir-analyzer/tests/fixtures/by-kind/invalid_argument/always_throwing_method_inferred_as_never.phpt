@@ -25,4 +25,3 @@ function run(string $sql): void {}
 function use1(Grammar $g, $n): void {
     run($g->make($n));
 }
-===expect===

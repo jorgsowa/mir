@@ -11,4 +11,3 @@ Undefined variable
 <?php
 $a = function() use ($i) {};
 //                   ^^ UndefinedVariable: Variable $i is not defined
-===expect===

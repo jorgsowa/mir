@@ -15,4 +15,3 @@ $inputs = ['hello', 'world'];
 $result = preg_replace('/o/', '0', $inputs);
 /** @mir-check $result is array<int, string> */
 var_dump($result);
-===expect===

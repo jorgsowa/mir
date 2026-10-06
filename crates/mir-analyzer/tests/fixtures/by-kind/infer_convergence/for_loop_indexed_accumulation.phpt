@@ -21,4 +21,3 @@ function buildLabels(array $values): array {
     }
     return $result;
 }
-===expect===

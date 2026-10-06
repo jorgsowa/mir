@@ -27,4 +27,3 @@ class Registry {
         self::$instance = $calculator;
     }
 }
-===expect===

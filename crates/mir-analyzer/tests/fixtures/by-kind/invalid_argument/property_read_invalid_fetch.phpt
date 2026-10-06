@@ -17,4 +17,3 @@ class A {
 $a = new A();
 echo count($a->foo);
 //         ^^^^^^^ InvalidArgument: Argument $value of count() expects 'array|Countable', got 'string'
-===expect===

@@ -24,4 +24,3 @@ function bothFinals(Holder $h): void {
         echo "unreachable";
     }
 }
-===expect===

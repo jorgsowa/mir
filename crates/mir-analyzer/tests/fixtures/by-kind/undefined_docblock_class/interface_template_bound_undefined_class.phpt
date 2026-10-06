@@ -6,4 +6,3 @@ class that does not exist, matching a class's identical tag.
 /** @template T of NonExistentBoundClass */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentBoundClass' does not exist
 interface Box {}
-===expect===

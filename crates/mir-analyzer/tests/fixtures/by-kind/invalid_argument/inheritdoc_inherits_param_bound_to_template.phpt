@@ -46,4 +46,3 @@ function plainStringStillAccepted(Impl $impl): void
 {
     $impl->get('Circle');
 }
-===expect===

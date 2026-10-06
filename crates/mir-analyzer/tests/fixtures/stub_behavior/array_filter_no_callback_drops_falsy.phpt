@@ -23,4 +23,3 @@ function run(?string $s, array $arr): void {
     $f = array_filter($arr, fn($v) => $v !== '');
     /** @mir-check $f is array<int, string|null> */
 }
-===expect===

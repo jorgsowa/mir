@@ -20,4 +20,3 @@ function test_no_guard_still_flags(): void {
     new \App\NoGuard();
 //      ^^^^^^^^^^^^ UndefinedClass: Class App\NoGuard does not exist
 }
-===expect===

@@ -28,4 +28,3 @@ class Caller extends Base {
 //      ^^^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of Widget directly
     }
 }
-===expect===

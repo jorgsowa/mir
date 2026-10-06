@@ -4,4 +4,3 @@ Undefined variable static call
 <?php
 $foo::bar();
 //<^^^^ UndefinedVariable: Variable $foo is not defined
-===expect===

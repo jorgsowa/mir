@@ -18,4 +18,3 @@ function boot(): string { return core_name(); }
 ===file:core.inc===
 <?php
 function core_name(): string { return 'core'; }
-===expect===

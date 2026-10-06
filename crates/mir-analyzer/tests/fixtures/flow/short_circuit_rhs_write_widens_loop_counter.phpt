@@ -11,4 +11,3 @@ function capped(array $items): void {
         }
     }
 }
-===expect===

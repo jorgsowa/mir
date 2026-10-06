@@ -9,4 +9,3 @@ function test(): void {
     noSuchFunc();
 //  ^^^^^^^^^^^^ UndefinedFunction: Function noSuchFunc() is not defined
 }
-===expect===

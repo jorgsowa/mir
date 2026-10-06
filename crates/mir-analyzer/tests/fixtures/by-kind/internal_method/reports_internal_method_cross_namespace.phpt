@@ -17,4 +17,3 @@ namespace User;
 $foo = new \Vendor\Library\Foo();
 $foo->internalHelper();
 //<^^^^^^^^^^^^^^^^^^^^^^ InternalMethod: Method Vendor\Library\Foo::internalHelper() is marked @internal
-===expect===

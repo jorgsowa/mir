@@ -15,4 +15,3 @@ function riskyOperation(): void {
 function callerWithThrows(): void {
     riskyOperation();
 }
-===expect===

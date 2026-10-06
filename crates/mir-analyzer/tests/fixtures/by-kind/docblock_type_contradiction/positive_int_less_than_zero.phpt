@@ -13,4 +13,3 @@ function test_identical(int $n): void {
     assert($n === 0);
 //         ^^^^^^^^ DocblockTypeContradiction: Type 'positive-int' makes '$n === 0' impossible — this can never hold
 }
-===expect===

@@ -10,4 +10,3 @@ function test(?string $value): void {
         greet($value);
     }
 }
-===expect===

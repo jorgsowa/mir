@@ -16,4 +16,3 @@ function render(string $s): void {}
 
 render(new Label());
 //     ^^^^^^^^^^^ InvalidArgument: Argument $s of render() expects 'string', got 'Label'
-===expect===

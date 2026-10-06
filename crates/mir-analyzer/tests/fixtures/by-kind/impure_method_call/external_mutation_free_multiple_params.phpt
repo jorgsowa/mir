@@ -20,4 +20,3 @@ class Pipe {
 //                ^^^^^^^^^^ ImpureMethodCall: Calling impure method read() in a pure or immutable context
     }
 }
-===expect===

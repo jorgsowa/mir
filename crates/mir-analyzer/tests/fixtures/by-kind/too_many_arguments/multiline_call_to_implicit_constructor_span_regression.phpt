@@ -33,4 +33,3 @@ function make(Config $configuration, Logger $logger): UnpackerS3Client
         binary: '/usr/bin/aws',
     );
 }
-===expect===

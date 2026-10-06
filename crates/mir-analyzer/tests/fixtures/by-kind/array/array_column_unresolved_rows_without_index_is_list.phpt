@@ -31,4 +31,3 @@ function test(array $rows, array $objects, string $col): void {
     /** @mir-check $ids_str is list<int> */
     $_ = $ids_str;
 }
-===expect===

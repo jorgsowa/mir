@@ -27,4 +27,3 @@ function reversed(array $a): int {
     }
     return 0;
 }
-===expect===

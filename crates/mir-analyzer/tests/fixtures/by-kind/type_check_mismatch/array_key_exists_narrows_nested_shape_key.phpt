@@ -18,4 +18,3 @@ function f(array $arr): void {
     }
 }
 function takesString(string $s): void {}
-===expect===

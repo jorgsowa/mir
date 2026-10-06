@@ -41,4 +41,3 @@ class Chain {
     public function first(): static { return $this; }
     public function second(int $n): static { echo $n; return $this; }
 }
-===expect===

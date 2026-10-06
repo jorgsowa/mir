@@ -5,4 +5,3 @@ PossiblyInvalidArrayAccess fires when the union includes a float atom.
 $a = rand(0, 1) > 0 ? 1.5 : ["hello"];
 echo $a[0];
 //   ^^^^^ PossiblyInvalidArrayAccess: Possibly invalid array access: '1.5|array{0: "hello"}' might not support []
-===expect===

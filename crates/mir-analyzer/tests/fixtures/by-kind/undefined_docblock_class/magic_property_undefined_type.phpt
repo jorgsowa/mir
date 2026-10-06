@@ -6,4 +6,3 @@ tag names a type that does not exist.
 /** @property NonExistentPropertyType $foo */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentPropertyType' does not exist
 class A {}
-===expect===

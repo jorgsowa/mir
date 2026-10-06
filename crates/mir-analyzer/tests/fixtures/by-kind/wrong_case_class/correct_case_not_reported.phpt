@@ -10,4 +10,3 @@ Correct case class name in new expression is not reported.
 <?php
 class Foo {}
 $x = new Foo();
-===expect===

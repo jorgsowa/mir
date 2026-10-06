@@ -34,4 +34,3 @@ function unrelatedConcreteClassesStillDropped(ConcreteA $x): void {
         $_ = 1;
     }
 }
-===expect===

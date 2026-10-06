@@ -18,4 +18,3 @@ $a = (new Foo());
 
 $a->foo = "hello";
 //<^^^^^^^^^^^^^^^^^ MixedPropertyAssignment: Property $foo assigned on mixed type
-===expect===

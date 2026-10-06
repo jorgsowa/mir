@@ -7,4 +7,3 @@ function test(int $param, int $param2): void {
 }
 
 test(1, ...["param" => 2]);
-===expect===

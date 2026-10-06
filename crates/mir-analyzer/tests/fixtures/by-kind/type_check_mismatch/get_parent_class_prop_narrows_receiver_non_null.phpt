@@ -34,4 +34,3 @@ function falseBranchAlsoNarrowsReceiver(?Container $c): void {
         $_ = 1;
     }
 }
-===expect===

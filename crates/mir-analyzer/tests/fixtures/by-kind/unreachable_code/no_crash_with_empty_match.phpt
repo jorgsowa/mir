@@ -14,4 +14,3 @@ function foo(int $i) {
 
     };
 }
-===expect===

@@ -22,4 +22,3 @@ function test(): void {
     $resolver = $reg->resolver();
     $resolver()->handle();
 }
-===expect===

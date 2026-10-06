@@ -18,4 +18,3 @@ class C {
 //                         ^^^^^^^^^^^^^^^^ UndefinedClass: Class ExampleUnknownAB does not exist
     }
 }
-===expect===

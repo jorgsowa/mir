@@ -14,4 +14,3 @@ try {
 }
 catch (A $e) {}
 //     ^ InvalidCatch: Caught type 'A' does not extend Throwable
-===expect===

@@ -29,4 +29,3 @@ function consume(string|null $key): void {
     // Both branches are subtypes of array — must not produce InvalidArgument.
     array_map(fn($row) => $row, $rows);
 }
-===expect===

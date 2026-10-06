@@ -11,4 +11,3 @@ final class OnlyUsedViaMagicProperty {}
 
 /** @property OnlyUsedViaMagicProperty $thing */
 class Consumer {}
-===expect===

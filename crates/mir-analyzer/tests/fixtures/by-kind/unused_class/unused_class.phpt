@@ -4,4 +4,3 @@ Unused class
 <?php
 final class A { }
 //    ^^^^^^^^^^^ UnusedClass: Class A is never referenced
-===expect===

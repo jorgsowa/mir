@@ -15,4 +15,3 @@ function b(): int {
     }
     return $i;
 }
-===expect===

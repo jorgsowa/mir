@@ -16,4 +16,3 @@ function process(): void {
 }
 
 process();
-===expect===

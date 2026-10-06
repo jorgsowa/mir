@@ -22,4 +22,3 @@ function test_dynamic_call_variable_named_like_builtin(?int $x): void {
         $_ = $x;
     }
 }
-===expect===

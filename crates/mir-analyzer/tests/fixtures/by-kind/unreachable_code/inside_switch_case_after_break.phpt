@@ -10,4 +10,3 @@ function test(int $mode): void {
 //          ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
     }
 }
-===expect===

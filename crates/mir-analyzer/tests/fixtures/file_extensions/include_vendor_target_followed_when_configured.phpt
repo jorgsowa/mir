@@ -18,4 +18,3 @@ function a_hook(): int { return pkg_helper(); }
 ===file:vendor/pkg/helper.inc===
 <?php
 function pkg_helper(): int { return 1; }
-===expect===

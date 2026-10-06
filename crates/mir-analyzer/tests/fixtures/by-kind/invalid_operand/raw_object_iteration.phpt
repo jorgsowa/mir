@@ -18,4 +18,3 @@ function example() : Generator {
     yield from $arr;
 //             ^^^^ RawObjectIteration: Cannot iterate over non-iterable object 'A'
 }
-===expect===

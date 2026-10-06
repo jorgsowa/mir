@@ -10,4 +10,3 @@ function foo($a): void {
     clone $a;
 //  ^^^^^^^^ PossiblyInvalidClone: cannot clone possibly non-object int|Exception
 }
-===expect===

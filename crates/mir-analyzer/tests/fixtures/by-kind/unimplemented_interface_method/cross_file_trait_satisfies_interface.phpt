@@ -15,4 +15,3 @@ trait RunsTrait {
 class Worker implements Runnable {
     use RunsTrait;
 }
-===expect===

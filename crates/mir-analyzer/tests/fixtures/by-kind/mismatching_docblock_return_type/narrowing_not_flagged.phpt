@@ -8,5 +8,3 @@ function greeting(): string { return "hello"; }
 
 /** @return string */
 function exact(): string { return "x"; }
-
-===expect===

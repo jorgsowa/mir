@@ -30,4 +30,3 @@ function test_assoc_slice(array $map): void {
     /** @mir-check $r is array<string, int> */
     $_ = $r;
 }
-===expect===

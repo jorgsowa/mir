@@ -12,4 +12,3 @@ A valid member of a literal-string union containing '@' is not flagged.
 function f($email): void {}
 
 f('admin@example.com');
-===expect===

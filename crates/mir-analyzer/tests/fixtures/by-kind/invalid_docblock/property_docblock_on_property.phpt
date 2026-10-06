@@ -7,4 +7,3 @@ class A {
    /** @property string[] */
   public array $arr;
 }
-===expect===

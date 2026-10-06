@@ -8,4 +8,3 @@ function foo() : void {
 //      ^^ UnusedForeachValue: Foreach value $i is never read
     }
 }
-===expect===

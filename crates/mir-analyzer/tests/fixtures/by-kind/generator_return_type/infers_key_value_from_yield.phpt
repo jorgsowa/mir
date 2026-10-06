@@ -18,4 +18,3 @@ function gen() {
 $g = gen();
 /** @mir-check $g is Generator<"a"|"b", 1|2, mixed, void> */
 $_ = 1;
-===expect===

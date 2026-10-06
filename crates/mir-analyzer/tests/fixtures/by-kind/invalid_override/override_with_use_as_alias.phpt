@@ -25,4 +25,3 @@ class HtmlRenderer extends BaseRenderer {
     #[\Override]
     public function render(): string { return '<html>'; }
 }
-===expect===

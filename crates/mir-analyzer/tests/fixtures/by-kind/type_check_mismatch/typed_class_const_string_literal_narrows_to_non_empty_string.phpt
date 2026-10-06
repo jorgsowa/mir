@@ -19,5 +19,3 @@ final class Foo {
 
 /** @param list<non-empty-string> $names */
 function baz(array $names): void {}
-
-===expect===

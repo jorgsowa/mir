@@ -17,4 +17,3 @@ class Foo {
 //      ^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of Foo directly
     }
 }
-===expect===

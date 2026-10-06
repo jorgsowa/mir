@@ -20,4 +20,3 @@ function test(bool $keepGoing): void {
         consume($box);
     } while ($keepGoing);
 }
-===expect===

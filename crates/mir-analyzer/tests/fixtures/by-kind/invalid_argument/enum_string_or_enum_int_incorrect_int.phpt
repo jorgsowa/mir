@@ -14,4 +14,3 @@ namespace Ns;
 function foo($s) : void {}
 foo(4);
 //  ^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"|1|2|3', got '4'
-===expect===

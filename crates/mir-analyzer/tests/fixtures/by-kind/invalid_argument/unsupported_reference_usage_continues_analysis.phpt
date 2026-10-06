@@ -18,5 +18,3 @@ $foo = ["foo"];
 $bar = &$arr[$foo[0]];
 
 /** @trace $bar */;
-
-===expect===

@@ -13,4 +13,3 @@ undefined.
 <?php
 function f(NotARealSNMPClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealSNMPClass does not exist
-===expect===

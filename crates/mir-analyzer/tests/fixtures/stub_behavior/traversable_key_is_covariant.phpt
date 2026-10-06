@@ -38,4 +38,3 @@ function rejectsWrongValue(Traversable $t): void {
     takesInts($t);
 //            ^^ InvalidArgument: Argument $items of takesInts() expects 'iterable<int, int>', got 'Traversable<int, string>'
 }
-===expect===

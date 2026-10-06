@@ -7,4 +7,3 @@ function test(): void {
         new \Pusher\Pusher('key', 'secret', 'app_id');
     }
 }
-===expect===

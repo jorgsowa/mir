@@ -33,4 +33,3 @@ function narrowsReceiverFalseBranch(?Holder $h): void {
         $_ = 1;
     }
 }
-===expect===

@@ -25,4 +25,3 @@ function describe(Suit $s): string {
         Suit::Spades => 'spades',
     };
 }
-===expect===

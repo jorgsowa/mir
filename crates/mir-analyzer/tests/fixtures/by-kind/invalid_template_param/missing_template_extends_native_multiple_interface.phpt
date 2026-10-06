@@ -7,5 +7,3 @@ Missing template extends native multiple interface
  */
 interface a extends Iterator, Traversable {
 }
-
-===expect===

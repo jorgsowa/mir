@@ -10,4 +10,3 @@ class C {
     private function b(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method C::b() is never called
 }
-===expect===

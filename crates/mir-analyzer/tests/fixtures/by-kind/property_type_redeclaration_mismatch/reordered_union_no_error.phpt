@@ -10,4 +10,3 @@ class A {
 class B extends A {
     public int|null $x = null;
 }
-===expect===

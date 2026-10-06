@@ -39,4 +39,3 @@ function test(Box $b): void {
     /** @mir-check $r is array{0: Animal, 1: non-empty-string} */
     echo 1;
 }
-===expect===

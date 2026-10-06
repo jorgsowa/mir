@@ -39,4 +39,3 @@ function test(): void {
     $fn3 = function(Data $acc, Data $item): Data { return $acc; };
     reduce($fn3);
 }
-===expect===

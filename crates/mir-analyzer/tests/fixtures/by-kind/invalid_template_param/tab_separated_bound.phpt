@@ -11,4 +11,3 @@ function f($x): void {}
 
 f(5);
 //<^^^^ InvalidTemplateParam: Template type 'T' inferred as '5' does not satisfy bound 'ArrayAccess'
-===expect===

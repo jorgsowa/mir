@@ -17,4 +17,3 @@ function test(): void {
     /** @mir-check $arr is array{0: 1, 1: 2, 2: 3} */
     $_ = $arr;
 }
-===expect===

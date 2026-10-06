@@ -47,4 +47,3 @@ function test_strlen_gte_one(string $s): void {
         $_ = $s;
     }
 }
-===expect===

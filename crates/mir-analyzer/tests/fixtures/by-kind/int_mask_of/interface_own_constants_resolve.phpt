@@ -25,4 +25,3 @@ class Flags implements HasFlags {
 
 $f = new Flags();
 $f->set(8);
-===expect===

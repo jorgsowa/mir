@@ -24,4 +24,3 @@ class NullableBug {
         return self::mock("NullableClass");
     }
 }
-===expect===

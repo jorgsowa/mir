@@ -24,4 +24,3 @@ class EloquentUserProvider {
         return new User();
     }
 }
-===expect===

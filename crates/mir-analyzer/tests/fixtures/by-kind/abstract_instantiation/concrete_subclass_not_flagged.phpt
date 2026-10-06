@@ -5,4 +5,3 @@ Instantiating a concrete subclass of an abstract base does not fire AbstractInst
 abstract class Base {}
 class Concrete extends Base {}
 new Concrete();
-===expect===

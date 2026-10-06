@@ -6,4 +6,3 @@ Global with var no indent
 $a = 5;
 clone $a;
 //<^^^^^^^^ MixedClone: cannot clone mixed
-===expect===

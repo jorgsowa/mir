@@ -25,4 +25,3 @@ function createInstance($classNameString) {
 $name = "ValidClass";
 $obj = createInstance($name);
 $obj->method();
-===expect===

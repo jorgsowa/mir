@@ -4,4 +4,3 @@ Empty callable
 <?php
 $a = "";
 $a();
-===expect===

@@ -16,4 +16,3 @@ function process($item): void {
 $unrelated = new Unrelated();
 process($unrelated);
 //<^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'
-===expect===

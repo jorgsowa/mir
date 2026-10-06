@@ -19,4 +19,3 @@ use App\Model\Item;
  * @param array<int, Item> $items
  */
 function process($items): void {}
-===expect===

@@ -22,4 +22,3 @@ function test_ne_impossible($n): void {
         $_ = $n; // always here
     }
 }
-===expect===

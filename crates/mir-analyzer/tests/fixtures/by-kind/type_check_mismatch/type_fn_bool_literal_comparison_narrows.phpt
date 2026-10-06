@@ -57,4 +57,3 @@ function instanceofIdenticalTrue(Foo|Bar $o): void {
         $_ = $o;
     }
 }
-===expect===

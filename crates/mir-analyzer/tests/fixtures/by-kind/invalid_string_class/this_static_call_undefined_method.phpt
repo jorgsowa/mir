@@ -8,4 +8,3 @@ class Foo {
 //      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::nonExistent() does not exist
     }
 }
-===expect===

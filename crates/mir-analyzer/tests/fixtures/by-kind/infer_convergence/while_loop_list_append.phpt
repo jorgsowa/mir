@@ -24,4 +24,3 @@ function filterNonEmpty(array $items): array {
     }
     return $result;
 }
-===expect===

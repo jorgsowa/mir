@@ -16,4 +16,3 @@ class Foo {
 $f = new Foo();
 $s = 'Value: ' . $f;
 echo $f;
-===expect===

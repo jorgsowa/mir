@@ -58,4 +58,3 @@ function plain_string(string $s): void {
         $_ = $s;
     }
 }
-===expect===

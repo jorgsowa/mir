@@ -17,5 +17,3 @@ function f($o) {
 }
 
 f(new \stdClass());
-
-===expect===

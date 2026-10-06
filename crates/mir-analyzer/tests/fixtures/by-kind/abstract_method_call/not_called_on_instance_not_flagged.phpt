@@ -13,4 +13,3 @@ class Circle extends Shape {
 
 $c = new Circle();
 echo $c->area();
-===expect===

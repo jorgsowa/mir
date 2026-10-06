@@ -27,4 +27,3 @@ function f(?Validator $v, $x): void {
         $_ = 1;
     }
 }
-===expect===

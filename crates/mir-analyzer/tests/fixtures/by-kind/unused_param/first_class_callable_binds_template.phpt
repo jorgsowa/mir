@@ -20,4 +20,3 @@ function apply(callable $fn, mixed $value): mixed { return $fn($value); }
 $result = apply(strlen(...), 'hello');
 /** @mir-check $result is int */
 echo $result;
-===expect===

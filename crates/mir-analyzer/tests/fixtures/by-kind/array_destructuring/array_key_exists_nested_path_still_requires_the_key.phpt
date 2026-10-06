@@ -17,4 +17,3 @@ function f(array $arr): void {
         $_ = $c;
     }
 }
-===expect===

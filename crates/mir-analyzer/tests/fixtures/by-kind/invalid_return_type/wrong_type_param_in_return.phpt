@@ -11,4 +11,3 @@ function makeStringBox(): mixed {
     return $b;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'Box<int>' is not compatible with declared 'Box<string>'
 }
-===expect===

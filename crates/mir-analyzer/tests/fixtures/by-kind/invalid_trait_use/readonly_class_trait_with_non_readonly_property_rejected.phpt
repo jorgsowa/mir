@@ -30,4 +30,3 @@ readonly class Account {
         $this->id = $id;
     }
 }
-===expect===

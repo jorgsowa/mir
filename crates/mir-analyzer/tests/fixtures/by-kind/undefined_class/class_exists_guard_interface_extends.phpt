@@ -6,4 +6,3 @@ if (!interface_exists(\Vendor\OptionalIface::class)) {
     throw new \RuntimeException('missing');
 }
 interface MyIface extends \Vendor\OptionalIface {}
-===expect===

@@ -11,4 +11,3 @@ function make() { return 1; }
 function use_it(): int {
     return strlen(make());
 }
-===expect===

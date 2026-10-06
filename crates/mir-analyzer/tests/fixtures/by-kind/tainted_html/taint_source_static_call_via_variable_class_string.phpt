@@ -26,4 +26,3 @@ function test(string $requestCls): void {
     echo $requestCls::getQuery();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

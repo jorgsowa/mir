@@ -13,4 +13,3 @@ function foo($a) : void {
 
     echo strlen($a);
 }
-===expect===

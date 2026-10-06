@@ -39,4 +39,3 @@ function noFixedTemplateStaysRaw(): void {
     /** @mir-check $box->value is T */
     $_ = $box->value;
 }
-===expect===

@@ -6,4 +6,3 @@ function test(): void {
     new UnknownClass();
 //      ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
 }
-===expect===

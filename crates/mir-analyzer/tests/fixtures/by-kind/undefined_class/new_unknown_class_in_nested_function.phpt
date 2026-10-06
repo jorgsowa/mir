@@ -8,4 +8,3 @@ function outer(): void {
 //          ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
     }
 }
-===expect===

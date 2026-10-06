@@ -22,4 +22,3 @@ function connect(string $uri) {
 function protocolVersionConstant(): int {
     return LDAP_OPT_PROTOCOL_VERSION;
 }
-===expect===

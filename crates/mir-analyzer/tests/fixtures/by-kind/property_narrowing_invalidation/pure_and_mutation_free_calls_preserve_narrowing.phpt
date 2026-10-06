@@ -37,4 +37,3 @@ class Session {
         return $this->user;
     }
 }
-===expect===

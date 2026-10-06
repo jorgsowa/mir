@@ -18,4 +18,3 @@ class Foo
 
 #[Foo("foo")]
 class Bar{}
-===expect===

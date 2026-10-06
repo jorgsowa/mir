@@ -19,4 +19,3 @@ function test(bool $cond): void {
     take($cond ? 'RealClass' : 'TotallyBogusClassName');
 //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class TotallyBogusClassName does not exist
 }
-===expect===

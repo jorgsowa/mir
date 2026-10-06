@@ -12,4 +12,3 @@ function run(): int {
     } while ($id > 5);
     return $id;
 }
-===expect===

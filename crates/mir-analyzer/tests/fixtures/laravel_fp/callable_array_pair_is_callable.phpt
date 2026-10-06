@@ -24,4 +24,3 @@ class TagSet {
 
     public function resetTag(string $name): void {}
 }
-===expect===

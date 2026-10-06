@@ -111,4 +111,3 @@ class Registry implements Named {
         };
     }
 }
-===expect===

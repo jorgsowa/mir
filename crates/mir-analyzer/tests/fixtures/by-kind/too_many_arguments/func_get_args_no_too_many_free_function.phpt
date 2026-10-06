@@ -18,4 +18,3 @@ function joinAll(string $separator) {
 // All of these should be accepted — extra args consumed by func_get_args().
 joinAll(', ', 'a', 'b', 'c');
 joinAll('-', 'x');
-===expect===

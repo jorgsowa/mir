@@ -33,4 +33,3 @@ function isWindowsFamily(): bool {
 function is32Bit(): bool {
     return PHP_INT_SIZE === 4;
 }
-===expect===

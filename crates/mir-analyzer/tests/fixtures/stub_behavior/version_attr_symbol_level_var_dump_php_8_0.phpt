@@ -11,4 +11,3 @@ Symbol-level PhpStormStubsElementAvailable: var_dump() resolves the 8.0 declarat
 <?php
 var_dump();
 //<^^^^^^^^^^ TooFewArguments: Too few arguments for var_dump(): expected 1, got 0
-===expect===

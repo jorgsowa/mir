@@ -41,4 +41,3 @@ function narrowsStringLiteral(?Holder $h): void {
         $_ = 1;
     }
 }
-===expect===

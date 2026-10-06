@@ -12,4 +12,3 @@ function test(int $value) {
     new $value();
 //      ^^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'int'
 }
-===expect===

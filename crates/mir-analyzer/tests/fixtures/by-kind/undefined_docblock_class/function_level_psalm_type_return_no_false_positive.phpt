@@ -15,4 +15,3 @@ class User {
 function findUser(bool $exists): User|null {
     return $exists ? new User("Alice") : null;
 }
-===expect===

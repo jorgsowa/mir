@@ -13,4 +13,3 @@ switch (rand(0, 2)) {
     default:
         $a = false;
 }
-===expect===

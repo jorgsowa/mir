@@ -22,4 +22,3 @@ function executeCallback($callback) {
 }
 
 executeCallback([Handler::class, "handle"]);
-===expect===

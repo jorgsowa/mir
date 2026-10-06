@@ -15,4 +15,3 @@ function test(array $items): void {
     /** @mir-check $n is int<1, max> */
     $_ = $n;
 }
-===expect===

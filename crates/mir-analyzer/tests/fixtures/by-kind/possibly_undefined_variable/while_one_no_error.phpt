@@ -16,4 +16,3 @@ function foo(callable $cb, int $i): mixed {
     }
     return $cb($result);
 }
-===expect===

@@ -21,4 +21,3 @@ abstract class Model {
     }
     abstract public function table(): string;
 }
-===expect===

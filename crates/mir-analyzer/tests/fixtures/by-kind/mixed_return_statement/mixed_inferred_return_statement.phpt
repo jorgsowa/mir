@@ -6,4 +6,3 @@ function fooFoo(array $arr): string {
     return array_pop($arr);
 //  ^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 }
-===expect===

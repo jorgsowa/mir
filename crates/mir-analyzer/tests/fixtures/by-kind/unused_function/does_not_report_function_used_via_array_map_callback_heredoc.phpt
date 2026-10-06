@@ -11,4 +11,3 @@ function formatRow(int $row): string { return (string) $row; }
 array_map(<<<EOT
 formatRow
 EOT, [1, 2, 3]);
-===expect===

@@ -19,4 +19,3 @@ function f(TakesId $takesId, Application $application): void {
    ($takesId)($application->getLocation()->getId());
 //            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method getId() on possibly null value
 }
-===expect===

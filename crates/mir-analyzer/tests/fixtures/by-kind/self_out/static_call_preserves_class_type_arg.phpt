@@ -27,4 +27,3 @@ class Box {
         $_ = 1;
     }
 }
-===expect===

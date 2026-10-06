@@ -9,4 +9,3 @@ class MixedReturn {
     }
 }
 new MixedReturn();
-===expect===

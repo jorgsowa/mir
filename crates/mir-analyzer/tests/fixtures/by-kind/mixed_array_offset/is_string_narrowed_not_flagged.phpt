@@ -14,4 +14,3 @@ $arr = ['hello' => 1, 'world' => 2];
 if (is_string($key)) {
     $val = $arr[$key];
 }
-===expect===

@@ -35,4 +35,3 @@ function test_bad_receiver_is_flagged($c): void {
 function test_good_receiver_is_silent($c): void {
     $c->get();
 }
-===expect===

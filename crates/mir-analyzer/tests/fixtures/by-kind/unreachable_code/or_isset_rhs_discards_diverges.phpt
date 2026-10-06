@@ -26,4 +26,3 @@ function definitely_null(?string $x, int $y): void {
 //                  ^^ NullArgument: Argument $string of strlen() cannot be null
     }
 }
-===expect===

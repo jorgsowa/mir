@@ -24,4 +24,3 @@ function a_hook(): int { return b(); }
 ===file:legacy/b.inc===
 <?php
 function b(): int { return 1; }
-===expect===

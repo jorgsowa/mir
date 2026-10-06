@@ -27,4 +27,3 @@ function readValue(Box $b): mixed {
 function readSecret(Box $b): mixed {
     return $b->secret;
 }
-===expect===

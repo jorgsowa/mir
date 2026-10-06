@@ -21,4 +21,3 @@ function foo(A $a) : void {
 //          ^^^^^^^^^ UndefinedMethod: Method B::bar() does not exist
     }
 }
-===expect===

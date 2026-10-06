@@ -27,4 +27,3 @@ $handler = new ChildHandler();
 $handler->accepts(new Integer());
 $handler->accepts(5);
 //                ^ InvalidArgument: Argument $value of accepts() expects 'Regression\DocblockTypePrecedence\Integer', got '5'
-===expect===

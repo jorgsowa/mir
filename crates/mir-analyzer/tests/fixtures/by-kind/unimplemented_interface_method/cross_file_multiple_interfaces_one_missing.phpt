@@ -17,4 +17,3 @@ class Entity implements HasLabel, HasCount {
     public function getLabel(): string { return ""; }
     # getCount() is NOT implemented
 }
-===expect===

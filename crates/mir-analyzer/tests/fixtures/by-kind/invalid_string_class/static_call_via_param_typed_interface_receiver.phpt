@@ -19,4 +19,3 @@ interface Provider {
 function run(Provider $p): void {
     $p::getDefinitions();
 }
-===expect===

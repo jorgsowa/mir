@@ -9,4 +9,3 @@ class Child extends AbstractBase {
 //          ^^^^^^ AbstractInstantiation: Cannot instantiate abstract class AbstractBase
     }
 }
-===expect===

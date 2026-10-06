@@ -36,4 +36,3 @@ function app(): void {
     $c = new Coll(null, 7, 1, 2, 3);
     $c->setValue(new Other());
 }
-===expect===

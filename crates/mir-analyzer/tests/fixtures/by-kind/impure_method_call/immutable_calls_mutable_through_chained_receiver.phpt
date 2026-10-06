@@ -26,4 +26,3 @@ class Service {
 //      ^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method write() in a pure or immutable context
     }
 }
-===expect===

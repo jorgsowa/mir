@@ -12,4 +12,3 @@ Array destructuring invalid array
 $a = 42;
 
 [$id2, $name2] = $a;
-===expect===

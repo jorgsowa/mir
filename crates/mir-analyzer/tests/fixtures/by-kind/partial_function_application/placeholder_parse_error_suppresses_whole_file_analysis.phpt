@@ -27,4 +27,3 @@ function add(int $a, int $b): int {
 
 $partial = add(?, "not-an-int");
 //             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
-===expect===

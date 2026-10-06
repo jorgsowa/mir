@@ -31,4 +31,3 @@ function narrowsNeedleViaPlainArrowStillWorks(Holder $h, string $x): void {
         $_ = $x;
     }
 }
-===expect===

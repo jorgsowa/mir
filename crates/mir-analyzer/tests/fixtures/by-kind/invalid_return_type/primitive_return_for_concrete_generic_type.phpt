@@ -9,4 +9,3 @@ function makeBox(): mixed {
     return 42;
 //  ^^^^^^^^^^ InvalidReturnType: Return type '42' is not compatible with declared 'Box<string>'
 }
-===expect===

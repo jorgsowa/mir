@@ -7,4 +7,3 @@ function test(array $arr): string {
     return strtoupper($arr['v']);
 //                    ^^^^^^^^^ PossiblyInvalidArgument: Argument $string of strtoupper() expects 'string', possibly different type 'string|int' provided
 }
-===expect===

@@ -9,4 +9,3 @@ function example() : int {
 function example2() : Generator {
     yield from example();
 }
-===expect===

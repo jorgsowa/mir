@@ -20,4 +20,3 @@ function binary(): string {
     }
     return 'artisan';
 }
-===expect===

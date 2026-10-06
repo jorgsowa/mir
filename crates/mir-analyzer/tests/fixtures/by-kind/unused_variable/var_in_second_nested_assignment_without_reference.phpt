@@ -11,4 +11,3 @@ if (rand(0, 1)) {
     $a = "foo";
 //  ^^ UnusedVariable: Variable $a is never read
 }
-===expect===

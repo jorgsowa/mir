@@ -10,4 +10,3 @@ function test(array $v): void {
     echo $v['missing'];
 //          ^^^^^^^^^ NonExistentArrayOffset: Array offset 'missing' does not exist
 }
-===expect===

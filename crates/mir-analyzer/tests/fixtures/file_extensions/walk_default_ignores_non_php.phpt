@@ -12,4 +12,3 @@ function b_bad(): int { return 'x'; }
 function c_use(): string { return b_helper(); }
 //                         ^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 //                                ^^^^^^^^^^ UndefinedFunction: Function b_helper() is not defined
-===expect===

@@ -36,4 +36,3 @@ $box = new Box(42);
 $box2 = $box->withValue(43);
 $v = $box2->get();
 /** @mir-check $v is int */
-===expect===

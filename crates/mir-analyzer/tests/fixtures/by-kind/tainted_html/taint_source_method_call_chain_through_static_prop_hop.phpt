@@ -32,4 +32,3 @@ class Http {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===

@@ -14,4 +14,3 @@ $foo = new class {
 //      ^^^^^^^^^ InvalidReturnType: Return type '5' is not compatible with declared 'string'
     }
 };
-===expect===

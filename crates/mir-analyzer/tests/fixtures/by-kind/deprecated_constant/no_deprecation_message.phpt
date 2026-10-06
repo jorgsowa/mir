@@ -16,4 +16,3 @@ class Config {
 
 $v = Config::OLD_MAX;
 //           ^^^^^^^ DeprecatedConstant: Constant Config::OLD_MAX is deprecated
-===expect===

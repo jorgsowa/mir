@@ -6,4 +6,3 @@ where variables come from the view composer / template engine
 echo $user;
 echo $notifications;
 echo $settings;
-===expect===

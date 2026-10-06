@@ -14,4 +14,3 @@ use function Lib\MYFUNC;
 
 MYFUNC();
 //<^^^^^^ WrongCaseFunction: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
-===expect===

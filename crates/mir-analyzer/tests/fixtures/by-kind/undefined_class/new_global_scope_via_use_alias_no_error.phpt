@@ -14,4 +14,3 @@ class Entity {}
 <?php
 use App\Model\Entity;
 $x = new Entity();
-===expect===

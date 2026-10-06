@@ -30,4 +30,3 @@ needsString((new Foo())->get()['a']);
 //          ^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of needsString() expects 'string', got 'int' — coercion may fail at runtime
 needsString((new Bar())->get()['a']);
 //          ^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of needsString() expects 'string', got 'int' — coercion may fail at runtime
-===expect===

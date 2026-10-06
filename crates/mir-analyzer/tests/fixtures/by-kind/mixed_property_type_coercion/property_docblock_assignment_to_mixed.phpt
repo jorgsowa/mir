@@ -24,4 +24,3 @@ function foo($b) : void {
     $a = new A();
     $a->__set("foo", $b);
 }
-===expect===

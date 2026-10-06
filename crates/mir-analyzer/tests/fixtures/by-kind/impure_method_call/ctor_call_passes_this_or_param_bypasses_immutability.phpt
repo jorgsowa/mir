@@ -41,4 +41,3 @@ class Service {
 //             ^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function Wrapper::__construct() in a @pure function
     }
 }
-===expect===

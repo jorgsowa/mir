@@ -29,4 +29,3 @@ function check_nested_conditional($value) {
      */
     var_dump($x);
 }
-===expect===

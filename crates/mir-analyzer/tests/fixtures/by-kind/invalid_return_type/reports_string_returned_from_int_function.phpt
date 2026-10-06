@@ -6,4 +6,3 @@ function f(): int {
     return 'hello';
 //  ^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"hello"' is not compatible with declared 'int'
 }
-===expect===

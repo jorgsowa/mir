@@ -23,4 +23,3 @@ function test(\stdClass $obj, array $arr, mixed $m, bool $b): void {
     // scalar vs scalar: complex coercion, conservative
     if ($m == 0) {}
 }
-===expect===

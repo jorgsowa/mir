@@ -8,4 +8,3 @@ variable in type position param
  */
 function foo(mixed $x): void {}
 //           ^^^^^^^^ UnusedParam: Parameter $x is never used
-===expect===

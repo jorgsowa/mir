@@ -42,4 +42,3 @@ class ChildBox extends Box {
         }
     }
 }
-===expect===

@@ -40,4 +40,3 @@ function r5(): int { return 5; }
 ===file:r6.inc===
 <?php
 function r6(): int { return 6; }
-===expect===

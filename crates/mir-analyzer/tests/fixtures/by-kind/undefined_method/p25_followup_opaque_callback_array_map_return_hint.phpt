@@ -47,4 +47,3 @@ function caller2(callable $cb, array $items): void
         echo $r->build();
     }
 }
-===expect===

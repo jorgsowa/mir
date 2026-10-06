@@ -26,4 +26,3 @@ class Color {
         return new self($r, $this->g, $this->b);
     }
 }
-===expect===

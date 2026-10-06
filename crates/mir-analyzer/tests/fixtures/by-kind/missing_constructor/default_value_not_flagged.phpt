@@ -8,5 +8,3 @@ class WithDefaults {
 }
 
 new WithDefaults();
-
-===expect===

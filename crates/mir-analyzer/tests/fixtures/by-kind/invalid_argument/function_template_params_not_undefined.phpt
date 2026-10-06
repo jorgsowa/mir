@@ -18,4 +18,3 @@ function test(): void {
     identity(123);
     identity(null);
 }
-===expect===

@@ -14,4 +14,3 @@ enum Status: string implements HasLabel {
     case Inactive = 'inactive';
     public function label(): string { return $this->value; }
 }
-===expect===

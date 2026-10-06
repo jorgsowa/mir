@@ -16,4 +16,3 @@ function f(array $x): void {
         'b' => $x['bar'],
     };
 }
-===expect===

@@ -13,4 +13,3 @@ class NullReturn {
     }
 }
 new NullReturn();
-===expect===

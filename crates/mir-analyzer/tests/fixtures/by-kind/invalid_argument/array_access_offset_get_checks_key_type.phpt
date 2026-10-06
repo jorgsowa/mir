@@ -30,4 +30,3 @@ function reads(TypedMap $m): void {
     $b = $m[42];
 //          ^^ InvalidArgument: Argument $offset of offsetGet() expects 'string', got '42'
 }
-===expect===

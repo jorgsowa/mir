@@ -29,4 +29,3 @@ function contact(array $data): string {
     }
     return "no email";
 }
-===expect===

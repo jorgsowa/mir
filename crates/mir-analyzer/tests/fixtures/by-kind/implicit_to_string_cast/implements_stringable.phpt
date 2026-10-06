@@ -17,4 +17,3 @@ class Foo implements Stringable {
 $f = new Foo();
 $s = 'Value: ' . $f;
 echo $f;
-===expect===

@@ -63,4 +63,3 @@ function test_non_bool_equal_not_narrowed(int $x): void {
         $_ = $x;
     }
 }
-===expect===

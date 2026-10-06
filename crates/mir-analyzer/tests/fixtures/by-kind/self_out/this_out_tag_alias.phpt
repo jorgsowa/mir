@@ -36,4 +36,3 @@ function test(): void {
     /** @mir-check $box is Box<string> */
     $_ = 1;
 }
-===expect===

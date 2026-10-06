@@ -13,4 +13,3 @@ function test(): void {
         $x = new class implements \Optional\Iface {};
     }
 }
-===expect===

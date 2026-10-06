@@ -56,5 +56,3 @@ function mixedDisjunctsWithIsNullDoNotProveReceiverNonNull(?Box $x): void {
         $_ = 1;
     }
 }
-
-===expect===

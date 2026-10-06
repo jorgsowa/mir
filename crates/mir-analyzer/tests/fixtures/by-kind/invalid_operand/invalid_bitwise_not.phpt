@@ -10,4 +10,3 @@ Invalid bitwise not
 <?php
 $a = ~new stdClass;
 //    ^^^^^^^^^^^^ InvalidOperand: Operator '~' not supported for operand of type 'stdClass'
-===expect===

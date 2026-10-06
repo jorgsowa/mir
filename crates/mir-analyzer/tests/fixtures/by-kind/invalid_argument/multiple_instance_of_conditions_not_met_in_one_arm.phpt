@@ -25,4 +25,3 @@ function bar(Foo $foo): int {
         default => 0,
     };
 }
-===expect===

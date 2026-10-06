@@ -24,4 +24,3 @@ namespace Regression\DocblockTypePrecedence\Support;
 final class Integer
 {
 }
-===expect===

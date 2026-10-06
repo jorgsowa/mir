@@ -11,4 +11,3 @@ class b {
 
 clone new b;
 //<^^^^^^^^^^^ InvalidClone: cannot clone non-object b
-===expect===

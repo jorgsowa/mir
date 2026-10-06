@@ -11,4 +11,3 @@ class Greeter {
 $g = new Greeter();
 $g->oldGreet('Alice');
 //<^^^^^^^^^^^^^^^^^^^^^ DeprecatedMethod: Method Greeter::oldGreet() is deprecated: use newGreet() instead
-===expect===

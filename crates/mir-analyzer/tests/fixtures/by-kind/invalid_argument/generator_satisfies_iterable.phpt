@@ -12,4 +12,3 @@ function gen(): Generator { yield 1; }
 function run(): int {
     return total(gen());   // Generator into iterable
 }
-===expect===

@@ -13,5 +13,3 @@ such as a mixed array element access.
 $data = [];
 $value = $data["key"];
 //<^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $value is assigned a mixed type
-
-===expect===

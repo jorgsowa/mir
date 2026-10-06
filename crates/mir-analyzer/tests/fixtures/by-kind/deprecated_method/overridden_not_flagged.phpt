@@ -19,4 +19,3 @@ class Child extends Base {
 function test(Child $c): void {
     $c->oldMethod();
 }
-===expect===

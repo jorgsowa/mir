@@ -6,4 +6,3 @@ function test(): void {
     \nonExistent();
 //  ^^^^^^^^^^^^^^ UndefinedFunction: Function nonExistent() is not defined
 }
-===expect===

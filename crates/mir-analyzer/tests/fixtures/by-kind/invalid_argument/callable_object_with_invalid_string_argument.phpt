@@ -8,5 +8,3 @@ Callable object with invalid string argument
 function takesCallableObject(object $object): void {
     $object(true);
 }
-
-===expect===

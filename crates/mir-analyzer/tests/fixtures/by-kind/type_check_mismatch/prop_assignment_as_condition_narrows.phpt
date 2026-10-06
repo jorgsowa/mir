@@ -27,4 +27,3 @@ final class Holder {
 function fetch(): ?Foo {
     return null;
 }
-===expect===

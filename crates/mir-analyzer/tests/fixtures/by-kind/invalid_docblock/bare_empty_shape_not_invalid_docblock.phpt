@@ -30,4 +30,3 @@ function takesEmptyListShape($c): void {
     /** @mir-check $c is array{} */
     $_ = 1;
 }
-===expect===

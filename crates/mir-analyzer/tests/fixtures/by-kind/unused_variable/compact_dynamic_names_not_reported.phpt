@@ -7,4 +7,3 @@ function view(array $names): array {
     $body = 'World';
     return compact(...$names);
 }
-===expect===

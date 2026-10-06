@@ -13,4 +13,3 @@ class Foo { }
 
 $a = new Foo();
 //       ^^^ DeprecatedClass: Class Foo is deprecated
-===expect===

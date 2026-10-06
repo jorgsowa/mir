@@ -10,4 +10,3 @@ class A {
         return true;
     }
 }
-===expect===

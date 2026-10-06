@@ -10,4 +10,3 @@ function sumAll(...$nums): int {
 sumAll("a", "b");
 //     ^^^ InvalidArgument: Argument $nums of sumAll() expects 'int', got '"a"'
 //          ^^^ InvalidArgument: Argument $nums of sumAll() expects 'int', got '"b"'
-===expect===

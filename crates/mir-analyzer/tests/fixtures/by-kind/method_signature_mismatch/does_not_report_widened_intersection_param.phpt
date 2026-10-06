@@ -16,4 +16,3 @@ interface Boxed {
 class Impl implements Boxed {
     public function setBox(Countable&ArrayAccess $box): void {}
 }
-===expect===

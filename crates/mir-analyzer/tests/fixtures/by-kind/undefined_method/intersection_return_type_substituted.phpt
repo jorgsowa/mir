@@ -28,4 +28,3 @@ function test(): void {
     $w->unwrap()->get()->undefinedMethod();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Item::undefinedMethod() does not exist
 }
-===expect===

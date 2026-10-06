@@ -30,4 +30,3 @@ class Main {
         $widget->targetOnly();
     }
 }
-===expect===

@@ -12,4 +12,3 @@ try {
 } catch (Throwable $t) {
   // something else
 }
-===expect===

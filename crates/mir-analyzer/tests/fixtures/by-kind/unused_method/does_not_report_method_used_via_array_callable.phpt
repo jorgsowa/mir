@@ -15,4 +15,3 @@ class Foo {
         call_user_func([$this, 'helper']);
     }
 }
-===expect===

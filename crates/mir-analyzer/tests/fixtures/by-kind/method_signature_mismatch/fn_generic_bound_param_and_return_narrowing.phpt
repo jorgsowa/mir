@@ -39,4 +39,3 @@ class StringBox extends Box {
         return "x";
     }
 }
-===expect===

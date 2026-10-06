@@ -22,4 +22,3 @@ function test(mixed $value): void {
         echo $value;
     }
 }
-===expect===

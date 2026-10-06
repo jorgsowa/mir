@@ -64,4 +64,3 @@ function test_max_literals(): void {
     /** @mir-check $r is int<7, 7> */
     $_ = $r;
 }
-===expect===

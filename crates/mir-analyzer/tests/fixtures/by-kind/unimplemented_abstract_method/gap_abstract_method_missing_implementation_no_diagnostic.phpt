@@ -11,4 +11,3 @@ class ConcreteChild extends AbstractBase {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class ConcreteChild must implement abstract method render()
     // implements neither compute() nor render()
 }
-===expect===

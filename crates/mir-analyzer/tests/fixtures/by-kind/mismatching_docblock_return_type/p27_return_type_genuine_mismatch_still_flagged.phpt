@@ -29,4 +29,3 @@ function make(): Generator
     return new Generator();
 //  ^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'App\Generator' is not compatible with declared 'App\Other'
 }
-===expect===

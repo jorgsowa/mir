@@ -19,4 +19,3 @@ function a_hook(): int { return sibling(); }
 ===file:deep/sibling.inc===
 <?php
 function sibling(): int { return 1; }
-===expect===

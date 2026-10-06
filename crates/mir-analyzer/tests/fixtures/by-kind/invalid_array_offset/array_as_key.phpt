@@ -6,4 +6,3 @@ $arr = [1, 2, 3];
 $key = [0, 1];
 echo $arr[$key];
 //        ^^^^ InvalidArrayOffset: Array offset expects 'array-key', got 'array{0: 0, 1: 1}'
-===expect===

@@ -28,4 +28,3 @@ class MimeType {
         return self::$mime;
     }
 }
-===expect===

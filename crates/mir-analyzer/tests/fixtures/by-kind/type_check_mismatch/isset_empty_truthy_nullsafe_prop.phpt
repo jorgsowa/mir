@@ -45,4 +45,3 @@ function bareFalsyLeavesNullable(?Box $box): void {
         $_ = 1;
     }
 }
-===expect===

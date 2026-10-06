@@ -18,4 +18,3 @@ $a = (new Foo());
 
 echo $a->foo;
 //   ^^^^^^^ MixedPropertyFetch: Property $foo fetched on mixed type
-===expect===

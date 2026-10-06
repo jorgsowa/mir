@@ -10,4 +10,3 @@ if (rand(0, 1)) {
     $b = "goodbye";
 }
 echo $a;
-===expect===

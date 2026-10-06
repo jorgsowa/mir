@@ -9,4 +9,3 @@ while (rand(0, 1)) {
 //  ^^ UnusedVariable: Variable $a is never read
     break;
 }
-===expect===

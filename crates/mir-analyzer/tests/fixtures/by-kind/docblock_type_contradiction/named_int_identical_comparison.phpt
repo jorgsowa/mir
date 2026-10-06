@@ -27,4 +27,3 @@ function test_nonneg_eq_minus_one(int $n): void {
     assert($n === -1);
 //         ^^^^^^^^^ DocblockTypeContradiction: Type 'non-negative-int' makes '$n === -1' impossible — this can never hold
 }
-===expect===

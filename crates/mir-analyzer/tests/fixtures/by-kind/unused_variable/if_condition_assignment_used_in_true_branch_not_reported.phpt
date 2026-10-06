@@ -22,4 +22,3 @@ function test(): void {
     }
     echo $req;
 }
-===expect===

@@ -14,5 +14,3 @@ class C {
 //                  ^ UnreachableCode: Unreachable code detected
     }
 }
-
-===expect===

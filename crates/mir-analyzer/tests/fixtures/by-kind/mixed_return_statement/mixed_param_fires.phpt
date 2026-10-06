@@ -9,4 +9,3 @@ function pass($x): int {
     return $x;
 //  ^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 }
-===expect===

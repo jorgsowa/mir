@@ -28,4 +28,3 @@ class Foo {
 
 $foo = new Foo();
 $foo->bar(Carbon::now());
-===expect===

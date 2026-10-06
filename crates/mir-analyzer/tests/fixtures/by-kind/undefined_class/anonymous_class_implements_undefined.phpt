@@ -11,4 +11,3 @@ UndefinedClass, matching a named class's `implements` check.
 <?php
 $x = new class implements UndefinedIface {};
 //                        ^^^^^^^^^^^^^^ UndefinedClass: Class UndefinedIface does not exist
-===expect===

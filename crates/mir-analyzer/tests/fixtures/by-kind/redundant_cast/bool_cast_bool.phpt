@@ -12,5 +12,3 @@ Redundant cast from bool to bool
 $x = true;
 $y = (bool)$x;
 //         ^^ RedundantCast: Casting 'true' to 'bool' is redundant
-
-===expect===

@@ -14,4 +14,3 @@ class Child extends Base implements Iface {
     protected function foo(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Child::foo() overrides with less visibility
 }
-===expect===

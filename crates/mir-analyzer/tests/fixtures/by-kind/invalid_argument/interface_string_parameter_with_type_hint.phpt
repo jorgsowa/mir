@@ -20,4 +20,3 @@ function describe(string $ifaceName) {
 }
 
 describe(Shape::class);
-===expect===

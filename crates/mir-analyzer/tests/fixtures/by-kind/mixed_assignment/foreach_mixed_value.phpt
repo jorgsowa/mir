@@ -8,4 +8,3 @@ foreach ($arr as $v) {
 //               ^^ MixedAssignment: Variable $v is assigned a mixed type
     echo $v;
 }
-===expect===

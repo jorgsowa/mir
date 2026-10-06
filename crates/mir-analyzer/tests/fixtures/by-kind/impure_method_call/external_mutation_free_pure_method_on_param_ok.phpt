@@ -19,4 +19,3 @@ class Reader {
         return $obj->getValue();
     }
 }
-===expect===

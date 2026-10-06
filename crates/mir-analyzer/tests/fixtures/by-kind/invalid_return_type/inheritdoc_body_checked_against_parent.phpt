@@ -21,4 +21,3 @@ class BadFactory extends AnimalFactory {
 //      ^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"not a cat"' is not compatible with declared 'Cat'
     }
 }
-===expect===

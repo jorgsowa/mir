@@ -10,4 +10,3 @@ PhpStormStubsElementAvailable: strrchr() third param available on PHP 8.3 — th
 ===file===
 <?php
 $x = strrchr("hello", "l", true);
-===expect===

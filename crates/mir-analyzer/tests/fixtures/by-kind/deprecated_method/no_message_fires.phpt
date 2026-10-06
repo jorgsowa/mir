@@ -17,4 +17,3 @@ function test(Foo $f): void {
     $f->oldMethod();
 //  ^^^^^^^^^^^^^^^ DeprecatedMethod: Method Foo::oldMethod() is deprecated
 }
-===expect===

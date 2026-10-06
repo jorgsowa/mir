@@ -14,4 +14,3 @@ class Foo {
     public function bar($x): void {}
 //                  ^^^ UndefinedDocblockClass: Docblock type 'UndefinedParamClass' does not exist
 }
-===expect===

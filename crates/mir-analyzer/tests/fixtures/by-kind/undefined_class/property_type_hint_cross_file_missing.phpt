@@ -12,4 +12,3 @@ class Bar {
     public Missing $prop;
 //         ^^^^^^^ UndefinedClass: Class Vendor\Lib\Missing does not exist
 }
-===expect===

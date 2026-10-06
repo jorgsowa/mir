@@ -23,4 +23,3 @@ function a_fn(): int {
 class Helper {
     public function name(): string { return 'h'; }
 }
-===expect===

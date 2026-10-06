@@ -19,4 +19,3 @@ class Sub extends Base {
     public function make(): string|Animal { return new Animal(); }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Sub::make() signature mismatch: return type 'string|Animal' is not a subtype of parent 'string|Cat'
 }
-===expect===

@@ -47,4 +47,3 @@ function multipleBranches(bool $flag): array
     }
     return $data;
 }
-===expect===

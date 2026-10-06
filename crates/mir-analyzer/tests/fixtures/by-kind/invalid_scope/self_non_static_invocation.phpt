@@ -10,4 +10,3 @@ class A {
 //      ^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method A::fooFoo() cannot be called statically
     }
 }
-===expect===

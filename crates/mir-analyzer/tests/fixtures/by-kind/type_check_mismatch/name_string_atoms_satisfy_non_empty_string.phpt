@@ -33,4 +33,3 @@ function enumString(string $e): void { requireNonEmpty($e); }
 
 /** @param trait-string $t */
 function traitString(string $t): void { requireNonEmpty($t); }
-===expect===

@@ -9,4 +9,3 @@ class InferredReturn {
     }
 }
 new InferredReturn();
-===expect===

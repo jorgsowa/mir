@@ -11,4 +11,3 @@ abstract class Loader {
 class Concrete extends Loader {
     public static function getType(): string { return "concrete"; }
 }
-===expect===

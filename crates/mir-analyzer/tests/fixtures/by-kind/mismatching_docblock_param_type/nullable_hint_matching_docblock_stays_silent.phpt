@@ -25,4 +25,3 @@ function viaUnion(?string $b): void {}
  * @param string $c
  */
 function nonNullableHint(string $c): void {}
-===expect===

@@ -38,4 +38,3 @@ class AnimalRenderer implements Renderer {
     /** @param Cat $shape */
     public function draw(Animal $shape): void {}
 }
-===expect===

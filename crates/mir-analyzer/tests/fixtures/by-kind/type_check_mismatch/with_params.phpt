@@ -7,4 +7,3 @@ function process(string $input, int $count): void {
     /** @mir-check $count is int */
     echo $input . $count;
 }
-===expect===

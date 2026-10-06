@@ -11,4 +11,3 @@ class Child extends Base {
     /** @inheritdoc */
     public function describe(): string { return 'child'; }
 }
-===expect===

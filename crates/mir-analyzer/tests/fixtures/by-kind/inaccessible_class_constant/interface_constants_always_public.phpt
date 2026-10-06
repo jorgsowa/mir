@@ -16,4 +16,3 @@ interface Limits {
 
 $max = Limits::MAX_ITEMS;
 $min = Limits::MIN_ITEMS;
-===expect===

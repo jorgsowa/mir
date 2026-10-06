@@ -15,4 +15,3 @@ function usesPrint(): void {
     print "side effect";
 //  ^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function print() in a @pure function
 }
-===expect===

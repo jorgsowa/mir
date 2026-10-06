@@ -19,4 +19,3 @@ function wrap(string $domain, int $options, ?array &$info = []) {
 function f(string $domain): void {
     wrap($domain, 0, $info);
 }
-===expect===

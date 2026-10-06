@@ -23,4 +23,3 @@ final class Widget extends WidgetMaker {
         return new self();
     }
 }
-===expect===

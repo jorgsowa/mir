@@ -15,4 +15,3 @@ class Request {
 $r = new Request();
 $r->only('email', 'password');
 $r->only('a', 'b', 'c', 'd');
-===expect===

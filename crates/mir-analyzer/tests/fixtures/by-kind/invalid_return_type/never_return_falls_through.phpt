@@ -27,4 +27,3 @@ class Foo {
         exit(1);
     }
 }
-===expect===

@@ -8,4 +8,3 @@ function dispatch(Notification $n): void {
     $n->broadcastOn();
 //  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
 }
-===expect===

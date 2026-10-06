@@ -11,4 +11,3 @@ function test(array $arr): void {
         $arr['item']->fooOnly();
     }
 }
-===expect===

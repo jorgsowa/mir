@@ -29,4 +29,3 @@ class CarbonImmutable extends Carbon {
         return clone $this;
     }
 }
-===expect===

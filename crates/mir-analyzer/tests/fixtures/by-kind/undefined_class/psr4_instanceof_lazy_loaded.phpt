@@ -13,4 +13,3 @@ namespace App;
 function check(mixed $val): bool {
     return $val instanceof Response;
 }
-===expect===

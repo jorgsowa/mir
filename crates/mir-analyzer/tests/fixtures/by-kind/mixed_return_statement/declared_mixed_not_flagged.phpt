@@ -5,4 +5,3 @@ When declared return type is mixed, MixedReturnStatement does NOT fire even when
 function decode(): mixed {
     return json_decode('{"key":"value"}');
 }
-===expect===

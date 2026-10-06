@@ -13,4 +13,3 @@ Variable in function call on RHS of assignment should be narrowed from !isset() 
 function doSomething($x): void { echo $x; }
 $result = !isset($x) || doSomething($x);
 // After fix: $x should be narrowed as defined in RHS
-===expect===

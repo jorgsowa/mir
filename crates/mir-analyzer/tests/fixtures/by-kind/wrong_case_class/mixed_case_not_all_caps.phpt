@@ -13,4 +13,3 @@ $c = new httpclient();
 //       ^^^^^^^^^^ WrongCaseClass: Class name 'httpclient' has incorrect casing; use 'HttpClient'
 $d = new HttpCLIENT();
 //       ^^^^^^^^^^ WrongCaseClass: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'
-===expect===

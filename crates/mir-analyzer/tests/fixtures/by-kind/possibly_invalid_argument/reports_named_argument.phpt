@@ -15,4 +15,3 @@ function test(): void {
     takesInt(n: getResult());
 //           ^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
 }
-===expect===

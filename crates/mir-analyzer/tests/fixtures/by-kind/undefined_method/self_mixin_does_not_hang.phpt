@@ -12,4 +12,3 @@ class A {
 function test(A $a): void {
     $a->foo();
 }
-===expect===

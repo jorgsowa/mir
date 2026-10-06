@@ -9,5 +9,3 @@ class Invalid {
     use ImposesImplementationRequirements;
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedTrait: Trait ImposesImplementationRequirements does not exist
 }
-
-===expect===

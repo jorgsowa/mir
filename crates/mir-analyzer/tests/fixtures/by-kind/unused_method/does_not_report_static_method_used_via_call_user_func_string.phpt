@@ -14,4 +14,3 @@ class Foo {
         call_user_func('Foo::helper');
     }
 }
-===expect===

@@ -23,4 +23,3 @@ final class Shapes {
         $x;
     }
 }
-===expect===

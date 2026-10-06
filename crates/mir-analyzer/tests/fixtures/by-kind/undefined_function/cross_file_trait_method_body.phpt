@@ -13,4 +13,3 @@ trait MyTrait {
 class MyClass {
     use MyTrait;
 }
-===expect===

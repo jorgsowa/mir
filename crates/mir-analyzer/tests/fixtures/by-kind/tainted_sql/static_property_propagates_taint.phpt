@@ -23,4 +23,3 @@ function run(mysqli $db): void {
     mysqli_query($db, Registry::$lastQuery);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
-===expect===

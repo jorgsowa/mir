@@ -18,4 +18,3 @@ function test(array $arr): string {
     }
     return '';
 }
-===expect===

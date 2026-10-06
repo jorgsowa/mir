@@ -42,4 +42,3 @@ function test_eq_true(bool $x): void {
         $_ = $x;
     }
 }
-===expect===

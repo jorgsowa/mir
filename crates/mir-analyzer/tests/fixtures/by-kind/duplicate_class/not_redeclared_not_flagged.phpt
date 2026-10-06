@@ -13,4 +13,3 @@ class Foo {
 }
 
 $obj = new Foo();
-===expect===

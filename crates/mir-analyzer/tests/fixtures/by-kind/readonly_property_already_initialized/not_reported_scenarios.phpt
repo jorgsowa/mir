@@ -39,4 +39,3 @@ class Box {
         $other->value = $v;
     }
 }
-===expect===

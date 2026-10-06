@@ -8,4 +8,3 @@ class Qux {
         $obj?->doSomething($ctx);
     }
 }
-===expect===

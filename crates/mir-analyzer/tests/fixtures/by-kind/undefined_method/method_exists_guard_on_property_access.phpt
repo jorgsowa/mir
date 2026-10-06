@@ -23,4 +23,3 @@ function send(Queue $q): void {
         $q->notification->via('mail');
     }
 }
-===expect===

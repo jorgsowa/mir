@@ -9,4 +9,3 @@ function test(): void {
     /** @phpstan-ignore undefinedClass */
     new NoSuchClass();
 }
-===expect===

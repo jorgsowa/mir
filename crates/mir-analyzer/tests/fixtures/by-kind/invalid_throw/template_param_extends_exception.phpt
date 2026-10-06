@@ -15,4 +15,3 @@ Throwing a @template T of Exception does not fire InvalidThrow
 function rethrow($e): never {
     throw $e;
 }
-===expect===

@@ -13,4 +13,3 @@ flagged undefined.
 <?php
 function f(NotARealMemcacheClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealMemcacheClass does not exist
-===expect===

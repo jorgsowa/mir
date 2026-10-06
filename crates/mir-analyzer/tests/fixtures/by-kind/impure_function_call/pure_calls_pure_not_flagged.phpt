@@ -11,5 +11,3 @@ function double(int $n): int {
 function quadruple(int $n): int {
     return double(double($n));
 }
-
-===expect===

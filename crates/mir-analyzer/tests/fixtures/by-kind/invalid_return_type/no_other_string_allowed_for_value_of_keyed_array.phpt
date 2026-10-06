@@ -9,5 +9,3 @@ function getValue() {
     return "adams";
 //  ^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"adams"' is not compatible with declared '"foo"|"bar"'
 }
-
-===expect===

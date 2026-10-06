@@ -32,4 +32,3 @@ $q = $c->q();
 /** @mir-check $q is NS\B<NS\C> */
 $first = $q->first();
 /** @mir-check $first is NS\C|null */
-===expect===

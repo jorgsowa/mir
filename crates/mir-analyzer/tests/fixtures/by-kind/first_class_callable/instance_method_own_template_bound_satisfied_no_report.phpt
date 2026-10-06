@@ -25,4 +25,3 @@ class Box {
 $box = new Box();
 $fn = $box->put(...);
 $fn(new Sub());
-===expect===

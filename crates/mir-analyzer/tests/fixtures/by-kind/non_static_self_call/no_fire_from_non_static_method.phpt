@@ -9,4 +9,3 @@ class Timer {
         self::tick();
     }
 }
-===expect===

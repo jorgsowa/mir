@@ -25,4 +25,3 @@ function takesType(Type $t) : void {
 //  ^^^^^^^^^ UndefinedMethod: Method Type::bar() does not exist
     $t->isFoo();
 }
-===expect===

@@ -12,4 +12,3 @@ function test($x): bool {
     return $x instanceof NoSuchClass;
 //                       ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
-===expect===

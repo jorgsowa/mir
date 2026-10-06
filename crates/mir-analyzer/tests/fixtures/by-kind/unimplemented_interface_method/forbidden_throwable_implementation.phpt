@@ -12,5 +12,3 @@ class C implements Throwable {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class C must implement Throwable::getPrevious() from interface
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class C must implement Throwable::__toString() from interface
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class C must implement Stringable::__toString() from interface
-
-===expect===

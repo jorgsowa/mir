@@ -14,4 +14,3 @@ enum Status: string implements \App\HasLabel {
     case Active = 'active';
     public function label(): string { return $this->value; }
 }
-===expect===

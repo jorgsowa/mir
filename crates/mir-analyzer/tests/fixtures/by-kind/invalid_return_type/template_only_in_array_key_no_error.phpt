@@ -25,4 +25,3 @@ function makeMap(): array
     $m = [];
     return $m;
 }
-===expect===

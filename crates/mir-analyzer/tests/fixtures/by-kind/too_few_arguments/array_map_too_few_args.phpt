@@ -10,4 +10,3 @@ function foo(int $i, string $s) : bool {
 
 array_map("foo", [1, 2, 3]);
 //        ^^^^^ TooFewArguments: Too few arguments for foo(): expected 2, got 1
-===expect===

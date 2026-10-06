@@ -28,4 +28,3 @@ function fromTraversable(Traversable $items): void {
         strtoupper($item);
     }
 }
-===expect===

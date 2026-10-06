@@ -14,4 +14,3 @@ function option(string $key): string|array|bool|null {
 }
 
 $value = (float) option('rate');
-===expect===

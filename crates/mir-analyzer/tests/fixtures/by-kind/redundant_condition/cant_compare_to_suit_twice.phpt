@@ -20,4 +20,3 @@ function foo(Suit $s): void {
         }
     }
 }
-===expect===

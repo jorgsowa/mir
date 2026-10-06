@@ -19,4 +19,3 @@ class DbConnection {
         $this->__construct($this->dsn, $this->user, $this->pass);
     }
 }
-===expect===

@@ -26,4 +26,3 @@ function test(): void {
     /** @mir-check $d is "hello" */
     $_ = $d;
 }
-===expect===

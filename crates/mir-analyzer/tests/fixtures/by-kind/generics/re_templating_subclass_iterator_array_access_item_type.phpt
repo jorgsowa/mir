@@ -74,4 +74,3 @@ function sumNamedBag(NamedBag $bag): int {
     }
     return $total;
 }
-===expect===

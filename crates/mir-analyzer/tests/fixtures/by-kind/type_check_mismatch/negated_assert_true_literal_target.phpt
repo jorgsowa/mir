@@ -21,4 +21,3 @@ function test(bool $b): void {
     /** @mir-check $b is false */
     echo "ok";
 }
-===expect===

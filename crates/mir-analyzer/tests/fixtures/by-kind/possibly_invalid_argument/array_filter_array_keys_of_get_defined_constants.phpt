@@ -19,4 +19,3 @@ function takesString(string $s): void
 {
     var_dump($s);
 }
-===expect===

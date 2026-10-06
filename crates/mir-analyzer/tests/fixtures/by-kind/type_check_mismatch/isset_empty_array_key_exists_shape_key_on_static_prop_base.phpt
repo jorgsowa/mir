@@ -57,4 +57,3 @@ class Config {
         return 'default';
     }
 }
-===expect===

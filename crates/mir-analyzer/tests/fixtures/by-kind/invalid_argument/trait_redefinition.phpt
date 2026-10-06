@@ -5,4 +5,3 @@ Trait redefinition
 trait Foo {}
 trait Foo {}
 //<^^^^^^^^^^^^ DuplicateTrait: Trait Foo has already been defined
-===expect===

@@ -51,4 +51,3 @@ class NoFixedTemplate extends PlainBox {
         return self::$staticValue;
     }
 }
-===expect===

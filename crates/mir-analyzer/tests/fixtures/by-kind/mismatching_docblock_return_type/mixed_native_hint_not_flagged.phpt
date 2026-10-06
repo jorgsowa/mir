@@ -8,4 +8,3 @@ function mixedHintStringDoc(): mixed { return 'x'; }
 
 /** @return int */
 function mixedHintIntDoc(): mixed { return 42; }
-===expect===

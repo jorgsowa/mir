@@ -21,4 +21,3 @@ function foo(): callable {
         return 1;
     };
 }
-===expect===

@@ -27,4 +27,3 @@ function iterateValue(iterable $value): void {
         $value->current();
     }
 }
-===expect===

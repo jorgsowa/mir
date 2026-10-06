@@ -25,4 +25,3 @@ function alias(int $n): int {
     $ref = $n;
     return $total;
 }
-===expect===

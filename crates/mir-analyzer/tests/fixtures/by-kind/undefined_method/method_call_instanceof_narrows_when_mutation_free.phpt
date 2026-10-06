@@ -29,4 +29,3 @@ function negated(X $x): void {
     /** @mir-check $r is Y */
         echo gettype($r);
 }
-===expect===

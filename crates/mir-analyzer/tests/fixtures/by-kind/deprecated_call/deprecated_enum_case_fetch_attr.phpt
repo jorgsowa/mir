@@ -11,5 +11,3 @@ enum Foo {
 
 Foo::B;
 //   ^ DeprecatedConstant: Constant Foo::B is deprecated
-
-===expect===

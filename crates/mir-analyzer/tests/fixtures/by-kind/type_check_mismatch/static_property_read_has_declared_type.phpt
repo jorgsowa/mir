@@ -40,4 +40,3 @@ class MimeType {
 function useCounter(): int {
     return Counter::$count;
 }
-===expect===

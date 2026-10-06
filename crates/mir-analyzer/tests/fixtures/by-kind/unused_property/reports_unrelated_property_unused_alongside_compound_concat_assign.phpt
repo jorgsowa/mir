@@ -16,4 +16,3 @@ class Foo {
         $this->log .= 'x';
     }
 }
-===expect===

@@ -37,4 +37,3 @@ function test_push_already_non_empty(array $arr, int $val): void {
     /** @mir-check $arr is non-empty-list<int> */
     $_ = $arr;
 }
-===expect===

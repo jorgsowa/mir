@@ -16,4 +16,3 @@ function describe(Money $m): void {
 //      ^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Money::missingMethod() does not exist
     }
 }
-===expect===

@@ -34,4 +34,3 @@ load()->getOrThrow(static function (Err $e): NotFound {
     /** @mir-check $e is Err::NotFound */
     return new NotFound();
 });
-===expect===

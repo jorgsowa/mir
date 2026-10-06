@@ -28,5 +28,3 @@ function readMultiple(Sealed $s): void {
     $s->role = "admin";
 //  ^^^^^^^^^^^^^^^^^^ NoInterfaceProperties: Property $role is not defined on this interface
 }
-
-===expect===

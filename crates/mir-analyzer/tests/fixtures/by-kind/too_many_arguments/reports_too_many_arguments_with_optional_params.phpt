@@ -7,4 +7,3 @@ function greet(string $name, string $suffix = ''): void {}
 //                           ^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $suffix is never used
 greet('Ada', 'Mrs.', 'extra');
 //                   ^^^^^^^ TooManyArguments: Too many arguments for greet(): expected 2, got 3
-===expect===

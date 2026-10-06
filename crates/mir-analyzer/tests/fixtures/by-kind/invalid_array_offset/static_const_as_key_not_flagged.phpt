@@ -19,4 +19,3 @@ class Registry {
         $this->data[static::KEY] = true;
     }
 }
-===expect===

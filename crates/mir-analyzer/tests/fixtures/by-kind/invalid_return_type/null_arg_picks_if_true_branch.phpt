@@ -25,4 +25,3 @@ function make(?string $cls = null): mixed { throw new \RuntimeException(); }
 $b = make(null);
 /** @mir-check $b is Box<object> */
 echo "ok";
-===expect===

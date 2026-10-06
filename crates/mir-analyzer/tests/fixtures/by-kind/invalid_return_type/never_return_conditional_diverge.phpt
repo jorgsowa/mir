@@ -33,4 +33,3 @@ function always_throws(bool $flag): never {
 function calls_never(bool $flag): never {
     always_throws($flag);
 }
-===expect===

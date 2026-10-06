@@ -26,4 +26,3 @@ function f(): void {
 //                     ^^ PossiblyNullArgument: Argument $object of get_class() might be null
     }
 }
-===expect===

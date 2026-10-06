@@ -13,4 +13,3 @@ class Lib {
     public function __construct($file = null) {}
 }
 new Lib(null);
-===expect===

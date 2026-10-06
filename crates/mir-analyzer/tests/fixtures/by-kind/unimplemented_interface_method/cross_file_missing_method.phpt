@@ -12,4 +12,3 @@ class Task implements Runnable {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Task must implement Runnable::stop() from interface
     public function run(): void {}
 }
-===expect===

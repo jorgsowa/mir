@@ -13,4 +13,3 @@ function useIt(object $x): void {
         echo $x->known;
     }
 }
-===expect===

@@ -22,4 +22,3 @@ function createService($serviceName) {
 // `class-string<AbstractService>` means the caller passes a concrete subclass,
 // so `new $serviceName()` is valid — AbstractInstantiation is not emitted here.
 createService(AbstractService::class);
-===expect===

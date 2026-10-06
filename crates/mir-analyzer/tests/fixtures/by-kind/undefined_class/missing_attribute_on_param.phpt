@@ -10,4 +10,3 @@ Missing attribute on param
 <?php
 function foo(#[Pure] string $str) : void {}
 //             ^^^^ UndefinedAttributeClass: Attribute class Pure does not exist
-===expect===

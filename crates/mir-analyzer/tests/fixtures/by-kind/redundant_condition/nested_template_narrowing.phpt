@@ -20,4 +20,3 @@ function nestedCheck(Base|Other $value): void {
         }
     }
 }
-===expect===

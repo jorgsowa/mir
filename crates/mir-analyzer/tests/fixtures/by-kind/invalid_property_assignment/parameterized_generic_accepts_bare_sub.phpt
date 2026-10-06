@@ -28,4 +28,3 @@ $intBox = $factory->makeInt();
 // Bare property accepts both parameterized values regardless of type param
 $c->box = $stringBox;
 $c->box = $intBox;
-===expect===

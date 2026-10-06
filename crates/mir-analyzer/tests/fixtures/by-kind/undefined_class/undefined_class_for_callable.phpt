@@ -14,4 +14,3 @@ class Foo {
 //                              ^^^^^^^^^^^^^^ UndefinedClass: Class UndefinedClass does not exist
 }
 new Foo(function() : void {});
-===expect===

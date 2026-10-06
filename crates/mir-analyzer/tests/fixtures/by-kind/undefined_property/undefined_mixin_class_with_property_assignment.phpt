@@ -7,4 +7,3 @@ Undefined mixin class with property assignment
 class A {}
 
 (new A)->foo = "bar";
-===expect===

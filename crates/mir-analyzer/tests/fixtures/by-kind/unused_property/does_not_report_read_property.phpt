@@ -13,4 +13,3 @@ class Foo {
         return $this->name;
     }
 }
-===expect===

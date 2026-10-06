@@ -9,4 +9,3 @@ class View {
 $this->title = 'About Us';
 /** @mir-check $this is View */
 echo $this->title;
-===expect===

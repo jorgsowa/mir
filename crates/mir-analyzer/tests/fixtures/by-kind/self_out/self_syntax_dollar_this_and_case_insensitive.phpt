@@ -49,4 +49,3 @@ function test(): void {
     /** @mir-check $other is Box<float> */
     $_ = 1;
 }
-===expect===

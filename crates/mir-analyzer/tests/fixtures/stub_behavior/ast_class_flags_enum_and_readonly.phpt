@@ -25,4 +25,3 @@ function values(): void {
     /** @mir-check $readonly is 65536 */
     /** @mir-check $final is 32 */
 }
-===expect===

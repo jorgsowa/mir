@@ -23,4 +23,3 @@ function f(array $items): void {
         echo $x;
     }
 }
-===expect===

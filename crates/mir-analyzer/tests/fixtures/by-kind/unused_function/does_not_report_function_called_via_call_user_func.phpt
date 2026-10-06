@@ -9,4 +9,3 @@ does not report function called via call user func
 function helper(): void {}
 
 call_user_func('helper');
-===expect===

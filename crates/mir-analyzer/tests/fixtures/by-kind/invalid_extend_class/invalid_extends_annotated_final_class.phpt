@@ -10,5 +10,3 @@ but @final alone must not emit InvalidExtendClass (it is an IDE hint, not a PHP 
 class DoctrineA {}
 
 class DoctrineB extends DoctrineA {}
-
-===expect===

@@ -12,4 +12,3 @@ enum Status: string implements Labelable {
     case Active = 'active';
     case Inactive = 'inactive';
 }
-===expect===

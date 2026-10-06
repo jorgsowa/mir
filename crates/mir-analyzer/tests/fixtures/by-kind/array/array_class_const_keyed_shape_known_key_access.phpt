@@ -11,4 +11,3 @@ final class C {
         return self::MAP['a'];
     }
 }
-===expect===

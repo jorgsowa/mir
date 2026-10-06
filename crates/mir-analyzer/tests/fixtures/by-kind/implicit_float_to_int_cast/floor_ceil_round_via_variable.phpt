@@ -12,5 +12,3 @@ $c = round(3.5);
 takes_int($a);
 takes_int($b);
 takes_int($c);
-
-===expect===

@@ -19,4 +19,3 @@ function process($obj): void {
     // T is a template param — must not fire MixedPropertyFetch
     $obj->name;
 }
-===expect===

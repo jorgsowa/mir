@@ -42,4 +42,3 @@ function callStatic(): void {
     }
     \MyStaticExtClass::doWork();
 }
-===expect===

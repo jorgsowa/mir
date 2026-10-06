@@ -13,4 +13,3 @@ function from_interface(\DateTimeInterface $dt): void {
 ===file:App.php===
 <?php
 from_interface(new DateTime());
-===expect===

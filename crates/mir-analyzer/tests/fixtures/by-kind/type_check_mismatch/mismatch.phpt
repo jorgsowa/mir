@@ -6,4 +6,3 @@ $x = 42;
 /** @mir-check $x is string */
 echo $x;
 //<^^^^^^^^ TypeCheckMismatch: Type of $x is expected to be string, got int
-===expect===

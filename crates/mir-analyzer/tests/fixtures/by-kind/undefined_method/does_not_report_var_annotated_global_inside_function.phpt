@@ -11,4 +11,3 @@ function test(): void {
     global $x;
     $x->bar();
 }
-===expect===

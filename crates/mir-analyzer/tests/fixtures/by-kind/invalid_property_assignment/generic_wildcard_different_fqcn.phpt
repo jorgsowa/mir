@@ -19,4 +19,3 @@ $c->a = $a;
 // This should error: GenericB value cannot assign to GenericA property
 $c->a = new GenericB();
 //<^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $a expects 'GenericA', cannot assign 'GenericB'
-===expect===

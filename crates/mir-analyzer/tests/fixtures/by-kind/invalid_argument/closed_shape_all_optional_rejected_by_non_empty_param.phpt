@@ -26,4 +26,3 @@ function test(array $allOptional, array $required, array $open): void {
     takesNonEmptyArray($required);
     takesNonEmptyArray($open);
 }
-===expect===

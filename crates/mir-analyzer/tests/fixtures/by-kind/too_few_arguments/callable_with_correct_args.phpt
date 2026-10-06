@@ -8,5 +8,3 @@ Callable with correct args
 function test(callable $fn): void {
     $fn('hello');
 }
-
-===expect===

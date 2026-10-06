@@ -35,4 +35,3 @@ class Collection {
         return new static(array_flip($this->items));
     }
 }
-===expect===

@@ -26,4 +26,3 @@ class TreeHolder {
         echo "ok";
     }
 }
-===expect===

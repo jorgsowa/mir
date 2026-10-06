@@ -12,5 +12,3 @@ class Base {
 }
 class Sub extends Base {}
 class Logger {}
-
-===expect===

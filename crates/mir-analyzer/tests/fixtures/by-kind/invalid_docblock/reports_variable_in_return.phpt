@@ -7,4 +7,3 @@ reports variable in return
 // ^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @return contains variable `$bar` in type position
  */
 function foo(): mixed { return null; }
-===expect===

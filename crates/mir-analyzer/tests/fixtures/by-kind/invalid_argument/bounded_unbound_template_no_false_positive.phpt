@@ -26,4 +26,3 @@ function app(): void {
     $r = new Repo(5);
     $r->add(new Other());
 }
-===expect===

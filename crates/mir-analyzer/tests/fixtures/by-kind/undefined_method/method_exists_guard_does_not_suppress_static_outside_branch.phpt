@@ -9,4 +9,3 @@ function dispatch(): void {
     Notification::broadcastOn();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
 }
-===expect===

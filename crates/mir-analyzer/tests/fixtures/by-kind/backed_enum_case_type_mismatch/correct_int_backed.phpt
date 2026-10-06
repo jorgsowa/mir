@@ -8,4 +8,3 @@ enum HttpStatus: int {
     case NotFound = 404;
     case Error = 500;
 }
-===expect===

@@ -30,4 +30,3 @@ function test_list(array $nums): void {
         $_ = $nums;
     }
 }
-===expect===

@@ -11,4 +11,3 @@ function test(Foo $foo, array $names): void {
         $foo->{$name}();
     }
 }
-===expect===

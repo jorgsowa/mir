@@ -14,4 +14,3 @@ function test(array $map, string $k): void {
     $v = $map[$k];
     if ($v === null) {}
 }
-===expect===

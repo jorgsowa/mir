@@ -20,4 +20,3 @@ function takesI(I $i): void
 {
     takesString($i);
 }
-===expect===

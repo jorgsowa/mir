@@ -35,4 +35,3 @@ function test(IntBox $box): void {
     /** @mir-check $x is int */
     echo "ok";
 }
-===expect===

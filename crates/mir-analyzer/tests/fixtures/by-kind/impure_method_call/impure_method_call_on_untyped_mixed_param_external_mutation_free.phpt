@@ -21,4 +21,3 @@ class Runner {
 //      ^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutate() in a pure or immutable context
     }
 }
-===expect===

@@ -13,4 +13,3 @@ function test(): string {
     $x ??= 'default';
     return $x;
 }
-===expect===

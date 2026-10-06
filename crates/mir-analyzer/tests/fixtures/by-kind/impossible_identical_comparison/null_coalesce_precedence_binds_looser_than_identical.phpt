@@ -16,4 +16,3 @@ function test(array $map, string $key): void {
     $ok = ($map[$key] ?? null) === 'foo';
     echo $bad, $ok;
 }
-===expect===

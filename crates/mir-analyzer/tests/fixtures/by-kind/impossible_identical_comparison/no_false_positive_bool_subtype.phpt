@@ -17,4 +17,3 @@ function test_bool(bool $b): void {
 function test_true(true $x): void {
     if ($x === true) {}
 }
-===expect===

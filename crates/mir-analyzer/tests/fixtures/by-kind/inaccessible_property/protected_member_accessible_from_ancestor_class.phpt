@@ -33,4 +33,3 @@ class Child extends Base {
     protected int $offset = 0;
     protected const SECRET = 'hidden';
 }
-===expect===

@@ -13,5 +13,3 @@ class C2 extends C {
     #[Override]
     public function __construct() {}
 }
-
-===expect===

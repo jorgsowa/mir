@@ -55,4 +55,3 @@ class ConfigTest {
         ]);
     }
 }
-===expect===

@@ -23,4 +23,3 @@ class MyError extends LogicException {}
 
 $err = new MyError();
 expectException($err::class);
-===expect===

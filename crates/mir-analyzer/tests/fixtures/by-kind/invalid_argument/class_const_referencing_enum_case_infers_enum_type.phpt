@@ -22,4 +22,3 @@ function f(): void {
     takesString(Card::DEFAULT);
 //              ^^^^^^^^^^^^^ InvalidArgument: Argument $s of takesString() expects 'string', got 'Suit'
 }
-===expect===

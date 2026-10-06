@@ -39,4 +39,3 @@ class DelegatesToParent extends Base {
         parent::__construct();
     }
 }
-===expect===

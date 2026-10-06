@@ -14,4 +14,3 @@ function foo(): void {
     /** @mir-check $x is string */
     $_ = 1;
 }
-===expect===

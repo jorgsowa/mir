@@ -14,4 +14,3 @@ function f(bool $c): void {
     /** @mir-check $z is string */
     echo $z;
 }
-===expect===

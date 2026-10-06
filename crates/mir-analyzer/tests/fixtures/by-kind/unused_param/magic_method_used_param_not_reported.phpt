@@ -18,4 +18,3 @@ class Cache {
         return isset($this->data[$name]);
     }
 }
-===expect===

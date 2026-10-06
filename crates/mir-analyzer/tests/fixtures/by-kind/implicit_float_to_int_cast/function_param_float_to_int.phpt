@@ -10,5 +10,3 @@ function foo(int $n): void {
 $x = 3.7;
 foo($x);
 //  ^^ ImplicitFloatToIntCast: Implicit cast from 3.7 to int truncates the fractional part
-
-===expect===

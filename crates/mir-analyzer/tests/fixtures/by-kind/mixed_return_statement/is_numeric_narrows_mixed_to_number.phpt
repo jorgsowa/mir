@@ -12,4 +12,3 @@ function f(mixed $x): int|float {
     }
     return 0;
 }
-===expect===

@@ -18,4 +18,3 @@ $fn = function(string &$out): void {
 $fn($result);
 /** @mir-check $result is string */
 $_ = $result;
-===expect===

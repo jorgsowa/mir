@@ -29,4 +29,3 @@ final class Box
         return $this->value;
       }
 }
-===expect===

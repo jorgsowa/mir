@@ -9,5 +9,3 @@ function test(callable $fn): void {
     $fn('hello', 'world');
 //               ^^^^^^^ TooManyArguments: Too many arguments for callable(): expected 1, got 2
 }
-
-===expect===

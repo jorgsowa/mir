@@ -28,4 +28,3 @@ $result = $factory->makePartial(null, 1);
 $factory->stringProp = $result;
 $factory->intProp = $result;
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $intProp expects 'int', cannot assign 'string'
-===expect===

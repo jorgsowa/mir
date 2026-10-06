@@ -15,4 +15,3 @@ class Box {
 }
 
 Box::factory()::build();
-===expect===

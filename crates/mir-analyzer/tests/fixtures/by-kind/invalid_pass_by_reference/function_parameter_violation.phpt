@@ -6,4 +6,3 @@ Function parameter violation
 function changeInt(int &$a) {
   $a = "hello";
 }
-===expect===

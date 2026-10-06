@@ -11,4 +11,3 @@ arithmetic and unary `~`.
 <?php
 $a = +"abc";
 //    ^^^^^ InvalidOperand: Operator '+' not supported for operand of type '"abc"'
-===expect===

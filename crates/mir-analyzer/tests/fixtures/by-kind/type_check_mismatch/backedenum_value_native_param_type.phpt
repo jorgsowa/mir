@@ -9,4 +9,3 @@ function backingValue(BackedEnum $e): int|string
 {
     return $e->value;
 }
-===expect===

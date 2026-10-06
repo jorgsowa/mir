@@ -19,4 +19,3 @@ class Child extends Base {
         $z = new parent();
     }
 }
-===expect===

@@ -33,4 +33,3 @@ function test(DogFactory $f): void {
     /** @mir-check $d is Dog */
     echo get_class($d);
 }
-===expect===

@@ -13,4 +13,3 @@ function foo(A $a) : void {
 //      ^^^^^^^ UndefinedVariable: Variable $object is not defined
     }
 }
-===expect===

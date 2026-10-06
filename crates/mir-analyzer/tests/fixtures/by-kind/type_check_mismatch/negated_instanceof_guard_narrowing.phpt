@@ -36,4 +36,3 @@ function test_object(object $subject): void {
     /** @mir-check $subject is Post */
     $_ = $subject;
 }
-===expect===

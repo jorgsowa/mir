@@ -22,4 +22,3 @@ function f(array $arr): void {
         echo 1;
     }
 }
-===expect===

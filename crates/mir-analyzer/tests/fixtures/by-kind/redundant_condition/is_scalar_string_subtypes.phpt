@@ -26,4 +26,3 @@ function test_positive_int(mixed $x): void {
     }
     // no RedundantCondition — array can bypass is_scalar
 }
-===expect===

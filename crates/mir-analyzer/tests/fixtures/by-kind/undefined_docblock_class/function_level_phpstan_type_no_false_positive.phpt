@@ -20,4 +20,3 @@ function sumCoords(array $p): int {
 }
 
 sumCoords(['x' => 1, 'y' => 2]);
-===expect===

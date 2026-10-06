@@ -19,4 +19,3 @@ function make(): Box {
     $b = new Box();
     return $b;
 }
-===expect===

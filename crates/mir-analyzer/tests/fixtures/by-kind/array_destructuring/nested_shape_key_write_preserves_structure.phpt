@@ -28,4 +28,3 @@ function three_levels(array $arr, int $n): void {
     /** @mir-check $arr is array{a: array{b: array{c: int}}} */
     echo 1;
 }
-===expect===

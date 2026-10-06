@@ -22,4 +22,3 @@ function test(string $className): void {
         needsShapeIface($className);
     }
 }
-===expect===

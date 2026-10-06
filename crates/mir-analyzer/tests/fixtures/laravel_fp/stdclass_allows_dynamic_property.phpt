@@ -20,4 +20,3 @@ longer emits UndefinedProperty.
 function rulesOf(\stdClass $compiled): mixed {
     return $compiled->rules;
 }
-===expect===

@@ -55,4 +55,3 @@ class CovariantImpl extends CovariantBase {
     /** @return SubCovariantBox<Cat> */
     public function make(): SubCovariantBox { return new SubCovariantBox(); }
 }
-===expect===

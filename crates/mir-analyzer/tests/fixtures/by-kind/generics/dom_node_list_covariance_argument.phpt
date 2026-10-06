@@ -24,4 +24,3 @@ snapshot($element->getElementsByTagName('item'));
 /** @var NodeSnapshot<DOMNode> $allNodes */
 $allNodes = new NodeSnapshot();
 $allNodes->capture($document->getElementsByTagName('item'));
-===expect===

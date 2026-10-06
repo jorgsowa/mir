@@ -37,4 +37,3 @@ class Box {
 $box = Box::make(42);
 /** @mir-check $box is Box<int> */
 echo "ok";
-===expect===

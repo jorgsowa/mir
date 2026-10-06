@@ -12,4 +12,3 @@ interface I {
     public function b(): NoSuchClass;
 //                       ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
-===expect===

@@ -11,4 +11,3 @@ function addCumulative(int $left) : int {
     $i += $left;
     return $left;
 }
-===expect===

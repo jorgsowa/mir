@@ -52,4 +52,3 @@ function check(Store $s, Key $any): void {
     /** @mir-check $s->flag(false) is string */
     $s->flag(false);
 }
-===expect===

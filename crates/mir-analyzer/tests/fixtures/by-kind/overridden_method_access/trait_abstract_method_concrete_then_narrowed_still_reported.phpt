@@ -23,4 +23,3 @@ class Child extends Base {
     protected function foo(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Child::foo() overrides with less visibility
 }
-===expect===

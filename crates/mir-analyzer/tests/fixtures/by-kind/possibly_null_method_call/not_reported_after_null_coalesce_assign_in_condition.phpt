@@ -12,4 +12,3 @@ function a(Foo|null $s): void {
     if (!($s ??= f())) { exit; }
     $s->bar();
 }
-===expect===

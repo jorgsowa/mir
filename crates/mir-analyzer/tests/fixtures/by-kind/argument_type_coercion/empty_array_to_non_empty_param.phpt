@@ -25,4 +25,3 @@ function run(): void {
     takes_non_empty_list([1]);
     takes_maybe_empty([]);
 }
-===expect===

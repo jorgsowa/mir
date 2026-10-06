@@ -25,5 +25,3 @@ function make(): Foo {
 
 make()->touch();
 (new Foo())->self()->touch();
-
-===expect===

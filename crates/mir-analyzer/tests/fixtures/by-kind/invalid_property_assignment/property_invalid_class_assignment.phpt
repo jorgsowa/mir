@@ -31,4 +31,3 @@ class A {
 $a = new A();
 $a->foo = new SomeOtherPropertyType();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'Bar\PropertyType', cannot assign 'Bar\SomeOtherPropertyType'
-===expect===

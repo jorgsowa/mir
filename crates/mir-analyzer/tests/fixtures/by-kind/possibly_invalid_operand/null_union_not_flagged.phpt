@@ -5,4 +5,3 @@ PossiblyInvalidOperand does NOT fire for nullable int; PHP coerces null to 0 in 
 function add(?int $x, int $y): int {
     return $x + $y;
 }
-===expect===

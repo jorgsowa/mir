@@ -26,4 +26,3 @@ class C extends B {
         }
     }
 }
-===expect===

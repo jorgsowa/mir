@@ -6,4 +6,3 @@ class User {
     public ?string $nickname = null;
     protected ?int $parentId = null;
 }
-===expect===

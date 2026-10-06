@@ -16,4 +16,3 @@ function render(Printable $p): void { $p->print(); }
 function test(): void {
     render(new Doc());
 }
-===expect===

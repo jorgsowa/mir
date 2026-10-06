@@ -16,4 +16,3 @@ trait HasTimestamps {
 trait ComposesTimestamps {
     use HasTimestamps;
 }
-===expect===

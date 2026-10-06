@@ -28,4 +28,3 @@ $result = $f->process(null);
 $f->stringProp = $result;
 $f->intProp = $result;
 //<^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $intProp expects 'int', cannot assign 'string'
-===expect===

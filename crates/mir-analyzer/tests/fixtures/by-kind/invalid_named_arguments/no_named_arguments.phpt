@@ -11,4 +11,3 @@ function sum(int ...$values): int {
 
 sum(a: 1);
 //  ^^^^ InvalidNamedArguments: sum() does not accept named arguments
-===expect===

@@ -30,4 +30,3 @@ function test($v): void {
     /** @mir-check $v is int */
     echo "ok";
 }
-===expect===

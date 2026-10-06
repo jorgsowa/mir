@@ -14,4 +14,3 @@ while ($i < 3) {
 }
 // After loop, $result should be string|int|null, not mixed
 echo $result;
-===expect===

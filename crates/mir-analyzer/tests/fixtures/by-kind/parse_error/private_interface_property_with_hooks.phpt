@@ -5,4 +5,3 @@ Private interface property with hooks
 interface A {
     private string $value { get; }
 }
-===expect===

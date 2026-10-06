@@ -26,4 +26,3 @@ function takesInt(int $n): void
 {
     var_dump($n);
 }
-===expect===

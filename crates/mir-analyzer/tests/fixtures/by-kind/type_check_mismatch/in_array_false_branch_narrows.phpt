@@ -25,4 +25,3 @@ function test_false_branch_int(int $code): void {
         $_ = $code;
     }
 }
-===expect===

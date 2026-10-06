@@ -17,4 +17,3 @@ class Foo {
 }
 
 run(array(Foo::class, "hello"));
-===expect===

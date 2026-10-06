@@ -15,5 +15,3 @@ interface Unsealed {
 function getName(Unsealed $u): string {
     return $u->name;
 }
-
-===expect===

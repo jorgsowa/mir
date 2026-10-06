@@ -25,4 +25,3 @@ class Sub extends Foo {}
 function process($x): void {}
 
 process(new Sub());
-===expect===

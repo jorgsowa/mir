@@ -9,4 +9,3 @@ does not report public method
 class Foo {
     public function publicMethod(): void {}
 }
-===expect===

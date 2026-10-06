@@ -24,4 +24,3 @@ set_flags(0);
 set_flags(1);
 set_flags(8);    // not a real combination, but int-mask-of falls back to int
 set_flags(999);  // any int is accepted
-===expect===

@@ -16,4 +16,3 @@ interface Foo {
 class Bar implements Foo {
     public function __construct(bool $foo) {}
 }
-===expect===

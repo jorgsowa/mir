@@ -7,4 +7,3 @@ class Foo {}
 
 namespace B;
 class Foo {}
-===expect===

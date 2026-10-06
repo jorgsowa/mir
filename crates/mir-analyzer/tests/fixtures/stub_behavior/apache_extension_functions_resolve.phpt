@@ -55,4 +55,3 @@ function writeEnv(string $name, string $value): true {
 function includeSubrequest(string $path): bool {
     return virtual($path);
 }
-===expect===

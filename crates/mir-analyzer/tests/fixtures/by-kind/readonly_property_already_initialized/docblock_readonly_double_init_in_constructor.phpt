@@ -22,4 +22,3 @@ class Point {
 //      ^^^^^^^^^^^^^^^^^ ReadonlyPropertyAlreadyInitialized: Cannot modify readonly property Point::$x — already initialized
     }
 }
-===expect===

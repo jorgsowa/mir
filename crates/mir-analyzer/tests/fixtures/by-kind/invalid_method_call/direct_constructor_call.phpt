@@ -8,5 +8,3 @@ class A {
 $a = new A;
 $a->__construct();
 //<^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
-
-===expect===

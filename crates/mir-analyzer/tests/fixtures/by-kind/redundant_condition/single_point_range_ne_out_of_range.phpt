@@ -25,4 +25,3 @@ function test_eq_out_of_range(int $n): void {
         $_ = $n; // never reached
     }
 }
-===expect===

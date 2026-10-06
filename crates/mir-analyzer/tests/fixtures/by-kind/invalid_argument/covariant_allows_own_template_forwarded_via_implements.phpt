@@ -44,4 +44,3 @@ function test(): void {
     needsDogs($animals);
 //            ^^^^^^^^ InvalidArgument: Argument $c of needsDogs() expects 'Collection<Dog>', got 'TypedList<Animal>'
 }
-===expect===

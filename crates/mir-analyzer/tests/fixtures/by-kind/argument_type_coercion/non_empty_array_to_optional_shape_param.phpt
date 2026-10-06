@@ -52,4 +52,3 @@ function nested(array $rows): void {
         optionalShape($row);
     }
 }
-===expect===

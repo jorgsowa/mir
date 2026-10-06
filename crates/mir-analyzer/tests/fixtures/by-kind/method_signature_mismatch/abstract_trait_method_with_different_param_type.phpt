@@ -23,4 +23,3 @@ class C {
     public function foo(B $a) : void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method C::foo() signature mismatch: parameter $a type 'B' is incompatible with parent type 'A'
 }
-===expect===

@@ -13,4 +13,3 @@ function tick(): void {
     Frozen::$hits++;
 //  ^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Frozen::$hits outside of constructor
 }
-===expect===

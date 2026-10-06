@@ -17,4 +17,3 @@ class Handler {
 //                         ^^^^^^^^^^^^ UndefinedClass: Class Other\Thing does not exist
     }
 }
-===expect===

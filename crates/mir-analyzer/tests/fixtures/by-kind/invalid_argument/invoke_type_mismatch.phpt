@@ -15,4 +15,3 @@ class A {
 $q = new A;
 $q(1);
 // ^ ArgumentTypeCoercion: Argument $p of A::__invoke() expects 'string', got '1' — coercion may fail at runtime
-===expect===

@@ -18,4 +18,3 @@ function resolveKey(string $key) {
 }
 
 resolveKey('database.connection');
-===expect===

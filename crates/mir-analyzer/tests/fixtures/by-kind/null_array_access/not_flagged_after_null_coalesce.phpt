@@ -7,4 +7,3 @@ function test(?array $arr): void {
     $arr = $arr ?? [];
     echo $arr[0];
 }
-===expect===

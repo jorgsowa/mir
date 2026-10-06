@@ -23,4 +23,3 @@ interface GetterSetter {
 function getBar(GetterSetter $o) : string {
     return $o->bar;
 }
-===expect===

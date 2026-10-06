@@ -27,4 +27,3 @@ $sub->accept(new Sub());
 
 $base = new Base();
 $base->accept(new Base());
-===expect===

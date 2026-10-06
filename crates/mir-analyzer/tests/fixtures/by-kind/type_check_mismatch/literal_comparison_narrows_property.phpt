@@ -70,4 +70,3 @@ function narrowsStringLiteralSymmetric(Holder $h): void {
         $_ = $x;
     }
 }
-===expect===

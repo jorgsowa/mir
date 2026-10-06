@@ -23,4 +23,3 @@ function executeCallback($callback) {
 
 executeCallback([Handler::class, "nonExistentMethod"]);
 //              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Handler::nonExistentMethod() does not exist
-===expect===

@@ -21,4 +21,3 @@ function rejectsEmptyBranch(array $counts): int {
 
     return $counts['total'];
 }
-===expect===

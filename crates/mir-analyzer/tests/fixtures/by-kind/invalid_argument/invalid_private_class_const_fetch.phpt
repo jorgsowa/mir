@@ -9,4 +9,3 @@ class A
 
 echo A::IS_PRIVATE;
 //      ^^^^^^^^^^ InaccessibleClassConstant: Cannot access constant A::IS_PRIVATE
-===expect===

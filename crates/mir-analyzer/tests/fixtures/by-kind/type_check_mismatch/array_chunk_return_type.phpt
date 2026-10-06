@@ -23,4 +23,3 @@ function test_chunk_non_empty_source(array $arr): void {
     /** @mir-check $chunks is non-empty-list<list<int>> */
     $_ = $chunks;
 }
-===expect===

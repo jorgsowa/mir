@@ -44,4 +44,3 @@ class MyTest {
         $this->prophecy = $prophecy;
     }
 }
-===expect===

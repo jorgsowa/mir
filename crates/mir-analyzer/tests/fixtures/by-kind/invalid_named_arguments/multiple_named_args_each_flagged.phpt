@@ -17,4 +17,3 @@ create(name: "test", count: 5, active: true);
 //     ^^^^^^^^^^^^ InvalidNamedArguments: create() does not accept named arguments
 //                   ^^^^^^^^ InvalidNamedArguments: create() does not accept named arguments
 //                             ^^^^^^^^^^^^ InvalidNamedArguments: create() does not accept named arguments
-===expect===

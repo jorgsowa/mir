@@ -9,5 +9,3 @@ interface I {
 interface I2 extends I {
     public function f(): void;
 }
-
-===expect===

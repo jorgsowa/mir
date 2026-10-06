@@ -9,4 +9,3 @@ class Config {
         return $other::SECRET;
     }
 }
-===expect===

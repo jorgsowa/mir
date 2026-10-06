@@ -11,4 +11,3 @@ final class Foo {}
 
 if (!class_exists('Foo')) {
 }
-===expect===

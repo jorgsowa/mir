@@ -26,4 +26,3 @@ function needsString(string $s): void {}
 
 needsString(identity(5));
 //          ^^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of needsString() expects 'string', got '5' — coercion may fail at runtime
-===expect===

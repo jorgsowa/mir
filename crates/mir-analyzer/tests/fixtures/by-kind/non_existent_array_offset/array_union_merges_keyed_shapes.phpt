@@ -56,4 +56,3 @@ function stillReportsMissingKey(): int {
 //  ^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 //            ^^^^^^^^ NonExistentArrayOffset: Array offset 'un_zzz' does not exist
 }
-===expect===

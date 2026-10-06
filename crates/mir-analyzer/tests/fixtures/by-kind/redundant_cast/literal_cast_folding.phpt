@@ -47,4 +47,3 @@ function test(): void {
     /** @mir-check $i is true */
     $_ = $i;
 }
-===expect===

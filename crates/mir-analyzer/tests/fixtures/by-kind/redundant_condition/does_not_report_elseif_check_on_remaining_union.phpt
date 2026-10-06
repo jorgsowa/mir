@@ -13,4 +13,3 @@ function foo(string|int|null $x): void {
         // $x could still be int here; is_string() is not redundant
     }
 }
-===expect===

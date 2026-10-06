@@ -11,4 +11,3 @@ function foo(string $foo): string {
         "foo" => "foo",
     };
 }
-===expect===

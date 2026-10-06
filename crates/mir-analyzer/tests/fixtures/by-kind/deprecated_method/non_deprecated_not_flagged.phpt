@@ -7,4 +7,3 @@ class Foo {
 }
 
 Foo::current();
-===expect===

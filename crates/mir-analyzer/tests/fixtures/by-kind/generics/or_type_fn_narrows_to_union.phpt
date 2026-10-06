@@ -19,4 +19,3 @@ function bar($x): void {
         $_ = 1;
     }
 }
-===expect===

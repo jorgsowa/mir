@@ -20,4 +20,3 @@ class Query {
 
 new Query((string) $_GET["q"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
-===expect===

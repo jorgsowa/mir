@@ -19,4 +19,3 @@ trait ComposesTimestamps {
 class Post extends Model {
     use ComposesTimestamps;
 }
-===expect===

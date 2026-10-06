@@ -13,4 +13,3 @@ function boot(): void {
         echo \Config::VERSION;
     }
 }
-===expect===

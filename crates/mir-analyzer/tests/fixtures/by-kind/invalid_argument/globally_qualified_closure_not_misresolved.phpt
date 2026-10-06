@@ -18,4 +18,3 @@ namespace Foo\Bar;
 function acceptsClosure(\Closure $callback): void {}
 
 acceptsClosure(function() {});
-===expect===

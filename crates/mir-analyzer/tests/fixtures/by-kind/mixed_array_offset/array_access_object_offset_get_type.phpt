@@ -54,4 +54,3 @@ function readTyped(TypedList $list): int {
 function weakMapObjectOffset(WeakMap $map, object $key): bool {
     return isset($map[$key]);
 }
-===expect===

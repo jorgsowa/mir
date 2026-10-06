@@ -14,4 +14,3 @@ $foo = new class {
 //          ^ UndefinedClass: Class B does not exist
     }
 };
-===expect===

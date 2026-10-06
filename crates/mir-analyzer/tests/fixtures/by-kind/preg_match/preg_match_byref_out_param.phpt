@@ -14,4 +14,3 @@ function run(string $s): void {
         echo $m[1];
     }
 }
-===expect===

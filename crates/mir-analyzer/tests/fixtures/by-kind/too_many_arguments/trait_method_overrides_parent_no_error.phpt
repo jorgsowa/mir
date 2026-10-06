@@ -23,4 +23,3 @@ class Concrete extends Base {
 $c = new Concrete();
 // Three args are valid per the trait signature — must not raise TooManyArguments.
 $c->process('hello', 42, true);
-===expect===

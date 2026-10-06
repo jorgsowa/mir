@@ -11,4 +11,3 @@ function label(Direction $d): string {
         Direction::South => "south",
     };
 }
-===expect===

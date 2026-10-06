@@ -35,4 +35,3 @@ function doesNotNarrowOutsideBranch(?Foo $obj): void {
     $obj->ping();
 //  ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
 }
-===expect===

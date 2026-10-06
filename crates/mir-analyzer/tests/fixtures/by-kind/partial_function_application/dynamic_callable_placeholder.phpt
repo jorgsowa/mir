@@ -17,4 +17,3 @@ $fn = function (int $a, int $b): int {
 };
 $partial = $fn(?, 5);
 //             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
-===expect===

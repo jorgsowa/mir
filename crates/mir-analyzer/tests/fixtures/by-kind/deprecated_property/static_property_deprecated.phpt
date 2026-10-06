@@ -9,4 +9,3 @@ class App {
 
 echo App::$old;
 //        ^^^^ DeprecatedProperty: Property App::$old is deprecated: use $instance instead
-===expect===

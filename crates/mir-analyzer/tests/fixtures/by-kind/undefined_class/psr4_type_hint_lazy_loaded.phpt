@@ -17,4 +17,3 @@ class Handler {
         return $r->path();
     }
 }
-===expect===

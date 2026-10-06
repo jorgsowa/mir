@@ -6,5 +6,3 @@ MixedFunctionCall fires when a variable typed as callable (not mixed) is called
 /** @var callable $fn */
 $fn = static function(): void {};
 $fn();
-
-===expect===

@@ -13,4 +13,3 @@ function test(string $s): void {
     if ($s === null) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'null' is always false — these types can never be identical
 }
-===expect===

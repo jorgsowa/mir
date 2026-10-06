@@ -20,4 +20,3 @@ function make(): void {
     $g = new RequestGuard();
     /** @mir-check $g is Illuminate\Auth\RequestGuard */
 }
-===expect===

@@ -86,4 +86,3 @@ function take(Outcome $o): void {}
 function passArg(): void {
     take(Outcome::failure(Level::Low));
 }
-===expect===

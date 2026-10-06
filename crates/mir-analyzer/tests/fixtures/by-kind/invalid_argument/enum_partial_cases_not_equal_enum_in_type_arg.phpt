@@ -34,4 +34,3 @@ function check(): void {
     takePartial($enum);
 //              ^^^^^ InvalidArgument: Argument $b of takePartial() expects 'Box<Suit::A|Suit::B>', got 'Box<Suit>'
 }
-===expect===

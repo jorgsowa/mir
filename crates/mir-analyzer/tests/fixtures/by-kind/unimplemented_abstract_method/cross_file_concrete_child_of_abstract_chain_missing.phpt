@@ -14,4 +14,3 @@ class Triangle extends Polygon {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Triangle must implement abstract method area()
     # area() NOT implemented despite being required
 }
-===expect===

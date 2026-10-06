@@ -12,4 +12,3 @@ known aliased class not reported
 class Bar {}
 use Bar as Baz;
 function f(Baz $x): void {}
-===expect===

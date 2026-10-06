@@ -12,4 +12,3 @@ new with mixed variable is not InvalidStringClass — mixed is already imprecise
 function test(mixed $value) {
     new $value();
 }
-===expect===

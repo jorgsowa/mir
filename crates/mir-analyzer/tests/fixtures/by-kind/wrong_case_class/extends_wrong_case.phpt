@@ -5,4 +5,3 @@ Wrong case parent class name in extends is reported.
 class Base {}
 class Child extends base {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'base' has incorrect casing; use 'Base'
-===expect===

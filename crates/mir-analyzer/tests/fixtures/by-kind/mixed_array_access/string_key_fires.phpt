@@ -6,4 +6,3 @@ MixedArrayAccess fires when using a string key on a mixed-typed variable.
 $a = [];
 echo $a['key'];
 //   ^^^^^^^^^ MixedArrayAccess: Array access on mixed type
-===expect===

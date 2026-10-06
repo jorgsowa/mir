@@ -24,4 +24,3 @@ class Bar {
         return self::$name;
     }
 }
-===expect===

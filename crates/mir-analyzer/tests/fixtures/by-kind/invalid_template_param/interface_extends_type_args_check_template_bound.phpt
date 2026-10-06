@@ -28,4 +28,3 @@ interface OkChild extends Container {}
 /** @template-extends Container<NotBase> */
 interface BadChild extends Container {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
-===expect===

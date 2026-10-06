@@ -16,4 +16,3 @@ switch(foo()) {
     default:
         echo "bar";
 }
-===expect===

@@ -19,4 +19,3 @@ function test(object $fn): void {
     $args = [1, 2, 3];
     $fn(...$args);
 }
-===expect===

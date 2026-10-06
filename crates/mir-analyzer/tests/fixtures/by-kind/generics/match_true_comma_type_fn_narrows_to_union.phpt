@@ -24,4 +24,3 @@ function bar($x): void {
         default => null,
     };
 }
-===expect===

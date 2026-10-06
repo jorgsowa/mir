@@ -25,4 +25,3 @@ class HasToString {
     public function __toString(): string { return 'x'; }
 }
 process(new HasToString());
-===expect===

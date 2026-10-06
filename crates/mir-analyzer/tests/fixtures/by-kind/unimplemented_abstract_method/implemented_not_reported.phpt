@@ -8,4 +8,3 @@ abstract class Base {
 class Complete extends Base {
     public function doWork(): void {}
 }
-===expect===

@@ -27,4 +27,3 @@ class WidgetTest {
         $this->service->reveal();
     }
 }
-===expect===

@@ -32,4 +32,3 @@ class D extends C {
     /** @var int */
     public int $count = 1;
 }
-===expect===

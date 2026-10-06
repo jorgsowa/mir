@@ -16,4 +16,3 @@ function test(): void {
 //  ^^^^^^^^^^^^^^^^ PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array|false'
     var_dump($a, $b);
 }
-===expect===

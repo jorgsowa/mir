@@ -12,4 +12,3 @@ namespace {
     foo();
 //  ^^^^^ UndefinedFunction: Function foo() is not defined
 }
-===expect===

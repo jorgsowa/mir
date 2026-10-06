@@ -13,4 +13,3 @@ undefined.
 <?php
 function f(NotARealAMQPClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealAMQPClass does not exist
-===expect===

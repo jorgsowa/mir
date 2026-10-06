@@ -28,4 +28,3 @@ $b->build();
 $b->paint();
 $b->missing();
 //<^^^^^^^^^^^^^ UndefinedMethod: Method Widget::missing() does not exist
-===expect===

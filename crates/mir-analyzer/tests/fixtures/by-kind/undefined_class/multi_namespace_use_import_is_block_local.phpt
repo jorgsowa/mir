@@ -15,4 +15,3 @@ namespace Two {
 //          ^^^^ UndefinedClass: Class Two\Tool does not exist
     }
 }
-===expect===

@@ -24,4 +24,3 @@ takeList(intKeyedRows());
 //       ^^^^^^^^^^^^^^ InvalidArgument: Argument $rows of takeList() expects 'list<array{'id': int}>', got 'list<array<int, int>>'
 takeList([1]);
 //       ^^^ InvalidArgument: Argument $rows of takeList() expects 'list<array{'id': int}>', got 'array{0: 1}'
-===expect===

@@ -31,4 +31,3 @@ class Plain {
     /** @mir-check $e is Err */
     return new NotFound();
 });
-===expect===

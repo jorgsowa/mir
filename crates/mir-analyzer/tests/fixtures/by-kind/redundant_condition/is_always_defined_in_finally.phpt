@@ -30,4 +30,3 @@ function doTry() : void {
         }
     }
 }
-===expect===

@@ -18,4 +18,3 @@ function run($a): void {
     $a->mutate();
 //  ^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutate() in a pure or immutable context
 }
-===expect===

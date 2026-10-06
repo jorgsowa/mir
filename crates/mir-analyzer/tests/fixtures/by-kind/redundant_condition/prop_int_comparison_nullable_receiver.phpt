@@ -36,4 +36,3 @@ function lessThanOnNonNullableReceiverDiverges(Holder $h): void {
         echo "unreachable";
     }
 }
-===expect===

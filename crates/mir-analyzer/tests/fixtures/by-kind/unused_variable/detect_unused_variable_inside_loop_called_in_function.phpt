@@ -12,4 +12,3 @@ function bar() : void {
 //      ^^ UnusedForeachValue: Foreach value $i is never read
     }
 }
-===expect===

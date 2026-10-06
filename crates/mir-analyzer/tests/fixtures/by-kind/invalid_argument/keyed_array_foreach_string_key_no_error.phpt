@@ -20,4 +20,3 @@ function foo(): void {
         takes_string($k);
     }
 }
-===expect===

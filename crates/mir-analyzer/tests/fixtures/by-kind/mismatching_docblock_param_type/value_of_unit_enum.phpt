@@ -11,4 +11,3 @@ Value of unit enum
     /** @param value-of<Foo> $arg */
     function foobar(string $arg): void {}
 //                  ^^^^^^^^^^^ UnusedParam: Parameter $arg is never used
-===expect===

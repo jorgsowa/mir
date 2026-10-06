@@ -22,4 +22,3 @@ $stdin = fopen('php://stdin', 'r');
 if ($stdin !== false) {
     $isTty = isTerminalStream($stdin);
 }
-===expect===

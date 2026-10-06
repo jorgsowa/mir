@@ -9,4 +9,3 @@ function greet(string $name): void {
 function test(): void {
     greet('Alice');
 }
-===expect===

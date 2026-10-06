@@ -24,4 +24,3 @@ final class D extends C {
         return 1;
     }
 }
-===expect===

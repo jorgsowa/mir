@@ -19,4 +19,3 @@ class ChildClass extends ParentClass
     /** @var string */
     protected $mightExist = "";
 }
-===expect===

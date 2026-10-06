@@ -25,4 +25,3 @@ function isValidId(int $id): bool {
 <?php
 $max = getMaxId();
 $ok = isValidId(99);
-===expect===

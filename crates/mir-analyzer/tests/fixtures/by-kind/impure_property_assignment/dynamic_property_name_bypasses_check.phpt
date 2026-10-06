@@ -20,4 +20,3 @@ function mutate(Bag $b, string $prop): void {
     $b->$prop = 5;
 //  ^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property $prop of a parameter in a pure or external-mutation-free context
 }
-===expect===

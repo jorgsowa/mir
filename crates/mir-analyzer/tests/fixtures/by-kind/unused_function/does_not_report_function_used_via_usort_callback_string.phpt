@@ -10,4 +10,3 @@ function my_cmp(int $a, int $b): int { return $a <=> $b; }
 
 $items = [3, 1, 2];
 usort($items, 'my_cmp');
-===expect===

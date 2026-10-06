@@ -22,4 +22,3 @@ $x = null;
 fill($x);
 /** @mir-check $x is string */
 $_ = $x;
-===expect===

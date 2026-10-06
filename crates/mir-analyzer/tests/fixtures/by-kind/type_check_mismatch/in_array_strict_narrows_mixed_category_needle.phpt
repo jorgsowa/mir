@@ -18,4 +18,3 @@ function test(int|string $x): void {
         $_ = $x;
     }
 }
-===expect===

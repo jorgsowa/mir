@@ -18,4 +18,3 @@ class StringHelper {
 $fn = StringHelper::pad(...);
 /** @mir-check $fn is Closure(string, int, string): string */
 $_ = $fn;
-===expect===

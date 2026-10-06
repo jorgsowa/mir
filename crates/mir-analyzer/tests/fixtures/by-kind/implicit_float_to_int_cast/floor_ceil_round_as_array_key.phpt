@@ -16,5 +16,3 @@ echo $arr[round(1.5)];
 $d = 1.7;
 echo $arr[$d];
 //        ^^ ImplicitFloatToIntCast: Implicit cast from 1.7 to int truncates the fractional part
-
-===expect===

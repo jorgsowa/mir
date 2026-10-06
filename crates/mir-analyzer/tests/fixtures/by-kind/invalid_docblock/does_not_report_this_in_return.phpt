@@ -8,4 +8,3 @@ class Foo {
      */
     public function self(): static { return $this; }
 }
-===expect===

@@ -81,4 +81,3 @@ function unchangedConstantHead(): void {
         }
     }
 }
-===expect===

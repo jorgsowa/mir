@@ -45,4 +45,3 @@ function passWrongCase(): void {
     take(Outcome::failure(Level::High));
 //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $o of take() expects 'Outcome<Level::Low, int>', got 'Outcome<Level::High, never>'
 }
-===expect===

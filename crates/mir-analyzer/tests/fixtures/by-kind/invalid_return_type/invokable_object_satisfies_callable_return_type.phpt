@@ -21,4 +21,3 @@ class NotInvokable {}
 /** @return callable(string): int */
 function makeInvalid(): callable { return new NotInvokable(); }
 //                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'NotInvokable' is not compatible with declared 'callable(string): int'
-===expect===

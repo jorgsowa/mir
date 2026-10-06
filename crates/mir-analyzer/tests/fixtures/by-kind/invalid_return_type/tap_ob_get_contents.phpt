@@ -37,4 +37,3 @@ function renderView(): string {
         ob_end_clean();
     });
 }
-===expect===

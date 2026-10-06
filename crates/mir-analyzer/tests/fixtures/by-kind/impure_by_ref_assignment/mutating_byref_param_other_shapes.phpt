@@ -55,4 +55,3 @@ function sortByRef(array &$arr): void {
     sort($arr);
 //       ^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $arr in a @pure function
 }
-===expect===

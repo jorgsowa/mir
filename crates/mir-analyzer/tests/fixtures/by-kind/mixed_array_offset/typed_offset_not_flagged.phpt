@@ -12,5 +12,3 @@ MixedArrayOffset does NOT fire when the offset has a concrete int or string type
 $arr = [];
 $key = "hello";
 $val = $arr[$key];
-
-===expect===

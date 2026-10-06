@@ -49,4 +49,3 @@ class Consts {
         $_ = $neg;
     }
 }
-===expect===

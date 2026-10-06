@@ -11,4 +11,3 @@ class Foo {
         header("X-Test: hello");
     }
 }
-===expect===

@@ -20,4 +20,3 @@ class Connection {
         $this->__construct($data);
     }
 }
-===expect===

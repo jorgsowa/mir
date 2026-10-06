@@ -6,4 +6,3 @@ when the result is coalesced (the ?string is handled)
 function sanitize(string $input): string {
     return preg_replace('/[^a-z]/', '', $input) ?? '';
 }
-===expect===

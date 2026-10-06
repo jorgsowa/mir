@@ -14,4 +14,3 @@ class Model {
 $m = Model::query();
 /** @mir-check $m is Model */
 $x = $m;
-===expect===

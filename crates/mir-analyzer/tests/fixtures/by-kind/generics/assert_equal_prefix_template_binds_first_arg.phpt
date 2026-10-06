@@ -69,4 +69,3 @@ function instanceCall(Guard $g, mixed $v): void {
     /** @mir-check $v is 5 */
     echo "ok";
 }
-===expect===

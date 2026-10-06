@@ -25,4 +25,3 @@ function replace_callback_into_param(string $pattern, string $subject): string {
 function convert_into_param(string $s): string {
     return mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1');
 }
-===expect===

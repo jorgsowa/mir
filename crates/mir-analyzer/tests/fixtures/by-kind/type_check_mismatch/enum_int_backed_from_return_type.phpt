@@ -18,4 +18,3 @@ enum Priority: int {
 $p = Priority::from(1);
 /** @mir-check $p is Priority */
 echo $p->value;
-===expect===

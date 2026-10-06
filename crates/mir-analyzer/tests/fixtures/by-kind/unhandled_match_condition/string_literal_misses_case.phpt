@@ -10,4 +10,3 @@ function label(string $color): string {
         "green" => "Green",
     };
 }
-===expect===

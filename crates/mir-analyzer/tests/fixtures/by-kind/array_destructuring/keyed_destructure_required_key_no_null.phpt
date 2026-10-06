@@ -18,4 +18,3 @@ function test(array $arr): void {
     strlen($a);
 //  ^^^^^^^^^^^ Trace: Type of $a is string
 }
-===expect===

@@ -10,4 +10,3 @@ Undefined trace variable
 <?php
 /** @trace $b */
 echo 1;
-===expect===

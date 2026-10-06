@@ -18,4 +18,3 @@ function withWrongElementType(): void {
     log('oops', ['requestId' => 42]);
 //              ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $context of log() expects 'array<int|string, string>', got 'array{'requestId': 42}'
 }
-===expect===

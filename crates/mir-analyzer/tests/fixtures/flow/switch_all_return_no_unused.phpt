@@ -30,4 +30,3 @@ function parseArgument(string $token): object {
 function extractDescription(string $token): array {
     return [$token, ''];
 }
-===expect===

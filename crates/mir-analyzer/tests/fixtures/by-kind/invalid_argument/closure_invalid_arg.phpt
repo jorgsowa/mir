@@ -8,4 +8,3 @@ function takesClosure(Closure $c): void {}
 
 takesClosure(5);
 //           ^ InvalidArgument: Argument $c of takesClosure() expects 'Closure(int): string', got '5'
-===expect===

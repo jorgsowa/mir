@@ -22,4 +22,3 @@ function test(): void {
     $p = new Pair();
     f($p);
 }
-===expect===

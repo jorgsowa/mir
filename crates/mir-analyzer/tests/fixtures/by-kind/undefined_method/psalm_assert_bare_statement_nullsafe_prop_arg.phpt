@@ -48,4 +48,3 @@ function narrowsViaStaticMethod(?Holder $h): void {
     $h->child->foo();
 //  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
-===expect===

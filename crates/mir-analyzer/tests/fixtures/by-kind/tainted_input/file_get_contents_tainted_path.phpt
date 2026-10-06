@@ -16,4 +16,3 @@ function test(): void {
     $data = file_get_contents($path);
 //          ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
-===expect===

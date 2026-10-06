@@ -22,4 +22,3 @@ function test_range_minus_eq(int $n): void {
     /** @mir-check $n is int<-3, 7> */
     $_ = $n;
 }
-===expect===

@@ -9,4 +9,3 @@ class A
     {
     }
 }
-===expect===

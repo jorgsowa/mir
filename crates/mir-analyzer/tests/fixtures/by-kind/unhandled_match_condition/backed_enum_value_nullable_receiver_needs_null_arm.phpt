@@ -22,4 +22,3 @@ function h(?Kind $type): bool {
         Kind::Bar->value => false,
     };
 }
-===expect===

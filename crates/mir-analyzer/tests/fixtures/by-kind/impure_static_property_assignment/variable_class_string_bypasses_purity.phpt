@@ -22,4 +22,3 @@ function bump(string $cls): void {
     $cls::$count = 5;
 //  ^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Registry::$count in a @pure function
 }
-===expect===

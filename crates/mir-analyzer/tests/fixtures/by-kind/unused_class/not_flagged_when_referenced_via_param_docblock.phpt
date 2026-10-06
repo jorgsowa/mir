@@ -18,4 +18,3 @@ function useBar($b): void {
 }
 
 useBar(null);
-===expect===

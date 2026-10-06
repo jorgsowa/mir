@@ -22,4 +22,3 @@ $shape = identity(Shape::class);
 $polygon = identity(Polygon::class);
 /** @mir-check $shape is interface-string<Shape> */
 /** @mir-check $polygon is interface-string<Polygon> */
-===expect===

@@ -14,4 +14,3 @@ Undefined parent class
 class B extends A {}
 
 $b = new B();
-===expect===

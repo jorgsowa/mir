@@ -6,5 +6,3 @@ Prevent traversable implementation
  * @implements Traversable<int, int>
  */
 final class C implements Traversable {}
-
-===expect===

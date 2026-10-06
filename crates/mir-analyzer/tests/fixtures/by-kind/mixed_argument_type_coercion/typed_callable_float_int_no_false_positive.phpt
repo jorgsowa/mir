@@ -17,4 +17,3 @@ function processFloat(callable $c2): void {
     $c2(5.5);
 }
 processFloat(function (int $a): void {});
-===expect===

@@ -10,4 +10,3 @@ InvalidArrayAssignment does NOT fire when assigning to an actual array.
 <?php
 $a = [];
 $a[0] = 5;
-===expect===

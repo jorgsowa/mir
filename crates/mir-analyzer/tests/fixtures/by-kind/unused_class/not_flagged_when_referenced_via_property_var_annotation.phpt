@@ -19,4 +19,3 @@ class Wallet {
 }
 
 (new Wallet())->balance();
-===expect===

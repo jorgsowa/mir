@@ -13,4 +13,3 @@ function foo(Closure $f, Closure $g) : callable {
         return $f($g($x));
     };
 }
-===expect===

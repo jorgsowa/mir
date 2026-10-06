@@ -58,4 +58,3 @@ function test_natcasesort_preserves_type(array $arr): void {
     /** @mir-check $arr is non-empty-list<string> */
     $_ = $arr;
 }
-===expect===

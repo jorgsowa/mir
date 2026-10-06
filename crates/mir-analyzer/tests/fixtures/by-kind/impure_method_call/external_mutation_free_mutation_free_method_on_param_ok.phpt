@@ -20,4 +20,3 @@ class Processor {
         return $fmt->format($input);
     }
 }
-===expect===

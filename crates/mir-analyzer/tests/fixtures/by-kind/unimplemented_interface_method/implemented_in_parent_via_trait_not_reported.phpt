@@ -12,4 +12,3 @@ abstract class Base implements Runnable {
     use RunsTrait;
 }
 class Task extends Base {}
-===expect===

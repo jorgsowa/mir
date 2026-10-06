@@ -37,4 +37,3 @@ $box->transform(42);
 
 $fn = $box->transform(...);
 $fn(42);
-===expect===

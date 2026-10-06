@@ -13,4 +13,3 @@ function test(int $x): void {
     if ($x === null) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'int' and 'null' is always false — these types can never be identical
 }
-===expect===

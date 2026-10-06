@@ -19,4 +19,3 @@ function set_flags(int $flags): void {}
 function caller(int $x): void {
     set_flags($x);  // int is not statically verified but not flagged
 }
-===expect===

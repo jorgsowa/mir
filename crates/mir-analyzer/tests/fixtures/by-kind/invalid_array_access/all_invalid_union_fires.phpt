@@ -6,4 +6,3 @@ InvalidArrayAccess fires when every type in a union is non-subscriptable (int|bo
 $x = 1;
 echo $x[0];
 //   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'int|bool'
-===expect===

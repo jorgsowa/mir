@@ -14,4 +14,3 @@ function test(Foo $f): void {
     echo get_class($f);
     new NoSuchClass();
 }
-===expect===

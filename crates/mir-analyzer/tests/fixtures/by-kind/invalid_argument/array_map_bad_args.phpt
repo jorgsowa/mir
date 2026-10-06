@@ -13,4 +13,3 @@ function foo(int $i) : bool {
 }
 
 array_map("foo", ["hello"]);
-===expect===

@@ -17,4 +17,3 @@ function foo(A $a) : void {
             echo "goodbye";
     }
 }
-===expect===

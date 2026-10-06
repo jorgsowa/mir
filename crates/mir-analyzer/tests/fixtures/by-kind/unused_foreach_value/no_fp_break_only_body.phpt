@@ -10,4 +10,3 @@ foreach (generate() as $first) { break; }
 foreach (generate() as $second) {
     break;
 }
-===expect===

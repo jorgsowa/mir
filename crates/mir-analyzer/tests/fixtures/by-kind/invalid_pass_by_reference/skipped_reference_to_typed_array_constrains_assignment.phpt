@@ -20,5 +20,3 @@ class Foo
         $int = (string) $int;
     }
 }
-
-===expect===

@@ -13,4 +13,3 @@ function invokeCallback(callable $cb): void {
 }
 
 invokeCallback('helper');
-===expect===

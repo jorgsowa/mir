@@ -34,4 +34,3 @@ function single_shape_stays_lenient(array $arr): void {
         echo 1;
     }
 }
-===expect===

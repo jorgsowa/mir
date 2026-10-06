@@ -13,4 +13,3 @@ function test(bool $cond): void {
 //           ^^ PossiblyUndefinedVariable: Variable $x might not be defined
     }
 }
-===expect===

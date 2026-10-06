@@ -45,4 +45,3 @@ class ServiceProvider {
         $bladeCompiler = Container::make('blade.compiler');
     }
 }
-===expect===

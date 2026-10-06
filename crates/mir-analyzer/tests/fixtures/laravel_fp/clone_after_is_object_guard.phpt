@@ -18,4 +18,3 @@ branch no longer flags MixedClone.
 function dispatch($event): mixed {
     return is_object($event) ? clone $event : $event;
 }
-===expect===

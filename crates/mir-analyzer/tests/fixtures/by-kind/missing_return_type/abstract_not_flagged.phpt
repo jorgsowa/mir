@@ -7,4 +7,3 @@ abstract class Base {
     abstract public function abstractNoReturn();
     abstract protected function abstractProtectedNoReturn();
 }
-===expect===

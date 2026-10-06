@@ -17,5 +17,3 @@ function run(string $s): void {
     /** @mir-check $m is array{0: array{0: string, 1: int}, 'a': array{0: string, 1: int}, 1: array{0: string, 1: int}} */
     $_ = $m;
 }
-
-===expect===

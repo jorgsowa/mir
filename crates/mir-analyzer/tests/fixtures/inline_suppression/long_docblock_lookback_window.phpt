@@ -65,4 +65,3 @@ genuinely-used suppression was wrongly reported as unused.
 function bar($x): void {}
 //           ^^ MissingParamType: Parameter $x of bar() has no type annotation
 //           ^^ UnusedParam: Parameter $x is never used
-===expect===

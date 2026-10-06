@@ -12,4 +12,3 @@ function test(): void {
     Greeter::oldGreet('Alice');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead
 }
-===expect===

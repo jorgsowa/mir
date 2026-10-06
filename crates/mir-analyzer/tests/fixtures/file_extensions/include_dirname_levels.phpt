@@ -25,4 +25,3 @@ function up1(): int { return 1; }
 ===file:deep/paren.inc===
 <?php
 function paren(): int { return 3; }
-===expect===

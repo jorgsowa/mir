@@ -5,4 +5,3 @@ UndefinedAttributeClass fires when an undefined attribute is placed on a standal
 #[Memoize]
 //^^^^^^^ UndefinedAttributeClass: Attribute class Memoize does not exist
 function foo(): void {}
-===expect===

@@ -28,4 +28,3 @@ $b = new Box2();
 $b->copyInto(42, $result);
 /** @mir-check $result is int */
 $_ = $result;
-===expect===

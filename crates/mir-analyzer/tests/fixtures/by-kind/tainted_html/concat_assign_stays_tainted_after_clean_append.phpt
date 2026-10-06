@@ -17,4 +17,3 @@ function test(): void {
     echo $html;
 //  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

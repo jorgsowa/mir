@@ -21,4 +21,3 @@ function firstMatch(DOMXPath $xpath, DOMNode $parent): void {
         echo $nodes->length;
     }
 }
-===expect===

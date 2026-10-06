@@ -24,4 +24,3 @@ class Flags {
 
 $f = new Flags();
 $f->set(999); // any int accepted — falls back to `int`
-===expect===

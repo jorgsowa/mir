@@ -61,4 +61,3 @@ function check_empty($x) {
      */
     var_dump($x);
 }
-===expect===

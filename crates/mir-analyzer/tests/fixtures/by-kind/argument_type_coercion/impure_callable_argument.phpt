@@ -34,4 +34,3 @@ $c = max_by([1, 2, 3], function(int $a): int {
 });
 
 echo $c;
-===expect===

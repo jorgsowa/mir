@@ -20,4 +20,3 @@ function test(): void {
 //      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===

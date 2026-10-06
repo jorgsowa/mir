@@ -11,4 +11,3 @@ Legacy `resource` return types are not undefined classes.
 function makeHandle(): resource {
     return fopen('php://memory', 'r');
 }
-===expect===

@@ -21,4 +21,3 @@ function test_non_empty(string $s): void {
     /** @mir-check $n is int<1, max> */
     $_ = $n;
 }
-===expect===

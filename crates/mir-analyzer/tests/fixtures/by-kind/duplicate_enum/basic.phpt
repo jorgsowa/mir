@@ -10,4 +10,3 @@ enum Status {
 //<^ +2:1 DuplicateEnum: Enum Status has already been defined
     case Inactive;
 }
-===expect===

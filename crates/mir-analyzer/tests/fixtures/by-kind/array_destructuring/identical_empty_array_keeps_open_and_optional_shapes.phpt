@@ -26,4 +26,3 @@ function generic_array(array $row): void {
         echo 1;
     }
 }
-===expect===

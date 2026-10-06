@@ -43,4 +43,3 @@ function run(callable $c): void {
     /** @mir-check $union is Lib\Other|Closure(Lib\Row): Lib\Row */
     echo 1;
 }
-===expect===

@@ -28,4 +28,3 @@ $box = new Box(42);
 $box->fill($result);
 /** @mir-check $result is int */
 $_ = $result;
-===expect===

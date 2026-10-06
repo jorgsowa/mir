@@ -11,4 +11,3 @@ class Service {
 //                  ^^^ UndefinedThrowsDocblock: @throws class 'NonExistentServiceException' does not exist
     }
 }
-===expect===

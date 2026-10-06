@@ -7,4 +7,3 @@ $a = ["k" => 1];
 $b = $a;
 echo $b["id"];
 echo $b["name"];
-===expect===

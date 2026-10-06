@@ -25,4 +25,3 @@ function classStringUnion(string $s): void {
     $arg = 5;
     $s::make($arg);
 }
-===expect===

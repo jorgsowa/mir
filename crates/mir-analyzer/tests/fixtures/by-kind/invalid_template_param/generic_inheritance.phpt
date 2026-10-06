@@ -82,4 +82,3 @@ function testDeepHierarchy() {
 testTemplateInheritance();
 testInterfaceInheritance();
 testDeepHierarchy();
-===expect===

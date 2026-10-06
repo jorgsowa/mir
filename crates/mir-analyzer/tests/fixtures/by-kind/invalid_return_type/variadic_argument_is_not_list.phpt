@@ -7,5 +7,3 @@ function foo(int ...$values): array
 {
     return $values;
 }
-
-===expect===

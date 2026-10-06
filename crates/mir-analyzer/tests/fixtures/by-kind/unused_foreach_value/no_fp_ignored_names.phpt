@@ -9,4 +9,3 @@ foreach (generate() as $_) { echo "x"; }
 foreach (generate() as $_skip) { echo "x"; }
 foreach (generate() as $ignored) { echo "x"; }
 foreach (generate() as $unused) { echo "x"; }
-===expect===

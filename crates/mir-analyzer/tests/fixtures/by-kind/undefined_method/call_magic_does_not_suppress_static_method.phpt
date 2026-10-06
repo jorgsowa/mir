@@ -11,4 +11,3 @@ function test(): void {
     Magic::missing();
 //  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Magic::missing() does not exist
 }
-===expect===

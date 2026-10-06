@@ -40,4 +40,3 @@ function test_is_subclass_of(mixed $obj): void {
         $_ = $obj;
     }
 }
-===expect===

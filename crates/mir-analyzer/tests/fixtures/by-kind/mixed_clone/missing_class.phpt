@@ -11,4 +11,3 @@ function get() {}
 
 /** @suppress UndefinedDocblockClass */
 clone get();
-===expect===

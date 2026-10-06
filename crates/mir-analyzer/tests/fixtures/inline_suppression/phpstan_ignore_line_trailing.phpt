@@ -5,4 +5,3 @@ trailing // @phpstan-ignore-line suppresses its own line
 function test(): void {
     new NoSuchClass(); // @phpstan-ignore-line
 }
-===expect===

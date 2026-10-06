@@ -28,4 +28,3 @@ function test(Box $other): void {
     /** @mir-check $other->value is string|null */
     $_ = 1;
 }
-===expect===

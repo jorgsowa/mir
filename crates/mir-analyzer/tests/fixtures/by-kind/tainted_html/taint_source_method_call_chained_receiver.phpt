@@ -29,4 +29,3 @@ class Handler {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===

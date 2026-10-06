@@ -44,4 +44,3 @@ function firstOf(Collection $c) {
 $x = firstOf(new TypedList(new Dog()));
 /** @mir-check $x is Dog */
 echo "ok";
-===expect===

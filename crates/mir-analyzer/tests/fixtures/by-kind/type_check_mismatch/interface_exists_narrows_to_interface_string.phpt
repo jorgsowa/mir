@@ -42,4 +42,3 @@ function test_already_interface_string(string $iface): void {
         $_ = $iface;
     }
 }
-===expect===

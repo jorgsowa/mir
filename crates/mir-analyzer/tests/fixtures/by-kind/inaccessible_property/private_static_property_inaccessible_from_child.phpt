@@ -15,4 +15,3 @@ class Child extends Base
 //                   ^^^^^^^ InaccessibleProperty: Cannot access property Base::$secret
     }
 }
-===expect===

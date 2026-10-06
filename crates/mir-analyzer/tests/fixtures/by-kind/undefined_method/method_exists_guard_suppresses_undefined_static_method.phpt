@@ -10,4 +10,3 @@ function dispatch(): void {
         Notification::broadcastOn();
     }
 }
-===expect===

@@ -20,4 +20,3 @@ $s = Status::tryFrom('active');
 if ($s !== null) {
     echo $s->value;
 }
-===expect===

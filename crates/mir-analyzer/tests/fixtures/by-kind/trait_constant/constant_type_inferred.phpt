@@ -60,4 +60,3 @@ function outside(Child $c): void {
     /** @mir-check $viaObject is 5 */
     echo $max, $nested, $viaObject;
 }
-===expect===

@@ -8,4 +8,3 @@
 function buildAssociativeArray() {
     return ['x' => 1, 'y' => 2];
 }
-===expect===

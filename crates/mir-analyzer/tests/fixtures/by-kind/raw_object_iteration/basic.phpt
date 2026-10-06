@@ -12,4 +12,3 @@ function items(): \Generator {
     yield from $c;
 //             ^^ RawObjectIteration: Cannot iterate over non-iterable object 'Config'
 }
-===expect===

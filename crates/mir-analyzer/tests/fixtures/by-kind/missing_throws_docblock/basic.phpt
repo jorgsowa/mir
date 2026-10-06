@@ -6,4 +6,3 @@ function riskyOperation(): void {
     throw new \Exception('fail');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
 }
-===expect===

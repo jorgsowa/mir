@@ -36,4 +36,3 @@ function writeThroughSelfTypedReceiver(Node $n): void {
 //      ^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $value expects 'int', cannot assign '"wrong"'
     }
 }
-===expect===

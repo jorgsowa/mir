@@ -8,4 +8,3 @@ function test(): void {
     $obj = new ActiveClass();
 //  ^^^^ UnusedVariable: Variable $obj is never read
 }
-===expect===

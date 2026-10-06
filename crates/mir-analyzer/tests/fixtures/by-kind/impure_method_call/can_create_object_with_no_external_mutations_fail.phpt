@@ -21,4 +21,3 @@ function makesACounter(int $i) : Counter {
     $c->increment();
     return $c;
 }
-===expect===

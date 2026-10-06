@@ -14,4 +14,3 @@ function test(): void {
     $y->bar();
 //  ^^^^^^^^^ MixedMethodCall: Method bar() called on mixed type
 }
-===expect===

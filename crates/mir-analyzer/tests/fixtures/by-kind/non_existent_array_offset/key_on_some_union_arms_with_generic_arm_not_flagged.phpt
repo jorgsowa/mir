@@ -13,4 +13,3 @@ function guarded(array $x): void {
         echo $x['a'];
     }
 }
-===expect===

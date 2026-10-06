@@ -21,4 +21,3 @@ takesClosureReturningException(
         echo "hello";
     }
 );
-===expect===

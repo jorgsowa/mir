@@ -24,4 +24,3 @@ class Connection {
         $this->ttl = $ttl;
     }
 }
-===expect===

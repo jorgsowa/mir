@@ -21,4 +21,3 @@ class Router {
 $r = new Router();
 $r->route("PATCH");
 //        ^^^^^^^ InvalidArgument: Argument $method of route() expects '"GET"|"POST"|"PUT"|"DELETE"', got '"PATCH"'
-===expect===

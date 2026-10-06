@@ -19,5 +19,3 @@ if (random_int(0, 1)) {
 }
 
 $var = "foo";
-
-===expect===

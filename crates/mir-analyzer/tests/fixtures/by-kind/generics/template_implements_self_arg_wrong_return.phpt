@@ -24,4 +24,3 @@ final class Order implements Cloner {
     public function copy(): Other { return new Other(); }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Order::copy() signature mismatch: return type 'Other' is not a subtype of parent 'self(Order)'
 }
-===expect===

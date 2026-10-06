@@ -25,4 +25,3 @@ class Svc {
  * @throws Single
  */
 function go(): void { throw new MyEx(); }
-===expect===

@@ -45,4 +45,3 @@ class C {
         }
     }
 }
-===expect===

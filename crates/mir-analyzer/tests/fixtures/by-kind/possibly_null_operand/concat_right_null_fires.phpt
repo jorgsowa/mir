@@ -6,4 +6,3 @@ function combine(string $x, ?string $sfx): string {
     return $x . $sfx;
 //              ^^^^ PossiblyNullOperand: Operator '.' operand 'string|null' might be null
 }
-===expect===

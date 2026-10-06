@@ -15,4 +15,3 @@ class Wrapper {
         $this->data = $c;
     }
 }
-===expect===

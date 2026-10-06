@@ -14,4 +14,3 @@ function isMatch(string $subject, string $pattern): bool {
     return preg_match($pattern, $subject);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int<0, 1>|false' is not compatible with declared 'bool'
 }
-===expect===

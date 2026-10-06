@@ -7,4 +7,3 @@ class MyAttr {}
 
 #[MyAttr]
 class Foo {}
-===expect===

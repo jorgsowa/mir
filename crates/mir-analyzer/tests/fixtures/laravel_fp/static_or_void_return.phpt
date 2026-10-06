@@ -34,4 +34,3 @@ class Password {
         static::$defaultCallback = $callback;
     }
 }
-===expect===

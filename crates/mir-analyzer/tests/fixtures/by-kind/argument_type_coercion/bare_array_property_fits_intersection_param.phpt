@@ -27,4 +27,3 @@ function bad(int $i): void {
     takesContext(['actor' => ['id' => 'x']]);
 //               ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesContext() expects 'array<string, mixed>&array{'actor': array{'id': int}&array<string, mixed>, 'target'?: array<string, mixed>}', got 'array{'actor': array{'id': "x"}}'
 }
-===expect===

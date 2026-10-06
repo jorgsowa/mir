@@ -33,4 +33,3 @@ function takesFooOrBar($x): void {}
 
 takesFooOrBar("plain-string");
 //            ^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takesFooOrBar() expects 'Foo|Bar<T>', got '"plain-string"'
-===expect===

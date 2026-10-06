@@ -42,4 +42,3 @@ function unionOfRanges(Holder $h, int $r): void {
     $h->flag = $r;
 //  ^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $flag expects '0|1', cannot assign 'int<0, 1>|int<5, 5>'
 }
-===expect===

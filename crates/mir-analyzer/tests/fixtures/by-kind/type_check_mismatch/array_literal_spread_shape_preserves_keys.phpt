@@ -42,4 +42,3 @@ function test_int_keyed_spread_falls_back(array $items): void {
     /** @mir-check $merged is array<"c"|int, true|int> */
     $_ = $merged;
 }
-===expect===

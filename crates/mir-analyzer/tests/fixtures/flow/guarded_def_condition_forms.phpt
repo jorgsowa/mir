@@ -125,4 +125,3 @@ function multiIssetIsNotAGuard(?string $g, ?string $h): void {
     if (isset($g, $h)) { echo $x; }
 //                            ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
-===expect===

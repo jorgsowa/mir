@@ -19,4 +19,3 @@ class LlmAgent {
 $agent = new LlmAgent();
 $agent->prompt("Tell me about " . (string) $_GET["topic"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedLlmPrompt: Tainted LLM prompt — possible prompt injection
-===expect===

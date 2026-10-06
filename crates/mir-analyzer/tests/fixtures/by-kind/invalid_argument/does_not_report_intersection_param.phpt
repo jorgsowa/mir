@@ -8,4 +8,3 @@ interface Iterator {}
 function f(Iterator&Countable $x): void {
     $_ = $x;
 }
-===expect===

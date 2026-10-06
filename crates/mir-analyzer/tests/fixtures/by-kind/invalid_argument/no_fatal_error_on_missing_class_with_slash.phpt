@@ -13,4 +13,3 @@ class Func {
 }
 
 new Func("f", ["Foo", "bar"]);
-===expect===

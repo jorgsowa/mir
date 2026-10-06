@@ -21,4 +21,3 @@ final class Box {
 }
 new Box('create');
 new Box(42);
-===expect===

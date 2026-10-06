@@ -28,4 +28,3 @@ function useIt(Generator $g): void
 //                       ^^ MismatchingDocblockParamType: Docblock type 'App\Other' for $g does not match inferred 'App\Generator'
 {
 }
-===expect===

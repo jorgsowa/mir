@@ -29,4 +29,3 @@ echo "a";
 $b = classify("s");
 /** @mir-check $b is string */
 echo "b";
-===expect===

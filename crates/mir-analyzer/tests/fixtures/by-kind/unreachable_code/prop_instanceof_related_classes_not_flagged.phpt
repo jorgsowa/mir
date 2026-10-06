@@ -22,4 +22,3 @@ function related(Holder $h): void {
         echo "reachable";
     }
 }
-===expect===

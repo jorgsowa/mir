@@ -34,4 +34,3 @@ function connect(PdoLike|Closure $conn): PdoLike {
     }
     return $conn;
 }
-===expect===

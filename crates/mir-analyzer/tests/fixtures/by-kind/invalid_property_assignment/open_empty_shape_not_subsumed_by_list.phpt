@@ -45,4 +45,3 @@ function test_closed_empty_shape_still_subsumed(bool $cond, array $emptyArr, arr
     }
     $s->x = $arr;
 }
-===expect===

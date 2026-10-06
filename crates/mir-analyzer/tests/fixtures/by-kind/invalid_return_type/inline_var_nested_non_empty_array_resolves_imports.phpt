@@ -53,4 +53,3 @@ namespace App {
 //      ^^^^^^^^^^ InvalidReturnType: Return type 'non-empty-array<string, non-empty-array<int, Lib\Other>>' is not compatible with declared 'non-empty-array<string, non-empty-array<int, Lib\Item>>'
     }
 }
-===expect===

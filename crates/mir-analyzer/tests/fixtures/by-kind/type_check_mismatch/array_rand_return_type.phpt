@@ -36,4 +36,3 @@ function test_non_literal_num_fallback(array $arr, int $num): void {
     /** @mir-check array_rand($arr, $num) is int|string|array */
     $_ = array_rand($arr, $num);
 }
-===expect===

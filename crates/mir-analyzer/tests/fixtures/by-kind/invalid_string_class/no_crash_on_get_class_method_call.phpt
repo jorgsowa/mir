@@ -20,4 +20,3 @@ class User {
         $class::foo();
     }
 }
-===expect===

@@ -10,4 +10,3 @@ whole variadic tail as such.
 function test(array $data): void {
     array_multisort(array_column($data, 'k'), SORT_ASC, $data);
 }
-===expect===

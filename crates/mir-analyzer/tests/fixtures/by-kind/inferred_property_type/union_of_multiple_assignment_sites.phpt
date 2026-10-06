@@ -30,4 +30,3 @@ class Holder {
         $_ = 1;
     }
 }
-===expect===

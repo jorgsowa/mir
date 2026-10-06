@@ -12,4 +12,3 @@ class Child extends Base {
         $_ = $result;
     }
 }
-===expect===

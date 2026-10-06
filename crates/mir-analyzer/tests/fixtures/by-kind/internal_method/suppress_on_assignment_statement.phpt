@@ -42,4 +42,3 @@ function unsuppressed(Cov $c): int {
     return $c->getReport();
 //         ^^^^^^^^^^^^^^^ InternalMethod: Method Vendor\Lib\Cov::getReport() is marked @internal
 }
-===expect===

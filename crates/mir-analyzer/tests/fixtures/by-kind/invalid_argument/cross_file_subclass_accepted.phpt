@@ -18,4 +18,3 @@ function accept(Base $x): void { var_dump($x); }
 function test(): void {
     accept(new Child());
 }
-===expect===

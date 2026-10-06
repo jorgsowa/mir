@@ -24,4 +24,3 @@ class Point {
 $p = new Point(?, 2);
 //             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
 //             ^ ParseError: Parse error: Cannot use partial function application in new expression
-===expect===

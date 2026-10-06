@@ -40,4 +40,3 @@ function keyLastNonNullNarrowsReceiver(?Box $b): void {
         $_ = 1;
     }
 }
-===expect===

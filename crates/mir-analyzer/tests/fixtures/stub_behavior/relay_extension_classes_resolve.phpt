@@ -22,4 +22,3 @@ function connect(string $host): Relay {
 function handle(Exception $e): void {
     echo $e->getCode();
 }
-===expect===

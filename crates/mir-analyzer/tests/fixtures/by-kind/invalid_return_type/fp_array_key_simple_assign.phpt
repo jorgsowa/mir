@@ -17,4 +17,3 @@ function buildMap(array $dtoRules): array
     }
     return $result;
 }
-===expect===

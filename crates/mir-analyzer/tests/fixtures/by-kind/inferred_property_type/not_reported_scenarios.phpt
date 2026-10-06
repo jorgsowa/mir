@@ -55,4 +55,3 @@ class OnlyOneBranchAssigns {
         $_ = 1;
     }
 }
-===expect===

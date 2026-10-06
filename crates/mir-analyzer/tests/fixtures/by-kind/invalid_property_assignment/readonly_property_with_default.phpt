@@ -6,4 +6,3 @@ class A {
     public readonly string $s = "a";
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReadonlyPropertyDeclaration: Readonly property A::$s cannot have a default value
 }
-===expect===

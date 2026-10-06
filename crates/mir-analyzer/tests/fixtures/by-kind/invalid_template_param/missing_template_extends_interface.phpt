@@ -5,5 +5,3 @@ Missing template extends interface
 /** @template T */
 interface A {}
 interface B extends A {}
-
-===expect===

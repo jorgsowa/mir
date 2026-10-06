@@ -15,4 +15,3 @@ class Name {
 function greet(?string $value): void {}
 
 greet(new Name());
-===expect===

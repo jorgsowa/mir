@@ -20,4 +20,3 @@ function makeMap() {
 $map = makeMap();
 /** @mir-check $map is array<class-string, Foo> */
 $_ = 1;
-===expect===

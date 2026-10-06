@@ -13,4 +13,3 @@ function test(): void {
     echo $c->anything;
     echo $c->anotherUndefined;
 }
-===expect===

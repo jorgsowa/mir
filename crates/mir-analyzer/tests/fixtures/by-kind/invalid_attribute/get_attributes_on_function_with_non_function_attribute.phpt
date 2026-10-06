@@ -11,5 +11,3 @@ function foo(): void {}
 //            ^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'InvalidArgument' is never used
 $r = new ReflectionFunction("foo");
 $r->getAttributes(Attr::class);
-
-===expect===

@@ -14,4 +14,3 @@ function run(): void {
     shell_exec($cmd);
 //  ^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
-===expect===

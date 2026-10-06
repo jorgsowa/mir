@@ -56,4 +56,3 @@ takeNested(['outer' => ['inner' => (new Box)->get()]]);
 takeList([(new Box)->get()]);
 takeMap(['k' => (new Box)->get()]);
 takeIntersection(['k' => (new Box)->get()]);
-===expect===

@@ -20,4 +20,3 @@ function spliceIntoPosition(string $position, string $value): void {}
 spliceIntoPosition(1, 0);
 //                 ^ ArgumentTypeCoercion: Argument $position of spliceIntoPosition() expects 'string', got '1' — coercion may fail at runtime
 //                    ^ ArgumentTypeCoercion: Argument $value of spliceIntoPosition() expects 'string', got '0' — coercion may fail at runtime
-===expect===

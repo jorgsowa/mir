@@ -12,5 +12,3 @@ class C {
         $f();
     }
 }
-
-===expect===

@@ -13,4 +13,3 @@ function unguarded(array $meta): string {
     return (string) $meta['favicon'];
 //                        ^^^^^^^^^ NonExistentArrayOffset: Array offset 'favicon' does not exist
 }
-===expect===

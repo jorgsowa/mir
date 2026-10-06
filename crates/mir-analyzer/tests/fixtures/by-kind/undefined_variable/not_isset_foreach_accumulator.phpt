@@ -12,4 +12,3 @@ function test(array $items): void {
         }
     }
 }
-===expect===

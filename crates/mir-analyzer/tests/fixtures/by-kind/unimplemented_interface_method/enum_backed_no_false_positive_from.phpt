@@ -12,4 +12,3 @@ enum Priority: int {
 // from()/tryFrom() are synthesized by the runtime — no UnimplementedInterfaceMethod is emitted
 Priority::from(2);
 Priority::tryFrom(99);
-===expect===

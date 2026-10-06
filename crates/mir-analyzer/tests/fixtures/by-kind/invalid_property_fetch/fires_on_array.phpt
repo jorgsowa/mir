@@ -6,4 +6,3 @@ InvalidPropertyFetch fires on array type.
 $items = [];
 $items->foo;
 //<^^^^^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type 'array<int, string>'
-===expect===

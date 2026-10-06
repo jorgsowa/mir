@@ -20,4 +20,3 @@ class Child extends Base {
 //      ^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Unrelated' is not compatible with declared 'parent(Child)'
     }
 }
-===expect===

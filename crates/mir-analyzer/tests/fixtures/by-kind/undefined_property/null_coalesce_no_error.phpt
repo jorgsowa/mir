@@ -14,4 +14,3 @@ class Mailable {
         return $messageGroup;
     }
 }
-===expect===

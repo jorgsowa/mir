@@ -27,4 +27,3 @@ function testInt(int $i): void {
     /** @mir-check $result is int */
 }
 ?>
-===expect===

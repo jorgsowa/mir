@@ -20,4 +20,3 @@ function loadData(mixed &$data): void {
 loadData($result);
 /** @mir-check $result is array<string, mixed> */
 $_ = $result;
-===expect===

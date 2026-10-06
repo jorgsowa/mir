@@ -16,4 +16,3 @@ trait B {
 class C {
     use B;
 }
-===expect===

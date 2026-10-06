@@ -10,4 +10,3 @@ class Validator {
 //             ^^^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Validator::validate() cannot be called statically
     }
 }
-===expect===

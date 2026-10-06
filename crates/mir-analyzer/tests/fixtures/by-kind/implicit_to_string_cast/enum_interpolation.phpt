@@ -15,4 +15,3 @@ enum Suit {
 $e = Suit::Hearts;
 $s = "Suit: {$e}";
 //           ^^ ImplicitToStringCast: Class Suit is implicitly cast to string
-===expect===

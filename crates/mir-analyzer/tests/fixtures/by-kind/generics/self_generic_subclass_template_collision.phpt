@@ -58,4 +58,3 @@ function methodCall(Wrapper $w): void {
 
 function takesString(string $s): void {}
 function takesInt(int $i): void {}
-===expect===

@@ -20,4 +20,3 @@ function test(array $items): void {
     /** @mir-check $r is list<Bar> */
     $_ = $r;
 }
-===expect===

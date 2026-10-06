@@ -6,4 +6,3 @@ function greet(string $name): void {}
 //             ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
 greet(name: 'Ada', name: 'Grace');
 //                 ^^^^^^^^^^^^^ InvalidNamedArgument: greet() argument $name overwrites a previous argument
-===expect===

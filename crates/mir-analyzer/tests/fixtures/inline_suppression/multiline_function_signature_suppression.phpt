@@ -19,4 +19,3 @@ class Foo {
     private function baz(int $c, string $d): void {
     }
 }
-===expect===

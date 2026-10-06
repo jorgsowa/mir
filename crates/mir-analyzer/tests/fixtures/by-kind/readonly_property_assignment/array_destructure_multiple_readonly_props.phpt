@@ -23,4 +23,3 @@ class Point {
 //                 ^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Point::$y outside of constructor
     }
 }
-===expect===

@@ -31,4 +31,3 @@ class Narrowed extends P {
     public function byElement(string ...$ids): int { return count($ids); }
     public function narrowed(string ...$ids): int { return count($ids); }
 }
-===expect===

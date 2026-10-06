@@ -8,4 +8,3 @@ class Base {
         self::secret();
     }
 }
-===expect===

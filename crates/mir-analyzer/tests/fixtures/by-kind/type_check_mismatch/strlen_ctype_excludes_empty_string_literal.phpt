@@ -39,4 +39,3 @@ function strlenEqualsZeroExcludesNonEmptyAtoms($s): void {
         $_ = 1;
     }
 }
-===expect===

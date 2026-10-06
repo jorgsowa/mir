@@ -52,4 +52,3 @@ function test_true_branch_drops_exact_and_non_object(mixed $obj): void {
         $_ = $obj;
     }
 }
-===expect===

@@ -18,4 +18,3 @@ contradiction.
  * @param MaybeString $a
  */
 function viaAlias(?string $a): void {}
-===expect===

@@ -14,4 +14,3 @@ function doSomething(object $obj): bool { return true; }
 if (!isset($x) || doSomething($x)) {
     // After fix: $x in function call should be narrowed as defined
 }
-===expect===

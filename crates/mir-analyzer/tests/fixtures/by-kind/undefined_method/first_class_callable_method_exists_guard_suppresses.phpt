@@ -14,4 +14,3 @@ $w = new Widget();
 if (method_exists($w, 'maybe')) {
     $closure = $w->maybe(...);
 }
-===expect===

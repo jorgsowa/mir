@@ -9,4 +9,3 @@ function test(bool $flag): void {
     echo $x->name;
 //       ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $name on possibly null value
 }
-===expect===

@@ -26,4 +26,3 @@ function test(array $ne, int $offset, int $length): void {
     /** @mir-check $sliced_keys is array<int, int> */
     $_ = $sliced_keys;
 }
-===expect===

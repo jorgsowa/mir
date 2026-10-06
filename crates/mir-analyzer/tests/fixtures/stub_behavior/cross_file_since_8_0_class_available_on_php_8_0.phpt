@@ -12,4 +12,3 @@ function make_weak_cache(): void {
 ===file:App.php===
 <?php
 make_weak_cache();
-===expect===

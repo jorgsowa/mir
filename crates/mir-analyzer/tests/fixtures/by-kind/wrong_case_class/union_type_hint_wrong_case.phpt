@@ -12,4 +12,3 @@ class Foo {}
 class Bar {}
 function process(FOO|Bar $x): void {}
 //               ^^^ WrongCaseClass: Class name 'FOO' has incorrect casing; use 'Foo'
-===expect===

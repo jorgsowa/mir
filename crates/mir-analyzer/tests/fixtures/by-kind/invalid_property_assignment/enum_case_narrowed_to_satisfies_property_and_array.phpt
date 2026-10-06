@@ -40,4 +40,3 @@ function collect(array $modes, RoundingMode $mode): array {
     }
     return $modes;
 }
-===expect===

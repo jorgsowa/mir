@@ -23,4 +23,3 @@ abstract class Option {
     public function ensure($value): void {
     }
 }
-===expect===

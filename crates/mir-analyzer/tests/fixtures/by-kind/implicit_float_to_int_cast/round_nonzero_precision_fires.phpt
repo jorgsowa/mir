@@ -8,5 +8,3 @@ function takes_int(int $n): void { echo $n; }
 
 takes_int(round(3.14159, 2));
 //        ^^^^^^^^^^^^^^^^^ ImplicitFloatToIntCast: Implicit cast from float to int truncates the fractional part
-
-===expect===

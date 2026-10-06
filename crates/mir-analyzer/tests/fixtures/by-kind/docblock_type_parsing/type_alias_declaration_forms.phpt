@@ -48,4 +48,3 @@ function check(Holder $h): void {
     /** @mir-check $h->loose() is array{id: int} */
     $h->loose();
 }
-===expect===

@@ -15,4 +15,3 @@ class Service {}
 namespace Client;
 use MyApp\Deep;
 $x = new deep\Service();
-===expect===

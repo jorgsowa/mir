@@ -13,4 +13,3 @@ undefined.
 <?php
 function f(Ds\NotARealClass $x): void {}
 //         ^^^^^^^^^^^^^^^^ UndefinedClass: Class Ds\NotARealClass does not exist
-===expect===

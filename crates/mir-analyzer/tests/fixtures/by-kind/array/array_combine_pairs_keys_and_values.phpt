@@ -35,4 +35,3 @@ function test(
     /** @mir-check $maybe_empty is array<string, int> */
     $_ = $maybe_empty;
 }
-===expect===

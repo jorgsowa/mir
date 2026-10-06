@@ -17,4 +17,3 @@ function test(): int {
     array_push($arr, 1);
     return $arr[0];
 }
-===expect===

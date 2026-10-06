@@ -23,4 +23,3 @@ function firstWord(string $token): string {
     }
     return '';
 }
-===expect===

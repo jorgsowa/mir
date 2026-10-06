@@ -8,4 +8,3 @@ unclosed generic return
  */
 function foo(): mixed { return []; }
 //       ^^^ UndefinedDocblockClass: Docblock type 'array<' does not exist
-===expect===

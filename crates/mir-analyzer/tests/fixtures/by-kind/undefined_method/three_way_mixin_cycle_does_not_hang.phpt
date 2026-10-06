@@ -26,4 +26,3 @@ class C {
 function test(A $a): void {
     $a->fromA();
 }
-===expect===

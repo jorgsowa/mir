@@ -33,4 +33,3 @@ class Box {
 $box = new Box('hi');
 $box->replace(42);
 //<^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Box::replace() — @if-this-is requires $this to be 'Box<U>', but it is 'Box<string>'
-===expect===

@@ -18,4 +18,3 @@ class Foo {
     public function useUndefined(UndefinedTypeX $x): void {
     }
 }
-===expect===

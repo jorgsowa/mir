@@ -40,4 +40,3 @@ function readViaPropertyExistsOnVar(BackwardsCompatShim $obj): mixed {
     }
     return null;
 }
-===expect===

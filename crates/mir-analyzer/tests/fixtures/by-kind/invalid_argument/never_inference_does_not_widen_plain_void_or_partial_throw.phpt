@@ -40,4 +40,3 @@ function useConditional(Service $s, $n): void {
     run($s->conditional($n));
 //      ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $sql of run() expects 'string', got 'void'
 }
-===expect===

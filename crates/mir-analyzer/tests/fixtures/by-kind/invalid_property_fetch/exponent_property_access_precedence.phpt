@@ -15,4 +15,3 @@ class Formatter {
         return 10 ** $this->maxDigits;
     }
 }
-===expect===

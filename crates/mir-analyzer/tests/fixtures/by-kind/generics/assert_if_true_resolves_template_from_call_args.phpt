@@ -33,4 +33,3 @@ function test(mixed $value): void {
         echo "ok";
     }
 }
-===expect===

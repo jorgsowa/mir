@@ -25,4 +25,3 @@ function testSimple(): string {
     }
     return $result;
 }
-===expect===

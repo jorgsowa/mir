@@ -49,4 +49,3 @@ function test_closure_return_violating_bound_is_flagged($f): void {
     processClosureOrSingle($f);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
 }
-===expect===

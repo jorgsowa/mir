@@ -19,4 +19,3 @@ function test(): int {
     $f();
     return 1;
 }
-===expect===

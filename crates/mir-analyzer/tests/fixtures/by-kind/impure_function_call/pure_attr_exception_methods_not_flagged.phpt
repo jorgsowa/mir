@@ -12,4 +12,3 @@ function codeOf(string $message): int {
 function fileOf(Exception $e): string {
     return $e->getFile();
 }
-===expect===

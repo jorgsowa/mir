@@ -37,4 +37,3 @@ function apply_scale(int $n): void {
     $n /= 3;
     takes_float($n);
 }
-===expect===

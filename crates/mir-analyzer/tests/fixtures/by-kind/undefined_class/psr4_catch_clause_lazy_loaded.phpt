@@ -23,4 +23,3 @@ function run(): void {
         // handle
     }
 }
-===expect===

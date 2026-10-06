@@ -16,4 +16,3 @@ function run(string $payload): mixed {
     // expect: UndefinedClass "string[]" (array-type string parsed as a class)
     return deserialize('string[]', $payload);
 }
-===expect===

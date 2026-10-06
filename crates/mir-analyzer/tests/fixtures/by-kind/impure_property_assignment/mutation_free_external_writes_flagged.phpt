@@ -47,4 +47,3 @@ class Counter {
 //      ^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $n in a @pure function
     }
 }
-===expect===

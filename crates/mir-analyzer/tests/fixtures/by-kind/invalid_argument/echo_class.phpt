@@ -10,4 +10,3 @@ Echo class
 <?php
 class A {}
 echo (new A);
-===expect===

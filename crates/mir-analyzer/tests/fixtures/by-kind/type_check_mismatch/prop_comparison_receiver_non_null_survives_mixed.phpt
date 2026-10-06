@@ -44,4 +44,3 @@ function strlenNonEmptyNarrowsReceiverEvenWhenMixed(?Box $x): void {
         $_ = 1;
     }
 }
-===expect===

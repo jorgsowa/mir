@@ -67,4 +67,3 @@ function otherBranchSetsFlag(array $names): void {
     if ($mode === 'x') { echo $file; }
 //                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
-===expect===

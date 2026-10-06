@@ -29,4 +29,3 @@ class Holder {
 //                                                                            ^^^^^^^^^ NonExistentArrayOffset: Array offset 'favicon' does not exist
     }
 }
-===expect===

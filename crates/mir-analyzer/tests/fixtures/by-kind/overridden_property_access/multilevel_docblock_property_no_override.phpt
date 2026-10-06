@@ -19,4 +19,3 @@ class Parent_ extends GrandParent {}
 class Child extends Parent_ {
     private string $value = '';
 }
-===expect===

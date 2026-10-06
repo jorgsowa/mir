@@ -15,4 +15,3 @@ namespace B {
 //          ^^^^ UndefinedClass: Class B\Real does not exist
     }
 }
-===expect===

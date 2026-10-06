@@ -26,4 +26,3 @@ class Y extends X {
 }
 
 (new Y())->boo(new A());
-===expect===

@@ -38,4 +38,3 @@ function test_pop_non_empty_map(array $map): void {
     /** @mir-check $v is int */
     $_ = $v;
 }
-===expect===

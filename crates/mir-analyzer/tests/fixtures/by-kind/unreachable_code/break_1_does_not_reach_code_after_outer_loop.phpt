@@ -22,4 +22,3 @@ function foo(array $matrix): void {
     echo "after";
 //  ^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
-===expect===

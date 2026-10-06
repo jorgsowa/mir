@@ -12,4 +12,3 @@ outer arrow function's (correct) return type.
 <?php
 $f = fn(): string => (fn(): string => 123)();
 //                                    ^^^ InvalidReturnType: Return type '123' is not compatible with declared 'string'
-===expect===

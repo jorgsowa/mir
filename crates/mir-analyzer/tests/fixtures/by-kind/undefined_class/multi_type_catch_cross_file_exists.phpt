@@ -19,4 +19,3 @@ function fetch(): void {
         echo $e->getMessage();
     }
 }
-===expect===

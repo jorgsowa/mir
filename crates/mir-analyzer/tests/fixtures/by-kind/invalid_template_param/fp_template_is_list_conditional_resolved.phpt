@@ -42,4 +42,3 @@ class Type {
 
 // A = list<I> → must pick first branch → Type<list<I>>; no unbound K/V leak
 $t = Type::wrap((new Type)->refined(Type::listOf()));
-===expect===

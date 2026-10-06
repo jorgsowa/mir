@@ -30,4 +30,3 @@ function test_non_empty_map(array $map): void {
     /** @mir-check $r is non-empty-array<string, int> */
     $_ = $r;
 }
-===expect===

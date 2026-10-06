@@ -30,4 +30,3 @@ function doWhileExit(?string $x): void {
     /** @mir-check $x is null */
     echo "";
 }
-===expect===

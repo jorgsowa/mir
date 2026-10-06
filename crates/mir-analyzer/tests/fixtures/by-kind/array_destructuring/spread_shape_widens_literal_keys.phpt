@@ -16,4 +16,3 @@ function test(): void {
     /** @mir-check $merged is array{x: 1, y: 2} */
     $_ = $merged;
 }
-===expect===

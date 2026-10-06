@@ -19,4 +19,3 @@ enum Suit implements Colorful {
         };
     }
 }
-===expect===

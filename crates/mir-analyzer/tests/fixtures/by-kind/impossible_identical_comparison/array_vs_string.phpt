@@ -13,4 +13,3 @@ function test(array $arr): void {
     if ($arr === "foo") {}
 //      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'array' and '"foo"' is always false — these types can never be identical
 }
-===expect===

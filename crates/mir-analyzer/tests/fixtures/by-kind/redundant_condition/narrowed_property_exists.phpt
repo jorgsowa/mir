@@ -24,4 +24,3 @@ function getAssetInfo(Document|Image $asset): void {
         echo $asset->width;
     }
 }
-===expect===

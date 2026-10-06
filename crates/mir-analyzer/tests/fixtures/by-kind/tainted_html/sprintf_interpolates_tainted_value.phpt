@@ -25,4 +25,3 @@ function viaVsprintf(): void {
 function safeFormatOnly(): void {
     echo sprintf('<b>%s</b>', 'static');
 }
-===expect===

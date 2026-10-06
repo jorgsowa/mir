@@ -21,4 +21,3 @@ function connect(string $host): Memcache {
 function usePool(MemcachePool $pool): void {
     $pool->close();
 }
-===expect===

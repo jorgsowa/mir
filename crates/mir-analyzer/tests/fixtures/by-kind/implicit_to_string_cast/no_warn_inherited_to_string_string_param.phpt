@@ -16,4 +16,3 @@ class Child extends Base {}
 function render(string $s): void {}
 
 render(new Child());
-===expect===

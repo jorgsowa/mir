@@ -28,4 +28,3 @@ class Inventory {
 $inv = new Inventory();
 $inv->describe("small", "red");
 $inv->describe("large", "green");
-===expect===

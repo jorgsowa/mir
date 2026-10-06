@@ -15,4 +15,3 @@ class C {
 //                 ^^^^^^^^^^^^ UndefinedClass: Class NoSuchClassB does not exist
     }
 }
-===expect===

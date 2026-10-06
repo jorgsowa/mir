@@ -20,4 +20,3 @@ function resolvedPaths(array $dirs): array {
 
     return $result;
 }
-===expect===

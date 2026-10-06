@@ -13,4 +13,3 @@ function strlen(string $string, string $encoding): int { return 0; }
 <?php
 strlen('hello');
 //<^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for strlen(): expected 2, got 1
-===expect===

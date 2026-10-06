@@ -15,4 +15,3 @@ class Cache {
         return $this->client;
     }
 }
-===expect===

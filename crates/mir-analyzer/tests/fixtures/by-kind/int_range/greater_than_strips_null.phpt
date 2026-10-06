@@ -47,4 +47,3 @@ function propGreaterThan(Box $x): void {
         $_ = 1;
     }
 }
-===expect===

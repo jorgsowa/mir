@@ -15,4 +15,3 @@ function extract(string $s): string {
     }
     return '';
 }
-===expect===

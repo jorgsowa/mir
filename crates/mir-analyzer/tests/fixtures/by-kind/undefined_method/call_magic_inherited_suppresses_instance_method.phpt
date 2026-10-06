@@ -13,4 +13,3 @@ function test(): void {
     $c->anything();
     $c->anotherMissing(1, 2);
 }
-===expect===

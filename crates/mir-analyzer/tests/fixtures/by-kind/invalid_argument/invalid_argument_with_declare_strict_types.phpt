@@ -6,4 +6,3 @@ Invalid argument with declare strict types
 //                                  ^^^^^^ UnusedParam: Parameter $a is never used
                     fooFoo("string");
 //                         ^^^^^^^^ InvalidArgument: Argument $a of fooFoo() expects 'int', got '"string"'
-===expect===

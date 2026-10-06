@@ -24,4 +24,3 @@ class A {
 //      ^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
     }
 }
-===expect===

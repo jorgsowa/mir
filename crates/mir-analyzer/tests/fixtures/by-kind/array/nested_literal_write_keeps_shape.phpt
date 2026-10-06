@@ -75,4 +75,3 @@ function wrongValueIsStillRejected(): void {
     takesFields($a);
 //              ^^ InvalidArgument: Argument $shape of takesFields() expects 'array{'fields': array<string, int>}', got 'array{'fields': array{'k': "text"}}'
 }
-===expect===

@@ -24,4 +24,3 @@ function test(Service $s): void {
     $s->find()->missing();
 //  ^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
-===expect===

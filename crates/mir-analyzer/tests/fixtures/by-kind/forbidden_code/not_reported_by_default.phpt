@@ -7,4 +7,3 @@ function run(string $cmd): void {
     shell_exec($cmd);
     $_ = `ls`;
 }
-===expect===

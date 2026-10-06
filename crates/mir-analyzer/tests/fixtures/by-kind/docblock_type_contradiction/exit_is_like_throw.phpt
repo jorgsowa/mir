@@ -14,4 +14,3 @@ function foo(int $i): void {
 //  ^^^^^^^^^^^^ DocblockTypeContradiction: Type '2|3' makes '$a === "aaa"' impossible — this can never hold
 //  ^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '2|3' and '"aaa"' is always false — these types can never be identical
 }
-===expect===

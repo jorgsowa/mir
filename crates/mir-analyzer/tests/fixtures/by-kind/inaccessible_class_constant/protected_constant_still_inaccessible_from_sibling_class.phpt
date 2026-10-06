@@ -23,4 +23,3 @@ class Cousin extends Base {
 //                    ^^^^^^ InaccessibleClassConstant: Cannot access constant Child::SECRET
     }
 }
-===expect===

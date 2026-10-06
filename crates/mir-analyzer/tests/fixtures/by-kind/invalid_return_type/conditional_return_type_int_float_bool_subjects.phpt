@@ -47,4 +47,3 @@ echo $e;
 $f = boolCheck(1);
 /** @mir-check $f is bool */
 echo $f;
-===expect===

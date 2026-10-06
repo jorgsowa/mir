@@ -35,4 +35,3 @@ function f(): void {
         use1((string) ($a ?? $b));
     }
 }
-===expect===

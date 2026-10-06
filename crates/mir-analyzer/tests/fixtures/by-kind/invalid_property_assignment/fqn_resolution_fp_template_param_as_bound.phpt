@@ -56,4 +56,3 @@ $result = \Util\bind($b, $c);
 // Method: template param (K) as bound for W — no spurious violation
 $pair = new Pair();
 $mapped = $pair->map($b);
-===expect===

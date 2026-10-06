@@ -28,4 +28,3 @@ class Widget {
 //      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::extra() does not exist
     }
 }
-===expect===

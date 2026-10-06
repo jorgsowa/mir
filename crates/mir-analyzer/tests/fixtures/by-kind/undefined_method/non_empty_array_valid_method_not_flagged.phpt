@@ -17,4 +17,3 @@ function test(): void {
         $tag->label();
     }
 }
-===expect===

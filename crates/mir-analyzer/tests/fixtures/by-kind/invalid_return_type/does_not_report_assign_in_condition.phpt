@@ -9,4 +9,3 @@ function d(object|null $s): object {
     if (!($s = f())) { exit; }
     return $s;
 }
-===expect===

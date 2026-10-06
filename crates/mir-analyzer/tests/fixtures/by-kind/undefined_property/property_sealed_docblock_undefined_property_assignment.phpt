@@ -22,4 +22,3 @@ class A {
 
 $a = new A();
 $a->bar = 5;
-===expect===

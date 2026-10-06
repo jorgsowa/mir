@@ -7,4 +7,3 @@ class User {}
 
 namespace Other;
 class User {}
-===expect===

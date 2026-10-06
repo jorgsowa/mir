@@ -26,4 +26,3 @@ function test_property_exists_scalar_narrows_to_string($x): void {
         $_ = $x;
     }
 }
-===expect===

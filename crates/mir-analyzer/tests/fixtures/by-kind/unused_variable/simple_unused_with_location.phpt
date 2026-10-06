@@ -13,4 +13,3 @@ function example() {
 //  ^^^^^^^ UnusedVariable: Variable $unused is never read
     return 10;
 }
-===expect===

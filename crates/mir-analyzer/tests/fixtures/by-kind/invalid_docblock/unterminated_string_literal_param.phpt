@@ -17,4 +17,3 @@ reported the same way as the lone-quote case.
  */
 function bar($x): void {}
 //           ^^ MissingParamType: Parameter $x of bar() has no type annotation
-===expect===

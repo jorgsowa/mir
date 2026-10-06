@@ -28,4 +28,3 @@ function f($x) {
     }
     return $x;
 }
-===expect===

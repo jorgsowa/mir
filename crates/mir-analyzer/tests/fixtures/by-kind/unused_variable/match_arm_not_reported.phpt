@@ -9,4 +9,3 @@ function test(string $type): string {
         default => $msg,
     };
 }
-===expect===

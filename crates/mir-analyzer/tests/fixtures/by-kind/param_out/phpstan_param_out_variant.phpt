@@ -20,4 +20,3 @@ $names = null;
 collectNames($names);
 /** @mir-check $names is list<string> */
 $_ = $names;
-===expect===

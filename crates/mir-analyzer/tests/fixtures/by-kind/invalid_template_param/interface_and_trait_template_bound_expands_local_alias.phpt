@@ -37,4 +37,3 @@ class StringBox implements Box {}
  * @template T of IntOrFloat
  */
 trait BoxTrait {}
-===expect===

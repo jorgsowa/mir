@@ -26,4 +26,3 @@ function exactMatch(): string { return 'x'; }
  * @return T
  */
 function templated(mixed $x): mixed { return $x; }
-===expect===

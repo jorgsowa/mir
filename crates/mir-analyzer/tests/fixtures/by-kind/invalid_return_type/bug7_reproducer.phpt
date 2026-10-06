@@ -17,4 +17,3 @@ function indexErrors(): array
     }
     return $out;
 }
-===expect===

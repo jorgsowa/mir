@@ -8,4 +8,3 @@ class User {}
 
 class User {}
 //<^^^^^^^^^^^^^ DuplicateClass: Class App\User has already been defined
-===expect===

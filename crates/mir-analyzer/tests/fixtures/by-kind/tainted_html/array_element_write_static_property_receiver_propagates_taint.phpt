@@ -18,4 +18,3 @@ class Cache {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===

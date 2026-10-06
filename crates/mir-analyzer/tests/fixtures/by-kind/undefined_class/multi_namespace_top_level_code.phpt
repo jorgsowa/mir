@@ -18,4 +18,3 @@ namespace B {
     undefined_fn();
 //  ^^^^^^^^^^^^^^ UndefinedFunction: Function undefined_fn() is not defined
 }
-===expect===

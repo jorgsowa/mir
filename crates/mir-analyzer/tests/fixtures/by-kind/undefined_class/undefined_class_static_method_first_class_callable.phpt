@@ -11,4 +11,3 @@ must report UndefinedClass, matching the plain `Foo::bar()` call form.
 <?php
 $c = MissingClass::baz(...);
 //   ^^^^^^^^^^^^ UndefinedClass: Class MissingClass does not exist
-===expect===

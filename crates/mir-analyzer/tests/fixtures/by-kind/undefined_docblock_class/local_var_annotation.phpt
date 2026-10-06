@@ -19,4 +19,3 @@ function process(): void {
 function fetchSomething(): mixed {
     return null;
 }
-===expect===

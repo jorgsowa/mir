@@ -7,4 +7,3 @@ function f(?Config $c): void {
     clone $c;
 //  ^^^^^^^^ PossiblyInvalidClone: cannot clone possibly non-object Config|null
 }
-===expect===

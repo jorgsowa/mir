@@ -5,4 +5,3 @@ Too many arguments for constructor
 class A { }
 new A("hello");
 //<^^^^^^^^^^^^^^ TooManyArguments: Too many arguments for A::__construct(): expected 0, got 1
-===expect===

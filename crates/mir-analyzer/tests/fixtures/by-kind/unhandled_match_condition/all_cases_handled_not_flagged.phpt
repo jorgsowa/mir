@@ -13,4 +13,3 @@ function label(Status $s): string {
         Status::Inactive => 'inactive',
     };
 }
-===expect===

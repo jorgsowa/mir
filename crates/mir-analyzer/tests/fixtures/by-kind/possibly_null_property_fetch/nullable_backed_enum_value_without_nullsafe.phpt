@@ -10,4 +10,3 @@ function test(?Status $status): string {
 //  ^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
 //         ^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
 }
-===expect===

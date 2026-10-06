@@ -5,4 +5,3 @@ Specific error message
 $params = ["key" => "value"];
 echo $params["fieldName"];
 //           ^^^^^^^^^^^ NonExistentArrayOffset: Array offset 'fieldName' does not exist
-===expect===

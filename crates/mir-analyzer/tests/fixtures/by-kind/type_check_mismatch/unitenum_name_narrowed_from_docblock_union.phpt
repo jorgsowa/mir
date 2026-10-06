@@ -15,4 +15,3 @@ function describe($token): string
     }
     return (string) $token;
 }
-===expect===

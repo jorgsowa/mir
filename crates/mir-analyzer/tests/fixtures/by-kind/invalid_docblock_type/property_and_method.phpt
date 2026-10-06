@@ -11,4 +11,3 @@ class Bag {
      */
     public array $items = [];
 }
-===expect===

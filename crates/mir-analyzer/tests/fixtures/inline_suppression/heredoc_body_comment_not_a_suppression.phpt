@@ -19,4 +19,3 @@ echo hello
 BASH;
 new NoSuchClass();
 //  ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
-===expect===

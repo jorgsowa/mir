@@ -30,4 +30,3 @@ trait HasCacheLock {
 class FileStore implements Store {
     use HasCacheLock;
 }
-===expect===

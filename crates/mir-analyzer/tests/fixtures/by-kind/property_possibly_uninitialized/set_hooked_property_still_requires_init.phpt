@@ -16,4 +16,3 @@ final class Box {
 //                  ^^^^^^^^^^^ PropertyPossiblyUninitialized: Property Box::$value may be left uninitialized by the constructor
     }
 }
-===expect===

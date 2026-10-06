@@ -20,4 +20,3 @@ function process(): void {
             $_ = 1;
         };
 }
-===expect===

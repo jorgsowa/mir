@@ -32,4 +32,3 @@ function narrowsIsString(Box $b): void {
         $_ = 1;
     }
 }
-===expect===

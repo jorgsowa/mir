@@ -36,4 +36,3 @@ class Holder {
 
 /** @param enum-string $e */
 function acceptsEnumString(string $e): void {}
-===expect===

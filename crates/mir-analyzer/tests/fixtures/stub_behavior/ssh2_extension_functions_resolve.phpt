@@ -20,4 +20,3 @@ function connect(string $host, string $user, string $password) {
     ssh2_auth_password($session, $user, $password);
     return $session;
 }
-===expect===

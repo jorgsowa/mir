@@ -13,4 +13,3 @@ function test(\stdClass $obj): void {
     if ($obj != null) {}
 //      ^^^^^^^^^^^^ ImpossibleLooseComparison: '!=' between 'stdClass' and 'null' is always true — these types can never be loosely equal
 }
-===expect===

@@ -8,5 +8,3 @@ function maybeGhost(): mixed {
 //       ^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'GhostClass' does not exist
     return null;
 }
-
-===expect===

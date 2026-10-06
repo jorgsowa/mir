@@ -46,4 +46,3 @@ function invert(array $map): array {
     }
     return $result;
 }
-===expect===

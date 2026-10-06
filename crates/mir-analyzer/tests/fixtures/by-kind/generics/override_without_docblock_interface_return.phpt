@@ -36,4 +36,3 @@ function run(ListSource $s): void {
     /** @mir-check $r is Source<float> */
     sink($r);
 }
-===expect===

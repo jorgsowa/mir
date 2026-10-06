@@ -26,4 +26,3 @@ class Mailer {
         return Converter::convert('hello', withQuote: isset($this->hasMarkdown));
     }
 }
-===expect===

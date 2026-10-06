@@ -8,4 +8,3 @@ function foo(): string {
 Hello $name!
 EOT;
 }
-===expect===

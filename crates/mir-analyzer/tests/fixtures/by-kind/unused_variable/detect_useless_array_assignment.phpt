@@ -7,4 +7,3 @@ function foo() : void {
 //  ^^ UnusedVariable: Variable $a is never read
     $a[0] = 1;
 }
-===expect===

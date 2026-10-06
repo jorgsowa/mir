@@ -13,4 +13,3 @@ class Impl implements Boxed {
         throw new RuntimeException();
     }
 }
-===expect===

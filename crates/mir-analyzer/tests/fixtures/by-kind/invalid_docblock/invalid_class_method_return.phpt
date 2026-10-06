@@ -11,4 +11,3 @@ class C {
         return $this;
     }
 }
-===expect===

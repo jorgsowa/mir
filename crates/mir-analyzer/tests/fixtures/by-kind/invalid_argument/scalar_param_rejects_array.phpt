@@ -18,4 +18,3 @@ function f(array $arr): void {
     acceptsScalar($arr);
 //                ^^^^ InvalidArgument: Argument $v of acceptsScalar() expects 'scalar', got 'array'
 }
-===expect===

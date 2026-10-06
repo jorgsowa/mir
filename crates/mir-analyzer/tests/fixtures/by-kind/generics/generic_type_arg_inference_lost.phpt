@@ -31,4 +31,3 @@ function run(): void {
     // expect: InvalidArgument short-name AssetId vs FQN Demo\Ids\AssetId
     takes(make());
 }
-===expect===

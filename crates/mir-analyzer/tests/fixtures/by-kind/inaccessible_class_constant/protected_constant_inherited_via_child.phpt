@@ -10,4 +10,3 @@ class Child extends Base {}
 
 echo Child::CONFIG;
 //          ^^^^^^ InaccessibleClassConstant: Cannot access constant Child::CONFIG
-===expect===

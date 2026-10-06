@@ -19,4 +19,3 @@ class Factory {
 }
 
 (new Factory())->make();
-===expect===

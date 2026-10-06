@@ -23,4 +23,3 @@ class Consumer {
         return vendor_str_pad('hello', 10);
     }
 }
-===expect===

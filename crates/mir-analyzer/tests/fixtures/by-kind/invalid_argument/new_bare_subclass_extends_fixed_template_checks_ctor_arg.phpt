@@ -42,4 +42,3 @@ new IntBox("hello");
 
 $b = new IntBox(5);
 needsInt($b->getValue());
-===expect===

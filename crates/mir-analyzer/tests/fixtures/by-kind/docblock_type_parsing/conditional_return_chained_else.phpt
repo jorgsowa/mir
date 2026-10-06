@@ -38,4 +38,3 @@ function check(): void {
     /** @mir-check by_flag(false) is string */
     by_flag(false);
 }
-===expect===

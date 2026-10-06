@@ -17,5 +17,3 @@ $labels = array_map(
     $keys,
     $counts,
 );
-
-===expect===

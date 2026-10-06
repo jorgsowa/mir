@@ -26,4 +26,3 @@ function bump(): int {
     $fn();
     return $c->n;
 }
-===expect===

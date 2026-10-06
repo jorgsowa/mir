@@ -15,4 +15,3 @@ function test() {
     $b = 'value';
     return ${$a};
 }
-===expect===

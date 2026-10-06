@@ -18,4 +18,3 @@ function run_query(mysqli $db): void {
     $id = (int) $_GET['id'];
     mysqli_query($db, "SELECT * FROM t WHERE id = $id");
 }
-===expect===

@@ -8,4 +8,3 @@ $result = array_filter([1, 2, 3], function(int $x) {
 //                                ^ +2:1 MissingClosureReturnType: Closure has no return type annotation
     return $x > 1;
 });
-===expect===

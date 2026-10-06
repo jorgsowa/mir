@@ -29,4 +29,3 @@ class Widget {
 //      ^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method extra() on possibly null value
     }
 }
-===expect===

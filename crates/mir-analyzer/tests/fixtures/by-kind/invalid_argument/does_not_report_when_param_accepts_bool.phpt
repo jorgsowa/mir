@@ -15,4 +15,3 @@ function test(): void {
     takesBool(getResult());
 //            ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $b of takesBool() expects 'bool', possibly different type 'int|false' provided
 }
-===expect===

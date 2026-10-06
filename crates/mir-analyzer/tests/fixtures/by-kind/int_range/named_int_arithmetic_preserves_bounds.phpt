@@ -43,4 +43,3 @@ function test_neg_minus_one(int $a): void {
     /** @mir-check $x is int<min, -2> */
     $_ = $x;
 }
-===expect===

@@ -19,4 +19,3 @@ class A {
 
 $a = new A();
 $a->bar = "goodbye";
-===expect===

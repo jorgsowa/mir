@@ -16,4 +16,3 @@ function addCumulativeGlobals(int $left) : int {
 //  ^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $i in a @pure function
     return $left;
 }
-===expect===

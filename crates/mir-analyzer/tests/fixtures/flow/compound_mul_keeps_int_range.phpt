@@ -53,4 +53,3 @@ function floatOperand(): void {
     /** @mir-check $x is float */
     $_ = $x;
 }
-===expect===

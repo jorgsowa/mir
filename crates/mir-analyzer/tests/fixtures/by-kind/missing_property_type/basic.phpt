@@ -8,4 +8,3 @@ class User {
     public $age;
 //  ^^^^^^^^^^^ MissingPropertyType: Property User::$age has no type annotation
 }
-===expect===

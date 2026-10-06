@@ -6,4 +6,3 @@ function foo(int $param): int {
 //           ^^^^^^^^^^ UnusedParam: Parameter $param is never used
     return 42;
 }
-===expect===

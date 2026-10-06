@@ -7,4 +7,3 @@ $a = rand(0, 1) > 0 ? 5 : ["hello"];
 if (is_array($a)) {
     echo $a[0];
 }
-===expect===

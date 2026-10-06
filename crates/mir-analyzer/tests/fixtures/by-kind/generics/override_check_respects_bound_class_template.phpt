@@ -38,4 +38,3 @@ class UnboundSub extends Box {
     /** @param mixed $x */
     public function set($x): void {}
 }
-===expect===

@@ -17,5 +17,3 @@ if (isset($arr[0])) {
 }
 
 $var = "foo";
-
-===expect===

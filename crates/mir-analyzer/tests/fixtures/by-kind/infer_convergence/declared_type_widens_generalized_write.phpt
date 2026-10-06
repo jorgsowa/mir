@@ -23,4 +23,3 @@ function test(array $counts, string $key): void {
         $_ = $counts;
     }
 }
-===expect===

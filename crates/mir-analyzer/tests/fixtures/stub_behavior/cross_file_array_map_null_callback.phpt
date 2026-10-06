@@ -15,4 +15,3 @@ function zipArrays(array $a, array $b): array {
 ===file:Main.php===
 <?php
 $pairs = zipArrays([1, 2], ['a', 'b']);
-===expect===

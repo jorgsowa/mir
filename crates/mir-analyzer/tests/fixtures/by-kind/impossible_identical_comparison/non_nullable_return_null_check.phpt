@@ -20,4 +20,3 @@ function test(string $input): void {
     $c = $maybe === null ? 'direct' : 'referral';
     echo $a, $b, $c;
 }
-===expect===

@@ -15,4 +15,3 @@ class TestDouble {
 function test(): void {
     (new TestDouble())->anyMethod()->anotherMethod();
 }
-===expect===

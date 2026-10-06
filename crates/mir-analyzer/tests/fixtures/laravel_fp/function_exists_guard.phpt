@@ -21,4 +21,3 @@ function compress(string $data): string {
     }
     return lzf_compress($data);
 }
-===expect===

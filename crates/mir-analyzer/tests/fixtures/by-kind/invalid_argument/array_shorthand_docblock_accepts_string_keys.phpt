@@ -18,4 +18,3 @@ function log(string $message, array $context = []): void {}
 function withStringKeys(): void {
     log('oops', ['requestId' => '42', 'userId' => '7']);
 }
-===expect===

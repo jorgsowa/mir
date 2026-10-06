@@ -8,4 +8,3 @@ class A {
 
 $a = rand(0, 1) ? new A : false;
 $a->bar();
-===expect===

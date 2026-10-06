@@ -7,4 +7,3 @@ function test(): void {
         \Optional\Pkg::create();
     }
 }
-===expect===

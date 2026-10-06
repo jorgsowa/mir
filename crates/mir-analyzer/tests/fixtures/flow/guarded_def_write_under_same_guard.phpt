@@ -88,4 +88,3 @@ function writeInElse(): void {
     if ($on) { echo 'a'; } else { $items = [2]; }
     if ($on) { echo count($items); }
 }
-===expect===

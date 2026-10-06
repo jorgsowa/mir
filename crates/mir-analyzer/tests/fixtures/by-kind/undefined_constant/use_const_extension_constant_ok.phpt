@@ -12,4 +12,3 @@ function kind(): int {
     /** @mir-check $k is int */
     return $k;
 }
-===expect===

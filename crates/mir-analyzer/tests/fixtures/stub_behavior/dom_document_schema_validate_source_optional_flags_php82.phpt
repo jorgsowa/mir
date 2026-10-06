@@ -18,4 +18,3 @@ $defaultFlags = $document->schemaValidateSource($schema);
 $namedFlags = $document->schemaValidateSource(source: $schema, flags: 0);
 $missingSource = $document->schemaValidateSource();
 //               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for schemaValidateSource(): expected 1, got 0
-===expect===

@@ -17,4 +17,3 @@ class X {
      */
     public function boo(A $class): void {}
 }
-===expect===

@@ -16,4 +16,3 @@ class Foo {
 /** @var string|Foo $val */
 $val = new Foo();
 $name = $val->name;
-===expect===

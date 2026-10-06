@@ -5,4 +5,3 @@ Object doesnt work in71
 function foo(): object {
     return new stdClass();
 }
-===expect===

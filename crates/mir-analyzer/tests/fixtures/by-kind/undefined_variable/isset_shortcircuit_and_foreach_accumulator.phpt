@@ -20,4 +20,3 @@ function test(array $items): void {
         $prev = $v;
     }
 }
-===expect===

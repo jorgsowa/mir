@@ -11,4 +11,3 @@ String increment
 $a = "hello";
 $a++;
 //<^^ InvalidOperand: Operator '++' not supported for operand of type '"hello"'
-===expect===

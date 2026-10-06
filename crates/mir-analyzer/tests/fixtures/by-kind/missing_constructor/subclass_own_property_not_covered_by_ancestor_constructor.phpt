@@ -17,5 +17,3 @@ class WidgetTest extends TestCaseBase {
     }
 }
 class Logger {}
-
-===expect===

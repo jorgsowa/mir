@@ -53,4 +53,3 @@ function caller(): void {
 function make(): Gen {
     return new Gen();
 }
-===expect===

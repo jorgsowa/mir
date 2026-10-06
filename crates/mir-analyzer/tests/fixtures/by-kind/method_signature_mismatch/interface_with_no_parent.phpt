@@ -7,5 +7,3 @@ interface I {
 //  ^^^^^^^^^^^ InvalidOverride: Method I::f() has #[Override] but no parent method exists to override
     public function f(): void;
 }
-
-===expect===

@@ -13,4 +13,3 @@ function make(): Money
 {
     return new Money();
 }
-===expect===

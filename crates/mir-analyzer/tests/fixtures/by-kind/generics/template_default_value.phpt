@@ -34,4 +34,3 @@ function makeWithBound() {
 $y = makeWithBound();
 /** @mir-check $y is Name */
 echo (string) $y;
-===expect===

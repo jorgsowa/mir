@@ -15,4 +15,3 @@ function test(int $x): void {
     if ($x !== "world") {}
 //      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between 'int' and '"world"' is always true — these types can never be identical
 }
-===expect===

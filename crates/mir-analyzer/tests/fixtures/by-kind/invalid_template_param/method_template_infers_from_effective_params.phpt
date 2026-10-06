@@ -35,4 +35,3 @@ function test(): void {
     $box = new Box(new Foo());
     $box->getOr(new Foo());
 }
-===expect===

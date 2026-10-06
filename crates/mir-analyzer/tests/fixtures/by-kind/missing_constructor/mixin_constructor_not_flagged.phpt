@@ -14,5 +14,3 @@ class Widget {
     private Logger $logger;
 }
 class Logger {}
-
-===expect===

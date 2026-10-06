@@ -19,4 +19,3 @@ function test(): void {
     g(new A());
 //    ^^^^^^^ InvalidArgument: Argument $b of g() expects 'array', got 'A'
 }
-===expect===

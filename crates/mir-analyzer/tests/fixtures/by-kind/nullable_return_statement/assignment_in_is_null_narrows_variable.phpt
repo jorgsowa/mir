@@ -16,4 +16,3 @@ class Repo {
         throw new \RuntimeException('Not found');
     }
 }
-===expect===

@@ -16,4 +16,3 @@ function formatDate(string $date): string {
         $date
     ) ?? '';
 }
-===expect===

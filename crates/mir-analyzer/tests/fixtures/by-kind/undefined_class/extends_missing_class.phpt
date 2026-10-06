@@ -4,4 +4,3 @@ extends missing class
 <?php
 class Foo extends MissingBase {}
 //                ^^^^^^^^^^^ UndefinedClass: Class MissingBase does not exist
-===expect===

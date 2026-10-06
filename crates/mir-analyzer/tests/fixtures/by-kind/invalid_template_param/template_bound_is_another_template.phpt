@@ -19,4 +19,3 @@ class Binder {
 
 $binder = new Binder();
 $binder->bind(IFoo::class, Bar::class);
-===expect===

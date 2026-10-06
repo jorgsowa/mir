@@ -15,4 +15,3 @@ class Client {
 //                         ^^^^^^^^^^^^^^ InvalidArgument: Argument $json of json_decode() expects 'string', got 'App\Body'
     }
 }
-===expect===

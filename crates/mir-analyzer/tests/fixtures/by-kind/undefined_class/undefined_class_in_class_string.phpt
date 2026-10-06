@@ -19,4 +19,3 @@ function instantiateClass($className) {
 // SHOULD emit UndefinedClass because it's documented as class-string
 instantiateClass("NonExistentClass");
 //               ^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NonExistentClass does not exist
-===expect===

@@ -33,4 +33,3 @@ onA(fn(HasLabel $e) => null);
 onA(function (Err $e): void {});
 onEither(fn(Err $e) => null);
 (new Bus())->on(fn(Err $e) => null);
-===expect===

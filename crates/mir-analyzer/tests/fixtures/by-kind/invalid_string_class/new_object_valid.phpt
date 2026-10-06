@@ -14,4 +14,3 @@ class Foo {}
 function test(Foo $obj) {
     new $obj();
 }
-===expect===

@@ -10,4 +10,3 @@ function label(int $n): string {
         3 => "three",
     };
 }
-===expect===

@@ -29,4 +29,3 @@ final class ConcreteContainer extends Container {
         return new Other();
     }
 }
-===expect===

@@ -15,4 +15,3 @@ class Container {
      */
     private $items = [];
 }
-===expect===

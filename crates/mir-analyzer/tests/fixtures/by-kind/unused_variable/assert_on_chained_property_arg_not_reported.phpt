@@ -55,4 +55,3 @@ final class SomeTest extends TestCase
         self::assertSame(2, $dto->id);
     }
 }
-===expect===

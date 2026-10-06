@@ -10,4 +10,3 @@ InterfaceInstantiation fires when instantiating a built-in PHP interface from th
 <?php
 $t = new Traversable();
 //       ^^^^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Traversable
-===expect===

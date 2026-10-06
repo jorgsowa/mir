@@ -21,4 +21,3 @@ function earlyReturnOnMatch(array $arr): void {
     $arr['item']->fooOnly();
 //  ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::fooOnly() does not exist
 }
-===expect===

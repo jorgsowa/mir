@@ -8,4 +8,3 @@ enum Status: string {
 //                ^ BackedEnumCaseTypeMismatch: Backed enum case Status::Active has value of type 1, but backing type is string
     case Inactive = 'inactive';
 }
-===expect===

@@ -19,4 +19,3 @@ function run(string $s): void {
     /** @mir-check $matches is list<list<string>> */
     $_ = $matches;
 }
-===expect===

@@ -24,4 +24,3 @@ function useDb(Db $db): int {
     $db->connect();
     return $db->connection->lastId;
 }
-===expect===

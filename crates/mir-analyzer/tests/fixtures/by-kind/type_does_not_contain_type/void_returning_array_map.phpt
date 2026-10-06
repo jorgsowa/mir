@@ -18,4 +18,3 @@ $arr = array_map(
 foreach ($arr as $a) {
     if ($a) {}
 }
-===expect===

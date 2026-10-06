@@ -20,4 +20,3 @@ function a_fn(): int { return b_fn() + nope_fn(); }
 ===file:b.inc===
 <?php
 function b_fn(): int { return 1; }
-===expect===

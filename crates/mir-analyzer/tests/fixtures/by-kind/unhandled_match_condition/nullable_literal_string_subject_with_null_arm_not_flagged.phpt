@@ -11,4 +11,3 @@ function label($s): string {
         null => "N",
     };
 }
-===expect===

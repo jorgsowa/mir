@@ -17,4 +17,3 @@ function makeFoo(): mixed {
 }
 
 makeFoo();
-===expect===

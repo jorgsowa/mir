@@ -11,4 +11,3 @@ class Child extends Base {
 //      ^^^^^^^^^^^^^ AbstractMethodCall: Cannot call abstract method Base::foo()
     }
 }
-===expect===

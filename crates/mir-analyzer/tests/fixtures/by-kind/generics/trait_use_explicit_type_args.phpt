@@ -39,4 +39,3 @@ function readsStringBox(StringBox $box): void {
     /** @mir-check $box->get() is string */
     $_ = 1;
 }
-===expect===

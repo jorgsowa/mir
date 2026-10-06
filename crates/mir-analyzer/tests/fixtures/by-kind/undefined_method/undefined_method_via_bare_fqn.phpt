@@ -12,4 +12,3 @@ function consume(): void {
     $s->nonexistent();
 //  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Service::nonexistent() does not exist
 }
-===expect===

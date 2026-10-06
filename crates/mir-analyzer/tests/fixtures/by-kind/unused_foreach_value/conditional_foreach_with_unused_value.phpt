@@ -6,5 +6,3 @@ if (rand(0, 1) > 0) {
     foreach ([1, 2, 3] as $val) {}
 //                        ^^^^ UnusedForeachValue: Foreach value $val is never read
 }
-
-===expect===

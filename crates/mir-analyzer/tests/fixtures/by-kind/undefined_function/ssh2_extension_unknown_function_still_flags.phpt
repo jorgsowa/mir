@@ -9,4 +9,3 @@ function f(): void {
     ssh2_connect_not_a_real_function('x');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function ssh2_connect_not_a_real_function() is not defined
 }
-===expect===

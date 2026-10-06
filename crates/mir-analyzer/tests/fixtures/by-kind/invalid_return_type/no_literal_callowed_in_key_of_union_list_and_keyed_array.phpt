@@ -9,5 +9,3 @@ function getKey() {
     return "c";
 //  ^^^^^^^^^^^ InvalidReturnType: Return type '"c"' is not compatible with declared 'int|"a"|"b"'
 }
-
-===expect===

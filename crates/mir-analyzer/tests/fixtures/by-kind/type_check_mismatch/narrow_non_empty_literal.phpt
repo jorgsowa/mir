@@ -24,4 +24,3 @@ function test_numeric_literal_narrow(string $x): void {
         $_ = $x;
     }
 }
-===expect===

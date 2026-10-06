@@ -14,4 +14,3 @@ function test(mixed $x): void {
     if ($x === "foo") {}
     if ($x === 42) {}
 }
-===expect===

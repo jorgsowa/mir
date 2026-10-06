@@ -12,5 +12,3 @@ in ways the reference tracker may not capture.
 abstract class NeverExtended {
     abstract public function work(): void;
 }
-
-===expect===

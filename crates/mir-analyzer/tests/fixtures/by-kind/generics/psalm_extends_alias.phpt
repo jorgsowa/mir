@@ -26,4 +26,3 @@ function test(): void {
     /** @mir-check $box->value is int */
     $_ = $box->value;
 }
-===expect===

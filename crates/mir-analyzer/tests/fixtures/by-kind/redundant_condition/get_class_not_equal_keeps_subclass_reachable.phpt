@@ -39,4 +39,3 @@ function isFinal(Sealed $x): void {
         echo "unreachable";
     }
 }
-===expect===

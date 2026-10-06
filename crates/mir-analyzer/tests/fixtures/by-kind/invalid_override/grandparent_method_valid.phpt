@@ -16,4 +16,3 @@ class Child extends Middle {
     #[\Override]
     public function render(): void {}
 }
-===expect===

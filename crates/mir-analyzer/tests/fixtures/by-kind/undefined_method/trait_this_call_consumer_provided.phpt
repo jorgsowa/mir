@@ -26,4 +26,3 @@ class UsesIt {
 
     public static function range(int $a, int $b): array { return [$a, $b]; }
 }
-===expect===

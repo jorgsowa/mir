@@ -45,4 +45,3 @@ class A {
         echo 1;
     }
 }
-===expect===

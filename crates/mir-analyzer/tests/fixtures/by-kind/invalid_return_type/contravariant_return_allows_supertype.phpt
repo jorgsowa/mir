@@ -23,4 +23,3 @@ function make(): Consumer {
     $c = new Consumer();
     return $c;
 }
-===expect===

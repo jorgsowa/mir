@@ -76,4 +76,3 @@ final class Bag {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $items expects 'non-empty-list<int>', cannot assign 'list<int>'
     }
 }
-===expect===

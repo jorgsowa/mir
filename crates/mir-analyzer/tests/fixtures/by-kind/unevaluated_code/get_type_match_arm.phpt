@@ -16,4 +16,3 @@ $x = match (gettype($a)) {
     "integer", "string" => 2,
     default => 3,
 };
-===expect===

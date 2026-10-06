@@ -24,4 +24,3 @@ function callFromOutside(C $c): void {
     $c->foo();
 //  ^^^^^^^^^ UndefinedMethod: Method C::foo() does not exist
 }
-===expect===

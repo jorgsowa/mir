@@ -14,4 +14,3 @@ class Complete {
 
     public function foo(): void {}
 }
-===expect===

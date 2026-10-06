@@ -20,4 +20,3 @@ function prepare(int $x, mixed &$out): void {
 prepare(7, $s);
 /** @mir-check $s is string */
 $_ = $s;
-===expect===

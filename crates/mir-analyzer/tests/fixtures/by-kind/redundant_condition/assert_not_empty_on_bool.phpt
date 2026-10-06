@@ -22,4 +22,3 @@ function foo(bool $bar) : void {
     if ($bar) {}
 //      ^^^^ RedundantCondition: Condition is always true, so the check is redundant
 }
-===expect===

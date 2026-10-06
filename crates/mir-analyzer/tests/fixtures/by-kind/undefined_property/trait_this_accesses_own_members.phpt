@@ -19,4 +19,3 @@ trait LockableTrait {
 class Service {
     use LockableTrait;
 }
-===expect===

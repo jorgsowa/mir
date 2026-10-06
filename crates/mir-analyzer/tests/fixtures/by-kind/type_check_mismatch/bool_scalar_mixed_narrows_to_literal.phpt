@@ -55,4 +55,3 @@ function mixedNeqFalse(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

@@ -25,4 +25,3 @@ function test() {
     $a++;
 //  ^^ UnusedVariable: Variable $a is never read
 }
-===expect===

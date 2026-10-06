@@ -7,4 +7,3 @@ class Greeter {
 }
 $g = new Greeter();
 $g->sayHello();
-===expect===

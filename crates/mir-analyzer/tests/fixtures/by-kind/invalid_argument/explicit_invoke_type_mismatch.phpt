@@ -13,4 +13,3 @@ class A {
 }
 (new A)->__invoke(1);
 //                ^ ArgumentTypeCoercion: Argument $p of __invoke() expects 'string', got '1' — coercion may fail at runtime
-===expect===

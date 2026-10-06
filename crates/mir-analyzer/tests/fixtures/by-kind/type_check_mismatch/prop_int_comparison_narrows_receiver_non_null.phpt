@@ -39,4 +39,3 @@ function greaterOrEqualZeroDoesNotNarrowReceiver(?Node $n): void {
         $_ = 1;
     }
 }
-===expect===

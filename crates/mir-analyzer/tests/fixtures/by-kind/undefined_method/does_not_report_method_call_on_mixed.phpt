@@ -8,4 +8,3 @@ function test(): void {
     $x->anything();
 //  ^^^^^^^^^^^^^^ MixedMethodCall: Method anything() called on mixed type
 }
-===expect===

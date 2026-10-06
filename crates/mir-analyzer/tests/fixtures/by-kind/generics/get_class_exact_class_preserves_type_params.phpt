@@ -46,4 +46,3 @@ function viaDynamicClassConst(Box $b): int {
     }
     return 0;
 }
-===expect===

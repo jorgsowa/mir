@@ -18,4 +18,3 @@ function directAccess(string $colorString): float {
     /** @mir-check $replaced is string */
     return (float) $replaced;
 }
-===expect===

@@ -15,4 +15,3 @@ function test(): void {
 //          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function array_key_list() is not defined
     $_ = $keys;
 }
-===expect===

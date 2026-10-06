@@ -19,4 +19,3 @@ function f($a, &$b) {
 
 f(b: $result, a: 1);
 echo $result;
-===expect===

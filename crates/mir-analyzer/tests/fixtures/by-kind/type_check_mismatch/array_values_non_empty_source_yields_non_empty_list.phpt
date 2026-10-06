@@ -15,4 +15,3 @@ function test(array $map): void {
     /** @mir-check $vals is non-empty-list<int> */
     $_ = $vals;
 }
-===expect===

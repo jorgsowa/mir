@@ -8,4 +8,3 @@ abstract class Base {
 function call_run(Base $b): void {
     $b->nonExistentMethod();
 }
-===expect===

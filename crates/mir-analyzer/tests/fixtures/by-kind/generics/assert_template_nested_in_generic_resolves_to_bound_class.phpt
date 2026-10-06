@@ -25,4 +25,3 @@ function test(mixed $value): void {
     /** @mir-check $value is list<Vendor\Dog> */
     echo "ok";
 }
-===expect===

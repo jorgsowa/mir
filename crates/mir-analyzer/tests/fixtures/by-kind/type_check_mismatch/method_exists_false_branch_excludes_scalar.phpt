@@ -29,4 +29,3 @@ function test_property_exists_false_branch($x): void {
         $_ = $x;
     }
 }
-===expect===

@@ -20,4 +20,3 @@ function test(int $n): void {
         $_ = $n;
     }
 }
-===expect===

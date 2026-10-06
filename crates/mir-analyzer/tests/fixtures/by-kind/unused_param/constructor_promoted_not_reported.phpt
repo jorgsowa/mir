@@ -16,4 +16,3 @@ class Tagged {
         protected int $priority = 0,
     ) {}
 }
-===expect===

@@ -11,4 +11,3 @@ class AppConfig extends Config {
         return parent::ENV;
     }
 }
-===expect===

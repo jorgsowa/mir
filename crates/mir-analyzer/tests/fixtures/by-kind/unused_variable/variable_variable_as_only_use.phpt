@@ -15,4 +15,3 @@ function test() {
     $foo = 'bar';
     return $$varName;
 }
-===expect===

@@ -33,4 +33,3 @@ function guarded(): array
     }
     return $out;
 }
-===expect===

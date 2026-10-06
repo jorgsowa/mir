@@ -12,4 +12,3 @@ class Foo
 #[Foo(self::BAR_CONST)]
 class Bar {}
                 
-===expect===

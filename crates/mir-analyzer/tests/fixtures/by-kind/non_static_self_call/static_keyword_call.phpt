@@ -10,4 +10,3 @@ class Widget {
 //             ^^^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Widget::render() cannot be called statically
     }
 }
-===expect===

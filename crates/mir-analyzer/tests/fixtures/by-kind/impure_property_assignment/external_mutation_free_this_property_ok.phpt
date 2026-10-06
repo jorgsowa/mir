@@ -12,4 +12,3 @@ class Updater {
         $this->state = 'active';
     }
 }
-===expect===

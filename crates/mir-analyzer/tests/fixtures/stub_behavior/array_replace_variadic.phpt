@@ -14,4 +14,3 @@ $result = array_replace(['x' => 1]);
 $result2 = array_replace(['x' => 1], ['y' => 2]);
 // array_replace with multiple replacement arrays
 $result3 = array_replace(['x' => 1], ['y' => 2], ['z' => 3]);
-===expect===

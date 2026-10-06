@@ -18,4 +18,3 @@ function sub(mixed $m): void {
     $b = $m * [1];
 //       ^^^^^^^^ InvalidOperand: Operator '*' not supported between 'mixed' and 'array{0: 1}'
 }
-===expect===

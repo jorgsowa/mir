@@ -13,5 +13,3 @@ class Bar
 
 Bar::$deprecatedProperty;
 //   ^^^^^^^^^^^^^^^^^^^ DeprecatedProperty: Property Bar::$deprecatedProperty is deprecated
-
-===expect===

@@ -23,4 +23,3 @@ function test(): void {
     /** @mir-check $d is int */
     echo 4;
 }
-===expect===

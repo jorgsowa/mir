@@ -9,4 +9,3 @@ function decimalChunks(): int {
         8 => 18,
     };
 }
-===expect===

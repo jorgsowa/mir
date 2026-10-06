@@ -14,4 +14,3 @@ function dispatch(Event $e): void {
 }
 
 dispatch(new MyEvent());
-===expect===

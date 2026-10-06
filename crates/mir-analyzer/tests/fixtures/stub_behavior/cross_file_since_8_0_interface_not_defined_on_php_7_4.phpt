@@ -18,4 +18,3 @@ class Label implements \Stringable {
 <?php
 $label = new Label('hello');
 echo $label;
-===expect===

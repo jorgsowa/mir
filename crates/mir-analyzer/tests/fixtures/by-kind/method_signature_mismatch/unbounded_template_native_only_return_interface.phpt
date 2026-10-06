@@ -28,4 +28,3 @@ function use_it(Shade $s): void {
     /** @mir-check $r is Wither */
     echo get_class($r);
 }
-===expect===

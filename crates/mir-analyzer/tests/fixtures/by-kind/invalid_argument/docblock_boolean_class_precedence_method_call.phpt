@@ -23,4 +23,3 @@ $handler = new Handler();
 $handler->accepts(new Boolean());
 $handler->accepts(false);
 //                ^^^^^ InvalidArgument: Argument $value of accepts() expects 'Regression\DocblockTypePrecedence\Boolean', got 'false'
-===expect===

@@ -42,4 +42,3 @@ trait HolderTrait {
         $c::make();
     }
 }
-===expect===

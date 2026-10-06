@@ -9,4 +9,3 @@ matching what it actually yields.
 function declaredClasses(): array {
     return get_declared_classes();
 }
-===expect===

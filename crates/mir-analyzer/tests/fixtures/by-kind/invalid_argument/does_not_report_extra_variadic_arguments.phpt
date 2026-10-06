@@ -10,4 +10,3 @@ does not report extra variadic arguments
 <?php
 function many(int $first, int ...$rest): void {}
 many(1, 2, 3);
-===expect===

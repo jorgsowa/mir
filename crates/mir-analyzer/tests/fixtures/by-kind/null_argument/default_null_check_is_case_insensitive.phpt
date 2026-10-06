@@ -11,4 +11,3 @@
 /** @param string $f */
 function plain($f = NULL): void {}
 plain(null);
-===expect===

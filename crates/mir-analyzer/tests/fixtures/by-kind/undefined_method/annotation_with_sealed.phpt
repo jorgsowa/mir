@@ -14,4 +14,3 @@ class Child extends ParentClass {}
 $child = new Child();
 $child->getString();
 $child->foo();
-===expect===

@@ -5,4 +5,3 @@ does not report correct return type
 function f(): int {
     return 42;
 }
-===expect===

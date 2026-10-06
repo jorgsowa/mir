@@ -31,4 +31,3 @@ function selectedInfo(CurlHandle $handle): void {
     $info = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
     /** @mir-check $info is mixed */
 }
-===expect===

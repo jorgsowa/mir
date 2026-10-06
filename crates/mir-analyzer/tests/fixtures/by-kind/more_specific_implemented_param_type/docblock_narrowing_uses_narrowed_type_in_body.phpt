@@ -26,4 +26,3 @@ class EmailProcessor extends Processor {
         $subject = $msg->getSubject();
     }
 }
-===expect===

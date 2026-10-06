@@ -38,4 +38,3 @@ $invalid = $document->createElement('not a name');
 
 $dynamic = $document->createElement(runtimeName());
 /** @mir-check $dynamic is DOMElement|false */
-===expect===

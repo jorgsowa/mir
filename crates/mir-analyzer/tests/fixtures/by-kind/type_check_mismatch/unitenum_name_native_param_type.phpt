@@ -8,4 +8,3 @@ function label(UnitEnum $e): string
 {
     return $e->name;
 }
-===expect===

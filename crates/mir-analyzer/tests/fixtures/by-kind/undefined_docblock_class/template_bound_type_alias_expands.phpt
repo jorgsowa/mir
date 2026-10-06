@@ -32,4 +32,3 @@ class Box {
 new Box(new Related());
 new Box(new Unrelated());
 //<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'
-===expect===

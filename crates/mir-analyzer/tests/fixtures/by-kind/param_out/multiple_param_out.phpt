@@ -25,4 +25,3 @@ unpack(["name" => "Alice", "age" => 30], $n, $a);
 $_ = $n;
 /** @mir-check $a is int */
 $_ = $a;
-===expect===

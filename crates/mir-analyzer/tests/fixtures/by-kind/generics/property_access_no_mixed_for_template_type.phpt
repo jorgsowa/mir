@@ -38,4 +38,3 @@ function template_value_prop(array $arr): void {
         $v->data; // V is a template param — must not fire MixedPropertyFetch
     }
 }
-===expect===

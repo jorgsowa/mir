@@ -29,4 +29,3 @@ function run(Box $b, Helper $h): void {
 //  ^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
 //           ^^^^^ ImpurePropertyAssignment: Assigning to property n of a parameter in a pure or external-mutation-free context
 }
-===expect===

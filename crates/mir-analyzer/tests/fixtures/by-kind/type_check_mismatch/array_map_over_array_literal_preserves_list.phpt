@@ -18,4 +18,3 @@ $mapped = array_map(function (int $x) {
 }, $arr);
 /** @mir-check $mapped is non-empty-list<int> */
 $_ = $mapped;
-===expect===

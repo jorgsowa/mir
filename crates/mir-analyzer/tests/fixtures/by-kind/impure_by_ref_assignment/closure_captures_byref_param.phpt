@@ -21,4 +21,3 @@ function pureFn(int &$x): void {
     };
     $f();
 }
-===expect===

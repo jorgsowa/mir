@@ -31,4 +31,3 @@ function test_nonneg(int $x): void {
         $_ = $x;
     }
 }
-===expect===

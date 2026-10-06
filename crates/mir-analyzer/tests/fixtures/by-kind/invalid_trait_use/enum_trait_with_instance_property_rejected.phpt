@@ -39,4 +39,3 @@ enum Kind {
 function f(Kind $k): string {
     return $k->describe();
 }
-===expect===

@@ -15,4 +15,3 @@ function test(): void {
     if ($a === $b) {}
 //      ^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '5' and '6' is always false — these types can never be identical
 }
-===expect===

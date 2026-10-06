@@ -43,4 +43,3 @@ class NotAModel {}
 $r = new Relation();
 $r->add(new NotAModel());
 //      ^^^^^^^^^^^^^^^ InvalidArgument: Argument $model of add() expects 'Model', got 'NotAModel'
-===expect===

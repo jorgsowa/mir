@@ -11,5 +11,3 @@ References ignore var annotation
 $a = 1;
 /** @var int */
 $b = &$a;
-
-===expect===

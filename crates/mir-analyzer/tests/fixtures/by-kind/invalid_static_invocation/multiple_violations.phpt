@@ -11,4 +11,3 @@ Api::getUser();
 //<^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Api::getUser() cannot be called statically
 Api::postUser();
 //<^^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Api::postUser() cannot be called statically
-===expect===

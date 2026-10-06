@@ -15,4 +15,3 @@ $bam = array_map(
     },
     $bar
 );
-===expect===

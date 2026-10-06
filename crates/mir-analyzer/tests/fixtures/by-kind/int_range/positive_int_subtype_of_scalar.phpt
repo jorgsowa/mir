@@ -13,4 +13,3 @@ function count_(): int { return 1; }
 function run(): void {
     equalTo(count_());
 }
-===expect===

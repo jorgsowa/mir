@@ -34,4 +34,3 @@ function arraySearchNarrowsStaticProp(): void {
         $_ = 1;
     }
 }
-===expect===

@@ -18,5 +18,3 @@ class A
 // ^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::a() signature mismatch: parameter $a type 'string' is incompatible with parent type 'int'
  */
 class B extends A {}
-
-===expect===

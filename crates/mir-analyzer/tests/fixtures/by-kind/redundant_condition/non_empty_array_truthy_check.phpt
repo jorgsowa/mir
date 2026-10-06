@@ -16,4 +16,3 @@ function test(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

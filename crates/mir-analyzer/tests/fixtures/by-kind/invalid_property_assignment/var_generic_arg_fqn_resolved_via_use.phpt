@@ -33,4 +33,3 @@ class MyTest {
         echo "ok";
     }
 }
-===expect===

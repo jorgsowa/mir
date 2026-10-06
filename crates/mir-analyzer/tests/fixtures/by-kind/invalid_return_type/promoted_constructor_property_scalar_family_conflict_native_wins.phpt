@@ -19,4 +19,3 @@ function f(Wrong $w): string {
     return $w->value;
 //  ^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
 }
-===expect===

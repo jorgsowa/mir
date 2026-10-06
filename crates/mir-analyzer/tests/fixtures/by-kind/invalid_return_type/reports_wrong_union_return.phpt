@@ -7,4 +7,3 @@ function f(): int {
     return $x;
 //  ^^^^^^^^^^ InvalidReturnType: Return type '1|"hello"' is not compatible with declared 'int'
 }
-===expect===

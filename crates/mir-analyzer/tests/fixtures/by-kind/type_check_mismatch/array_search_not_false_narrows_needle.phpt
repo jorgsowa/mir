@@ -32,4 +32,3 @@ function test_false_branch_removes_literals(string $mode): void {
         $_ = $mode;
     }
 }
-===expect===

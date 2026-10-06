@@ -28,4 +28,3 @@ function assign_optional_to_required(Box $b, array $optionalShape): void {
 function assign_required_to_required(Box $b, array $requiredShape): void {
     $b->shape = $requiredShape;
 }
-===expect===

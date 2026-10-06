@@ -27,4 +27,3 @@ function testIsReal($x) {
         return sqrt($x);
     }
 }
-===expect===

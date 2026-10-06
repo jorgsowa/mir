@@ -38,4 +38,3 @@ function test_map_key_last(array $map): void {
     /** @mir-check $k is int|string */
     $_ = $k;
 }
-===expect===

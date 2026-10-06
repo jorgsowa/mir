@@ -12,5 +12,3 @@ function foo(int $n): void {
 
 foo(3.7);
 //  ^^^ InvalidArgument: Argument $n of foo() expects 'int', got '3.7'
-
-===expect===

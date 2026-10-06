@@ -11,4 +11,3 @@ function foo($arg) {}
 
 foo(false);
 //  ^^^^^ InvalidArgument: Argument $arg of foo() expects 'true|string', got 'false'
-===expect===

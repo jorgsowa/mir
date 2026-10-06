@@ -20,4 +20,3 @@ function yieldFirst(): \Generator {
     yield 1;
     return;
 }
-===expect===

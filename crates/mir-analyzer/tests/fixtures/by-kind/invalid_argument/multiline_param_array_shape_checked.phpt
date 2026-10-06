@@ -19,4 +19,3 @@ function f(array $data): void {}
 
 f("not an array");
 //^^^^^^^^^^^^^^ InvalidArgument: Argument $data of f() expects 'array{'id': int, 'name': string}', got '"not an array"'
-===expect===

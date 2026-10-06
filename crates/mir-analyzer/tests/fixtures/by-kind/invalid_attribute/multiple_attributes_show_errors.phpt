@@ -11,5 +11,3 @@ class Bar {}
 #[Foo, Bar]
 //     ^^^ InvalidAttribute: Attribute Bar cannot be used on this target
 class Baz {}
-
-===expect===

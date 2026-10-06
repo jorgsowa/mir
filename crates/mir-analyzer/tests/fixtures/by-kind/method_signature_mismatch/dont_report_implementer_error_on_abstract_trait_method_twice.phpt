@@ -15,4 +15,3 @@ final class A {
         return $foo;
     }
 }
-===expect===

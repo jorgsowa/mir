@@ -19,4 +19,3 @@ class GrandChild extends Mid {
         return GrandParent::LIMIT;
     }
 }
-===expect===

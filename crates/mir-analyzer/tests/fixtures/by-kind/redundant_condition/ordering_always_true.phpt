@@ -17,4 +17,3 @@ function test(int $a): void {
         // always taken
     }
 }
-===expect===

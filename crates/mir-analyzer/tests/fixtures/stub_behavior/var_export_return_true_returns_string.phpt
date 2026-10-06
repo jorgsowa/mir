@@ -11,4 +11,3 @@ var_export with $return=true returns string, not string|null
 $exported = var_export(['key' => 'value'], true);
 /** @mir-check $exported is string */
 echo $exported;
-===expect===

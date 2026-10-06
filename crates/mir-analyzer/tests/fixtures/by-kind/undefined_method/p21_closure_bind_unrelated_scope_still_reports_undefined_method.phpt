@@ -27,4 +27,3 @@ class Filter {
         return Closure::bind($copy, null, Other::class);
     }
 }
-===expect===

@@ -12,4 +12,3 @@ Mixed assignment
 $a = 5;
 $b = $a;
 //<^^^^^^^ MixedAssignment: Variable $b is assigned a mixed type
-===expect===

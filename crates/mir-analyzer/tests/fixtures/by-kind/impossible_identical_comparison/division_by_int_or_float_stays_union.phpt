@@ -18,4 +18,3 @@ function test(int $maxDigits, int $mul, int $value): void {
         echo "nonzero";
     }
 }
-===expect===

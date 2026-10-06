@@ -13,4 +13,3 @@ function parseQuery(string $s): array {
     /** @mir-check $s is array */
     return $s;
 }
-===expect===

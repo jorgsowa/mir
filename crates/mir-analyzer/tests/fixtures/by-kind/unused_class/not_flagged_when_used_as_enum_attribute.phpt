@@ -19,4 +19,3 @@ enum Status {
 }
 
 Status::Active;
-===expect===

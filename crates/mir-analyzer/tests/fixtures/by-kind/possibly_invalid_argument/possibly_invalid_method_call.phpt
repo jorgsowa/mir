@@ -13,4 +13,3 @@ function example($x, bool $isObject) : void {
         $x->methodOfA();
     }
 }
-===expect===

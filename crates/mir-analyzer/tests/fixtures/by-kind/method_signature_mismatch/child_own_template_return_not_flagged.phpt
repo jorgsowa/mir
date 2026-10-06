@@ -36,4 +36,3 @@ class IntRepo implements Repo {
         return 1;
     }
 }
-===expect===

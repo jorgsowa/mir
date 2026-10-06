@@ -35,4 +35,3 @@ function lastIsNullNarrowsEmpty(): void {
         $_ = 1;
     }
 }
-===expect===

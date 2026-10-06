@@ -19,4 +19,3 @@ Generic arguments reject backslash-qualified keywords case-insensitively.
 function f($a) {
     return 1;
 }
-===expect===

@@ -5,4 +5,3 @@ DOM appendChild with DOMElement (subclass of DOMNode) should satisfy template bo
 $el = new DOMElement('x');
 $parent = new DOMNode();
 $parent->appendChild($el);
-===expect===

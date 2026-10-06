@@ -19,4 +19,3 @@ final class Attr {
 function f(Attr $attr): int {
     return match ($attr->value) { 'a' => 1, 'b' => 2 };
 }
-===expect===

@@ -13,4 +13,3 @@ class B extends A {
     echo $a;
   }
 }
-===expect===

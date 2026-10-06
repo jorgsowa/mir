@@ -16,4 +16,3 @@ foreach (Suit::cases() as $case) {
         Suit::Clubs => "Black",
     };
 }
-===expect===

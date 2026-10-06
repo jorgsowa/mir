@@ -10,4 +10,3 @@ class A {
         $this->foo = 5;
     }
 }
-===expect===

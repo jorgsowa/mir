@@ -10,4 +10,3 @@ trait Timestampable {
 //<^ +2:1 DuplicateTrait: Trait Timestampable has already been defined
     public function updatedAt(): string { return ''; }
 }
-===expect===

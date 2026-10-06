@@ -35,4 +35,3 @@ function run(array $mixed, int|string $v, array $flags, array $nullable): void {
     takes_name_map($nullable);
 //                 ^^^^^^^^^ InvalidArgument: Argument $map of takes_name_map() expects 'array<int|string, non-empty-string>', got 'list<string|null>'
 }
-===expect===

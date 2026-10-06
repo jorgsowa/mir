@@ -9,4 +9,3 @@ function foo(): void {
         $x = 1;
     };
 }
-===expect===

@@ -37,4 +37,3 @@ function test_matching_partial_type_arg_now_flagged_for_arity(): void {
 //  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
     needsStringIntMap($m);
 }
-===expect===

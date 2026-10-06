@@ -7,5 +7,3 @@ class Foo
 {
     public const BAR = 1;
 }
-
-===expect===

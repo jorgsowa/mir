@@ -14,4 +14,3 @@ Prevent string docblock type
 function map2(callable $mapper): void {}
 
 map2("foo");
-===expect===

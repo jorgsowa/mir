@@ -75,4 +75,3 @@ final class Consumer {
         $this->keys = array_keys(iterator_to_array($bag));
     }
 }
-===expect===

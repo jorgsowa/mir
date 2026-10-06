@@ -30,4 +30,3 @@ function rejectsNested(): void {
     str_replace('a', [['nested']], 'subject');
 //                   ^^^^^^^^^^^^ InvalidArgument: Argument $replace of str_replace() expects 'string|array<int|string, scalar|Stringable|null>', got 'array{0: array{0: "nested"}}'
 }
-===expect===

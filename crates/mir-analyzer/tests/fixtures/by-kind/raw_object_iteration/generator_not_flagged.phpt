@@ -10,4 +10,3 @@ function gen(): \Generator {
 function process(): void {
     yield from gen();
 }
-===expect===

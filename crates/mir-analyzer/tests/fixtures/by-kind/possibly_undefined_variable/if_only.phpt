@@ -7,4 +7,3 @@ function foo(bool $c): string {
     return $r;
 //         ^^ PossiblyUndefinedVariable: Variable $r might not be defined
 }
-===expect===

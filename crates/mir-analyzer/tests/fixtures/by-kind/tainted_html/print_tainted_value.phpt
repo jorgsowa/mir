@@ -12,4 +12,3 @@ function test(): void {
     print($_GET['x']);
 //  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

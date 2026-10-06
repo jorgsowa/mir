@@ -21,4 +21,3 @@ class A {
 $bar = 5;
 $a = new A($bar);
 $bar = null;
-===expect===

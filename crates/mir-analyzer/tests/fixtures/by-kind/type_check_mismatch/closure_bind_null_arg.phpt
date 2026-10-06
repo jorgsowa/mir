@@ -19,4 +19,3 @@ if ($unbound) {
     $result = $unbound();
     /** @mir-check $result is bool */
 }
-===expect===

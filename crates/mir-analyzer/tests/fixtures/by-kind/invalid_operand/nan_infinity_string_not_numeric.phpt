@@ -14,4 +14,3 @@ $a = "NAN" + 1;
 $b = "INF" * 2;
 //   ^^^^^^^^^ InvalidOperand: Operator '*' not supported between '"INF"' and '2'
 $c = "5" + 1;
-===expect===

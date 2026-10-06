@@ -7,4 +7,3 @@ class A {
 //                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $howManyTimes is never used
 //                                                  ^^^^^^^^^^^^^^^^^^^ UndefinedConstant: Constant A::DEFAULT_TIMES is not defined
 }
-===expect===

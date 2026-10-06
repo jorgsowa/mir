@@ -10,4 +10,3 @@ function items(Config|\ArrayIterator $source): \Generator {
     yield from $source;
 //             ^^^^^^^ PossiblyRawObjectIteration: Cannot iterate over possibly non-iterable object 'Config|ArrayIterator'
 }
-===expect===

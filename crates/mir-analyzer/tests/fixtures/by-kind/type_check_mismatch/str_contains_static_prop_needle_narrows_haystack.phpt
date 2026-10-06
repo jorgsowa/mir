@@ -42,4 +42,3 @@ function test_empty_static_prop_needle_not_narrowed(string $haystack): void {
         $_ = $haystack;
     }
 }
-===expect===

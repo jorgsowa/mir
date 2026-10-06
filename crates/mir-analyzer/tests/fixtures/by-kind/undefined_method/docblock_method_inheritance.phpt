@@ -14,4 +14,3 @@ class Child extends ParentClass {
 
 $obj = new Child();
 $obj->getName();
-===expect===

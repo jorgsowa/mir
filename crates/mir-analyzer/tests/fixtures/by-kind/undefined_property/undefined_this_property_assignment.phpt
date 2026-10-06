@@ -7,4 +7,3 @@ class A {
         $this->foo = "cool";
     }
 }
-===expect===

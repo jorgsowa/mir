@@ -8,4 +8,3 @@ abstract class Base {
 function f(Base $b): void {
     $b->run();
 }
-===expect===

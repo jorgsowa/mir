@@ -16,4 +16,3 @@ function test(int $x): void {
         $_ = $x;
     }
 }
-===expect===

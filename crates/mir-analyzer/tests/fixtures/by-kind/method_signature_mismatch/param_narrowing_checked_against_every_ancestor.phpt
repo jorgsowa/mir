@@ -20,4 +20,3 @@ class C implements IB, IA {
     public function f(Dog $a): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method C::f() signature mismatch: parameter $a type 'Dog' is narrower than parent type 'Animal'
 }
-===expect===

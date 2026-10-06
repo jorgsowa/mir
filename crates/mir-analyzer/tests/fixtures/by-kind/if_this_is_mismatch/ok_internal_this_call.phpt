@@ -23,4 +23,3 @@ class Box {
 }
 $b = new Box(5);
 $b->onlyInt();
-===expect===

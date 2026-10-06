@@ -43,4 +43,3 @@ final class Box {
 new Box([1 => ['id' => 1, 'name' => 'a']]);
 new Box('nope');
 //      ^^^^^^ InvalidArgument: Argument $items of App\Models\Box::__construct() expects 'array<int, array{'id': int, 'name': string}>', got '"nope"'
-===expect===

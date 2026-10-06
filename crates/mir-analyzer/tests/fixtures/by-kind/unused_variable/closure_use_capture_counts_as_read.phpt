@@ -32,4 +32,3 @@ function arrow_like(int $base): int {
     $fn = fn (int $x): int => $x + $offset;
     return $fn($base);
 }
-===expect===

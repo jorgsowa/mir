@@ -14,4 +14,3 @@ trait TemplateLoader {
 final class Generator {
     use TemplateLoader;
 }
-===expect===

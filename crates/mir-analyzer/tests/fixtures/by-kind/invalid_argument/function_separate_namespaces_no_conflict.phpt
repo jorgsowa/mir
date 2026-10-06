@@ -8,4 +8,3 @@ namespace Aye {
 namespace Bee {
     function foo(): void {}
 }
-===expect===

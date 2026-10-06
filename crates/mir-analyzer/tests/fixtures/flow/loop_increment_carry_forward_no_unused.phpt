@@ -29,4 +29,3 @@ function findPrefix(array $lines, string $needle): int {
     }
     return 0;
 }
-===expect===

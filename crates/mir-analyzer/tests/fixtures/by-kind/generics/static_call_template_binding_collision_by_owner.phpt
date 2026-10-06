@@ -47,4 +47,3 @@ function ownMemberStillCorrect(Wrapper $w): void {
     /** @mir-check $w->extra is string */
     $_ = $w->extra;
 }
-===expect===

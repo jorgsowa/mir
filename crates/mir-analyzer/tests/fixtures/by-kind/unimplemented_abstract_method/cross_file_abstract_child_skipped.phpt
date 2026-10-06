@@ -15,4 +15,3 @@ abstract class Polygon extends Shape {
 class Triangle extends Polygon {
     public function area(): float { return 0.5; }
 }
-===expect===

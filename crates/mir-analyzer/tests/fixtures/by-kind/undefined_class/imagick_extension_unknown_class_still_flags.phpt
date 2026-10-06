@@ -13,4 +13,3 @@ flagged undefined.
 <?php
 function f(NotARealImagickClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealImagickClass does not exist
-===expect===

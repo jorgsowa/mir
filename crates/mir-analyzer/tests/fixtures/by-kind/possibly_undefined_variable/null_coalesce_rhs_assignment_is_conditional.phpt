@@ -12,4 +12,3 @@ function test(): void {
     echo $y;
 //       ^^ PossiblyUndefinedVariable: Variable $y might not be defined
 }
-===expect===

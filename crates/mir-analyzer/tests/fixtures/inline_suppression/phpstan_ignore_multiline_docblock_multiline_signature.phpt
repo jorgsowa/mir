@@ -16,4 +16,3 @@ class C {
     ): void {
     }
 }
-===expect===

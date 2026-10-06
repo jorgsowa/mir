@@ -9,5 +9,3 @@ class Foo {}
 
 $r = new ReflectionClass(Foo::class);
 $r->getAttributes(Attr::class);
-
-===expect===

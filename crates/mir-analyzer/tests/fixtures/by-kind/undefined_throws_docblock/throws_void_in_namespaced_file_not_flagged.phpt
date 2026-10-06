@@ -33,4 +33,3 @@ final class Overridden extends Base {
 function useOverride(Overridden $o): void {
     $o->risky();
 }
-===expect===

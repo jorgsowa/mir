@@ -15,4 +15,3 @@ function test(): void {
     (new TestDouble())->anyMethod()->anotherMethod();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method anotherMethod() called on mixed type
 }
-===expect===

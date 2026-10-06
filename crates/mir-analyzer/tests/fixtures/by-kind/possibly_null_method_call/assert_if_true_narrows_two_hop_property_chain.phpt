@@ -35,4 +35,3 @@ function test(Container $c): void {
         $c->box->inner->bar();
     }
 }
-===expect===

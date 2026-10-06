@@ -8,4 +8,3 @@ if (!isset($x) || (!isset($y) || ($x->foo() && $y->bar()))) {
 //                                             ^^^^^^^^^ MixedMethodCall: Method bar() called on mixed type
     // Should not error: $x and $y are both defined in their respective branches
 }
-===expect===

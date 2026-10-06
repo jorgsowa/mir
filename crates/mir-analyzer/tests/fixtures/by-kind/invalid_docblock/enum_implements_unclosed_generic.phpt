@@ -10,4 +10,3 @@ interface Container {}
 // ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @implements has unclosed generic type `Container<int`
  */
 enum Status implements Container { case A; case B; }
-===expect===

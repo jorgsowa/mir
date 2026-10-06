@@ -7,5 +7,3 @@ $fn = null;
 
 $fn();
 //<^^^^^ MixedFunctionCall: Cannot call mixed type as a function
-
-===expect===

@@ -18,4 +18,3 @@ class T {
 //                            ^^^^^^^^^^^^^^ TooManyArguments: Too many arguments for configure(): expected 0, got 1
     }
 }
-===expect===

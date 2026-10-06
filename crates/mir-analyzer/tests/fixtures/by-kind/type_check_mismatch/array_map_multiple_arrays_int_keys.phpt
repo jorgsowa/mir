@@ -18,4 +18,3 @@ function test(array $a, array $b): void {
     /** @mir-check $r is array<int, int> */
     $_ = $r;
 }
-===expect===

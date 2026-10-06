@@ -68,4 +68,3 @@ function fx($i) {
 $o = fx(null);
 /** @mir-check $o is A\B\Item|null */
 echo 1;
-===expect===

@@ -13,5 +13,3 @@ $x = null;
 if ($x !== null) {
     $val = $x[0];
 }
-
-===expect===

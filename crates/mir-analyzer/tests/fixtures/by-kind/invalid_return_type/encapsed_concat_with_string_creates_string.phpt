@@ -17,4 +17,3 @@ since the keyword wasn't recognized at all.
 function foo(string $s1, string $s2): string {
     return "hello $s1 $s2";
 }
-===expect===

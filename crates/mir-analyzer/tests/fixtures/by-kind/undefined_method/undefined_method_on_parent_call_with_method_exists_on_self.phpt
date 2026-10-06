@@ -15,4 +15,3 @@ class B extends A {
 //             ^^^^^^^^^^^^^ UndefinedMethod: Method A::foo() does not exist
     }
 }
-===expect===

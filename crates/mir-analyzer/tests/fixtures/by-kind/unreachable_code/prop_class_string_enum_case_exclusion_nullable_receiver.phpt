@@ -58,4 +58,3 @@ function enumCaseExclusionDivergesOnNonNullableReceiver(StatusHolder $h): void {
         $_ = 1;
     }
 }
-===expect===

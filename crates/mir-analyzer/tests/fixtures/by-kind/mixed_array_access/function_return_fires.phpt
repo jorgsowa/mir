@@ -7,4 +7,3 @@ function getMixed(): mixed {
 }
 echo getMixed()[0];
 //   ^^^^^^^^^^^^^ MixedArrayAccess: Array access on mixed type
-===expect===

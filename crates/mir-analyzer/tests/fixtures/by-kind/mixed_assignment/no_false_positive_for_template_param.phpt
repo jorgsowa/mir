@@ -39,4 +39,3 @@ function copy_list(array $items): void {
         $local = $item;  // no MixedAssignment; T has a bound but is still a param
     }
 }
-===expect===

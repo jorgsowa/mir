@@ -40,4 +40,3 @@ function infersTemplatesFromSpread(Pair $p): void {
     /** @mir-check $result is array{0: "x", 1: 42} */
     $_ = 1;
 }
-===expect===

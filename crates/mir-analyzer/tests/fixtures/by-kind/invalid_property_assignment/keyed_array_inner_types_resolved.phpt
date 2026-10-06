@@ -26,4 +26,3 @@ class Repository {
 
 $repo = new Repository();
 $repo->query(['type' => 'active', 'count' => 10]);
-===expect===

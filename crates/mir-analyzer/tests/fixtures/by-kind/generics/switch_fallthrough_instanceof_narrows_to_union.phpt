@@ -36,4 +36,3 @@ function bar_literal(int $x): void {
             break;
     }
 }
-===expect===

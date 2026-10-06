@@ -19,4 +19,3 @@ class Foo {
 //        ^^^^^^^^^^^^^^^^^ InvalidAttribute: Attribute OnlyClassConstant cannot be used on this target
     ) {}
 }
-===expect===

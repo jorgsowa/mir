@@ -24,4 +24,3 @@ function processResource(File|Stream $resource): void {
     }
 
 }
-===expect===

@@ -13,4 +13,3 @@ class Foo {
 
     private function helper(): void {}
 }
-===expect===

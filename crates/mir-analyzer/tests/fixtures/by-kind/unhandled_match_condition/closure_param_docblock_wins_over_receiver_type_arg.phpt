@@ -37,4 +37,3 @@ load()->getOrThrow(
         return new NotFound();
     },
 );
-===expect===

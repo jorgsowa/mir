@@ -13,4 +13,3 @@ argument as compatible with anything, silencing this entirely
 function needsInt(int $x): void {}
 needsInt([1, 2, 3]);
 //       ^^^^^^^^^ InvalidArgument: Argument $x of needsInt() expects 'int', got 'array{0: 1, 1: 2, 2: 3}'
-===expect===

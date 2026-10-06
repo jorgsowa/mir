@@ -33,4 +33,3 @@ function fromEnumConst(): int {
     /** @mir-check $y is int */
     return $y;
 }
-===expect===

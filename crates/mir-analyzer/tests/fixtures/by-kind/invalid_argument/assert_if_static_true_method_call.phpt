@@ -26,4 +26,3 @@ class C {
         }
     }
 }
-===expect===

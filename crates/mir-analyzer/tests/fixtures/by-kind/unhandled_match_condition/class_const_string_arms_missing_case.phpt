@@ -13,4 +13,3 @@ function f(string $x): string {
         C::A => 'x',
     };
 }
-===expect===

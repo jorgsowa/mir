@@ -35,4 +35,3 @@ function test_dowhile(int $n): void {
     } while ($n < 4);
 //           ^^^^^^ DocblockTypeContradiction: Type 'int<5, max>' makes '$n < 4' impossible — this can never hold
 }
-===expect===

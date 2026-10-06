@@ -10,4 +10,3 @@ interface Logger {
 //<^ +2:1 DuplicateInterface: Interface Logger has already been defined
     public function write(string $msg): void;
 }
-===expect===

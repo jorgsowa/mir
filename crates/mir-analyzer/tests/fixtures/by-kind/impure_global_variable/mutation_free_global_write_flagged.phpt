@@ -34,4 +34,3 @@ class Registry {
 //      ^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property count of a parameter in a pure or external-mutation-free context
     }
 }
-===expect===

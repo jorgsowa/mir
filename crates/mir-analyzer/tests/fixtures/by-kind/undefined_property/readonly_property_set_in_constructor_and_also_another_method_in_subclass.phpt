@@ -19,4 +19,3 @@ class B extends A {
 //      ^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property A::$bar outside of constructor
     }
 }
-===expect===

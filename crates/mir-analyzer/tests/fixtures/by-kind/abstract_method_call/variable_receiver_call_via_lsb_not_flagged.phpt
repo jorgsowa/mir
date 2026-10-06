@@ -10,4 +10,3 @@ class Consumer {
         return $l::getType();
     }
 }
-===expect===

@@ -11,4 +11,3 @@ class Child extends Base {
         self::foo();
     }
 }
-===expect===

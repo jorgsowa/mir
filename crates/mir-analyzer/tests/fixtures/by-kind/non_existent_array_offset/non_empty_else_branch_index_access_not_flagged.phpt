@@ -18,4 +18,3 @@ function acceptsNonEmptyBranch(array $values): int {
 
     return $values[0];
 }
-===expect===

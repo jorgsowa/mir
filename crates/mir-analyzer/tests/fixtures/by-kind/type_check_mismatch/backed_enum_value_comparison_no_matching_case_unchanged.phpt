@@ -25,4 +25,3 @@ function noMatch(Suit $s): void {
         $_ = 1;
     }
 }
-===expect===

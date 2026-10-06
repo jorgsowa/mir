@@ -10,5 +10,3 @@ Valid cast from string to int - string is implicitly converted to int, should no
 ===file===
 <?php
 $x = (int)"42";
-
-===expect===

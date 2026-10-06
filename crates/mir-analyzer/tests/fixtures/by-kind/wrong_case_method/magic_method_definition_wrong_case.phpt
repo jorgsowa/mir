@@ -20,4 +20,3 @@ class Foo {
     public function __debuginfo(): array { return []; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__debuginfo' has incorrect casing; use '__debugInfo'
 }
-===expect===

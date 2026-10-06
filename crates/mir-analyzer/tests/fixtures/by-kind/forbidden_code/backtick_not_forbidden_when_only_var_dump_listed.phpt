@@ -14,4 +14,3 @@ function run(string $cmd): void {
     var_dump($cmd);
 //  ^^^^^^^^^^^^^^ ForbiddenCode: Use of var_dump is forbidden
 }
-===expect===

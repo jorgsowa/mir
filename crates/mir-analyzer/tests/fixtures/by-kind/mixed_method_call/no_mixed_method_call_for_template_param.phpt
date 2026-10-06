@@ -28,4 +28,3 @@ function call_bounded_method($obj): void {
     // T of object — must not fire MixedMethodCall
     $obj->process();
 }
-===expect===

@@ -33,4 +33,3 @@ function unwrapIfIntBox(Box $b): int {
     }
     return 0;
 }
-===expect===

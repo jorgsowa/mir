@@ -7,4 +7,3 @@ trait Logging {
 //    ^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
     public function log(): void {}
 }
-===expect===

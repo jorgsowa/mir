@@ -21,4 +21,3 @@ function f(?Foo $foo): void {
 //      ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::baz() does not exist
     }
 }
-===expect===

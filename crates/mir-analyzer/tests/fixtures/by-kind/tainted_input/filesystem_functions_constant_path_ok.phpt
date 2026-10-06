@@ -14,4 +14,3 @@ function test(): void {
     copy('/tmp/a', $_GET['dest']);
     chmod('/tmp/a', 0644);
 }
-===expect===

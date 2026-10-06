@@ -10,4 +10,3 @@ class Counter {
         return $this->count;
     }
 }
-===expect===

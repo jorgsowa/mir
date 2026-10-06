@@ -24,4 +24,3 @@ function f(\ReflectionClass $reflectionClass): void {
 }
 
 function maybeThrow(): void {}
-===expect===

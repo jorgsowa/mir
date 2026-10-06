@@ -22,4 +22,3 @@ function processArray($data) {
     // Using a known function string - should NOT emit false positives
     return array_filter($data, "strlen");  // strlen exists, so this is OK
 }
-===expect===

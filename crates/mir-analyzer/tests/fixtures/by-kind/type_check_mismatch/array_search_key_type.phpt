@@ -23,4 +23,3 @@ function test_search_string_keyed(array $arr, int $needle): void {
     /** @mir-check $key is string|false */
     $_ = $key;
 }
-===expect===

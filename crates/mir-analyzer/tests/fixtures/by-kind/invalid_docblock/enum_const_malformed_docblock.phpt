@@ -12,4 +12,3 @@ enum Suit {
      */
     const FOO = 1;
 }
-===expect===

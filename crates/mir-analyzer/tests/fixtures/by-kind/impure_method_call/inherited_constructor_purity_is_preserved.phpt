@@ -22,4 +22,3 @@ class DomainException extends IntermediateException {
         parent::__construct($message);
     }
 }
-===expect===

@@ -12,4 +12,3 @@ final class Foo {
 }
 
 get_class_methods('Foo');
-===expect===

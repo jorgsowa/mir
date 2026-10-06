@@ -29,4 +29,3 @@ class Repo {
         $_ = 1;
     }
 }
-===expect===

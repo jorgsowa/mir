@@ -58,4 +58,3 @@ function check_non_variadic($x) {
      */
     var_dump($x);
 }
-===expect===

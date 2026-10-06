@@ -10,4 +10,3 @@ function test(): void {
     } catch (Exception) {
     }
 }
-===expect===

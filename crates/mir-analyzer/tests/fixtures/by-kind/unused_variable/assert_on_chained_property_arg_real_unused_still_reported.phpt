@@ -31,4 +31,3 @@ final class SomeTest extends TestCase
         self::assertSame(1, $this->dto->id);
     }
 }
-===expect===

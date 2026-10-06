@@ -29,4 +29,3 @@ function run(int $i, string $s, ?int $n): void {
     takes_positive(fn(): ?int => $n);
 //                 ^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takes_positive() expects 'callable returning positive-int', got 'callable returning int|null'
 }
-===expect===

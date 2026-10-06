@@ -22,5 +22,3 @@ final class Foo implements HasId {
 
 /** @param list<positive-int> $ids */
 function baz(array $ids): void {}
-
-===expect===

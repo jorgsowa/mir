@@ -18,4 +18,3 @@ function wrap(callable $c): void {
     /** @mir-check $x is Closure */
     $_ = $x;
 }
-===expect===

@@ -30,4 +30,3 @@ final class ReadService implements Reader {
     public function strict(string ...$ids): array { return []; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method ReadService::strict() signature mismatch: parameter $ids type 'string' is incompatible with parent type 'int'
 }
-===expect===

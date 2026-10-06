@@ -8,4 +8,3 @@ function test(): void {
     foo();
 //  ^^^^^ UndefinedFunction: Function foo() is not defined
 }
-===expect===

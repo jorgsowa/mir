@@ -12,4 +12,3 @@ function check_contains(string $text, string $needle): void {
 ===file:App.php===
 <?php
 check_contains('hello world', 'world');
-===expect===

@@ -22,4 +22,3 @@ class A {
 //      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'array<int, A>', cannot assign 'array<int|string, A>'
     }
 }
-===expect===

@@ -4,4 +4,3 @@ not reported when not final
 <?php
 class Base {}
 class Child extends Base {}
-===expect===

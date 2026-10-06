@@ -24,4 +24,3 @@ class Concrete extends Base {}
 function wrap($item): void {}
 
 wrap(fn(): Concrete => new Concrete());
-===expect===

@@ -21,4 +21,3 @@ namespace NS {
 namespace OtherNS {
     class C {}
 }
-===expect===

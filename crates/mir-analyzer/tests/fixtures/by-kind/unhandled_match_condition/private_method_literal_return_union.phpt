@@ -75,4 +75,3 @@ class Str {
         return match ($this->kind()) { 'x' => 1, 'y' => 2 };
     }
 }
-===expect===

@@ -53,4 +53,3 @@ function testElseAfterNarrowing(string|null $value) {
         return null;
     }
 }
-===expect===

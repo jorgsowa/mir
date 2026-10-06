@@ -18,4 +18,3 @@ function build(): Needs {
     echo strlen(Factory::make());
     return new Needs(Factory::make());
 }
-===expect===

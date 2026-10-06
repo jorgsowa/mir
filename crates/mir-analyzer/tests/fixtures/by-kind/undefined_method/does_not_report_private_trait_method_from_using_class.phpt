@@ -11,4 +11,3 @@ class MyClass {
         $this->privateMethod();
     }
 }
-===expect===

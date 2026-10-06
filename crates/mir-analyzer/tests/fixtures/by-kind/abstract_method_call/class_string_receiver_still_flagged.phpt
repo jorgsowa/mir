@@ -12,4 +12,3 @@ class Consumer {
 //             ^^^^^^^^^^^^^^^ AbstractMethodCall: Cannot call abstract method Loader::getType()
     }
 }
-===expect===

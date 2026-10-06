@@ -37,4 +37,3 @@ function bad($parent, $other, $parentList, $parentMap): void {
     map($parentMap);
 //      ^^^^^^^^^^ InvalidArgument: Argument $c of map() expects 'array<string, class-string<I>>', got 'array<string, class-string<P>>'
 }
-===expect===

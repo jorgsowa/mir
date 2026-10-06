@@ -10,4 +10,3 @@ function apply(callable $fn): void {
     $fn('not an int');
 //      ^^^^^^^^^^^^ InvalidArgument: Argument $arg0 of callable() expects 'int', got '"not an int"'
 }
-===expect===

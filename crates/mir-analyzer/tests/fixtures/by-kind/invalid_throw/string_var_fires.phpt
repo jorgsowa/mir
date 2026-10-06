@@ -6,4 +6,3 @@ Throwing a string variable fires InvalidThrow
 $e = 'error message';
 throw $e;
 //<^^^^^^^^^ InvalidThrow: Thrown type 'string' does not extend Throwable
-===expect===

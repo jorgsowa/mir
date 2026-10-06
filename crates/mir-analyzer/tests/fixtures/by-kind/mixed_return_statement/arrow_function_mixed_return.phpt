@@ -12,4 +12,3 @@ MixedReturnStatement when returning a mixed value, mirroring the equivalent
 <?php
 $f = fn(): string => json_decode('{}');
 //                   ^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
-===expect===

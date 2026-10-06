@@ -27,4 +27,3 @@ function f(array $x): void {
     /** @mir-check $r is int|string */
     $_ = $r;
 }
-===expect===

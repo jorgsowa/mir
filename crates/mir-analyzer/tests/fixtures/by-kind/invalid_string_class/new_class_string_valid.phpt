@@ -14,4 +14,3 @@ function test(string $className) {
     /** @var class-string<Foo> $className */
     new $className();
 }
-===expect===

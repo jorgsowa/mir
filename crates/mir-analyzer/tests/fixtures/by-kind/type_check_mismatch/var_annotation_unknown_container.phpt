@@ -19,4 +19,3 @@ function main(mixed $container): void {
     /** @mir-check $repo is UserRepository */
     $repo->find(1);
 }
-===expect===

@@ -23,4 +23,3 @@ function inspect(string $code): void {
 function inspectFile(string $path): ast\Node {
     return ast\parse_file($path, 90);
 }
-===expect===

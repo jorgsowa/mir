@@ -8,4 +8,3 @@ trait HasName {
     protected $description;
 //  ^^^^^^^^^^^^^^^^^^^^^^ MissingPropertyType: Property HasName::$description has no type annotation
 }
-===expect===

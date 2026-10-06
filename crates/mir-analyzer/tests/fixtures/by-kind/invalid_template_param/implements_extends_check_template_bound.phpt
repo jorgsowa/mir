@@ -37,4 +37,3 @@ class BadBag implements Container {}
 /** @extends AbstractBox<NotBase> */
 class BadBox extends AbstractBox {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
-===expect===

@@ -35,4 +35,3 @@ function unguardedDefault(\ReflectionParameter $p): void {
     $p->getDefaultValue();
 //  ^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception ReflectionException is thrown but not declared in @throws
 }
-===expect===

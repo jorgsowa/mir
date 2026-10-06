@@ -13,4 +13,3 @@ class StillExternalMutationFree implements Cache {
         return 1;
     }
 }
-===expect===

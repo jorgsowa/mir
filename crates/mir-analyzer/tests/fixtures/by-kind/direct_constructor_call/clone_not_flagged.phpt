@@ -18,4 +18,3 @@ class Registry {
         $this->__construct($this->name . '_copy');
     }
 }
-===expect===

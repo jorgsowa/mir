@@ -13,4 +13,3 @@ unrelated issue on the very same physical line.
 <?php
 $x = "// @psalm-suppress UndefinedClass"; new NoSuchClass();
 //                                            ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
-===expect===

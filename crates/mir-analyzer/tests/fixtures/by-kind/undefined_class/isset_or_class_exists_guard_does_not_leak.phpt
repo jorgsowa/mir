@@ -20,4 +20,3 @@ function f($x): void {
     new \Totally\Undefined\GuardLeak();
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class Totally\Undefined\GuardLeak does not exist
 }
-===expect===

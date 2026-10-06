@@ -6,4 +6,3 @@ Array filter key callback
  * @var array<int, string> $arg
  */
 array_filter($arg, "strlen", ARRAY_FILTER_USE_KEY);
-===expect===

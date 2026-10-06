@@ -26,4 +26,3 @@ final class Impl implements Shape {
         $_x = $a;
     }
 }
-===expect===

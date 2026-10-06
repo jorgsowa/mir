@@ -12,4 +12,3 @@ class Child extends Base {
     public static function foo(): void {}
 }
 Child::bar();
-===expect===

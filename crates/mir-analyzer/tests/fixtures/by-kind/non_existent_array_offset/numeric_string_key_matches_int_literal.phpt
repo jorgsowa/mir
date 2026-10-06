@@ -9,4 +9,3 @@ function f(): void {
     $arr = ['0' => 'x', '1' => 'y'];
     echo $arr[0];
 }
-===expect===

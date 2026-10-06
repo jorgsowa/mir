@@ -8,4 +8,3 @@ class A {}
 
 (new A)->foo;
 //       ^^^ UndefinedProperty: Property A::$foo does not exist
-===expect===

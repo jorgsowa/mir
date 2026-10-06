@@ -18,4 +18,3 @@ function move(string $dir): void {}
 
 move("up");
 //   ^^^^ InvalidArgument: Argument $dir of move() expects '"north"|"south"|"east"|"west"', got '"up"'
-===expect===

@@ -18,4 +18,3 @@ function foo(int $i): void {
     if ($a) {}
 //      ^^ PossiblyUndefinedVariable: Variable $a might not be defined
 }
-===expect===

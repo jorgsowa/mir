@@ -12,4 +12,3 @@ enum Direction {
 
 // cases() is synthesized by the runtime — no UnimplementedInterfaceMethod is emitted
 Direction::cases();
-===expect===

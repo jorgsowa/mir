@@ -8,4 +8,3 @@
 function risky(): void {
 //       ^^^^^ UndefinedThrowsDocblock: @throws class 'NonExistentException' does not exist
 }
-===expect===

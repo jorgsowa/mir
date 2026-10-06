@@ -39,4 +39,3 @@ function returns_shape_with_required_prop(): array {
 function returns_open_shape(array $x): array {
     return $x;
 }
-===expect===

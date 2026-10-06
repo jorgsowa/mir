@@ -35,4 +35,3 @@ final class Tag implements Tagged {
         $_x = $v;
     }
 }
-===expect===

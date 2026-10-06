@@ -18,4 +18,3 @@ class IntProcessor implements Processor {
 $p = new IntProcessor();
 $p->process("this should be an int, not a string");
 //          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $v of process() expects 'int', got '"this should be an int, not a string"'
-===expect===

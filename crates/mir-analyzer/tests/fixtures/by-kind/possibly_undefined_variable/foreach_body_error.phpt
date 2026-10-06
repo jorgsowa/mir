@@ -16,4 +16,3 @@ function foo(array $items): string {
     return $last;
 //         ^^^^^ PossiblyUndefinedVariable: Variable $last might not be defined
 }
-===expect===

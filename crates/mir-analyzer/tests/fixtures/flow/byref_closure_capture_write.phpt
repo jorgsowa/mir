@@ -72,4 +72,3 @@ function arrowFnIsByValue(): void {
     /** @mir-check $n is 0 */
     $_ = $n;
 }
-===expect===

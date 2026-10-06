@@ -11,4 +11,3 @@ final class OnlyUsedViaMixin {}
 
 /** @mixin OnlyUsedViaMixin */
 class Consumer {}
-===expect===

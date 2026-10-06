@@ -79,4 +79,3 @@ function possiblyEmptyIntoNonEmpty(array $l): array {
     return $l;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Sub>>' is not compatible with declared 'array<string, non-empty-array<int, Base>>'
 }
-===expect===

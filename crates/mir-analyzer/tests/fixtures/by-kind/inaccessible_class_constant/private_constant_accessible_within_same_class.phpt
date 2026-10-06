@@ -15,4 +15,3 @@ class Config {
         return self::SECRET;
     }
 }
-===expect===

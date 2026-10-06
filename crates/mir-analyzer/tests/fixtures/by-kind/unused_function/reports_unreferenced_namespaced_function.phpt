@@ -6,4 +6,3 @@ namespace App;
 
 function helper(): void {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function helper() is never called
-===expect===

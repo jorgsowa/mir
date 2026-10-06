@@ -39,4 +39,3 @@ function test_array_search_loose_not_false_narrows_needle(string $mode): void {
         $_ = $mode;
     }
 }
-===expect===

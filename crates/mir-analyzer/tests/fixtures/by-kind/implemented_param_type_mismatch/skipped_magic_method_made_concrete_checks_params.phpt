@@ -16,4 +16,3 @@ class FooModel extends Model {
         $x;
     }
 }
-===expect===

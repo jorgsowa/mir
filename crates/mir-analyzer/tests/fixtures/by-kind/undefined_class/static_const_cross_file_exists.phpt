@@ -18,4 +18,3 @@ use App\Config;
 function getVersion(): string {
     return Config::VERSION;
 }
-===expect===

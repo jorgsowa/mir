@@ -8,4 +8,3 @@ class Config {
 
 echo Config::INTERNAL;
 //           ^^^^^^^^ InaccessibleClassConstant: Cannot access constant Config::INTERNAL
-===expect===

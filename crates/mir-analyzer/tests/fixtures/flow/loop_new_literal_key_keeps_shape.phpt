@@ -95,4 +95,3 @@ function writeAfterBranchThatAddedKey(bool $c): void {
     /** @mir-check $r is array{a: 1, b: 'x'} */
     $r;
 }
-===expect===

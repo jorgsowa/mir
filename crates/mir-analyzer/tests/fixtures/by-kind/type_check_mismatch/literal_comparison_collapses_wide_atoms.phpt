@@ -55,4 +55,3 @@ function narrowsMixedToIntLiteral(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

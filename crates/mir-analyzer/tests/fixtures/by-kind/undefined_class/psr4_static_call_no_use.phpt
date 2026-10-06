@@ -20,4 +20,3 @@ function acceptString(string $s): void { var_dump($s); }
 function run(): void {
     acceptString(\Util\Formatter::format('hello'));
 }
-===expect===

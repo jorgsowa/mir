@@ -23,4 +23,3 @@ class Container {
         $this->item->name;
     }
 }
-===expect===

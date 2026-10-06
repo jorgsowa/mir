@@ -30,4 +30,3 @@ $f->set(4);  // C
 $f->set(5);  // A|C
 $f->set(6);  // B|C
 $f->set(7);  // A|B|C
-===expect===

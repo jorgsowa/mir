@@ -12,4 +12,3 @@ function myFunc(int $x): int { return $x; }
 
 $fn = MYFUNC(...);
 //    ^^^^^^ WrongCaseFunction: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
-===expect===

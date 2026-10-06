@@ -12,4 +12,3 @@ class ConsoleLogger implements Logger {
     public function log(string $msg): void { echo $msg; }
     public function error(string $msg): void { echo $msg; }
 }
-===expect===

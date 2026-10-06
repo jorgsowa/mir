@@ -43,4 +43,3 @@ function afterReassignment(Context $ctx, Context $other): int {
     return $ctx->getIdentity()->accountId;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
 }
-===expect===

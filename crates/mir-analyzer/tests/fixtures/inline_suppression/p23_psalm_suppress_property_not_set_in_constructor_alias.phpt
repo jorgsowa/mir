@@ -14,4 +14,3 @@ class Config {
         $this->env = $env;
     }
 }
-===expect===

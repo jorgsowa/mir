@@ -11,4 +11,3 @@ A function without a declared return type does NOT fire MixedReturnStatement eve
 function decode() {
     return json_decode('{"key":"value"}');
 }
-===expect===

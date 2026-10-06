@@ -7,4 +7,3 @@ class Foo {
 //    ^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
     public function bar(): void {}
 }
-===expect===

@@ -15,4 +15,3 @@ function name_of(Impl $i): string {
     /** @mir-check $n is string */
     return $n;
 }
-===expect===

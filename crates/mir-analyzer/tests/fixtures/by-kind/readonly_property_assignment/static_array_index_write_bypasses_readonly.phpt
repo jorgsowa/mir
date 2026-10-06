@@ -14,4 +14,3 @@ class Registry {
 //      ^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Registry::$store outside of constructor
     }
 }
-===expect===

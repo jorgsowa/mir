@@ -37,4 +37,3 @@ function foo(A $a) : void {
 }
 
 foo(new AChild());
-===expect===

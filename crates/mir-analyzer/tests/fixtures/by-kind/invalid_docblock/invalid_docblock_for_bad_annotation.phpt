@@ -12,4 +12,3 @@ Invalid docblock for bad annotation
  * @param-out array<a(),bool> $ar
  */
 function foo(array &$ar) : void {}
-===expect===

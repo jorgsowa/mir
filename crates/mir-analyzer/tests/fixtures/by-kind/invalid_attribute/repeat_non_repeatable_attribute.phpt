@@ -9,5 +9,3 @@ class Foo {}
 //^^^ InvalidAttribute: Attribute Foo is not repeatable
 //     ^^^ InvalidAttribute: Attribute Foo is not repeatable
 class Baz {}
-
-===expect===

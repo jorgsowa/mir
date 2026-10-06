@@ -31,4 +31,3 @@ function test_ordinary_single_point_exclusion_still_unreachable(int $x): void {
         $_ = 1;
     }
 }
-===expect===

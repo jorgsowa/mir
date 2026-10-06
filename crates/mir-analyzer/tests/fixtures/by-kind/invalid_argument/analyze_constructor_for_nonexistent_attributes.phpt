@@ -16,5 +16,3 @@ class Foo
 /** @suppress UndefinedAttributeClass */
 #[AttrA(new Foo(1))]
 class Bar {}
-
-===expect===

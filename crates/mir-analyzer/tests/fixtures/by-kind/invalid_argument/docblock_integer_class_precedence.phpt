@@ -19,4 +19,3 @@ function acceptsIntegerClass($value): void
 acceptsIntegerClass(new Integer());
 acceptsIntegerClass(5);
 //                  ^ InvalidArgument: Argument $value of acceptsIntegerClass() expects 'Regression\DocblockTypePrecedence\Integer', got '5'
-===expect===

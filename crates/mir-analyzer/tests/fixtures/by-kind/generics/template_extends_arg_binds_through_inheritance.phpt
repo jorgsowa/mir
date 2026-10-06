@@ -37,4 +37,3 @@ $c = $h->child();
 /** @mir-check $c is NS\Child<NS\Thing> */
 $x = $c->first();
 /** @mir-check $x is NS\Thing|null */
-===expect===

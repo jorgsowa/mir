@@ -42,4 +42,3 @@ function test_ordinary_comparison_still_narrows(int $x): void {
         $_ = 1;
     }
 }
-===expect===

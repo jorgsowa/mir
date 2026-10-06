@@ -20,4 +20,3 @@ class A {
 $a = new A();
 echo strlen($a->foo);
 //          ^^^^^^^ InvalidArgument: Argument $string of strlen() expects 'string', got 'array{'x': int}'
-===expect===

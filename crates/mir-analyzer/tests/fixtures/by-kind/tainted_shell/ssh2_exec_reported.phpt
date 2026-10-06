@@ -14,4 +14,3 @@ function test($conn): void {
     ssh2_exec($conn, $_GET['cmd']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
-===expect===

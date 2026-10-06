@@ -75,4 +75,3 @@ function check_mixed_quote_equivalence($x) {
      */
     var_dump($x);
 }
-===expect===

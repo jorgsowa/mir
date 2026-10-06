@@ -42,4 +42,3 @@ function notAStringElement(): array {
     return [$h];
 //  ^^^^^^^^^^^^ InvalidReturnType: Return type 'array{0: object}' is not compatible with declared 'list<string>'
 }
-===expect===

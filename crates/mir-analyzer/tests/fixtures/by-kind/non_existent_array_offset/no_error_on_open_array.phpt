@@ -7,4 +7,3 @@ function counts(): array { return ['a' => 1]; }
 
 $c = counts();
 echo $c['missing'];
-===expect===

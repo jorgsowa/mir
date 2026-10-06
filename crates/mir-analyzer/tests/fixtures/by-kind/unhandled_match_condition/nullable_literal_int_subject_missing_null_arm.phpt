@@ -12,4 +12,3 @@ function label($n): string {
         2 => "two",
     };
 }
-===expect===

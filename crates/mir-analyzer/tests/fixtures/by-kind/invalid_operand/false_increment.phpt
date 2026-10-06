@@ -10,4 +10,3 @@ False increment
 <?php
 $a = false;
 $a++;
-===expect===

@@ -26,4 +26,3 @@ class Auth {
 
 $auth = new Auth();
 $auth->validate(['value' => 'abc', 'expiry' => 9999]);
-===expect===

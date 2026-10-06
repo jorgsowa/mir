@@ -22,4 +22,3 @@ class A {
         $this->__set("foo", new stdClass());
     }
 }
-===expect===

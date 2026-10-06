@@ -17,4 +17,3 @@ enum Suit: string {
 
 if (Suit::Hearts->value === "a") {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"h"' and '"a"' is always false — these types can never be identical
-===expect===

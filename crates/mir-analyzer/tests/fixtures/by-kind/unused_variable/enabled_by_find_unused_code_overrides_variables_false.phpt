@@ -13,4 +13,3 @@ function total(array $items): int {
     return 1;
 }
 total([]);
-===expect===

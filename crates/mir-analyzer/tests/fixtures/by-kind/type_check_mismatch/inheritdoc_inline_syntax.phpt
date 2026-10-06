@@ -34,4 +34,3 @@ function test(FileItemLoader $loader): void {
     /** @mir-check $item is Item */
     echo get_class($item);
 }
-===expect===

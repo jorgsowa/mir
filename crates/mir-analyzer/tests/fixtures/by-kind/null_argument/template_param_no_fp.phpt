@@ -19,4 +19,3 @@ function some($value) { return $value; }
 
 success(null);
 some(null);
-===expect===

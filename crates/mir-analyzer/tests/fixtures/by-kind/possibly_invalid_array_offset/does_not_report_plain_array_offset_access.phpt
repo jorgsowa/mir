@@ -13,4 +13,3 @@ function test(): void {
     $x = $arr[0];
     var_dump($x);
 }
-===expect===

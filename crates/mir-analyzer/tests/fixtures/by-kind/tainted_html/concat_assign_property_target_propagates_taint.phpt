@@ -22,4 +22,3 @@ function test(): void {
     echo $b->log;
 //  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

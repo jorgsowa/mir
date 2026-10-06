@@ -26,4 +26,3 @@ function g(Base $t): void {
 }
 
 g(new Concrete());
-===expect===

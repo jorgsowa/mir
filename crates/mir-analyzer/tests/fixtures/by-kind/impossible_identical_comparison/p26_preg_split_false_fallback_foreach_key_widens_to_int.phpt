@@ -26,4 +26,3 @@ function odd_segments(string $pattern, string $string): array {
     }
     return $result;
 }
-===expect===

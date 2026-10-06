@@ -26,4 +26,3 @@ namespace Client;
 $c = new C();
 $c->take("not a service");
 //       ^^^^^^^^^^^^^^^ InvalidArgument: Argument $s of take() expects 'MyApp\Deep\Service', got '"not a service"'
-===expect===

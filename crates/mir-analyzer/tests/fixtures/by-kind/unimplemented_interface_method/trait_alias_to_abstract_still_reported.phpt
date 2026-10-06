@@ -21,4 +21,3 @@ interface Greets {
 }
 class D extends C implements Greets {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class D must implement Greets::helloAlias() from interface
-===expect===

@@ -28,4 +28,3 @@ function test_key_last_null_on_already_non_empty(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

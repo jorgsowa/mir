@@ -18,4 +18,3 @@ function dispatch(callable $fn): void {
 
 $h = new Handler();
 dispatch([$h, 'handle']);
-===expect===

@@ -19,4 +19,3 @@ class Child extends ParentClass {}
 $c = new Child();
 $s = 'Value: ' . $c;
 echo $c;
-===expect===

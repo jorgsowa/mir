@@ -28,4 +28,3 @@ function test(array $assoc): void {
     /** @mir-check $upper is array{FOO: 1, BAR: 'x'} */
     $_ = $upper;
 }
-===expect===

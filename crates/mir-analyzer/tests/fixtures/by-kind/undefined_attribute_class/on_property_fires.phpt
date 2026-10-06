@@ -7,4 +7,3 @@ class Foo {
 //    ^^^^^^ UndefinedAttributeClass: Attribute class Column does not exist
     public string $name = '';
 }
-===expect===

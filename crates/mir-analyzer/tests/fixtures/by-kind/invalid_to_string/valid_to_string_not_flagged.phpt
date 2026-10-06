@@ -7,4 +7,3 @@ class Label {
         return 'label';
     }
 }
-===expect===

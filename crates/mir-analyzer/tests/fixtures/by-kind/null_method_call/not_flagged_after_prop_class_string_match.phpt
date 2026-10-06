@@ -38,4 +38,3 @@ function stillFlaggedWithoutMatch(?Widget $w): void {
     $w->realMethod();
 //  ^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method realMethod() on possibly null value
 }
-===expect===

@@ -20,4 +20,3 @@ class Circle extends Shape {}
 function make(string $cls): void {}
 
 make(Circle::class);
-===expect===

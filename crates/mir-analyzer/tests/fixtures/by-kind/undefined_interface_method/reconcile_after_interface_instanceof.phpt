@@ -15,4 +15,3 @@ function foobar(Base $foo) : void {
 
     $foo->bar();
 }
-===expect===

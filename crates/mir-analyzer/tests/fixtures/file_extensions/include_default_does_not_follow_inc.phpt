@@ -16,4 +16,3 @@ function a_hook(): string { return b_helper(); }
 <?php
 function b_helper(): string { return 'b'; }
 function b_bad(): int { return 'x'; }
-===expect===

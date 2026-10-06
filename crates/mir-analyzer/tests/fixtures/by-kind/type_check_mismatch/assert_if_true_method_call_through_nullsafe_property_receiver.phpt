@@ -33,4 +33,3 @@ function check(?Wrapper $w, $p): void {
         $_ = 1;
     }
 }
-===expect===

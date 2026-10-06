@@ -51,4 +51,3 @@ function strlenEmptyDoesNotNarrowReceiver(?Bag $x): void {
         $_ = 1;
     }
 }
-===expect===

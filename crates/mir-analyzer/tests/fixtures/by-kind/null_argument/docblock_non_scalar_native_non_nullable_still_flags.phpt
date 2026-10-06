@@ -19,4 +19,3 @@ final class C {
 }
 (new C())->requiresObject(null);
 //                        ^^^^ NullArgument: Argument $x of requiresObject() cannot be null
-===expect===

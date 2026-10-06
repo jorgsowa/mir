@@ -22,4 +22,3 @@ function test(?A $x): void {
     $x->commit();
 //  ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method commit() on possibly null value
 }
-===expect===

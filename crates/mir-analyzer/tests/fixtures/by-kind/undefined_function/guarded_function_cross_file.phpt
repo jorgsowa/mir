@@ -14,4 +14,3 @@ function wrap(): string
 {
     return my_helper();
 }
-===expect===

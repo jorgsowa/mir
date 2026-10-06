@@ -10,4 +10,3 @@ function foo() : string {
         default => "impossible",
     };
 }
-===expect===

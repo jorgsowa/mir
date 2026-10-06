@@ -23,4 +23,3 @@ class Registry {
 
 Registry::register(Concrete::class)::doesNotExist();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Concrete::doesNotExist() does not exist
-===expect===

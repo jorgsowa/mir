@@ -35,4 +35,3 @@ function test_unresolved_variable_needle_not_narrowed(string $s, string $needle)
         $_ = $s;
     }
 }
-===expect===

@@ -13,4 +13,3 @@ function render(string $html): void {}
 
 // Should NOT report InvalidArgument — PHP calls __toString() in coercive mode.
 render(new Tag());
-===expect===

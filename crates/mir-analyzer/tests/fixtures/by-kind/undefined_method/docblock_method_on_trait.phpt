@@ -17,4 +17,3 @@ class MyClass {
 $obj = new MyClass();
 $obj->getName();
 MyClass::create();
-===expect===

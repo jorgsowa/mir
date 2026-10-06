@@ -11,4 +11,3 @@ class Service {
 //      ^^^^^^^^^^^^^^^^ DeprecatedMethod: Method Service::process() is deprecated: use newProcess() instead
     }
 }
-===expect===

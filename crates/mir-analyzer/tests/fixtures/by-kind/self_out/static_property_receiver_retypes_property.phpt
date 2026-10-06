@@ -34,4 +34,3 @@ function test(): void {
     $_ = 1;
     Holder::$factory->build();
 }
-===expect===

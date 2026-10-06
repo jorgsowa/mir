@@ -10,5 +10,3 @@ Attribute invalid target parameter
 <?php
 function foo(#[Attribute] string $_bar): void {}
 //             ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not parameters
-
-===expect===

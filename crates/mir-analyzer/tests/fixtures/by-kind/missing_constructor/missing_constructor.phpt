@@ -8,5 +8,3 @@ class Foo {
 }
 
 new Foo();
-
-===expect===

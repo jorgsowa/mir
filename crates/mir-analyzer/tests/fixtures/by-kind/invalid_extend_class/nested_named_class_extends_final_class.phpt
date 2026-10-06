@@ -10,4 +10,3 @@ function make(): void {
     class Inner extends Base {}
 //                      ^^^^ InvalidExtendClass: Class Inner cannot extend final class Base
 }
-===expect===

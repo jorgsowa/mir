@@ -8,4 +8,3 @@ function test(array $shape): void {
     if ($v !== null) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between 'int' and 'null' is always true — these types can never be identical
 }
-===expect===

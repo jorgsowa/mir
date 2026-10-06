@@ -88,4 +88,3 @@ function unguardedReadStillReported(array $in): void {
     echo count($items);
 //             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
-===expect===

@@ -21,4 +21,3 @@ function f(): void {
 
     echo $a, $b, $c;
 }
-===expect===

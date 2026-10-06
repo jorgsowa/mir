@@ -10,4 +10,3 @@ function outer(): void {
         }
     }
 }
-===expect===

@@ -23,4 +23,3 @@ function mod_by_zero(int $x): int {
 function div_by_nonzero(int $x): float {
     return $x / 5;
 }
-===expect===

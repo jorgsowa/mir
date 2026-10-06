@@ -35,4 +35,3 @@ function test(DynamicModel $model): void {
     $model->delegated()->name();
     strlen($model->title);
 }
-===expect===

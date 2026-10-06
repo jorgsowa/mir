@@ -40,4 +40,3 @@ function use_in_arrow($x): void {
     $set = fn() => $box->n = $x;
     $set();
 }
-===expect===

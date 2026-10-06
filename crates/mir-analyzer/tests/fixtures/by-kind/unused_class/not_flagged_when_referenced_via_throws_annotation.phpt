@@ -16,4 +16,3 @@ function risky(): void {
 }
 
 risky();
-===expect===

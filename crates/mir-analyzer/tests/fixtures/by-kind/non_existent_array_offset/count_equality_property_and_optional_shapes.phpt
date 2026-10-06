@@ -39,4 +39,3 @@ function deadBranchKeepsType(array $a): int {
     }
     return $a[0];
 }
-===expect===

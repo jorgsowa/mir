@@ -21,4 +21,3 @@ function myFunction() {
 
 // This SHOULD be resolvable because it came from documented callable type
 executeCallback("myFunction");
-===expect===

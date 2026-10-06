@@ -5,4 +5,3 @@ PossiblyRawObjectIteration does NOT fire when all types in a union implement Tra
 function gen(\ArrayIterator|\Generator $source): \Generator {
     yield from $source;
 }
-===expect===

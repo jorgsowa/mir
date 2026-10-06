@@ -30,4 +30,3 @@ function stillFlagsRealUndefinedProperty(Impl $i): int {
     return $i->nope;
 //             ^^^^ UndefinedProperty: Property Impl::$nope does not exist
 }
-===expect===

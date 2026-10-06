@@ -13,4 +13,3 @@ class Child extends Base {
 //                   ^^^ DeprecatedConstant: Constant Base::OLD is deprecated: use BASE_NEW instead
     }
 }
-===expect===

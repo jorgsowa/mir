@@ -11,4 +11,3 @@ final class Page {
         return $this->is_protected;
     }
 }
-===expect===

@@ -6,4 +6,3 @@ function test(): void {
     $x = new stdClass();
     $x->foo = "bar";
 }
-===expect===

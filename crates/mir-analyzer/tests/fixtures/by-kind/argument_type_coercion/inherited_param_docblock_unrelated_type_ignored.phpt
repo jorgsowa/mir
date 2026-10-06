@@ -19,4 +19,3 @@ final class FileReader implements Reader {
         $_x = $id;
     }
 }
-===expect===

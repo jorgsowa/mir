@@ -26,4 +26,3 @@ function callDangerous(): void {
         echo $e->getMessage();
     }
 }
-===expect===

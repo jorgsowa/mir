@@ -29,4 +29,3 @@ function fillFromNegativeStartIsNotList(): void {
     /** @mir-check $r is non-empty-array<int, "x"> */
     $_ = $r;
 }
-===expect===

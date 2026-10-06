@@ -9,4 +9,3 @@ class Counter {
         return self::increment(0);
     }
 }
-===expect===

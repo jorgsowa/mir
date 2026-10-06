@@ -19,4 +19,3 @@ $s = new Sub();
 $s->touch();
 /** @mir-check $s is Sub */
 $_ = 1;
-===expect===

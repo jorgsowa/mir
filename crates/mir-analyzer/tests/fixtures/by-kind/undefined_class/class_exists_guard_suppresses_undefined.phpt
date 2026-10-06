@@ -26,4 +26,3 @@ if (interface_exists(\Countable::class)) {
         public function count(): int { return 0; }
     };
 }
-===expect===

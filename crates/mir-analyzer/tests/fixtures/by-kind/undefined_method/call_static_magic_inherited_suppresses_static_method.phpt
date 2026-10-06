@@ -12,4 +12,3 @@ function test(): void {
     Child::anything();
     Child::anotherMissing(1, 2);
 }
-===expect===

@@ -14,4 +14,3 @@ function test(array $arr): void {
     if ($arr == false) {}
 //      ^^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'non-empty-array<int|string, string>' and 'false' is always false — these types can never be loosely equal
 }
-===expect===

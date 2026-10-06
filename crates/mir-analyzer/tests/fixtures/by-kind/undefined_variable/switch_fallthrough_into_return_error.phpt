@@ -18,4 +18,3 @@ function foo(int $x): void {
     echo $y;
 //       ^^ UndefinedVariable: Variable $y is not defined
 }
-===expect===

@@ -23,4 +23,3 @@ function loadService(string $serviceName) {
 }
 
 loadService(Service::class);
-===expect===

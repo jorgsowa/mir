@@ -13,5 +13,3 @@ and picks $callback at depth 0.
 function run($callback, $label): void {
     /** @mir-check $label is string */
 }
-
-===expect===

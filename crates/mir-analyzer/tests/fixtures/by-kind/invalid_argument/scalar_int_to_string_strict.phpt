@@ -16,4 +16,3 @@ function takes_string(string $s): void { echo $s; }
 
 takes_string(1);
 //           ^ InvalidArgument: Argument $s of takes_string() expects 'string', got '1'
-===expect===

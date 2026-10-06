@@ -8,4 +8,3 @@ class Bar {
     public Foo $prop;
 //         ^^^ UndefinedClass: Class Vendor\Missing\Foo does not exist
 }
-===expect===

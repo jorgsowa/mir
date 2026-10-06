@@ -14,4 +14,3 @@ class Config {
 }
 
 $v = Config::MAX_RETRIES;
-===expect===

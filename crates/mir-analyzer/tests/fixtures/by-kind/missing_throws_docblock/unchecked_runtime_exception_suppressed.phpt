@@ -23,4 +23,3 @@ class MyCustomError extends \RuntimeException {}
 function fe(): void {
     throw new MyCustomError('custom');
 }
-===expect===

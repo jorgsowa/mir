@@ -23,4 +23,3 @@ function f(Suit $a, Suit $b): bool {
     }
     return false;
 }
-===expect===

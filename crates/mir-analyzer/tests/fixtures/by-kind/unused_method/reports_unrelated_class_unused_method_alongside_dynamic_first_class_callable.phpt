@@ -19,4 +19,3 @@ class Bar {
     private function unused(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method Bar::unused() is never called
 }
-===expect===

@@ -24,4 +24,3 @@ class CarFleetManager extends FleetManager {
     /** @param Car $vehicle */
     public function register(Vehicle $vehicle): void {}
 }
-===expect===

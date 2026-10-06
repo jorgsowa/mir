@@ -49,4 +49,3 @@ acceptsBoolean(false);
 acceptsDouble(new Double());
 acceptsDouble(3.14);
 //            ^^^^ InvalidArgument: Argument $value of acceptsDouble() expects 'Regression\DocblockTypePrecedence\Double', got '3.14'
-===expect===

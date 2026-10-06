@@ -29,4 +29,3 @@ function test_empty_string_is_not_narrowed(): void {
     /** @mir-check $r is string */
     $_ = $r;
 }
-===expect===

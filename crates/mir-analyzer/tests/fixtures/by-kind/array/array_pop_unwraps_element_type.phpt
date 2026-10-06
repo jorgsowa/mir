@@ -26,4 +26,3 @@ function test(array $ne, array $maybe_empty): void {
     /** @mir-check $popped is string|null */
     $_ = $popped;
 }
-===expect===

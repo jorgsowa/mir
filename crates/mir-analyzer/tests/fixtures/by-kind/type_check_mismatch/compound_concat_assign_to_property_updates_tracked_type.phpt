@@ -19,4 +19,3 @@ class Foo {
         $_ = $x;
     }
 }
-===expect===

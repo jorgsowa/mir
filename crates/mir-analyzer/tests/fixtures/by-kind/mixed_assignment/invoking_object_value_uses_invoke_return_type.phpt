@@ -41,4 +41,3 @@ function invokeClosureOrCallableUnion(int $n, $gen): void {
     $result = $gen($n);
     strlen($result);
 }
-===expect===

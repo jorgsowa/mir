@@ -10,4 +10,3 @@ class A {
 //      ^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
     }
 }
-===expect===

@@ -11,4 +11,3 @@ function unused(): void {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function unused() is never called
 
 Closure::fromCallable('helper');
-===expect===

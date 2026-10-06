@@ -14,4 +14,3 @@ function check(object $o): bool {
 }
 
 check(new Widget());
-===expect===

@@ -28,4 +28,3 @@ class T {
         $this->service->doSomething(1, 2, 3);
     }
 }
-===expect===

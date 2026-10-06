@@ -14,4 +14,3 @@ function test(): void {
     $box->set("hello");
 //            ^^^^^^^ InvalidArgument: Argument $value of set() expects 'int', got '"hello"'
 }
-===expect===

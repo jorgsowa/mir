@@ -21,4 +21,3 @@ function foo(array $matrix): void {
     }
     echo "after";
 }
-===expect===

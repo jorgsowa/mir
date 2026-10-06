@@ -13,4 +13,3 @@ interface B {
 function foo (A&B $test): A&B {
     return $test;
 }
-===expect===

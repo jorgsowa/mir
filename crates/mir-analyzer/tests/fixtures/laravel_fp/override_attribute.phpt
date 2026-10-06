@@ -24,4 +24,3 @@ class Cmd extends Base {
     #[\Override]
     public function handle(): void {}
 }
-===expect===

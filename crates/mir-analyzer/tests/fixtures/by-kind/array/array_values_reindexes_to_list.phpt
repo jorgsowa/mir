@@ -27,4 +27,3 @@ function test(array $ne_assoc, array $assoc): void {
     /** @mir-check $vals is list<int> */
     $_ = $vals;
 }
-===expect===

@@ -25,5 +25,3 @@ function resize(Shape $s, float $value): void {
     $s->radius = $value;
 //  ^^^^^^^^^^^^^^^^^^^ NoInterfaceProperties: Property $radius is not defined on this interface
 }
-
-===expect===

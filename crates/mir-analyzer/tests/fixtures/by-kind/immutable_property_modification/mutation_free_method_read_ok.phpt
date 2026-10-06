@@ -17,4 +17,3 @@ class Config {
         return $this->timeout;
     }
 }
-===expect===

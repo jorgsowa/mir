@@ -21,5 +21,3 @@ function parse(string $s): array {
     }
     return $m;
 }
-
-===expect===

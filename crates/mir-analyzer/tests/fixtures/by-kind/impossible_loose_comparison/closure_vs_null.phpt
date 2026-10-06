@@ -13,4 +13,3 @@ function test(\Closure $fn): void {
     if ($fn == null) {}
 //      ^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'Closure' and 'null' is always false — these types can never be loosely equal
 }
-===expect===

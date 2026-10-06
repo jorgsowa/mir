@@ -18,4 +18,3 @@ class C {
 function foo($s) : void {}
 foo("for");
 //  ^^^^^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"|"bat"|"baz"', got '"for"'
-===expect===

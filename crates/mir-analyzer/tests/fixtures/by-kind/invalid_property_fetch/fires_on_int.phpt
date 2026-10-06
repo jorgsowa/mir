@@ -6,4 +6,3 @@ InvalidPropertyFetch fires on int type.
 $x = 5;
 $x->foo;
 //<^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type 'int'
-===expect===

@@ -40,4 +40,3 @@ function test_correct_arity_stays_silent(): void {
     /** @var TypedMap<string, int> $m */
     $m = new TypedMap();
 }
-===expect===

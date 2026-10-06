@@ -9,4 +9,3 @@ namespace Barrr;
  */
 
 class A {}
-===expect===

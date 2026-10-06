@@ -4,4 +4,3 @@ Invalid this fetch
 <?php
 echo $this;
 //   ^^^^^ InvalidScope: $this cannot be used outside of a class
-===expect===

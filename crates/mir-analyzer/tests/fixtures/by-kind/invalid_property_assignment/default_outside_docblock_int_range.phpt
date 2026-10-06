@@ -37,4 +37,3 @@ final class Color {
         return $this->widened + $this->inRange + $this->unannotated + $this->nullable;
     }
 }
-===expect===

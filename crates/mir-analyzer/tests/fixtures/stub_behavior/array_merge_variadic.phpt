@@ -14,4 +14,3 @@ $merged = array_merge(['x' => 1]);
 $merged2 = array_merge(['x' => 1], ['y' => 2]);
 // array_merge with more arrays
 $merged3 = array_merge(['x' => 1], ['y' => 2], ['z' => 3]);
-===expect===

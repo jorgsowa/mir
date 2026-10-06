@@ -4,5 +4,3 @@ Invalid backing type
 <?php
 enum Status: array {}
 //           ^^^^^ ParseError: Parse error: Enum backing type must be int or string
-
-===expect===

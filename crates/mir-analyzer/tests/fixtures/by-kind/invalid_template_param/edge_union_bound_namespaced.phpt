@@ -17,4 +17,3 @@ function f($val): void {
 
 f('hello');      // satisfies string arm
 f(new MyList()); // satisfies Countable arm
-===expect===

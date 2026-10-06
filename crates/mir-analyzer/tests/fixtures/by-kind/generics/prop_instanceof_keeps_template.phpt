@@ -31,4 +31,3 @@ class Box {
         }
     }
 }
-===expect===

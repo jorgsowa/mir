@@ -43,4 +43,3 @@ function test_empty_needle_prop_not_narrowed(Holder $h): void {
         $_ = $h->text;
     }
 }
-===expect===

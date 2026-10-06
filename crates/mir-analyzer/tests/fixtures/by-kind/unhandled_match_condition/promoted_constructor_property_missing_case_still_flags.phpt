@@ -17,4 +17,3 @@ function f(Attr $attr): int {
     return match ($attr->value) { 'a' => 1 };
 //         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnhandledMatchCondition: Unhandled match condition: "b"
 }
-===expect===

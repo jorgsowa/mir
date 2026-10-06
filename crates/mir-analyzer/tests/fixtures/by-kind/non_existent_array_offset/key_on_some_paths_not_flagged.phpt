@@ -24,4 +24,3 @@ function nested_branches(int $n): string {
     }
     return $o['extra'];
 }
-===expect===

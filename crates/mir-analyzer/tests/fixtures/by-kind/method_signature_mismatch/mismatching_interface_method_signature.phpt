@@ -18,4 +18,3 @@ class B implements A {
 
     }
 }
-===expect===

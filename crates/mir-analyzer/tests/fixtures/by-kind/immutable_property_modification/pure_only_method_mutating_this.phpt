@@ -24,4 +24,3 @@ class Counter {
         return $this->n;
     }
 }
-===expect===

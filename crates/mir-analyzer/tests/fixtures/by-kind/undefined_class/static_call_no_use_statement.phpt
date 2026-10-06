@@ -10,4 +10,3 @@ class Helper {
 function call_it(): void {
     \Helper::go();
 }
-===expect===

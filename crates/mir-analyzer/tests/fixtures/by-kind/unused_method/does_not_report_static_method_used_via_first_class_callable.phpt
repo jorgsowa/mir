@@ -14,4 +14,3 @@ class Foo {
         (self::helper(...))();
     }
 }
-===expect===

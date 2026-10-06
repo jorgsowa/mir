@@ -71,4 +71,3 @@ function test_plain_string(?string $s): void {
     /** @mir-check $r is string */
     $_ = $r;
 }
-===expect===

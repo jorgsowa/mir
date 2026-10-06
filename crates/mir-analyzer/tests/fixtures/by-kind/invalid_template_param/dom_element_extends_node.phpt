@@ -22,4 +22,3 @@ $parent->appendChild($text);
 // Test with DOMDocumentFragment
 $fragment = new DOMDocumentFragment();
 $fragment->appendChild($el);
-===expect===

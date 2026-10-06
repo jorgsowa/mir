@@ -33,4 +33,3 @@ function carryArray(array $columns): void {
         $previous = ['cols' => $merged];
     }
 }
-===expect===

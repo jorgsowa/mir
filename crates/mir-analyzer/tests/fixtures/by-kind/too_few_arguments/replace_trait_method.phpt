@@ -25,4 +25,3 @@ class C {
 
     protected function foo(string $s) : void {}
 }
-===expect===

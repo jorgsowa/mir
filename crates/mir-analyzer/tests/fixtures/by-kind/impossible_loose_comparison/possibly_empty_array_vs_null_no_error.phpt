@@ -14,4 +14,3 @@ flagged, unlike a non-empty array (see nonempty_array_vs_null.phpt).
 function test(array $arr): void {
     if ($arr == null) {}
 }
-===expect===

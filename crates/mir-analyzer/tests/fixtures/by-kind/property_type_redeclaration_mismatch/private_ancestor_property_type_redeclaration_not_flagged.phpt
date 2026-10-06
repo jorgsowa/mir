@@ -11,4 +11,3 @@ class Base {
 class Sub extends Base {
     public string $x = 'hello';
 }
-===expect===

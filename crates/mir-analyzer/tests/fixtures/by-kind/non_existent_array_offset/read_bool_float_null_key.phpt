@@ -40,4 +40,3 @@ function readFloatKeyResolvesToCanonicalSlot(): void {
     /** @mir-check $v is 'x' */
     $_ = $v;
 }
-===expect===

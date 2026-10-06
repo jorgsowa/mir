@@ -9,4 +9,3 @@ Throwing \TypeError (extends \Error) does not fire InvalidThrow
 ===file===
 <?php
 throw new \TypeError('type mismatch');
-===expect===

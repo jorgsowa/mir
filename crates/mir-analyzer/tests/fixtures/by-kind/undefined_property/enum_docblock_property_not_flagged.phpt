@@ -30,4 +30,3 @@ function stillFlagsRealUndefinedProperty(Status $s): string {
     return $s->nope;
 //             ^^^^ UndefinedProperty: Property Status::$nope does not exist
 }
-===expect===

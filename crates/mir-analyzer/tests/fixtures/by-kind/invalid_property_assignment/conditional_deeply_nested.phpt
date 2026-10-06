@@ -23,4 +23,3 @@ $factory = new DeepFactory();
 $result = $factory->makeDeep(null, 1, "x");
 /** @mir-check $result is Box<object> */
 $factory->box = $result;
-===expect===

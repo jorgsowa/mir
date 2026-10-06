@@ -59,4 +59,3 @@ function check_pure_closure_bare($x) {
      */
     var_dump($x);
 }
-===expect===

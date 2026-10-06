@@ -5,4 +5,3 @@ Possibly invalid concat
 $b = rand(0, 1) ? [] : "hello";
 echo $b . "goodbye";
 //   ^^^^^^^^^^^^^^ PossiblyInvalidOperand: Operator '.' might not be supported between 'array{}|"hello"' and '"goodbye"'
-===expect===

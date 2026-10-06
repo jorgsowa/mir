@@ -9,4 +9,3 @@ namespace MyApp {
         new MyService();
     }
 }
-===expect===

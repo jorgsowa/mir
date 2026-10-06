@@ -11,4 +11,3 @@ class Example extends Base {
         return Closure::fromCallable([$this, "privateMethod"]);
     }
 }
-===expect===

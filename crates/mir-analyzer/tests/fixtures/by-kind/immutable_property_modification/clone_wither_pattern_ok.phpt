@@ -24,4 +24,3 @@ class Point {
 //      ^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $other in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
-===expect===

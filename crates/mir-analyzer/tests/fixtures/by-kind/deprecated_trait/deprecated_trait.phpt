@@ -9,5 +9,3 @@ class C {
 //<^^^^^^^^^ DeprecatedTrait: Trait T is deprecated
     use T;
 }
-
-===expect===

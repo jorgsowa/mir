@@ -18,4 +18,3 @@ class Foo
         return $this;
     }
 }
-===expect===

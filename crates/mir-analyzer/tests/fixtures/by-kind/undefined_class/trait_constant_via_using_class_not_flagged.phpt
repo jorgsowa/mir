@@ -13,4 +13,3 @@ class Bar {
 }
 
 echo Bar::FOO;
-===expect===

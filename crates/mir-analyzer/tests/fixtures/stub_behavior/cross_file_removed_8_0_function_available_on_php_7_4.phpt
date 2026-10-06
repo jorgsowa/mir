@@ -12,4 +12,3 @@ function format_hebrew(string $text): void {
 ===file:App.php===
 <?php
 format_hebrew('שלום');
-===expect===

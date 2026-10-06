@@ -19,4 +19,3 @@ function process(Closure $c): void {
 
 process(function (string $a, string $b): void {});
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of process() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'
-===expect===

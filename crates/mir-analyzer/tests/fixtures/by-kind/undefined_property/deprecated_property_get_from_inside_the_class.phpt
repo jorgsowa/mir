@@ -20,5 +20,3 @@ class A{
 //                  ^^^ DeprecatedProperty: Property A::$foo is deprecated
     }
 }
-
-===expect===

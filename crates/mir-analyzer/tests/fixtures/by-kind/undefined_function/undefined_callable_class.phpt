@@ -20,4 +20,3 @@ class A {
         $this->getFoo()($argOne, $argTwo);
     }
 }
-===expect===

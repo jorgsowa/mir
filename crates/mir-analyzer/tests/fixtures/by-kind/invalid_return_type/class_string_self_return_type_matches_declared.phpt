@@ -12,4 +12,3 @@ class Box {
         return self::class;
     }
 }
-===expect===

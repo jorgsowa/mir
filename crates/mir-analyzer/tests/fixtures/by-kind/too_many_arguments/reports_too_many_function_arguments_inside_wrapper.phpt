@@ -8,4 +8,3 @@ function wrap(): void {
     takes_one('a', 'b', 'c');
 //                 ^^^ TooManyArguments: Too many arguments for takes_one(): expected 1, got 3
 }
-===expect===

@@ -32,4 +32,3 @@ function takesArraylike($bag): void {}
 
 takesArraylike(new IntStringBag());
 //             ^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $bag of takesArraylike() expects 'ArrayAccess<string, int>&Countable&Traversable<string, int>', got 'IntStringBag'
-===expect===

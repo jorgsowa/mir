@@ -27,4 +27,3 @@ function keyedShapes(): void {
         echo $y;
     }
 }
-===expect===

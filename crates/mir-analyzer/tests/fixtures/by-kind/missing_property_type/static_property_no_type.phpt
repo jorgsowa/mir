@@ -8,4 +8,3 @@ class Counter {
     private static $instance;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^ MissingPropertyType: Property Counter::$instance has no type annotation
 }
-===expect===

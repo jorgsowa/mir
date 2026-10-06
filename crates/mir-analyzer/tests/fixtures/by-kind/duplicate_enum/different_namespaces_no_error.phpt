@@ -7,4 +7,3 @@ enum Status { case Active; }
 
 namespace Other;
 enum Status { case Inactive; }
-===expect===

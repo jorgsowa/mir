@@ -11,4 +11,3 @@ An integer `exit` operand is a status code, not output.
 function test(): void {
     exit((int) $_GET['code']);
 }
-===expect===

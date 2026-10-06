@@ -18,5 +18,3 @@ class SomeAttr
 #[SomeAttr(parent::class)]
 //         ^^^^^^ ParentNotFound: Cannot use parent:: when current class has no parent
 class A {}
-
-===expect===

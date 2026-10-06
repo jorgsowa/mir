@@ -31,4 +31,3 @@ class Box {
 Box::makeAndFill(42, $result);
 /** @mir-check $result is int */
 $_ = $result;
-===expect===

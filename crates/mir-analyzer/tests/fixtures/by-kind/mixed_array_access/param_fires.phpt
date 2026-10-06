@@ -6,4 +6,3 @@ function foo(mixed $a): void {
     echo $a[0];
 //       ^^^^^ MixedArrayAccess: Array access on mixed type
 }
-===expect===

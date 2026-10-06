@@ -12,4 +12,3 @@ $g->greet(name: "a", 2);
 //                   ^ ParseError: Parse error: cannot use positional argument after named argument
 Greeter::shout(name: "a", 2);
 //                        ^ ParseError: Parse error: cannot use positional argument after named argument
-===expect===

@@ -29,4 +29,3 @@ class Crate {
         return new Dog();
     }
 }
-===expect===

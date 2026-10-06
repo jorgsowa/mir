@@ -19,4 +19,3 @@ function test(): void {
     createUser(new Admin());
 //             ^^^^^^^^^^^ InvalidArgument: Argument $u of createUser() expects 'User', got 'Admin'
 }
-===expect===

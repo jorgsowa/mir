@@ -11,4 +11,3 @@ function c(string $c): void {
 
 c("hii");
 //^^^^^ UndefinedFunction: Function hii() is not defined
-===expect===

@@ -68,4 +68,3 @@ function test_already_class_string(string $cls): void {
         $_ = $cls;
     }
 }
-===expect===

@@ -65,4 +65,3 @@ function check_user_class_generic($x) {
      */
     var_dump($x);
 }
-===expect===

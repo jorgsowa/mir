@@ -9,4 +9,3 @@ function gen(): \Generator {
     return "not a bool";
 //  ^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"not a bool"' is not compatible with declared 'bool'
 }
-===expect===

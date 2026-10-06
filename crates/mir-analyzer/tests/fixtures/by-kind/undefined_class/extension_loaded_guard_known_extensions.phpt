@@ -30,4 +30,3 @@ function connectToCustomExt(): void {
     $conn = new \MyDbExt\Connection();
     $conn->open();
 }
-===expect===

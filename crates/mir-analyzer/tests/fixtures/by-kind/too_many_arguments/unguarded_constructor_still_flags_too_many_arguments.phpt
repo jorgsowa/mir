@@ -15,4 +15,3 @@ function check(): void {
     new NewApi(1);
 //  ^^^^^^^^^^^^^ TooManyArguments: Too many arguments for NewApi::__construct(): expected 0, got 1
 }
-===expect===

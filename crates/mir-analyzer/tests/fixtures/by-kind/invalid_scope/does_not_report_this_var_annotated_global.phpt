@@ -13,4 +13,3 @@ $this->title = 'Processing...';
 /** @mir-check $this is \yii\web\View */
 $this->render('index');
 echo $this->title;
-===expect===

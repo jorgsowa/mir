@@ -14,4 +14,3 @@ class Holder {
         $this->value = $item;
     }
 }
-===expect===

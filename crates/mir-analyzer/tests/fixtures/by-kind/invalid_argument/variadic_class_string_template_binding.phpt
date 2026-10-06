@@ -32,4 +32,3 @@ function needsConn(Conn $c): void {}
 $mock = Mockery::mock(Conn::class);
 /** @mir-check $mock is MockInterface&Conn */
 needsConn($mock);
-===expect===

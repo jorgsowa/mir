@@ -13,4 +13,3 @@ function test(A $a): void {
     /** @mir-check $result is int */
     $_ = $result;
 }
-===expect===

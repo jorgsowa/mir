@@ -28,4 +28,3 @@ function testRequire(): void {
 function testSafe(): void {
     include 'header.php';
 }
-===expect===

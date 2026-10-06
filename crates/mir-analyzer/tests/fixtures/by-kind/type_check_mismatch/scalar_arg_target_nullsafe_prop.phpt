@@ -40,4 +40,3 @@ function countPlainArrowStillWorks(Holder $h): void {
         $_ = $h->items;
     }
 }
-===expect===

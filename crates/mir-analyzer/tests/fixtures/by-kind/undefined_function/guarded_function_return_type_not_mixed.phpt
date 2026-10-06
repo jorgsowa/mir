@@ -15,4 +15,3 @@ function wrap(): void
     /** @mir-check $g is string */
     echo $g;
 }
-===expect===

@@ -27,4 +27,3 @@ final class SpecialListing extends Listing {
 //                    ^^^^^ InaccessibleProperty: Cannot access property Paging::$limit
     }
 }
-===expect===

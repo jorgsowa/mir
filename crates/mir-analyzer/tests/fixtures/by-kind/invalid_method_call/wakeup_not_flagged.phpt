@@ -6,4 +6,3 @@ class A {
     public function __construct() {}
     public function __wakeup(): void { $this->__construct(); }
 }
-===expect===

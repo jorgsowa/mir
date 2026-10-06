@@ -32,4 +32,3 @@ function app(): void {
     $b = new Box(5);
     $b->set(6);
 }
-===expect===

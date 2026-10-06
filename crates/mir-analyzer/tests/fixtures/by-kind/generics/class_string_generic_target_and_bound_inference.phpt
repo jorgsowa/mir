@@ -69,4 +69,3 @@ final class Module {
 //                                      ^^^^^^^^^^^^^^^^ InvalidArgument: Argument $handler of register() expects 'class-string<Handler>', got 'class-string<Unrelated>'
     }
 }
-===expect===

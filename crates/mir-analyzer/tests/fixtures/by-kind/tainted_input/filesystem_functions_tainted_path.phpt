@@ -23,4 +23,3 @@ function test(): void {
     parse_ini_file($_GET['p']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
-===expect===

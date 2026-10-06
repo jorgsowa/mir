@@ -6,4 +6,3 @@ function remainder(int $a, ?int $b): int {
     return $a % $b;
 //         ^^^^^^^ PossiblyNullOperand: Operator '%' operand 'int|null' might be null
 }
-===expect===

@@ -41,4 +41,3 @@ $key = $col->firstKey();
 /** @mir-check $key is string|null */
 $val = $col->first();
 /** @mir-check $val is int|null */
-===expect===

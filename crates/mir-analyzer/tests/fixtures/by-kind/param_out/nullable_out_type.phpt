@@ -21,4 +21,3 @@ function findFirst(array $haystack, mixed &$found): bool {
 findFirst([1, 2], $val);
 /** @mir-check $val is int|null */
 $_ = $val;
-===expect===

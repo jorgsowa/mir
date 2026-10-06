@@ -88,4 +88,3 @@ class Subject {
 //                    ^ NonExistentArrayOffset: Array offset '0' does not exist
     }
 }
-===expect===

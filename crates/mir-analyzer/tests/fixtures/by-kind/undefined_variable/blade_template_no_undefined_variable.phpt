@@ -5,4 +5,3 @@ variables are injected by the template engine from the calling scope
 <?php
 echo $title;
 echo $userName;
-===expect===

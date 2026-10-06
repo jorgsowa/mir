@@ -10,5 +10,3 @@ trait ConsumerTrait {
 //<^^^^^^^^^^^^^^^^^^^^^ DeprecatedTrait: Trait DeprecatedLogger is deprecated: Use NewLogger instead
     use DeprecatedLogger;
 }
-
-===expect===

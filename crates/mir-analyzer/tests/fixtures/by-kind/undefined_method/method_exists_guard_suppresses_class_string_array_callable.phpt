@@ -19,4 +19,3 @@ function free(): void {
         register_shutdown([Other::class, 'gateStatic']);
     }
 }
-===expect===

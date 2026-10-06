@@ -15,4 +15,3 @@ function f($x): void {
 function g($x): void {
     echo count($x);
 }
-===expect===

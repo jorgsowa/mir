@@ -45,4 +45,3 @@ function test_union_false_branch_narrows_out_callable_string(mixed $x): void {
 //                   ^^ ArgumentTypeCoercion: Argument $s of needs_string() expects 'string', got 'int' — coercion may fail at runtime
     }
 }
-===expect===

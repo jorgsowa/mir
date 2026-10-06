@@ -9,4 +9,3 @@ function foo(int $i) : void {
 //      ^ ParadoxicalCondition: Value 1 is duplicated; this branch can never be reached
     };
 };
-===expect===

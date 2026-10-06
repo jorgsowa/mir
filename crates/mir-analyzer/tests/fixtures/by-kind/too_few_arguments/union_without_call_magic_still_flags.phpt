@@ -19,4 +19,3 @@ function test(ServiceA|ServiceB $service): void {
     $service->doSomething(1);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for doSomething(): expected 2, got 1
 }
-===expect===

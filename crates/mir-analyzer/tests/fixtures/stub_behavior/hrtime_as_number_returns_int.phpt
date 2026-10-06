@@ -25,4 +25,3 @@ function g(bool $flag): void {
     $d = hrtime($flag);
     /** @mir-check $d is array{0: int, 1: int}|false|int */
 }
-===expect===

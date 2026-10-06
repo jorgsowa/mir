@@ -18,4 +18,3 @@ class FooTest {
         return [[1, 2]];
     }
 }
-===expect===

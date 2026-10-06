@@ -30,4 +30,3 @@ function gen() : Generator {
     yield from $arr;
 //             ^^^^ PossiblyRawObjectIteration: Cannot iterate over possibly non-iterable object 'array{0: A}|B'
 }
-===expect===

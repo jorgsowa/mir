@@ -12,4 +12,3 @@ the diagnostic actually fires on.
 <?php
 #[BadAttrClass] // @mir-ignore UndefinedAttributeClass
 class Foo {}
-===expect===

@@ -23,4 +23,3 @@ class AChild extends A {
     /** @var int */
     public $foo = 0;
 }
-===expect===

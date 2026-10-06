@@ -5,5 +5,3 @@ Return by reference non variable in closure
 function &(): int {
     return 45;
 };
-
-===expect===

@@ -14,4 +14,3 @@ function test() {
     $$key = 42;
     return $value;
 }
-===expect===

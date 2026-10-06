@@ -15,4 +15,3 @@ class Counter {
 //                   ^^ ImpureStaticPropertyAccess: Reading static property Counter::$n in a @pure function
     }
 }
-===expect===

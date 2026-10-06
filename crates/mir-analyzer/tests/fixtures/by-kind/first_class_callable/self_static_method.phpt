@@ -26,4 +26,3 @@ class Factory {
         return $fn;
     }
 }
-===expect===

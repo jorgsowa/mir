@@ -18,4 +18,3 @@ takes_string(42);
 //           ^^ ArgumentTypeCoercion: Argument $s of takes_string() expects 'string', got '42' — coercion may fail at runtime
 takes_string(3.14);
 //           ^^^^ ArgumentTypeCoercion: Argument $s of takes_string() expects 'string', got '3.14' — coercion may fail at runtime
-===expect===

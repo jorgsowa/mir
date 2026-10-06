@@ -13,4 +13,3 @@ switch (rand(0, 4)) {
         $a = 1;
 //      ^^ UnusedVariable: Variable $a is never read
 }
-===expect===

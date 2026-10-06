@@ -12,5 +12,3 @@ function impure(): int {
     static $count = 0;
     return ++$count;
 }
-
-===expect===

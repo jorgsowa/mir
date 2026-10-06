@@ -48,4 +48,3 @@ function descriptionNotSwallowed(Plain $p): void {
     /** @mir-check $p->bar is string */
     $_ = 1;
 }
-===expect===

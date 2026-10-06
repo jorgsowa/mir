@@ -7,4 +7,3 @@ interface Repository {
 //    ^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
     public function findAll(): array;
 }
-===expect===

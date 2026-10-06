@@ -26,4 +26,3 @@ function test(array $ne, array $maybe_empty): void {
     /** @mir-check $rev is list<string> */
     $_ = $rev;
 }
-===expect===

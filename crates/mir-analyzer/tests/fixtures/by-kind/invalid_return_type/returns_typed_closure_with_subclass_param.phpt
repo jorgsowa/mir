@@ -18,4 +18,3 @@ function foo(Closure $f, Closure $g) : Closure {
         return $f($g($x));
     };
 }
-===expect===

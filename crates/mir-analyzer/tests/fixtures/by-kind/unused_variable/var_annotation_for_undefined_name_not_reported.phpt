@@ -26,4 +26,3 @@ function property_annotation(Foo $o): void {
     /** @var int $o->count */
     echo $o->m();
 }
-===expect===

@@ -22,4 +22,3 @@ function f(array $items): void {
         echo "after switch";
     }
 }
-===expect===

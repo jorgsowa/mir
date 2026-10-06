@@ -26,4 +26,3 @@ class Foo {
 }
 
 (new Foo())->pub();
-===expect===

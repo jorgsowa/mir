@@ -7,4 +7,3 @@ class Serializer {
 }
 
 Serializer::__toString();
-===expect===

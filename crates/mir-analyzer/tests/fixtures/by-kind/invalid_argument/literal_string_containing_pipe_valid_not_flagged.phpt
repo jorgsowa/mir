@@ -13,4 +13,3 @@ member exactly is not flagged.
 function g($x): void {}
 
 g('a|b');
-===expect===

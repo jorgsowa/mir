@@ -101,4 +101,3 @@ function sumPlainBag(PlainIntBag $bag): int {
     }
     return $total;
 }
-===expect===

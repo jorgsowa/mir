@@ -6,4 +6,3 @@ class A {
     public function __construct() {}
     public function __clone(): void { $this->__construct(); }
 }
-===expect===

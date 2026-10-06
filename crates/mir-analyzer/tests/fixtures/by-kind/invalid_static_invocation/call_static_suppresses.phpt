@@ -8,4 +8,3 @@ class Proxy {
 }
 
 Proxy::forward();
-===expect===

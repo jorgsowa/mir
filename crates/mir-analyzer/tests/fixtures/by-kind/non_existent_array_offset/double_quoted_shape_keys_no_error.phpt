@@ -16,4 +16,3 @@ class Mapper {
         echo $row['account'];
     }
 }
-===expect===

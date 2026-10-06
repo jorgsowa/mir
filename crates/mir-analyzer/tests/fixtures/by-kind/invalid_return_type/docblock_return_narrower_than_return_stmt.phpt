@@ -11,4 +11,3 @@ function strictlyNotOne(int $x): int {
     }
     return $x;
 }
-===expect===

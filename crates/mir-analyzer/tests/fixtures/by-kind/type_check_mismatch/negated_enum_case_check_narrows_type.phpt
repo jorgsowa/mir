@@ -20,4 +20,3 @@ function foo(Status $s): void {
     /** @mir-check $s is Status::Active|Status::Inactive */
     $_ = 1;
 }
-===expect===

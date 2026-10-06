@@ -17,4 +17,3 @@ class MyCollection implements \IteratorAggregate {
 function process(MyCollection $col): void {
     yield from $col;
 }
-===expect===

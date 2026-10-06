@@ -31,4 +31,3 @@ function processStream($_stream): void {}
 $readable = new OnlyReadable();
 processStream($readable);
 //<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'OnlyReadable' does not satisfy bound 'Base&Readable&Writable'
-===expect===

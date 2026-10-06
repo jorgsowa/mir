@@ -19,4 +19,3 @@ function a_fn(): int { return x_fn(); }
 ===file:vendor/lib/x.inc===
 <?php
 function x_fn(): int { return 1; }
-===expect===

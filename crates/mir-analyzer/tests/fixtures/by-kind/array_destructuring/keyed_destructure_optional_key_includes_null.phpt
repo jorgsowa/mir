@@ -19,4 +19,3 @@ function test(array $arr): void {
 //  ^^^^^^^^^^^ Trace: Type of $a is string|null
 //         ^^ PossiblyNullArgument: Argument $string of strlen() might be null
 }
-===expect===

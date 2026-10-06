@@ -23,4 +23,3 @@ class Consumer {
         $this->w = \Lib\makeWidget();
     }
 }
-===expect===

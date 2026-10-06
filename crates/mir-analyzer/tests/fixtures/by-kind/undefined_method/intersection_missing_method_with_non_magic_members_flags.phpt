@@ -16,4 +16,3 @@ function f(A&B $x): void {
     $x->nope();
 //  ^^^^^^^^^^ UndefinedMethod: Method A&B::nope() does not exist
 }
-===expect===

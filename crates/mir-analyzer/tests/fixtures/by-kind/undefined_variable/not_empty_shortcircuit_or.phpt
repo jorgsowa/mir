@@ -8,4 +8,3 @@ if (empty($x) || $x->method()) {
     // empty() doesn't provide same narrowing as !isset() because empty($undefined) is true
     // So this WILL error with UndefinedVariable - expected
 }
-===expect===

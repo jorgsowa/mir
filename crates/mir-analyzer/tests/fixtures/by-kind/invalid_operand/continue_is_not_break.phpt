@@ -9,4 +9,3 @@ Continue is not break
                             continue 2;
 //                          ^^^^^^^^ ParseError: Parse error: Cannot 'continue' 2 levels
                     }
-===expect===

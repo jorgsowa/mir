@@ -26,4 +26,3 @@ function literal(): string {
 function intValue(Level $l): int {
     return $l->value;
 }
-===expect===

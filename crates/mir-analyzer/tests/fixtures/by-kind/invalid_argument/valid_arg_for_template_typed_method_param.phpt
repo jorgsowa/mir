@@ -13,4 +13,3 @@ function test(): void {
     $box = new Box();
     $box->set(42);
 }
-===expect===

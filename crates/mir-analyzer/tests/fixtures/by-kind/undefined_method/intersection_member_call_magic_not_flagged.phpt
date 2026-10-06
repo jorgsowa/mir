@@ -36,4 +36,3 @@ function declaredWinsOverMagic(A&Magic $x): void {
 function nullsafe($x): void {
     $x?->zzz();
 }
-===expect===

@@ -24,4 +24,3 @@ function encode(mixed $value): void {
     }
     needsString($str);
 }
-===expect===

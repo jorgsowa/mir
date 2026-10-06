@@ -14,4 +14,3 @@ function test() {
     clone $a;
 //  ^^^^^^^^ MixedClone: cannot clone mixed
 }
-===expect===

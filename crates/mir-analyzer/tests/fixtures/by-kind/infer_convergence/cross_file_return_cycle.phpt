@@ -23,4 +23,3 @@ class B {
 <?php
 function test(): string { return B::g(); }
 //                        ^^^^^^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared 'string'
-===expect===

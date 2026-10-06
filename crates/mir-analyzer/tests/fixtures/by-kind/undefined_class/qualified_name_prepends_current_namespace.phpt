@@ -14,4 +14,3 @@ function handle(): string {
     $r = new Http\Request();
     return $r->path();
 }
-===expect===

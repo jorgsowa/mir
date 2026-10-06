@@ -17,5 +17,3 @@ final class C implements Iterator {
         return false;
     }
 }
-
-===expect===

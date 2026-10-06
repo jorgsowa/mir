@@ -53,4 +53,3 @@ function isSubclassOfFalseBranchDoesNotNarrowReceiver(?Holder $h): void {
         $_ = 1;
     }
 }
-===expect===

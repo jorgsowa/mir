@@ -14,4 +14,3 @@ function test($out): void {
     vfprintf($out, '%s', [$_GET['x']]);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

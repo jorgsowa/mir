@@ -49,4 +49,3 @@ class Box {
         static::onlyInt();
     }
 }
-===expect===

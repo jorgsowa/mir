@@ -18,4 +18,3 @@ function a_fn(): int { return b_fn(); }
 <?php
 require_once __DIR__ . '/a.module';
 function b_fn(): int { return 1; }
-===expect===

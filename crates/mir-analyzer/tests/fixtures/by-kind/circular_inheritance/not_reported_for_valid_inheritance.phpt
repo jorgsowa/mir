@@ -5,4 +5,3 @@ not reported for valid inheritance
 class Base {}
 class Child extends Base {}
 class GrandChild extends Child {}
-===expect===

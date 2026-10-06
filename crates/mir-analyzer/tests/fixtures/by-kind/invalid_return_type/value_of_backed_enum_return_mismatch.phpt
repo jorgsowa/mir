@@ -12,5 +12,3 @@ function wrong(): string {
     return 'x';
 //  ^^^^^^^^^^^ InvalidReturnType: Return type '"x"' is not compatible with declared 'value-of<Suit>'
 }
-
-===expect===

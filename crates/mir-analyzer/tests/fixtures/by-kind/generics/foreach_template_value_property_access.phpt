@@ -33,4 +33,3 @@ function inspect_values(array $map): void {
         $val->id;
     }
 }
-===expect===

@@ -42,4 +42,3 @@ function test_dynamic_class_const_loose_equal(Foo|Bar $x): void {
         $_ = $x;
     }
 }
-===expect===

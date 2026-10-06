@@ -12,4 +12,3 @@ enum Status {
 //<^ +2:1 DuplicateEnum: Enum App\Status has already been defined
     case Inactive;
 }
-===expect===

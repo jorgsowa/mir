@@ -21,4 +21,3 @@ function compute(): \stdClass {
 $x = compute();
 /** @mir-check $x is Foo */
 $_ = $x;
-===expect===

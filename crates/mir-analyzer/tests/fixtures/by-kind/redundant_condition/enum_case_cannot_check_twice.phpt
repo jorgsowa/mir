@@ -61,4 +61,3 @@ function checkSpades($spades): void {
 processClubs(Suit::Clubs);
 processHearts(Suit::Hearts);
 narrowToSpades(Suit::Spades);
-===expect===

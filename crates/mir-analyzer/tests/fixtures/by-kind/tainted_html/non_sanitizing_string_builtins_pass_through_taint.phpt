@@ -42,4 +42,3 @@ function viaHtmlspecialchars(): void {
 function staticOnly(): void {
     echo str_replace('a', 'b', 'static');
 }
-===expect===

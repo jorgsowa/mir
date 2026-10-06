@@ -19,4 +19,3 @@ function test(): void {
     echo $arr['x'];
 //  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

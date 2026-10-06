@@ -41,4 +41,3 @@ function parentToChild(): array {
     return ['x' => ['a' => P::class]];
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'array{'x': array{'a': class-string<P>}}' is not compatible with declared 'array<string, array{'a': class-string<C>}>'
 }
-===expect===

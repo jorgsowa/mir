@@ -89,4 +89,3 @@ function push_after_cap(Repo $repo): void {
     /** @mir-check $row[0] is mixed */
     $repo->take($row[0]);
 }
-===expect===

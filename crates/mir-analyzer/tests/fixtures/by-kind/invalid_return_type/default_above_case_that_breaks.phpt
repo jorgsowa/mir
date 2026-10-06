@@ -16,4 +16,3 @@ function foo(string $a) : string {
       return "goodbye";
   }
 }
-===expect===

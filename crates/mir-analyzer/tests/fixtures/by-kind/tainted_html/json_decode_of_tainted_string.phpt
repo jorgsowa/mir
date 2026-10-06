@@ -23,4 +23,3 @@ function staticOnly(): void {
     $data = json_decode('{"name":"safe"}', true);
     echo $data['name'];
 }
-===expect===

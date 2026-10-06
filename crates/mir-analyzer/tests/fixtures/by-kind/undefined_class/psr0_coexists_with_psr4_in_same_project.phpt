@@ -31,4 +31,3 @@ class Consumer {
 //      ^^^^^^^^^^ UndefinedMethod: Method Legacy_Helper::nope() does not exist
     }
 }
-===expect===

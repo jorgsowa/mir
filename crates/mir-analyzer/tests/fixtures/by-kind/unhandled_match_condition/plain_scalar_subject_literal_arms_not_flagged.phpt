@@ -79,4 +79,3 @@ function literalUnionStillFlagged(string $kind): int {
         'a' => 1,
     };
 }
-===expect===

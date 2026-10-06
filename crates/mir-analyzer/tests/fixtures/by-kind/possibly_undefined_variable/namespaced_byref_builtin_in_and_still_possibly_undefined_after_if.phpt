@@ -12,4 +12,3 @@ function f(?string $p): ?int {
     return (int) $m[1];
 //               ^^ PossiblyUndefinedVariable: Variable $m might not be defined
 }
-===expect===

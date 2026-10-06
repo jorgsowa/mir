@@ -11,5 +11,3 @@ function pi() {
 function half() {
     return -0.5;
 }
-
-===expect===

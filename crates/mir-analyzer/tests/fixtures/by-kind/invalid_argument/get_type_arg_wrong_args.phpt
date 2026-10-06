@@ -27,4 +27,3 @@ switch (gettype($a)) {
         testString($a);
 //                 ^^ PossiblyInvalidArgument: Argument $var of testString() expects 'string', possibly different type '1|"two"' provided
 }
-===expect===

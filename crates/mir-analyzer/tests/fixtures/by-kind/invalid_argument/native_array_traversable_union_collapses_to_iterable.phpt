@@ -10,4 +10,3 @@ function f(array|Traversable $x): void { $_ = $x; }
 
 f(new A());
 //^^^^^^^ InvalidArgument: Argument $x of f() expects 'iterable', got 'A'
-===expect===

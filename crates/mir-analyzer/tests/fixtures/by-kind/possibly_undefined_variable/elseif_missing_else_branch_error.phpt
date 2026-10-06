@@ -14,4 +14,3 @@ function foo(int $x): string {
     return $result;
 //         ^^^^^^^ PossiblyUndefinedVariable: Variable $result might not be defined
 }
-===expect===

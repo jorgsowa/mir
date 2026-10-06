@@ -6,4 +6,3 @@ tag's parameter type does not exist.
 /** @method void setThing(NonExistentParamType $thing) */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentParamType' does not exist
 class A {}
-===expect===

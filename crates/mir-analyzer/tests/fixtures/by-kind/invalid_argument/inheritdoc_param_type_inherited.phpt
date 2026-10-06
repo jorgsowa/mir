@@ -26,4 +26,3 @@ function bad(ConcreteHandler $h): void {
     $h->handle("not a cat");
 //             ^^^^^^^^^^^ InvalidArgument: Argument $input of handle() expects 'Cat', got '"not a cat"'
 }
-===expect===

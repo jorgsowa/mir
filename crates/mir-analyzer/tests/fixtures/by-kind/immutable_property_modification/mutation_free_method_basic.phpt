@@ -17,4 +17,3 @@ class Counter {
         $this->count++;
     }
 }
-===expect===

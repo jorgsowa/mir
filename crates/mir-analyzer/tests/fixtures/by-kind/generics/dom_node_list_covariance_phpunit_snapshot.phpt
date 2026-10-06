@@ -27,4 +27,3 @@ $root = new DOMElement('root');
 
 SnapshotNodeList::fromNodeList($document->getElementsByTagName('testcase'));
 SnapshotNodeList::fromNodeList($root->getElementsByTagName('testcase'));
-===expect===

@@ -8,4 +8,3 @@ interface I {
 function f(I $i): void {
     $i->doIt();
 }
-===expect===

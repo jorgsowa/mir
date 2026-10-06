@@ -10,4 +10,3 @@ function run(): void {
     new Missing();
 //      ^^^^^^^ UndefinedClass: Class Missing does not exist
 }
-===expect===

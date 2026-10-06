@@ -21,4 +21,3 @@ function guess(string $name): string {
         default => 'fallback',
     };
 }
-===expect===

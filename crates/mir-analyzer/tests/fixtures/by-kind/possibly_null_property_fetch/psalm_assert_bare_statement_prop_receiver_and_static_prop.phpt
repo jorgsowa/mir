@@ -39,4 +39,3 @@ function narrowsStaticProp(): void {
     Holder::$staticChild->foo();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
-===expect===

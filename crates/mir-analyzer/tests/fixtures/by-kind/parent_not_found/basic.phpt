@@ -8,4 +8,3 @@ class Orphan {
 //      ^^^^^^ ParentNotFound: Cannot use parent:: when current class has no parent
     }
 }
-===expect===

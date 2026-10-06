@@ -17,4 +17,3 @@ foreach (generate() as $c) { break; echo "x"; }
 
 foreach (generate() as $ignoredValue) { echo "x"; }
 //                     ^^^^^^^^^^^^^ UnusedForeachValue: Foreach value $ignoredValue is never read
-===expect===

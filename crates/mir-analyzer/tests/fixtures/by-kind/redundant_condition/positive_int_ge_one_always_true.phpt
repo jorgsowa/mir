@@ -16,4 +16,3 @@ function test(int $n): void {
         echo "always";
     }
 }
-===expect===

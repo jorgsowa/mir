@@ -10,4 +10,3 @@ function process(callable $c): void {
     $c(null);
 }
 process(function (int $a = null): void {});
-===expect===

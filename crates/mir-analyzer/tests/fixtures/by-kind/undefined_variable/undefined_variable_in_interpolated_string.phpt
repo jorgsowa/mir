@@ -5,4 +5,3 @@ Undefined variable in interpolated string
 fn(): string => "$a";
 //               ^^ UndefinedVariable: Variable $a is not defined
                 
-===expect===

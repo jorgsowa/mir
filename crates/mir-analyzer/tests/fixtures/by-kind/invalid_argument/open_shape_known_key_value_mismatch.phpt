@@ -33,4 +33,3 @@ function passBadOpenShapeNonEmpty(array $shape): void {
     wantsNonEmptyIntMap($shape);
 //                      ^^^^^^ InvalidArgument: Argument $arr of wantsNonEmptyIntMap() expects 'non-empty-array<string, int>', got 'array{'a': string}'
 }
-===expect===

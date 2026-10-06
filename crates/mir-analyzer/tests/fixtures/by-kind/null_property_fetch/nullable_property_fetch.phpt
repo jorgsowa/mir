@@ -6,4 +6,3 @@ $a = null;
 
 echo $a->foo;
 //   ^^^^^^^ NullPropertyFetch: Cannot access property $foo on null
-===expect===

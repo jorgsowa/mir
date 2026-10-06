@@ -11,4 +11,3 @@ function foo(string $a_class) : void {
         new $a_class();
     }
 }
-===expect===

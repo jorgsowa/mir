@@ -55,4 +55,3 @@ function test_template_bearing(Validator $v, Dog $seed, mixed $target): void {
     /** @mir-check $target is Dog */
     $target;
 }
-===expect===

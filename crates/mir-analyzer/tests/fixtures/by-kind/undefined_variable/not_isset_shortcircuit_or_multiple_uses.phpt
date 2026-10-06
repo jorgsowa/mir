@@ -8,4 +8,3 @@ if (!isset($x) || ($x->foo() && $x->bar())) {
 //                              ^^^^^^^^^ MixedMethodCall: Method bar() called on mixed type
     // After fix: no UndefinedVariable errors for $x in RHS of !isset($x) ||
 }
-===expect===

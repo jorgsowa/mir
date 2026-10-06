@@ -8,4 +8,3 @@ if (is_int($x)) {
     echo $x[0];
 //       ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'int'
 }
-===expect===

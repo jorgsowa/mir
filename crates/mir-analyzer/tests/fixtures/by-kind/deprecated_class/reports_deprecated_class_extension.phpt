@@ -7,4 +7,3 @@ class OldBase {}
 
 class Child extends OldBase {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedClass: Class OldBase is deprecated: use NewBase instead
-===expect===

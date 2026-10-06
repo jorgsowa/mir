@@ -14,4 +14,3 @@ function test(): void {
     echo $x->val;
 //       ^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $val on possibly null value
 }
-===expect===

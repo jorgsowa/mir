@@ -37,4 +37,3 @@ function test_nullable_int_narrows(?int $mode): void {
         $_ = $mode;
     }
 }
-===expect===

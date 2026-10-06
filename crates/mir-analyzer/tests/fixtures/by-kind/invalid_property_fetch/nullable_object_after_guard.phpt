@@ -17,5 +17,3 @@ $obj = null;
 if ($obj !== null) {
     $name = $obj->name;
 }
-
-===expect===

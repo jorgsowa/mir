@@ -8,4 +8,3 @@ if (isset($x) || $x->method()) {
 //               ^^ UndefinedVariable: Variable $x is not defined
     // Correctly should error: RHS runs when isset($x) is FALSE, so $x is undefined
 }
-===expect===

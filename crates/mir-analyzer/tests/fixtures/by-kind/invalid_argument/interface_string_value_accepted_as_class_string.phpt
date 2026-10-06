@@ -21,4 +21,3 @@ function forward(string $iface): void {
     /** @var interface-string<Shape> $iface */
     needsClassString($iface);
 }
-===expect===

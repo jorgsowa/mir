@@ -36,4 +36,3 @@ function run(): void {
 //                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $f of takes_int_returning() expects 'callable whose parameter #1 accepts Base', got 'callable whose parameter #1 only accepts Child' — coercion may fail at runtime
 //                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of takes_int_returning() expects 'callable returning int', got 'callable returning non-empty-string'
 }
-===expect===

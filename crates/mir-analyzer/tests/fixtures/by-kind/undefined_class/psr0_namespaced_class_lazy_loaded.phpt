@@ -20,4 +20,3 @@ class Handler {
         return $m->body();
     }
 }
-===expect===

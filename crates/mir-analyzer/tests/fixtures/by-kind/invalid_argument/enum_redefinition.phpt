@@ -5,4 +5,3 @@ Enum redefinition
 enum Foo {}
 enum Foo {}
 //<^^^^^^^^^^^ DuplicateEnum: Enum Foo has already been defined
-===expect===

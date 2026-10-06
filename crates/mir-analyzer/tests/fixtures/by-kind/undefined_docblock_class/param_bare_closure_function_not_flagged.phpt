@@ -20,4 +20,3 @@ namespace App;
  */
 function apply($callback): void {
 }
-===expect===

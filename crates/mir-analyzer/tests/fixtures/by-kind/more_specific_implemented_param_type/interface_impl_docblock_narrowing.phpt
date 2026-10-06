@@ -27,4 +27,3 @@ class SquareRenderer implements Renderer {
     /** @param Square $shape */
     public function draw(Shape $shape): void {}
 }
-===expect===

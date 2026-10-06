@@ -18,4 +18,3 @@ function a_fn(): int { return b_fn(); }
 <?php
 function b_fn(): int { return 'x'; }
 //                     ^^^^^^^^^^^ InvalidReturnType: Return type '"x"' is not compatible with declared 'int'
-===expect===

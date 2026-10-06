@@ -12,4 +12,3 @@ interface X {
     public function boo(A $class): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: interface method cannot contain a body
 }
-===expect===

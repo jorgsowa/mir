@@ -17,4 +17,3 @@ is itself mixed, so the condition !declared.is_mixed() is false
 function first(array $items) {
     return $items[0];
 }
-===expect===

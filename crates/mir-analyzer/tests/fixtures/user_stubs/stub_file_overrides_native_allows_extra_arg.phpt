@@ -12,4 +12,3 @@ function strlen(string $string, string $encoding = 'UTF-8'): int { return 0; }
 ===file:App.php===
 <?php
 strlen('hello', 'ASCII');
-===expect===

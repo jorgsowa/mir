@@ -18,4 +18,3 @@ function foo(int $x): string {
     }
     return $y;
 }
-===expect===

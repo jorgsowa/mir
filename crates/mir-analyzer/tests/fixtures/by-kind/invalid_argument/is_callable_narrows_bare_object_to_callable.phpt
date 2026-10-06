@@ -23,4 +23,3 @@ function test(object $x): void {
         $x();
     }
 }
-===expect===

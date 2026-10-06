@@ -11,4 +11,3 @@ function test(): void {
      */
     new NoSuchClass();
 }
-===expect===

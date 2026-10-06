@@ -25,4 +25,3 @@ function mixedRight(mixed $right): array {
 function unionArray(mixed $left, array $shape): array {
     return $left + $shape;
 }
-===expect===

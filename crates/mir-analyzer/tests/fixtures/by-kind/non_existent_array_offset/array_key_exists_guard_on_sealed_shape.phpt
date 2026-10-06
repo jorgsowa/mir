@@ -14,4 +14,3 @@ class Renderer {
         return array_key_exists('favicon', $this->meta) ? (string) $this->meta['favicon'] : '';
     }
 }
-===expect===

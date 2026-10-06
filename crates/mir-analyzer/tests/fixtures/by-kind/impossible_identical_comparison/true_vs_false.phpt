@@ -18,4 +18,3 @@ function test_false(false $x): void {
     if ($x === true) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'false' and 'true' is always false — these types can never be identical
 }
-===expect===

@@ -27,4 +27,3 @@ function wrap(LegacyBuilder $builder): string {
     return $builder->build();
 //         ^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method build() in a pure or immutable context
 }
-===expect===

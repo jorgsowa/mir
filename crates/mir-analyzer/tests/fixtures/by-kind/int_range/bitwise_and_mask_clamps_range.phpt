@@ -40,4 +40,3 @@ function test_right_shift_non_negative($n): void {
     /** @mir-check $r is non-negative-int */
     $_ = $r;
 }
-===expect===

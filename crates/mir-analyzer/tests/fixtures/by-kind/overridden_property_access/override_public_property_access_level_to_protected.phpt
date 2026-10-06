@@ -18,4 +18,3 @@ class B extends A {
     protected $foo;
 //  ^^^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$foo overrides with less visibility
 }
-===expect===

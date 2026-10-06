@@ -52,4 +52,3 @@ function ok($x, $s, $l, $m, $impl, $implShape): void {
     ifaceShape($implShape);
     ifaceShape(['k' => Impl::class]);
 }
-===expect===

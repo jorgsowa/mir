@@ -19,4 +19,3 @@ function a_str(): string { return LIMIT; }
 ===file:consts.inc===
 <?php
 const LIMIT = 10;
-===expect===

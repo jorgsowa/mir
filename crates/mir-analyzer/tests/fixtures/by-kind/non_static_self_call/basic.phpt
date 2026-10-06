@@ -10,4 +10,3 @@ class Counter {
 //             ^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Counter::count() cannot be called statically
     }
 }
-===expect===

@@ -18,4 +18,3 @@ function f($skipUncloneable): void {
     /** @mir-check $skipUncloneable is mixed */
     echo $skipUncloneable;
 }
-===expect===

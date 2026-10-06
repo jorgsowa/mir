@@ -19,4 +19,3 @@ class NullLogger implements Logger {
         // noop
     }
 }
-===expect===

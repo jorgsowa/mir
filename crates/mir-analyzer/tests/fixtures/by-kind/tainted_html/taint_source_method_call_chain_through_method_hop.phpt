@@ -35,4 +35,3 @@ function leak(): void {
     echo $http->params()->get('id');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

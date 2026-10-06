@@ -15,5 +15,3 @@ function bar(): string
 }
 
 foo(bar());
-
-===expect===

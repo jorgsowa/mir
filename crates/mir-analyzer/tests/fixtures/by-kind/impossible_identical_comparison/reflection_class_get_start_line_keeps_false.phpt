@@ -8,4 +8,3 @@ sibling getFileName()'s already-correct T|false docblock.
 class Foo {}
 $line = (new ReflectionClass(Foo::class))->getStartLine();
 assert($line !== false);
-===expect===

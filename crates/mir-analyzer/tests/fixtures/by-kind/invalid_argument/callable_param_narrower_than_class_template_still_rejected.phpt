@@ -36,4 +36,3 @@ function test(Box $b): void {
     $r = $b->apply(fn(Dog $d): string => "x");
 //                 ^^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $fn of apply() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Dog' — coercion may fail at runtime
 }
-===expect===

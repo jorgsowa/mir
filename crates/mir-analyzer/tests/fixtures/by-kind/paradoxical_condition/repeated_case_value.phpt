@@ -11,4 +11,3 @@ switch ($a) {
 //       ^ ParadoxicalCondition: Value 0 is duplicated; this branch can never be reached
         echo "I never get here";
 }
-===expect===

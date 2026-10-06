@@ -11,4 +11,3 @@ InvalidArrayAssignment fires for literal true.
 $a = true;
 $a[0] = 5;
 //<^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type 'true'
-===expect===

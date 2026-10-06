@@ -12,4 +12,3 @@ final class Person
 
 new Person(name: "", 0);
 //                   ^ ParseError: Parse error: cannot use positional argument after named argument
-===expect===

@@ -12,5 +12,3 @@ Redundant cast from array to array
 $x = [];
 $y = (array)$x;
 //          ^^ RedundantCast: Casting 'array{}' to 'array' is redundant
-
-===expect===

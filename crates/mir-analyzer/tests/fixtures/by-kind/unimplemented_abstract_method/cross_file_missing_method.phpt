@@ -12,4 +12,3 @@ class Circle extends Shape {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Circle must implement abstract method perimeter()
     public function area(): float { return 3.14; }
 }
-===expect===

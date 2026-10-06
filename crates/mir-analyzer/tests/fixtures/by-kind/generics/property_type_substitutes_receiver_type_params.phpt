@@ -29,4 +29,3 @@ $box = new Box(42);
 $v = $box->value;
 /** @mir-check $v is int */
 echo "ok";
-===expect===

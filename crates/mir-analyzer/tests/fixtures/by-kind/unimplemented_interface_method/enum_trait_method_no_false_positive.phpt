@@ -18,4 +18,3 @@ enum Suit implements Colorful {
 
     case Hearts;
 }
-===expect===

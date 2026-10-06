@@ -9,4 +9,3 @@ namespace App;
 use Http\Client\HttpAsyncClient;
 
 final class Client implements HttpAsyncClient {}
-===expect===

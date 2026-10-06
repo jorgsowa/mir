@@ -56,4 +56,3 @@ final class Holder {
         /** @mir-check $d is Cached<iterable<mixed, mixed>> */
     }
 }
-===expect===

@@ -9,4 +9,3 @@ function fooFoo(A $a): void {
     $a->bar = 5;
 //  ^^^^^^^^^^^ NoInterfaceProperties: Property $bar is not defined on this interface
 }
-===expect===

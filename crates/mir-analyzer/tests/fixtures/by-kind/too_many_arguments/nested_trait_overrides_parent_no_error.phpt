@@ -34,4 +34,3 @@ class Child extends ParentClass {
 
 // Two args valid per InnerTrait::create — must not raise TooManyArguments.
 Child::create('foo', 'bar');
-===expect===

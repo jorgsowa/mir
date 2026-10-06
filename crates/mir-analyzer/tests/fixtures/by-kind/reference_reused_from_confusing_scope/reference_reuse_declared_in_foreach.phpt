@@ -17,5 +17,3 @@ foreach ($arr as $val) {
 }
 
 $var = "foo";
-
-===expect===

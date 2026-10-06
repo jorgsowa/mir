@@ -8,5 +8,3 @@ function missing(): mixed {
 //       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentReturnClass' does not exist
     return null;
 }
-
-===expect===

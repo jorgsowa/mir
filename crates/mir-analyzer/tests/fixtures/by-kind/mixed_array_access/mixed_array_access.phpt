@@ -6,4 +6,3 @@ Mixed array access
 $a = [];
 echo $a[0];
 //   ^^^^^ MixedArrayAccess: Array access on mixed type
-===expect===

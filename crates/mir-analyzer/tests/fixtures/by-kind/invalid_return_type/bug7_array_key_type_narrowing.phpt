@@ -41,4 +41,3 @@ function stringKeys(): array
     }
     return $out;
 }
-===expect===

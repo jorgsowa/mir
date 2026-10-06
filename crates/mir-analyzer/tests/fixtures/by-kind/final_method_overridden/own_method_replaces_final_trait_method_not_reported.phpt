@@ -13,4 +13,3 @@ class Widget {
     use Greeter;
     protected function greet(): string { return 'bye'; }
 }
-===expect===

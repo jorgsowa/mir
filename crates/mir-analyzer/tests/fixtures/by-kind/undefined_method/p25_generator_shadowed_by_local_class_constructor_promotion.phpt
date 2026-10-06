@@ -29,4 +29,3 @@ final class Consumer
     public function __construct(private Generator $generator) {}
     public function run(): string { return $this->generator->build(); }
 }
-===expect===

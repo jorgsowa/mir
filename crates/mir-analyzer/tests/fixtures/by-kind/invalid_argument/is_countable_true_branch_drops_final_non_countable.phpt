@@ -11,4 +11,3 @@ function f($x): void {
         echo count($x);
     }
 }
-===expect===

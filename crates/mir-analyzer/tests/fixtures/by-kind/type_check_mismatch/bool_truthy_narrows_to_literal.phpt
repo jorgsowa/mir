@@ -31,4 +31,3 @@ function test_nullable_bool(bool|null $y): void {
         $_ = $y;
     }
 }
-===expect===

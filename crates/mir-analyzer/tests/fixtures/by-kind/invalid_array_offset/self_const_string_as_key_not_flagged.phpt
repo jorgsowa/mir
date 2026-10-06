@@ -23,4 +23,3 @@ class Routes {
         $this->handlers[self::CONTACT] = $fn;
     }
 }
-===expect===

@@ -8,4 +8,3 @@ function f(?Config $c): void {
         clone $c;
     }
 }
-===expect===

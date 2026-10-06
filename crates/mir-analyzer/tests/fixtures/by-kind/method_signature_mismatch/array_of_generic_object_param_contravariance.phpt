@@ -34,4 +34,3 @@ class InvalidNarrowingImpl extends Base {
     public function process(array $items): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method InvalidNarrowingImpl::process() signature mismatch: parameter $items type 'array<int, Kitten>' is narrower than parent type 'array<int, Cat>'
 }
-===expect===

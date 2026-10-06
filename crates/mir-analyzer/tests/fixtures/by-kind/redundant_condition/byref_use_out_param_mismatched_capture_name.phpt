@@ -18,4 +18,3 @@ function run(): void {
         throw $error;
     }
 }
-===expect===

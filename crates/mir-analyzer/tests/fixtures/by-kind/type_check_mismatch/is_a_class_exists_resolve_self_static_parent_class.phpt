@@ -42,4 +42,3 @@ class Puppy extends Dog {
         }
     }
 }
-===expect===

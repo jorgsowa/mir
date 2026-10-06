@@ -21,4 +21,3 @@ class Shelter extends Base {
     // same type is allowed
     public function pet(Animal $a): void {}
 }
-===expect===

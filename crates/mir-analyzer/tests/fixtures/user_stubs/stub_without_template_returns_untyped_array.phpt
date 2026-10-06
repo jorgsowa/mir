@@ -21,4 +21,3 @@ function test(): void {
     $_ = $keys;
 //  ^^^^^^^^^^^ TypeCheckMismatch: Type of $keys is expected to be list<string>, got array
 }
-===expect===

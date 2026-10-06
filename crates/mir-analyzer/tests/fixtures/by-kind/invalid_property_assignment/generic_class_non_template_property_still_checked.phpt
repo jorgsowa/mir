@@ -15,4 +15,3 @@ class Box {
 //      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $label expects 'string', cannot assign 'int'
     }
 }
-===expect===

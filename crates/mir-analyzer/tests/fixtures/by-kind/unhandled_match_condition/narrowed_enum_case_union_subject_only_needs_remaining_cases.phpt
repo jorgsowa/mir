@@ -25,4 +25,3 @@ function missing(Err $e): int {
         Err::NotFound => 1,
     };
 }
-===expect===

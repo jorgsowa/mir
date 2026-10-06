@@ -16,4 +16,3 @@ function process(int|array $data): void {
     }
     echo $data[0];
 }
-===expect===

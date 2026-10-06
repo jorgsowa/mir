@@ -16,4 +16,3 @@ enum Status: string implements Labelable {
         return ucfirst($this->value);
     }
 }
-===expect===

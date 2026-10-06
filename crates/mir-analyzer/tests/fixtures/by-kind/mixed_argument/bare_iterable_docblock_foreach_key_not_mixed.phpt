@@ -24,4 +24,3 @@ function walk($iter): void
         needsIntOrString($k);
     }
 }
-===expect===

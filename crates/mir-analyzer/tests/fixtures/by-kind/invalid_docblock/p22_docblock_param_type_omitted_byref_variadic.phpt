@@ -18,4 +18,3 @@ function g(&$ref): void {}
 
 /** @param ...$rest no type, variadic */
 function h(...$rest): void {}
-===expect===

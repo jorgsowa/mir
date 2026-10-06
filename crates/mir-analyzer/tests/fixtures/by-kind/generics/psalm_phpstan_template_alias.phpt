@@ -37,4 +37,3 @@ echo "ok";
 $other = new OtherBox("s");
 /** @mir-check $other is OtherBox<string> */
 echo "ok";
-===expect===

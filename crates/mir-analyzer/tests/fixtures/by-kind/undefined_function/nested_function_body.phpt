@@ -8,4 +8,3 @@ function outer(): void {
 //      ^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function nonexistent_function() is not defined
     }
 }
-===expect===

@@ -84,4 +84,3 @@ enum Env {
 function readEnumDefined(): bool {
     return ENUM_DEFINED;
 }
-===expect===

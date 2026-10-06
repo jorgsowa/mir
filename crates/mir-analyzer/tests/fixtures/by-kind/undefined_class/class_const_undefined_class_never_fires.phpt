@@ -25,4 +25,3 @@ $cls = class_exists(\Optional\NewVersion::class)
 function make_it($container): void {
     $container->make(\Optional\SomeService::class);
 }
-===expect===

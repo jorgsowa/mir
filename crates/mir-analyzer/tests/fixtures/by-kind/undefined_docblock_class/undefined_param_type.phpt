@@ -14,5 +14,3 @@ not exist, even without a native type hint.
  */
 function process($x): void {}
 //       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentParamClass' does not exist
-
-===expect===

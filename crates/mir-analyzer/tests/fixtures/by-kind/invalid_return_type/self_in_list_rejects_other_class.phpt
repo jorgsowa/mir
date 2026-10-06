@@ -10,4 +10,3 @@ class Node {
     }
 }
 class Other {}
-===expect===

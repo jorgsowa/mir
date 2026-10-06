@@ -16,4 +16,3 @@ function option(string $key): string|array|bool|null {
 
 $timeout = (int) option('timeout');
 $retries = (int) option('retries');
-===expect===

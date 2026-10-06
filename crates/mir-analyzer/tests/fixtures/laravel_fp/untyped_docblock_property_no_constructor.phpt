@@ -20,4 +20,3 @@ class Grammar {
     /** @var Connection */
     protected $connection;
 }
-===expect===

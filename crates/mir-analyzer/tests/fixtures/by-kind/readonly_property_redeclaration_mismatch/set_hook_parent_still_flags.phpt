@@ -17,4 +17,3 @@ class Child extends Base {
         $this->x = 1;
     }
 }
-===expect===

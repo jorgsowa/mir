@@ -23,4 +23,3 @@ function test(?Box $b): void {
         /** @mir-check $b is Box */
     }
 }
-===expect===

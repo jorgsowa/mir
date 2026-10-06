@@ -35,4 +35,3 @@ function narrowedFirst(?Foo $obj): string {
     }
     return $obj->bar;
 }
-===expect===

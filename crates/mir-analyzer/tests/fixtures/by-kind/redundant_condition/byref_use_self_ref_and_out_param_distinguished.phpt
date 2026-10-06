@@ -25,4 +25,3 @@ function run(): void {
         echo $total;
     }
 }
-===expect===

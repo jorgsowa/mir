@@ -16,4 +16,3 @@ class Output {
 namespace Symfony\Component\Console\Helper;
 $out = new \Symfony\Component\Console\Output();
 $out->doWrite();
-===expect===

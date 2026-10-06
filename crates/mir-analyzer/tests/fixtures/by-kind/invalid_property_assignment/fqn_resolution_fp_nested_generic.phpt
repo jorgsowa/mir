@@ -41,4 +41,3 @@ class Consumer {
         $this->prop = $result;
     }
 }
-===expect===

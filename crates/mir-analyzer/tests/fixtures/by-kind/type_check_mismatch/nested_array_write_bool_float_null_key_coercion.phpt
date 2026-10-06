@@ -34,4 +34,3 @@ function nestedNullKeyCoercesToEmptyString(): void {
     /** @mir-check $arr is array<string, array{x: 1}> */
     $_ = $arr;
 }
-===expect===

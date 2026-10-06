@@ -26,4 +26,3 @@ class Context {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'positive-int|null' is not compatible with declared 'positive-int'
     }
 }
-===expect===

@@ -8,4 +8,3 @@ class Config
 }
 
 echo (new Config())->timeout;
-===expect===

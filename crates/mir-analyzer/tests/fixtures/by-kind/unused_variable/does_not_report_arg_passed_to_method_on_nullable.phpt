@@ -9,4 +9,3 @@ class Baz {
 //      ^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method doSomething() on possibly null value
     }
 }
-===expect===

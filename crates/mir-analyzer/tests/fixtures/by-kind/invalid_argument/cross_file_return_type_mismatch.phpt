@@ -18,4 +18,3 @@ class Maker {
 function expect_banana(Banana $v): void {}
 expect_banana((new Maker)->make());
 //            ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $v of expect_banana() expects 'Banana', got 'Apple'
-===expect===

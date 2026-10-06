@@ -15,4 +15,3 @@ function test(): void {
     $data = $_POST['body'];
     file_put_contents('/var/log/app.log', $data);
 }
-===expect===

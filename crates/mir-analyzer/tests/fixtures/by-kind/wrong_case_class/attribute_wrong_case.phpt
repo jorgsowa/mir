@@ -8,4 +8,3 @@ class myAttr {}
 #[myattr]
 //^^^^^^ WrongCaseClass: Class name 'myattr' has incorrect casing; use 'myAttr'
 class Foo {}
-===expect===

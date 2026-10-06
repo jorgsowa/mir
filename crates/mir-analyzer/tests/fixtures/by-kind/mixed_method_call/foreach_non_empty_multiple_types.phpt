@@ -19,4 +19,3 @@ if (is_string($result) || is_int($result)) {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
     echo "valid";
 }
-===expect===

@@ -5,4 +5,3 @@ Undefined mixin class
 /** @mixin B */
 //  ^^^^^^^^ UndefinedDocblockClass: Docblock type 'B' does not exist
 class A {}
-===expect===

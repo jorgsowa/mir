@@ -12,4 +12,3 @@ Trace variables comma
 $a = getmypid();
 //<^^^^^^^^^^^^^^^^ Trace: Type of $a is mixed
 $b = getmypid();
-===expect===

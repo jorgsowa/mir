@@ -6,4 +6,3 @@ A literal shape array is a non-empty-array and should satisfy non-empty-array<K,
 function test(): array {
     return ['a' => 1, 'b' => 2];
 }
-===expect===

@@ -15,4 +15,3 @@ function test(array $words): void {
     /** @mir-check $r is list<string> */
     $_ = $r;
 }
-===expect===

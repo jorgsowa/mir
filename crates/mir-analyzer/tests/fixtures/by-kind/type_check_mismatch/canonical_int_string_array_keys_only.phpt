@@ -33,4 +33,3 @@ function literalKeys(): void {
     echo $arr['-0'];
     echo $arr['1.0'];
 }
-===expect===

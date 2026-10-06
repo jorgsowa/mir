@@ -17,5 +17,3 @@ class T {
 //           ^^^^^ UndefinedVariable: Variable $nope is not defined
     }
 }
-
-===expect===

@@ -14,4 +14,3 @@ function getResult(): int|false { return 1; }
 function test(): void {
     takesMixed(getResult());
 }
-===expect===

@@ -19,4 +19,3 @@ function gen() {
 $g = gen();
 /** @mir-check $g is Generator<int, 1|2, mixed, "done"> */
 $_ = 1;
-===expect===

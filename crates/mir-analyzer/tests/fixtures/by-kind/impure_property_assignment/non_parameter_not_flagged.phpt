@@ -13,5 +13,3 @@ function localOnly(int $n): Foo {
     $obj->a = $n;
     return $obj;
 }
-
-===expect===

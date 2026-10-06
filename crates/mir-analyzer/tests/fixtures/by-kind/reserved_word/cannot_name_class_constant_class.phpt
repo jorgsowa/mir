@@ -9,5 +9,3 @@ class Foo
 }
 
 class Bar {}
-
-===expect===

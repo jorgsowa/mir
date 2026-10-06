@@ -24,4 +24,3 @@ function wrap(Greeter $obj, string $name): void {
     /** @mir-check $x is Closure */
     $_ = $x;
 }
-===expect===

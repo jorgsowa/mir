@@ -18,4 +18,3 @@ class C {
         A::foo as bar;
     }
 }
-===expect===

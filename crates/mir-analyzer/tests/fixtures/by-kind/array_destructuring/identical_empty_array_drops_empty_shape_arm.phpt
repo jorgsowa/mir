@@ -54,4 +54,3 @@ function count_check(array $row): string {
     }
     return $row['algorithm'];
 }
-===expect===

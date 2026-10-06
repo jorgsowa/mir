@@ -39,4 +39,3 @@ function wrap_and_return($obj) {
     $local = $obj; // type T of object — must not fire MixedAssignment
     return $local;
 }
-===expect===

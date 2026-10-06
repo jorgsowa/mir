@@ -7,4 +7,3 @@ isset($max) && $value > $max: no UndefinedVariable on $max in the comparison ope
 function test(?int $max, int $value): bool {
     return isset($max) && $value > $max;
 }
-===expect===

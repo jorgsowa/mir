@@ -71,4 +71,3 @@ function literalPathStillPrecise(int $row): void {
     /** @mir-check $r is array<int, array{tags: list<'t'>, name: 'n'}> */
     $r;
 }
-===expect===

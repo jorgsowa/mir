@@ -8,4 +8,3 @@ class A {
 //          ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
     }
 }
-===expect===

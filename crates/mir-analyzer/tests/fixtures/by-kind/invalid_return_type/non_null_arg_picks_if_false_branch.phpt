@@ -27,4 +27,3 @@ class Item {}
 $b = make(Item::class);
 /** @mir-check $b is Box<Item> */
 echo "ok";
-===expect===

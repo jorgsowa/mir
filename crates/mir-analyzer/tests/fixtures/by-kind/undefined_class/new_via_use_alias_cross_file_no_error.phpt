@@ -17,4 +17,3 @@ use App\Model\Entity;
 function wrap(): void {
     $x = new Entity();
 }
-===expect===

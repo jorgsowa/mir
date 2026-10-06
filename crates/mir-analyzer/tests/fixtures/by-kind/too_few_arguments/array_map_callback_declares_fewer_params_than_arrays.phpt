@@ -18,5 +18,3 @@ function acceptsOne(int $a): void {}
 
 array_map("acceptsNone", [1, 2, 3]); // 1 array, 0-param callback
 array_map("acceptsOne", [1, 2, 3], [4, 5, 6]); // 2 arrays, 1-param callback
-
-===expect===

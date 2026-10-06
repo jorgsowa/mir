@@ -11,4 +11,3 @@ function test(): void {
     Magic::anything();
     Magic::anotherMissing(1, 2);
 }
-===expect===

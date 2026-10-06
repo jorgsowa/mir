@@ -50,4 +50,3 @@ function mixed_named_and_other(): int {
      */
     return $x->m() + $y->n();
 }
-===expect===

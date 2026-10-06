@@ -22,4 +22,3 @@ function foo(): void {
 //                ^^ InvalidArgument: Argument $k of takes_int() expects 'int', got '"hello"|"world"'
     }
 }
-===expect===

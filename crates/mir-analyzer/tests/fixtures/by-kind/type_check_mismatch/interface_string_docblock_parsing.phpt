@@ -31,4 +31,3 @@ function var_annotation(string $c): void {
      */
     $_ = $c;
 }
-===expect===

@@ -7,5 +7,3 @@ function test(string|null $in): string|null {
 }
 test(2);
 //   ^ ArgumentTypeCoercion: Argument $in of test() expects 'string|null', got '2' — coercion may fail at runtime
-
-===expect===

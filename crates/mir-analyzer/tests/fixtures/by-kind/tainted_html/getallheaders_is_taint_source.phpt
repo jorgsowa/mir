@@ -23,4 +23,3 @@ function fromApacheRequestHeaders(): void {
     echo $headers['User-Agent'];
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

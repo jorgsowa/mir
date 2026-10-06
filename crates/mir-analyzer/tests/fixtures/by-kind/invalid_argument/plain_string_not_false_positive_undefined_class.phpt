@@ -27,4 +27,3 @@ $methodName = "execute";
 echo $callback;
 echo $className;
 echo $methodName;
-===expect===

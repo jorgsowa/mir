@@ -11,4 +11,3 @@ function unused(): void {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function unused() is never called
 
 array_map('formatRow', [1, 2, 3]);
-===expect===

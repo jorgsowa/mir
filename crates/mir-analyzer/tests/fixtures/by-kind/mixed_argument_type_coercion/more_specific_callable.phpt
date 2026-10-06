@@ -10,4 +10,3 @@ function takesSpecificCallable(callable $c) : void {
 function takesCallable(callable $c) : void {
     takesSpecificCallable($c);
 }
-===expect===

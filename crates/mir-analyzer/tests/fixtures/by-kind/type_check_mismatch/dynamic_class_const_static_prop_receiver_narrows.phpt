@@ -55,4 +55,3 @@ function looseStaticPropClassConst(): void {
         echo "";
     }
 }
-===expect===

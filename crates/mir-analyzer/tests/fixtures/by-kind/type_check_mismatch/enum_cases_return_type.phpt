@@ -31,4 +31,3 @@ $dirs = Direction::cases();
 foreach ($dirs as $d) {
     echo $d->name;
 }
-===expect===

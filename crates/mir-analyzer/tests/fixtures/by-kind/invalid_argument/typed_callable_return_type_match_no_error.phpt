@@ -15,4 +15,3 @@ function giveString(int $x): string {
 }
 
 takesCb('giveString');
-===expect===

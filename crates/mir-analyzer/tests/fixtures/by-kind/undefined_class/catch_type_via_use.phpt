@@ -18,4 +18,3 @@ function f(): void {
 //           ^^^^^^^^^^^ UndefinedClass: Class Vendor\Missing\MyException does not exist
     }
 }
-===expect===

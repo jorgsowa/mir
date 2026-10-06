@@ -13,4 +13,3 @@ class Foo {
 namespace User;
 $foo = new \Vendor\Library\Foo();
 $foo->publicHelper();
-===expect===

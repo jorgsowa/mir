@@ -10,4 +10,3 @@ Var dump
 <?php
 var_dump("hello");
 //<^^^^^^^^^^^^^^^^^ ForbiddenCode: Use of var_dump is forbidden
-===expect===

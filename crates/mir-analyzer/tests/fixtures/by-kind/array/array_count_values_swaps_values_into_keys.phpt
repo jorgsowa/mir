@@ -31,4 +31,3 @@ function test(array $names, array $maybe_empty_ids, array $rows): void {
     /** @mir-check $bad is array */
     $_ = $bad;
 }
-===expect===

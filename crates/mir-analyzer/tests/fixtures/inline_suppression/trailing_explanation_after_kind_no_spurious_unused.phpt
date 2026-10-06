@@ -11,4 +11,3 @@ kind (UndefinedClass) IS used here, so no UnusedSuppress should fire at all.
 <?php
 /** @psalm-suppress UndefinedClass because of a vendor stub */
 new NoSuchClass();
-===expect===

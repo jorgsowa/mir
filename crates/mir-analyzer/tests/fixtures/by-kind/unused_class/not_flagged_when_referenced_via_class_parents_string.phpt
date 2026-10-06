@@ -11,4 +11,3 @@ class Base {}
 final class Foo extends Base {}
 
 class_parents('Foo');
-===expect===

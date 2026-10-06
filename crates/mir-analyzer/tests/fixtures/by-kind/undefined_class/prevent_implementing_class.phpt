@@ -5,4 +5,3 @@ Prevent implementing class
 class Foo {}
 
 class Bar implements Foo {}
-===expect===

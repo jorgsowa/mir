@@ -7,4 +7,3 @@
 function test(?int $min, int $value): bool {
     return !isset($min) || $value < $min;
 }
-===expect===

@@ -13,4 +13,3 @@ function check_is_list(array $items): void {
 ===file:App.php===
 <?php
 check_is_list([1, 2, 3]);
-===expect===

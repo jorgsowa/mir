@@ -45,4 +45,3 @@ function propEnumCaseContradiction(StatusHolder $h): void {
         echo "unreachable";
     }
 }
-===expect===

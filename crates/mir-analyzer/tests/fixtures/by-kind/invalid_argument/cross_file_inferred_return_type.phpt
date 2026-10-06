@@ -21,4 +21,3 @@ class Apple {}
 function getFruit() {
     return new Apple();
 }
-===expect===

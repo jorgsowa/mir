@@ -34,4 +34,3 @@ function first_item(array $items) {
     }
     return null;
 }
-===expect===

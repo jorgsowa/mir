@@ -30,5 +30,3 @@ $ref2 = &$box->value;
 /** @var array<string, array<int, string>> */
 $matrix = [];
 $cell = &$matrix['row'][0];
-
-===expect===

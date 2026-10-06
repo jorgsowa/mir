@@ -29,4 +29,3 @@ function test(array $assoc): void {
     /** @mir-check $udiff_uassoc is array<string, int> */
     $_ = $udiff_uassoc;
 }
-===expect===

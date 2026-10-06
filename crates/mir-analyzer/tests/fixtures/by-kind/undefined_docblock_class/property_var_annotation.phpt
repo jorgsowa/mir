@@ -14,4 +14,3 @@ class Wallet {
     private $money;
 //  ^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentMoneyClass' does not exist
 }
-===expect===

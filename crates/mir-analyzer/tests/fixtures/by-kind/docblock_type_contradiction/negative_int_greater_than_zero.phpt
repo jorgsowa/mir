@@ -7,4 +7,3 @@ function test(int $n): void {
     assert($n > 0);
 //         ^^^^^^ DocblockTypeContradiction: Type 'negative-int' makes '$n > 0' impossible — this can never hold
 }
-===expect===

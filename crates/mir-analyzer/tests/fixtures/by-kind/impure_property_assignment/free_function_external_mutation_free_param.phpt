@@ -23,4 +23,3 @@ function configureMutationFree(Config $cfg): void {
     $cfg->mode = 'active';
 //  ^^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property mode of a parameter in a pure or external-mutation-free context
 }
-===expect===

@@ -11,5 +11,3 @@ Explicit cast from float to int - user explicitly requests the cast, so no issue
 <?php
 $x = 3.7;
 $y = (int)$x;
-
-===expect===

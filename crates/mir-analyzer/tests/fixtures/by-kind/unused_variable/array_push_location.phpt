@@ -6,4 +6,3 @@ function test(): void {
     $arr[] = 1;
 //  ^^^^ UnusedVariable: Variable $arr is never read
 }
-===expect===

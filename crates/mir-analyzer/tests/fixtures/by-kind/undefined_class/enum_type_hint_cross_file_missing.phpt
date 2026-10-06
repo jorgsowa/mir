@@ -14,4 +14,3 @@ function getStatus(): MissingEnum {
     return MissingEnum::Active;
 //         ^^^^^^^^^^^ UndefinedClass: Class App\MissingEnum does not exist
 }
-===expect===

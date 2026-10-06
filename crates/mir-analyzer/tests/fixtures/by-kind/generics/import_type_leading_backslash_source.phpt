@@ -57,4 +57,3 @@ class User {
         echo 1;
     }
 }
-===expect===

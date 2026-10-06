@@ -37,4 +37,3 @@ function test_negate_mixed_range($n): void {
     /** @mir-check $r is int<-3, 5> */
     $_ = $r;
 }
-===expect===

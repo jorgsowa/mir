@@ -9,4 +9,3 @@ function getNumber(): int
 $n = getNumber();
 echo $n[0];
 //   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'int'
-===expect===

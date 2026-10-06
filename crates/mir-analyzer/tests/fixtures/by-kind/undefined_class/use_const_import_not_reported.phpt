@@ -10,4 +10,3 @@ use const import not reported
 <?php
 use const Vendor\Missing\SOME_CONST;
 echo SOME_CONST;
-===expect===

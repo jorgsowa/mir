@@ -47,4 +47,3 @@ function condition_not_applied_to_first_iteration(?string $s): void {
         $s = rand(0, 1) ? 'a' : null;
     } while ($s !== null);
 }
-===expect===

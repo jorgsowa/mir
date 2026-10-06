@@ -10,4 +10,3 @@ use App\Router;
 function getRouterClass(): string {
     return Router::class;
 }
-===expect===

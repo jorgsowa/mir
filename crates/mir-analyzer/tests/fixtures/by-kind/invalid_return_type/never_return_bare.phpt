@@ -15,4 +15,3 @@ class Foo {
 //      ^^^^^^^ ParseError: Parse error: A never-returning function must not return
     }
 }
-===expect===

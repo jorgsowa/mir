@@ -18,4 +18,3 @@ class Router {
 //                     ^^^^^^^^^^^^ MixedArrayOffset: Mixed type used as array offset
     }
 }
-===expect===

@@ -8,4 +8,3 @@ class Config {
 
 $c = new Config();
 echo $c->host;
-===expect===

@@ -18,4 +18,3 @@ class C {
 }
 
 f([new C, "m"]);
-===expect===

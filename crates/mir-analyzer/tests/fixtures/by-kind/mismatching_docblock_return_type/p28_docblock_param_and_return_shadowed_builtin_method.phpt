@@ -24,4 +24,3 @@ final class Factory
         return $g;
     }
 }
-===expect===

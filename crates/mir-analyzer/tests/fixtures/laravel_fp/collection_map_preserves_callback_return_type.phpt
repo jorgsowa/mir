@@ -46,4 +46,3 @@ final class Post {
 
 $post = Post::findBySlug('hello');
 /** @mir-check $post is Post|null */
-===expect===

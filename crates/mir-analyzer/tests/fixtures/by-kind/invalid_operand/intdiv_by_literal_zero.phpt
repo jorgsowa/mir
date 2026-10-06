@@ -20,4 +20,3 @@ function intdiv_by_zero(int $x): int {
 function intdiv_by_nonzero(int $x): int {
     return intdiv($x, 5);
 }
-===expect===

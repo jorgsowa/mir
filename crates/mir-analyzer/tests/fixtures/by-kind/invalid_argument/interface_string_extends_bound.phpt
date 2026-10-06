@@ -22,4 +22,3 @@ function forward(string $poly): void {
     /** @var interface-string<Polygon> $poly */
     needsShape($poly);
 }
-===expect===

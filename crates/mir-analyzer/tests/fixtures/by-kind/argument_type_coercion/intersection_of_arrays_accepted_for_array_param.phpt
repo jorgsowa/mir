@@ -16,4 +16,3 @@ final class Logger {
     }
     public function write(array $context): void {}
 }
-===expect===

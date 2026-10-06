@@ -9,4 +9,3 @@ function veryLongFunctionNameForRegressionTest() /* AAAAAAAAAAAAAAAAAAAAAAAAAAAA
 //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingReturnType: Function veryLongFunctionNameForRegressionTest() has no return type annotation
     return 1;
 }
-===expect===

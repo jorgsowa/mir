@@ -5,4 +5,3 @@ trailing // @mir-ignore comment suppresses its own line
 function test(): void {
     new NoSuchClass(); // @mir-ignore UndefinedClass
 }
-===expect===

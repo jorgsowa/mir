@@ -11,4 +11,3 @@ namespace Outer {
 namespace Inner {
     class Foo {}
 }
-===expect===

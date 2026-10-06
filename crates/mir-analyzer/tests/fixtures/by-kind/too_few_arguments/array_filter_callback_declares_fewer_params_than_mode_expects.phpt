@@ -7,5 +7,3 @@ the rest — a value-only callback under USE_BOTH is valid PHP, not an arity err
 /** @var array<string, float> $arg */
 $arg = [];
 array_filter($arg, "strlen", ARRAY_FILTER_USE_BOTH);
-
-===expect===

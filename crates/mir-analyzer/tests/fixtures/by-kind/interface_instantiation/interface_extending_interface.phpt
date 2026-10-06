@@ -18,4 +18,3 @@ interface StructuredLoggable extends Loggable {
 
 $l = new StructuredLoggable();
 //       ^^^^^^^^^^^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface StructuredLoggable
-===expect===

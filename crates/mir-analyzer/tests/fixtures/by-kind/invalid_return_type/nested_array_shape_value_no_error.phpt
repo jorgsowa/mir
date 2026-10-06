@@ -22,4 +22,3 @@ function getItems(): array {
 function getListItems(): array {
     return [['id' => 1]];
 }
-===expect===

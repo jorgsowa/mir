@@ -16,4 +16,3 @@ class Foo {
 namespace User;
 \Vendor\Library\Foo::internalHelper();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InternalMethod: Method Vendor\Library\Foo::internalHelper() is marked @internal
-===expect===

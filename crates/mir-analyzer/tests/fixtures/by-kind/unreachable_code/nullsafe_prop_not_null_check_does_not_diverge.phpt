@@ -30,4 +30,3 @@ function doesNotDiverge(?Inner $i): void {
         echo "also reachable when \$i is null";
     }
 }
-===expect===

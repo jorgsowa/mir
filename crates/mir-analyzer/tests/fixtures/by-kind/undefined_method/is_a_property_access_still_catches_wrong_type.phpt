@@ -25,4 +25,3 @@ function f(Container $c): void {
 //      ^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::barMethod() does not exist
     }
 }
-===expect===

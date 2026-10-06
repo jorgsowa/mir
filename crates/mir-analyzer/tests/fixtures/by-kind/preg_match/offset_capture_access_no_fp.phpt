@@ -23,4 +23,3 @@ function extractOffset(string $s): int {
     }
     return -1;
 }
-===expect===

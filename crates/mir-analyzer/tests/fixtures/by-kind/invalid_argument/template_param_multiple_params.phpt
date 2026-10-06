@@ -22,4 +22,3 @@ function test(): void {
     $pair = new Pair();
     processPair($pair);
 }
-===expect===

@@ -158,4 +158,3 @@ function checksMalformedExprFallsBackToMixed(): void {
     $_ = null;
 //  ^^^^^^^^^^ TypeCheckMismatch: Type of $ is expected to be int, got mixed
 }
-===expect===

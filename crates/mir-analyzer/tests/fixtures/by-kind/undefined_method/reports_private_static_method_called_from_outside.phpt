@@ -7,4 +7,3 @@ class Base {
 }
 Base::secret();
 //<^^^^^^^^^^^^^^ UndefinedMethod: Method Base::secret() does not exist
-===expect===

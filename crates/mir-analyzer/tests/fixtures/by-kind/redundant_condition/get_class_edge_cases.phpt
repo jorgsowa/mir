@@ -85,4 +85,3 @@ function testWithNullCheck(object|null $obj) {
         }
     }
 }
-===expect===

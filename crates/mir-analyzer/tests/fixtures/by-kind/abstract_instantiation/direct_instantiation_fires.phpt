@@ -5,4 +5,3 @@ AbstractInstantiation fires when directly instantiating an abstract class.
 abstract class Repo {}
 new Repo();
 //  ^^^^ AbstractInstantiation: Cannot instantiate abstract class Repo
-===expect===

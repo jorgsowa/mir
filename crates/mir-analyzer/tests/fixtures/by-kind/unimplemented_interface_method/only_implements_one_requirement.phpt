@@ -12,5 +12,3 @@ class Invalid implements A {
     use ImposesImplementationRequirements;
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedTrait: Trait ImposesImplementationRequirements does not exist
 }
-
-===expect===

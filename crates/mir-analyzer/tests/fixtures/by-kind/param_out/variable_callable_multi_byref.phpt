@@ -21,4 +21,3 @@ $fill($s, $n);
 $_ = $s;
 /** @mir-check $n is int */
 $_ = $n;
-===expect===

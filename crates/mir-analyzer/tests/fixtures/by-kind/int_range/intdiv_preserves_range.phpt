@@ -31,4 +31,3 @@ function test_positive_by_literal($n): void {
     /** @mir-check $r is non-negative-int */
     $_ = $r;
 }
-===expect===

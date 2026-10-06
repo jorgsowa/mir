@@ -9,4 +9,3 @@ type must stay silent.
 function apply(callable $fn): void {
     $fn(1);
 }
-===expect===

@@ -23,4 +23,3 @@ $fn = new Filler();
 $fn($out);
 /** @mir-check $out is string */
 $_ = $out;
-===expect===

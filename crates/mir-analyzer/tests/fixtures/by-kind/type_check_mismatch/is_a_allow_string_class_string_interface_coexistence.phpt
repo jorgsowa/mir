@@ -51,4 +51,3 @@ function test_still_drops_unrelated_class_string_when_both_concrete(string $cls)
         $_ = $cls;
     }
 }
-===expect===

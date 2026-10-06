@@ -13,4 +13,3 @@ class Sub extends Base {
     public function __construct(private int $x) {
     }
 }
-===expect===

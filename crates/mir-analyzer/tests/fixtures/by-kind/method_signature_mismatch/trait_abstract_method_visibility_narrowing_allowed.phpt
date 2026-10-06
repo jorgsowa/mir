@@ -31,4 +31,3 @@ class NarrowsToPrivate {
     use ProtectedRequirement;
     private function bar(): void {}
 }
-===expect===

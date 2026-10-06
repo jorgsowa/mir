@@ -18,4 +18,3 @@ class Task implements Runnable {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Task must implement Runnable::run() from interface
     use TraitA;
 }
-===expect===

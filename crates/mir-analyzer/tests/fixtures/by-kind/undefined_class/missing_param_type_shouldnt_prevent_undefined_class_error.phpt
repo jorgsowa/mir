@@ -12,4 +12,3 @@ Missing param type shouldnt prevent undefined class error
 /** @suppress MissingParamType */
 function foo($s = Foo::BAR) : void {}
 //                ^^^ UndefinedClass: Class Foo does not exist
-===expect===

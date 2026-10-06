@@ -18,5 +18,3 @@ class Foo
         $int = &$this->arr[0]; // If $this->arr[0] isn't set, this will set it to null.
     }
 }
-
-===expect===

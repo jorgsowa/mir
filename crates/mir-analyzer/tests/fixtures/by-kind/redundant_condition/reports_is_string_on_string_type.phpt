@@ -6,4 +6,3 @@ function f(string $x): void {
     if (is_string($x)) {}
 //      ^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
 }
-===expect===

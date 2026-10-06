@@ -15,4 +15,3 @@ class Label {
 function render(string $s): void {}
 
 render(new Label());
-===expect===

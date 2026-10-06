@@ -18,4 +18,3 @@ class Cache {
 //               ^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Storage
     }
 }
-===expect===

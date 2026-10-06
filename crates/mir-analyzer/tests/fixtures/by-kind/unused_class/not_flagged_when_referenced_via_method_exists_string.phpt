@@ -12,4 +12,3 @@ final class Foo {
 }
 
 method_exists('Foo', 'bar');
-===expect===

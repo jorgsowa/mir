@@ -9,4 +9,3 @@ function test(): void {
     $f = new Foo();
     $f->bar();
 }
-===expect===

@@ -49,4 +49,3 @@ takesStringBox($int);
 $pair = new Pair(null, 'x');
 /** @mir-check $pair is Pair<string> */
 takesStringPair($pair);
-===expect===

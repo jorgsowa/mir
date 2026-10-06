@@ -13,4 +13,3 @@ function acceptsIntegerPseudo($value): void
 }
 
 acceptsIntegerPseudo(5);
-===expect===

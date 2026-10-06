@@ -14,4 +14,3 @@ Implicit cast with strict types
 //                                  ^^^^^^^^^ UnusedParam: Parameter $b is never used
                     fooFoo(new A());
 //                         ^^^^^^^ InvalidArgument: Argument $b of fooFoo() expects 'string', got 'A'
-===expect===

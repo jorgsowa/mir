@@ -8,4 +8,3 @@ class Foo {
 function test(): void {
     echo Foo::BAR;
 }
-===expect===

@@ -27,4 +27,3 @@ function test(array $assoc, array $words): void {
     /** @mir-check $filtered_words is array<int, string> */
     $_ = $filtered_words;
 }
-===expect===

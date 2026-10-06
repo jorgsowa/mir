@@ -11,4 +11,3 @@ use Vendor\Lib\Foo;
 function run(): void {
     new Foo();
 }
-===expect===

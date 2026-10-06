@@ -15,4 +15,3 @@ Float as a boundary
 function scope(int $a){
     return $a;
 }
-===expect===

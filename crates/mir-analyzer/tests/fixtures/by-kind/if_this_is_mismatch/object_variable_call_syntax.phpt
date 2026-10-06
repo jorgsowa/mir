@@ -25,4 +25,3 @@ function bad(Model $m): void {
 function ok(Model $m): void {
     $m::onlyIntKeyed();
 }
-===expect===

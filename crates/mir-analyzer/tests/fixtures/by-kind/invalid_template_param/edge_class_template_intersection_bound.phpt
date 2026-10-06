@@ -20,4 +20,3 @@ class Repository {
 
 $repo = new Repository();
 $repo->save(new Entity());
-===expect===

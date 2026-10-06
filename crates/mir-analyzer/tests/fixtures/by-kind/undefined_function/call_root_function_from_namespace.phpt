@@ -12,4 +12,3 @@ namespace A {
     Aoo();
 //    ^^ ParseError: Parse error: expected ';' after expression
 }
-===expect===

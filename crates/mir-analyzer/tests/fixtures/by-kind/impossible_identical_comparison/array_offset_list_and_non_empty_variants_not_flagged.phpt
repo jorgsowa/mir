@@ -26,4 +26,3 @@ function testNonEmptyList(array $list): void {
     $v = $list[3];
     if ($v !== null) {}
 }
-===expect===

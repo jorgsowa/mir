@@ -16,4 +16,3 @@ function lookup($key): void {
     echo $arr[$key];
 //            ^^^^ MixedArrayOffset: Mixed type used as array offset
 }
-===expect===

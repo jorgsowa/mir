@@ -28,4 +28,3 @@ function narrowsNotEmpty(Box $x): void {
         $_ = 1;
     }
 }
-===expect===

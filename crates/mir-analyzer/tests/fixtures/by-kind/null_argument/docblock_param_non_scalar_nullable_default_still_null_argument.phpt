@@ -13,4 +13,3 @@ final class Service {
     }
 }
 (new Service())->getAll(null);
-===expect===

@@ -38,4 +38,3 @@ function test(SqlStore $store): void {
     /** @mir-check $p is Product */
     echo get_class($p);
 }
-===expect===

@@ -17,4 +17,3 @@ function foo(Status $s): string {
         Status::Inactive => 'i',
     };
 }
-===expect===

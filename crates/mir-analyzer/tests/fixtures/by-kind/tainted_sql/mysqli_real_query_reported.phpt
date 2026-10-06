@@ -15,4 +15,3 @@ function test(mysqli $db): void {
     mysqli_multi_query($db, $_GET['q']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
-===expect===

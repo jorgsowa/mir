@@ -18,4 +18,3 @@ function run(Suit $s): void {
     take('x');
 //       ^^^ InvalidArgument: Argument $v of take() expects '"h"|"s"', got '"x"'
 }
-===expect===

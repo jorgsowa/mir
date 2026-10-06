@@ -25,5 +25,3 @@ function f($a, $b): string {
 function flags() {
     return 3;
 }
-
-===expect===

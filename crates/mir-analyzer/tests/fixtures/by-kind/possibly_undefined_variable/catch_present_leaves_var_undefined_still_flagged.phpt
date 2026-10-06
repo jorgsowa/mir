@@ -26,4 +26,3 @@ function encode(mixed $value): void {
     assert($str !== false);
 //         ^^^^ PossiblyUndefinedVariable: Variable $str might not be defined
 }
-===expect===

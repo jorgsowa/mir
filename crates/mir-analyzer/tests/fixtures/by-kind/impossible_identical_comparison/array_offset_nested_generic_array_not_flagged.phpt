@@ -24,4 +24,3 @@ function testInner(array $matrix): void {
     $v = $row['b'];
     if ($v !== null) {}
 }
-===expect===

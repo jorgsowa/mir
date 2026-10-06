@@ -22,4 +22,3 @@ $getAButReallyB = /** @return A */ fn() => new B;
 takesA($getAButReallyB());
 takesB($getAButReallyB());
 //     ^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime
-===expect===

@@ -26,4 +26,3 @@ function run(Canvas $c): void {
     $c->shapes = ['a' => new Circle()];
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shapes expects 'non-empty-list<Shape>', cannot assign 'array{'a': Circle}'
 }
-===expect===

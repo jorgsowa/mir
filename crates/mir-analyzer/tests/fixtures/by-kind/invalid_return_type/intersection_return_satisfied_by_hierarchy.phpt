@@ -47,4 +47,3 @@ function viaDocblock($c) {
     /** @mir-check $c is Channel&Writable */
     return $c;
 }
-===expect===

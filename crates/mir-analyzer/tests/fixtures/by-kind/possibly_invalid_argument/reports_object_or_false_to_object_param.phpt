@@ -16,4 +16,3 @@ function test(): void {
     takesConnection(getConnection());
 //                  ^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided
 }
-===expect===

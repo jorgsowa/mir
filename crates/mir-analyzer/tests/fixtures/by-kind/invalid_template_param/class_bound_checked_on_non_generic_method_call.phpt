@@ -43,4 +43,3 @@ function test_static_call_on_bad_receiver_is_flagged($box): void {
 function test_static_call_on_good_receiver_is_silent($box): void {
     $box::make();
 }
-===expect===

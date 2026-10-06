@@ -32,4 +32,3 @@ function partial(): Box {
     return $b;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'Box<Suit>' is not compatible with declared 'Box<Suit::A|Suit::B>'
 }
-===expect===

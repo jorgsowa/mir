@@ -32,4 +32,3 @@ function test(Child $c): void {
     /** @mir-check $result is mixed */
     echo get_class($result);
 }
-===expect===

@@ -78,4 +78,3 @@ class Page extends Limits {
 //      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $limit expects 'int<1, 20>', cannot assign 'int'
     }
 }
-===expect===

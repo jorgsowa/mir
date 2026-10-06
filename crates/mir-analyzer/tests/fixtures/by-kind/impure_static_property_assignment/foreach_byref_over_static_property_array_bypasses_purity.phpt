@@ -25,4 +25,3 @@ function bumpAll(): void {
         $v++;
     }
 }
-===expect===

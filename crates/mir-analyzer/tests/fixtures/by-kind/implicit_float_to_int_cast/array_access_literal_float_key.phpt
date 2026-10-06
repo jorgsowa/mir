@@ -14,5 +14,3 @@ $arr = [];
 $val = $arr[3.7];
 //          ^^^ ImplicitFloatToIntCast: Implicit cast from 3.7 to int truncates the fractional part
 //          ^^^ NonExistentArrayOffset: Array offset '3' does not exist
-
-===expect===

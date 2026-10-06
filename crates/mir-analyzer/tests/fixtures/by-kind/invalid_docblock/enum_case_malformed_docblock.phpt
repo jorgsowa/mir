@@ -10,4 +10,3 @@ enum Suit {
      */
     case Hearts;
 }
-===expect===

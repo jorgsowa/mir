@@ -22,4 +22,3 @@ function test(Box $b): void {
     /** @mir-check $b->value is int */
     $_ = 1;
 }
-===expect===

@@ -26,4 +26,3 @@ function test_non_empty_int_keyed(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

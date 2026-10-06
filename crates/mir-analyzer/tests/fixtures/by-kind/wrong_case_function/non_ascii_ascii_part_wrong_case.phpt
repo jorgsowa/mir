@@ -6,4 +6,3 @@ checks: only the ASCII letters must match the declaration's casing.
 function grüFunc(): void {}
 GRüFunc();
 //<^^^^^^^ WrongCaseFunction: Function name 'GRüFunc' has incorrect casing; use 'grüFunc'
-===expect===

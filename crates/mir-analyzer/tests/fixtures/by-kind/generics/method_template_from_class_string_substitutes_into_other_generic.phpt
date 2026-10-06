@@ -35,4 +35,3 @@ class Widget {}
 $c = new Container();
 $box = $c->make(Widget::class);
 /** @mir-check $box is Box<Widget> */
-===expect===

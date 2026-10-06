@@ -23,4 +23,3 @@ class Crate {
 //      ^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Plant' is not compatible with declared 'T'
     }
 }
-===expect===

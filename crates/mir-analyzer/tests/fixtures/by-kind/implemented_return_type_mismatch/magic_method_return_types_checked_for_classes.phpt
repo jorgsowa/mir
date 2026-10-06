@@ -17,5 +17,3 @@ class A
  * @method stdClass a(int $a)
  */
 class B extends A {}
-
-===expect===

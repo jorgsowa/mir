@@ -12,4 +12,3 @@ class A {}
 needsA(new A);
 function needsA(a $x): void {}
 //              ^ WrongCaseClass: Class name 'a' has incorrect casing; use 'A'
-===expect===

@@ -10,4 +10,3 @@ class Logger {
 function write(\Logger $logger, string $msg): void {
     $logger->log($msg);
 }
-===expect===

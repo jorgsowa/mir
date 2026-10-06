@@ -12,4 +12,3 @@ class Foo {}
 $f = new Foo();
 $s = 'Value: ' . $f;
 //               ^^ ImplicitToStringCast: Class Foo is implicitly cast to string
-===expect===

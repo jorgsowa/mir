@@ -28,4 +28,3 @@ function taintPropagates(): void {
     echo $$name;
 //  ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

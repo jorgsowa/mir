@@ -14,4 +14,3 @@ function run_query(AppDatabase $pdo): void {
     $pdo->query($_GET['sql']);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
-===expect===

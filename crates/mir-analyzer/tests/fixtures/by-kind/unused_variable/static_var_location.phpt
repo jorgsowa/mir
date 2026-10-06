@@ -6,4 +6,3 @@ function test(): void {
     static $count;
 //         ^^^^^^ UnusedVariable: Variable $count is never read
 }
-===expect===

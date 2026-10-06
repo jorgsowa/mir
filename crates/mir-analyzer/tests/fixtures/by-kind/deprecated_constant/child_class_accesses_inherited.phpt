@@ -18,4 +18,3 @@ class Client extends Base {}
 
 $v = Client::MAX_RETRIES;
 //           ^^^^^^^^^^^ DeprecatedConstant: Constant Client::MAX_RETRIES is deprecated: use RETRIES instead
-===expect===

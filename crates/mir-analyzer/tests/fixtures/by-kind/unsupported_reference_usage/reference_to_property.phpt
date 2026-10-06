@@ -14,5 +14,3 @@ class Foo {
 
 $obj = new Foo();
 $ref = &$obj->bar;
-
-===expect===

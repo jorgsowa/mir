@@ -19,4 +19,3 @@ final class Db {
         return $this->connection->lastId;
     }
 }
-===expect===

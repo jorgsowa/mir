@@ -12,4 +12,3 @@ function test(): void {
     sort(make());
 //       ^^^^^^ InvalidPassByReference: Argument $array of sort() must be passed by reference
 }
-===expect===

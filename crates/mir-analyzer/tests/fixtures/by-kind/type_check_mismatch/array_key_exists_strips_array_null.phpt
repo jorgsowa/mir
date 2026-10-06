@@ -69,4 +69,3 @@ function test_still_nullable_outside_condition(?array $arr): void {
     $_ = 1;
     array_key_exists('a', $arr);
 }
-===expect===

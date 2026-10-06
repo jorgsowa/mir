@@ -15,5 +15,3 @@ function foo(int $bar): void {}
 
 $r = new ReflectionParameter("foo", "bar");
 $r->getAttributes(Attr::class);
-
-===expect===

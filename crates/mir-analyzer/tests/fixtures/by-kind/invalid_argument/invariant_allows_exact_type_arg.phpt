@@ -21,4 +21,3 @@ function test(): void {
     $c = new Box();
     f($c);
 }
-===expect===

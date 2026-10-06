@@ -13,4 +13,3 @@ function foo(callable $c): void {}
 
 foo("A::barr");
 //  ^^^^^^^^^ UndefinedMethod: Method A::barr() does not exist
-===expect===

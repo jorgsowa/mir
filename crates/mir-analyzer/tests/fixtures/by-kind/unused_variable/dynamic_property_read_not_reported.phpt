@@ -22,4 +22,3 @@ class HasOneOrMany {
 
     protected function getForeignKeyName(): string { return 'user_id'; }
 }
-===expect===

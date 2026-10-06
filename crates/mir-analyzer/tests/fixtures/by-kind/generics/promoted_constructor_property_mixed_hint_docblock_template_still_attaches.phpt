@@ -23,4 +23,3 @@ function f(Box $box): int {
     $intBox = $box;
     return $intBox->value + 1;
 }
-===expect===

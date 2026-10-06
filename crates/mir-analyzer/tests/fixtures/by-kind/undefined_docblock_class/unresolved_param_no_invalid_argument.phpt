@@ -9,4 +9,3 @@ function forward($x): int {
 //       ^^^^^^^ UndefinedDocblockClass: Docblock type 'App\Missing' does not exist
     return strlen($x);
 }
-===expect===

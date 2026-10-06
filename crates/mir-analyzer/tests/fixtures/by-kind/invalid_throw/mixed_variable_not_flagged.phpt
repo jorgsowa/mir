@@ -5,4 +5,3 @@ Throwing a mixed variable does not fire InvalidThrow — cannot statically deter
 /** @var mixed $e */
 $e = new \RuntimeException();
 throw $e;
-===expect===

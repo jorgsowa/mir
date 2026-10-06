@@ -15,4 +15,3 @@ function test(array $arr): void {
     /** @mir-check $last is int<-1, max> */
     $_ = $last;
 }
-===expect===

@@ -10,4 +10,3 @@ Add array to number
 <?php
 $a = [1] + 1;
 //   ^^^^^^^ InvalidOperand: Operator '+' not supported between 'array{0: 1}' and '1'
-===expect===

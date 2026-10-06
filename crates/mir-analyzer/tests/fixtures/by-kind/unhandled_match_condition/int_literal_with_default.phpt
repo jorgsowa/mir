@@ -9,4 +9,3 @@ function label(int $n): string {
         default => "other",
     };
 }
-===expect===

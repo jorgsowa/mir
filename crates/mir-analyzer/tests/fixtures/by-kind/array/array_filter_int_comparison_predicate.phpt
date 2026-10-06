@@ -54,4 +54,3 @@ function stillRejectsUnfiltered(int $u): void {
     takesPositive([$u]);
 //                ^^^^ ArgumentTypeCoercion: Argument $ids of takesPositive() expects 'list<positive-int>', got 'array{0: int}' — coercion may fail at runtime
 }
-===expect===

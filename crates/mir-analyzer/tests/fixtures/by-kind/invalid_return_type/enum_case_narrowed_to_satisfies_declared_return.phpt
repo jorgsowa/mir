@@ -43,4 +43,3 @@ function narrowsBackedEnumReturn(Suit $suit): ?Suit {
     }
     return null;
 }
-===expect===

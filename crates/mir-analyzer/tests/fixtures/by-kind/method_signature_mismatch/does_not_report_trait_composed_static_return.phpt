@@ -18,4 +18,3 @@ trait T {
 class Child extends Base {
     use T;
 }
-===expect===

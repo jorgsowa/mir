@@ -14,4 +14,3 @@ function a(callable $fn): void{
 //      ^^ UndefinedVariable: Variable $a is not defined
 }
 a($fn);
-===expect===

@@ -24,4 +24,3 @@ class Cousin extends Base {
 //                 ^^^^^^ InaccessibleProperty: Cannot access property Child::$offset
     }
 }
-===expect===

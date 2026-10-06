@@ -18,4 +18,3 @@ class MyException extends Exception {
         echo '';
     }
 }
-===expect===

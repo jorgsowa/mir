@@ -48,4 +48,3 @@ function first_value(array $arr) {
 $list = make_list(1, 2);
 $y = first_value($list);
 /** @mir-check $y is int */
-===expect===

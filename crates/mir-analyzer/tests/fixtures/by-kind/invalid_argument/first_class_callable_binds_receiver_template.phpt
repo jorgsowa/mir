@@ -26,4 +26,3 @@ $box = new Box(1);
 $fn = $box->set(...);
 $fn("bad-not-int");
 //  ^^^^^^^^^^^^^ InvalidArgument: Argument $x of {closure}() expects 'int', got '"bad-not-int"'
-===expect===

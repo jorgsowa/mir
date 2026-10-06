@@ -22,4 +22,3 @@ class Child extends Base {
         $this->own = $v;
     }
 }
-===expect===

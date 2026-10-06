@@ -21,4 +21,3 @@ function pair($t, $u): void {}
 
 pair(new Cat(), new Dog());
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as 'Dog' does not satisfy bound 'Cat'
-===expect===

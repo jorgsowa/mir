@@ -74,4 +74,3 @@ function recorded(int $n, string $s, ?int $maybe, mixed $m): void {
     $open = fn() => 5;
     /** @mir-check $open is Closure(): 5 */
 }
-===expect===

@@ -30,4 +30,3 @@ function bad(): void {
     $b->value = 'not an int';
 //  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $value expects 'int', cannot assign '"not an int"'
 }
-===expect===

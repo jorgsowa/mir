@@ -34,4 +34,3 @@ $bar = getImplementationOfFoo();
 assertInstanceOf($bar, Bar::class);
 
 $bar->sayHello();
-===expect===

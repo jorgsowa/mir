@@ -8,4 +8,3 @@ interface A {
 
 class B implements A { }
 //<^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class B must implement A::fooFoo() from interface
-===expect===

@@ -12,4 +12,3 @@ mt_rand can be called with zero arguments
 $r = mt_rand();
 // mt_rand with two arguments is also allowed
 $r2 = mt_rand(1, 100);
-===expect===

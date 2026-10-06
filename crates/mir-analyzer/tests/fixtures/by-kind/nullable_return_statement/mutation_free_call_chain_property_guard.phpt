@@ -77,4 +77,3 @@ function onParameter(Context $ctx): int {
     /** @mir-check $id is positive-int */
     return $id;
 }
-===expect===

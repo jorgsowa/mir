@@ -18,4 +18,3 @@ function buildGrouped(array $listeners): array
     /** @mir-check $out is array<class-string<Event>, non-empty-list<callable>> */
     return $out;
 }
-===expect===

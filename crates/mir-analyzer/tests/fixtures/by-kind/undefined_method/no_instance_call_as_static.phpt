@@ -8,4 +8,3 @@ class C {
 
 (new C)::foo();
 //<^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method C::foo() cannot be called statically
-===expect===

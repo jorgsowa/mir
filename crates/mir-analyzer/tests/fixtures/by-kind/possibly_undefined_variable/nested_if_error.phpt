@@ -11,4 +11,3 @@ function foo(bool $a, bool $b): int {
     return $x;
 //         ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
-===expect===

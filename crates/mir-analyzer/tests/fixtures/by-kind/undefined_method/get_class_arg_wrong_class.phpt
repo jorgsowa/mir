@@ -20,4 +20,3 @@ $a = match (get_class($a)) {
     A::class => $a->barBar(),
 //              ^^^^^^^^^^^^ UndefinedMethod: Method A::barBar() does not exist
 };
-===expect===

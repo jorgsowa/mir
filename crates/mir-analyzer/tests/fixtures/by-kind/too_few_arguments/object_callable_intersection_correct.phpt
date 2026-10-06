@@ -8,5 +8,3 @@ Object callable intersection correct
 function test(object $obj): void {
     $obj('hello');
 }
-
-===expect===

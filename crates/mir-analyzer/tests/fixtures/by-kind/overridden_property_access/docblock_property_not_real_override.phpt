@@ -24,4 +24,3 @@ class Child extends Base {
     private string $name = '';
     protected int $id = 0;
 }
-===expect===

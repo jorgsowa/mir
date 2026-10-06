@@ -15,4 +15,3 @@ function test(): void {
     $c = new Child();
     $c->greet();
 }
-===expect===

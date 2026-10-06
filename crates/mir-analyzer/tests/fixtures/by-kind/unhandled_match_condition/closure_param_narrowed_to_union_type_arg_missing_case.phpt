@@ -34,4 +34,3 @@ load()->getOrThrow(static fn(Err $e) => match ($e) {
 //                                      ^ +2:1 UnhandledMatchCondition: Unhandled match condition: Err::Denied
     Err::NotFound => new NotFound(),
 });
-===expect===

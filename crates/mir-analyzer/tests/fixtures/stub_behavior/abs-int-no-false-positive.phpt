@@ -16,4 +16,3 @@ function test(int $n): void {
     takesInt(abs($n)); // mir reports: Argument 1 expects int, got float|int (FALSE POSITIVE)
 }
 ?>
-===expect===

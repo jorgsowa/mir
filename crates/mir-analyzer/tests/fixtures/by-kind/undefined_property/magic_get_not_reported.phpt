@@ -11,4 +11,3 @@ function test(): void {
     $m = new Magic();
     echo $m->anything;
 }
-===expect===

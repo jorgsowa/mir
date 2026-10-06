@@ -101,4 +101,3 @@ function test(ClassCase $cc, InterfaceCase $ic, EnumCase $ec, TraitCase $tc): vo
     /** @mir-check $tc->get() is array{id: int, name: string} */
     $_ = 1;
 }
-===expect===

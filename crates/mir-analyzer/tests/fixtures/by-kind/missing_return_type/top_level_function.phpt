@@ -19,4 +19,3 @@ function hinted(): int {
 function docTyped() {
     return 'x';
 }
-===expect===

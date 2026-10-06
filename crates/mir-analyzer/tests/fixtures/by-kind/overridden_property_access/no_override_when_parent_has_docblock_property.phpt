@@ -23,4 +23,3 @@ class B extends A {
 class C extends A {
     protected string $foo = '';
 }
-===expect===

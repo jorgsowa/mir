@@ -24,4 +24,3 @@ function test(): void {
     $resolver()->undefinedMethod();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Service::undefinedMethod() does not exist
 }
-===expect===

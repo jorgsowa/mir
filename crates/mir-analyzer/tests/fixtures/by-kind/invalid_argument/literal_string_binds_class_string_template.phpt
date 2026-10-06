@@ -31,4 +31,3 @@ namespace {
     /** @mir-check $mock is MockInterface&Acme\Conn */
     needsConn($mock);
 }
-===expect===

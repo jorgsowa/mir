@@ -43,4 +43,3 @@ function test(): void {
     /** @mir-check $pair is Pair<string, float> */
     $_ = 1;
 }
-===expect===

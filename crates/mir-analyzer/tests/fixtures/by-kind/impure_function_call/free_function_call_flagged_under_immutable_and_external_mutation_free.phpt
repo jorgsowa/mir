@@ -44,4 +44,3 @@ class Wrapper {
         mutate(new Box());
     }
 }
-===expect===

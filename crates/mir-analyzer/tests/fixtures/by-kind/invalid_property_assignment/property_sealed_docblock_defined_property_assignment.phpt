@@ -23,4 +23,3 @@ class A {
 $a = new A();
 $a->foo = 5;
 //<^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'string', cannot assign '5'
-===expect===

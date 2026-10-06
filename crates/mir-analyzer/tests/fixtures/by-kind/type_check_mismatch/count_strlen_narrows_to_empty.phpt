@@ -97,4 +97,3 @@ function test_count_zero_on_already_non_empty_stays_unchanged(array $arr): void 
         $_ = $arr;
     }
 }
-===expect===

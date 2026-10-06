@@ -15,4 +15,3 @@ function setupLogging($logger): void {
 
 $logger = new ConsoleLogger();
 setupLogging($logger);
-===expect===

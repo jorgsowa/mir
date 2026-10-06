@@ -8,4 +8,3 @@ function gen(): Generator {
     yield from [2];
     return null;
 }
-===expect===

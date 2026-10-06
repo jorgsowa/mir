@@ -38,4 +38,3 @@ function run(int|string $v, ?int $n, ?string $s, int|bool $b, string $str, int|s
     by_name($f);
 //          ^^ InvalidArgument: Argument $name of by_name() expects 'non-empty-string', got 'int|string|float'
 }
-===expect===

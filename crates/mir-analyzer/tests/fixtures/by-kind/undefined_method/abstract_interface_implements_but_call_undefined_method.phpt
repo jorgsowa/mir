@@ -11,4 +11,3 @@ abstract class A implements I {
         $this->foo2();
     }
 }
-===expect===

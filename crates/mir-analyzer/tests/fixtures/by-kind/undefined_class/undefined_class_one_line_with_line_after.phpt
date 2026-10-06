@@ -12,4 +12,3 @@ class A {
 //          ^ UndefinedClass: Class C does not exist
     }
 }
-===expect===

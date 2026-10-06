@@ -14,4 +14,3 @@ trait Timestampable
 {
     public function updatedAt(): int { return 0; }
 }
-===expect===

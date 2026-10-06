@@ -7,4 +7,3 @@ Method with ampersand and space
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @method parameter `string & $result` uses by-reference (`&`) which is not supported in @method annotations
  */
 class Foo {}
-===expect===

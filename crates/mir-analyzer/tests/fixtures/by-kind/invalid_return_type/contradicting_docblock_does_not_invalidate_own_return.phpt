@@ -18,4 +18,3 @@ the contradiction itself.
  * @return string
  */
 function g(): int { return 1; }
-===expect===

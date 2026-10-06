@@ -13,5 +13,3 @@ function noDynamic(): void {
     echo $undefined;
 //       ^^^^^^^^^^ UndefinedVariable: Variable $undefined is not defined
 }
-
-===expect===

@@ -9,4 +9,3 @@ function foo($a) : void {
     $a->bar(B::bat());
 //          ^^^^^^^^ UndefinedMethod: Method B::bat() does not exist
 }
-===expect===

@@ -6,4 +6,3 @@ tag's return type does not exist.
 /** @method NonExistentReturnType getThing() */
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentReturnType' does not exist
 class A {}
-===expect===

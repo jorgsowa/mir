@@ -31,4 +31,3 @@ class Job {
         $l->log(['job' => 1]);
     }
 }
-===expect===

@@ -20,4 +20,3 @@ class Point {
 $p = new Point(1, 2);
 $px = $p->x;
 $py = $p->y;
-===expect===

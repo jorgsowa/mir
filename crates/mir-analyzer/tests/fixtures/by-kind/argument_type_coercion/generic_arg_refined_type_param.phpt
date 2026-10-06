@@ -44,4 +44,3 @@ function run(Box $a, Box $b, Box $c, Box $d, Box $e, Box $f): void {
     takes_refined_nullable($f);
 //                         ^^ InvalidArgument: Argument $b of takes_refined_nullable() expects 'Box<positive-int|null>', got 'Box<float>'
 }
-===expect===

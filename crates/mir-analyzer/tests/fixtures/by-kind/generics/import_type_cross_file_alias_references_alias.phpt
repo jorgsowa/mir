@@ -40,4 +40,3 @@ final class Consumer {
 new Consumer([1 => ['id' => 1, 'name' => 'a']]);
 new Consumer('nope');
 //           ^^^^^^ InvalidArgument: Argument $items of Dst\Consumer::__construct() expects 'array<int, array{'id': int, 'name': string}>', got '"nope"'
-===expect===

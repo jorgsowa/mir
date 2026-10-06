@@ -14,4 +14,3 @@ class MyClass implements MyInterface {
 
 $obj = new MyClass();
 $obj->getName();
-===expect===

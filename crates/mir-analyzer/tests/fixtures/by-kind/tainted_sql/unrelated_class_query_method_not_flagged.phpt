@@ -16,4 +16,3 @@ class SearchIndex {
 function run(SearchIndex $index): void {
     $index->query($_GET['q']);
 }
-===expect===

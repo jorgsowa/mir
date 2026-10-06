@@ -19,4 +19,3 @@ class Db {
 
 Db::run((string) $_GET["q"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
-===expect===

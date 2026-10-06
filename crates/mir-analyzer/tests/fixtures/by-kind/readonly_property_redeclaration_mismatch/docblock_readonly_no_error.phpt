@@ -16,4 +16,3 @@ class A {
 class B extends A {
     public $x = 1;
 }
-===expect===

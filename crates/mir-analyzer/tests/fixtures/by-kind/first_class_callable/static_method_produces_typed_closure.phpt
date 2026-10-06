@@ -18,4 +18,3 @@ class Math {
 $fn = Math::double(...);
 /** @mir-check $fn is Closure(int): int */
 $_ = $fn;
-===expect===

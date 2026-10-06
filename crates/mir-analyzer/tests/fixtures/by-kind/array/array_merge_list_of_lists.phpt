@@ -31,4 +31,3 @@ function test(array $ne, array $maybe_empty): void {
     /** @mir-check $merged_maybe is list<int> */
     $_ = $merged_maybe;
 }
-===expect===

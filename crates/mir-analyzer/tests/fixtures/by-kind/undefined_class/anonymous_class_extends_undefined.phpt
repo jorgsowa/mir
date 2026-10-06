@@ -11,4 +11,3 @@ matching a named class's `extends` check.
 <?php
 $x = new class extends UndefinedBase {};
 //                     ^^^^^^^^^^^^^ UndefinedClass: Class UndefinedBase does not exist
-===expect===

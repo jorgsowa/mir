@@ -13,4 +13,3 @@ be flagged undefined.
 <?php
 function f(MongoDB\Driver\NotARealClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class MongoDB\Driver\NotARealClass does not exist
-===expect===

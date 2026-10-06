@@ -12,5 +12,3 @@ interface A
 // ^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::a() signature mismatch: parameter $a type 'int' is incompatible with parent type 'string'
  */
 interface B extends A {}
-
-===expect===

@@ -59,4 +59,3 @@ final class FooGrandChild extends FooChild {}
 function test() : FooGrandChild {
     return (new FooGrandChild)->type();
 }
-===expect===

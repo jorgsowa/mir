@@ -24,4 +24,3 @@ function test(string $ability): string {
     /** @mir-check $result is string */
     return $result;
 }
-===expect===

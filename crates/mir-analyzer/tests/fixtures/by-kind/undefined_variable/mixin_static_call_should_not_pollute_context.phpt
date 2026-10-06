@@ -29,4 +29,3 @@ class Bar
 //             ^^^^^^^^^^^^^^^^^^ UndefinedVariable: Variable $__tmp_mixin_var__ is not defined
     }
 }
-===expect===

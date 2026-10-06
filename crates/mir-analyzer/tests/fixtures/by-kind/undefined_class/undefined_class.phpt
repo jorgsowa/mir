@@ -4,4 +4,3 @@ Undefined class
 <?php
 (new Foo());
 //   ^^^ UndefinedClass: Class Foo does not exist
-===expect===

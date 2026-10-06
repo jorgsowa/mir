@@ -57,4 +57,3 @@ function more_keys(array $names, bool $flag): void {
     /** @mir-check $looped is array<array-key, mixed> */
     $_ = $looped;
 }
-===expect===

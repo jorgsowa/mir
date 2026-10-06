@@ -11,5 +11,3 @@ interface A
  * @method stdClass a(int $a)
  */
 interface B extends A {}
-
-===expect===

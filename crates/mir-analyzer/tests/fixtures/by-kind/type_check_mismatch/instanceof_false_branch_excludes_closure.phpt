@@ -35,4 +35,3 @@ function negatedInstanceofExcludesClosure(Foo|Closure $x): void {
         $_ = 1;
     }
 }
-===expect===

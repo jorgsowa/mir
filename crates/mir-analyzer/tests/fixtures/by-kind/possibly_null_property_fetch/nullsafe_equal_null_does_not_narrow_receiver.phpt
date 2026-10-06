@@ -23,4 +23,3 @@ function test(?Box $b): void {
 //           ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $other on possibly null value
     }
 }
-===expect===

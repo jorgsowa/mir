@@ -38,4 +38,3 @@ function test_empty_needle_not_narrowed(string $s): void {
         $_ = $s;
     }
 }
-===expect===

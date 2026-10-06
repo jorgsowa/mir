@@ -33,4 +33,3 @@ echo $b;
 $c = classify([1, 2]);
 /** @mir-check $c is string */
 echo $c;
-===expect===

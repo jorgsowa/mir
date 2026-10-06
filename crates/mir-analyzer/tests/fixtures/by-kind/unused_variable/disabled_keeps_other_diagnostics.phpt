@@ -14,4 +14,3 @@ function total(bool $flag): int {
     return $maybe;
 //         ^^^^^^ PossiblyUndefinedVariable: Variable $maybe might not be defined
 }
-===expect===

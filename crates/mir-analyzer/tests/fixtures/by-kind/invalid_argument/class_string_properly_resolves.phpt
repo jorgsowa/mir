@@ -23,4 +23,3 @@ function instantiate(string $className) {
 }
 
 instantiate(ConfigRegistry::class);
-===expect===

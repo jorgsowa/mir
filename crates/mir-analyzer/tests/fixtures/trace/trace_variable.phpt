@@ -11,4 +11,3 @@ Trace variable
 /** @trace $a */
 $a = getmypid();
 //<^^^^^^^^^^^^^^^^ Trace: Type of $a is mixed
-===expect===

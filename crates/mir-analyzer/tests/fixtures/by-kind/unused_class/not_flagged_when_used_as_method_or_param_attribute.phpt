@@ -20,4 +20,3 @@ class Controller {
 }
 
 (new Controller())->index('a');
-===expect===

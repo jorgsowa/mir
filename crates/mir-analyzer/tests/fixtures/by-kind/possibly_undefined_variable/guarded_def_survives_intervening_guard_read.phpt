@@ -56,4 +56,3 @@ function intervening_foreach_target(array $in): void {
     if ($enabled) { echo count($items); }
 //                             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
-===expect===

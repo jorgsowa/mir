@@ -26,4 +26,3 @@ function test(): void {
     /** @mir-check $keys is list<int> */
     $_ = $keys;
 }
-===expect===

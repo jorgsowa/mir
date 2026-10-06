@@ -16,4 +16,3 @@ function test(): void {
     file_put_contents($path, 'safe-constant');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
-===expect===

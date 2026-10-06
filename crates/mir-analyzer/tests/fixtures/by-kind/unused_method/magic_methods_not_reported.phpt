@@ -24,4 +24,3 @@ class Magic {
     private function __clone(): void {}
     private function __debugInfo(): array { return []; }
 }
-===expect===

@@ -23,4 +23,3 @@ function handle(string $token, string $key): void {
         $val = cache_get($key);
     }
 }
-===expect===

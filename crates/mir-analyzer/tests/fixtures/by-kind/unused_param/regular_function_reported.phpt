@@ -6,4 +6,3 @@ function greet(string $name): string {
 //             ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
     return 'hello';
 }
-===expect===

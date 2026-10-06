@@ -16,4 +16,3 @@ class Base {
 class Child extends Base {
     public function process(string $x): void { var_dump($x); }
 }
-===expect===

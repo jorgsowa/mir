@@ -37,4 +37,3 @@ function mixedCategoryNotNarrowed($x): void {
         $_ = $x;
     }
 }
-===expect===

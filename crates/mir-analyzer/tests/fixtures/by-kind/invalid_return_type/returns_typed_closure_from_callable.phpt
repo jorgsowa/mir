@@ -27,4 +27,3 @@ function foo(Closure $f, Closure $g) : callable {
 function bar(Closure $f, Closure $g) : Closure {
     return foo($f, $g);
 }
-===expect===

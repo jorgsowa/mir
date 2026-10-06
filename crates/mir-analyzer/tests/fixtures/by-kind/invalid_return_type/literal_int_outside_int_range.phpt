@@ -9,4 +9,3 @@ function test(): int {
     return 15;
 //  ^^^^^^^^^^ InvalidReturnType: Return type '15' is not compatible with declared 'int<1, 5>'
 }
-===expect===

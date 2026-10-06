@@ -13,4 +13,3 @@ function run(): void {
     helper();
 //  ^^^^^^^^ UndefinedFunction: Function helper() is not defined
 }
-===expect===

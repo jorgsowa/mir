@@ -12,4 +12,3 @@ function f(?string $p): ?int {
     /** @mir-check $m is list<string> */
     return (int) $m[1];
 }
-===expect===

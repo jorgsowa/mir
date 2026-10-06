@@ -10,4 +10,3 @@ $items = ['a', 'b', 'c'];
 foreach ($items as &$item) {
     $item = transform($item);
 }
-===expect===

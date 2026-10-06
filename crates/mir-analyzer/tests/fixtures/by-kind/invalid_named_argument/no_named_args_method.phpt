@@ -25,4 +25,3 @@ function foo(array $input) : CustomerData {
 //      ^^^^^^^^^^^^^^^^^^^^^^ InvalidNamedArguments: CustomerData::__construct() does not accept named arguments
     );
 }
-===expect===

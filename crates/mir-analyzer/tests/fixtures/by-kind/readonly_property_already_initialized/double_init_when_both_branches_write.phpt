@@ -24,4 +24,3 @@ class Box {
 //      ^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAlreadyInitialized: Cannot modify readonly property Box::$value — already initialized
     }
 }
-===expect===

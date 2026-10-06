@@ -30,4 +30,3 @@ function normalize(Bag $b): void {
     fill(out: $b->items, skip: $b);
 //            ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
-===expect===

@@ -34,4 +34,3 @@ function test_double_false_branch(bool $cond, string $s) {
         $_ = $x;
     }
 }
-===expect===

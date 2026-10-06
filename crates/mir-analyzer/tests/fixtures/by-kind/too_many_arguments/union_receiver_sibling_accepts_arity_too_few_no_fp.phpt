@@ -17,4 +17,3 @@ class Lax {
 function f(Strict|Lax $x): void {
     $x->run();
 }
-===expect===

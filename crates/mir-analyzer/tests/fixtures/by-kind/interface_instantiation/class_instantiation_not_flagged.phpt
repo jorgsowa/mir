@@ -13,4 +13,3 @@ class FileLogger implements \Countable {
 }
 
 $l = new FileLogger();
-===expect===

@@ -9,4 +9,3 @@ class Foo {
 function test(Foo $value): void {
     $value->bar();
 }
-===expect===

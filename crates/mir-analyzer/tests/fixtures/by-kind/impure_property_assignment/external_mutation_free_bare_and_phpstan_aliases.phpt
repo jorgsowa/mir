@@ -25,4 +25,3 @@ class PhpstanConfigurator {
 //      ^^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property mode of a parameter in a pure or external-mutation-free context
     }
 }
-===expect===

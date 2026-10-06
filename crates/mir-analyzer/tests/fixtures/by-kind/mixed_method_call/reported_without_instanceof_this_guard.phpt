@@ -13,4 +13,3 @@ abstract class A
         return true;
     }
 }
-===expect===

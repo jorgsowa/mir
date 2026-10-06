@@ -9,4 +9,3 @@ function foo(): void {
 //              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function totallyUndefinedFunctionXyz() is not defined
     echo $x;
 }
-===expect===

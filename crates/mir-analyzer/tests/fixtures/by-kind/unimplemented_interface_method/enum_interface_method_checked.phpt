@@ -19,4 +19,3 @@ enum Suit: string implements Colorable {
         };
     }
 }
-===expect===

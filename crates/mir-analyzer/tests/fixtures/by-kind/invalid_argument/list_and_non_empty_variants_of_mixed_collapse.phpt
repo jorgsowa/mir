@@ -23,4 +23,3 @@ function test(): void {
     h(new A());
 //    ^^^^^^^ InvalidArgument: Argument $c of h() expects 'non-empty-array', got 'A'
 }
-===expect===

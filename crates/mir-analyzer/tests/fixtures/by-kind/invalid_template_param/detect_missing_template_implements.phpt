@@ -5,5 +5,3 @@ Detect missing template implements
 /** @template T */
 interface A {}
 final class B implements A {}
-
-===expect===

@@ -10,4 +10,3 @@ function test(Color $color): string {
     return $color->value;
 //  ^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
 }
-===expect===

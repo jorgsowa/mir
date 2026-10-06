@@ -30,4 +30,3 @@ function run(Child $c): void {
     /** @mir-check $r is Child */
     sink($r);
 }
-===expect===

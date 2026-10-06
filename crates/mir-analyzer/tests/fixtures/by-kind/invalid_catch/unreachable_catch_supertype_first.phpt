@@ -39,4 +39,3 @@ function union_catch_shadows_later_subtype(): void {
 //           ^^^^^^^^^^^^^^^^^^^^^^^^^ UnreachableCatch: Catch block for 'InvalidArgumentException' is unreachable — already caught by 'Exception'
     }
 }
-===expect===

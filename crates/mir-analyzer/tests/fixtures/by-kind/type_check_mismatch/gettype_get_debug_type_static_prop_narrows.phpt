@@ -58,4 +58,3 @@ function getDebugTypeClassNameNarrowsStaticProp(): void {
         $_ = 1;
     }
 }
-===expect===

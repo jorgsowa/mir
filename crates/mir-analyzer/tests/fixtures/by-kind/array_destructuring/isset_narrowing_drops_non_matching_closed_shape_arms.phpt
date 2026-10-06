@@ -20,4 +20,3 @@ function test(array $arr): void {
         echo 1;
     }
 }
-===expect===

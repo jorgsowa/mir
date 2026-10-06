@@ -23,4 +23,3 @@ final class MoverImpl implements Mover {
         new Event([$id]);
     }
 }
-===expect===

@@ -14,4 +14,3 @@ function test(): void {
     f(new A());
 //    ^^^^^^^ InvalidArgument: Argument $x of f() expects 'array<int, string>|Traversable', got 'A'
 }
-===expect===

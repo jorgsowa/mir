@@ -10,5 +10,3 @@ Simple reference assignment ($b = &$a) does not fire UnsupportedReferenceUsage.
 <?php
 $a = "hello";
 $b = &$a;
-
-===expect===

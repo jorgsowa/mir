@@ -21,4 +21,3 @@ function check(X $x): void {
     /** @mir-check $s is Y */
         echo gettype($s);
 }
-===expect===

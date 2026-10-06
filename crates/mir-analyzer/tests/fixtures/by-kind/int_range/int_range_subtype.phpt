@@ -13,4 +13,3 @@ function bright(): int { return 200; }
 function run(): void {
     channel(bright());
 }
-===expect===

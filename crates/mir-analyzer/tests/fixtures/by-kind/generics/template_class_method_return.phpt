@@ -28,4 +28,3 @@ $v1 = $strBox->get();
 $intBox = new Box(42);
 $v2 = $intBox->get();
 /** @mir-check $v2 is 42 */
-===expect===

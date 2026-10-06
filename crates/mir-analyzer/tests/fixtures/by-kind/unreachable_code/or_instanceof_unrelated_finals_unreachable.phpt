@@ -49,4 +49,3 @@ function orInstanceofRelatedStillNarrows(Quacks $x): void {
         $_ = 1;
     }
 }
-===expect===

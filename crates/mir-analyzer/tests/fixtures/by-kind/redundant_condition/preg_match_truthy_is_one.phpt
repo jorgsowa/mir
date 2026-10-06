@@ -19,4 +19,3 @@ function test(string $s): void {
         }
     }
 }
-===expect===

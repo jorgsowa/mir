@@ -44,4 +44,3 @@ class Svc {
 //                  ^^^^^^^^^^^^^ InvalidArgument: Argument $r of take() expects 'array{'id': int, 'name': string}', got 'array{'id': "x"}'
     }
 }
-===expect===

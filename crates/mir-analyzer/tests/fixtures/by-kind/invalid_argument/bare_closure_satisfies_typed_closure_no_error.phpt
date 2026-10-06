@@ -24,4 +24,3 @@ function connect(PDO|Closure $pdo): PDO {
 $connection = new PDO();
 
 connect($connection);
-===expect===

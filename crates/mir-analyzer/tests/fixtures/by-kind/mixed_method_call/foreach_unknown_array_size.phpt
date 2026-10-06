@@ -22,4 +22,3 @@ foreach ($items as $item) {
 // After loop, $result is mixed|null
 // because array size is unknown and loop might not execute
 echo $result;
-===expect===

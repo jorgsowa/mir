@@ -11,4 +11,3 @@ static call with string variable should not error
 function test(string $className) {
     $className::method();
 }
-===expect===

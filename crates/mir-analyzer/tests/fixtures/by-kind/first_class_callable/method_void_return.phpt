@@ -18,4 +18,3 @@ $logger = new Logger();
 $fn = $logger->log(...);
 /** @mir-check $fn is Closure(string): void */
 $_ = $fn;
-===expect===

@@ -24,4 +24,3 @@ function replace_dates(string $pattern, string $subject): string {
     }
     return $result;
 }
-===expect===

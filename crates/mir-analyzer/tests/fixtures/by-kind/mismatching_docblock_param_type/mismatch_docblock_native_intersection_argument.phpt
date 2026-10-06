@@ -16,5 +16,3 @@ function test(A&B $in): void {
 //                ^^^ MismatchingDocblockParamType: Docblock type 'A&C' for $in does not match inferred 'A&B'
     $in->foo();
 }
-
-===expect===

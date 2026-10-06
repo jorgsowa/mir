@@ -7,4 +7,3 @@ class MyClass {
 }
 myclass::hello();
 //<^^^^^^^ WrongCaseClass: Class name 'myclass' has incorrect casing; use 'MyClass'
-===expect===

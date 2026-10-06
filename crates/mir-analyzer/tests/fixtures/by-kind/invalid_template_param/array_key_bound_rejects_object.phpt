@@ -22,4 +22,3 @@ function test(array $arr): void {
     array_key_list($arr);
 //  ^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TKey' inferred as 'object' does not satisfy bound 'int|string'
 }
-===expect===

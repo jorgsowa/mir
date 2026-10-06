@@ -16,4 +16,3 @@ function foo(A $i): B {
 }
 
 foo(new C);
-===expect===

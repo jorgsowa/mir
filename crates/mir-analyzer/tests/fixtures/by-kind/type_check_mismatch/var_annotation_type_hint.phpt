@@ -20,4 +20,3 @@ $container = new Container();
 $repo = $container->get(UserRepository::class);
 /** @mir-check $repo is UserRepository */
 $repo->find(1);
-===expect===

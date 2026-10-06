@@ -12,4 +12,3 @@ class Foo {
 //      ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
     }
 }
-===expect===

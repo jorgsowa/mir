@@ -29,4 +29,3 @@ function useDouble(Reader $r): int {
 function useTriple(Reader $r): int {
     return $r->triple();
 }
-===expect===

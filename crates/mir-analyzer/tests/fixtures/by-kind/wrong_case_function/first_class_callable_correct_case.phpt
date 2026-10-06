@@ -11,4 +11,3 @@ Correct case in first-class callable syntax is not reported.
 function myFunc(int $x): int { return $x; }
 
 $fn = myFunc(...);
-===expect===

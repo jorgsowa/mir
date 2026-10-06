@@ -24,4 +24,3 @@ class Timer {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $start expects 'int|null', cannot assign 'int|array{0: int, 1: int}|false'
     }
 }
-===expect===

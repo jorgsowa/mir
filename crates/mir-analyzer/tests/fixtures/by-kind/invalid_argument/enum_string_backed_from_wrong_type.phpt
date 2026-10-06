@@ -13,4 +13,3 @@ enum Color: string {
 
 Color::from(42);
 //          ^^ ArgumentTypeCoercion: Argument $value of from() expects 'string', got '42' — coercion may fail at runtime
-===expect===

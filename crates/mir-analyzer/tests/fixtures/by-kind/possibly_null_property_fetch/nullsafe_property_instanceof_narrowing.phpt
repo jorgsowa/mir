@@ -20,4 +20,3 @@ function f(?Foo $foo): void {
         $foo->bar->baz();
     }
 }
-===expect===

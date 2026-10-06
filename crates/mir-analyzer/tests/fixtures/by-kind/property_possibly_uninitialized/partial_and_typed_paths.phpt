@@ -31,4 +31,3 @@ class ReadonlyNeverSet {
     public function __construct() {}
 //                  ^^^^^^^^^^^ PropertyPossiblyUninitialized: Property ReadonlyNeverSet::$id may be left uninitialized by the constructor
 }
-===expect===

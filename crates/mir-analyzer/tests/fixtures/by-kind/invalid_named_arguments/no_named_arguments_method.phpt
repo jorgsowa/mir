@@ -15,4 +15,3 @@ $calc = new Calculator();
 $calc->add(a: 1, b: 2);
 //         ^^^^ InvalidNamedArguments: add() does not accept named arguments
 //               ^^^^ InvalidNamedArguments: add() does not accept named arguments
-===expect===

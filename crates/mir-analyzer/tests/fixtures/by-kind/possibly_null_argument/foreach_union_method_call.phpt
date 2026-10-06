@@ -21,4 +21,3 @@ foreach ($items as $item) {
 }
 // The literal array is non-empty, so the loop assigns string on every path.
 $len = strlen($result);
-===expect===

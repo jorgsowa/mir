@@ -18,4 +18,3 @@ function test(): void {
 //      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Tag::noSuchMethod() does not exist
     }
 }
-===expect===

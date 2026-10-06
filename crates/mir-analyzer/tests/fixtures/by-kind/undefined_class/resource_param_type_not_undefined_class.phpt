@@ -10,4 +10,3 @@ Legacy `resource` parameter types are not undefined classes.
 ===file===
 <?php
 function takesResource(resource $value): void {}
-===expect===

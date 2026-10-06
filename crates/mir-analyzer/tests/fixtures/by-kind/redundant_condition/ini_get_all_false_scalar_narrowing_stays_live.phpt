@@ -9,4 +9,3 @@ foreach (ini_get_all(null, false) as $value) {
 
     echo strtolower((string) $value);
 }
-===expect===

@@ -36,4 +36,3 @@ function nested_dead_trailing_write(array $items, array $cs): void {
         }
     }
 }
-===expect===

@@ -10,4 +10,3 @@ No NonExistentArrayOffset on the LHS of ??
 <?php
 $a = ["k" => 1];
 $x = $a["missing"] ?? "default";
-===expect===

@@ -16,4 +16,3 @@ class A {
         return 'k';
     }
 }
-===expect===

@@ -5,4 +5,3 @@ PossiblyNullOperand does NOT fire when the operand cannot be null.
 function ratio(int $a, int $b): float {
     return $a / $b;
 }
-===expect===

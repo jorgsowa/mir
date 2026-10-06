@@ -51,4 +51,3 @@ function test5(string $filename): string
     }
     return $filename;
 }
-===expect===

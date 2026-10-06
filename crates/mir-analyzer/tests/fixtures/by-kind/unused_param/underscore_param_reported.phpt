@@ -8,4 +8,3 @@ class Foo {
         return 42;
     }
 }
-===expect===

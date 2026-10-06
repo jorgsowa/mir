@@ -41,4 +41,3 @@ class Type {
 
 // A = string → must pick first branch → Type<string>; no unbound I/K/V leak
 $t = Type::list((new Type)->refined(Type::string()));
-===expect===

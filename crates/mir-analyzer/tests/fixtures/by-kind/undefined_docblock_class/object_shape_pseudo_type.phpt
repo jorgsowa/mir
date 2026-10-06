@@ -19,5 +19,3 @@ function takeShape($x): void {
 function returnsShape() {
     return (object) ['ok' => true];
 }
-
-===expect===

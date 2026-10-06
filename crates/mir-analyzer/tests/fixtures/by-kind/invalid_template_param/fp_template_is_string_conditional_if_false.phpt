@@ -33,4 +33,3 @@ $obj = new Type;
 $result = $obj->refined(Type::int());
 /** @mir-check $result is Type<int> */
 echo "ok";
-===expect===

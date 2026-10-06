@@ -42,4 +42,3 @@ function narrowsBackedEnum(Suit $suit): void {
     }
     needsSuit($suit);
 }
-===expect===

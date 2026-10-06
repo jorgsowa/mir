@@ -41,4 +41,3 @@ function build(array $source): void {
 
     $missing = mapKeys(not_a_function(...), $source);
 }
-===expect===

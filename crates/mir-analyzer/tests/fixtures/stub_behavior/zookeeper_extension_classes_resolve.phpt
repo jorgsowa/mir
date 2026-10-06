@@ -19,4 +19,3 @@ function connect(string $hosts): Zookeeper {
 function handle(ZookeeperConnectionException $e): string {
     return $e->getMessage();
 }
-===expect===

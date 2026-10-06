@@ -19,4 +19,3 @@ function f(int $x): void {
     /** @mir-check $z is string */
     echo $z;
 }
-===expect===

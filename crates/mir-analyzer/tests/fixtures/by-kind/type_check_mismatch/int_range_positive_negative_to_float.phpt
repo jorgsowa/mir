@@ -48,4 +48,3 @@ function returns_float_from_int_range(): float {
     $n = 127;
     return $n;
 }
-===expect===

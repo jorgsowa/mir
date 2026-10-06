@@ -36,4 +36,3 @@ function test_null_plus_int(int $n): void {
     /** @mir-check $v is int */
     $_ = $v;
 }
-===expect===

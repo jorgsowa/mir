@@ -23,4 +23,3 @@ function f(): void {
     unset($_SESSION['key']);
 //        ^^^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $_SESSION in a @pure function
 }
-===expect===

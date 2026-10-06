@@ -10,5 +10,3 @@ function getKeys(array $array) {
     return array_keys($array);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'list<string>' is not compatible with declared 'list<int>'
 }
-
-===expect===

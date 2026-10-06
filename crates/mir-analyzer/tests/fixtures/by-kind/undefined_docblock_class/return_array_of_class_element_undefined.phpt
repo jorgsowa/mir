@@ -7,5 +7,3 @@ function missing(): array {
 //       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentElement' does not exist
     return [];
 }
-
-===expect===

@@ -28,4 +28,3 @@ $i = $factory->makeInt();
 // Both parameterized values accepted by bare property
 $c->prop = $s;
 $c->prop = $i;
-===expect===

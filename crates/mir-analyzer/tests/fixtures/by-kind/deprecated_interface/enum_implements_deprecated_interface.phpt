@@ -10,5 +10,3 @@ enum Status: string implements StatusInterface {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedInterface: Interface StatusInterface is deprecated: use NewStatus instead
     case Active = 'active';
 }
-
-===expect===

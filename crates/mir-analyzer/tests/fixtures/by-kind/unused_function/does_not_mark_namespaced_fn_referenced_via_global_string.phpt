@@ -9,4 +9,3 @@ function helper(): void {}
 
 // 'helper' resolves as \helper (global), NOT \App\helper
 call_user_func('helper');
-===expect===

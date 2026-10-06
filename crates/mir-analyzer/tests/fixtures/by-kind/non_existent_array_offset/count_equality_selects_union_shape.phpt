@@ -24,4 +24,3 @@ function ne(array $a): int {
 function noGuard(array $a): int {
     return $a[1];
 }
-===expect===

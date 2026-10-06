@@ -21,4 +21,3 @@ function process($c): void {}
 $c = new Collection(new Cat());
 process($c);
 //<^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Collection<Cat>' does not satisfy bound 'Collection<Animal>'
-===expect===

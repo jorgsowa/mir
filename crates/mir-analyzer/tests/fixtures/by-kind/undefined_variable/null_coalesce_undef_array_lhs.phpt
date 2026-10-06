@@ -13,4 +13,3 @@ $undefinedArr['key'] ?? d is valid PHP
 function test(): string {
     return $undefinedArr['key'] ?? 'default';
 }
-===expect===

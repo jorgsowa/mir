@@ -14,4 +14,3 @@ class Ñoño {}
 $a = new Ñoño();
 $b = new ñoño();
 //       ^^^^ UndefinedClass: Class ñoño does not exist
-===expect===

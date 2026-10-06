@@ -15,4 +15,3 @@ class UserModel extends Model {}
 $m = UserModel::query();
 /** @mir-check $m is UserModel */
 $x = $m;
-===expect===

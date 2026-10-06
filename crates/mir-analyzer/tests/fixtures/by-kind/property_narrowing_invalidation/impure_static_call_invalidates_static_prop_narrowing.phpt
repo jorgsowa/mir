@@ -59,4 +59,3 @@ function pureStaticCallPreserves(): void {
     /** @mir-check Box::$value is string */
     $_ = 1;
 }
-===expect===

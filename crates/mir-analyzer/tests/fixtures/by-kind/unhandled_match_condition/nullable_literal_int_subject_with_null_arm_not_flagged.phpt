@@ -11,4 +11,3 @@ function label($n): string {
         null => "none",
     };
 }
-===expect===

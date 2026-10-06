@@ -22,4 +22,3 @@ set_flags(4);  // flag C
 set_flags(5);  // A|C
 set_flags(6);  // B|C
 set_flags(7);  // A|B|C (all set)
-===expect===

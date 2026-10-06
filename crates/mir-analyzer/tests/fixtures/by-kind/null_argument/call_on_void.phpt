@@ -8,4 +8,3 @@ class A {
 
 $p = new A();
 $p->foo()->bar();
-===expect===

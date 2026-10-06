@@ -9,4 +9,3 @@ does not report call on template param with bound
 function g($obj): void {
     $obj->doSomething();
 }
-===expect===

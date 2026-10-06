@@ -10,4 +10,3 @@ class User {
     /** @var int */
     public $age;
 }
-===expect===

@@ -22,5 +22,3 @@ enum Suit {
 
 /** @param list<positive-int> $counts */
 function baz(array $counts): void {}
-
-===expect===

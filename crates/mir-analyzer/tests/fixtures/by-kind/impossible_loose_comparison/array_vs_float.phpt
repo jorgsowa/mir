@@ -13,4 +13,3 @@ function test(array $arr, float $f): void {
     if ($arr == $f) {}
 //      ^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'array' and 'float' is always false — these types can never be loosely equal
 }
-===expect===

@@ -12,4 +12,3 @@ function b_helper(): string { return 'b'; }
 ===file:c.php===
 <?php
 function c_use(): int { return 'x'; }
-===expect===

@@ -19,5 +19,3 @@ class Test {
 $test = new Test();
 $closure = $test->length(...);
 $length = $closure();
-
-===expect===

@@ -11,4 +11,3 @@ class Child extends Base {
     public function fetch(): ?string { return null; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Child::fetch() signature mismatch: return type 'string|null' is not a subtype of parent 'string'
 }
-===expect===

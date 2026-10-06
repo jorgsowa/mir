@@ -34,4 +34,3 @@ function run(string $dyn): void {
     /** @mir-check $d is array<string, 1> */
     $_ = $d;
 }
-===expect===

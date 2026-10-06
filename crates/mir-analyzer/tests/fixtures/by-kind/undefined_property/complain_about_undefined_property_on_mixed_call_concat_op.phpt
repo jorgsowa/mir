@@ -12,4 +12,3 @@ class A {
 //                             ^^^ UndefinedProperty: Property A::$baz does not exist
     }
 }
-===expect===

@@ -34,4 +34,3 @@ function checkAnimal(Animal $a): void {
     /** @mir-check $y is bool */
     $_ = 1;
 }
-===expect===

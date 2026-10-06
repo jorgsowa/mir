@@ -26,4 +26,3 @@ function isUrgent(string $level): bool {
 
 isUrgent("high");
 isUrgent("low");
-===expect===

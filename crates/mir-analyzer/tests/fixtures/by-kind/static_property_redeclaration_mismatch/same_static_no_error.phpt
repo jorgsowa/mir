@@ -17,4 +17,3 @@ class C {
 class D extends C {
     public int $y = 1;
 }
-===expect===

@@ -22,4 +22,3 @@ final class Reader {
         return $k;
     }
 }
-===expect===

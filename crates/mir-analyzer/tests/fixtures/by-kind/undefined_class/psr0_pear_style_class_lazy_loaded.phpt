@@ -16,4 +16,3 @@ class Handler {
         return $t->name();
     }
 }
-===expect===

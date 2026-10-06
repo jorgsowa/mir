@@ -15,4 +15,3 @@ interface I {
      */
     public static function foo($value);
 }
-===expect===

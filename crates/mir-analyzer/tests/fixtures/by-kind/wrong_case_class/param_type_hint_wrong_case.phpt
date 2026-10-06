@@ -11,4 +11,3 @@ Wrong case class name in parameter type hint is reported.
 class Request {}
 function handle(request $r): void {}
 //              ^^^^^^^ WrongCaseClass: Class name 'request' has incorrect casing; use 'Request'
-===expect===

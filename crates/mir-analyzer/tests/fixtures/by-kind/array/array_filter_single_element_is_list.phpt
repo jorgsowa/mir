@@ -23,4 +23,3 @@ function check(?Item $a, ?Item $b): void {
     takeList(array_values(array_filter([$a, $b])));
     takeList(array_filter([$a, $b]));
 }
-===expect===

@@ -15,4 +15,3 @@ function test(array $nums): void {
     /** @mir-check $r is array<int, int> */
     $_ = $r;
 }
-===expect===

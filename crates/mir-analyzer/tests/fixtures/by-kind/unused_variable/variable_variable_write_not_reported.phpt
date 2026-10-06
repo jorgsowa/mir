@@ -14,4 +14,3 @@ function branch(bool $c, string $k): void {
     }
     $other = 2;
 }
-===expect===

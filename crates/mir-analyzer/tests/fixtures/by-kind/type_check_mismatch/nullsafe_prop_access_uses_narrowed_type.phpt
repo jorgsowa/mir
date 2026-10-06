@@ -13,4 +13,3 @@ function f(Box $b): void {
         echo $y;
     }
 }
-===expect===

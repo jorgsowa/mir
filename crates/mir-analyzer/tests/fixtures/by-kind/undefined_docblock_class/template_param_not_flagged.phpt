@@ -11,5 +11,3 @@ introduces T as a valid type name for the function's scope.
 function identity(mixed $item): mixed {
     return $item;
 }
-
-===expect===

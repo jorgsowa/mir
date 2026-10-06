@@ -5,4 +5,3 @@ stdclass not reported
 function test(): void {
     new stdClass();
 }
-===expect===

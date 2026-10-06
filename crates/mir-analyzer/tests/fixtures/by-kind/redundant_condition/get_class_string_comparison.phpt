@@ -30,4 +30,3 @@ function testGetClassElseif(Foo|Bar $obj) {
         $obj->bar();
     }
 }
-===expect===

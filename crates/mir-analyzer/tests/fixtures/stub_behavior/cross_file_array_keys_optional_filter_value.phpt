@@ -20,4 +20,3 @@ function extractMatchingKeys(array $map, mixed $value): array {
 <?php
 $keys = extractKeys(['x' => 1, 'y' => 2]);
 $matching = extractMatchingKeys(['x' => 1, 'y' => 1, 'z' => 2], 1);
-===expect===

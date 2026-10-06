@@ -17,4 +17,3 @@ enum Color: string {
 function pick(string $name): Color {
     return Color::{$name};
 }
-===expect===

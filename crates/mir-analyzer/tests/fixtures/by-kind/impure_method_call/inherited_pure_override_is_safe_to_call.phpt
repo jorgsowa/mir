@@ -18,4 +18,3 @@ class Value implements HasValue {
 function read(Value $value): int {
     return $value->value();
 }
-===expect===

@@ -46,4 +46,3 @@ needsIntCollectionBound(new StringCollection());
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'StringCollection' does not satisfy bound 'Collection<int>&Countable'
 needsIntCollectionParam(new StringCollection());
 //                      ^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of needsIntCollectionParam() expects 'Collection<int>&Countable', got 'StringCollection'
-===expect===

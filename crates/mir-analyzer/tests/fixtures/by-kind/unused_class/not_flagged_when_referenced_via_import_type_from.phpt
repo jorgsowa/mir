@@ -12,4 +12,3 @@ final class OnlyUsedViaImportTypeFrom {}
 
 /** @psalm-import-type UserId from OnlyUsedViaImportTypeFrom */
 class Consumer {}
-===expect===

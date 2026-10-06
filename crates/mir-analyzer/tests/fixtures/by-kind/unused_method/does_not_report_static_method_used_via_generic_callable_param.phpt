@@ -21,4 +21,3 @@ class Handler {
 }
 
 Handler::run();
-===expect===

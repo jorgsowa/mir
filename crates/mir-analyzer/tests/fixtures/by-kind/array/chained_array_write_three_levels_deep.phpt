@@ -23,4 +23,3 @@ function fourLevels(string $v): string {
     /** @mir-check $leaf is string */
     return $leaf;
 }
-===expect===

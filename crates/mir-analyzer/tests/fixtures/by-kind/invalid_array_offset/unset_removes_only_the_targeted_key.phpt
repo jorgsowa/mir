@@ -8,4 +8,3 @@ function test(): string {
     unset($x["a"]);
     return $x["b"];
 }
-===expect===

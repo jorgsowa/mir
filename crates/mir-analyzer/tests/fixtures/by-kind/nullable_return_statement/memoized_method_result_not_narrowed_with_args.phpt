@@ -28,4 +28,3 @@ function g(Box $b): string {
     }
     return $b->name();
 }
-===expect===

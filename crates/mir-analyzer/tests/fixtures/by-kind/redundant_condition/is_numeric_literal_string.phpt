@@ -24,4 +24,3 @@ function test_always_false(string $s): void {
         // never taken
     }
 }
-===expect===

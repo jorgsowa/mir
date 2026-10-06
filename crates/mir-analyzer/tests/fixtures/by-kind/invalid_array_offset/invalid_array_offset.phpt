@@ -12,4 +12,3 @@ Invalid array offset
 $x = ["a"];
 $y = $x["b"];
 //      ^^^ NonExistentArrayOffset: Array offset 'b' does not exist
-===expect===

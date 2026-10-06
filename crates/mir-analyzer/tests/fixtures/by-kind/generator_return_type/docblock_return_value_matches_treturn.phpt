@@ -8,4 +8,3 @@ function gen(): \Generator {
     yield 'a';
     return true;
 }
-===expect===

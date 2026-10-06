@@ -28,4 +28,3 @@ class Sub extends Base {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Sub::nope() does not exist
 (new Sub())->chain()->nope();
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Sub::nope() does not exist
-===expect===

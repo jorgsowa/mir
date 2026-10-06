@@ -10,4 +10,3 @@ function f($p): void {
     $p->zugzug();
 //  ^^^^^^^^^^^^ UndefinedMethod: Method B&A::zugzug() does not exist
 }
-===expect===

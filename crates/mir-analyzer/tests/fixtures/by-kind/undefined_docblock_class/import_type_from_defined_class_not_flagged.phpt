@@ -8,4 +8,3 @@ class UserRepository {}
 
 /** @psalm-import-type UserId from UserRepository */
 class A {}
-===expect===

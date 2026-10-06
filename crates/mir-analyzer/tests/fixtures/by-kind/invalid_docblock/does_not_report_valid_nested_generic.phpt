@@ -6,4 +6,3 @@ does not report valid nested generic
  * @return array<string, array<int>>
  */
 function foo(): array { return []; }
-===expect===

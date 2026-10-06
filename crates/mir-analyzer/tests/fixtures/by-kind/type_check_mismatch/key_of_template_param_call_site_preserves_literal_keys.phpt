@@ -37,4 +37,3 @@ function acceptsFlagName(string $flag): void
 
 acceptsString(firstKey(['debug' => false, 'verbose' => true]));
 acceptsFlagName(firstKey(['debug' => false, 'verbose' => true]));
-===expect===

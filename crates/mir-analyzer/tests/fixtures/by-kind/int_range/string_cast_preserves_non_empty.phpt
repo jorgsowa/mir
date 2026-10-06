@@ -48,4 +48,3 @@ function test_nullable_string(?string $x): void {
     /** @mir-check $s is string */
     $_ = $s;
 }
-===expect===

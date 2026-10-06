@@ -13,4 +13,3 @@ use App\Status;
 function getAll(): array {
     return Status::cases();
 }
-===expect===

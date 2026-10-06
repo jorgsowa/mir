@@ -19,4 +19,3 @@ bound's expansion is.
 function identity($x) {
     return $x;
 }
-===expect===

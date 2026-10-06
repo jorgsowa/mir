@@ -8,4 +8,3 @@ function test(mixed $x): bool {
     }
     return false;
 }
-===expect===

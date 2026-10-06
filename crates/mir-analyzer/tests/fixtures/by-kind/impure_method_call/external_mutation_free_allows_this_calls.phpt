@@ -16,4 +16,3 @@ class Counter {
         $this->increment();
     }
 }
-===expect===

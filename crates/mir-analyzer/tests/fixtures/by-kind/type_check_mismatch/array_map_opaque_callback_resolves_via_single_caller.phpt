@@ -18,4 +18,3 @@ function apply(callable $cb, array $nums): array {
 function useIt(array $nums): void {
     apply(fn(int $x): string => (string) $x, $nums);
 }
-===expect===

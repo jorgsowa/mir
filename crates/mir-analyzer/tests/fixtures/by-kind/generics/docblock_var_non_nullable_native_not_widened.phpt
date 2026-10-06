@@ -23,4 +23,3 @@ function check(Box $b): void {
     /** @mir-check $b->item is Foo */
     $x = $b->item;
 }
-===expect===

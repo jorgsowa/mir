@@ -16,4 +16,3 @@ enum OldStatus { case A; case B; }
 
 function foo(OldStatus $s): void {}
 //           ^^^^^^^^^ DeprecatedClass: Class OldStatus is deprecated: use Status instead
-===expect===

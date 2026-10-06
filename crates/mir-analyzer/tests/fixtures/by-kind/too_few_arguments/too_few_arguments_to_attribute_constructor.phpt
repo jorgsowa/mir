@@ -11,4 +11,3 @@ class Table {
 
 #[Table()]
 class Video {}
-===expect===

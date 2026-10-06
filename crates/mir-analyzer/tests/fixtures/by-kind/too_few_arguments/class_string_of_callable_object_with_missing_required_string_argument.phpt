@@ -9,4 +9,3 @@ function takesCallableObject(string $className): void {
     $object = new $className();
     $object();
 }
-===expect===

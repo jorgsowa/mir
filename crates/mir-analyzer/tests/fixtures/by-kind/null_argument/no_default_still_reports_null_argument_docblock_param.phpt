@@ -12,4 +12,3 @@ Without a default, a docblock non-null param still rejects null.
 function plain($f): void {}
 plain(null);
 //    ^^^^ NullArgument: Argument $f of plain() cannot be null
-===expect===

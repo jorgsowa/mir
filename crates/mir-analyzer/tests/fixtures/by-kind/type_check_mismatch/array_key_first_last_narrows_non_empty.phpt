@@ -33,4 +33,3 @@ function test_key_first_null_narrows_to_empty_shape(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

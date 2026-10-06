@@ -15,4 +15,3 @@ $obj = new MyClass();
 $obj->getName();
 $obj->setName("test");
 MyClass::create();
-===expect===

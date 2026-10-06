@@ -6,4 +6,3 @@ function test(): void {
     global $config;
 //         ^^^^^^^ UnusedVariable: Variable $config is never read
 }
-===expect===

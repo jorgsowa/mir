@@ -75,4 +75,3 @@ new Provider(static fn(): array => ['a']);
 /** @param callable(): int[] $c */
 function takes_callable(callable $c): void { $c(); }
 takes_callable(static fn(): array => [1]);
-===expect===

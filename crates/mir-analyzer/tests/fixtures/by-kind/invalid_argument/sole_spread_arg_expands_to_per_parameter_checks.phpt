@@ -44,4 +44,3 @@ function via_constructor(array $pair): void {
     new Pair(...$pair);
 //            ^^^^^^^ InvalidArgument: Argument $b of Pair::__construct() expects 'int', got 'string'
 }
-===expect===

@@ -15,4 +15,3 @@ function test(): void {
     if ($s == 1.5) {}
 //      ^^^^^^^^^ ImpossibleLooseComparison: '==' between '"hello"' and '1.5' is always false — these types can never be loosely equal
 }
-===expect===

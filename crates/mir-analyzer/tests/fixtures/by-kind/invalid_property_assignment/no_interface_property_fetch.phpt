@@ -11,4 +11,3 @@ function fooFoo(A $a): void {
 
     }
 }
-===expect===

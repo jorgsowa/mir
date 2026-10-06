@@ -18,4 +18,3 @@ function parse(): string {
     }
     return '';
 }
-===expect===

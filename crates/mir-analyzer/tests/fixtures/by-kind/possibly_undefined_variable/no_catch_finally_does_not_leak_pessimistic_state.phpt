@@ -22,4 +22,3 @@ function encode(mixed $value): void {
     }
     assert($str !== false);
 }
-===expect===

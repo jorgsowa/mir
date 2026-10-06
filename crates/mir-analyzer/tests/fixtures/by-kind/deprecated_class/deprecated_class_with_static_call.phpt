@@ -12,4 +12,3 @@ class Foo {
 
 Foo::barBar();
 //<^^^ DeprecatedClass: Class Foo is deprecated
-===expect===

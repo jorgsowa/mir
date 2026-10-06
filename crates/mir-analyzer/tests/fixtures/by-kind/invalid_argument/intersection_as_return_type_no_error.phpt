@@ -10,4 +10,3 @@ function f(): Iterator&Countable {
     $x = null;
     return $x;
 }
-===expect===

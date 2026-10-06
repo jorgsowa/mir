@@ -31,4 +31,3 @@ function loadFree(Registry $registry, string $name): void
     /** @var class-string<T> $name */
     $registry->get($name);
 }
-===expect===

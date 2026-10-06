@@ -25,4 +25,3 @@ class SubFactory extends Factory {}
 SubFactory::make($result);
 /** @mir-check $result is SubFactory */
 $_ = $result;
-===expect===

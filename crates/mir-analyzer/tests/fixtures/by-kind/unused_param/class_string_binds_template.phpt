@@ -26,4 +26,3 @@ $fooWrapper = make(Foo::class);
 $barWrapper = make(Bar::class);
 /** @mir-check $fooWrapper is Wrapper<Foo> */
 /** @mir-check $barWrapper is Wrapper<Bar> */
-===expect===

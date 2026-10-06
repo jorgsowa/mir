@@ -22,4 +22,3 @@ function notAnEnum(Money $m): void {
         $_ = 1;
     }
 }
-===expect===

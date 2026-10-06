@@ -19,4 +19,3 @@ class Loader {
         return $this->data->findFirst();
     }
 }
-===expect===

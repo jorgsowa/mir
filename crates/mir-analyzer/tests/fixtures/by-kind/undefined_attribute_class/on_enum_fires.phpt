@@ -7,4 +7,3 @@ UndefinedAttributeClass fires when an undefined attribute is placed on an enum d
 enum Status {
     case Active;
 }
-===expect===

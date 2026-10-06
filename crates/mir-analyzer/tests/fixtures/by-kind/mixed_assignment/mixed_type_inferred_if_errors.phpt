@@ -18,4 +18,3 @@ function foo($a): void {
      */
     $cloned = clone $a;
 }
-===expect===

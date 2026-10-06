@@ -16,4 +16,3 @@ try {
     throw new ValidExc();
 } catch (ValidExc|NonThrowable $e) {}
 //                ^^^^^^^^^^^^ InvalidCatch: Caught type 'NonThrowable' does not extend Throwable
-===expect===

@@ -17,4 +17,3 @@ function handle(): void {
         echo $e->getMessage();
     }
 }
-===expect===

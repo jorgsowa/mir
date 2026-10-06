@@ -16,4 +16,3 @@ class Foo {
 $a = rand(0, 10) ? new Foo() : null;
 
 $a->foo = "hello";
-===expect===

@@ -11,4 +11,3 @@ class Box {
         return static::class;
     }
 }
-===expect===

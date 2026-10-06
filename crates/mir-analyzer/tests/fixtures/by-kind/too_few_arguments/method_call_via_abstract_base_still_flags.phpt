@@ -22,4 +22,3 @@ class T {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for configure(): expected 2, got 1
     }
 }
-===expect===

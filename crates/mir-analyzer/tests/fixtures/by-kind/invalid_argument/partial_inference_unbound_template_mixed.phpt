@@ -28,4 +28,3 @@ function app(): void {
     $m = new Map("k");
     $m->put(new Other());
 }
-===expect===

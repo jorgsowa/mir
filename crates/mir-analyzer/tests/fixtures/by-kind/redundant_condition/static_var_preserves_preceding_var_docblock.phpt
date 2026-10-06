@@ -23,4 +23,3 @@ function test(): void {
         $x->bar();
     }
 }
-===expect===

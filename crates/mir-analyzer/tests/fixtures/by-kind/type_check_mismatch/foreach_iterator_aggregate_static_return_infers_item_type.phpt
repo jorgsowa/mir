@@ -47,4 +47,3 @@ function sumAnimals(AnimalBag $bag): void {
         $_ = 1;
     }
 }
-===expect===

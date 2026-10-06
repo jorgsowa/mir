@@ -14,4 +14,3 @@ class UnionReturn {
     }
 }
 new UnionReturn();
-===expect===

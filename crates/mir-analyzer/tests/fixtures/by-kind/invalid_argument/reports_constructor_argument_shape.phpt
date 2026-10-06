@@ -15,4 +15,3 @@ new User();
 //<^^^^^^^^^^ TooFewArguments: Too few arguments for User::__construct(): expected 1, got 0
 new User('Ada', 'Grace');
 //              ^^^^^^^ TooManyArguments: Too many arguments for User::__construct(): expected 1, got 2
-===expect===

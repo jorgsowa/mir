@@ -5,4 +5,3 @@ does not report exception
 function test(): void {
     throw new \RuntimeException('something went wrong');
 }
-===expect===

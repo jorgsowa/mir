@@ -48,4 +48,3 @@ function usesArraylike($bag): void {
 }
 
 usesArraylike(new StringIntBag());
-===expect===

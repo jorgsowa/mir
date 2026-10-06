@@ -37,4 +37,3 @@ takeArray(rows());
 takeArray(keyedRows());
 takeShape(['item' => untyped()]);
 takeRow(untyped());
-===expect===

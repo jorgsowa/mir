@@ -27,4 +27,3 @@ function callDangerous(): void {
         $s = "hello";
     }
 }
-===expect===

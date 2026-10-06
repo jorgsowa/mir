@@ -8,4 +8,3 @@ class A {
 //      ^^^^^^^^^ UndefinedFunction: Function missing() is not defined
     }
 }
-===expect===

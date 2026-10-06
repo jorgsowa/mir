@@ -16,4 +16,3 @@ function return_array() {
 }
 $result = return_array();
 $v = $result[0]["key"];
-===expect===

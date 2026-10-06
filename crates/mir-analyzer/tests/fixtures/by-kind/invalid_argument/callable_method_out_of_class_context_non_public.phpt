@@ -18,4 +18,3 @@ class Foo {
 
 $foo = new Foo();
 run(array($foo, "hello"));
-===expect===

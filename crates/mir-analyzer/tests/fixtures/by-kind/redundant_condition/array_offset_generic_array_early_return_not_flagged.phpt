@@ -16,4 +16,3 @@ function test(array $matrix): int {
     }
     return $row['b'] ?? 0;
 }
-===expect===

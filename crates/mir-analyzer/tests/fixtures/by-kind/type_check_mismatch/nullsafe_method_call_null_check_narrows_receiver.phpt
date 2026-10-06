@@ -46,4 +46,3 @@ function doesNotNarrowWhenReturnIsNullable(?Bar $bar): void {
 //      ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
     }
 }
-===expect===

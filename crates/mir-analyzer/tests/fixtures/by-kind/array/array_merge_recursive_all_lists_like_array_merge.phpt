@@ -28,4 +28,3 @@ function test(array $ints, array $maybe_empty_strings, array $assoc): void {
     /** @mir-check $with_assoc is array */
     $_ = $with_assoc;
 }
-===expect===

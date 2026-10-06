@@ -13,4 +13,3 @@ Legacy `resource` property types are not undefined classes.
 class HandleBox {
     public resource $handle;
 }
-===expect===

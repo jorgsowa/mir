@@ -57,4 +57,3 @@ function dynamicBoolKeyFallsBackToInt(bool $b): void {
     /** @mir-check $arr is array<int, 1> */
     $_ = $arr;
 }
-===expect===

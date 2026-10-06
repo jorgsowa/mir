@@ -16,4 +16,3 @@ function test(): void {
 //             ^^^^^^^^^^ InvalidArgument: Argument $xs of takes_ints() expects 'int', got '"1"'
 //              ^^^^^^^^^ InvalidArgument: Argument $xs of takes_ints() expects 'int', got '"2"'
 }
-===expect===

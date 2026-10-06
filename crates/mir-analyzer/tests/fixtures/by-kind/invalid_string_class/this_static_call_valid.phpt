@@ -11,4 +11,3 @@ class Foo {
         $this::bar();
     }
 }
-===expect===

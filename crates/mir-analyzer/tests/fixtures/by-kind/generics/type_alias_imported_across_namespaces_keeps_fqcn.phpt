@@ -32,4 +32,3 @@ class Svc {
         echo 1;
     }
 }
-===expect===

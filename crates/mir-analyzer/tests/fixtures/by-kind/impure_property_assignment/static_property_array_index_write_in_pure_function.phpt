@@ -16,4 +16,3 @@ class Registry {
 //            ^^^^^^ ImpureStaticPropertyAccess: Reading static property Registry::$items in a @pure function
     }
 }
-===expect===

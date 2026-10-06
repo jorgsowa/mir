@@ -15,4 +15,3 @@ function test(): void {
     $obj = unserialize($_COOKIE['session']);
 //         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'unserialize'
 }
-===expect===

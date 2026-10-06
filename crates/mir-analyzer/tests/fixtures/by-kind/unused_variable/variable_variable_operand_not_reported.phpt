@@ -5,4 +5,3 @@ variable-variable operand should be marked as read
 <?php
 $key = 'value';
 echo $$key;
-===expect===

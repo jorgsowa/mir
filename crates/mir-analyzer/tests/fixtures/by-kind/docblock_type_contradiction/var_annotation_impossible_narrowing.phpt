@@ -17,4 +17,3 @@ function f(): void {
     echo strlen($x);
 //  ^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type '1' makes '@var string $x' impossible — this can never hold
 }
-===expect===

@@ -13,4 +13,3 @@ $x = new class {
     use UndefinedTrait;
 //      ^^^^^^^^^^^^^^ UndefinedTrait: Trait UndefinedTrait does not exist
 };
-===expect===

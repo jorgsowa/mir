@@ -35,4 +35,3 @@ function useDirect(array $items): void
         echo $r->build();
     }
 }
-===expect===

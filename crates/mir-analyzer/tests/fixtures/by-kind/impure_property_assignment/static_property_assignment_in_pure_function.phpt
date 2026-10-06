@@ -15,4 +15,3 @@ class Counter {
 //      ^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Counter::$count in a @pure function
     }
 }
-===expect===

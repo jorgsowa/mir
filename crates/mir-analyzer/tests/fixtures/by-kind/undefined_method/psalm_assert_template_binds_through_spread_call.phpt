@@ -32,4 +32,3 @@ function test(mixed $x): void {
 //      ^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
     }
 }
-===expect===

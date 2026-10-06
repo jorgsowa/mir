@@ -15,4 +15,3 @@ function dispatch(Notification $n): void {
         $n->broadcastOn();
     }
 }
-===expect===

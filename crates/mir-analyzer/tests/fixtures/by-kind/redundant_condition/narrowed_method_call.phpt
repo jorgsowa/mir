@@ -36,4 +36,3 @@ function errorCase(Article|Photo $content): void {
     $content->undefinedMethod();
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Article::undefinedMethod() does not exist
 }
-===expect===

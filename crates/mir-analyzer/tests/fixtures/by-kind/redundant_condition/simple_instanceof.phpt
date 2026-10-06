@@ -14,4 +14,3 @@ function test(string|File $file): void {
         }
     }
 }
-===expect===

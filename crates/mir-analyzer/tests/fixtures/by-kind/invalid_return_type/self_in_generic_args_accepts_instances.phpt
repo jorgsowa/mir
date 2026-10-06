@@ -33,4 +33,3 @@ class Node {
 $pair = Node::pair();
 //<^^^^^^^^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $pair is expected to be list<Node>, got mixed
 echo count($pair);
-===expect===

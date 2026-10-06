@@ -38,4 +38,3 @@ function still_dead(): int {
     $x = 2;
     return $x;
 }
-===expect===

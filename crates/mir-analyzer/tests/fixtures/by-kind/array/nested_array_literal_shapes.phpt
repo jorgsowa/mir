@@ -61,4 +61,3 @@ function deep(): void {
     /** @mir-check $d is array{'x': array{0: array{'y': array{0: 1, 1: 2}}}} */
     echo 1;
 }
-===expect===

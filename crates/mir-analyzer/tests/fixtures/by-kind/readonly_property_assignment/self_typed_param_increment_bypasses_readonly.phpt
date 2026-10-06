@@ -38,4 +38,3 @@ class Sub extends Base {
 //      ^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Base::$x outside of constructor
     }
 }
-===expect===

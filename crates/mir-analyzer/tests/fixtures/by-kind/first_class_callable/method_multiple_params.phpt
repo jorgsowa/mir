@@ -20,4 +20,3 @@ $f = new Formatter();
 $fn = $f->format(...);
 /** @mir-check $fn is Closure(string, int, bool): string */
 $_ = $fn;
-===expect===

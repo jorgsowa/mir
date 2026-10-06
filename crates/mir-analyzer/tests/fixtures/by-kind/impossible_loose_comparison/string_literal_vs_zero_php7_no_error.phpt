@@ -15,4 +15,3 @@ function test(): void {
     $s = "foo";
     if ($s == 0) {}
 }
-===expect===

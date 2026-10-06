@@ -17,4 +17,3 @@ class Mutates implements Cache {
         return $this->calls;
     }
 }
-===expect===

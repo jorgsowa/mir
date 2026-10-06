@@ -38,4 +38,3 @@ function test(): void {
     /** @mir-check $all is list<Impl> */
     echo count($all);
 }
-===expect===

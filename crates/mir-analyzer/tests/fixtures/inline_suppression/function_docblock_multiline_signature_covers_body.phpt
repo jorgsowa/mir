@@ -13,4 +13,3 @@ function f(
     echo $a . $b;
     new NoSuchClass();
 }
-===expect===

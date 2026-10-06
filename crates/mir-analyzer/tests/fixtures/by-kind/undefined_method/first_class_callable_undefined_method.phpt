@@ -13,5 +13,3 @@ $queue = new SplQueue;
 $closure = $queue->undefined(...);
 //                 ^^^^^^^^^ UndefinedMethod: Method SplQueue::undefined() does not exist
 $count = $closure();
-
-===expect===

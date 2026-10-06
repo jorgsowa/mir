@@ -17,5 +17,3 @@ for ($i = 0; $i < count($arr); ++$i) {
 }
 
 $var = "foo";
-
-===expect===

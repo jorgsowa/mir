@@ -22,4 +22,3 @@ $gen = nextId(...);
 $gen($id);
 /** @mir-check $id is int */
 echo $id;
-===expect===

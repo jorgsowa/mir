@@ -9,4 +9,3 @@ does not report public property
 class Foo {
     public string $name = 'bar';
 }
-===expect===

@@ -16,5 +16,3 @@ function setAge(Sealed $s): void {
     $s->age = 42;
 //  ^^^^^^^^^^^^ NoInterfaceProperties: Property $age is not defined on this interface
 }
-
-===expect===

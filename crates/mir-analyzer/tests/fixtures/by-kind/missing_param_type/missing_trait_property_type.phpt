@@ -10,4 +10,3 @@ trait T {
 class A {
     use T;
 }
-===expect===

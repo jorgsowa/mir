@@ -20,4 +20,3 @@ class Child extends base {}
 function takes_base(Base $x): void {}
 function make(): Base { return new Child(); }
 takes_base(new Child());
-===expect===

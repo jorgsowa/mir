@@ -31,4 +31,3 @@ class Plain {
 //                    ^^^^^ UndefinedProperty: Property Plain::$extra does not exist
     }
 }
-===expect===

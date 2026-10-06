@@ -27,4 +27,3 @@ function use_impl(Ident $i, Plain $p): int {
     /** @mir-check $b is int */
     return $a + $b;
 }
-===expect===

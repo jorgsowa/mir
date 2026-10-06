@@ -19,4 +19,3 @@ function acceptsAnimalBox(Box $box): void { var_dump($box); }
 function test(): void {
     acceptsAnimalBox(new CatBox());
 }
-===expect===

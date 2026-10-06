@@ -23,4 +23,3 @@ class Legacy_Thing {
 <?php
 $t = new Legacy_Thing();
 $t->fromSpecific();
-===expect===

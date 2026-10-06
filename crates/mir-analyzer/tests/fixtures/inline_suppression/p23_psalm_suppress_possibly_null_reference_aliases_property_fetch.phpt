@@ -12,4 +12,3 @@ function test(?Foo $obj): void {
     /** @psalm-suppress PossiblyNullReference */
     echo $obj->prop;
 }
-===expect===

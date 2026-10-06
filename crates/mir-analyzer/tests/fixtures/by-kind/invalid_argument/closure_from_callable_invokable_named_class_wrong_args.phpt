@@ -21,4 +21,3 @@ class NamedInvokable {
 }
 
 acceptsIntToBool(Closure::fromCallable(new NamedInvokable));
-===expect===

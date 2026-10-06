@@ -9,4 +9,3 @@ trait B { final public function greet(): string { return 'B'; } }
 class Widget {
     use A, B { A::greet insteadof B; }
 }
-===expect===

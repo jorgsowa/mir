@@ -25,4 +25,3 @@ function helper(): string {
     return 1;
 //  ^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared 'string'
 }
-===expect===

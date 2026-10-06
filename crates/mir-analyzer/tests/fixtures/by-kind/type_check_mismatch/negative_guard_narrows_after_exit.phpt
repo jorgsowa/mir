@@ -29,4 +29,3 @@ function onlyPositive(int|null $n): int {
     }
     return $n;
 }
-===expect===

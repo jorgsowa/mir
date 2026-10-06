@@ -12,4 +12,3 @@ function test(bool $flag) {
     new $flag();
 //      ^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'bool'
 }
-===expect===

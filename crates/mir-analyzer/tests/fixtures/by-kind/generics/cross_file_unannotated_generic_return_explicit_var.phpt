@@ -29,4 +29,3 @@ function app(): void {
     $result = $h->get();
     echo $result;
 }
-===expect===

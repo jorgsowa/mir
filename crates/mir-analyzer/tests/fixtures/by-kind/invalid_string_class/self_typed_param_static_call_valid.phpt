@@ -9,4 +9,3 @@ class Foo {
         $other::bar();
     }
 }
-===expect===

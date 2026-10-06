@@ -52,4 +52,3 @@ function test_not_narrowed_when_needle_is_not_a_literal(string $s, string $needl
         $_ = $s;
     }
 }
-===expect===

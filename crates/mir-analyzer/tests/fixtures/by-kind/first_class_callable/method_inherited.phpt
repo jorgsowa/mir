@@ -19,4 +19,3 @@ $c = new Child();
 $fn = $c->compute(...);
 /** @mir-check $fn is Closure(int): float */
 $_ = $fn;
-===expect===

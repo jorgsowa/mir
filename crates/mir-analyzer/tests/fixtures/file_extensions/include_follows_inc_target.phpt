@@ -20,4 +20,3 @@ function b_helper(): string { return 'b'; }
 ===file:orphan.inc===
 <?php
 function orphan(): int { return 'x'; }
-===expect===

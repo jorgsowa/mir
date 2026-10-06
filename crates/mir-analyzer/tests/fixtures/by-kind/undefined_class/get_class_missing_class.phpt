@@ -18,4 +18,3 @@ $a = match (get_class($a)) {
 //   ^ +2:1 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
     C::class => 5,
 };
-===expect===

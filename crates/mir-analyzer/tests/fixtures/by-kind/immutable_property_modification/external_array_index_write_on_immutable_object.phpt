@@ -17,4 +17,3 @@ function mutateImmutable(Box $b): void {
     $b->items['x'] = 1;
 //  ^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property items of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
 }
-===expect===

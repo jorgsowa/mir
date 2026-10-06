@@ -18,4 +18,3 @@ $h = new Holder();
 $b = new ProphecyB();
 $h->prop = $b;
 //<^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'
-===expect===

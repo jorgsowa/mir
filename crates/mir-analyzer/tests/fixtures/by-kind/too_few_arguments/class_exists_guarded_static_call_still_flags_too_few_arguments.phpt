@@ -22,4 +22,3 @@ function check(): void {
 //      ^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for run(): expected 2, got 1
     }
 }
-===expect===

@@ -20,4 +20,3 @@ function useIt(Generator $g): string
 {
     return $g->build();
 }
-===expect===

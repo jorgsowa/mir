@@ -35,4 +35,3 @@ function notFooOnNonNullableReceiverDiverges(Holder $h): void {
         echo "unreachable";
     }
 }
-===expect===

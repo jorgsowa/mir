@@ -23,4 +23,3 @@ class DatabaseUserRepository implements UserRepository {
         return new User();
     }
 }
-===expect===

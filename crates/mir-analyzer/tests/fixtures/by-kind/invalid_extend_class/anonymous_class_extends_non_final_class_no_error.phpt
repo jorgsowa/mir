@@ -7,4 +7,3 @@ must stay silent.
 class Base {}
 
 new class extends Base {};
-===expect===

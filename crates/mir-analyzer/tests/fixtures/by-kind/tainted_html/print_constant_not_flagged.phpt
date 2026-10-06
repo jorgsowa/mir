@@ -5,4 +5,3 @@ print() with a constant string is not flagged.
 function test(): void {
     print("hello");
 }
-===expect===

@@ -20,4 +20,3 @@ function fetch_prop($obj): void {
     $obj->name;
     $obj->value;
 }
-===expect===

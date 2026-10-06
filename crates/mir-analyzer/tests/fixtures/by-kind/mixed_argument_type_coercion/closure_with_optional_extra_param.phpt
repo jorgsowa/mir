@@ -17,4 +17,3 @@ function process(callable $c): void {
 }
 
 process(function (string $s, int $extra = 0): void {});
-===expect===

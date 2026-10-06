@@ -22,4 +22,3 @@ function test(): void {
 function testSafe(): void {
     eval('1 + 1;');
 }
-===expect===

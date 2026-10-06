@@ -10,4 +10,3 @@ require_once __DIR__ . '/Foo.php';
 function run(): void {
     new \Foo();
 }
-===expect===

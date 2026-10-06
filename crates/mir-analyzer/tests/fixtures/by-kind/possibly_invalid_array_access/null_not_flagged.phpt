@@ -7,4 +7,3 @@ diagnostic for nullable arrays.
 $a = rand(0, 1) > 0 ? null : ["hello"];
 echo $a[0];
 //   ^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
-===expect===

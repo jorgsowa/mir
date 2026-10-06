@@ -18,4 +18,3 @@ function option(string $key): string|array|bool|null {
 
 $timeout = (string) option('timeout');
 //                  ^^^^^^^^^^^^^^^^^ InvalidCast: Cannot cast 'string|array|bool|null' to 'string'
-===expect===

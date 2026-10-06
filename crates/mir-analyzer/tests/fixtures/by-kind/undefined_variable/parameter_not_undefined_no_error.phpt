@@ -5,4 +5,3 @@ parameter not undefined no error
 function greet(string $name): string {
     return 'Hello, ' . $name;
 }
-===expect===

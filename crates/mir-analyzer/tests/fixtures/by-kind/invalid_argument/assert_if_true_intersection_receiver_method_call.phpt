@@ -31,4 +31,3 @@ function doWork(Validator&Bar $obj, $p): void {
 //             ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
     }
 }
-===expect===

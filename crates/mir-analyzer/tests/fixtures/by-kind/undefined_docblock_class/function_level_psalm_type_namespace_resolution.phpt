@@ -22,4 +22,3 @@ class User {
 function getNameOrEmpty(User|null $u): string {
     return $u !== null ? $u->getName() : '';
 }
-===expect===

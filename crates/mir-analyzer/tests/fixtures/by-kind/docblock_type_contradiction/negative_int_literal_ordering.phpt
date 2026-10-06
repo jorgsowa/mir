@@ -28,4 +28,3 @@ function test_pos_lte_neg(int $n): void {
     assert($n <= -1);
 //         ^^^^^^^^ DocblockTypeContradiction: Type 'positive-int' makes '$n <= -1' impossible — this can never hold
 }
-===expect===

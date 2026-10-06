@@ -5,4 +5,3 @@ Unused var with addition op
 $a = 5;
 $a += 1;
 //<^^ UnusedVariable: Variable $a is never read
-===expect===

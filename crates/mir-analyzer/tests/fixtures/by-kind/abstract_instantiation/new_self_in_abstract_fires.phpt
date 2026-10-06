@@ -8,4 +8,3 @@ abstract class Base {
 //          ^^^^ AbstractInstantiation: Cannot instantiate abstract class Base
     }
 }
-===expect===

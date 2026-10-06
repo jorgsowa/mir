@@ -33,4 +33,3 @@ function test_merge_non_empty_second(array $a, array $b): void {
     /** @mir-check $r is non-empty-list<string|int> */
     $_ = $r;
 }
-===expect===

@@ -28,4 +28,3 @@ final class Holder {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method realMethod() on possibly null value
     }
 }
-===expect===

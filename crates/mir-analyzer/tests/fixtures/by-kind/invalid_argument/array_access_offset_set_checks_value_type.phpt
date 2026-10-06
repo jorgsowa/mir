@@ -30,4 +30,3 @@ function stores(TypedMap $m): void {
     $m['y'] = 'not an int';
 //  ^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of offsetSet() expects 'int', got '"not an int"'
 }
-===expect===

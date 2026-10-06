@@ -23,4 +23,3 @@ function useClosure($c): void {
     /** @mir-check $c is Closure */
     $_ = 1;
 }
-===expect===

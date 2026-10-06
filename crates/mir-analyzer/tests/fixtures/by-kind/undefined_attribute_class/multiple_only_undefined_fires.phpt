@@ -9,4 +9,3 @@ class Route {}
 #[Cache]
 //^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
 class HomeController {}
-===expect===

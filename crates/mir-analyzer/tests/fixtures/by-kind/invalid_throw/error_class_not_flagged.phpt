@@ -9,4 +9,3 @@ Throwing \Error does not fire InvalidThrow — Error implements Throwable
 ===file===
 <?php
 throw new \Error('fatal');
-===expect===

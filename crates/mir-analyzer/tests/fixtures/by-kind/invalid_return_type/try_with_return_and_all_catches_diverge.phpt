@@ -34,4 +34,3 @@ function noReturnStillErrors(): bool {
         throw $e;
     }
 }
-===expect===

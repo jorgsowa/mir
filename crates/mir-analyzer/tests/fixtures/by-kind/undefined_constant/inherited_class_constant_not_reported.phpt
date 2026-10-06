@@ -9,4 +9,3 @@ class Child extends Base {}
 function test(): void {
     echo Child::VALUE;
 }
-===expect===

@@ -23,4 +23,3 @@ function test(): void {
     f($c);
 //    ^^ InvalidArgument: Argument $s of f() expects 'Sink<Animal>', got 'Sink<Cat>'
 }
-===expect===

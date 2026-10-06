@@ -22,4 +22,3 @@ $g = function (Holder $h): string {
     return $h->name;
 //  ^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'null|string' is not compatible with declared 'string'
 };
-===expect===

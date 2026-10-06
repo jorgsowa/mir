@@ -29,4 +29,3 @@ $b = identity(true);
 $arr = ['a' => 1];
 $a = identity($arr);
 /** @mir-check $a is array<string, int> */
-===expect===

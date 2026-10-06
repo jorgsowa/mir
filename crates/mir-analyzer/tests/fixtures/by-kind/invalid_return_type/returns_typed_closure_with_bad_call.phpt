@@ -20,4 +20,3 @@ function foo(Closure $f, Closure $g) : Closure {
 //                   ^^ InvalidArgument: Argument $arg0 of {closure}() expects 'C', got 'int'
     };
 }
-===expect===

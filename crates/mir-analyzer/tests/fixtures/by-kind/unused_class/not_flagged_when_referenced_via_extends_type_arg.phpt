@@ -19,4 +19,3 @@ class ConcreteBox extends Box {}
 
 /** @template T of OnlyUsedInTemplateBound */
 class BoundedBox {}
-===expect===

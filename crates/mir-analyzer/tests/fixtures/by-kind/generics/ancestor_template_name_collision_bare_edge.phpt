@@ -56,4 +56,3 @@ function typedEdgeBindsOwnArgs(TypedImpl $o): void {
     /** @mir-check $k is Kind */
     echo "ok";
 }
-===expect===

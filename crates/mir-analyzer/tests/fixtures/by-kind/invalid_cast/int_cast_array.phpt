@@ -11,5 +11,3 @@ Invalid explicit cast from array to int
 <?php
 $x = (int)[];
 //        ^^ InvalidCast: Cannot cast 'array{}' to 'int'
-
-===expect===

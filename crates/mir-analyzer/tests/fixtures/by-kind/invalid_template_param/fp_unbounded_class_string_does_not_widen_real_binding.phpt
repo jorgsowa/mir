@@ -36,4 +36,3 @@ function violating(): void {
 function union_arg(string $any, bool $c): void {
     register($c ? Good::class : $any);
 }
-===expect===

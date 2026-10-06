@@ -24,4 +24,3 @@ class Clearer {
 //            ^^^^^ ImpurePropertyAssignment: Assigning to property x of a parameter in a pure or external-mutation-free context
     }
 }
-===expect===

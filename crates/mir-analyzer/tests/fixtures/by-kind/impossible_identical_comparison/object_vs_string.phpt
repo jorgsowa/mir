@@ -17,4 +17,3 @@ function test(Foo $obj): void {
     if ($obj === 42) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'Foo' and '42' is always false — these types can never be identical
 }
-===expect===

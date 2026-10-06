@@ -27,4 +27,3 @@ function test(): void {
     $w = new Wrapper();
     $w->unwrap()->get()->process();
 }
-===expect===

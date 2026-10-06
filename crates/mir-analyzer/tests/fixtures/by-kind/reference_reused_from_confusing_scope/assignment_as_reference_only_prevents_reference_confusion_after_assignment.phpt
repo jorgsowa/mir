@@ -20,5 +20,3 @@ for ($i = 0; $i < 10; ++$i) {
 
 $i = &$foo;
 //    ^^^^ UndefinedVariable: Variable $foo is not defined
-
-===expect===

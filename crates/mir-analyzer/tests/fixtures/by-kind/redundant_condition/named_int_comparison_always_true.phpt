@@ -33,4 +33,3 @@ function test_neg_lt_zero(int $n): void {
         $_ = $n;
     }
 }
-===expect===

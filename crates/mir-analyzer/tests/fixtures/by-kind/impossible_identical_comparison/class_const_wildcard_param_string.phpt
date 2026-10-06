@@ -18,4 +18,3 @@ class B {
         return $k === self::KIND_A;
     }
 }
-===expect===

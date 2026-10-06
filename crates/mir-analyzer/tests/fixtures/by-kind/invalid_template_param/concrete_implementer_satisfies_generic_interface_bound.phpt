@@ -26,4 +26,3 @@ class IntCollection implements Collection {}
 function takesIntCollection($c): void {}
 
 takesIntCollection(new IntCollection());
-===expect===

@@ -19,4 +19,3 @@ function takesString(string $str): void { echo $str; }
 $s = 'hello';
 $result = studly($s);
 takesString($result);
-===expect===

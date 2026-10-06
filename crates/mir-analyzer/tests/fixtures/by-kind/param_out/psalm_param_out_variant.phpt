@@ -21,4 +21,3 @@ $n = null;
 countItems([1, 2, 3], $n);
 /** @mir-check $n is int */
 $_ = $n;
-===expect===

@@ -14,4 +14,3 @@ $input = 'hello world';
 $result = preg_replace('/world/', 'PHP', $input);
 /** @mir-check $result is non-empty-string */
 echo $result;
-===expect===

@@ -15,4 +15,3 @@ class Box {
         return 0;
     }
 }
-===expect===

@@ -26,4 +26,3 @@ function bar(?string $s) : string {
     return $s;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'true' is not compatible with declared 'string'
 }
-===expect===

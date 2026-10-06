@@ -11,4 +11,3 @@ function test(bool $c): void {
     /** @mir-check $x is mixed */
     echo $x;
 }
-===expect===

@@ -28,4 +28,3 @@ function dangerous() : string {
     }
     return "hello";
 }
-===expect===

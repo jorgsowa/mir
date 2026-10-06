@@ -17,4 +17,3 @@ class B extends A{}
  */
 function fooFoo(array $b) {}
 fooFoo([new A()]);
-===expect===

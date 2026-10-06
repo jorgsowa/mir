@@ -12,4 +12,3 @@ function f(array $a): void {
     clone $a;
 //  ^^^^^^^^ InvalidClone: cannot clone non-object array
 }
-===expect===

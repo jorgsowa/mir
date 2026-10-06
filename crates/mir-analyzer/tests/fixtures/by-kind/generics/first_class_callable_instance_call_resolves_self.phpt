@@ -24,4 +24,3 @@ $fn = $child->makeSelf(...);
 $obj = $fn();
 /** @mir-check $obj is Child */
 echo "ok";
-===expect===

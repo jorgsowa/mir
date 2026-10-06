@@ -13,4 +13,3 @@ function size(): int { return 3; }
 function run(): void {
     sleepish(size());
 }
-===expect===

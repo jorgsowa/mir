@@ -21,4 +21,3 @@ function build(): int {
     };
     return $factorial(5);
 }
-===expect===

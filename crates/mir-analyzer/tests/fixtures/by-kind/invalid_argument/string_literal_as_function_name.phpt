@@ -13,4 +13,3 @@ String literal as function name
 
 $callback = "trim";  // TLiteralString("trim")
 $result = array_map($callback, ["  hello  ", "  world  "]);
-===expect===

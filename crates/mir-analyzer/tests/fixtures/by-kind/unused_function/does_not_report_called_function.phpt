@@ -9,4 +9,3 @@ does not report called function
 function helper(): void {}
 
 helper();
-===expect===

@@ -24,4 +24,3 @@ function still_flags_undefined_method($x): void {
         }
     }
 }
-===expect===

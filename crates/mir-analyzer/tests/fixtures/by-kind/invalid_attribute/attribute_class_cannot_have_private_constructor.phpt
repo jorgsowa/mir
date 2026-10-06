@@ -7,4 +7,3 @@ class Baz {
     private function __construct() {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidAttribute: Attribute class constructor must not be private
 }
-===expect===

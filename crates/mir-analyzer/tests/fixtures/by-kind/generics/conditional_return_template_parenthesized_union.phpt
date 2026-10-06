@@ -25,4 +25,3 @@ function test(): void {
     echo "x$a";
     $_ = 1;
 }
-===expect===

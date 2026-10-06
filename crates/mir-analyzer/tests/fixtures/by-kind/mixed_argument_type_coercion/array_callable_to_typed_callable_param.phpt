@@ -24,4 +24,3 @@ function applyFormatter(callable $fn, string $value): string {
 
 $f = new Formatter();
 $result = applyFormatter([$f, 'format'], 'hello');
-===expect===

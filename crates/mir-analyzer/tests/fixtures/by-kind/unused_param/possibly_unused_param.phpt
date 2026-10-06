@@ -14,4 +14,3 @@ class A {
 }
 
 (new A)->foo(4);
-===expect===

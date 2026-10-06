@@ -29,4 +29,3 @@ function process($value): void {
     $value->missing();
 //  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
-===expect===

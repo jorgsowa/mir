@@ -32,4 +32,3 @@ function too_many_required_params(): void {
     array_reduce($items, static fn(int $a, int $b, int $c): int => 0, 0);
 //                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of array_reduce() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
 }
-===expect===

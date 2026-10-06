@@ -52,4 +52,3 @@ function firstClassCallable(A&B $x): void {
     $f = $x->b(...);
     $_ = $f;
 }
-===expect===

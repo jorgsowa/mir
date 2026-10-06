@@ -32,4 +32,3 @@ function notGuest(Admin|User|Guest $person): void {
         echo $person->role;
     }
 }
-===expect===

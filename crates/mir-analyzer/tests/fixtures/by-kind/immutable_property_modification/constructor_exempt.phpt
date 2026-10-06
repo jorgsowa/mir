@@ -24,4 +24,3 @@ class Money {
         return $this->amount;
     }
 }
-===expect===

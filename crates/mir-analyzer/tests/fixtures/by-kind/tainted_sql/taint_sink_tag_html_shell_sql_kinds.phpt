@@ -29,4 +29,3 @@ runQuery((string) $_GET["b"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 runShell((string) $_GET["c"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
-===expect===

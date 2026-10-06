@@ -33,4 +33,3 @@ function withoutGuard(array $option): array {
     return explode('=', $option[1]);
 //                      ^^^^^^^^^^ PossiblyNullArgument: Argument $string of explode() might be null
 }
-===expect===

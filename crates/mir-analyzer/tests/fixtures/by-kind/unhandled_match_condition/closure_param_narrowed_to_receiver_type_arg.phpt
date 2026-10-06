@@ -33,4 +33,3 @@ function load(): Result { return new Result(); }
 load()->getOrThrow(static fn(Err $e) => match ($e) {
     Err::NotFound => new NotFound(),
 });
-===expect===

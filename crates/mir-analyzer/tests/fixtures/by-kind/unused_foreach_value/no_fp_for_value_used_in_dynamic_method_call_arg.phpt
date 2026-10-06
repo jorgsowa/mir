@@ -20,4 +20,3 @@ function sendMail(Mailer $mailer): void {
         }
     }
 }
-===expect===

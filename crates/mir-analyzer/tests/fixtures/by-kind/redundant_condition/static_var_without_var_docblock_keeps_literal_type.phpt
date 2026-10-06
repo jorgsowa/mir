@@ -18,4 +18,3 @@ function test(): void {
         echo 'unreachable';
     }
 }
-===expect===

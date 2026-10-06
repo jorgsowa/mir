@@ -58,4 +58,3 @@ function test_enum_exists_false_branch_stays_string(string $en): void {
         $_ = $en;
     }
 }
-===expect===

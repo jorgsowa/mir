@@ -16,4 +16,3 @@ function set_flags(int $flags): void {}
 
 set_flags(0);
 set_flags(999); // any int accepted — no false positives from 9-member mask
-===expect===

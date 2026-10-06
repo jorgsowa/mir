@@ -21,4 +21,3 @@ $result = parsePacket("\x00\x00\x00\x01");
 if ($result !== false) {
     $first = $result[1];
 }
-===expect===

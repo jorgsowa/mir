@@ -9,4 +9,3 @@ enum Status {
 function test(): Status {
     return Status::Active;
 }
-===expect===

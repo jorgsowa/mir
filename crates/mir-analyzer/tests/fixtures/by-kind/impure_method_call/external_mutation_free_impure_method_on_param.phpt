@@ -17,4 +17,3 @@ class Service {
 //      ^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method log() in a pure or immutable context
     }
 }
-===expect===

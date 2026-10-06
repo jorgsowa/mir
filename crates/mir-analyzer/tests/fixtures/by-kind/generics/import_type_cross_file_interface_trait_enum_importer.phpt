@@ -63,4 +63,3 @@ class UsesTrait {
         echo 1;
     }
 }
-===expect===

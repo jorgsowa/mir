@@ -6,4 +6,3 @@ if (!isset($x) && true) {
     echo $x;
 //       ^^ UndefinedVariable: Variable $x is not defined
 }
-===expect===

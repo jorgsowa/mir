@@ -8,4 +8,3 @@ abstract class Entity {
     protected $payload;
 //  ^^^^^^^^^^^^^^^^^^ MissingPropertyType: Property Entity::$payload has no type annotation
 }
-===expect===

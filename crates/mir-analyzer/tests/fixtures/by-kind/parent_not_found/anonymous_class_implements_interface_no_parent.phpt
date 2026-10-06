@@ -21,4 +21,3 @@ $obj = new class implements Greeter {
 //             ^^^^^^ ParentNotFound: Cannot use parent:: when current class has no parent
     }
 };
-===expect===

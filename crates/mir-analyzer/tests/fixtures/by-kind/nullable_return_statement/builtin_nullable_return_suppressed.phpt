@@ -13,4 +13,3 @@ not modeled at compile time.
 function clean(string $input): string {
     return preg_replace('/\s+/', ' ', $input);
 }
-===expect===

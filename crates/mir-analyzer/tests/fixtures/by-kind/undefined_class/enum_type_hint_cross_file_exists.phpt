@@ -14,4 +14,3 @@ function getStatus(): Status {
     return Status::Active;
 }
 function checkStatus(Status $s): string { return $s->value; }
-===expect===

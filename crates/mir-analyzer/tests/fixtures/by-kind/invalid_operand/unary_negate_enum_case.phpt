@@ -14,4 +14,3 @@ enum Suit {
 }
 $a = -Suit::Hearts;
 //    ^^^^^^^^^^^^ InvalidOperand: Operator '-' not supported for operand of type 'Suit'
-===expect===

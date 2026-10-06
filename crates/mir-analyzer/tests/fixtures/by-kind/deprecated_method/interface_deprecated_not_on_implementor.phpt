@@ -19,4 +19,3 @@ class Doc implements Printable {
 function test(Doc $d): void {
     $d->display();
 }
-===expect===

@@ -124,4 +124,3 @@ function check_enum_string($x) {
      */
     var_dump($x);
 }
-===expect===

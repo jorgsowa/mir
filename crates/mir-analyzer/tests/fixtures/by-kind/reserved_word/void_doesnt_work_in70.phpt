@@ -5,4 +5,3 @@ Void doesnt work in70
 function foo(): void {
 
 }
-===expect===

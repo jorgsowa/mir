@@ -33,4 +33,3 @@ takesBar("plain-string");
 //       ^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takesBar() expects 'Bar<T>', got '"plain-string"'
 takesBar(new Unrelated());
 //       ^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takesBar() expects 'Bar<T>', got 'Unrelated'
-===expect===

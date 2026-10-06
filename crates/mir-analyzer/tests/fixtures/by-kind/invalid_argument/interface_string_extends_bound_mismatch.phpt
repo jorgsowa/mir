@@ -23,4 +23,3 @@ function forward(string $shape): void {
     needsPolygon($shape);
 //               ^^^^^^ InvalidArgument: Argument $className of needsPolygon() expects 'interface-string<Polygon>', got 'interface-string<Shape>'
 }
-===expect===

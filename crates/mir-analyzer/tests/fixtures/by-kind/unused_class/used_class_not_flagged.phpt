@@ -12,5 +12,3 @@ final class Used {
 }
 
 new Used();
-
-===expect===

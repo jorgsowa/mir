@@ -8,4 +8,3 @@ function test(Foo $obj): void {
     $obj::nonExistent();
 //  ^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::nonExistent() does not exist
 }
-===expect===

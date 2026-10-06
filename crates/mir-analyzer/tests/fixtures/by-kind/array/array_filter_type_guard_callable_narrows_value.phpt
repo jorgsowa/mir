@@ -36,4 +36,3 @@ function keepsTypeForUseKeyMode(array $m): void {
     /** @mir-check $r is array<string, int|string> */
     echo count($r);
 }
-===expect===

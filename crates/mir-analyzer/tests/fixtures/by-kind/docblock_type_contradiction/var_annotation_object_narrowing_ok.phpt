@@ -19,4 +19,3 @@ function f(Animal $animal): void {
     /** @var Dog $animal */
     $animal->bark();
 }
-===expect===

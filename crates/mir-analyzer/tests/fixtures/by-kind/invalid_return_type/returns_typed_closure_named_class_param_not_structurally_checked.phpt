@@ -19,4 +19,3 @@ function foo(): Closure {
         return new A2();
     };
 }
-===expect===

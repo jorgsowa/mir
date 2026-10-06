@@ -18,4 +18,3 @@ class C {
 }
 
 f([C::class, "m"]);
-===expect===

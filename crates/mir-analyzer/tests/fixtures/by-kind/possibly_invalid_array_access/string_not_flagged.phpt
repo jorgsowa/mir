@@ -6,4 +6,3 @@ array-access type.
 <?php
 $a = rand(0, 1) > 0 ? "hello" : ["world"];
 echo $a[0];
-===expect===

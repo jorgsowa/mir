@@ -44,4 +44,3 @@ class Derived extends Base {
         }
     }
 }
-===expect===

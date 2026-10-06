@@ -32,4 +32,3 @@ function useFactory(Factory $f): string
 {
     return $f->make()->build();
 }
-===expect===

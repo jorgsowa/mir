@@ -34,4 +34,3 @@ $a = $box->pick(Attr::class);
 //   ^^^^^^^^^^^^^^^^^^^^^^^ ShadowedTemplateParam: Method template parameter 'T' shadows class-level template parameter with the same name
 /** @mir-check $a is Attr|null */
 echo $a !== null ? 'y' : 'n';
-===expect===

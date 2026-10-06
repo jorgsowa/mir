@@ -13,4 +13,3 @@ class Filters {
         return \Closure::fromCallable('Filters::keep');
     }
 }
-===expect===

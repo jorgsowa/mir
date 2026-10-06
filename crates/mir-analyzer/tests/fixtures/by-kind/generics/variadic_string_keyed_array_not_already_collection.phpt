@@ -35,4 +35,3 @@ function listKeyed(...$lists): void {
     /** @mir-check $lists is list<int> */
     $_ = $lists;
 }
-===expect===

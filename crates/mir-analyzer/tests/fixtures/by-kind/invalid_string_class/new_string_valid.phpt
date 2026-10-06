@@ -11,4 +11,3 @@ new with string variable should not error
 function test(string $className) {
     new $className();
 }
-===expect===

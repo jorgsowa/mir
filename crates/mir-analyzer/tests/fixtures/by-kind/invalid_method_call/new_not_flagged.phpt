@@ -10,4 +10,3 @@ $a = new A;
 echo $a->greet();
 $b = new A();
 echo $b->greet();
-===expect===

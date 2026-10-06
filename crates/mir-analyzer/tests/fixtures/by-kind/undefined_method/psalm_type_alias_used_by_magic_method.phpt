@@ -20,4 +20,3 @@ function test(Repository $repo): void {
     $repo->get()->missing();
 //  ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
-===expect===

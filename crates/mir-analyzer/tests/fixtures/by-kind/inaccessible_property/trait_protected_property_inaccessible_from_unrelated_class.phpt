@@ -25,4 +25,3 @@ final class Unrelated {
 //                 ^^^^^^ InaccessibleProperty: Cannot access property Paging::$offset
     }
 }
-===expect===

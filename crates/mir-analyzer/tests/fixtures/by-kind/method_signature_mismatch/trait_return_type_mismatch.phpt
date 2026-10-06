@@ -15,4 +15,3 @@ trait T {
 class B extends A {
     use T;
 }
-===expect===

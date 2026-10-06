@@ -11,4 +11,3 @@ class Factory {
 //              ^^^^^^ WrongCaseMethod: Method name 'Factory::CREATE' has incorrect casing; use 'create'
     }
 }
-===expect===

@@ -19,4 +19,3 @@ function takesA(?A $a) : void {
      */
     takesString($a->foo);
 }
-===expect===

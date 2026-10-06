@@ -16,4 +16,3 @@ function test(string $s): void {
     }
     // should not emit RedundantCondition
 }
-===expect===

@@ -50,4 +50,3 @@ final class Box {
         return $this->h;
     }
 }
-===expect===

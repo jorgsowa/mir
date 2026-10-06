@@ -19,4 +19,3 @@ function executeCallback($callback) {
 // SHOULD emit UndefinedFunction because it's documented as callable
 executeCallback("nonExistentFunction");
 //              ^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function nonExistentFunction() is not defined
-===expect===

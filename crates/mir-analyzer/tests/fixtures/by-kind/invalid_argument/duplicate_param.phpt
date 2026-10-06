@@ -13,4 +13,3 @@ Duplicate param
  * @return void
  */
 function f($p, $p) {}
-===expect===

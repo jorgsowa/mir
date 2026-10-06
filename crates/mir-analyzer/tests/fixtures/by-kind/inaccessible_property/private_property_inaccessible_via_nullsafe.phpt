@@ -12,4 +12,3 @@ function reveal(?Vault $v): ?string
     return $v?->secret;
 //              ^^^^^^ InaccessibleProperty: Cannot access property Vault::$secret
 }
-===expect===

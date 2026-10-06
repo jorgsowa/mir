@@ -36,4 +36,3 @@ function test(): void {
     $mapData = new Map();
     processMapWithContainer($mapData);
 }
-===expect===

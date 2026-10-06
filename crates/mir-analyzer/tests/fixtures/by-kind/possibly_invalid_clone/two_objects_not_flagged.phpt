@@ -7,4 +7,3 @@ class Config {}
 function f(Logger|Config $obj): void {
     clone $obj;
 }
-===expect===

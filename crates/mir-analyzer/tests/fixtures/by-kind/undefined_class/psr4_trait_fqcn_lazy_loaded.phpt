@@ -20,4 +20,3 @@ function test(): void {
     $h->greet();
     $h->bye();
 }
-===expect===

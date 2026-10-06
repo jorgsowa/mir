@@ -21,5 +21,3 @@ function process($name, $count): void {
     /** @mir-check $count is int */
     echo $name . $count;
 }
-
-===expect===

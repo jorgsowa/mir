@@ -5,4 +5,3 @@ mir-check passes when type matches exactly
 $x = "hello";
 /** @mir-check $x is string */
 echo $x;
-===expect===

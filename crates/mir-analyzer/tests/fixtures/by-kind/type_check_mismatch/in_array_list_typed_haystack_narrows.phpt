@@ -36,4 +36,3 @@ function test_non_literal_list_no_narrow(string $mode, array $arr): void {
         $_ = 1;
     }
 }
-===expect===

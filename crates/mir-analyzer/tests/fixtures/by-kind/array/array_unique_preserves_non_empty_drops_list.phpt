@@ -27,4 +27,3 @@ function test(array $ne, array $maybe_empty): void {
     /** @mir-check $unique is array<int, string> */
     $_ = $unique;
 }
-===expect===

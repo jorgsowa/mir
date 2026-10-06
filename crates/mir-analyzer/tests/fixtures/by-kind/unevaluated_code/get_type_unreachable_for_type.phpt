@@ -18,4 +18,3 @@ function scope(int $n): void {
             break;
     }
 }
-===expect===

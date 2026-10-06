@@ -23,4 +23,3 @@ function useMap(array $arr, callable $callback): bool {
 }
 
 useMap(['a' => 1], function (int $x): bool { return $x > 0; });
-===expect===

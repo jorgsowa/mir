@@ -12,4 +12,3 @@ Plain string not resolved as class
 // This should NOT emit UndefinedClass even though "NonExistentClass" is not defined
 $className = "NonExistentClass";
 $instance = new $className();
-===expect===

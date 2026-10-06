@@ -19,4 +19,3 @@ function f(A|B $x): void {
 //          ^ TooManyArguments: Too many arguments for run(): expected 0, got 2
 //             ^ TooManyArguments: Too many arguments for run(): expected 1, got 2
 }
-===expect===

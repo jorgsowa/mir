@@ -59,4 +59,3 @@ function test_generic_string_still_preserved(string $name): void {
         $_ = $name;
     }
 }
-===expect===

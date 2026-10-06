@@ -14,4 +14,3 @@ $f =
     /** @return int */
     fn() => 'not an int';
 //          ^^^^^^^^^^^^ InvalidReturnType: Return type '"not an int"' is not compatible with declared 'int'
-===expect===

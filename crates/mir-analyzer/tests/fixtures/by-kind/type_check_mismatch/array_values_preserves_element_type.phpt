@@ -16,4 +16,3 @@ function test(array $arr): void {
     /** @mir-check $vals is list<Foo> */
     $_ = $vals;
 }
-===expect===

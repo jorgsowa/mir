@@ -24,4 +24,3 @@ class D extends C {
 //      ^^^^^^^^^^^^ UndefinedMethod: Method C::foo() does not exist
     }
 }
-===expect===

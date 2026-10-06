@@ -20,4 +20,3 @@ $f = new Factory();
 $result = $f->make(null);
 /** @mir-check $result is Container<object> */
 $f->prop = $result;
-===expect===

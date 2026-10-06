@@ -35,4 +35,3 @@ function check_arraylike_object_generic($x) {
      */
     var_dump($x);
 }
-===expect===

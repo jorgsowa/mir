@@ -8,4 +8,3 @@ class Base {
 class Child extends Base {
     public function __construct() { parent::__construct(); }
 }
-===expect===

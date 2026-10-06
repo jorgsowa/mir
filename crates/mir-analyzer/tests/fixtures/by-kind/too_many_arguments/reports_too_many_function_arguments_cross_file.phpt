@@ -8,4 +8,3 @@ function greet(string $name): void {}
 <?php
 greet('Ada', 'Grace');
 //           ^^^^^^^ TooManyArguments: Too many arguments for greet(): expected 1, got 2
-===expect===

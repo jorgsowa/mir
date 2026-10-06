@@ -46,4 +46,3 @@ class Child extends Service {
         }
     }
 }
-===expect===

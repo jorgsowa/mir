@@ -4,4 +4,3 @@ Missing parent
 <?php
 class A extends B { }
 //              ^ UndefinedClass: Class B does not exist
-===expect===

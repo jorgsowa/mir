@@ -19,4 +19,3 @@ function test(int|string $x): void {
 //             ^^ PossiblyInvalidArgument: Argument $string of strlen() expects 'string', possibly different type 'int|string' provided
     }
 }
-===expect===

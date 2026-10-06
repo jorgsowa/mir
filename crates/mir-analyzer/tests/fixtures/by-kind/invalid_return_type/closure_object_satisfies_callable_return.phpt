@@ -5,4 +5,3 @@ A Closure object satisfies a callable return type — no InvalidReturnType
 function getHandler(): callable {
     return function(): void {};
 }
-===expect===

@@ -15,4 +15,3 @@ Suppressing `InvalidDocblockType` hides the warning.
 function f($a): string {
     return "x";
 }
-===expect===

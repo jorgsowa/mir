@@ -8,4 +8,3 @@ function test(): void {
     $f->missing();
 //  ^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
 }
-===expect===

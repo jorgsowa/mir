@@ -21,4 +21,3 @@ class EventDispatcher {
 
 $d = new EventDispatcher();
 $d->register(['event' => 'login', 'handler' => fn() => null]);
-===expect===

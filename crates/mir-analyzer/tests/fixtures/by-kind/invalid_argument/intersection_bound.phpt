@@ -16,4 +16,3 @@ function f(Type&NamedType $t): void {
 }
 
 f(new Both());
-===expect===

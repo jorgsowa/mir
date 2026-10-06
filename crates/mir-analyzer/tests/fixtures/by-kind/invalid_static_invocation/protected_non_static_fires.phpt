@@ -8,4 +8,3 @@ class Service {
 
 Service::build();
 //<^^^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Service::build() cannot be called statically
-===expect===

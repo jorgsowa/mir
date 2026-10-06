@@ -16,4 +16,3 @@ function getItems(): array {
     return ['a' => ['id' => 'not-an-int', 'name' => 'x']];
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'array{'a': array{'id': "not-an-int", 'name': "x"}}' is not compatible with declared 'array<string, array{'id': int, 'name': string}>'
 }
-===expect===

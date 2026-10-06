@@ -10,4 +10,3 @@ trait TraitB {
 //<^^^^^^^^^^^^^^ InvalidTraitUse: Trait TraitB used incorrectly: TraitB has a circular trait composition chain
     use TraitA;
 }
-===expect===

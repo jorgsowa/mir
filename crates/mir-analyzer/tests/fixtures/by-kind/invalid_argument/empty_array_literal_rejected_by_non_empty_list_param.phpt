@@ -25,4 +25,3 @@ takesNonEmptyList([]);
 takesNonEmptyArray(['a' => 1]);
 takesNonEmptyArray([]);
 //                 ^^ ArgumentTypeCoercion: Argument $counts of takesNonEmptyArray() expects 'non-empty-array<string, int>', got 'array{}' — coercion may fail at runtime
-===expect===

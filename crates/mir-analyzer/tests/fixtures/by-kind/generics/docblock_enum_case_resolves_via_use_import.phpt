@@ -50,4 +50,3 @@ namespace App\App {
         /** @mir-check $r is App\Util\Res<App\Data\Err::X> */
     }
 }
-===expect===

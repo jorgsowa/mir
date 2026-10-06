@@ -9,4 +9,3 @@ class Bar {
 //          ^^^ AbstractInstantiation: Cannot instantiate abstract class Foo
     }
 }
-===expect===

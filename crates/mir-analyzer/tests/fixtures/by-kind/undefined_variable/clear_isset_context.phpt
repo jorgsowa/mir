@@ -14,4 +14,3 @@ function greet(bool $arg): ?string
 }
 
 echo greet($undef) ?? "bye";
-===expect===

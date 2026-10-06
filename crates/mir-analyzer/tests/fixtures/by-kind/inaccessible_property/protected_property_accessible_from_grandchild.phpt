@@ -18,4 +18,3 @@ class GrandChild extends Mid
         return $this->limit;
     }
 }
-===expect===

@@ -29,4 +29,3 @@ trait HasBoot {
 class Widget extends Base {
     use HasBoot;
 }
-===expect===

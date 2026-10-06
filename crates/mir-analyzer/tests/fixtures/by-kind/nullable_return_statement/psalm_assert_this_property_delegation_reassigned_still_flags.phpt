@@ -23,4 +23,3 @@ final class Db {
 //             ^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $lastId on possibly null value
     }
 }
-===expect===

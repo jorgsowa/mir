@@ -14,4 +14,3 @@ Resource cannot be coerced to string
 function takesString(string $s) : void {}
 $a = fopen("php://memory", "r");
 takesString($a);
-===expect===

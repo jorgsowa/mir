@@ -7,4 +7,3 @@ class Greeter {
         return 'Hello, ' . $name;
     }
 }
-===expect===

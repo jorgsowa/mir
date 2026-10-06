@@ -13,4 +13,3 @@ use function Vendor\Missing\helper;
 function run(): void {
     helper();
 }
-===expect===

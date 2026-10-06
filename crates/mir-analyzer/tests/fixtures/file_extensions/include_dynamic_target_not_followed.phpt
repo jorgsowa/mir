@@ -21,4 +21,3 @@ function a_fn(string $name): int {
 ===file:b.inc===
 <?php
 function b_fn(): int { return 1; }
-===expect===

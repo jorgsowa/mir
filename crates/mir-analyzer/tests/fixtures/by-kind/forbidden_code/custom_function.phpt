@@ -14,4 +14,3 @@ function run(): void {
 //  ^^^^^^^^^^^ ForbiddenCode: Use of eval_like is forbidden
     var_dump(1);
 }
-===expect===

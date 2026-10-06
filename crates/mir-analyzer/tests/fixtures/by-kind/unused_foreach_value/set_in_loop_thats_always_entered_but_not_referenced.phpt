@@ -12,4 +12,3 @@ function getLastNum(array $a): int {
     }
     return 4;
 }
-===expect===

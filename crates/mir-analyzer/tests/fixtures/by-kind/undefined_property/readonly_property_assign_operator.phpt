@@ -16,4 +16,3 @@ $test = new Test(5);
 
 $test->prop += 1;
 //<^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Test::$prop outside of constructor
-===expect===

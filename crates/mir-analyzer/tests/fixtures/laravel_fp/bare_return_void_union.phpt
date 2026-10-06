@@ -25,4 +25,3 @@ function render(bool $cond) {
     }
     return new HtmlString();
 }
-===expect===

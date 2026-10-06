@@ -14,4 +14,3 @@ function all(): array {
 }
 
 all();
-===expect===

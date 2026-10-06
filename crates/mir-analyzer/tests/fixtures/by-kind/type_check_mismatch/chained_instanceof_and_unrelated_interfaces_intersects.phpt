@@ -19,4 +19,3 @@ function f(object $x): void {
         echo get_class($x);
     }
 }
-===expect===

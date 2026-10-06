@@ -29,4 +29,3 @@ function flip_keys(array $arr): array {
 $map = ['a' => 1, 'b' => 2];
 $flipped = flip_keys($map);
 /** @mir-check $flipped is array<int, string> */
-===expect===

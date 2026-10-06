@@ -21,4 +21,3 @@ class T {
         $this->foo->configure(new stdClass());
     }
 }
-===expect===

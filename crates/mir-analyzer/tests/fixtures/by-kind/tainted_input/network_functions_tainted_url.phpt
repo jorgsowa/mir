@@ -17,4 +17,3 @@ function test(): void {
     fsockopen($_GET['h'], 80);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
-===expect===

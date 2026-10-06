@@ -16,4 +16,3 @@ function test(): int {
     array_unshift($arr, 1);
     return $arr[0];
 }
-===expect===

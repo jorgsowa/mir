@@ -39,4 +39,3 @@ function classString(): void {
 function fromDate(): void {
     acceptsScalar(date('Y-m-d')); // non-empty-string, the exact repro
 }
-===expect===

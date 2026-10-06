@@ -14,4 +14,3 @@ function foo(string|null $x): void {
         // $x is already string (null excluded by the if above)
     }
 }
-===expect===

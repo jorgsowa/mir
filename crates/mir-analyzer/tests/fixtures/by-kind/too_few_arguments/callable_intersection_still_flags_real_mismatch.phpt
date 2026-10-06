@@ -11,4 +11,3 @@ function test(object $fn): void {
     $fn(1, 2);
 //  ^^^^^^^^^ TooFewArguments: Too few arguments for callable(): expected 3, got 2
 }
-===expect===

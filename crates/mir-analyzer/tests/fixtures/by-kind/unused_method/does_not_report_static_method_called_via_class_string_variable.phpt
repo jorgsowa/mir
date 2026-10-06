@@ -18,4 +18,3 @@ class Foo {
 }
 
 Foo::get();
-===expect===

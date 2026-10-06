@@ -32,4 +32,3 @@ function checkPlain(Box $b): void {
     /** @mir-check $y is bool */
     $_ = 1;
 }
-===expect===

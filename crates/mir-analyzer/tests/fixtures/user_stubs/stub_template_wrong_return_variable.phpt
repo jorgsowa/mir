@@ -30,4 +30,3 @@ function test(array $arr): void {
     $_ = $keys;
 //  ^^^^^^^^^^^ TypeCheckMismatch: Type of $keys is expected to be list<string>, got list<int>
 }
-===expect===

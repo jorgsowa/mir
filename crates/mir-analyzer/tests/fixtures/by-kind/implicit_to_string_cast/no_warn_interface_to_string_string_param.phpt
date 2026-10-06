@@ -20,4 +20,3 @@ class Report implements Printable {
 function log(string $message): void {}
 
 log(new Report());
-===expect===

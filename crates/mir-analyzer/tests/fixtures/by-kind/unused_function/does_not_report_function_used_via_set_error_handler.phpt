@@ -12,4 +12,3 @@ function myHandler(int $errno, string $errstr): bool {
 }
 
 set_error_handler('myHandler');
-===expect===

@@ -7,4 +7,3 @@ final class Middle extends Base {}
 //    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class Middle cannot extend final class Base
 class Child extends Middle {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class Child cannot extend final class Middle
-===expect===

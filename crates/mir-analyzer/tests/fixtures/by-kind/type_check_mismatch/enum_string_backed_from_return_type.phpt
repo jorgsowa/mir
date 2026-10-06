@@ -18,4 +18,3 @@ enum Status: string {
 $s = Status::from('active');
 /** @mir-check $s is Status */
 echo $s->value;
-===expect===

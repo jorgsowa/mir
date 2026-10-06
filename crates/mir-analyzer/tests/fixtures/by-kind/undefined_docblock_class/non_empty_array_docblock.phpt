@@ -29,5 +29,3 @@ function makeEmptyList(): array {
 useList([1]);
 useList([]);
 //      ^^ ArgumentTypeCoercion: Argument $xs of useList() expects 'non-empty-array', got 'array{}' — coercion may fail at runtime
-
-===expect===

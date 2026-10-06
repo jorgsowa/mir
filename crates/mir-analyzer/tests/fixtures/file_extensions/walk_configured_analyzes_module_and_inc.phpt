@@ -20,4 +20,3 @@ function b_bad(): int { return 'x'; }
 ===file:c.php===
 <?php
 function c_use(): string { return b_helper(); }
-===expect===

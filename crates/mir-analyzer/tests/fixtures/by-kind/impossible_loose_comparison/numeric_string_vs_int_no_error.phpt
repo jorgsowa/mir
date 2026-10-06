@@ -18,4 +18,3 @@ function test(): void {
     $u = "0";
     if ($u == 0) {}
 }
-===expect===

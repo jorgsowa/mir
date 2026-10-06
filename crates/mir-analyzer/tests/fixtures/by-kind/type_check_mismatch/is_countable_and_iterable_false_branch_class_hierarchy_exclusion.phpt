@@ -45,4 +45,3 @@ function test_is_countable_false_excludes_final_implementor(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

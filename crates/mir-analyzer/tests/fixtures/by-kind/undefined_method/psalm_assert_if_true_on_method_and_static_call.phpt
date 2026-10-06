@@ -65,4 +65,3 @@ function test_unguarded_stays_mixed(Checker $c, mixed $value): void {
     $value->missing();
 //  ^^^^^^^^^^^^^^^^^ MixedMethodCall: Method missing() called on mixed type
 }
-===expect===

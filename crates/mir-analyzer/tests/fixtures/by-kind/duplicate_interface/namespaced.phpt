@@ -14,4 +14,3 @@ interface Repository
 {
     public function findAll(): array;
 }
-===expect===

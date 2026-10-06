@@ -32,4 +32,3 @@ class Processor {
         return $result;
     }
 }
-===expect===

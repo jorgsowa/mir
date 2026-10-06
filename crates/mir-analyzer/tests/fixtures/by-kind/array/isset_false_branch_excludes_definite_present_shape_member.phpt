@@ -43,4 +43,3 @@ function loneNullableMemberUnaffected(array $u): void {
         $_ = $u;
     }
 }
-===expect===

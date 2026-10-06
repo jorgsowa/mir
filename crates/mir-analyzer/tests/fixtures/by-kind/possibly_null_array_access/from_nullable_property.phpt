@@ -11,4 +11,3 @@ class Container {
 //           ^^^^^^^^^^^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
     }
 }
-===expect===

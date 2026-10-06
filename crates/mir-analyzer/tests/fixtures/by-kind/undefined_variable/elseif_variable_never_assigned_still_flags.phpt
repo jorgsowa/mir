@@ -27,4 +27,3 @@ function f(): void {
 //           ^^^^^^^^^^^^^^^ UndefinedVariable: Variable $never_assigned is not defined
     }
 }
-===expect===

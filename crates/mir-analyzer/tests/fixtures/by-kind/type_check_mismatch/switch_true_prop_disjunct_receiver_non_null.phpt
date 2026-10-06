@@ -50,4 +50,3 @@ function mixedDisjunctCaseOrderB(?Box $x): void {
             $_ = $x;
     }
 }
-===expect===

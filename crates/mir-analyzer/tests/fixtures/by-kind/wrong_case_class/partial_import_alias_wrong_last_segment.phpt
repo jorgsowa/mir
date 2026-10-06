@@ -15,4 +15,3 @@ namespace Client;
 use MyApp\Service as Svc;
 $x = new Svc\userservice();
 //       ^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'userservice' has incorrect casing; use 'UserService'
-===expect===

@@ -16,4 +16,3 @@ Backslash-qualified parameter keywords are invalid; unqualified keywords are val
 function f($a, $b): string {
     return "x";
 }
-===expect===

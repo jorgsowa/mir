@@ -14,4 +14,3 @@ function f(bool $c): void {
     takeInt('b');
 //          ^^^ InvalidArgument: Argument $x of takeInt() expects 'int', got '"b"'
 }
-===expect===

@@ -24,4 +24,3 @@ function makeClosure() {
 $closure = makeClosure();
 /** @mir-check $closure is Closure(int): string */
 $_ = 1;
-===expect===

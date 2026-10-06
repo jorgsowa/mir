@@ -5,4 +5,3 @@ InvalidArrayAccess fires when accessing a boolean false literal with []
 $a = false;
 echo $a[0];
 //   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'false'
-===expect===

@@ -8,4 +8,3 @@ Assert redundant inferior
 function scope(int $a): void{
     assert($a < 10);
 }
-===expect===

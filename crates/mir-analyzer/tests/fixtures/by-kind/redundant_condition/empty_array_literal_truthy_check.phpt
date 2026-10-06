@@ -15,4 +15,3 @@ function test(): void {
         $_ = $a;
     }
 }
-===expect===

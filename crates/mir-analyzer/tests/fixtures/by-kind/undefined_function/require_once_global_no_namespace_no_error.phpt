@@ -11,4 +11,3 @@ require_once __DIR__ . '/Helpers.php';
 function run(): string {
     return helper();
 }
-===expect===

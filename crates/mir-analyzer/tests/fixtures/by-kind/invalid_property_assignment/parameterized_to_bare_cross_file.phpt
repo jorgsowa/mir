@@ -40,4 +40,3 @@ class MyTest extends TestCase {
         $this->prophecy = $prophecy;
     }
 }
-===expect===

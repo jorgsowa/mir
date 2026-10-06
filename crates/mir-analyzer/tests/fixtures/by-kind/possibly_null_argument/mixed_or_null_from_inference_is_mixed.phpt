@@ -33,4 +33,3 @@ function run(Bag $bag): void
     takesString($bag->column);
 //              ^^^^^^^^^^^^ MixedArgument: Argument $s of takesString() is mixed
 }
-===expect===

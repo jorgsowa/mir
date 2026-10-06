@@ -20,4 +20,3 @@ function dispatch(Notification $n): void {
         register_shutdown($cb);
     }
 }
-===expect===

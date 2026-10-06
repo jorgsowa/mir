@@ -10,4 +10,3 @@ function c(object|null $s): object {
     if (!$s) { exit; }
     return $s;
 }
-===expect===

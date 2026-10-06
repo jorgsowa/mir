@@ -15,4 +15,3 @@ class Holder {
         $this->count = $this->prop;
     }
 }
-===expect===

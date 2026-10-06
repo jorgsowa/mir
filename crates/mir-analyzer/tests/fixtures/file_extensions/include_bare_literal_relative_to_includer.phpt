@@ -20,4 +20,3 @@ function sub_fn(): int { return 1; }
 ===file:b.inc===
 <?php
 function sub_fn(): string { return 'root'; }
-===expect===

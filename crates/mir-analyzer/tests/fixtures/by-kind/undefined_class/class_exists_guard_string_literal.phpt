@@ -7,4 +7,3 @@ function test(): void {
         new \Optional\Pkg();
     }
 }
-===expect===

@@ -15,4 +15,3 @@ Min greater than max
 function scope(int $a){
     return $a;
 }
-===expect===

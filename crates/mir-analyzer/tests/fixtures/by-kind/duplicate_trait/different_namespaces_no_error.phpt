@@ -7,4 +7,3 @@ trait Timestampable {}
 
 namespace Other;
 trait Timestampable {}
-===expect===

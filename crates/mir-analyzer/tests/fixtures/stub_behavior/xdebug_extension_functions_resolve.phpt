@@ -15,4 +15,3 @@ function trace(): void {
     xdebug_break();
     $depth = xdebug_get_stack_depth();
 }
-===expect===

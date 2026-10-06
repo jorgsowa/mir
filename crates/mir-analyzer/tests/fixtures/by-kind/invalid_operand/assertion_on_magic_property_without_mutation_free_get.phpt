@@ -27,5 +27,3 @@ if (assertString($a)) {
 }
 
 function requiresString(string $_str): void {}
-
-===expect===

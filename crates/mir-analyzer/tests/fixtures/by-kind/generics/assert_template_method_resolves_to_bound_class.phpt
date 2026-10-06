@@ -28,4 +28,3 @@ function test(Guard $g, mixed $value): void {
     /** @mir-check $value is Vendor\Dog */
     echo "ok";
 }
-===expect===

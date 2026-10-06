@@ -7,4 +7,3 @@ enum Suit {
 }
 print Suit::Hearts;
 //    ^^^^^^^^^^^^ ImplicitToStringCast: Class Suit is implicitly cast to string
-===expect===

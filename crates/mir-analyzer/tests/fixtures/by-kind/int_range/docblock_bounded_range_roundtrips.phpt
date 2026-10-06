@@ -14,4 +14,3 @@ function test(int $x): void {
     /** @mir-check $x is int<2, 10> */
     $_ = $x;
 }
-===expect===

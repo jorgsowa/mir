@@ -28,4 +28,3 @@ function join_with_commas(array $items): string {
     }
     return $out;
 }
-===expect===

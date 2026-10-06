@@ -17,4 +17,3 @@ class Foo {
 }
 
 run("Foo::hello");
-===expect===

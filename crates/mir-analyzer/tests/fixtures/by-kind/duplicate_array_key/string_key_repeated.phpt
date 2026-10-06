@@ -7,4 +7,3 @@ function test(): array {
     return ['a' => 1, 'b' => 2, 'a' => 3];
 //                              ^^^ DuplicateArrayKey: Array key 'a' is duplicated — the earlier entry is silently overwritten
 }
-===expect===

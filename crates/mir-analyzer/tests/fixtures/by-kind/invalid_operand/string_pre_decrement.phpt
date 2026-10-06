@@ -11,4 +11,3 @@ FN: prefix -- never checked its operand, unlike postfix --.
 $a = "hello";
 --$a;
 //^^ InvalidOperand: Operator '--' not supported for operand of type '"hello"'
-===expect===

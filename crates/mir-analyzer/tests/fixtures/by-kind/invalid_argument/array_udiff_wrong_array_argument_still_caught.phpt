@@ -12,4 +12,3 @@ argument-type errors on the preceding array parameters.
 $cmp = function ($x, $y) { return $x <=> $y; };
 array_udiff('not an array', ['b' => 2], $cmp);
 //          ^^^^^^^^^^^^^^ InvalidArgument: Argument $array of array_udiff() expects 'array', got '"not an array"'
-===expect===

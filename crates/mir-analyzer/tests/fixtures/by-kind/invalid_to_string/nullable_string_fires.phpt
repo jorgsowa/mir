@@ -9,4 +9,3 @@ class NullableReturn {
     }
 }
 new NullableReturn();
-===expect===

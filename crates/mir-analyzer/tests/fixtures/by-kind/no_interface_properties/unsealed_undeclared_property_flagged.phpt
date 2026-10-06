@@ -18,5 +18,3 @@ function getAny(Unsealed $u): mixed {
     return $u->anything;
 //             ^^^^^^^^ NoInterfaceProperties: Property $anything is not defined on this interface
 }
-
-===expect===

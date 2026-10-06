@@ -15,4 +15,3 @@ Template bounds reject backslash-qualified keywords.
  */
 function f($a): void {
 }
-===expect===

@@ -25,4 +25,3 @@ function takes_ifoo(IFoo $x): void {}
 function accept_enum($x): void { echo get_debug_type($x); }
 takes_ifoo(new Thing());
 accept_enum(Color::Red);
-===expect===

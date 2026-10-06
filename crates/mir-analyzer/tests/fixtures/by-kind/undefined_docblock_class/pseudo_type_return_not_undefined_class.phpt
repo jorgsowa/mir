@@ -16,5 +16,3 @@ function flags() {
 function name() {
     return "n";
 }
-
-===expect===

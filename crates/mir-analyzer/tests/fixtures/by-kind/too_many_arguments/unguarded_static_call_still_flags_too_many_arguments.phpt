@@ -18,4 +18,3 @@ function check(): void {
     NewApi::run(1, 2);
 //                 ^ TooManyArguments: Too many arguments for run(): expected 1, got 2
 }
-===expect===

@@ -16,4 +16,3 @@ function reasonLocation(Good1|Good2|Good3|Bad1 $reason): string
     }
     return $reason->file();
 }
-===expect===

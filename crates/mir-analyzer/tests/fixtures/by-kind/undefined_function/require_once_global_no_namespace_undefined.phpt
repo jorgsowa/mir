@@ -12,4 +12,3 @@ function run(): void {
     missing_helper();
 //  ^^^^^^^^^^^^^^^^ UndefinedFunction: Function missing_helper() is not defined
 }
-===expect===

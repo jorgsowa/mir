@@ -7,4 +7,3 @@ function neverReturns(): int {
         continue;
     }
 }
-===expect===

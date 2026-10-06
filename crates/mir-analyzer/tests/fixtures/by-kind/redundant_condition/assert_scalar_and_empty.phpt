@@ -28,4 +28,3 @@ function foo($bar) : void {
 
     if ($bar) {}
 }
-===expect===

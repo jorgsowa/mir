@@ -20,4 +20,3 @@ function test(object $c): void {
     /** @var Container<Item>&Taggable $c */
     $c->get()->process();
 }
-===expect===

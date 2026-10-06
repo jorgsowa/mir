@@ -16,5 +16,3 @@ class Container {
         return $item;
     }
 }
-
-===expect===

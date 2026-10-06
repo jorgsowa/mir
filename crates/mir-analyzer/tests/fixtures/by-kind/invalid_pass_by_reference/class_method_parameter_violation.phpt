@@ -22,4 +22,3 @@ class A {
 $bar = 5;
 $a = new A($bar); // $bar is constrained to an int
 $bar = null; // ReferenceConstraintViolation issue emitted
-===expect===

@@ -29,4 +29,3 @@ function takesA(A $a): void {
     $a->foo1();
 //  ^^^^^^^^^^ UndefinedMethod: Method A::foo1() does not exist
 }
-===expect===

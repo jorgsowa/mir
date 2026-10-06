@@ -8,4 +8,3 @@ function foo(bool $c): string {
     return $x;
 //         ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
-===expect===

@@ -20,4 +20,3 @@ final class Wrapper {
 function f(Wrapper $w): int {
     return $w->value + 1;
 }
-===expect===

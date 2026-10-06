@@ -28,4 +28,3 @@ function read(PromotedId $i): string {
     /** @mir-check $v is string */
     return $v;
 }
-===expect===

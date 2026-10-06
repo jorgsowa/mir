@@ -7,4 +7,3 @@ function foo(): void {
     $x = 2;
 //  ^^^^^^^ UnreachableCode: Unreachable code detected
 }
-===expect===

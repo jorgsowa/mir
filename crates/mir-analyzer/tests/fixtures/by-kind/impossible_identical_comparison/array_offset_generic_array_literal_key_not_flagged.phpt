@@ -20,4 +20,3 @@ function identicalDirection(array $map): void {
     $v = $map[5];
     if ($v === null) {}
 }
-===expect===

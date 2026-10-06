@@ -11,4 +11,3 @@ class Impl extends Base {
     protected function foo(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Impl::foo() overrides with less visibility
 }
-===expect===

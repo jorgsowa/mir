@@ -9,5 +9,3 @@ function takes_float(float $x): void { echo $x; }
 takes_float(floor(3.7));
 takes_float(ceil(3.1));
 takes_float(round(3.5));
-
-===expect===

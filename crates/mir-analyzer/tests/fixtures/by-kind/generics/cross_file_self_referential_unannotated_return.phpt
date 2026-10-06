@@ -29,4 +29,3 @@ function app(): void {
     $r = new Rec(1);
     echo $r->loop();
 }
-===expect===

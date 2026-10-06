@@ -11,4 +11,3 @@ trait Greeter {
 class Widget {
     use Greeter;
 }
-===expect===

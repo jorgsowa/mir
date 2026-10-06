@@ -29,4 +29,3 @@ class Point {
         return $other->x;
     }
 }
-===expect===

@@ -18,4 +18,3 @@ class Temperature {
         return $this->toCelsius() . "°C";
     }
 }
-===expect===

@@ -13,4 +13,3 @@ same way as `@var`/`@param`.
 function bar() {
     return 'foo';
 }
-===expect===

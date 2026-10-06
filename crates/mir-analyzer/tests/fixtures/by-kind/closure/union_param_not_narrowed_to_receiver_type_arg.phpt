@@ -45,4 +45,3 @@ box()->each(function (Base $r): void {
     /** @mir-check $r is Ok */
     $_ = $r;
 });
-===expect===

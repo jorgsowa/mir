@@ -7,5 +7,3 @@ class Foo {
 //    ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not methods
     public function bar(): void {}
 }
-
-===expect===

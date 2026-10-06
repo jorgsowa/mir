@@ -83,4 +83,3 @@ class Registry {
         $_ = $bucket;
     }
 }
-===expect===

@@ -58,4 +58,3 @@ function callCaughtByOuterNestedTry(): void {
     } catch (\Exception $e) {
     }
 }
-===expect===

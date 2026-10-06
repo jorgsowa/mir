@@ -25,4 +25,3 @@ $d->subDay();
 $d->addSecond();
 // Optional param — zero args still valid.
 $d->addDays();
-===expect===

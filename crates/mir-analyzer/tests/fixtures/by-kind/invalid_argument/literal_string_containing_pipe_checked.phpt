@@ -14,4 +14,3 @@ function g($x): void {}
 
 g('z');
 //^^^ InvalidArgument: Argument $x of g() expects '"a|b"|"c"', got '"z"'
-===expect===

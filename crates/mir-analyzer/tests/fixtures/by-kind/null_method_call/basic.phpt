@@ -7,4 +7,3 @@ function test(): void {
     $x->foo();
 //  ^^^^^^^^^ NullMethodCall: Cannot call method foo() on null
 }
-===expect===

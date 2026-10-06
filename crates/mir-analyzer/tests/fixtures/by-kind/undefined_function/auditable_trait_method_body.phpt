@@ -8,4 +8,3 @@ trait Auditable {
 //      ^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function nonexistent_function() is not defined
     }
 }
-===expect===

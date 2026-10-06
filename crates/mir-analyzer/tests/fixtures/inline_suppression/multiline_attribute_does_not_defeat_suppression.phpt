@@ -18,4 +18,3 @@ suppression target instead of the class declaration after it.
 ]
 class Foo extends UndefinedClass {
 }
-===expect===

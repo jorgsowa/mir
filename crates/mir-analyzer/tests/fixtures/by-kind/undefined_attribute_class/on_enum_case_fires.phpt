@@ -7,4 +7,3 @@ enum Status {
 //    ^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
     case Active;
 }
-===expect===

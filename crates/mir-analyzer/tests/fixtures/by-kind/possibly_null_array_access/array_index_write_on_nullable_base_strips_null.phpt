@@ -14,4 +14,3 @@ function withPush(?array $data): array {
     $data[] = 'x';
     return $data;
 }
-===expect===

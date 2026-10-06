@@ -43,5 +43,3 @@ if (assertBIsOne($a)) {
 
 /** @param 1 $_arg */
 function takesOne(int $_arg): void {}
-
-===expect===

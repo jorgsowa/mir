@@ -6,5 +6,3 @@ function process(?callable $callback): void {
     $callback ??= fn () => true;
     $callback('arg');
 }
-
-===expect===

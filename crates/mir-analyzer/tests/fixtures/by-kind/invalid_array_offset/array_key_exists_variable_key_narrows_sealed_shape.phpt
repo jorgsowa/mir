@@ -35,4 +35,3 @@ function not_narrowed_when_key_is_not_a_literal(array $meta, string $key): strin
     return array_key_exists($key, $meta) ? (string) $meta['favicon'] : '';
 //                                                        ^^^^^^^^^ NonExistentArrayOffset: Array offset 'favicon' does not exist
 }
-===expect===

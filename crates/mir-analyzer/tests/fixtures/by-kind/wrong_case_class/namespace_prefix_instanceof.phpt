@@ -15,4 +15,3 @@ namespace Client;
 $obj = new \MyApp\Service\UserService();
 $x = $obj instanceof \myapp\service\UserService;
 //                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'myapp\service\UserService' has incorrect casing; use 'MyApp\Service\UserService'
-===expect===

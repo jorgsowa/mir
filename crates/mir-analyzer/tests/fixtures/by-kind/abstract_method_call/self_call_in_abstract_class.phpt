@@ -10,4 +10,3 @@ abstract class Base {
 //      ^^^^^^^^^^^ AbstractMethodCall: Cannot call abstract method Base::foo()
     }
 }
-===expect===

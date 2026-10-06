@@ -9,4 +9,3 @@ function test(): int {
     return $b;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'bool' is not compatible with declared 'int'
 }
-===expect===

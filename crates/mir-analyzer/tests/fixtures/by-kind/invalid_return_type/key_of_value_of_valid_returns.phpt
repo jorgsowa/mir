@@ -16,5 +16,3 @@ function getValue() {
 function getStr() {
     return "anything";
 }
-
-===expect===

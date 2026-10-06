@@ -73,4 +73,3 @@ function closed_shape_unchanged(array $row): void {
     $row['missing'];
 //       ^^^^^^^^^ NonExistentArrayOffset: Array offset 'missing' does not exist
 }
-===expect===

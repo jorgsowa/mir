@@ -59,4 +59,3 @@ function makeResultNestedArray(): mixed
     $r = new Result([], []);
     return $r;
 }
-===expect===

@@ -19,4 +19,3 @@ function foo(callable $c): void {}
 
 foo("B::bar");
 //  ^^^^^^^^ UndefinedClass: Class B does not exist
-===expect===

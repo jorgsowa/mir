@@ -19,4 +19,3 @@ further down.
 #[Foo]
 function useUndefined(UndefinedTypeX $x): void {
 }
-===expect===

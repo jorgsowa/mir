@@ -53,4 +53,3 @@ function strlenEqualityNarrows(): void {
         $_ = 1;
     }
 }
-===expect===

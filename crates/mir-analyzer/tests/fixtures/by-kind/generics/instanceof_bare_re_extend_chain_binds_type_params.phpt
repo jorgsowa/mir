@@ -42,4 +42,3 @@ function narrowsThroughBareChain(Box $b): void {
         $_ = 1;
     }
 }
-===expect===

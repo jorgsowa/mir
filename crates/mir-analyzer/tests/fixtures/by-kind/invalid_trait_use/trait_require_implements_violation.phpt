@@ -19,4 +19,3 @@ class Bag {
     use HasCount;
 //      ^^^^^^^^ InvalidTraitUse: Trait HasCount used incorrectly: Class Bag uses trait HasCount but does not implement Countable
 }
-===expect===

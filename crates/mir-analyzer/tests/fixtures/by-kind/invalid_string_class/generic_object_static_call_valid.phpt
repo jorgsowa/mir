@@ -5,4 +5,3 @@ $obj::method() where $obj is plain object type should not error
 function test(object $obj): void {
     $obj::bar();
 }
-===expect===

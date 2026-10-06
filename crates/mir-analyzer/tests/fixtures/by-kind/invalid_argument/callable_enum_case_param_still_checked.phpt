@@ -21,4 +21,3 @@ onA(fn(int $e) => null);
 //  ^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of onA() expects 'callable whose parameter #1 accepts App\Err::A', got 'callable whose parameter #1 only accepts int'
 onA(fn(Other $e) => null);
 //  ^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of onA() expects 'callable whose parameter #1 accepts App\Err::A', got 'callable whose parameter #1 only accepts App\Other'
-===expect===

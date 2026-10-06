@@ -30,4 +30,3 @@ class OtherTest {
         return [];
     }
 }
-===expect===

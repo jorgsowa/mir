@@ -30,4 +30,3 @@ function readEnv(): string {
     return $_ENV['HOME'];
 //         ^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $HOME in a @pure function
 }
-===expect===

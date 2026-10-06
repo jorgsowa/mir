@@ -11,5 +11,3 @@ class A {
 //      ^^^^^^^^^^ InvalidReturnType: Return type '42' is not compatible with declared 'string'
     }
 }
-
-===expect===

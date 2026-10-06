@@ -25,4 +25,3 @@ function sumGroups(array $groups): array {
     }
     return $sums;
 }
-===expect===

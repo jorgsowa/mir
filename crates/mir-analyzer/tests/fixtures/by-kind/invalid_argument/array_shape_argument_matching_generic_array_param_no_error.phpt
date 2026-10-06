@@ -14,4 +14,3 @@ treating every shape as unconditionally array-compatible
 /** @param array<int,int> $x */
 function needsIntArray(array $x): void {}
 needsIntArray([1, 2, 3]);
-===expect===

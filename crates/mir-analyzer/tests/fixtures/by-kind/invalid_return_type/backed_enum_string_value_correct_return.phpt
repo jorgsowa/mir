@@ -8,4 +8,3 @@ enum Status: string {
 function test(Status $status): string {
     return $status->value;
 }
-===expect===

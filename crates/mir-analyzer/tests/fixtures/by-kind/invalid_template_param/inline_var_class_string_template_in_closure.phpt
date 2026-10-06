@@ -57,4 +57,3 @@ function in_function(Registry $r): callable {
         return $r->get($name);
     };
 }
-===expect===

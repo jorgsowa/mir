@@ -54,4 +54,3 @@ class DocblockOnlyOk {
     public $value;
     public function __construct() {}
 }
-===expect===

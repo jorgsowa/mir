@@ -11,4 +11,3 @@ satisfies its declared return type must not be flagged.
 <?php
 $f = fn(): int => 123;
 $g = fn(): string => (string) 123;
-===expect===

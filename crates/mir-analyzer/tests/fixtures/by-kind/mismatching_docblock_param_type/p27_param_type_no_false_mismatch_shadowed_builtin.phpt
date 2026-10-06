@@ -25,4 +25,3 @@ final class Generator
 function useIt(Generator $g): void
 {
 }
-===expect===

@@ -18,4 +18,3 @@ $closure = function(): array { return ["a", "b"]; };
 $result = $closure->call(new C());
 // call() returns the closure's return type directly (not nullable since it executes immediately)
 /** @mir-check $result is array */
-===expect===

@@ -17,4 +17,3 @@ $val = new Foo();
 if ($val instanceof Foo) {
     $name = $val->name;
 }
-===expect===

@@ -13,4 +13,3 @@ flagged undefined.
 <?php
 function f(NotARealZookeeperClass $x): void {}
 //         ^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealZookeeperClass does not exist
-===expect===

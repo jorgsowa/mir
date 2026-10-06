@@ -21,4 +21,3 @@ class A {
  */
 function fooFoo($b): void {}
 fooFoo(new A());
-===expect===

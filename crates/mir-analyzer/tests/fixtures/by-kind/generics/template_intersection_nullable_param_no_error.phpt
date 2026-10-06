@@ -28,4 +28,3 @@ maybeCount(null);
 maybeCount(new Unrelated());
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Countable2'
 //         ^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of maybeCount() expects 'T&Countable2|null', got 'Unrelated'
-===expect===

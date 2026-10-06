@@ -20,4 +20,3 @@ function check(string $s): bool {
 <?php
 require_once 'App.php';
 check('hello');
-===expect===

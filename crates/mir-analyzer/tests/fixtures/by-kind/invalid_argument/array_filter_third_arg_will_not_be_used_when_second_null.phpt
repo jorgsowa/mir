@@ -10,4 +10,3 @@ Array filter third arg will not be used when second null
 <?php
 array_filter( $arg, null, ARRAY_FILTER_USE_BOTH );
 //            ^^^^ UndefinedVariable: Variable $arg is not defined
-===expect===

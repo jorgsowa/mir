@@ -9,4 +9,3 @@ function test(?Obj $obj): void {
         echo $obj->name;
     }
 }
-===expect===

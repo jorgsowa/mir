@@ -16,4 +16,3 @@ function foo(bool $a, object $obj): void {
 //           ^^ PossiblyUndefinedVariable: Variable $y might not be defined
     }
 }
-===expect===

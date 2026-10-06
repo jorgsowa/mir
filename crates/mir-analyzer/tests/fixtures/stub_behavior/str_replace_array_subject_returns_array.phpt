@@ -10,4 +10,3 @@ $_ = $x;
 $y = str_ireplace('L', 'r', $subjects);
 /** @mir-check $y is array<int, string> */
 $_ = $y;
-===expect===

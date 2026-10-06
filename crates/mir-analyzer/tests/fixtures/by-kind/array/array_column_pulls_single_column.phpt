@@ -33,4 +33,3 @@ function test(array $rows): void {
     /** @mir-check $whole_rows_by_id is non-empty-array<int, array{'id': int, 'name': string, 'active': bool}> */
     $_ = $whole_rows_by_id;
 }
-===expect===

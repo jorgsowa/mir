@@ -13,4 +13,3 @@ $x = 5;
 $x = "hello";
 /** @mir-check $x is string */
 echo $x;
-===expect===

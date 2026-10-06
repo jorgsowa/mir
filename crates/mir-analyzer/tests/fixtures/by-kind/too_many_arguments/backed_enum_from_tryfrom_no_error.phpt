@@ -23,4 +23,3 @@ $c = Color::from('r');
 $t = Color::tryFrom('x');
 $p = Priority::from(1);
 $q = Priority::tryFrom(99);
-===expect===

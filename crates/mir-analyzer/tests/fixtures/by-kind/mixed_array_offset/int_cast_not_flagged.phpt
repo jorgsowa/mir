@@ -12,4 +12,3 @@ MixedArrayOffset does NOT fire after an explicit (int) cast — the cast produce
 $x = 0;
 $arr = [10, 20, 30];
 $val = $arr[(int) $x];
-===expect===

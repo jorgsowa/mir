@@ -12,4 +12,3 @@ Parse bad method annotation
 ";
                         }
                     }
-===expect===

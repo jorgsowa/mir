@@ -16,4 +16,3 @@ class A {
 $a = new A("hello");
 $b = $a->bar;
 //       ^^^ InaccessibleProperty: Cannot access property A::$bar
-===expect===

@@ -58,4 +58,3 @@ function check(): void {
     /** @mir-check $l is list<Suit::A|Suit::B> */
     echo 1;
 }
-===expect===

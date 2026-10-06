@@ -25,4 +25,3 @@ require_once __DIR__ . '/d.theme';
 ===file:d.theme===
 <?php
 function d(): int { return 4; }
-===expect===

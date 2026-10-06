@@ -16,4 +16,3 @@ class DedupeIterator extends FilterIterator {
         parent::__construct($i);
     }
 }
-===expect===

@@ -14,4 +14,3 @@ accept_closure(
     return $x;
   }
 );
-===expect===

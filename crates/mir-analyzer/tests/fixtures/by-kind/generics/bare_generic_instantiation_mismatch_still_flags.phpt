@@ -41,4 +41,3 @@ function caller(): void {
     take(new StrGen());
 //       ^^^^^^^^^^^^ InvalidArgument: Argument $g of take() expects 'Gen<int>', got 'StrGen<string>'
 }
-===expect===

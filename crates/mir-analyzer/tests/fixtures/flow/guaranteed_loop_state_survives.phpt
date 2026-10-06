@@ -41,4 +41,3 @@ function doRefinement(?Box $box, bool $keepGoing): void {
 
     $box->ping();
 }
-===expect===

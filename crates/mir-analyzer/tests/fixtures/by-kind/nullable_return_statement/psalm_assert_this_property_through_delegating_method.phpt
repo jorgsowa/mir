@@ -22,4 +22,3 @@ final class Db {
         return $c;
     }
 }
-===expect===

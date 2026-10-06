@@ -7,4 +7,3 @@ enum Color: string implements stringable2 {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'stringable2' has incorrect casing; use 'Stringable2'
     case Red = 'red';
 }
-===expect===

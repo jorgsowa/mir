@@ -17,4 +17,3 @@ class Rect {
 //      ^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property height of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
-===expect===

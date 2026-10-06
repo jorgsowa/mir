@@ -45,4 +45,3 @@ class Track {
 function useLength(Track $t): float {
     return $t->getLength();
 }
-===expect===

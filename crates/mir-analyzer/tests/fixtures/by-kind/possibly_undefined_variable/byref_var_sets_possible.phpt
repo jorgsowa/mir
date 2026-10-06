@@ -16,4 +16,3 @@ if (rand(0, 1)) {
 
 echo $b;
 //   ^^ PossiblyUndefinedVariable: Variable $b might not be defined
-===expect===

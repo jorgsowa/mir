@@ -7,4 +7,3 @@ function b(string $s): int {
     $fn('/a/', $s, $m);
     return count($m);
 }
-===expect===

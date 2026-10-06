@@ -12,4 +12,3 @@ class Greeter {
 //      ^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead
     }
 }
-===expect===

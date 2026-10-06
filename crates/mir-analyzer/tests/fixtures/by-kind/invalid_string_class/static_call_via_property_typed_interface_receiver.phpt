@@ -21,4 +21,3 @@ class Holder {
 function run(Holder $h): void {
     $h->provider::getDefinitions();
 }
-===expect===

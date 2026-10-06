@@ -15,4 +15,3 @@ function run(): void {
     $m->send(42);
 //           ^^ ArgumentTypeCoercion: Argument $address of send() expects 'string', got '42' — coercion may fail at runtime
 }
-===expect===

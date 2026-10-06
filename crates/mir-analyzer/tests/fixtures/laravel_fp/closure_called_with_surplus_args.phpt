@@ -21,4 +21,3 @@ function dispatchPair(): void {
     };
     $callback(1, 2);
 }
-===expect===

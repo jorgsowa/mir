@@ -29,4 +29,3 @@ function test_bounded($w, $h): void {
     /** @mir-check $area is int<0, 50> */
     $_ = $area;
 }
-===expect===

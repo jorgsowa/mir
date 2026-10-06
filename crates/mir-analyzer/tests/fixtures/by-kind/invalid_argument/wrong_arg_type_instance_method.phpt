@@ -18,4 +18,3 @@ function run(): void {
     $p->process('not-an-int');
 //              ^^^^^^^^^^^^ InvalidArgument: Argument $n of process() expects 'int', got '"not-an-int"'
 }
-===expect===

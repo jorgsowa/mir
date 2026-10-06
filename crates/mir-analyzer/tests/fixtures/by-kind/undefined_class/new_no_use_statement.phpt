@@ -11,4 +11,3 @@ function consume(): void {
     $s = new \Service();
     $s->run();
 }
-===expect===

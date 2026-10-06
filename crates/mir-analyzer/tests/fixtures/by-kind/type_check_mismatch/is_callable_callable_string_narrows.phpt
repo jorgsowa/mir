@@ -36,4 +36,3 @@ function test_mixed_string_types_false_branch(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

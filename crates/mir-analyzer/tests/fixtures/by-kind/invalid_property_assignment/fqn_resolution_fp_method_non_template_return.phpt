@@ -34,4 +34,3 @@ class Consumer {
         $this->result = $box->info(\stdClass::class);
     }
 }
-===expect===

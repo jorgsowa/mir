@@ -77,4 +77,3 @@ function check_object_shape($x) {
      */
     var_dump($x);
 }
-===expect===

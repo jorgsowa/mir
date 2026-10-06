@@ -34,4 +34,3 @@ function testParenthesizedComparison(int|null $x) {
     }
     return $x;
 }
-===expect===

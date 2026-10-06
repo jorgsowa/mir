@@ -12,5 +12,3 @@ function getKey(bool $asInt) {
     return "42";
 //  ^^^^^^^^^^^^ InvalidReturnType: Return type '"42"' is not compatible with declared 'int|"42.0"'
 }
-
-===expect===

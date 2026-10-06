@@ -66,4 +66,3 @@ function negatedGuard(bool $flag): void {
     if (!$flag && $x > 0) { echo $x; }
 //                ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
-===expect===

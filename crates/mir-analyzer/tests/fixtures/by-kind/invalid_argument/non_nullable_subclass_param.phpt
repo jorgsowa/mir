@@ -14,4 +14,3 @@ class B extends A {
         return $s;
     }
 }
-===expect===

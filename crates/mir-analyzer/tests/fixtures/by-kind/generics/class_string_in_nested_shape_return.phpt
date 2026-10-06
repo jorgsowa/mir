@@ -60,4 +60,3 @@ function viaVariable(): array {
 function shapeHoldingMap(): array {
     return ['x' => [['k' => C::class]]];
 }
-===expect===

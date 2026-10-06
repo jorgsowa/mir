@@ -33,4 +33,3 @@ function timestamp(): UTCDateTime {
 function handle(ConnectionException $e): string {
     return $e->getMessage();
 }
-===expect===

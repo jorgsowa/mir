@@ -5,4 +5,3 @@ isset short-circuit with && — variable available in true branch
 if (isset($x) && true) {
     echo $x;
 }
-===expect===

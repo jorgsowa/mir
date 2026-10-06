@@ -8,4 +8,3 @@ class Foo {
 
 $foo = new Foo();
 $foo->activeMethod();
-===expect===

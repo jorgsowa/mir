@@ -16,4 +16,3 @@ function f(\Throwable $e): void {
         }
     }
 }
-===expect===

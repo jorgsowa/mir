@@ -22,4 +22,3 @@ $v = 42;
 stringify($v);
 /** @mir-check $v is string */
 $_ = $v;
-===expect===

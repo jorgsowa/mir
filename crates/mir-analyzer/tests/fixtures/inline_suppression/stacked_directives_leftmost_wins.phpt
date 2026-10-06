@@ -15,4 +15,3 @@ next line) should not.
 foo(); // @mir-ignore-line UndefinedFunction @phpstan-ignore-next-line
 bar();
 //<^^^^^ UndefinedFunction: Function bar() is not defined
-===expect===

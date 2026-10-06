@@ -5,4 +5,3 @@ RawObjectIteration does NOT fire when yield-from target implements Iterator.
 function gen(\Iterator $it): \Generator {
     yield from $it;
 }
-===expect===

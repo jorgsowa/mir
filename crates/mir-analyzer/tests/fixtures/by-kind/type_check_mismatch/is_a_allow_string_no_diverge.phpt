@@ -55,4 +55,3 @@ function test_false_branch_no_false_diverge(Foo $obj): void {
 //                ^^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'Foo'
     }
 }
-===expect===

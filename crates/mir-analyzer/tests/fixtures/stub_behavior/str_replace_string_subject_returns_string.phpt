@@ -19,4 +19,3 @@ echo $x;
 $y = str_ireplace('a', 'b', 'hello');
 /** @mir-check $y is string */
 echo $y;
-===expect===

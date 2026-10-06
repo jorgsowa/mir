@@ -49,4 +49,3 @@ function test_ambiguous_nullable_arg(?string $name): void {
     /** @mir-check $v is string|array|false */
     $_ = $v;
 }
-===expect===

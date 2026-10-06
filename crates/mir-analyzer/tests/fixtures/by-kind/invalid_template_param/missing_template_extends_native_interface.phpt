@@ -4,5 +4,3 @@ Missing template extends native interface
 <?php
 interface a extends Iterator {
 }
-
-===expect===

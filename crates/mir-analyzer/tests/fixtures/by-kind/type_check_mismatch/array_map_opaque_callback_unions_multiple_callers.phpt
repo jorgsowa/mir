@@ -23,4 +23,3 @@ function callerA(array $nums): void {
 function callerB(array $nums): void {
     apply(fn(int $x): int => $x, $nums);
 }
-===expect===

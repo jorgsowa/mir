@@ -13,4 +13,3 @@ class Bar {
     public function __sleep(): array { return []; }
     public function __wakeup(): void {}
 }
-===expect===

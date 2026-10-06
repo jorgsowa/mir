@@ -58,4 +58,3 @@ final class TestSuiteCollectionIterator implements \Iterator {
     #[\ReturnTypeWillChange]
     public function rewind(): void {}
 }
-===expect===

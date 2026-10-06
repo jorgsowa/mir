@@ -12,4 +12,3 @@ class Child extends Base {
 //                   ^^^^^^ InaccessibleClassConstant: Cannot access constant Base::SECRET
     }
 }
-===expect===

@@ -20,4 +20,3 @@ namespace Ns;
 function foo($s) : void {}
 //           ^^ MissingParamType: Parameter $s of foo() has no type annotation
 foo(4);
-===expect===

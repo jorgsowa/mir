@@ -9,4 +9,3 @@ function f(?array $data): array {
     return $data;
 //  ^^^^^^^^^^^^^ NullableReturnStatement: Return type 'array|null' is not compatible with declared 'array'
 }
-===expect===

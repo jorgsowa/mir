@@ -20,5 +20,3 @@ function f(array $arr): array {
     }
     return $elt;
 }
-
-===expect===

@@ -20,4 +20,3 @@ $r = new Readable();
 //       ^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Readable
 $w = new Writable();
 //       ^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Writable
-===expect===

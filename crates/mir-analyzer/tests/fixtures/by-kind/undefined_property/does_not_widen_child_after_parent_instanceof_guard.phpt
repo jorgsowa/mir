@@ -15,4 +15,3 @@ function test(object $value): void {
     }
     echo $value->childOnly;
 }
-===expect===

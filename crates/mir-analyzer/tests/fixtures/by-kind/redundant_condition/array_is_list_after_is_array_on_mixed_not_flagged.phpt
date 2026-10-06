@@ -15,4 +15,3 @@ function isList(mixed $array): array
 
     return $array;
 }
-===expect===

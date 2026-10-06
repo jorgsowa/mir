@@ -22,4 +22,3 @@ function test(?int $x, $y): void {
         $_ = $y;
     }
 }
-===expect===

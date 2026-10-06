@@ -10,4 +10,3 @@ Array filter third arg invalid behaves like0
 <?php
 array_filter( $arg, "strlen", 3 );
 //            ^^^^ UndefinedVariable: Variable $arg is not defined
-===expect===

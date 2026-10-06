@@ -6,4 +6,3 @@ function firstElement(array $arr): string {
     return $arr[0];
 //  ^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 }
-===expect===

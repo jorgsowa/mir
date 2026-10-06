@@ -15,4 +15,3 @@ Unknown constant
 function scope(int $a){
     return $a;
 }
-===expect===

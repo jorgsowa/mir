@@ -8,5 +8,3 @@ class Foo {
      */
     public string $bar = "baz";
 }
-
-===expect===

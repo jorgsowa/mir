@@ -28,4 +28,3 @@ $obj = new class extends Base {
         return parent::compute();
     }
 };
-===expect===

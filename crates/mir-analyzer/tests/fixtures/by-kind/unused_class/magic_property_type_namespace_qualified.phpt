@@ -21,4 +21,3 @@ final class Money {}
  * @method Money getBalance()
  */
 class Wallet {}
-===expect===

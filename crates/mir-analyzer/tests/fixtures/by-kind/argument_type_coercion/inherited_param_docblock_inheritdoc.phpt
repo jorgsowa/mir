@@ -20,4 +20,3 @@ final class MoverImpl implements Mover {
         $_x = $id;
     }
 }
-===expect===

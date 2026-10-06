@@ -14,4 +14,3 @@ function test(int $x): void {
     if ($x === 1.5) {}
 //      ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'int' and '1.5' is always false — these types can never be identical
 }
-===expect===

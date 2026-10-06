@@ -15,4 +15,3 @@ empty generic array parameter
 function process($items): void {
     echo $items;
 }
-===expect===

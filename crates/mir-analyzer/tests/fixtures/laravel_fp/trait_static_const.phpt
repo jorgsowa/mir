@@ -25,4 +25,3 @@ class Post {
     use HasTimestamps;
     const CREATED_AT = 'created_at';
 }
-===expect===

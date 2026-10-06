@@ -11,4 +11,3 @@ class Maker {
 $x = (new Maker)->make();
 /** @mir-check $x is Apple */
 $_ = $x;
-===expect===

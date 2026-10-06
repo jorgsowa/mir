@@ -25,4 +25,3 @@ function index(array $rows): array
 
     return $indexed;
 }
-===expect===

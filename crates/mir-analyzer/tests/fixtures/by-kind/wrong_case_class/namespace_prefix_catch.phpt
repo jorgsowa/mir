@@ -16,4 +16,3 @@ try {
 } catch (\myapp\exceptions\ServiceException $e) {
 //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'myapp\exceptions\ServiceException' has incorrect casing; use 'MyApp\Exceptions\ServiceException'
 }
-===expect===

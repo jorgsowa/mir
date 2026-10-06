@@ -14,4 +14,3 @@ class A implements I1, I2 {
     return "hello";
   }
 }
-===expect===

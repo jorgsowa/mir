@@ -46,4 +46,3 @@ function testStaticMethod(array $c): void {
     /** @mir-check $c is array{key: string} */
     $_ = 1;
 }
-===expect===

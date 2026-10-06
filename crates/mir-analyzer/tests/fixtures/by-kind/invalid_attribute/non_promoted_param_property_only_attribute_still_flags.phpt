@@ -15,4 +15,3 @@ class OnlyProperty {}
 
 function foo(#[OnlyProperty] int $id): void {}
 //             ^^^^^^^^^^^^ InvalidAttribute: Attribute OnlyProperty cannot be used on this target
-===expect===

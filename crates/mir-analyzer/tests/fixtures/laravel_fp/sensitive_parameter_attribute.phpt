@@ -23,4 +23,3 @@ class Encrypter {
         return $payload;
     }
 }
-===expect===

@@ -17,4 +17,3 @@ class A{
 }
 echo (new A)->foo;
 //            ^^^ DeprecatedProperty: Property A::$foo is deprecated
-===expect===

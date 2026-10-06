@@ -22,4 +22,3 @@ final class Db {
         $this->connection = new Conn();
     }
 }
-===expect===

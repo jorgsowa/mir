@@ -29,4 +29,3 @@ function test_plain_int_count(int $n): void {
     /** @mir-check $arr is array<mixed, mixed> */
     $_ = $arr;
 }
-===expect===

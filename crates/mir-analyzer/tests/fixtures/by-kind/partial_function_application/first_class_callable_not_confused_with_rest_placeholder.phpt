@@ -19,4 +19,3 @@ function add(int $a, int $b): int {
 
 $fn = add(...);
 $result = $fn(1, 2);
-===expect===

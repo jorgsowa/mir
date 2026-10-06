@@ -46,4 +46,3 @@ function emptyNeedleDoesNotNarrowStaticProp(): void {
         $_ = 1;
     }
 }
-===expect===

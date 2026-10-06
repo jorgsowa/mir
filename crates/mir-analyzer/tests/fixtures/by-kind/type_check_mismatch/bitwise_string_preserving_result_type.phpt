@@ -65,4 +65,3 @@ function shiftRightStringsStaysInt(string $a, string $b): void {
     /** @mir-check $r is int */
     $_ = $r;
 }
-===expect===

@@ -17,4 +17,3 @@ final class Impl implements MyIface {
 }
 
 new Impl();
-===expect===

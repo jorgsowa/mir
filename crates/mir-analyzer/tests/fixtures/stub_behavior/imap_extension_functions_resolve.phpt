@@ -18,4 +18,3 @@ entry — same missing-stub root cause as the fixed C6 (ast).
 function openMailbox(string $mailbox, string $user, string $password) {
     return imap_open($mailbox, $user, $password, IMAP_GC_ELT);
 }
-===expect===

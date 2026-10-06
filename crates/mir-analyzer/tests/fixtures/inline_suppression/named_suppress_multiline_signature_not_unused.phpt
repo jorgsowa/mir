@@ -18,4 +18,3 @@ class Foo {
         echo $used;
     }
 }
-===expect===

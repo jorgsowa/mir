@@ -21,4 +21,3 @@ function f($ids, $label): void {
     /** @mir-check $label is string */
     echo $label;
 }
-===expect===

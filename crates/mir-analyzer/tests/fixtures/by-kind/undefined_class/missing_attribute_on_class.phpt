@@ -5,4 +5,3 @@ Missing attribute on class
 #[Pure]
 //^^^^ UndefinedAttributeClass: Attribute class Pure does not exist
 class Video {}
-===expect===

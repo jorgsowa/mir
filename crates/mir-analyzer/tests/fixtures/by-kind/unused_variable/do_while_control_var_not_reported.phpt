@@ -17,4 +17,3 @@ function foo(): void {
         $run = true;
     } while ($run);
 }
-===expect===

@@ -17,4 +17,3 @@ class B extends A {
     /** @var string */
     public $x = 'hello';
 }
-===expect===

@@ -11,5 +11,3 @@ Redundant cast from float literal to float
 <?php
 $x = (float)3.0;
 //          ^^^ RedundantCast: Casting '3' to 'float' is redundant
-
-===expect===

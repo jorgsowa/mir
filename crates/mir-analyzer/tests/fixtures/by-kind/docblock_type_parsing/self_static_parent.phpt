@@ -38,4 +38,3 @@ class Derived extends Base {
         var_dump($this_var);
     }
 }
-===expect===

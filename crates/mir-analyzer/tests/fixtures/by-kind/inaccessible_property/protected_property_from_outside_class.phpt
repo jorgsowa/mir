@@ -9,4 +9,3 @@ class Config
 
 echo (new Config())->internal;
 //                   ^^^^^^^^ InaccessibleProperty: Cannot access property Config::$internal
-===expect===

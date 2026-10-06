@@ -16,4 +16,3 @@ function f(Type&NamedType $t): void {
 
 f(new PartialImpl());
 //^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $t of f() expects 'Type&NamedType', got 'PartialImpl'
-===expect===

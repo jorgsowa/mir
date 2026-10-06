@@ -32,4 +32,3 @@ function test_bounded_neg_or_zero(int $y): void {
         $_ = $y;
     }
 }
-===expect===

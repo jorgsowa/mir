@@ -31,4 +31,3 @@ function testNotArray(array|string $x) {
         strlen($x);
     }
 }
-===expect===

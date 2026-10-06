@@ -23,4 +23,3 @@ function test_possibly_empty_keys(array $keys, bool $value): void {
     /** @mir-check $result is array<string, bool> */
     $_ = $result;
 }
-===expect===

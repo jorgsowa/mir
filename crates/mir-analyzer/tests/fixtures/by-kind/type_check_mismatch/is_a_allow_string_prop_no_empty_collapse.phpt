@@ -24,4 +24,3 @@ function f(Container $c): void {
         $_ = $c->item;
     }
 }
-===expect===

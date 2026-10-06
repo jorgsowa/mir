@@ -17,4 +17,3 @@ function sendPrompt(string $prompt): string {
 
 sendPrompt((string) $_GET["question"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedLlmPrompt: Tainted LLM prompt — possible prompt injection
-===expect===

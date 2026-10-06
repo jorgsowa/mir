@@ -13,4 +13,3 @@ function foo(Suit $s): void {
     if ($s === Suit::Clu) {}
 //             ^^^^^^^^^ UndefinedConstant: Constant Suit::Clu is not defined
 }
-===expect===

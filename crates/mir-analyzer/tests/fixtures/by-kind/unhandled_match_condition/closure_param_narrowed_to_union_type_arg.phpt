@@ -34,4 +34,3 @@ load()->getOrThrow(static fn(Err $e) => match ($e) {
     Err::NotFound => new NotFound(),
     Err::Denied => new Denied(),
 });
-===expect===

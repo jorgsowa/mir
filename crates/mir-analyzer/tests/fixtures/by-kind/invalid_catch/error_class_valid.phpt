@@ -17,4 +17,3 @@ try {
 //       ^^^^^^^^^^ UnreachableCatch: Catch block for 'TypeError' is unreachable — already caught by 'Error'
     echo $e->getMessage();
 }
-===expect===

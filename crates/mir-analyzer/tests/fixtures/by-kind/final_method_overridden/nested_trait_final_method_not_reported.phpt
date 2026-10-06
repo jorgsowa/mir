@@ -16,4 +16,3 @@ trait Outer {
 class C {
     use Outer;
 }
-===expect===

@@ -22,4 +22,3 @@ if ($bound !== null) {
     $result = $bound();
     /** @mir-check $result is int */
 }
-===expect===

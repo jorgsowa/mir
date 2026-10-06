@@ -19,4 +19,3 @@ class Counter {
 //      ^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAlreadyInitialized: Cannot modify readonly property Counter::$value — already initialized
     }
 }
-===expect===

@@ -15,4 +15,3 @@ function test(object $value): void {
     /** @mir-check $value is Child */
     $value->childOnly();
 }
-===expect===

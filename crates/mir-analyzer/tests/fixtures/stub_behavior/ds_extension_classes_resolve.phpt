@@ -27,4 +27,3 @@ function buildMap(): Map {
 function buildSet(): Set {
     return new Set([1, 2, 3]);
 }
-===expect===

@@ -5,4 +5,3 @@ does not report is string on union
 function f(string|int $x): void {
     if (is_string($x)) {}
 }
-===expect===

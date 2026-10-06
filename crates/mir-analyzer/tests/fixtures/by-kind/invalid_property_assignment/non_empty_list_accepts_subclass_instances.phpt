@@ -35,4 +35,3 @@ function run(Canvas $c): void {
     $c->shapes = $local;
 }
 new Canvas([new Circle(), new Square()]);
-===expect===

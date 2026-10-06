@@ -20,4 +20,3 @@ class Lib {
 plain(null);
 (new Lib())->inst(null);
 Lib::stat(null);
-===expect===

@@ -26,4 +26,3 @@ class Foo {
 }
 
 echo (new Foo())->reveal();
-===expect===

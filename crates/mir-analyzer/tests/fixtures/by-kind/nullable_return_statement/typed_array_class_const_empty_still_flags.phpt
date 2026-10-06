@@ -12,4 +12,3 @@ final class C {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|int|null' is not compatible with declared 'string'
     }
 }
-===expect===

@@ -22,4 +22,3 @@ function h(\ReflectionClass $reflectionClass): void {
 }
 
 function maybeThrow(): void {}
-===expect===

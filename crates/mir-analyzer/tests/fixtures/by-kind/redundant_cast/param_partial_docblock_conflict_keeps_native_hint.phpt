@@ -21,4 +21,3 @@ function f(int $x): void {
     $y = (int) $x;
 //             ^^ RedundantCast: Casting 'int' to 'int' is redundant
 }
-===expect===

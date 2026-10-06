@@ -40,4 +40,3 @@ class MyTest {
 //      ^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
     }
 }
-===expect===

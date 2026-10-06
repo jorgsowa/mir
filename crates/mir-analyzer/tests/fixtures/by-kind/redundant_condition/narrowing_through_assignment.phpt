@@ -37,4 +37,3 @@ function branchNarrowing(Document|Media $asset): void {
         echo $media->url;
     }
 }
-===expect===

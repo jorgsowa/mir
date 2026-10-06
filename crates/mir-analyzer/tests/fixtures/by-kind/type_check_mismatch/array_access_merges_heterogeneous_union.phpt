@@ -37,4 +37,3 @@ function test_pure_generic_unaffected(array $x): void {
     /** @mir-check $x['a'] is int */
     $_ = $x['a'];
 }
-===expect===

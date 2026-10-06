@@ -62,4 +62,3 @@ class A {
 //      ^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 }
-===expect===

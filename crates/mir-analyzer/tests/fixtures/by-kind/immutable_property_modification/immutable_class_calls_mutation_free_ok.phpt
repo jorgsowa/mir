@@ -21,4 +21,3 @@ class Vector {
         return "({$this->x}/{$len}, {$this->y}/{$len})";
     }
 }
-===expect===

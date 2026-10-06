@@ -35,4 +35,3 @@ function test_key_mixed_keys_fallback(array $arr): void {
     /** @mir-check key($arr) is string|int|null */
     $_ = key($arr);
 }
-===expect===

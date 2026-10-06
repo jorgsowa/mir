@@ -24,4 +24,3 @@ function range_log(string $s): float {
     $len = strlen($s);   // int<0, max>
     return log($len + 1); // int<0, max> + 1 -> float param
 }
-===expect===

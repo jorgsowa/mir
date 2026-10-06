@@ -51,4 +51,3 @@ function check_key_of_list($x) {
      */
     var_dump($x);
 }
-===expect===

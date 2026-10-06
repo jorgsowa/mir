@@ -32,4 +32,3 @@ function bad_pos(): int {
     return $x;
 //  ^^^^^^^^^^ InvalidReturnType: Return type 'int<0, 10>' is not compatible with declared 'positive-int'
 }
-===expect===

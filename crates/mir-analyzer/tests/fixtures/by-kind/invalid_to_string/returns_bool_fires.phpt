@@ -9,4 +9,3 @@ class BoolReturn {
     }
 }
 new BoolReturn();
-===expect===

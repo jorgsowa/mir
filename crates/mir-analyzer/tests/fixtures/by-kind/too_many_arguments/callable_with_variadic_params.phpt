@@ -8,5 +8,3 @@ Callable with variadic params
 function test(callable $fn): void {
     $fn('hello', 'world', 'extra');
 }
-
-===expect===

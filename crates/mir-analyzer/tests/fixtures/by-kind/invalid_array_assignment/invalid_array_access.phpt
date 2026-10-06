@@ -11,4 +11,3 @@ Invalid array access
 $a = 5;
 $a[0] = 5;
 //<^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type '5'
-===expect===

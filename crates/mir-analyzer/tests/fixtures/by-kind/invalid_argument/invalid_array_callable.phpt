@@ -12,4 +12,3 @@ final class Bar {
 
 foo([Bar::class, "baz", 1231233]);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of callable() expects 'callable (string or [object, "method"])', got 'array{0: class-string<Bar>, 1: "baz", 2: 1231233}'
-===expect===

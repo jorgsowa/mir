@@ -15,4 +15,3 @@ $a = $argv[1];
 /** @mir-check $a is mixed */
 $b = $argc;
 /** @mir-check $b is mixed */
-===expect===

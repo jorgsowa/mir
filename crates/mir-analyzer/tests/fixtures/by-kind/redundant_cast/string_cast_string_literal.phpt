@@ -11,5 +11,3 @@ Redundant cast from string literal to string
 <?php
 $x = (string)"hello";
 //           ^^^^^^^ RedundantCast: Casting '"hello"' to 'string' is redundant
-
-===expect===

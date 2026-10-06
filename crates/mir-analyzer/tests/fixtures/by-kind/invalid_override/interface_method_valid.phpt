@@ -14,4 +14,3 @@ class Widget implements Renderable {
     #[Override]
     public function render(): void {}
 }
-===expect===

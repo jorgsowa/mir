@@ -14,4 +14,3 @@ isn't flagged redundant.
 function backoff(int $retries): int {
     return (int) (2 ** ($retries - 1));
 }
-===expect===

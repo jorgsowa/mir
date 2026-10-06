@@ -13,4 +13,3 @@ class B extends A {
     public string $name = 'default';
     public ?bool $flag = false;
 }
-===expect===

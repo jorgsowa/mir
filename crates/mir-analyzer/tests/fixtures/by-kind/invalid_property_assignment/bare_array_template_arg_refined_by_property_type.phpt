@@ -32,4 +32,3 @@ final class Holder {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $scalar expects 'Lazy<int>', cannot assign 'Lazy<array>'
     }
 }
-===expect===

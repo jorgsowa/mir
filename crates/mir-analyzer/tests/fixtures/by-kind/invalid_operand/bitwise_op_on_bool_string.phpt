@@ -23,4 +23,3 @@ function bitwiseTrueConst(int $n): int {
 function bitwiseFalseConst(int $n): int {
     return false | $n;
 }
-===expect===

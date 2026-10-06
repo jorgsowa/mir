@@ -26,4 +26,3 @@ class E extends D {
     $a->bar();
   }
 }
-===expect===

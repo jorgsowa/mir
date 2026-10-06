@@ -26,4 +26,3 @@ function parseNumber(string $value): void {
         echo "no fraction\n";
     }
 }
-===expect===

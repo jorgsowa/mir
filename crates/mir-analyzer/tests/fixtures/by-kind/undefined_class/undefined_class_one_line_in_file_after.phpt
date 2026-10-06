@@ -8,4 +8,3 @@ Undefined class one line in file after
 new B();
 new C();
 //  ^ UndefinedClass: Class C does not exist
-===expect===

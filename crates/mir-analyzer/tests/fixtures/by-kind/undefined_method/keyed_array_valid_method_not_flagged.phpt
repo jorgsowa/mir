@@ -16,4 +16,3 @@ function test(): void {
     $result = $box->wrap();
     $result['item']->process();
 }
-===expect===

@@ -12,4 +12,3 @@ Implicit nullability adds only null: other wrong argument types are still report
 function plain($f = null): void {}
 plain([]);
 //    ^^ InvalidArgument: Argument $f of plain() expects 'string|null', got 'array{}'
-===expect===

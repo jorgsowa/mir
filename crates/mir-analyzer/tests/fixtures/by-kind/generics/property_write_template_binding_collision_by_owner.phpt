@@ -43,4 +43,3 @@ function collision(Wrapper $w): void {
 function ownMemberStillCorrect(Wrapper $w): void {
     $w->extra = "a string is fine here";
 }
-===expect===

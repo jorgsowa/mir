@@ -7,4 +7,3 @@ enum Offset: int {
     case None = 0;
     case After = 1;
 }
-===expect===

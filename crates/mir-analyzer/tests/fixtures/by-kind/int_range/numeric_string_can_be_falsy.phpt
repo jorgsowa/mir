@@ -18,4 +18,3 @@ function test(string $s): void {
     }
     // false branch must remain reachable (no RedundantCondition)
 }
-===expect===

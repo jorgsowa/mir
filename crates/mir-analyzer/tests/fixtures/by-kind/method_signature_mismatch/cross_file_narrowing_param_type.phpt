@@ -17,4 +17,3 @@ class Dog extends Animal {
     public function eat(int $food): void { var_dump($food); }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Dog::eat() signature mismatch: parameter $food type 'int' is incompatible with parent type 'string'
 }
-===expect===

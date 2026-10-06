@@ -13,4 +13,3 @@ final class C {
 //                       ^^^^^^ NonExistentArrayOffset: Array offset 'nope' does not exist
     }
 }
-===expect===

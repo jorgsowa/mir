@@ -16,4 +16,3 @@ function test(): void {
     if ($s == 0) {}
 //      ^^^^^^^ ImpossibleLooseComparison: '==' between '""' and '0' is always false — these types can never be loosely equal
 }
-===expect===

@@ -28,4 +28,3 @@ function test(array $arr): void {
     /** @mir-check $keys is list<string> */
     $_ = $keys;
 }
-===expect===

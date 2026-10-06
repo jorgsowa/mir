@@ -22,4 +22,3 @@ function f(Container $c): void {
         $c->item->fooMethod();
     }
 }
-===expect===

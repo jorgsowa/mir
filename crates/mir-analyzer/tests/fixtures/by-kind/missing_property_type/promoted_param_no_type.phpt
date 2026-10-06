@@ -14,4 +14,3 @@ class Point {
 //      ^^^^^^^^^ MissingPropertyType: Property Point::$y has no type annotation
     ) {}
 }
-===expect===

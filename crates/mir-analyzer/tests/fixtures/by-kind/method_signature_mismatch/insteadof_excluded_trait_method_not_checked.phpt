@@ -12,4 +12,3 @@ class Base {
 class Child extends Base {
     public function f(): string { return "y"; }
 }
-===expect===

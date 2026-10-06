@@ -10,4 +10,3 @@ abstract class A implements I {}
 
 class B extends A {}
 //<^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class B must implement I::fnc() from interface
-===expect===

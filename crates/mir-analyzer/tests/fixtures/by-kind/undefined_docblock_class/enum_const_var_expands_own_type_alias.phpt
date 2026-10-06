@@ -25,4 +25,3 @@ enum Status {
         echo "ok";
     }
 }
-===expect===

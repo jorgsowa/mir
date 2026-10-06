@@ -17,4 +17,3 @@ function run(string $s): void {
     /** @mir-check $matches is list<string> */
     $_ = $matches;
 }
-===expect===

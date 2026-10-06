@@ -41,4 +41,3 @@ function test(): void {
     /** @mir-check $box is MutableBox<string> */
     $_ = 1;
 }
-===expect===

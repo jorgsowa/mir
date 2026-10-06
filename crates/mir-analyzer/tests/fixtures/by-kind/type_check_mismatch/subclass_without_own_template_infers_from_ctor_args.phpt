@@ -28,4 +28,3 @@ $b = new IntBox(42);
 $v = $b->get();
 /** @mir-check $v is int */
 $_ = $v;
-===expect===

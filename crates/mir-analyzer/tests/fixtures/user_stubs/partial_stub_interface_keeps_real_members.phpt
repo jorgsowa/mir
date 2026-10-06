@@ -74,4 +74,3 @@ function intersection(object $m): void {
 function asParent(Handle $h): Base {
     return $h;
 }
-===expect===

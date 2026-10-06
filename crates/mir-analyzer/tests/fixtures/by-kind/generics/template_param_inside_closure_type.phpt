@@ -31,4 +31,3 @@ class Box {
         return $predicate($item);
     }
 }
-===expect===

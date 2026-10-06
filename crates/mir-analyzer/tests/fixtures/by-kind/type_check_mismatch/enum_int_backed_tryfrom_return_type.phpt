@@ -20,4 +20,3 @@ $p = Priority::tryFrom(99);
 if ($p !== null) {
     echo $p->value;
 }
-===expect===

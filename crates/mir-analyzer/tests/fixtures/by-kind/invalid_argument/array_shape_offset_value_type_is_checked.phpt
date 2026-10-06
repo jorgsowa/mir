@@ -15,4 +15,3 @@ function test(): void {
     takes_string($row['id']);
 //               ^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of takes_string() expects 'string', got '123' — coercion may fail at runtime
 }
-===expect===

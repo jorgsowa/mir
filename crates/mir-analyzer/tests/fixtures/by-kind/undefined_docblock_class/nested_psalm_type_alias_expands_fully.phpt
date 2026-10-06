@@ -25,4 +25,3 @@ class Repo {
         echo "ok";
     }
 }
-===expect===

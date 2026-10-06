@@ -9,4 +9,3 @@ class Greeter {
 }
 (new Greeter())->say('Ada');
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for say(): expected 2, got 1
-===expect===

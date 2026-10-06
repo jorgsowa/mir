@@ -23,4 +23,3 @@ function test(): void {
     /** @mir-check $v is string|null */
     echo "x$v";
 }
-===expect===

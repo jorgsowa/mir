@@ -21,4 +21,3 @@ function test(int $n): void {
     /** @mir-check $after is array{0: 1} */
     $_ = $after;
 }
-===expect===

@@ -11,5 +11,3 @@ takes_int(floor(3.7));
 takes_int(ceil(3.1));
 takes_int(round(3.5));
 takes_int(round(3.5, 0));
-
-===expect===

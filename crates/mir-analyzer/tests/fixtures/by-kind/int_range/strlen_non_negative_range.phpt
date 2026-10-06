@@ -14,4 +14,3 @@ function test(string $s): void {
     /** @mir-check $n is int<0, max> */
     $_ = $n;
 }
-===expect===

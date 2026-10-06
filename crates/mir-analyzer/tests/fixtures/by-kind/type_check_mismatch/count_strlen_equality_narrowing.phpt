@@ -65,4 +65,3 @@ function test_strlen_identical_zero(string $s): void {
         $_ = $s;
     }
 }
-===expect===

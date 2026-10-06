@@ -44,4 +44,3 @@ function optional_key_shape_survives_false_branch(array $arr): void {
         $_ = $arr;
     }
 }
-===expect===

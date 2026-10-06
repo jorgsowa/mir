@@ -10,4 +10,3 @@ function sum(int ...$values): int {
 }
 
 sum(1, 2, 3);
-===expect===

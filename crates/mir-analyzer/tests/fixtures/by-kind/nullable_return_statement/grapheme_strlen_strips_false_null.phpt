@@ -21,4 +21,3 @@ function measure_with_check(string $s): int {
     /** @mir-check $len is int */
     return $len;
 }
-===expect===

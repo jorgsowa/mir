@@ -14,4 +14,3 @@ switch ($a) {
     default:
         echo "impossible";
 }
-===expect===

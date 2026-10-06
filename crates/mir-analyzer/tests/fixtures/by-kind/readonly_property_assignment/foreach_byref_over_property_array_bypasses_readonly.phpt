@@ -23,4 +23,3 @@ function tick(Frozen $f): void {
         $v++;
     }
 }
-===expect===

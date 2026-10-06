@@ -34,4 +34,3 @@ function viaArrayReduce(): void {
 function staticOnly(): void {
     echo array_map('strtoupper', ['a', 'b'])[0];
 }
-===expect===

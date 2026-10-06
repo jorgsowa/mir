@@ -17,4 +17,3 @@ without crashing and emit at most a parse-warning, never an ICE.
  * @param Ⱥrray<int, string> $x
  */
 function foo($x): void {}
-===expect===

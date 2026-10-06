@@ -14,4 +14,3 @@ function helper(): void {}
 use function Utils\helper;
 
 helper();
-===expect===

@@ -11,4 +11,3 @@ function dispatch(string $cls): void {
         $cls::broadcastOn();
     }
 }
-===expect===

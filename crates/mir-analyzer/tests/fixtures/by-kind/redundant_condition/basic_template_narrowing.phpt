@@ -22,4 +22,3 @@ function makeFileUrl(string|File $file): ?string {
     }
     return '//file/' . $path;
 }
-===expect===

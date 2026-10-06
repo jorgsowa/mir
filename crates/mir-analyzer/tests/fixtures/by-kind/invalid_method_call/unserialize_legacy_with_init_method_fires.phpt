@@ -18,4 +18,3 @@ class A {
         $this->init();
     }
 }
-===expect===

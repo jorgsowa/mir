@@ -39,4 +39,3 @@ function otherSuperglobals(): void {
     echo file_get_contents($_POST['file']['tmp_name']);
 //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
-===expect===

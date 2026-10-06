@@ -14,4 +14,3 @@ class Foo {
 
 $f = new Foo();
 $f->name = 42;
-===expect===

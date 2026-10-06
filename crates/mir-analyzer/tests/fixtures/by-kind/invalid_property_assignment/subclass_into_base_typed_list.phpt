@@ -16,4 +16,3 @@ class Command {
         $this->args = [new CommandArgument(), new CommandOption()];
     }
 }
-===expect===

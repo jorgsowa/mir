@@ -20,4 +20,3 @@ namespace App;
 function passthrough($value): iterable {
     return $value;
 }
-===expect===

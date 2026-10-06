@@ -31,4 +31,3 @@ use Lib\Child;
 $child = new Child();
 $result = \Lib\wrap($child);
 /** @mir-check $result is Lib\Child */
-===expect===

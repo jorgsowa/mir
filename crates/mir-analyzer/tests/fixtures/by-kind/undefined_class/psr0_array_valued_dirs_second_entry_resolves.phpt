@@ -17,4 +17,3 @@ $t = new Legacy_Thing();
 echo $t->name();
 $t->nope();
 //<^^^^^^^^^^ UndefinedMethod: Method Legacy_Thing::nope() does not exist
-===expect===

@@ -30,4 +30,3 @@ function test_array_walk_recursive_preserves_type(array $arr): void {
     /** @mir-check $arr is non-empty-array<string, int> */
     $_ = $arr;
 }
-===expect===

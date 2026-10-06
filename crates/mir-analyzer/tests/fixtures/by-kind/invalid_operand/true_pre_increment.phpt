@@ -11,4 +11,3 @@ FN: prefix ++ never checked its operand, unlike postfix ++.
 $a = true;
 ++$a;
 //^^ InvalidOperand: Operator '++' not supported for operand of type 'true'
-===expect===

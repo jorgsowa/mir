@@ -20,4 +20,3 @@ function run(): void {
     echo $matches[0];
 //  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

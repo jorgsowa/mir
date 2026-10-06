@@ -11,4 +11,3 @@ function test(): array {
 function no_collision(): array {
     return [1 => 'a', 'b'];
 }
-===expect===

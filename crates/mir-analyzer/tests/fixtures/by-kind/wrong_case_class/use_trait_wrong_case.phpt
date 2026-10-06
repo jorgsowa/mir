@@ -9,4 +9,3 @@ class Person {
 //<^^^^^^^^^^^^^^ WrongCaseClass: Class name 'greetable' has incorrect casing; use 'Greetable'
     use greetable;
 }
-===expect===

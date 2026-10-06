@@ -19,5 +19,3 @@ function reported_before_def(): void {
 //       ^^^^^^ UndefinedVariable: Variable $early is not defined
     ${"x"} = 1;
 }
-
-===expect===

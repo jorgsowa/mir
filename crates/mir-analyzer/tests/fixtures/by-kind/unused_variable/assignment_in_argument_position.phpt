@@ -31,4 +31,3 @@ function still_unused(): void {
     $o = new Mock();
 //  ^^ UnusedVariable: Variable $o is never read
 }
-===expect===

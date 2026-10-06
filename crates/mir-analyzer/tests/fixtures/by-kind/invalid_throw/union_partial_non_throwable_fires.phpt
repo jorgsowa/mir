@@ -6,4 +6,3 @@ Union type where one part is not Throwable fires InvalidThrow
 $e = new \RuntimeException();
 throw $e;
 //<^^^^^^^^^ InvalidThrow: Thrown type 'RuntimeException|string' does not extend Throwable
-===expect===

@@ -23,4 +23,3 @@ function test(array $a, array $b): void {
     /** @mir-check $mapped_b is array<int|string, mixed> */
     $_ = $mapped_b;
 }
-===expect===

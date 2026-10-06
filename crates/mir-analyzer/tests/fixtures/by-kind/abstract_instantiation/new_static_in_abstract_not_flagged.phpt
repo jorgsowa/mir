@@ -7,4 +7,3 @@ abstract class Factory {
         return new static();
     }
 }
-===expect===

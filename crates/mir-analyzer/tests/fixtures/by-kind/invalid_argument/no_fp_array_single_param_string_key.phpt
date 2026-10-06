@@ -17,4 +17,3 @@ function acceptsArray(array $arr): void { var_dump($arr); }
 $data = ["foo" => 1, "bar" => 2];
 
 acceptsArray($data);
-===expect===

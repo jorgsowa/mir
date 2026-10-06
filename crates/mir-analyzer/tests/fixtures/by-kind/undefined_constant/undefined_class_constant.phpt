@@ -5,4 +5,3 @@ Undefined class constant
 class A {}
 echo A::HELLO;
 //   ^^^^^^^^ UndefinedConstant: Constant A::HELLO is not defined
-===expect===

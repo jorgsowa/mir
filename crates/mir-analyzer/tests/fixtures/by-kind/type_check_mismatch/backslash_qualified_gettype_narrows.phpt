@@ -43,4 +43,3 @@ function test_get_debug_type(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

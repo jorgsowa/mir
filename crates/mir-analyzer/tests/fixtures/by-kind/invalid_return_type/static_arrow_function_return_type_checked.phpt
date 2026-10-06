@@ -11,4 +11,3 @@ return-type check must not be skipped just because there's no captured $this.
 <?php
 $f = static fn(): int => 'not an int';
 //                       ^^^^^^^^^^^^ InvalidReturnType: Return type '"not an int"' is not compatible with declared 'int'
-===expect===

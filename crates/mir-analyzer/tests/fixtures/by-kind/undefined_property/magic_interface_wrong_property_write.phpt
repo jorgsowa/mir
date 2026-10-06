@@ -17,4 +17,3 @@ interface GetterSetter {
 function getFoo(GetterSetter $o) : void {
     $o->bar = "hello";
 }
-===expect===

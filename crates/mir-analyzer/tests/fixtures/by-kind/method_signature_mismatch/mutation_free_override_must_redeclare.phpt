@@ -16,4 +16,3 @@ class Mutates implements Counter {
         return $this->calls;
     }
 }
-===expect===

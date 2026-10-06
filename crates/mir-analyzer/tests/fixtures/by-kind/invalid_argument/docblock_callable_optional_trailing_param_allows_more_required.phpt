@@ -17,5 +17,3 @@ declared signature.
 function register(Closure $cb): void {}
 
 register(function (int $a, array $b, string $c): void {});
-
-===expect===

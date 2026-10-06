@@ -13,4 +13,3 @@ class StillPure implements Calculator {
         return $a + $b;
     }
 }
-===expect===

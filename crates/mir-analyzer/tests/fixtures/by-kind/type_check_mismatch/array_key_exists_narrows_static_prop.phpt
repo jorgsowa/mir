@@ -33,4 +33,3 @@ class ChildBag extends Bag {
         return "unknown";
     }
 }
-===expect===

@@ -12,4 +12,3 @@ use App\Countable;
 interface Collection extends Countable {
     public function isEmpty(): bool;
 }
-===expect===

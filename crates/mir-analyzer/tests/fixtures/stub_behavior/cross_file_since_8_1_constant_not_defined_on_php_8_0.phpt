@@ -13,4 +13,3 @@ function is_avif(int $type): void {
 ===file:App.php===
 <?php
 is_avif(19);
-===expect===

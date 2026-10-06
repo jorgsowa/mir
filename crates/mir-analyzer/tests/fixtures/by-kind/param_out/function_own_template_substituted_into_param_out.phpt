@@ -24,4 +24,3 @@ function identity($in, mixed &$out): void {
 identity(42, $result);
 /** @mir-check $result is int */
 $_ = $result;
-===expect===

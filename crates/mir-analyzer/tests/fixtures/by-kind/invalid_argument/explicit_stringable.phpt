@@ -8,5 +8,3 @@ class A implements Stringable {
         return "";
     }
 }
-
-===expect===

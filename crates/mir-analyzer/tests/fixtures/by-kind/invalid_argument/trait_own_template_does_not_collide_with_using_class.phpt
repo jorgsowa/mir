@@ -37,4 +37,3 @@ function f(Container $c): void {
     takesString($c->traitValue);
 //              ^^^^^^^^^^^^^^ MixedArgument: Argument $x of takesString() is mixed
 }
-===expect===

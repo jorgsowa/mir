@@ -18,4 +18,3 @@ function isMap(mixed $array): array
 
     return $array;
 }
-===expect===

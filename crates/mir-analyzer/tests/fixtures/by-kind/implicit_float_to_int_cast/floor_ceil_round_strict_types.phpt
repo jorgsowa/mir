@@ -14,5 +14,3 @@ takes_int(ceil(3.1));
 //        ^^^^^^^^^ InvalidArgument: Argument $n of takes_int() expects 'int', got 'float'
 takes_int(round(3.5));
 //        ^^^^^^^^^^ InvalidArgument: Argument $n of takes_int() expects 'int', got 'float'
-
-===expect===

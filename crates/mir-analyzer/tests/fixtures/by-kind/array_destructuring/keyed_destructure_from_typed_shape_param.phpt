@@ -20,4 +20,3 @@ function test(array $arr): void {
     /** @mir-check $b is string */
     echo 2;
 }
-===expect===

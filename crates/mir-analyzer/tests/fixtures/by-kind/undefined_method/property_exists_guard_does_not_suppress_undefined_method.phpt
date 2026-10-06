@@ -11,4 +11,3 @@ function dispatch(Notification $n): void {
 //      ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
     }
 }
-===expect===

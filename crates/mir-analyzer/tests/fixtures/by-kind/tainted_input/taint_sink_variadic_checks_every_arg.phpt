@@ -28,4 +28,3 @@ class Searcher {
 
 (new Searcher())->runLdapSearchMethod("a", "b", (string) $_GET["q"]);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
-===expect===

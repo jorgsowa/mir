@@ -27,4 +27,3 @@ function test($v): void {
     /** @mir-check $v is C */
     echo "ok";
 }
-===expect===

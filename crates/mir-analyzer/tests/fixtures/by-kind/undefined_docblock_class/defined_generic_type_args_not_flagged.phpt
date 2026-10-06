@@ -39,4 +39,3 @@ class TypedList implements Collection {
         return null;
     }
 }
-===expect===

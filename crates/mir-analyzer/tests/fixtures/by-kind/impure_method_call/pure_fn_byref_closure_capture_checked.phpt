@@ -38,4 +38,3 @@ function bumpViaProperty(Counter $c): void {
     };
     $fn();
 }
-===expect===

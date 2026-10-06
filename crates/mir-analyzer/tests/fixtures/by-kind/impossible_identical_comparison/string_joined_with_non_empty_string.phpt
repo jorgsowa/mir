@@ -40,4 +40,3 @@ function onlyNonEmpty(string $a, bool $c): void {
     if ($x === null) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'non-empty-string' and 'null' is always false — these types can never be identical
 }
-===expect===

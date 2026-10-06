@@ -22,4 +22,3 @@ $factory = new NestedFactory();
 $result = $factory->makeNested(null, 1);
 /** @mir-check $result is Wrapper<string> */
 $factory->wrapper = $result;
-===expect===

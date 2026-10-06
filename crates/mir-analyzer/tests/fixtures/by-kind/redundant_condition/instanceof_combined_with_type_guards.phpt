@@ -48,4 +48,3 @@ function mixedNarrowing($value) {
         count($value);
     }
 }
-===expect===

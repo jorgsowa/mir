@@ -7,4 +7,3 @@ class A {}
 #[A]
 //^ InvalidAttribute: Class A does not have an #[Attribute] annotation
 class B {}
-===expect===

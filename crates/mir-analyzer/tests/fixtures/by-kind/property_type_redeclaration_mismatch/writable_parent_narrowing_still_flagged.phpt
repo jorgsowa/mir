@@ -10,4 +10,3 @@ final class NarrowId extends Id {
     public string $value = 'a';
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of NarrowId::$value must be int|string (as in parent class), string given
 }
-===expect===

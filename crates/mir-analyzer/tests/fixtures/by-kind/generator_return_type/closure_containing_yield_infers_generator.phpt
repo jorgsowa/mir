@@ -20,4 +20,3 @@ $gen = function () {
 $g = $gen();
 /** @mir-check $g is Generator<int, 1|2, mixed, void> */
 $_ = 1;
-===expect===

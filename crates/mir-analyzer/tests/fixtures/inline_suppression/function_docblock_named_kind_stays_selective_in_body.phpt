@@ -8,4 +8,3 @@ function f(): void {
     new NoSuchClass(noSuchFunc());
 //                  ^^^^^^^^^^^^ UndefinedFunction: Function noSuchFunc() is not defined
 }
-===expect===

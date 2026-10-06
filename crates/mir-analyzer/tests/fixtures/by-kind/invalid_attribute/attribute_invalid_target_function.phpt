@@ -5,5 +5,3 @@ Attribute invalid target function
 #[Attribute]
 //^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not functions
 function foo(): void {}
-
-===expect===

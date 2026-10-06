@@ -27,4 +27,3 @@ class KeyListener extends Listener {
     /** @param KeyEvent $event */
     public function handle(Event $event): void {}
 }
-===expect===

@@ -33,4 +33,3 @@ function useIt(Generator $g): string
 //  ^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 //         ^^^^^^^^^^^ UndefinedMethod: Method App\Other::build() does not exist
 }
-===expect===

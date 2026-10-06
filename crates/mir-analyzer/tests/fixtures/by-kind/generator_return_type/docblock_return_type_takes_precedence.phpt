@@ -18,4 +18,3 @@ function gen() {
 $g = gen();
 /** @mir-check $g is Generator<string, int> */
 $_ = 1;
-===expect===

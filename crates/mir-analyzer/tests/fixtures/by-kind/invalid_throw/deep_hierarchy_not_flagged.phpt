@@ -7,4 +7,3 @@ class NotFoundException extends DomainException {}
 class UserNotFoundException extends NotFoundException {}
 
 throw new UserNotFoundException('user not found');
-===expect===

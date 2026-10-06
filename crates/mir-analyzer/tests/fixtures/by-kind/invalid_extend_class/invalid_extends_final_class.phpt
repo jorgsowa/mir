@@ -7,5 +7,3 @@ final class A {}
 
 class B extends A {}
 //<^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class B cannot extend final class A
-
-===expect===

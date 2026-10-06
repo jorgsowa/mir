@@ -75,4 +75,3 @@ function unguarded(bool $f): void {
     }
     echo $d['cfg']->name;
 }
-===expect===

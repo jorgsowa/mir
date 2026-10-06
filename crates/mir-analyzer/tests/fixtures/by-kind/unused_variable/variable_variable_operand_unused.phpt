@@ -14,4 +14,3 @@ function test() {
     $$foo = 42;
 //  ^^^^^ UnusedVariable: Variable $bar is never read
 }
-===expect===

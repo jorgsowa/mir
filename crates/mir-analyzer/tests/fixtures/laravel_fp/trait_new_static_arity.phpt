@@ -26,4 +26,3 @@ class Collection {
     use MakesItems;
     public function __construct(array $items) {}
 }
-===expect===

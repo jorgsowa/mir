@@ -5,4 +5,3 @@ Variable method call on array
 $arr = [];
 $b = "foo";
 $arr->$b();
-===expect===

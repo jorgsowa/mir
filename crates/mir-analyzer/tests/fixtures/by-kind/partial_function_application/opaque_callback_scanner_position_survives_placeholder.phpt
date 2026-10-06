@@ -41,4 +41,3 @@ function double(int $x): int {
 
 $partial = process(?, 'double');
 //                 ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
-===expect===

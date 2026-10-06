@@ -26,5 +26,3 @@ function run(string $s, string $dyn): void {
     /** @mir-check $m4 is list<string> */
     $_4 = $m4;
 }
-
-===expect===

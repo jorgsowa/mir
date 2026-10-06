@@ -8,4 +8,3 @@ enum Direction: string {
     case East = 'east';
     case West = 'west';
 }
-===expect===

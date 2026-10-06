@@ -11,4 +11,3 @@ InvalidClone fires when cloning a null literal.
 $x = null;
 clone $x;
 //<^^^^^^^^ InvalidClone: cannot clone non-object null
-===expect===

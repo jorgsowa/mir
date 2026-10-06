@@ -8,4 +8,3 @@ class Dog extends Animal {}
 
 /** @return Dog */
 function getAnimal(): Animal { return new Dog(); }
-===expect===

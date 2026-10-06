@@ -19,4 +19,3 @@ function test(?Bar $x): void {
     $x->missing();
 //  ^^^^^^^^^^^^^ UndefinedMethod: Method Bar::missing() does not exist
 }
-===expect===

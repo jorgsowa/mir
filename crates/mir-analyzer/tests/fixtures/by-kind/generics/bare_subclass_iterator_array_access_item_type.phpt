@@ -64,4 +64,3 @@ class IntTypedList extends TypedList {}
 function readIntTypedList(IntTypedList $list): int {
     return $list[0] + 1;
 }
-===expect===

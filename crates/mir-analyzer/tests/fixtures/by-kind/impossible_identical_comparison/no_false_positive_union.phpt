@@ -13,4 +13,3 @@ function test(string|int $x): void {
     if ($x === "foo") {}
     if ($x === 42) {}
 }
-===expect===

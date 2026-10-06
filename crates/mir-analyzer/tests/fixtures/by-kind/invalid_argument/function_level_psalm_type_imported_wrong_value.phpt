@@ -23,4 +23,3 @@ function log(string $level): void {}
 
 log("trace");
 //  ^^^^^^^ InvalidArgument: Argument $level of log() expects '"debug"|"info"|"warning"|"error"', got '"trace"'
-===expect===

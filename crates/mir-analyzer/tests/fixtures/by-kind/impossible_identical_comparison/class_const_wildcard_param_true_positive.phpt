@@ -13,4 +13,3 @@ class D {
 //             ^^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '1|2' and '9' is always false — these types can never be identical
     }
 }
-===expect===

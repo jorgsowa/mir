@@ -73,4 +73,3 @@ function test_property_exists(mixed $x): void {
         $_ = $x;
     }
 }
-===expect===

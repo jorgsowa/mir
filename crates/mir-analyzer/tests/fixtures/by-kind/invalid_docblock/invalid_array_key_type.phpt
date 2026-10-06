@@ -15,4 +15,3 @@ Invalid array key type
  * @return void
  */
 function foo($arg) {}
-===expect===

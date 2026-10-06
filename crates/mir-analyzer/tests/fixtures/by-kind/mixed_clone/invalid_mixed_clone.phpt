@@ -7,4 +7,3 @@ $a = 5;
 /** @mir-check $a is mixed */
 clone $a;
 //<^^^^^^^^ MixedClone: cannot clone mixed
-===expect===

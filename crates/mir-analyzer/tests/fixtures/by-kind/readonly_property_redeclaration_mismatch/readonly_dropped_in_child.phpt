@@ -16,4 +16,3 @@ class B extends A {
         $this->x = $x;
     }
 }
-===expect===

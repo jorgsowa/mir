@@ -11,4 +11,3 @@ closure parameter not undefined no error
 $fn = function(string $name): string {
     return $name;
 };
-===expect===

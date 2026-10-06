@@ -40,4 +40,3 @@ class Wrapper {
         $this->holder->factory->build();
     }
 }
-===expect===

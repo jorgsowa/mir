@@ -64,4 +64,3 @@ function useIfTrue(?string $x): string {
     }
     return "default";
 }
-===expect===

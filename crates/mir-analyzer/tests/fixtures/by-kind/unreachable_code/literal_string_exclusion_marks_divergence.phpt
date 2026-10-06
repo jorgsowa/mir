@@ -62,4 +62,3 @@ class StaticBag {
         }
     }
 }
-===expect===

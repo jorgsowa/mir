@@ -13,4 +13,3 @@ function wrap(?string $value): array|string
     }
     return $value . '!';
 }
-===expect===

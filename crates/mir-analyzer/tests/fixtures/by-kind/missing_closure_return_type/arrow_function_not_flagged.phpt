@@ -11,4 +11,3 @@ return type is inferred from the expression body, so no annotation is required.
 <?php
 $fn = fn() => 1;
 $fn2 = fn(int $x) => $x + 1;
-===expect===

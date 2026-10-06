@@ -37,4 +37,3 @@ class Config {
         }
     }
 }
-===expect===

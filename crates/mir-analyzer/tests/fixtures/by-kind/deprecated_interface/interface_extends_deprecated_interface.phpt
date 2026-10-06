@@ -12,5 +12,3 @@ interface OldLogger {
 
 interface ExtendedLogger extends OldLogger {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedInterface: Interface OldLogger is deprecated: Use NewLogger instead
-
-===expect===

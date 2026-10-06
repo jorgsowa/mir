@@ -14,4 +14,3 @@ function test(): void {
     [$a] = $v;
     var_dump($a);
 }
-===expect===

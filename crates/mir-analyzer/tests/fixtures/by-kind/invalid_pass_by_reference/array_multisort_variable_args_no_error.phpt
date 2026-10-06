@@ -6,4 +6,3 @@ regress once the lenient-by-ref special case is added.
 function test(array $keys, array $data): void {
     array_multisort($keys, SORT_ASC, $data);
 }
-===expect===

@@ -10,4 +10,3 @@ class Child extends Middle {
     public function locked(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::locked() cannot override final method from Grandparent
 }
-===expect===

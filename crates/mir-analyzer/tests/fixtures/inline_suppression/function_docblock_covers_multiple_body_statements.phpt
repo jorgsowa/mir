@@ -10,4 +10,3 @@ function f(): void {
     echo 'between';
     new NoSuchClassB();
 }
-===expect===

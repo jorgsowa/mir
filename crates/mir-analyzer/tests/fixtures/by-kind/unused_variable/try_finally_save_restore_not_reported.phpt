@@ -16,4 +16,3 @@ function withConstraints(callable $callback): mixed {
 function getGlobal() { return true; }
 /** @param bool $v */
 function setGlobal($v): void { echo (int)$v; }
-===expect===

@@ -24,4 +24,3 @@ class Registry {
 namespace App\Models;
 
 class Foo {}
-===expect===

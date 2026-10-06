@@ -22,4 +22,3 @@ class C extends B {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method C::foofoo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
     }
 }
-===expect===

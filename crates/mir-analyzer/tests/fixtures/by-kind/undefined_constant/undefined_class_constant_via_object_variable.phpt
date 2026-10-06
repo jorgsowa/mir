@@ -7,4 +7,3 @@ function run(A $obj): void {
     echo $obj::MISSING;
 //       ^^^^^^^^^^^^^ UndefinedConstant: Constant A::MISSING is not defined
 }
-===expect===

@@ -34,4 +34,3 @@ function handle(Request $req): void {
     echo $req->getParam('x');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

@@ -12,4 +12,3 @@ function defineConstant() {
 }
 
 echo CONSTANT;
-===expect===

@@ -34,4 +34,3 @@ function f(int $x): void {
     /** @mir-check $r is 1|2|0 */
     echo "ok";
 }
-===expect===

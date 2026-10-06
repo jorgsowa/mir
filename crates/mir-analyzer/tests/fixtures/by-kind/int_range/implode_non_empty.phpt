@@ -22,4 +22,3 @@ function test_possibly_empty_parts(array $parts): void {
     /** @mir-check $r is string */
     $_ = $r;
 }
-===expect===

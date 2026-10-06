@@ -8,4 +8,3 @@ class Foo {
 //      ^^^^^ InvalidScope: $this cannot be used in a static method
     }
 }
-===expect===

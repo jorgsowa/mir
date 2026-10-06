@@ -19,4 +19,3 @@ class Counter {
 //      ^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Counter::$n outside of constructor
     }
 }
-===expect===

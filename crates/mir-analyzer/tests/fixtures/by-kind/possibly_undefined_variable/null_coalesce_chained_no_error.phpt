@@ -14,4 +14,3 @@ function decrypt(bool $aead): string {
     }
     return $decrypted;
 }
-===expect===

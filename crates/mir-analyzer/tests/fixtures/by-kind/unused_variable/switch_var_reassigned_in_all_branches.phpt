@@ -17,4 +17,3 @@ switch (rand(0, 2)) {
 if ($a) {
     echo "cool";
 }
-===expect===

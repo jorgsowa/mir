@@ -26,4 +26,3 @@ trait HasLogger {
         #[OnlyProperty] private readonly string $name,
     ) {}
 }
-===expect===

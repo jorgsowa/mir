@@ -44,4 +44,3 @@ class ChildBag extends Bag {
         }
     }
 }
-===expect===

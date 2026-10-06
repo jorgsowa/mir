@@ -29,4 +29,3 @@ class Mid extends Base {
 new Mid(5);
 new Mid("wrong");
 //      ^^^^^^^ InvalidArgument: Argument $value of Mid::__construct() expects 'int', got '"wrong"'
-===expect===

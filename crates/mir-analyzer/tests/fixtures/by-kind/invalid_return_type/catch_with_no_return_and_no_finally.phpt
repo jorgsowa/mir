@@ -18,4 +18,3 @@ function foo() : bool {
         // do nothing here either
     }
 }
-===expect===

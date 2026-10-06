@@ -67,4 +67,3 @@ function falseBranchDoesNotNarrow(mixed $obj): void {
 //      ^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Animal::onlyOnDuck() does not exist
     }
 }
-===expect===

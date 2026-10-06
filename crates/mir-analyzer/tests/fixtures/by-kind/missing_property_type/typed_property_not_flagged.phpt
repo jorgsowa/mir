@@ -7,4 +7,3 @@ class User {
     public string $name;
     public int $age;
 }
-===expect===

@@ -11,4 +11,3 @@ class Unrelated {
 //      ^^^^^^^^^^^^^^ UndefinedMethod: Method Base::secret() does not exist
     }
 }
-===expect===

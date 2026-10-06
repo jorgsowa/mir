@@ -8,4 +8,3 @@ class Obj { public string $name = 'x'; }
 function test(?Obj $obj): string {
     return $obj?->name ?? '';
 }
-===expect===

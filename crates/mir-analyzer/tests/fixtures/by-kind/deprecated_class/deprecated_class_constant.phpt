@@ -11,4 +11,3 @@ class Foo {
 
 echo Foo::FOO;
 //   ^^^ DeprecatedClass: Class Foo is deprecated
-===expect===

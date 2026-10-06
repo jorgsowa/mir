@@ -39,4 +39,3 @@ function join_with_separator(string $left, string $right): string {
     /** @mir-check $joined is non-empty-string */
     return $joined;
 }
-===expect===

@@ -46,4 +46,3 @@ function test_pure_string_format_is_not_narrowed(string $s): void {
     /** @mir-check $r is string */
     $_ = $r;
 }
-===expect===

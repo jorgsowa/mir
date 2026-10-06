@@ -10,4 +10,3 @@ function test(): void
 {
     echo MY_GUARDED_CONST;
 }
-===expect===

@@ -80,4 +80,3 @@ function caller(Repo $r): void {
     $r->missingConstant('anything');
     $r->missingClass('anything');
 }
-===expect===

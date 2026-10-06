@@ -14,4 +14,3 @@ function getArray(): array {
 
 $x = (int) getArray();
 //         ^^^^^^^^^^ InvalidCast: Cannot cast 'array' to 'int'
-===expect===

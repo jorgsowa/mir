@@ -10,4 +10,3 @@ mir-check inside anonymous callable body emits error
 <?php
 $fn = fn(int $x): int => (/** @mir-check $x is string */ $x * 2);
 //                                                       ^^^^^^ TypeCheckMismatch: Type of $x is expected to be string, got int
-===expect===

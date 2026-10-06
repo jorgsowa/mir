@@ -10,4 +10,3 @@ InvalidArrayAssignment does NOT fire for string — PHP allows single-character 
 <?php
 $a = "hello";
 $a[0] = 'x';
-===expect===

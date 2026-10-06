@@ -35,4 +35,3 @@ function relay($list): void {
     accept_dog_collection($list);
 //                        ^^^^^ InvalidArgument: Argument $c of accept_dog_collection() expects 'Collection<Dog>', got 'DogList<Cat>'
 }
-===expect===

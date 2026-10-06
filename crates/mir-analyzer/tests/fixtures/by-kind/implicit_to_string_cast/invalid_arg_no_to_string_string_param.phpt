@@ -14,4 +14,3 @@ function render(string $s): void {}
 
 render(new Opaque());
 //     ^^^^^^^^^^^^ InvalidArgument: Argument $s of render() expects 'string', got 'Opaque'
-===expect===

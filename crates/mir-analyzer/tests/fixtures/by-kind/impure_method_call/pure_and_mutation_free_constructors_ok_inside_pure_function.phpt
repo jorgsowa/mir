@@ -30,4 +30,3 @@ function make(): void {
     $p = new PureBox(1);
     $m = new MutationFreeBox(1);
 }
-===expect===

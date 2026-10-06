@@ -21,4 +21,3 @@ function test(array $arr): int {
     }
     return 0;
 }
-===expect===

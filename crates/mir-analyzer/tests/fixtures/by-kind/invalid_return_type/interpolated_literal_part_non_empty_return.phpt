@@ -75,4 +75,3 @@ function no_literal(string $a, string $b): false|string {
     return "{$b}";
 //  ^^^^^^^^^^^^^^ InvalidReturnType: Return type 'string' is not compatible with declared 'false|non-empty-string'
 }
-===expect===

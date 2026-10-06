@@ -14,4 +14,3 @@ function useIt(object $x): void {
         $x->count();
     }
 }
-===expect===

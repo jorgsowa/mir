@@ -11,4 +11,3 @@ bound may be a class-string
 function make(string $class) {
     return new $class();
 }
-===expect===

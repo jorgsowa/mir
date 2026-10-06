@@ -34,4 +34,3 @@ function checks_bound_template(Box $b): void {
     $b::make('not an int');
 //           ^^^^^^^^^^^^ InvalidArgument: Argument $seed of make() expects 'int', got '"not an int"'
 }
-===expect===

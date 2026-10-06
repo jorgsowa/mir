@@ -6,4 +6,3 @@ function test(): void {
     // @phpstan-ignore-next-line
     new NoSuchClass();
 }
-===expect===

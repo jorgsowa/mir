@@ -17,4 +17,3 @@ function countWord(string $output): int {
 ===file:App.php===
 <?php
 $result = countWord('some text with info here');
-===expect===

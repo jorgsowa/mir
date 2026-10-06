@@ -12,4 +12,3 @@ $x ?? 'fallback' is valid PHP even if $x is undefined
 function test(): string {
     return $x ?? 'fallback';
 }
-===expect===

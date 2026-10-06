@@ -8,5 +8,3 @@ class Baz
 //    ^^^^ UndefinedAttributeClass: Attribute class Pure does not exist
     public string $foo = "bar";
 }
-
-===expect===

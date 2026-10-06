@@ -9,4 +9,3 @@ enum Color: int {
 function test(?Color $color): string {
     return $color?->name ?? 'none';
 }
-===expect===

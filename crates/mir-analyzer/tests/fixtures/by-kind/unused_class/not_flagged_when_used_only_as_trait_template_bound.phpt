@@ -18,4 +18,3 @@ final class Impl {
 }
 
 new Impl();
-===expect===

@@ -19,4 +19,3 @@ function bar($b) : void {}
 
 bar($foo);
 //  ^^^^ PossiblyInvalidArgument: Argument $b of bar() expects 'B|C', possibly different type 'A|B' provided
-===expect===

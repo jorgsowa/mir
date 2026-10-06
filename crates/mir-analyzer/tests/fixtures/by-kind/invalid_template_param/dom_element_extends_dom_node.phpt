@@ -12,4 +12,3 @@ function process($node): void {
 
 $el = new DOMElement('x');
 process($el);
-===expect===

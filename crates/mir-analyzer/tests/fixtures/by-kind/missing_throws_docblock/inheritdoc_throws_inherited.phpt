@@ -26,4 +26,3 @@ class DbFinder implements Finder {
         return 'result';
     }
 }
-===expect===

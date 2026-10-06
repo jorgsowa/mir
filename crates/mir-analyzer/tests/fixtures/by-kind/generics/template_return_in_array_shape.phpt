@@ -30,4 +30,3 @@ $b = new Box();
 $k = $b->first([1]);
 /** @mir-check $k is 1 */
 $k;
-===expect===

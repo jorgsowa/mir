@@ -10,4 +10,3 @@ function f(int $x): string {
         1 => 'b',
     };
 }
-===expect===

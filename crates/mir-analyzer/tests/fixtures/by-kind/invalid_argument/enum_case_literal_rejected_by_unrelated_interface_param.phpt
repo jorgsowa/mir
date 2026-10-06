@@ -28,4 +28,3 @@ function test(Status $s): void {
 //                     ^^ InvalidArgument: Argument $x of needsUnrelated() expects 'Unrelated', got 'Status::Active'
     }
 }
-===expect===

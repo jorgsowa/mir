@@ -22,4 +22,3 @@ class Bar {
         call_user_func($callable);
     }
 }
-===expect===

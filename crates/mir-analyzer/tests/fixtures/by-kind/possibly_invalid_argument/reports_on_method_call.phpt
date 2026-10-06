@@ -17,4 +17,3 @@ function test(Parser $parser): void {
     $parser->parse(readInput());
 //                 ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $input of parse() expects 'string', possibly different type 'string|false' provided
 }
-===expect===

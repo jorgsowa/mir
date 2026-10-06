@@ -52,4 +52,3 @@ function mixed_shape_union_not_guaranteed(array $items): int {
     return $last;
 //         ^^^^^ PossiblyUndefinedVariable: Variable $last might not be defined
 }
-===expect===

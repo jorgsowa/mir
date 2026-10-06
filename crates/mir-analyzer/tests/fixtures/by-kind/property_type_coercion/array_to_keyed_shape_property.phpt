@@ -48,4 +48,3 @@ class Holder {
 //      ^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $meta expects 'array{'id': int, 'name': string}', cannot assign 'string'
     }
 }
-===expect===

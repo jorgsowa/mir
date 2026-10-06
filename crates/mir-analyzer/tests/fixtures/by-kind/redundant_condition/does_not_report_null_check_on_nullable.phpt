@@ -5,4 +5,3 @@ does not report null check on nullable
 function f(?string $x): void {
     if ($x === null) {}
 }
-===expect===

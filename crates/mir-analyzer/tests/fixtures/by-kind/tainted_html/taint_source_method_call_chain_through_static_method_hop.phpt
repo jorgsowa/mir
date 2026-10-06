@@ -32,4 +32,3 @@ function leak(): void {
     echo Factory::repo()->get('id');
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===

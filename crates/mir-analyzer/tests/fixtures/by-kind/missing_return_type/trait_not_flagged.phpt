@@ -7,4 +7,3 @@ trait MyTrait {
     public function noReturn() { return 1; }
     abstract public function abstractNoReturn();
 }
-===expect===

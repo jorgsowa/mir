@@ -31,4 +31,3 @@ function test(array $assoc, array $ne_assoc): void {
     /** @mir-check $intersected is array<string, int> */
     $_ = $intersected;
 }
-===expect===

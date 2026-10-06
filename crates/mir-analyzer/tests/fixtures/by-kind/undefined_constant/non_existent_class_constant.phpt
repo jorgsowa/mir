@@ -11,4 +11,3 @@ function getVal()
 {
     return 5;
 }
-===expect===

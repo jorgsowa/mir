@@ -21,4 +21,3 @@ function f(Plain|Wide $x, Plain|Variadic $y): void {
     $x->run(1);
     $y->run(1, 2);
 }
-===expect===

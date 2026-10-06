@@ -25,4 +25,3 @@ function describeAll(): void {
 function supportsFlags(int $kind): bool {
     return ast\kind_uses_flags($kind);
 }
-===expect===

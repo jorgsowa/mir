@@ -116,4 +116,3 @@ class A {
 
     private function touch(): void {}
 }
-===expect===

@@ -17,4 +17,3 @@ class Child extends Base {
         return Base::LIMIT;
     }
 }
-===expect===

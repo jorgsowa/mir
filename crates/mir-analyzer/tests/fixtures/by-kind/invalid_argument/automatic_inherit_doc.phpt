@@ -20,4 +20,3 @@ class X extends Y {
 }
 
 (new X())->boo([1, 2]);
-===expect===

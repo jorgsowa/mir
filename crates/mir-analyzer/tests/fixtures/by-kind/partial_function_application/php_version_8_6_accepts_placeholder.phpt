@@ -17,4 +17,3 @@ function add(int $a, int $b): int {
 }
 
 $partial = add(?, 5);
-===expect===

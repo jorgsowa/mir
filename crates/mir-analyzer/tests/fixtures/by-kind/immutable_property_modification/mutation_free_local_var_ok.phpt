@@ -14,4 +14,3 @@ class Formatter {
         return $upper;
     }
 }
-===expect===

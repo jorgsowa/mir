@@ -12,4 +12,3 @@ functions or arrow functions. MissingClosureReturnType is a separate issue kind.
 <?php
 $fn = function() { return 1; };
 $arrow = fn() => 2;
-===expect===

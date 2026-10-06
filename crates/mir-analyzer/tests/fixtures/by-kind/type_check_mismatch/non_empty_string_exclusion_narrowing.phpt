@@ -43,4 +43,3 @@ function viaAssert(string $x): void {
     /** @mir-check $x is non-empty-string */
     $_ = $x;
 }
-===expect===

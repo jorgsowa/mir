@@ -19,4 +19,3 @@ function add(int $a, int $b): int {
 $curried = add(?, ?);
 //             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
 //                ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
-===expect===
