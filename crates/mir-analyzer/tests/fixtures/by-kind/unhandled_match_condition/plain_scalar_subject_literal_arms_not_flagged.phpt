@@ -43,6 +43,7 @@ class Kind {
 
     public static function mixedWithVariable(string $kind, string $other): int {
         return match ($kind) {
+//             ^ +3:9 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
             self::A => 1,
             $other => 2,
         };
@@ -65,6 +66,7 @@ function inlineLiterals(string $kind, int $n): int {
 /** @param int<0, 100000> $n */
 function largeRangeStillFlagged(int $n): int {
     return match ($n) {
+//         ^ +3:5 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'int<0, 100000>'
         0 => 1,
         1 => 2,
     };
@@ -73,10 +75,8 @@ function largeRangeStillFlagged(int $n): int {
 /** @param 'a'|'b' $kind */
 function literalUnionStillFlagged(string $kind): int {
     return match ($kind) {
+//         ^ +2:5 UnhandledMatchCondition: Unhandled match condition: "b"
         'a' => 1,
     };
 }
 ===expect===
-UnhandledMatchCondition@36:15-39:9: Unhandled match condition: possibly-unmatched value of type 'string'
-UnhandledMatchCondition@58:11-61:5: Unhandled match condition: possibly-unmatched value of type 'int<0, 100000>'
-UnhandledMatchCondition@66:11-68:5: Unhandled match condition: "b"

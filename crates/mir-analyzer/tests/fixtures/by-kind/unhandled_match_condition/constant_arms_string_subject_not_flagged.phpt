@@ -83,6 +83,7 @@ class Registry implements Named {
 
     public static function runtimeProperty(string $k, Level $level): int {
         return match ($k) {
+//             ^ +3:9 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
             Level::View->value => 1,
             $level->value => 2,
         };
@@ -90,25 +91,24 @@ class Registry implements Named {
 
     public static function runtimeIndex(string $k, string $i): int {
         return match ($k) {
+//             ^ +2:9 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
             self::SLOT[$i] => 1,
         };
     }
 
     public static function runtimeBase(string $k, array $arr): int {
         return match ($k) {
+//             ^ +2:9 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
             $arr['id'] => 1,
         };
     }
 
     public static function unknownConstant(string $k): int {
         return match ($k) {
+//             ^ +2:9 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
             self::MISSING => 1,
+//          ^^^^^^^^^^^^^ UndefinedConstant: Constant Registry::MISSING is not defined
         };
     }
 }
 ===expect===
-UnhandledMatchCondition@76:15-79:9: Unhandled match condition: possibly-unmatched value of type 'string'
-UnhandledMatchCondition@83:15-85:9: Unhandled match condition: possibly-unmatched value of type 'string'
-UnhandledMatchCondition@89:15-91:9: Unhandled match condition: possibly-unmatched value of type 'string'
-UnhandledMatchCondition@95:15-97:9: Unhandled match condition: possibly-unmatched value of type 'string'
-UndefinedConstant@96:12-96:25: Constant Registry::MISSING is not defined

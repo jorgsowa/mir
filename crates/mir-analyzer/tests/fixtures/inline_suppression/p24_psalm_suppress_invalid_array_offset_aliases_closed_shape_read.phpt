@@ -11,8 +11,8 @@ class Holder {
 function test(Holder $h): void {
     /** @psalm-suppress InvalidArrayOffset */
     $x = $h->config['missing'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $x is assigned a mixed type
     /** @mir-check $x is mixed */
     echo $x;
 }
 ===expect===
-MixedAssignment@8:4-8:30: Variable $x is assigned a mixed type

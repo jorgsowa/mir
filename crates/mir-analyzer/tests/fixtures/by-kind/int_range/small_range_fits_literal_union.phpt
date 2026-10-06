@@ -28,18 +28,18 @@ function exactRange(Holder $h, int $r): void {
 /** @param int<0, 3> $r */
 function rangeTooWide(Holder $h, int $r): void {
     $h->small = $r;
+//  ^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $small expects '0|1|2', cannot assign 'int<0, 3>'
 }
 
 /** @param int<0, 100> $r */
 function rangeTooLarge(Holder $h, int $r): void {
     $h->flag = $r;
+//  ^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $flag expects '0|1', cannot assign 'int<0, 100>'
 }
 
 /** @param int<0, 1>|int<5, 5> $r */
 function unionOfRanges(Holder $h, int $r): void {
     $h->flag = $r;
+//  ^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $flag expects '0|1', cannot assign 'int<0, 1>|int<5, 5>'
 }
 ===expect===
-InvalidPropertyAssignment@27:4-27:18: Property $small expects '0|1|2', cannot assign 'int<0, 3>'
-InvalidPropertyAssignment@32:4-32:17: Property $flag expects '0|1', cannot assign 'int<0, 100>'
-InvalidPropertyAssignment@37:4-37:17: Property $flag expects '0|1', cannot assign 'int<0, 1>|int<5, 5>'

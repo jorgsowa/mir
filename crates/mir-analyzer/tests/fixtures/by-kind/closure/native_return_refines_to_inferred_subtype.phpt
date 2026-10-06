@@ -39,11 +39,17 @@ function accepted(int $n, string $s): void {
 
 function rejected(int $n, string $s, ?int $maybe): void {
     takesPositive(fn(): int => $n);
+//                ^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int' — coercion may fail at runtime
     takesPositive(fn(): int => 0);
+//                ^^^^^^^^^^^^^^ InvalidArgument: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning non-negative-int'
     takesPositive(fn(): int => -3);
+//                ^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning negative-int'
     takesNonEmpty(fn(): string => $s);
+//                ^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string' — coercion may fail at runtime
     takesNonEmpty(fn(): string => '');
+//                ^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string' — coercion may fail at runtime
     takesPositive(fn(): int => $n > 0 ? 1 : -1);
+//                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int' — coercion may fail at runtime
 }
 
 function recorded(int $n, string $s, ?int $maybe, mixed $m): void {
@@ -69,9 +75,3 @@ function recorded(int $n, string $s, ?int $maybe, mixed $m): void {
     /** @mir-check $open is Closure(): 5 */
 }
 ===expect===
-ArgumentTypeCoercion@29:18-29:33: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int' — coercion may fail at runtime
-InvalidArgument@30:18-30:32: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning non-negative-int'
-InvalidArgument@31:18-31:33: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning negative-int'
-ArgumentTypeCoercion@32:18-32:36: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string' — coercion may fail at runtime
-ArgumentTypeCoercion@33:18-33:36: Argument $f of takesNonEmpty() expects 'callable returning non-empty-string', got 'callable returning string' — coercion may fail at runtime
-ArgumentTypeCoercion@34:18-34:46: Argument $f of takesPositive() expects 'callable returning positive-int', got 'callable returning int' — coercion may fail at runtime

@@ -43,6 +43,6 @@ function run(array $source): void {
     /** @mir-check $only is int */
 
     visit(fn(string $s): string => $s);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'int'
 }
 ===expect===
-InvalidTemplateParam@35:4-35:38: Template type 'T' inferred as 'string' does not satisfy bound 'int'

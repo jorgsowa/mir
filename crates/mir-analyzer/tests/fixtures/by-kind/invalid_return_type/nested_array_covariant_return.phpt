@@ -22,13 +22,13 @@ function listInList(array $x): array { return $x; }
 
 /** @param array<string, list<Animal>> $x @return array<string, list<Cat>> */
 function narrowingIsStillRejected(array $x): array { return $x; }
+//                                                   ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Animal>>' is not compatible with declared 'array<string, list<Cat>>'
 
 /** @param array<string, list<Cat>> $x @return array<int, list<Animal>> */
 function outerKeyMismatchIsStillRejected(array $x): array { return $x; }
+//                                                          ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Cat>>' is not compatible with declared 'array<int, list<Animal>>'
 
 /** @param array<string, list<string>> $x @return array<string, list<Animal>> */
 function unrelatedLeafIsStillRejected(array $x): array { return $x; }
+//                                                       ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<string>>' is not compatible with declared 'array<string, list<Animal>>'
 ===expect===
-InvalidReturnType@21:53-21:63: Return type 'array<string, list<Animal>>' is not compatible with declared 'array<string, list<Cat>>'
-InvalidReturnType@24:60-24:70: Return type 'array<string, list<Cat>>' is not compatible with declared 'array<int, list<Animal>>'
-InvalidReturnType@27:57-27:67: Return type 'array<string, list<string>>' is not compatible with declared 'array<string, list<Animal>>'

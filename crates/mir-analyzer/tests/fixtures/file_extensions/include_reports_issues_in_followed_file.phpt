@@ -17,5 +17,5 @@ function a_fn(): int { return b_fn(); }
 ===file:b.inc===
 <?php
 function b_fn(): int { return 'x'; }
+//                     ^^^^^^^^^^^ InvalidReturnType: Return type '"x"' is not compatible with declared 'int'
 ===expect===
-b.inc: InvalidReturnType@2:23-2:34: Return type '"x"' is not compatible with declared 'int'

@@ -20,6 +20,7 @@ function keyed_on_null_or_false(null|false $s): array {
 /** @return list<string> */
 function push_on_false(false $s): array {
     $s[] = 'x';
+//  ^^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type 'false'
     return $s;
 }
 
@@ -39,8 +40,7 @@ function keyed_on_false_or_array(array|false $s): int {
 
 function push_on_int(int $s): int {
     $s[] = 'x';
+//  ^^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type 'int'
     return $s;
 }
 ===expect===
-InvalidArrayAssignment@18:4-18:14: Cannot use [] assignment on non-array type 'false'
-InvalidArrayAssignment@37:4-37:14: Cannot use [] assignment on non-array type 'int'

@@ -21,8 +21,8 @@ interface Source {
 /** @implements Source<Alpha> */
 final class AlphaSource implements Source {
     public function get(): Beta {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method AlphaSource::get() signature mismatch: return type 'Beta' is not a subtype of parent 'Alpha'
         return new Beta();
     }
 }
 ===expect===
-MethodSignatureMismatch@13:4-13:33: Method AlphaSource::get() signature mismatch: return type 'Beta' is not a subtype of parent 'Alpha'

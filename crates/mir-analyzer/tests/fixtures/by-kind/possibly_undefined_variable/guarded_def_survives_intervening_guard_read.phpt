@@ -29,6 +29,7 @@ function intervening_assignment(array $in): void {
     if ($enabled) { $items = $in; }
     if ($in) { $enabled = false; }
     if ($enabled) { echo count($items); }
+//                             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 
 function intervening_unset(array $in): void {
@@ -36,6 +37,7 @@ function intervening_unset(array $in): void {
     if ($enabled) { $items = $in; }
     if ($in) { unset($enabled); }
     if ($enabled) { echo count($items); }
+//                             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 
 function intervening_by_ref(array $in): void {
@@ -43,6 +45,7 @@ function intervening_by_ref(array $in): void {
     if ($enabled) { $items = $in; }
     if ($in) { fill($enabled); }
     if ($enabled) { echo count($items); }
+//                             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 
 /** @param list<bool> $in */
@@ -51,9 +54,6 @@ function intervening_foreach_target(array $in): void {
     if ($enabled) { $items = $in; }
     foreach ($in as $enabled) { echo "x"; }
     if ($enabled) { echo count($items); }
+//                             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@26:31-26:37: Variable $items might not be defined
-PossiblyUndefinedVariable@33:31-33:37: Variable $items might not be defined
-PossiblyUndefinedVariable@40:31-40:37: Variable $items might not be defined
-PossiblyUndefinedVariable@48:31-48:37: Variable $items might not be defined

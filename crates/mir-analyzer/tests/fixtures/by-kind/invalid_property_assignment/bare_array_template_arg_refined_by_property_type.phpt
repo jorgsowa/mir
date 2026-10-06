@@ -29,7 +29,7 @@ final class Holder {
         $this->list = new Lazy(fn(): array => []);
         $this->shape = new Lazy(fn(): array => ['id' => 1]);
         $this->scalar = new Lazy(fn(): array => []);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $scalar expects 'Lazy<int>', cannot assign 'Lazy<array>'
     }
 }
 ===expect===
-InvalidPropertyAssignment@22:8-22:51: Property $scalar expects 'Lazy<int>', cannot assign 'Lazy<array>'

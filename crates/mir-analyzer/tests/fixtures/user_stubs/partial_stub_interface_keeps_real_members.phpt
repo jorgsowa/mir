@@ -68,10 +68,10 @@ function intersection(object $m): void {
     $m->real(1);
     $m->run();
     $m->missing();
+//  ^^^^^^^^^^^^^ UndefinedMethod: Method App\Handle&App\Service::missing() does not exist
 }
 
 function asParent(Handle $h): Base {
     return $h;
 }
 ===expect===
-main.php: UndefinedMethod@24:4-24:17: Method App\Handle&App\Service::missing() does not exist

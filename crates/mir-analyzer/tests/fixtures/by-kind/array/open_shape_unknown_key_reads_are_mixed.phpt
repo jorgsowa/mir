@@ -71,6 +71,6 @@ function closed_shape_unchanged(array $row): void {
     /** @mir-check array_values($row) is non-empty-list<int> */
     $_ = array_values($row);
     $row['missing'];
+//       ^^^^^^^^^ NonExistentArrayOffset: Array offset 'missing' does not exist
 }
 ===expect===
-NonExistentArrayOffset@59:9-59:18: Array offset 'missing' does not exist

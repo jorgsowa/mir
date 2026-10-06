@@ -85,6 +85,6 @@ function wrongElementTypeIsStillRejected(string $k): array {
     $out = [];
     $out[$k][] = 'text';
     return $out;
+//  ^^^^^^^^^^^^ InvalidReturnType: Return type 'array<string, non-empty-list<"text">>' is not compatible with declared 'array<string, non-empty-list<int>>'
 }
 ===expect===
-InvalidReturnType@84:4-84:16: Return type 'array<string, non-empty-list<"text">>' is not compatible with declared 'array<string, non-empty-list<int>>'

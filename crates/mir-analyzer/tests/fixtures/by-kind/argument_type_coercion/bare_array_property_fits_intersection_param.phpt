@@ -23,8 +23,8 @@ function ok(array $actor, array $target): void {
 
 function bad(int $i): void {
     takesContext(['actor' => $i]);
+//               ^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesContext() expects 'array<string, mixed>&array{'actor': array{'id': int}&array<string, mixed>, 'target'?: array<string, mixed>}', got 'array{'actor': int}'
     takesContext(['actor' => ['id' => 'x']]);
+//               ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesContext() expects 'array<string, mixed>&array{'actor': array{'id': int}&array<string, mixed>, 'target'?: array<string, mixed>}', got 'array{'actor': array{'id': "x"}}'
 }
 ===expect===
-InvalidArgument@15:17-15:32: Argument $c of takesContext() expects 'array<string, mixed>&array{'actor': array{'id': int}&array<string, mixed>, 'target'?: array<string, mixed>}', got 'array{'actor': int}'
-InvalidArgument@16:17-16:43: Argument $c of takesContext() expects 'array<string, mixed>&array{'actor': array{'id': int}&array<string, mixed>, 'target'?: array<string, mixed>}', got 'array{'actor': array{'id': "x"}}'

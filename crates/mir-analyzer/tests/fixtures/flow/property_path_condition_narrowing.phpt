@@ -75,6 +75,7 @@ class A {
         }
         $this->cfg->reset();
         return $this->cfg->domain;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
     public function callOnThisInvalidates(): string {
@@ -83,6 +84,7 @@ class A {
         }
         $this->touch();
         return $this->cfg->domain;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
     public function intermediateWriteInvalidates(Cfg $other): string {
@@ -91,6 +93,7 @@ class A {
         }
         $this->cfg = $other;
         return $this->cfg->domain;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
     public function leafWriteReplacesNarrowing(): string {
@@ -99,6 +102,7 @@ class A {
         }
         $this->cfg->domain = null;
         return $this->cfg->domain;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'null' is not compatible with declared 'string'
     }
 
     public function nullableIntermediateStaysNullable(): ?string {
@@ -113,7 +117,3 @@ class A {
     private function touch(): void {}
 }
 ===expect===
-NullableReturnStatement@68:8-68:34: Return type 'string|null' is not compatible with declared 'string'
-NullableReturnStatement@76:8-76:34: Return type 'string|null' is not compatible with declared 'string'
-NullableReturnStatement@84:8-84:34: Return type 'string|null' is not compatible with declared 'string'
-InvalidReturnType@92:8-92:34: Return type 'null' is not compatible with declared 'string'

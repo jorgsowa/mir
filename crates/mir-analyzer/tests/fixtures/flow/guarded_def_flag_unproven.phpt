@@ -15,17 +15,20 @@ function flagSetWithoutDefinition(): void {
     if (rand(0, 1) === 1) { $file = 'f'; $mode = 'x'; }
     if (rand(0, 1) === 1) { $mode = 'x'; }
     if ($mode === 'x') { echo $file; }
+//                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 
 function flagAlreadyHeldValue(): void {
     $mode = 'x';
     if (rand(0, 1) === 1) { $file = 'f'; $mode = 'x'; }
     if ($mode === 'x') { echo $file; }
+//                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 
 function flagOfUnknownType(string $mode): void {
     if (rand(0, 1) === 1) { $file = 'f'; $mode = 'x'; }
     if ($mode === 'x') { echo $file; }
+//                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 
 function flagReassignedAfter(): void {
@@ -33,6 +36,7 @@ function flagReassignedAfter(): void {
     if (rand(0, 1) === 1) { $file = 'f'; $mode = 'x'; }
     $mode = 'x';
     if ($mode === 'x') { echo $file; }
+//                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 
 function definitionNotUnconditional(): void {
@@ -42,12 +46,15 @@ function definitionNotUnconditional(): void {
         $mode = 'x';
     }
     if ($mode === 'x') { echo $file; }
+//                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 
 function elseSetsFlagToOtherValue(): void {
     $mode = null;
     if (rand(0, 1) === 1) { $file = 'f'; $mode = 'x'; } else { $mode = 'y'; }
     if ($mode !== null) { echo $file; }
+//      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between '"x"|"y"' and 'null' is always true — these types can never be identical
+//                             ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 
 /** @param list<string> $names */
@@ -58,13 +65,6 @@ function otherBranchSetsFlag(array $names): void {
         elseif (str_ends_with($n, '.y')) { $mode = 'x'; }
     }
     if ($mode === 'x') { echo $file; }
+//                            ^^^^^ PossiblyUndefinedVariable: Variable $file might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@6:30-6:35: Variable $file might not be defined
-PossiblyUndefinedVariable@12:30-12:35: Variable $file might not be defined
-PossiblyUndefinedVariable@17:30-17:35: Variable $file might not be defined
-PossiblyUndefinedVariable@24:30-24:35: Variable $file might not be defined
-PossiblyUndefinedVariable@33:30-33:35: Variable $file might not be defined
-ImpossibleIdenticalComparison@39:8-39:22: '!==' between '"x"|"y"' and 'null' is always true — these types can never be identical
-PossiblyUndefinedVariable@39:31-39:36: Variable $file might not be defined
-PossiblyUndefinedVariable@49:30-49:35: Variable $file might not be defined

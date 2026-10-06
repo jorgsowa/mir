@@ -64,6 +64,7 @@ function unsetUnderGuard(): void {
     if ($on) { $items = [1]; }
     if ($on) { unset($items); }
     if ($on) { echo count($items); }
+//                        ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 
 function guardReassignedWhileWriting(): void {
@@ -71,6 +72,7 @@ function guardReassignedWhileWriting(): void {
     if ($on) { $items = [1]; }
     if ($on) { $on = rand(0, 1) === 1; $items = [2]; }
     if ($on) { echo count($items); }
+//                        ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 
 function writeOutsideGuard(): void {
@@ -87,5 +89,3 @@ function writeInElse(): void {
     if ($on) { echo count($items); }
 }
 ===expect===
-PossiblyUndefinedVariable@56:26-56:32: Variable $items might not be defined
-PossiblyUndefinedVariable@63:26-63:32: Variable $items might not be defined

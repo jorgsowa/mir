@@ -59,6 +59,7 @@ class Page extends Limits {
             return;
         }
         $this->limit = $n;
+//      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $limit expects 'int<1, 20>', cannot assign 'int<min, 20>'
     }
 
     public function lateStaticBindingIsNotNarrowed(int $n): void {
@@ -66,6 +67,7 @@ class Page extends Limits {
             return;
         }
         $this->limit = $n;
+//      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $limit expects 'int<1, 20>', cannot assign 'int<1, max>'
     }
 
     public function nonIntConstantIgnored(int $n): void {
@@ -73,9 +75,7 @@ class Page extends Limits {
             return;
         }
         $this->limit = $n;
+//      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $limit expects 'int<1, 20>', cannot assign 'int'
     }
 }
 ===expect===
-InvalidPropertyAssignment@58:8-58:25: Property $limit expects 'int<1, 20>', cannot assign 'int<min, 20>'
-InvalidPropertyAssignment@65:8-65:25: Property $limit expects 'int<1, 20>', cannot assign 'int<1, max>'
-InvalidPropertyAssignment@72:8-72:25: Property $limit expects 'int<1, 20>', cannot assign 'int'

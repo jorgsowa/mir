@@ -13,6 +13,7 @@ final class Box {
 
     public function bare(): void {
         $this->shaped = $this->load();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeCoercion: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign 'array' — coercion may fail at runtime
     }
 
     public function grown_in_branch(bool $c): void {
@@ -22,6 +23,7 @@ final class Box {
             $r['a'] = 1;
         }
         $this->shaped = $r;
+//      ^^^^^^^^^^^^^^^^^^ PropertyTypeCoercion: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign 'array{'b': "x", 'a': 1}|array' — coercion may fail at runtime
     }
 
     public function grown_in_both_branches(bool $c): void {
@@ -46,6 +48,7 @@ final class Box {
             $r['extra'] = 'x';
         }
         $this->shaped = $r;
+//      ^^^^^^^^^^^^^^^^^^ PropertyTypeCoercion: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign 'array{'a': 1, 'extra': "x"}|array{'extra': "x"}|array{'a': 1}|array' — coercion may fail at runtime
     }
 
     public function scalar_in_union(bool $c): void {
@@ -54,10 +57,7 @@ final class Box {
             $r = 1;
         }
         $this->shaped = $r;
+//      ^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign '1|array'
     }
 }
 ===expect===
-PropertyTypeCoercion@9:8-9:37: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign 'array' — coercion may fail at runtime
-PropertyTypeCoercion@18:8-18:26: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign 'array{'b': "x", 'a': 1}|array' — coercion may fail at runtime
-PropertyTypeCoercion@42:8-42:26: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign 'array{'a': 1, 'extra': "x"}|array{'extra': "x"}|array{'a': 1}|array' — coercion may fail at runtime
-InvalidPropertyAssignment@50:8-50:26: Property $shaped expects 'array{'a': int, 'b': string}', cannot assign '1|array'

@@ -27,10 +27,10 @@ function ok(array $actor, array $meta): void {
 
 function bad(int $i, string $s): void {
     takesShape(['actor' => $i]);
+//             ^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'actor': int}'
     takesShape(['actor' => $s]);
+//             ^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'actor': string}'
     takesShape(['other' => []]);
+//             ^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'other': array{}}'
 }
 ===expect===
-InvalidArgument@19:15-19:30: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'actor': int}'
-InvalidArgument@20:15-20:30: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'actor': string}'
-InvalidArgument@21:15-21:30: Argument $c of takesShape() expects 'array{'actor': array{'id': int}&array<string, mixed>}', got 'array{'other': array{}}'

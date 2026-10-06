@@ -57,6 +57,7 @@ $fromInterface = $i->fetch();
 /** @mir-check $fromInterface is B */
 $i->set(new A());
 $i->set(new B());
+//      ^^^^^^^ InvalidArgument: Argument $v of set() expects 'A', got 'B'
 
 $d = new ImplDoc();
 $docParent = $d->get();
@@ -64,4 +65,3 @@ $docParent = $d->get();
 $docInterface = $d->fetch();
 /** @mir-check $docInterface is B */
 ===expect===
-InvalidArgument@46:8-46:15: Argument $v of set() expects 'A', got 'B'

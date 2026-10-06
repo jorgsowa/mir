@@ -66,8 +66,8 @@ class Reader {
         }
         foreach ($n->children as $child) {
             takesOther($child);
+//                     ^^^^^^ InvalidArgument: Argument $o of takesOther() expects 'Other', got 'self(Node)'
         }
     }
 }
 ===expect===
-InvalidArgument@58:23-58:29: Argument $o of takesOther() expects 'Other', got 'self(Node)'

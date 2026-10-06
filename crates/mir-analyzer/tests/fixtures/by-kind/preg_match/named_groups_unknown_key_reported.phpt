@@ -15,7 +15,7 @@ Reading a name the pattern does not define is still reported.
 function run(string $s): string {
     preg_match('/(?<a>x)/', $s, $m);
     return (string) $m['b'];
+//                     ^^^ NonExistentArrayOffset: Array offset 'b' does not exist
 }
 
 ===expect===
-NonExistentArrayOffset@5:23-5:26: Array offset 'b' does not exist

@@ -36,6 +36,6 @@ function accepts(Traversable $t, Iterator $i, IteratorAggregate $a, Generator $g
 /** @param Traversable<int, string> $t */
 function rejectsWrongValue(Traversable $t): void {
     takesInts($t);
+//            ^^ InvalidArgument: Argument $items of takesInts() expects 'iterable<int, int>', got 'Traversable<int, string>'
 }
 ===expect===
-InvalidArgument@28:14-28:16: Argument $items of takesInts() expects 'iterable<int, int>', got 'Traversable<int, string>'

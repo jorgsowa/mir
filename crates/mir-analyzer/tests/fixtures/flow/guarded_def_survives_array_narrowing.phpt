@@ -86,6 +86,6 @@ function unguardedReadStillReported(array $in): void {
     if ($on) { $items = $in; }
     if ($on && count($items) > 0) { echo 'x'; }
     echo count($items);
+//             ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@78:15-78:21: Variable $items might not be defined

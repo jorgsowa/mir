@@ -28,21 +28,21 @@ final class Outcome {
 
 /** @return Outcome<Level::Low, int> */
 function otherCase(): Outcome { return Outcome::failure(Level::High); }
+//                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Outcome<Level::High, never>' is not compatible with declared 'Outcome<Level::Low, int>'
 
 /** @return Outcome<Level::Low, int> */
 function otherEnum(): Outcome { return Outcome::failure(Mode::Fast); }
+//                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Outcome<Mode::Fast, never>' is not compatible with declared 'Outcome<Level::Low, int>'
 
 /** @return Outcome<Tier::One|Tier::Two, int> */
 function partialUnion(): Outcome { return Outcome::failure(Tier::Three); }
+//                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Outcome<Tier::Three, never>' is not compatible with declared 'Outcome<Tier::One|Tier::Two, int>'
 
 /** @param Outcome<Level::Low, int> $o */
 function take(Outcome $o): void {}
 
 function passWrongCase(): void {
     take(Outcome::failure(Level::High));
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $o of take() expects 'Outcome<Level::Low, int>', got 'Outcome<Level::High, never>'
 }
 ===expect===
-InvalidReturnType@20:32-20:69: Return type 'Outcome<Level::High, never>' is not compatible with declared 'Outcome<Level::Low, int>'
-InvalidReturnType@23:32-23:68: Return type 'Outcome<Mode::Fast, never>' is not compatible with declared 'Outcome<Level::Low, int>'
-InvalidReturnType@26:35-26:72: Return type 'Outcome<Tier::Three, never>' is not compatible with declared 'Outcome<Tier::One|Tier::Two, int>'
-InvalidArgument@32:9-32:38: Argument $o of take() expects 'Outcome<Level::Low, int>', got 'Outcome<Level::High, never>'

@@ -33,13 +33,13 @@ function viaVariable(): array {
 /** @return list<int> */
 function notAnObjectElement(): array {
     return [new class {}];
+//  ^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'array{0: object}' is not compatible with declared 'list<int>'
 }
 
 /** @return list<string> */
 function notAStringElement(): array {
     $h = new class {};
     return [$h];
+//  ^^^^^^^^^^^^ InvalidReturnType: Return type 'array{0: object}' is not compatible with declared 'list<string>'
 }
 ===expect===
-InvalidReturnType@32:4-32:26: Return type 'array{0: object}' is not compatible with declared 'list<int>'
-InvalidReturnType@38:4-38:16: Return type 'array{0: object}' is not compatible with declared 'list<string>'

@@ -50,6 +50,7 @@ function deeper(array $l): array {
  */
 function parentIntoChild(array $l): array {
     return $l;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Base>>' is not compatible with declared 'array<string, array<int|string, Sub>>'
 }
 
 /**
@@ -58,6 +59,7 @@ function parentIntoChild(array $l): array {
  */
 function unrelatedValue(array $l): array {
     return $l;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Unrelated>>' is not compatible with declared 'array<string, array<int|string, Base>>'
 }
 
 /**
@@ -66,6 +68,7 @@ function unrelatedValue(array $l): array {
  */
 function listIntoStringKeys(array $l): array {
     return $l;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Sub>>' is not compatible with declared 'array<string, array<string, Base>>'
 }
 
 /**
@@ -74,9 +77,6 @@ function listIntoStringKeys(array $l): array {
  */
 function possiblyEmptyIntoNonEmpty(array $l): array {
     return $l;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Sub>>' is not compatible with declared 'array<string, non-empty-array<int, Base>>'
 }
 ===expect===
-InvalidReturnType@43:4-43:14: Return type 'array<string, list<Base>>' is not compatible with declared 'array<string, array<int|string, Sub>>'
-InvalidReturnType@51:4-51:14: Return type 'array<string, list<Unrelated>>' is not compatible with declared 'array<string, array<int|string, Base>>'
-InvalidReturnType@59:4-59:14: Return type 'array<string, list<Sub>>' is not compatible with declared 'array<string, array<string, Base>>'
-InvalidReturnType@67:4-67:14: Return type 'array<string, list<Sub>>' is not compatible with declared 'array<string, non-empty-array<int, Base>>'

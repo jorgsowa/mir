@@ -13,5 +13,5 @@ function a_hook(): int { return 'x'; }
 ===file:c.php===
 <?php
 function c_use(): int { return 'x'; }
+//                      ^^^^^^^^^^^ InvalidReturnType: Return type '"x"' is not compatible with declared 'int'
 ===expect===
-c.php: InvalidReturnType@2:24-2:35: Return type '"x"' is not compatible with declared 'int'

@@ -8,6 +8,6 @@ function test(array $v): void {
     /** @psalm-suppress InvalidArrayOffset */
     echo $v['missing'];
     echo $v['missing'];
+//          ^^^^^^^^^ NonExistentArrayOffset: Array offset 'missing' does not exist
 }
 ===expect===
-NonExistentArrayOffset@6:12-6:21: Array offset 'missing' does not exist

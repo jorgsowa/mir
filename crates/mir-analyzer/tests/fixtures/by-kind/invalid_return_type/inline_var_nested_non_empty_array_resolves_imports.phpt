@@ -50,7 +50,7 @@ namespace App {
         $g = [];
         /** @var non-empty-array<string, non-empty-array<int, Other>> $g */
         return $g;
+//      ^^^^^^^^^^ InvalidReturnType: Return type 'non-empty-array<string, non-empty-array<int, Lib\Other>>' is not compatible with declared 'non-empty-array<string, non-empty-array<int, Lib\Item>>'
     }
 }
 ===expect===
-InvalidReturnType@43:8-43:18: Return type 'non-empty-array<string, non-empty-array<int, Lib\Other>>' is not compatible with declared 'non-empty-array<string, non-empty-array<int, Lib\Item>>'

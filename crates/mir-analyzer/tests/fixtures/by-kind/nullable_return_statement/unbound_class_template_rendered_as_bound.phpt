@@ -24,14 +24,14 @@ final class Holder {
 
     public function viaMethod(): Shape {
         return $this->bounded->find();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'Shape|null' is not compatible with declared 'Shape'
     }
 
     public function viaClosure(): Closure {
         return function (): Shape {
             return $this->bounded->find();
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'Shape|null' is not compatible with declared 'Shape'
         };
     }
 }
 ===expect===
-NullableReturnStatement@14:8-14:38: Return type 'Shape|null' is not compatible with declared 'Shape'
-NullableReturnStatement@19:12-19:42: Return type 'Shape|null' is not compatible with declared 'Shape'

@@ -7,8 +7,8 @@ function test(bool $c): void {
     $v = $c ? ['a' => 1] : 'text';
     /** @psalm-suppress InvalidArrayOffset */
     $x = $v['missing'];
+//  ^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $x is assigned a mixed type
     /** @mir-check $x is mixed */
     echo $x;
 }
 ===expect===
-MixedAssignment@5:4-5:22: Variable $x is assigned a mixed type

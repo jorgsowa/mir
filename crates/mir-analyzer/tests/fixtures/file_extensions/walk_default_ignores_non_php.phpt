@@ -10,6 +10,6 @@ function b_bad(): int { return 'x'; }
 ===file:c.php===
 <?php
 function c_use(): string { return b_helper(); }
+//                         ^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
+//                                ^^^^^^^^^^ UndefinedFunction: Function b_helper() is not defined
 ===expect===
-c.php: MixedReturnStatement@2:27-2:45: Cannot return a mixed type from function with declared return type 'string'
-c.php: UndefinedFunction@2:34-2:44: Function b_helper() is not defined

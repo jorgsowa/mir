@@ -73,6 +73,6 @@ function wrongValueIsStillRejected(): void {
     $a = ['fields' => []];
     $a['fields']['k'] = 'text';
     takesFields($a);
+//              ^^ InvalidArgument: Argument $shape of takesFields() expects 'array{'fields': array<string, int>}', got 'array{'fields': array{'k': "text"}}'
 }
 ===expect===
-InvalidArgument@72:16-72:18: Argument $shape of takesFields() expects 'array{'fields': array<string, int>}', got 'array{'fields': array{'k': "text"}}'

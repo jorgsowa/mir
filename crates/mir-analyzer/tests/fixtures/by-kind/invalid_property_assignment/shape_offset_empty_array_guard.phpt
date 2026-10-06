@@ -67,13 +67,13 @@ final class Bag {
             return;
         }
         $this->items = $a['items'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $items expects 'non-empty-list<int>', cannot assign 'list<int>'
     }
 
     /** @param array{items: list<int>} $a */
     public function noGuardStillErrors(array $a): void {
         $this->items = $a['items'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $items expects 'non-empty-list<int>', cannot assign 'list<int>'
     }
 }
 ===expect===
-InvalidPropertyAssignment@66:8-66:34: Property $items expects 'non-empty-list<int>', cannot assign 'list<int>'
-InvalidPropertyAssignment@71:8-71:34: Property $items expects 'non-empty-list<int>', cannot assign 'list<int>'

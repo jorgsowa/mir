@@ -21,6 +21,7 @@ $_ = $i;
 $fn = build(...);
 $mapped = array_map('build', [1, 2]);
 build('wrong');
+//    ^^^^^^^ InvalidArgument: Argument $a of build() expects 'int', got '"wrong"'
 ===file:second.php===
 <?php
 function build(string $a, string $b): string { return $a . $b; }
@@ -35,6 +36,8 @@ $_ = $i;
 $fn = build(...);
 $mapped = array_map('build', ['a'], ['b']);
 build(1, 2);
+//    ^ ArgumentTypeCoercion: Argument $a of build() expects 'string', got '1' — coercion may fail at runtime
+//       ^ ArgumentTypeCoercion: Argument $b of build() expects 'string', got '2' — coercion may fail at runtime
 ===file:third.php===
 <?php
 $_ = unique_helper(1);
@@ -43,6 +46,3 @@ function unique_helper(int $a): int { return $a; }
 <?php
 $_ = unique_helper(2);
 ===expect===
-first.php: InvalidArgument@13:6-13:13: Argument $a of build() expects 'int', got '"wrong"'
-second.php: ArgumentTypeCoercion@13:6-13:7: Argument $a of build() expects 'string', got '1' — coercion may fail at runtime
-second.php: ArgumentTypeCoercion@13:9-13:10: Argument $b of build() expects 'string', got '2' — coercion may fail at runtime

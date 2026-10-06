@@ -34,12 +34,14 @@ final class Box {
     public function otherPropertyUntouched(mixed $m): string {
         $this->h = $m;
         return $this->other;
+//      ^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
     public function nullAssignmentStillNullable(mixed $m): string {
         $this->h = $m;
         $this->h = null;
         return $this->h;
+//      ^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'null' is not compatible with declared 'string'
     }
 
     public function laterMixedAssignmentClearsNull(mixed $m): string {
@@ -49,5 +51,3 @@ final class Box {
     }
 }
 ===expect===
-NullableReturnStatement@33:8-33:28: Return type 'string|null' is not compatible with declared 'string'
-InvalidReturnType@39:8-39:24: Return type 'null' is not compatible with declared 'string'

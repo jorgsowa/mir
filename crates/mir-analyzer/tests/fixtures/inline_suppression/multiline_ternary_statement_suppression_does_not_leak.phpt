@@ -9,9 +9,9 @@ function f(bool $c): void {
     $c
         ? takeInt('a')
         : undefined_fn();
+//        ^^^^^^^^^^^^^^ UndefinedFunction: Function undefined_fn() is not defined
 
     takeInt('b');
+//          ^^^ InvalidArgument: Argument $x of takeInt() expects 'int', got '"b"'
 }
 ===expect===
-UndefinedFunction@8:10-8:24: Function undefined_fn() is not defined
-InvalidArgument@10:12-10:15: Argument $x of takeInt() expects 'int', got '"b"'
