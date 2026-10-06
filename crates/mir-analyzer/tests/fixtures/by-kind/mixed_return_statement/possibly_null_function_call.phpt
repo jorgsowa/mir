@@ -19,6 +19,7 @@ $foo =
     /**
      * @param mixed $bar
      * @suppress MixedFunctionCall
+//               ^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'MixedFunctionCall' is never used
      */
     function ($bar) use (&$foo): string
     {
@@ -29,4 +30,3 @@ $foo =
         return $bar;
     };
 ===expect===
-UnusedSuppress@11:17-11:34: Suppress annotation for 'MixedFunctionCall' is never used

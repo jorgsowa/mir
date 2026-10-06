@@ -8,8 +8,8 @@ class Attr {}
 function foo(): void {}
 
 /** @suppress InvalidArgument */
+//            ^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'InvalidArgument' is never used
 $r = new ReflectionFunction("foo");
 $r->getAttributes(Attr::class);
 
 ===expect===
-UnusedSuppress@7:14-7:29: Suppress annotation for 'InvalidArgument' is never used

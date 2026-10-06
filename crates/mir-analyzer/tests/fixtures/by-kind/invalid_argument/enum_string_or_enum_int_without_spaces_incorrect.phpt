@@ -16,8 +16,8 @@ discards the bogus type entirely rather than InvalidArgument checking
 namespace Ns;
 
 /** @param "foo"with"|"bar"|1|2|3 $s */
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has an unterminated string literal in `"foo"with"|"bar"|1|2|3`
 function foo($s) : void {}
 //           ^^ MissingParamType: Parameter $s of foo() has no type annotation
 foo(4);
 ===expect===
-InvalidDocblock@4:4-4:36: Invalid docblock: @param has an unterminated string literal in `"foo"with"|"bar"|1|2|3`

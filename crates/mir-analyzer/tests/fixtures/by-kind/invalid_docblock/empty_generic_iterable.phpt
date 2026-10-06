@@ -4,7 +4,7 @@ empty generic iterable return
 <?php
 /**
  * @return iterable<>
+// ^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @return has empty generic type parameter in `iterable<>`
  */
 function getData() { return []; }
 ===expect===
-InvalidDocblock@3:3-3:21: Invalid docblock: @return has empty generic type parameter in `iterable<>`

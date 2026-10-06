@@ -10,7 +10,7 @@ trait A {
 class C {
     use A {
         A::missingMethod as aliasName;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedTraitAliasMethod: An alias was defined for A::missingmethod but this method does not exist
     }
 }
 ===expect===
-UndefinedTraitAliasMethod@8:8-8:38: An alias was defined for A::missingmethod but this method does not exist

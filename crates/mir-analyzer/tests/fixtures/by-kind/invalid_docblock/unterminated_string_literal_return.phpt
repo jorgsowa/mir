@@ -8,9 +8,9 @@ same way as `@var`/`@param`.
 
 /**
  * @return 'foo
+// ^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @return has an unterminated string literal in `'foo`
  */
 function bar() {
     return 'foo';
 }
 ===expect===
-InvalidDocblock@4:3-4:15: Invalid docblock: @return has an unterminated string literal in `'foo`

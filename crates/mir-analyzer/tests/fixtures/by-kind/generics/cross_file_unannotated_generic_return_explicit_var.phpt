@@ -17,6 +17,7 @@ class Holder {
     /**
      * @param T $v
      * @suppress UnusedParam
+//               ^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UnusedParam' is never used
      */
     public function __construct($v) { $this->value = $v; }
     public function get() { return $this->value; }
@@ -29,4 +30,3 @@ function app(): void {
     echo $result;
 }
 ===expect===
-holder.php: UnusedSuppress@10:17-10:28: Suppress annotation for 'UnusedParam' is never used

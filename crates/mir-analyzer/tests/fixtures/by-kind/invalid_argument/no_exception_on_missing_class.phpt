@@ -10,6 +10,7 @@ No exception on missing class
 ===file===
 <?php
 /** @suppress UndefinedClass */
+//            ^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedClass' is never used
 class A
 {
     /** @var class-string<Foo> */
@@ -23,4 +24,3 @@ class A
     }
 }
 ===expect===
-UnusedSuppress@2:14-2:28: Suppress annotation for 'UndefinedClass' is never used

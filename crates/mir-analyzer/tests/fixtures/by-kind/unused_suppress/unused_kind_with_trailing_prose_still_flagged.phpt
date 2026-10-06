@@ -7,8 +7,8 @@ accidentally swallow the real kind name along with itself.
 class Foo {
     /**
      * @suppress UndefinedClass because it's fine, actually not needed
+//               ^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedClass' is never used
      */
     public string $bar = "baz";
 }
 ===expect===
-UnusedSuppress@4:17-4:31: Suppress annotation for 'UndefinedClass' is never used

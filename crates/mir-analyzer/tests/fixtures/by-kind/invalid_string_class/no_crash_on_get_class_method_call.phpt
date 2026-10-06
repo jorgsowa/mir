@@ -11,6 +11,7 @@ No crash on get class method call
 class User {
     /**
      * @suppress MixedArgument
+//               ^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'MixedArgument' is never used
      */
     public function give(): void{
         /** @var mixed */
@@ -20,4 +21,3 @@ class User {
     }
 }
 ===expect===
-UnusedSuppress@4:17-4:30: Suppress annotation for 'MixedArgument' is never used

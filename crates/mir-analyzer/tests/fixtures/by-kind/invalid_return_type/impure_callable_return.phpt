@@ -14,6 +14,7 @@ Impure callable return
  */
 function foo(): callable {
     /** @suppress ImpureFunctionCall */
+//                ^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'ImpureFunctionCall' is never used
     return function() {
         echo "bar";
 //      ^^^^^^^^^^^ ImpureFunctionCall: Calling impure function echo() in a @pure function
@@ -21,4 +22,3 @@ function foo(): callable {
     };
 }
 ===expect===
-UnusedSuppress@7:18-7:36: Suppress annotation for 'ImpureFunctionCall' is never used

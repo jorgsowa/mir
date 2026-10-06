@@ -11,6 +11,7 @@ function generator2() : Generator {
 
 /**
  * @suppress InvalidNullableReturnType
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'InvalidNullableReturnType' is never used
  */
 function notagenerator() : Generator {
     if (rand(0, 1)) {
@@ -20,4 +21,3 @@ function notagenerator() : Generator {
     return generator2();
 }
 ===expect===
-UnusedSuppress@10:13-10:38: Suppress annotation for 'InvalidNullableReturnType' is never used

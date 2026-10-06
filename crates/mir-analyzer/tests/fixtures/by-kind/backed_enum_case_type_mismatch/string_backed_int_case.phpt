@@ -5,7 +5,7 @@ The correctly-typed case (Inactive = 'inactive') must NOT produce an error.
 <?php
 enum Status: string {
     case Active = 1;
+//                ^ BackedEnumCaseTypeMismatch: Backed enum case Status::Active has value of type 1, but backing type is string
     case Inactive = 'inactive';
 }
 ===expect===
-BackedEnumCaseTypeMismatch@3:18-3:19: Backed enum case Status::Active has value of type 1, but backing type is string

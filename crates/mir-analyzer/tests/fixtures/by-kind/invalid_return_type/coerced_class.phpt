@@ -20,8 +20,8 @@ class NullableBug {
      */
     public function returns_nullable_class() {
         /** @suppress ArgumentTypeCoercion */
+//                    ^^^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'ArgumentTypeCoercion' is never used
         return self::mock("NullableClass");
     }
 }
 ===expect===
-UnusedSuppress@19:22-19:42: Suppress annotation for 'ArgumentTypeCoercion' is never used

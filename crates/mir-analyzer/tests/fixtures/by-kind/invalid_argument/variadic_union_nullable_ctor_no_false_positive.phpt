@@ -20,6 +20,7 @@ class Coll {
     /**
      * @param T ...$items
      * @suppress UnusedParam
+//               ^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UnusedParam' is never used
      */
     public function __construct(?string $label, int|string $tag, ...$items) {
         $this->items = $items;
@@ -36,4 +37,3 @@ function app(): void {
     $c->setValue(new Other());
 }
 ===expect===
-Coll.php: UnusedSuppress@13:17-13:28: Suppress annotation for 'UnusedParam' is never used

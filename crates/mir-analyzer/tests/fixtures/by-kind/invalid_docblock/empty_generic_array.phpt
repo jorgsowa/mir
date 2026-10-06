@@ -10,9 +10,9 @@ empty generic array parameter
 <?php
 /**
  * @param array<> $items
+// ^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has empty generic type parameter in `array<>`
  */
 function process($items): void {
     echo $items;
 }
 ===expect===
-InvalidDocblock@3:3-3:24: Invalid docblock: @param has empty generic type parameter in `array<>`

@@ -8,8 +8,8 @@ enum Suit {
 
     /**
      * @var array<>
+//     ^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @var has empty generic type parameter in `array<>`
      */
     const FOO = 1;
 }
 ===expect===
-InvalidDocblock@6:7-6:19: Invalid docblock: @var has empty generic type parameter in `array<>`

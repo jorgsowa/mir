@@ -8,10 +8,10 @@ identifiers in general.
 class Foo {}
 /**
  * @psalm-suppress UndefinedClass, PossiblyInvalidCast
+//                                 ^^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'PossiblyInvalidCast' is never used
  */
 function test(Foo $f): void {
     echo get_class($f);
     new NoSuchClass();
 }
 ===expect===
-UnusedSuppress@4:35-4:54: Suppress annotation for 'PossiblyInvalidCast' is never used

@@ -6,8 +6,8 @@ not a normalized form, even though matching itself is case-insensitive.
 class Foo {
     /**
      * @suppress undefinedclass
+//               ^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'undefinedclass' is never used
      */
     public string $bar = "baz";
 }
 ===expect===
-UnusedSuppress@4:17-4:31: Suppress annotation for 'undefinedclass' is never used

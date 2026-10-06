@@ -6,7 +6,7 @@ namespace App\Enums;
 
 enum Severity: int {
     case Low = 'low';
+//             ^^^^^ BackedEnumCaseTypeMismatch: Backed enum case App\Enums\Severity::Low has value of type "low", but backing type is int
     case High = 3;
 }
 ===expect===
-BackedEnumCaseTypeMismatch@5:15-5:20: Backed enum case App\Enums\Severity::Low has value of type "low", but backing type is int

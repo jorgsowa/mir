@@ -6,7 +6,7 @@ suppression is still reported as unused.
 /** @param array{a: int} $v */
 function test(array $v): void {
     /** @psalm-suppress InvalidArrayOffset */
+//                      ^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'InvalidArrayOffset' is never used
     echo $v['a'];
 }
 ===expect===
-UnusedSuppress@4:24-4:42: Suppress annotation for 'InvalidArrayOffset' is never used

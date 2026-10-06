@@ -16,6 +16,7 @@ class Rec {
     /**
      * @param T $value
      * @suppress UnusedParam
+//               ^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UnusedParam' is never used
      */
     public function __construct($value) {
         $this->value = $value;
@@ -29,4 +30,3 @@ function app(): void {
     echo $r->loop();
 }
 ===expect===
-rec.php: UnusedSuppress@9:17-9:28: Suppress annotation for 'UnusedParam' is never used

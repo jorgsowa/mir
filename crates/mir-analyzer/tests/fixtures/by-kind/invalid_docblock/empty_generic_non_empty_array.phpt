@@ -11,8 +11,8 @@ empty generic non-empty-array in class property
 class Container {
     /**
      * @var non-empty-array<> $items
+//     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @var has empty generic type parameter in `non-empty-array<>`
      */
     private $items = [];
 }
 ===expect===
-InvalidDocblock@4:7-4:36: Invalid docblock: @var has empty generic type parameter in `non-empty-array<>`

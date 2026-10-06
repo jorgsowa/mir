@@ -8,10 +8,10 @@ a single tracked kind.
 class Foo {}
 /**
  * @psalm-suppress UndefinedClass, UndefinedMethod
+//                                 ^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedMethod' is never used
  */
 function test(Foo $f): void {
     echo get_class($f);
     new NoSuchClass();
 }
 ===expect===
-UnusedSuppress@4:35-4:50: Suppress annotation for 'UndefinedMethod' is never used

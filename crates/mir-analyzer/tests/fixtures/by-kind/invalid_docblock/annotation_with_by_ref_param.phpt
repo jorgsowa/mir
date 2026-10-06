@@ -8,7 +8,7 @@ class ParentClass {
 
 /**
  * @method string getString(&$a)
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @method parameter `&$a` uses by-reference (`&`) which is not supported in @method annotations
  */
 class Child extends ParentClass {}
 ===expect===
-InvalidDocblock@7:3-7:32: Invalid docblock: @method parameter `&$a` uses by-reference (`&`) which is not supported in @method annotations

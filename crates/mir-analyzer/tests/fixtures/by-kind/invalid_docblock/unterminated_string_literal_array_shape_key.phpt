@@ -16,13 +16,13 @@ arm of `parse_type_string` and panicked on the same slice.
 
 class Foo {
     /** @var array{': int} */
+//      ^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @var has an unterminated string literal in `array{': int}`
     public $bar;
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$bar has no type annotation
 
     /** @var array{": int} */
+//      ^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @var has an unterminated string literal in `array{": int}`
     public $baz;
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$baz has no type annotation
 }
 ===expect===
-InvalidDocblock@4:8-4:26: Invalid docblock: @var has an unterminated string literal in `array{': int}`
-InvalidDocblock@8:8-8:26: Invalid docblock: @var has an unterminated string literal in `array{": int}`

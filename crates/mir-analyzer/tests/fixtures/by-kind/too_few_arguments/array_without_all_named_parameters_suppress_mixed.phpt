@@ -15,7 +15,7 @@ class User {
  */
 function processUserDataInvalid(array $data) : User {
     /** @suppress MixedArgument */
+//                ^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'MixedArgument' is never used
     return new User(...$data);
 }
 ===expect===
-UnusedSuppress@14:18-14:31: Suppress annotation for 'MixedArgument' is never used

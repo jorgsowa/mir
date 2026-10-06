@@ -4,7 +4,7 @@ Method with ampersand and space
 <?php
 /**
  * @method void alloc(string & $result)
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @method parameter `string & $result` uses by-reference (`&`) which is not supported in @method annotations
  */
 class Foo {}
 ===expect===
-InvalidDocblock@3:3-3:39: Invalid docblock: @method parameter `string & $result` uses by-reference (`&`) which is not supported in @method annotations

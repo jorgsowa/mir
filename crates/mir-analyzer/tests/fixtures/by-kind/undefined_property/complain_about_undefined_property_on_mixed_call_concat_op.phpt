@@ -5,6 +5,7 @@ Complain about undefined property on mixed call concat op
 class A {
     /**
      * @suppress MixedMethodCall
+//               ^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'MixedMethodCall' is never used
      */
     public function foo(object $a) : void {
         $a->bar("bat" . $this->baz);
@@ -12,4 +13,3 @@ class A {
     }
 }
 ===expect===
-UnusedSuppress@4:17-4:32: Suppress annotation for 'MixedMethodCall' is never used

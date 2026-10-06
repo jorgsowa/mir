@@ -6,10 +6,10 @@ must NOT swallow the following, unrelated declaration's own diagnostic.
 <?php
 interface I {
     /** @psalm-suppress UndefinedClass */
+//                      ^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedClass' is never used
     public function a(): void;
 
     public function b(): NoSuchClass;
 //                       ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
 ===expect===
-UnusedSuppress@3:24-3:38: Suppress annotation for 'UndefinedClass' is never used

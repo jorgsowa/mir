@@ -5,9 +5,9 @@ Unused suppress is flagged
 class Foo {
     /**
      * @suppress UndefinedClass
+//               ^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedClass' is never used
      */
     public string $bar = "baz";
 }
 
 ===expect===
-UnusedSuppress@4:17-4:31: Suppress annotation for 'UndefinedClass' is never used
