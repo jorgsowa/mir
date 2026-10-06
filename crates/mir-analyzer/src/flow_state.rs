@@ -820,7 +820,7 @@ impl FlowState {
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: &str, ty: Type) {
         self.narrow_var(name, ty);
-        self.drop_guarded_defs_of(Name::from(name.trim_start_matches('$')));
+        self.drop_guards_on(Name::from(name.trim_start_matches('$')));
     }
 
     /// [`Self::set_var`] for a type refinement: the value is unchanged, so
@@ -831,19 +831,27 @@ impl FlowState {
         Arc::make_mut(&mut self.assigned_vars).insert(name);
     }
 
-    fn drop_guarded_defs_of(&mut self, name: Name) {
-        if self
-            .guarded_defs
-            .iter()
-            .any(|(var, guard)| *var == name || guard.var == name)
-        {
-            Arc::make_mut(&mut self.guarded_defs)
-                .retain(|var, guard| *var != name && guard.var != name);
+    /// Drops guarded defs whose guard condition involves `name`.
+    fn drop_guards_on(&mut self, name: Name) {
+        if self.guarded_defs.values().any(|guard| guard.var == name) {
+            Arc::make_mut(&mut self.guarded_defs).retain(|_, guard| guard.var != name);
         }
+    }
+
+    /// Drops guarded defs that rely on `name` being defined or that it guards.
+    fn drop_guarded_defs_of(&mut self, name: Name) {
+        self.drop_guard_for(name);
+        self.drop_guards_on(name);
     }
 
     pub fn drop_guarded_def(&mut self, var: Name) {
         Arc::make_mut(&mut self.guarded_defs).remove(&var);
+    }
+
+    fn drop_guard_for(&mut self, var: Name) {
+        if self.guarded_defs.contains_key(&var) {
+            self.drop_guarded_def(var);
+        }
     }
 
     /// Record that `var` is defined whenever `guard` holds.
