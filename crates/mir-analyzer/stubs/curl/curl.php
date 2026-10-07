@@ -5,6 +5,14 @@ use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 use JetBrains\PhpStorm\Internal\TentativeType;
 
+/**
+ * This class or CURLStringFile should be used to upload a file with CURLOPT_POSTFIELDS.
+ *
+ * Unserialization of CURLFile instances is not allowed. As of PHP 7.4.0, serialization is forbidden
+ * in the first place.
+ *
+ * @link https://php.net/manual/en/class.curlfile.php
+ */
 class CURLFile
 {
     #[LanguageLevelTypeAware(['8.1' => 'string'], default: '')]
@@ -18,7 +26,7 @@ class CURLFile
 
     /**
      * Create a CURLFile object
-     * @link https://secure.php.net/manual/en/curlfile.construct.php
+     * @link https://php.net/manual/en/curlfile.construct.php
      * @param string $filename <p>Path to the file which will be uploaded.</p>
      * @param string $mime_type [optional] <p>Mimetype of the file.</p>
      * @param string $posted_filename [optional] <p>Name of the file.</p>
@@ -32,7 +40,7 @@ class CURLFile
 
     /**
      * Get file name
-     * @link https://secure.php.net/manual/en/curlfile.getfilename.php
+     * @link https://php.net/manual/en/curlfile.getfilename.php
      * @return string Returns file name.
      * @since 5.5
      */
@@ -42,7 +50,7 @@ class CURLFile
 
     /**
      * Get MIME type
-     * @link https://secure.php.net/manual/en/curlfile.getmimetype.php
+     * @link https://php.net/manual/en/curlfile.getmimetype.php
      * @return string Returns MIME type.
      * @since 5.5
      */
@@ -52,7 +60,7 @@ class CURLFile
 
     /**
      * Get file name for POST
-     * @link https://secure.php.net/manual/en/curlfile.getpostfilename.php
+     * @link https://php.net/manual/en/curlfile.getpostfilename.php
      * @return string Returns file name for POST.
      * @since 5.5
      */
@@ -62,8 +70,8 @@ class CURLFile
 
     /**
      * Set MIME type
-     * @link https://secure.php.net/manual/en/curlfile.setmimetype.php
-     * @param string $mime_type
+     * @link https://php.net/manual/en/curlfile.setmimetype.php
+     * @param string $mime_type MIME type to be used in POST data.
      * @since 5.5
      */
     #[TentativeType]
@@ -72,21 +80,24 @@ class CURLFile
     /**
      * Set file name for POST
      * https://secure.php.net/manual/en/curlfile.setpostfilename.php
-     * @param string $posted_filename
+     * @link https://php.net/manual/en/curlfile.setpostfilename.php
+     * @param string $posted_filename Filename to be used in POST data.
      * @since 5.5
      */
     #[TentativeType]
     public function setPostFilename(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $posted_filename): void {}
 
     /**
-     * @link https://secure.php.net/manual/en/curlfile.wakeup.php
      * Unserialization handler
+     * @link https://php-legacy-docs.zend.com/manual/php5/en/curlfile.wakeup
      * @since 5.5
      */
     public function __wakeup() {}
 }
 
 /**
+ * Represents a persistent cURL "share" handle.
+ * @link https://php.net/manual/en/class.curlsharepersistenthandle.php
  * @since 8.5
  */
 final class CurlSharePersistentHandle
@@ -110,7 +121,7 @@ function curl_init(?string $url = null) {}
 /**
  * Copy a cURL handle along with all of its preferences
  * @link https://php.net/manual/en/function.curl-copy-handle.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return CurlHandle|resource|false a new cURL handle.
  * @pure
  */
@@ -169,7 +180,7 @@ function curl_version(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $
 /**
  * Set an option for a cURL transfer
  * @link https://php.net/manual/en/function.curl-setopt.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @param int $option <p>
  * The CURLOPT_XXX option to set.
  * </p>
@@ -2127,7 +2138,7 @@ function curl_setopt(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 
 /**
  * Set multiple options for a cURL transfer
  * @link https://php.net/manual/en/function.curl-setopt-array.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @param array $options <p>
  * An array specifying which options to set and their values.
  * The keys should be valid curl_setopt constants or
@@ -2143,11 +2154,11 @@ function curl_setopt_array(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], def
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Close a cURL share handle
- * @link https://secure.php.net/manual/en/function.curl-share-close.php
+ * @link https://php.net/manual/en/function.curl-share-close.php
  * @param CurlShareHandle|resource $share_handle <p>
- * A cURL share handle returned by  {@link https://secure.php.net/manual/en/function.curl-share-init.php curl_share_init()}
+ * A cURL share handle returned by  {@link https://php.net/manual/en/function.curl-share-init.php curl_share_init()}
  * </p>
- * @return void
+ * @return void No value is returned.
  * @since 5.5
  */
 #[\JetBrains\PhpStorm\Deprecated('Deprecated: it has no effect', since: '8.5')]
@@ -2156,7 +2167,7 @@ function curl_share_close(#[LanguageLevelTypeAware(['8.0' => 'CurlShareHandle'],
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Initialize a cURL share handle
- * @link https://secure.php.net/manual/en/function.curl-share-init.php
+ * @link https://php.net/manual/en/function.curl-share-init.php
  * @return resource|CurlShareHandle Returns resource of type "cURL Share Handle".
  * @since 5.5
  */
@@ -2166,9 +2177,9 @@ function curl_share_init() {}
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Set an option for a cURL share handle.
- * @link https://secure.php.net/manual/en/function.curl-share-setopt.php
+ * @link https://php.net/manual/en/function.curl-share-setopt.php
  * @param CurlShareHandle|resource $share_handle <p>
- * A cURL share handle returned by  {@link https://secure.php.net/manual/en/function.curl-share-init.php curl_share_init()}.
+ * A cURL share handle returned by  {@link https://php.net/manual/en/function.curl-share-init.php curl_share_init()}.
  * </p>
  * @param int $option <table>
  *
@@ -2245,7 +2256,7 @@ function curl_share_setopt(#[LanguageLevelTypeAware(['8.0' => 'CurlShareHandle']
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Return string describing the given error code
- * @link https://secure.php.net/manual/en/function.curl-strerror.php
+ * @link https://php.net/manual/en/function.curl-strerror.php
  * @param int $error_code <p>
  * One of the {@link https://curl.haxx.se/libcurl/c/libcurl-errors.html &nbsp;cURL error codes} constants.
  * </p>
@@ -2258,9 +2269,9 @@ function curl_strerror(int $error_code): ?string {}
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Decodes the given URL encoded string
- * @link https://secure.php.net/manual/en/function.curl-unescape.php
+ * @link https://php.net/manual/en/function.curl-unescape.php
  * @param CurlHandle|resource $handle <p>A cURL handle returned by
- * {@link https://secure.php.net/manual/en/function.curl-init.php curl_init()}.</p>
+ * {@link https://php.net/manual/en/function.curl-init.php curl_init()}.</p>
  * @param string $string <p>
  * The URL encoded string to be decoded.
  * </p>
@@ -2273,7 +2284,7 @@ function curl_unescape(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default
 /**
  * Perform a cURL session
  * @link https://php.net/manual/en/function.curl-exec.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return string|bool true on success or false on failure. However, if the CURLOPT_RETURNTRANSFER
  * option is set, it will return the result on success, false on failure.
  */
@@ -2282,7 +2293,7 @@ function curl_exec(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'r
 /**
  * Get information regarding a specific transfer
  * @link https://php.net/manual/en/function.curl-getinfo.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @param int|null $option [optional] <p>
  * This may be one of the following constants:
  * <ul>
@@ -2545,7 +2556,7 @@ function curl_getinfo(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default:
 /**
  * Return a string containing the last error for the current session
  * @link https://php.net/manual/en/function.curl-error.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return string the error message or '' (the empty string) if no
  * error occurred.
  * @pure
@@ -2555,7 +2566,7 @@ function curl_error(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
 /**
  * Return the last error number
  * @link https://php.net/manual/en/function.curl-errno.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return int the error number or 0 (zero) if no error
  * occurred.
  * @pure
@@ -2564,10 +2575,10 @@ function curl_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
 
 /**
  * URL encodes the given string
- * @link https://secure.php.net/manual/en/function.curl-escape.php
+ * @link https://php.net/manual/en/function.curl-escape.php
  * @param CurlHandle|resource $handle <p>
  * A cURL handle returned by
- * {@link https://secure.php.net/manual/en/function.curl-init.php curl_init()}.</p>
+ * {@link https://php.net/manual/en/function.curl-init.php curl_init()}.</p>
  * @param string $string <p>
  * The string to be encoded.</p>
  * @return string|false Returns escaped string or FALSE on failure.
@@ -2579,12 +2590,12 @@ function curl_escape(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 
 /**
  * (PHP 5 >= 5.5.0) <br/>
  * Create a CURLFile object
- * @link https://secure.php.net/manual/en/curlfile.construct.php
+ * @link https://php.net/manual/en/curlfile.construct.php
  * @param string $filename <p> Path to the file which will be uploaded.</p>
  * @param string|null $mime_type <p>Mimetype of the file.</p>
  * @param string|null $posted_filename <p>Name of the file.</p>
  * @return CURLFile
- * Returns a {@link https://secure.php.net/manual/en/class.curlfile.php CURLFile} object.
+ * Returns a {@link https://php.net/manual/en/class.curlfile.php CURLFile} object.
  * @since 5.5
  * @pure
  */
@@ -2593,8 +2604,8 @@ function curl_file_create(string $filename, ?string $mime_type = null, ?string $
 /**
  * Close a cURL session
  * @link https://php.net/manual/en/function.curl-close.php
- * @param CurlHandle|resource $handle
- * @return void
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
+ * @return void No value is returned.
  */
 #[\JetBrains\PhpStorm\Deprecated('Deprecated: it has no effect', since: '8.5')]
 function curl_close(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle): void {}
@@ -2605,13 +2616,13 @@ function curl_close(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
  * @return resource|CurlMultiHandle a cURL multi handle resource or object depends on the php version
  */
 #[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'], default: 'resource')]
-function curl_multi_init(): CurlMultiHandle {}
+function curl_multi_init() {}
 
 /**
  * Add a normal cURL handle to a cURL multi handle
  * @link https://php.net/manual/en/function.curl-multi-add-handle.php
- * @param CurlMultiHandle|resource $multi_handle
- * @param CurlHandle|resource $handle
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return int 0 on success, or one of the CURLM_XXX errors
  * code.
  */
@@ -2620,8 +2631,8 @@ function curl_multi_add_handle(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHand
 /**
  * Remove a multi handle from a set of cURL handles
  * @link https://php.net/manual/en/function.curl-multi-remove-handle.php
- * @param CurlMultiHandle|resource $multi_handle
- * @param CurlHandle|resource $handle
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return int|false On success, returns one of the CURLM_XXX error codes, false on failure.
  */
 #[LanguageLevelTypeAware(['8.0' => 'int'], default: 'int|false')]
@@ -2630,7 +2641,7 @@ function curl_multi_remove_handle(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiH
 /**
  * Wait for activity on any curl_multi connection
  * @link https://php.net/manual/en/function.curl-multi-select.php
- * @param CurlMultiHandle|resource $multi_handle
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
  * @param float $timeout [optional] <p>
  * Time, in seconds, to wait for a response.
  * </p>
@@ -2642,8 +2653,8 @@ function curl_multi_select(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle']
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Set an option for the cURL multi handle
- * @link https://secure.php.net/manual/en/function.curl-multi-setopt.php
- * @param CurlMultiHandle|resource $multi_handle
+ * @link https://php.net/manual/en/function.curl-multi-setopt.php
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
  * @param int $option <p>
  * One of the <b>CURLMOPT_*</b> constants.
  * </p>
@@ -2694,7 +2705,7 @@ function curl_multi_setopt(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle']
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Return string describing error code
- * @link https://secure.php.net/manual/en/function.curl-multi-strerror.php
+ * @link https://php.net/manual/en/function.curl-multi-strerror.php
  * @param int $error_code <p>
  * One of the {@link https://curl.haxx.se/libcurl/c/libcurl-errors.html CURLM error codes} constants.
  * </p>
@@ -2706,9 +2717,9 @@ function curl_multi_strerror(int $error_code): ?string {}
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Pause and unpause a connection
- * @link https://secure.php.net/manual/en/function.curl-pause.php
+ * @link https://php.net/manual/en/function.curl-pause.php
  * @param CurlHandle|resource $handle
- * <p>A cURL handle returned by {@link https://secure.php.net/manual/en/function.curl-init.php curl_init()}.</p>
+ * <p>A cURL handle returned by {@link https://php.net/manual/en/function.curl-init.php curl_init()}.</p>
  * @param int $flags <p>One of <b>CURLPAUSE_*</b> constants.</p>
  * @return int Returns an error code (<b>CURLE_OK</b> for no error).
  * @since 5.5
@@ -2718,10 +2729,10 @@ function curl_pause(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
  * Reset all options of a libcurl session handle
- * @link https://secure.php.net/manual/en/function.curl-reset.php
+ * @link https://php.net/manual/en/function.curl-reset.php
  * @param CurlHandle|resource $handle <p>A cURL handle returned by
- * {@link https://secure.php.net/manual/en/function.curl-init.php curl_init()}.</p>
- * @return void
+ * {@link https://php.net/manual/en/function.curl-init.php curl_init()}.</p>
+ * @return void No value is returned.
  * @since 5.5
  */
 function curl_reset(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle): void {}
@@ -2729,7 +2740,7 @@ function curl_reset(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
 /**
  * Run the sub-connections of the current cURL handle
  * @link https://php.net/manual/en/function.curl-multi-exec.php
- * @param CurlMultiHandle|resource $multi_handle
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
  * @param int &$still_running <p>
  * A reference to a flag to tell whether the operations are still running.
  * </p>
@@ -2749,7 +2760,7 @@ function curl_multi_exec(
 /**
  * Return the content of a cURL handle if <constant>CURLOPT_RETURNTRANSFER</constant> is set
  * @link https://php.net/manual/en/function.curl-multi-getcontent.php
- * @param CurlHandle|resource $handle
+ * @param CurlHandle|resource $handle A cURL handle returned by curl_init.
  * @return null|string Return the content of a cURL handle if CURLOPT_RETURNTRANSFER is set.
  * @pure
  */
@@ -2758,7 +2769,7 @@ function curl_multi_getcontent(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'],
 /**
  * Get information about the current transfers
  * @link https://php.net/manual/en/function.curl-multi-info-read.php
- * @param CurlMultiHandle|resource $multi_handle
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
  * @param int &$queued_messages [optional] <p>
  * Number of messages that are still in the queue
  * </p>
@@ -2771,15 +2782,16 @@ function curl_multi_info_read(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandl
 /**
  * Close a set of cURL handles
  * @link https://php.net/manual/en/function.curl-multi-close.php
- * @param CurlMultiHandle|resource $multi_handle
- * @return void
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
+ * @return void No value is returned.
  */
 function curl_multi_close(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'], default: 'resource')] $multi_handle): void {}
 
 /**
  * Return the last multi curl error number
- * @param CurlMultiHandle|resource $multi_handle
- * @return int
+ * @link https://php.net/manual/en/function.curl-multi-errno.php
+ * @param CurlMultiHandle|resource $multi_handle A cURL multi handle returned by curl_multi_init.
+ * @return int Return an integer containing the last multi curl error number.
  * @since 7.1
  * @pure
  */
@@ -2787,7 +2799,7 @@ function curl_multi_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'],
 
 /**
  * Return the last share curl error number
- * @param CurlMultiHandle|resource $share_handle
+ * @param CurlShareHandle|resource $share_handle
  * @return int
  * @since 7.1
  * @pure
@@ -2796,14 +2808,20 @@ function curl_share_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlShareHandle'],
 
 /**
  * Return string describing the given error code
- * @param int $error_code
- * @return string|null
+ * @link https://php.net/manual/en/function.curl-share-strerror.php
+ * @param int $error_code One of the cURL error codes constants.
+ * @return string|null Returns error description or null for invalid error code.
  * @since 7.1
  * @pure
  */
 function curl_share_strerror(int $error_code): ?string {}
 
 /**
+ * Performs any connection upkeep checks
+ *
+ * Available if built against libcurl >= 7.62.0.
+ *
+ * @link https://php.net/manual/en/function.curl_upkeep.php
  * @since 8.2
  */
 function curl_upkeep(CurlHandle $handle): bool {}
@@ -2814,11 +2832,20 @@ function curl_upkeep(CurlHandle $handle): bool {}
 function curl_multi_get_handles(CurlMultiHandle $multi_handle): array {}
 
 /**
+ * Initialize a persistent cURL share handle
+ *
+ * Initialize a persistent cURL share handle with the given share options. Unlike curl_share_init,
+ * handles created by this function will not be destroyed at the end of the PHP request. If a
+ * persistent share handle with the same set of share_options is found, it will be reused.
+ *
+ * @link https://php.net/manual/en/function.curl-share-init-persistent.php
  * @since 8.5
  */
 function curl_share_init_persistent(array $share_options): CurlSharePersistentHandle {}
 
 /**
+ * A fully opaque class which replaces curl resources as of PHP 8.0.0.
+ * @link https://php.net/manual/en/class.curlhandle.php
  * @since 8.0
  */
 final class CurlHandle
@@ -2831,6 +2858,8 @@ final class CurlHandle
 }
 
 /**
+ * A fully opaque class which replaces curl_multi resources as of PHP 8.0.0.
+ * @link https://php.net/manual/en/class.curlmultihandle.php
  * @since 8.0
  */
 final class CurlMultiHandle
@@ -2843,6 +2872,8 @@ final class CurlMultiHandle
 }
 
 /**
+ * A fully opaque class which replaces curl_share resources as of PHP 8.0.0.
+ * @link https://php.net/manual/en/class.curlsharehandle.php
  * @since 8.0
  */
 final class CurlShareHandle

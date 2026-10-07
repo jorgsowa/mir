@@ -73,7 +73,7 @@ function closelog() {}
  * Registers a function that will be called when PHP starts sending output.
  * The callback is executed just after PHP prepares all headers to be sent,<br>
  * and before any other output is sent, creating a window to manipulate the outgoing headers before being sent.
- * @link https://secure.php.net/manual/en/function.header-register-callback.php
+ * @link https://php.net/manual/en/function.header-register-callback.php
  * @param callable $callback Function called just before the headers are sent.
  * @return bool true on success or false on failure.
  */
@@ -94,9 +94,9 @@ function header_register_callback(callable $callback): bool {}
  * Index 3 is a text string with the correct <b>height="yyy" width="xxx"</b> string<br>
  * that can be used directly in an IMG tag.<br>
  * On failure, FALSE is returned.
- * @link https://secure.php.net/manual/en/function.getimagesizefromstring.php
+ * @link https://php.net/manual/en/function.getimagesizefromstring.php
  * @since 5.4
- * @link https://secure.php.net/manual/en/function.getimagesizefromstring.php
+ * @link https://php.net/manual/en/function.getimagesizefromstring.php
  * @since 5.4
  */
 #[ArrayShape([0 => 'int', 1 => 'int', 2 => 'int', 3 => 'string', 'bits' => 'int', 'channels' => 'int', 'mime' => 'string'])]
@@ -108,7 +108,7 @@ function getimagesizefromstring(string $string, &$image_info = null): array|fals
  * @param int $size The desired new chunk size.
  * @return int|false Returns the previous chunk size on success.<br>
  * Will return <b>FALSE</b> if chunk_size is less than 1 or greater than <b>PHP_INT_MAX</b>.
- * @link https://secure.php.net/manual/en/function.stream-set-chunk-size.php
+ * @link https://php.net/manual/en/function.stream-set-chunk-size.php
  * @since 5.4
  */
 #[LanguageLevelTypeAware(["8.0" => "int"], default: "int|false")]
@@ -116,8 +116,9 @@ function stream_set_chunk_size($stream, int $size) {}
 
 /**
  * Initializes all syslog related variables
- * @link https://php.net/manual/en/function.define-syslog-variables.php
- * @return void
+ * @link https://php-legacy-docs.zend.com/manual/php5/en/function.define-syslog-variables
+ * @return void No value is returned. This function has been DEPRECATED as of PHP 5.3.0 and REMOVED
+ * as of PHP 5.4.0.
  * @removed 5.4
  */
 #[Deprecated(since: '5.3')]
@@ -209,14 +210,14 @@ function ob_start($callback = null, int $chunk_size = 0, int $flags = PHP_OUTPUT
 /**
  * Flush (send) the output buffer
  * @link https://php.net/manual/en/function.ob-flush.php
- * @return bool
+ * @return bool Returns true on success or false on failure.
  */
 function ob_flush(): bool {}
 
 /**
  * Clean (erase) the output buffer
  * @link https://php.net/manual/en/function.ob-clean.php
- * @return bool
+ * @return bool Returns true on success or false on failure.
  */
 function ob_clean(): bool {}
 
@@ -368,7 +369,7 @@ function ob_get_contents(): string|false {}
  * 1|<b>TRUE</b> to turn implicit flushing on, 0|<b>FALSE</b> turns it off.
  * <br><br>default: 1|<b>TRUE</b>
  * </p>
- * @return void
+ * @return void No value is returned.
  */
 function ob_implicit_flush(#[LanguageLevelTypeAware(["8.0" => "bool"], default: "int")] $enable = true): void {}
 
@@ -950,7 +951,7 @@ function range(
  * @param array &$array <p>
  * An array being sorted.
  * </p>
- * @param  &...$rest [optional] <p>
+ * @param mixed &...$rest [optional] <p>
  * More arrays, optionally followed by sort order and flags.
  * Only elements corresponding to equivalent elements in previous arrays are compared.
  * In other words, the sort is lexicographical.
@@ -1121,10 +1122,15 @@ function array_slice(array $array, int $offset, ?int $length = null, bool $prese
 function array_merge(array ...$arrays): array {}
 
 /**
+ * Gets the first value of an array
+ *
+ * Get the first value of the given array.
+ *
+ * @link https://php.net/manual/en/function.array-first.php
  * @template TKey
  * @template TValue
- * @param array<TKey, TValue> $array
- * @return TValue|null
+ * @param array<TKey, TValue> $array An array.
+ * @return TValue|null Returns the first value of array if the array is not empty; null otherwise.
  * @since 8.5
  * @meta
  * @pure
@@ -1132,10 +1138,15 @@ function array_merge(array ...$arrays): array {}
 function array_first(array $array): mixed {}
 
 /**
+ * Gets the last value of an array
+ *
+ * Get the last value of the given array.
+ *
+ * @link https://php.net/manual/en/function.array-last.php
  * @template TKey
  * @template TValue
- * @param array<TKey, TValue> $array
- * @return TValue|null
+ * @param array<TKey, TValue> $array An array.
+ * @return TValue|null Returns the last value of array if the array is not empty; null otherwise.
  * @since 8.5
  * @meta
  * @pure

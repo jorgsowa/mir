@@ -5,6 +5,7 @@ use JetBrains\PhpStorm\Internal\TentativeType;
 /**
  * The ReflectionGenerator class reports information about a generator.
  *
+ * @link https://php.net/manual/en/class.reflectiongenerator.php
  * @since 7.0
  */
 final class ReflectionGenerator
@@ -99,6 +100,12 @@ final class ReflectionGenerator
     public function getExecutingGenerator(): Generator {}
 
     /**
+     * Checks if execution finished
+     *
+     * Returns whether the execution reached the end of the function, a return statement or if an
+     * exception was thrown.
+     *
+     * @link https://php.net/manual/en/reflectiongenerator.isclosed.php
      * @since 8.4
      */
     public function isClosed(): bool {}

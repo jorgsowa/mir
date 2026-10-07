@@ -133,9 +133,10 @@ function strncasecmp(string $string1, string $string2, int $length): int {}
  * The function returns {@see true} if the passed $haystack starts from the
  * $needle string or {@see false} otherwise.
  *
- * @param string $haystack
- * @param string $needle
- * @return bool
+ * @link https://php.net/manual/en/function.str-starts-with.php
+ * @param string $haystack The string to search in.
+ * @param string $needle The substring to search for in the haystack.
+ * @return bool Returns true if haystack begins with needle, false otherwise.
  * @since 8.0
  * @pure
  */
@@ -145,9 +146,10 @@ function str_starts_with(string $haystack, string $needle): bool {}
  * The function returns {@see true} if the passed $haystack ends with the
  * $needle string or {@see false} otherwise.
  *
- * @param string $haystack
- * @param string $needle
- * @return bool
+ * @link https://php.net/manual/en/function.str-ends-with.php
+ * @param string $haystack The string to search in.
+ * @param string $needle The substring to search for in the haystack.
+ * @return bool Returns true if haystack ends with needle, false otherwise.
  * @since 8.0
  * @pure
  */
@@ -157,21 +159,32 @@ function str_ends_with(string $haystack, string $needle): bool {}
  * Checks if $needle is found in $haystack and returns a boolean value
  * (true/false) whether or not the $needle was found.
  *
- * @param string $haystack
- * @param string $needle
- * @return bool
+ * @link https://php.net/manual/en/function.str-contains.php
+ * @param string $haystack The string to search in.
+ * @param string $needle The substring to search for in the haystack.
+ * @return bool Returns true if needle is in haystack, false otherwise.
  * @since 8.0
  * @pure
  */
 function str_contains(string $haystack, string $needle): bool {}
 
 /**
+ * Decrement an alphanumeric string
+ *
+ * Returns the decremented alphanumeric ASCII string.
+ *
+ * @link https://php.net/manual/en/function.str-decrement.php
  * @since 8.3
  * @pure
  */
 function str_decrement(string $string): string {}
 
 /**
+ * Increment an alphanumeric string
+ *
+ * Returns the incremented alphanumeric ASCII string.
+ *
+ * @link https://php.net/manual/en/function.str-increment.php
  * @since 8.3
  * @pure
  */
@@ -183,7 +196,7 @@ function str_increment(string $string): string {}
  * @param array|ArrayObject &$array <p>
  * The input array.
  * </p>
- * @return array the current key and value pair from the array
+ * @return array|false the current key and value pair from the array
  * <i>array</i>. This pair is returned in a four-element
  * array, with the keys 0, 1,
  * key, and value. Elements
@@ -198,7 +211,7 @@ function str_increment(string $string): string {}
  * @removed 8.0
  */
 #[Deprecated(reason: "Use a foreach loop instead", since: "7.2")]
-function each(&$array): array {}
+function each(&$array): array|false {}
 
 /**
  * Sets which PHP errors are reported
@@ -442,7 +455,7 @@ function property_exists($object_or_class, string $property): bool {}
  * @param string $trait Name of the trait to check
  * @param bool $autoload [optional] Whether to autoload if not already loaded.
  * @return bool Returns true if trait exists, false otherwise
- * @link https://secure.php.net/manual/en/function.trait-exists.php
+ * @link https://php.net/manual/en/function.trait-exists.php
  * @since 5.4
  */
 function trait_exists(string $trait, bool $autoload = true): bool {}
@@ -709,6 +722,11 @@ function set_error_handler(?callable $callback, int $error_levels = E_ALL) {}
 function restore_error_handler(): bool {}
 
 /**
+ * Gets the user-defined error handler function
+ *
+ * Returns the current error handler function, if any.
+ *
+ * @link https://php.net/manual/en/function.get-error-handler.php
  * @since 8.5
  */
 function get_error_handler(): ?callable {}
@@ -729,6 +747,11 @@ function get_error_handler(): ?callable {}
 function set_exception_handler(?callable $callback) {}
 
 /**
+ * Gets the user-defined exception handler function
+ *
+ * Returns the current exception handler function, if any.
+ *
+ * @link https://php.net/manual/en/function.get-exception-handler.php
  * @since 8.5
  */
 function get_exception_handler(): ?callable {}
@@ -767,8 +790,8 @@ function get_declared_interfaces(): array {}
 
 /**
  * Returns an array of all declared traits
- * @return array with names of all declared traits in values. Returns NULL in case of a failure.
- * @link https://secure.php.net/manual/en/function.get-declared-traits.php
+ * @return array with names of all declared traits in values.
+ * @link https://php.net/manual/en/function.get-declared-traits.php
  * @see class_uses()
  * @since 5.4
  * @pure
@@ -1065,7 +1088,7 @@ function debug_backtrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT, int $lim
  * As of 5.4.0, this parameter can be used to limit the number of stack frames printed.
  * By default (<i>limit</i> = 0) it prints all stack frames.
  * </p>
- * @return void
+ * @return void No value is returned.
  */
 function debug_print_backtrace(
     int $options = 0,
@@ -1090,14 +1113,14 @@ function gc_enabled(): bool {}
 /**
  * Activates the circular reference collector
  * @link https://php.net/manual/en/function.gc-enable.php
- * @return void
+ * @return void No value is returned.
  */
 function gc_enable(): void {}
 
 /**
  * Deactivates the circular reference collector
  * @link https://php.net/manual/en/function.gc-disable.php
- * @return void
+ * @return void No value is returned.
  */
 function gc_disable(): void {}
 
@@ -1151,6 +1174,12 @@ function gc_mem_caches(): int {}
 function get_resources(?string $type = null): array {}
 
 /**
+ * Terminate the current script with a status code or message
+ *
+ * Terminates execution of the script. Shutdown functions and object destructors will always be
+ * executed even if exit is called. However, finally blocks are never executed.
+ *
+ * @link https://php.net/manual/en/function.exit.php
  * @since 8.4
  */
 function exit(string|int $status = 0): never {}

@@ -23,6 +23,8 @@ function spl_classes(): array {}
  * </p>
  * @return void
  * @since 5.1.2
+ * @throws \LogicException Throws LogicException when the class is not found and there are no other
+ * autoloaders registered.
  */
 function spl_autoload(string $class, ?string $file_extensions = null): void {}
 
@@ -128,7 +130,7 @@ function class_implements($object_or_class, bool $autoload = true): array|false 
 /**
  * Return hash id for given object
  * @link https://php.net/manual/en/function.spl-object-hash.php
- * @param object $object
+ * @param object $object Any object.
  * @return string A string that is unique for each object and is always the same for
  * the same object.
  * @pure
@@ -199,8 +201,10 @@ function class_uses($object_or_class, bool $autoload = true): array|false {}
 
 /**
  * return the integer object handle for given object
- * @param object $object
- * @return int
+ * @link https://php.net/manual/en/function.spl-object-id.php
+ * @param object $object Any object.
+ * @return int An integer identifier that is unique for each currently existing object and is always
+ * the same for each object.
  * @since 7.2
  * @pure
  */

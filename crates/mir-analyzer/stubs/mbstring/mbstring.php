@@ -831,7 +831,8 @@ function mb_convert_variables(
  * convmap is array specifies code area to
  * convert.
  * </p>
- * @param null|string $encoding
+ * @param null|string $encoding The encoding parameter is the character encoding. If it is omitted
+ * or null, the internal character encoding value will be used.
  * @param bool $hex [optional]
  * @return string The converted string.
  * @pure
@@ -848,7 +849,8 @@ function mb_encode_numericentity(string $string, array $map, ?string $encoding =
  * convmap is an array that specifies
  * the code area to convert.
  * </p>
- * @param null|string $encoding
+ * @param null|string $encoding The encoding parameter is the character encoding. If it is omitted
+ * or null, the internal character encoding value will be used.
  * @param bool $is_hex [optional] <p>
  * this parameter is not used.
  * </p>
@@ -975,7 +977,7 @@ function mb_regex_set_options(?string $options = null): string {}
  * @param string[] &$matches [optional] <p>
  * Contains a substring of the matched string.
  * </p>
- * @return bool
+ * @return bool Returns whether pattern matches string.
  */
 function mb_ereg(string $pattern, string $string, &$matches = null): bool {}
 
@@ -991,7 +993,7 @@ function mb_ereg(string $pattern, string $string, &$matches = null): bool {}
  * @param string[] &$matches [optional] <p>
  * Contains a substring of the matched string.
  * </p>
- * @return bool|int
+ * @return bool|int Returns whether pattern matches string.
  */
 #[LanguageLevelTypeAware(["8.0" => "bool"], default: "false|int")]
 function mb_eregi(string $pattern, string $string, &$matches = null): bool {}
@@ -1029,7 +1031,7 @@ function mb_ereg_replace(string $pattern, string $replacement, string $string, ?
 
 /**
  * Perform a regular expresssion seach and replace with multibyte support using a callback
- * @link https://secure.php.net/manual/en/function.mb-ereg-replace-callback.php
+ * @link https://php.net/manual/en/function.mb-ereg-replace-callback.php
  * @param string $pattern <p>
  * The regular expression pattern.
  * </p>
@@ -1191,7 +1193,7 @@ function mb_ereg_search_regs(?string $pattern = null, ?string $options = null): 
  * @param string|null $options [optional] <p>
  * The search option.
  * </p>
- * @return bool
+ * @return bool Returns true on success or false on failure.
  */
 function mb_ereg_search_init(string $string, ?string $pattern = null, ?string $options = null): bool {}
 
@@ -1228,7 +1230,8 @@ function mb_ereg_search_getpos(): int {}
 function mb_ereg_search_setpos(int $offset): bool {}
 
 /**
- * @param $encoding [optional]
+ * @link https://php.net/manual/en/function.mb-regex-encoding.php
+ * @param string|null $encoding [optional]
  * @see mb_regex_encoding
  * @removed 8.0
  */
@@ -1256,9 +1259,10 @@ function mbereg(string $pattern, string $string, array &$registers) {}
 function mberegi(string $pattern, string $string, array &$registers) {}
 
 /**
- * @param $pattern
- * @param $replacement
- * @param $string
+ * @link https://php.net/manual/en/function.mb-ereg-replace.php
+ * @param string $pattern
+ * @param string $replacement
+ * @param string $string
  * @param $option [optional]
  * @see mb_ereg_replace
  * @removed 8.0
@@ -1267,9 +1271,10 @@ function mberegi(string $pattern, string $string, array &$registers) {}
 function mbereg_replace($pattern, $replacement, $string, $option) {}
 
 /**
- * @param $pattern
- * @param $replacement
- * @param $string
+ * @link https://php.net/manual/en/function.mb-eregi-replace.php
+ * @param string $pattern
+ * @param string $replacement
+ * @param string $string
  * @param string $option
  * @return string
  * @see mb_eregi_replace
@@ -1284,9 +1289,10 @@ function mberegi_replace(
 ): string {}
 
 /**
- * @param $pattern
- * @param $string
- * @param $limit [optional]
+ * @link https://php.net/manual/en/function.mb-split.php
+ * @param string $pattern
+ * @param string $string
+ * @param int $limit [optional]
  * @see mb_split
  * @removed 8.0
  */
@@ -1294,8 +1300,9 @@ function mberegi_replace(
 function mbsplit($pattern, $string, $limit) {}
 
 /**
- * @param $pattern
- * @param $string
+ * @link https://php.net/manual/en/function.mb-ereg-match.php
+ * @param string $pattern
+ * @param string $string
  * @param $option [optional]
  * @see mb_ereg_match
  * @removed 8.0
@@ -1304,7 +1311,8 @@ function mbsplit($pattern, $string, $limit) {}
 function mbereg_match($pattern, $string, $option) {}
 
 /**
- * @param $pattern [optional]
+ * @link https://php.net/manual/en/function.mb-ereg-search.php
+ * @param string|null $pattern [optional]
  * @param $option [optional]
  * @see mb_ereg_search
  * @removed 8.0
@@ -1313,7 +1321,8 @@ function mbereg_match($pattern, $string, $option) {}
 function mbereg_search($pattern, $option) {}
 
 /**
- * @param $pattern [optional]
+ * @link https://php.net/manual/en/function.mb-ereg-search-pos.php
+ * @param string|null $pattern [optional]
  * @param $option [optional]
  * @see mb_ereg_search_pos
  * @removed 8.0
@@ -1322,7 +1331,8 @@ function mbereg_search($pattern, $option) {}
 function mbereg_search_pos($pattern, $option) {}
 
 /**
- * @param $pattern [optional]
+ * @link https://php.net/manual/en/function.mb-ereg-search-regs.php
+ * @param string|null $pattern [optional]
  * @param $option [optional]
  * @see mb_ereg_search_regs
  * @removed 8.0
@@ -1331,8 +1341,9 @@ function mbereg_search_pos($pattern, $option) {}
 function mbereg_search_regs($pattern, $option) {}
 
 /**
- * @param $string
- * @param $pattern [optional]
+ * @link https://php.net/manual/en/function.mb-ereg-search-init.php
+ * @param string $string
+ * @param string|null $pattern [optional]
  * @param $option [optional]
  * @see mb_ereg_search_init
  * @removed 8.0
@@ -1357,7 +1368,7 @@ function mbereg_search_getpos() {}
 /**
  * Get a specific character.
  * @link https://www.php.net/manual/en/function.mb-chr.php
- * @param int $codepoint
+ * @param int $codepoint A Unicode codepoint value, e.g. 128024 for U+1F418 ELEPHANT
  * @param string|null $encoding [optional]
  * @return string|false specific character or FALSE on failure.
  * @since 7.2
@@ -1368,7 +1379,7 @@ function mb_chr(int $codepoint, ?string $encoding = null): string|false {}
 /**
  * Get code point of character
  * @link https://www.php.net/manual/en/function.mb-ord.php
- * @param string $string
+ * @param string $string A string
  * @param string|null $encoding [optional]
  * @return int|false code point of character or FALSE on failure.
  * @since 7.2
@@ -1379,9 +1390,9 @@ function mb_ord(string $string, ?string $encoding = null): int|false {}
 /**
  * Scrub broken multibyte strings.
  * @link https://www.php.net/manual/en/function.mb-scrub.php
- * @param string $string
+ * @param string $string The input string.
  * @param string|null $encoding [optional]
- * @return string|false
+ * @return string|false The string result with invalid byte sequences replaced.
  * @since 7.2
  * @pure
  */
@@ -1389,14 +1400,17 @@ function mb_ord(string $string, ?string $encoding = null): int|false {}
 function mb_scrub(string $string, ?string $encoding = null): false|string {}
 
 /**
- * @param $position
+ * @link https://php.net/manual/en/function.mb-ereg-search-setpos.php
+ * @param int $position
  * @see mb_ereg_search_setpos
+ * @removed 8.0
  */
 #[Deprecated(replacement: "mb_ereg_search_setpos(%parametersList%)", since: "7.3")]
 function mbereg_search_setpos($position) {}
 
 /**
  * Function performs string splitting to an array of defined size chunks.
+ * @link https://php.net/manual/en/function.mb-str-split.php
  * @param string $string <p>
  * The string to split into characters or chunks.
  * </p>
@@ -1407,7 +1421,7 @@ function mbereg_search_setpos($position) {}
  * Character encoding name to use.
  * If it is omitted, internal character encoding is used.
  * </p>
- * @return string[]|false
+ * @return string[]|false mb_str_split returns an array of strings.
  * @since 7.4
  * @pure
  */

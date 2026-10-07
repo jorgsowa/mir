@@ -270,6 +270,12 @@ class SoapClient
     ) {}
 
     /**
+     * Calls a SOAP function (deprecated)
+     *
+     * Calling this method directly is deprecated. Usually, SOAP functions can be called as methods
+     * of the SoapClient object; in situations where this is not possible or additional options are
+     * needed, use SoapClient::__soapCall.
+     *
      * @link https://php.net/manual/en/soapclient.call.php
      * @param string $name
      * @param array $args
@@ -421,6 +427,9 @@ class SoapClient
      * If $oneWay is set to 1, this method returns nothing.
      * Use this where a response is not expected.
      * </p>
+     * @param string|null $uriParserClass The classname to use for parsing the redirection URI when
+     * a "Location" header is received in the response, or null to use the default, parse_url based
+     * parsing.
      * @return string|null The XML SOAP response.
      * @since 5.0.1
      */
@@ -591,7 +600,7 @@ class SoapServer
 {
     /**
      * SoapServer constructor
-     * @link https://php.net/manual/en/soapserver.soapserver.php
+     * @link https://php.net/manual/en/soapserver.construct.php
      * @param mixed $wsdl <p>
      * To use the SoapServer in WSDL mode, pass the URI of a WSDL file.
      * Otherwise, pass <b>NULL</b> and set the uri option to the
@@ -636,7 +645,7 @@ class SoapServer
 
     /**
      * SoapServer constructor
-     * @link https://php.net/manual/en/soapserver.soapserver.php
+     * @link https://php.net/manual/en/soapserver.construct.php
      * @param mixed $wsdl <p>
      * To use the SoapServer in WSDL mode, pass the URI of a WSDL file.
      * Otherwise, pass <b>NULL</b> and set the uri option to the
@@ -819,6 +828,11 @@ class SoapServer
     public function addSoapHeader(SoapHeader $header): void {}
 
     /**
+     * Returns last SOAP response
+     *
+     * Returns the XML sent in the last SOAP response.
+     *
+     * @link https://php.net/manual/en/soapserver.getlastresponse.php
      * @since 8.4
      */
     public function __getLastResponse(): ?string {}
@@ -885,7 +899,7 @@ class SoapFault extends Exception
 
     /**
      * SoapFault constructor
-     * @link https://php.net/manual/en/soapfault.soapfault.php
+     * @link https://php.net/manual/en/soapfault.construct.php
      * @param string $code <p>
      * The error code of the <b>SoapFault</b>.
      * </p>
@@ -920,7 +934,7 @@ class SoapFault extends Exception
 
     /**
      * SoapFault constructor
-     * @link https://php.net/manual/en/soapfault.soapfault.php
+     * @link https://php.net/manual/en/soapfault.construct.php
      * @param string $faultcode <p>
      * The error code of the <b>SoapFault</b>.
      * </p>
@@ -975,7 +989,7 @@ class SoapParam
 
     /**
      * SoapParam constructor
-     * @link https://php.net/manual/en/soapparam.soapparam.php
+     * @link https://php.net/manual/en/soapparam.construct.php
      * @param mixed $data <p>
      * The data to pass or return. This parameter can be passed directly as PHP
      * value, but in this case it will be named as paramN and
@@ -993,7 +1007,7 @@ class SoapParam
 
     /**
      * SoapParam constructor
-     * @link https://php.net/manual/en/soapparam.soapparam.php
+     * @link https://php.net/manual/en/soapparam.construct.php
      * @param mixed $data <p>
      * The data to pass or return. This parameter can be passed directly as PHP
      * value, but in this case it will be named as paramN and
@@ -1046,7 +1060,7 @@ class SoapHeader
 
     /**
      * SoapHeader constructor
-     * @link https://www.php.net/manual/en/soapheader.construct.php
+     * @link https://php.net/manual/en/soapheader.construct.php
      * @param string $namespace <p>
      * The namespace of the SOAP header element.
      * </p>
@@ -1074,7 +1088,7 @@ class SoapHeader
 
     /**
      * SoapHeader constructor
-     * @link https://php.net/manual/en/soapheader.soapheader.php
+     * @link https://php.net/manual/en/soapheader.construct.php
      * @param string $namespace <p>
      * The namespace of the SOAP header element.
      * </p>

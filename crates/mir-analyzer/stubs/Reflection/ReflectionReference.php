@@ -14,6 +14,7 @@ final class ReflectionReference
 {
     /**
      * ReflectionReference cannot be created explicitly.
+     * @link https://php.net/manual/en/reflectionreference.construct.php
      */
     private function __construct() {}
 
@@ -23,7 +24,8 @@ final class ReflectionReference
      * @link https://php.net/manual/en/reflectionreference.fromarrayelement.php
      * @param array $array The array which contains the potential reference.
      * @param int|string $key The key; either an integer or a string.
-     * @return ReflectionReference|null
+     * @return ReflectionReference|null Returns a ReflectionReference instance if $array[$key] is a
+     * reference, or null otherwise.
      */
     public static function fromArrayElement(
         array $array,

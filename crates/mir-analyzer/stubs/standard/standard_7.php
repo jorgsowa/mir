@@ -65,7 +65,8 @@ function fsockopen(
  * @param int &$error_code [optional]
  * @param string &$error_message [optional]
  * @param float|null $timeout [optional]
- * @return resource|false
+ * @return resource|false pfsockopen returns a file pointer which may be used together with the
+ * other file functions (such as fgets, fgetss, fwrite, fclose, and feof), or false on failure.
  */
 function pfsockopen(
     string $hostname,
@@ -317,7 +318,7 @@ function opendir(string $directory, $context = null) {}
  * not specified, the last link opened by opendir
  * is assumed.
  * </p>
- * @return void
+ * @return void No value is returned.
  */
 function closedir($dir_handle = null): void {}
 
@@ -391,8 +392,9 @@ function readdir($dir_handle = null): string|false {}
  * Directory to open
  * </p>
  * @param resource $context [optional]
- * @return Directory|false an instance of Directory, or <b>NULL</b> with wrong
- * parameters, or <b>FALSE</b> in case of another error
+ * @return Directory|false an instance of Directory, or <b>FALSE</b> in case of error. Prior to
+ * PHP 8.0, passing a wrong parameter raised a warning and returned null; since 8.0 a TypeError is
+ * thrown instead.
  */
 function dir(string $directory, $context = null): Directory|false {}
 
@@ -928,7 +930,7 @@ function touch(string $filename, ?int $mtime = null, ?int $atime = null): bool {
  * Clear realpath cache on a specific filename, only used if
  * clear_realpath_cache is true.
  * </p>
- * @return void
+ * @return void No value is returned.
  */
 function clearstatcache(bool $clear_realpath_cache = false, string $filename = ''): void {}
 

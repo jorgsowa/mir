@@ -7,6 +7,7 @@ use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 /**
  * (PHP 5.5.0)<br/>
  * Get the boolean value of a variable
+ * @link https://php.net/manual/en/function.boolval.php
  * @param mixed $value <p>the scalar value being converted to a boolean.</p>
  * @return bool The boolean value of var.
  * @since 5.5
@@ -342,7 +343,7 @@ function is_callable(mixed $value, bool $syntax_only = false, &$callable_name = 
 
 /**
  * Verify that the contents of a variable is a countable value
- * @link https://secure.php.net/is_countable
+ * @link https://php.net/is_countable
  *
  * @param mixed $value The value to check
  * @return bool <b>TRUE</b> if $var is countable, <b>FALSE</b> otherwise.
@@ -808,14 +809,18 @@ function fflush($stream): bool {}
 
 /**
  * Sync file to storage. Similar to fflush() but blocks until OS buffers have flushed.
- * @param resource $stream
+ * @link https://php.net/manual/en/function.fsync.php
+ * @param resource $stream The file pointer must be valid, and must point to a file successfully
+ * opened by fopen or fsockopen (and not yet closed by fclose).
  * @since 8.1
  */
 function fsync($stream): bool {}
 
 /**
  * Sync file data only to storage. Similar to fsync but does not flush modified metadata. POSIX only, aliased to fsync on Win32.
- * @param resource $stream
+ * @link https://php.net/manual/en/function.fdatasync.php
+ * @param resource $stream The file pointer must be valid, and must point to a file successfully
+ * opened by fopen or fsockopen (and not yet closed by fclose).
  * @since 8.1
  */
 function fdatasync($stream): bool {}

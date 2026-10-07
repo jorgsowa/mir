@@ -466,7 +466,9 @@ function pcntl_sigtimedwait(array $signals, &$info = [], int $seconds = 0, int $
  * Whether asynchronous signal handling should be enabled.
  * </p>
  *
- * @return bool
+ * @return bool When used as getter (enable parameter is null) it returns whether asynchronous
+ * signal handling is enabled. When used as setter (enable parameter is not null), it returns
+ * whether asynchronous signal handling was enabled before the function call.
  * @since 7.1
  */
 function pcntl_async_signals(
@@ -482,31 +484,65 @@ function pcntl_async_signals(
  * The signal number.
  * </p>
  *
- * @return bool|resource
+ * @return bool|resource This function may return an integer value that refers to SIG_DFL or
+ * SIG_IGN. If a custom handler has been set, that callable is returned.
  * @since 7.1
  */
 function pcntl_signal_get_handler(int $signal) {}
 
 /**
- * @param int $flags
- * @return bool
+ * Dissociates parts of the process execution context
+ *
+ * pcntl_unshare allows a process to disassociate parts of its execution context that are currently
+ * being shared with other processes. The main use of pcntl_unshare is to allow a process to control
+ * its shared execution context without creating a new process.
+ *
+ * @link https://php.net/manual/en/function.pcntl-unshare.php
+ * @param int $flags The flags parameter is a bitmask that specifies which parts of the execution
+ * context should be unshared. This parameter is specified by ORing together zero or more of the
+ * CLONE_* constants: CLONE_NEWNS CLONE_NEWIPC CLONE_NEWUTS CLONE_NEWNET CLONE_NEWPID CLONE_NEWUSER
+ * CLONE_NEWCGROUP
+ * @return bool Returns 0 on success, -1 otherwise. On failure it sets an error code, that can be
+ * retrieved with pcntl_get_last_error.
  * @since 7.4
  */
 function pcntl_unshare(int $flags): bool {}
 
 /**
+ * Waits for a child process to change state
+ *
+ * Obtains status information pertaining to termination, stop, and/or continue events in one of the
+ * caller's child processes.
+ *
+ * @link https://php.net/manual/en/function.pcntl-waitid.php
  * @since 8.4
  */
 function pcntl_waitid(int $idtype = P_ALL, ?int $id = null, &$info = [], int $flags = WEXITED, #[PhpStormStubsElementAvailable(from: '8.5')] &$resource_usage = []): bool {}
 /**
+ * Get the cpu affinity of a process
+ *
+ * Retrieve the cpu affinity of the process_id.
+ *
+ * @link https://php.net/manual/en/function.pcntl-getcpuaffinity.php
  * @since 8.4
  */
 function pcntl_getcpuaffinity(?int $process_id = null): array|false {}
 /**
+ * Set the cpu affinity of a process
+ *
+ * Sets the cpu affinity for the process_id with the cpu affinity mask given by cpu_ids.
+ *
+ * @link https://php.net/manual/en/function.pcntl-setcpuaffinity.php
  * @since 8.4
  */
 function pcntl_setcpuaffinity(?int $process_id = null, array $cpu_ids = []): bool {}
 /**
+ * Get the CPU number on which the calling process last executed
+ *
+ * pcntl_getcpu returns the number of the CPU on which the calling process was last executed. This
+ * function uses the sched_getcpu(3) system call available on Linux.
+ *
+ * @link https://php.net/manual/en/function.pcntl-getcpu.php
  * @since 8.4
  */
 function pcntl_getcpu(): int {}

@@ -346,7 +346,7 @@ function is_nan(float $num): bool {}
  * @link https://php.net/manual/en/function.intdiv.php
  * @param int $num1 <p>Number to be divided.</p>
  * @param int $num2 <p>Number which divides the <b><i>dividend</i></b></p>
- * @return int
+ * @return int The integer quotient of the division of num1 by num2.
  * @since 7.0
  * @throws DivisionByZeroError <p>if divisor is 0</p>
  * @throws ArithmeticError <p>if the <b><i>dividend</i></b> is <b>PHP_INT_MIN</b> and the <b><i>divisor</i></b> is -1</p>
@@ -696,9 +696,10 @@ function fmod(float $num1, float $num2): float {}
  * Performs a floating-point division under
  * IEEE 754 semantics. Division by zero is considered well-defined and
  * will return one of Inf, -Inf or NaN.
- * @param float $num1
- * @param float $num2
- * @return float
+ * @link https://php.net/manual/en/function.fdiv.php
+ * @param float $num1 The dividend (numerator)
+ * @param float $num2 The divisor
+ * @return float The floating point result of num1/num2
  * @since 8.0
  * @pure
  */
@@ -960,7 +961,7 @@ function get_cfg_var(string $option): array|string|false {}
 /**
  * Alias:
  * {@see set_magic_quotes_runtime}
- * @link https://php.net/manual/en/function.magic-quotes-runtime.php
+ * @link https://php-legacy-docs.zend.com/manual/php5/en/function.magic-quotes-runtime
  * @param bool $new_setting
  * @removed 7.0
  */
@@ -969,7 +970,7 @@ function magic_quotes_runtime(bool $new_setting) {}
 
 /**
  * Sets the current active configuration setting of magic_quotes_runtime
- * @link https://php.net/manual/en/function.set-magic-quotes-runtime.php
+ * @link https://php-legacy-docs.zend.com/manual/php5/en/function.set-magic-quotes-runtime
  * @param bool $new_setting <p>
  * false for off, true for on.
  * </p>
@@ -998,7 +999,7 @@ function get_magic_quotes_runtime(): int {}
 
 /**
  * Import GET/POST/Cookie variables into the global scope
- * @link https://php.net/manual/en/function.import-request-variables.php
+ * @link https://php-legacy-docs.zend.com/manual/php5/en/function.import-request-variables
  * @param string $types <p>
  * Using the types parameter, you can specify
  * which request variables to import. You can use 'G', 'P' and 'C'

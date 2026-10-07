@@ -457,16 +457,22 @@ class XMLReader
     ): DOMNode|false {}
 
     /**
+     * Creates an XMLReader from a URI to read from
+     * @link https://php.net/manual/en/xmlreader.fromuri.php
      * @since 8.4
      */
     public static function fromUri(string $uri, ?string $encoding = null, int $flags = 0): static {}
 
     /**
+     * Creates an XMLReader from a stream to read from
+     * @link https://php.net/manual/en/xmlreader.fromstream.php
      * @since 8.4
      */
     public static function fromStream($stream, ?string $encoding = null, int $flags = 0, ?string $documentUri = null): static {}
 
     /**
+     * Creates an XMLReader from an XML string
+     * @link https://php.net/manual/en/xmlreader.fromstring.php
      * @since 8.4
      */
     public static function fromString(string $source, ?string $encoding = null, int $flags = 0): static {}
