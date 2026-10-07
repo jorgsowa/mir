@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `AnalysisSnapshot::warm_files` and `reanalyze_files` analyse files on dedicated worker threads, each with its own frozen db clone. A full Symfony warm sweep drops from ~5.9s to ~1.7s on 18 cores; passes under 4 files stay serial.
+- `AnalysisSnapshot::warm_files` and `reanalyze_files` analyse files on dedicated worker threads, each with its own frozen db clone. A full Symfony warm sweep drops from ~5.9s to ~1.7s on 18 cores; passes under 4 files stay serial. Warm passes reuse the cached mention scanner while the name universe grows slightly, instead of rebuilding the automaton per chunk.
 
 ### Fixed
 

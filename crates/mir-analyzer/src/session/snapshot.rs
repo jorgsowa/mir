@@ -746,7 +746,7 @@ impl AnalysisSnapshot {
         catch(|| {
             let mut db = self.db.clone();
             db.freeze_workspace_index();
-            let mention_scanner = db.class_mention_scanner();
+            let mention_scanner = db.class_mention_scanner_reusing_cached();
             let cache = self.cache.as_deref();
             let index = &self.index;
             let scanner = mention_scanner.as_deref();

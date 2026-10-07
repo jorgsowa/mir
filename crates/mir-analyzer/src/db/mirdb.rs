@@ -1339,6 +1339,13 @@ impl MirDbStorage {
         self.class_mentions.scanner()
     }
 
+    /// Mention scanner for passes that tolerate a slightly stale universe.
+    pub fn class_mention_scanner_reusing_cached(
+        &self,
+    ) -> Option<Arc<crate::db::class_mention_index::MentionScanner>> {
+        self.class_mentions.scanner_reusing_cached()
+    }
+
     /// Resolve a gate needle against the mention universe. `None` when the
     /// name is unknown (callers keep the raw-scan path).
     pub fn prepare_class_mention_query(

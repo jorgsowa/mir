@@ -239,6 +239,21 @@ impl ClassMentionIndex {
         Some(scanner)
     }
 
+    /// [`Self::scanner`], but keeps the cached automaton while the universe
+    /// has grown only slightly since it was built; a rebuild is O(universe).
+    pub fn scanner_reusing_cached(&self) -> Option<Arc<MentionScanner>> {
+        {
+            let u = self.universe.lock();
+            if let Some(s) = u.scanner.as_ref() {
+                let grown = u.names.len().saturating_sub(s.patterns.len());
+                if s.epoch == u.epoch || grown <= (s.patterns.len() / 4).max(512) {
+                    return Some(s.clone());
+                }
+            }
+        }
+        self.scanner()
+    }
+
     /// Resolve `needle` (any case, short name) against the universe.
     pub fn prepare_query(&self, needle: &str) -> Option<MentionQuery> {
         let name = Name::new(needle).ascii_lowercase();
@@ -438,6 +453,44 @@ mod tests {
         // Content-equal but different Arc: not answerable (must rescan).
         let other: Arc<str> = Arc::from("new Job();");
         assert_eq!(idx.answer(file, &q, &other), None);
+    }
+
+    #[test]
+    fn small_universe_growth_reuses_the_cached_scanner() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("A")]);
+        let first = idx.scanner().unwrap();
+        idx.add_names([lc("B")]);
+        let reused = idx.scanner_reusing_cached().unwrap();
+        assert!(Arc::ptr_eq(&first, &reused));
+        assert_ne!(idx.scanner().unwrap().epoch(), first.epoch());
+    }
+
+    #[test]
+    fn large_universe_growth_rebuilds_the_scanner() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("A")]);
+        let first = idx.scanner().unwrap();
+        idx.add_names((0..2000).map(|i| lc(&format!("N{i}"))));
+        let rebuilt = idx.scanner_reusing_cached().unwrap();
+        assert!(!Arc::ptr_eq(&first, &rebuilt));
+        assert_eq!(rebuilt.epoch(), idx.scanner().unwrap().epoch());
+    }
+
+    #[test]
+    fn name_added_after_a_reused_scan_falls_back_to_a_raw_scan() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("A")]);
+        idx.scanner().unwrap();
+        idx.add_names([lc("B")]);
+        let old = idx.scanner_reusing_cached().unwrap();
+        let text: Arc<str> = Arc::from("new A(); new B();");
+        let file: crate::db::FileNo = 0;
+        idx.set_file(file, text.clone(), old.epoch(), old.scan(&text));
+        let q = idx.prepare_query("B").unwrap();
+        assert_eq!(idx.answer(file, &q, &text), None);
+        let qa = idx.prepare_query("A").unwrap();
+        assert_eq!(idx.answer(file, &qa, &text), Some(true));
     }
 
     #[test]
