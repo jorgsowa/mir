@@ -18,7 +18,7 @@ use super::args::{
     check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
     expr_can_be_passed_by_reference_owned, spread_element_type, CheckArgsParams,
 };
-use super::builtin_purity::{builtin_call_is_pure, builtin_purity, BuiltinPurity};
+use super::builtin_purity::callback_builtin_call_is_pure;
 use super::callable::extract_callable_params;
 use super::CallAnalyzer;
 
@@ -733,7 +733,7 @@ impl CallAnalyzer {
 
             if ctx.is_in_pure_fn
                 && !is_pure
-                && !builtin_call_is_pure(ea, ctx, &resolved.fqn, &params, &call.args)
+                && !callback_builtin_call_is_pure(ea, ctx, &resolved.fqn, &params, &call.args)
             {
                 ea.emit(
                     IssueKind::ImpureFunctionCall {
@@ -754,7 +754,6 @@ impl CallAnalyzer {
             if (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
                 && !is_pure
                 && !is_mutation_free
-                && builtin_purity(&resolved.fqn) != Some(BuiltinPurity::Pure)
             {
                 for arg in call.args.iter() {
                     let Some(value) = &arg.value else { continue };

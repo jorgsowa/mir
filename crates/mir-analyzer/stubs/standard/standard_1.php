@@ -787,6 +787,7 @@ function rtrim(string $string, string $characters = " \n\r\t\v\0"): string {}
  * </p>
  * @param int &$count [optional] If passed, this will hold the number of matched and replaced needles.
  * @return ($subject is array ? array<int, string> : string)
+ * @pure
  */
 function str_replace(array|string $search, array|string $replace, array|string $subject, &$count = null): array|string {}
 
@@ -811,6 +812,7 @@ function str_replace(array|string $search, array|string $replace, array|string $
  * reference.
  * </p>
  * @return ($subject is array ? array<int, string> : string)
+ * @pure
  */
 function str_ireplace(array|string $search, array|string $replace, array|string $subject, &$count = null): array|string {}
 
@@ -957,6 +959,7 @@ function strip_tags(string $string, #[LanguageLevelTypeAware(["7.4" => "string[]
  * percent for you.
  * </p>
  * @return int the number of matching chars in both strings.
+ * @pure
  */
 function similar_text(string $string1, string $string2, &$percent = null): int {}
 

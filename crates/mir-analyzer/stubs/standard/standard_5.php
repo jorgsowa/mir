@@ -336,6 +336,7 @@ function is_scalar(mixed $value): bool {}
  * </p>
  * @return bool <b>TRUE</b> if $var is callable, <b>FALSE</b>
  * otherwise.
+ * @pure
  */
 function is_callable(mixed $value, bool $syntax_only = false, &$callable_name = null): bool {}
 

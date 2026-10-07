@@ -167,11 +167,13 @@ function str_contains(string $haystack, string $needle): bool {}
 
 /**
  * @since 8.3
+ * @pure
  */
 function str_decrement(string $string): string {}
 
 /**
  * @since 8.3
+ * @pure
  */
 function str_increment(string $string): string {}
 

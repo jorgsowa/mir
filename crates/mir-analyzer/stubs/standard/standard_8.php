@@ -394,6 +394,7 @@ function ob_list_handlers(): array {}
  * parameter sort_flags, for details
  * see sort.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
 function ksort(array &$array, int $flags = SORT_REGULAR) {}
@@ -409,6 +410,7 @@ function ksort(array &$array, int $flags = SORT_REGULAR) {}
  * sort_flags, for details see
  * sort.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
 function krsort(array &$array, int $flags = SORT_REGULAR) {}
@@ -419,6 +421,7 @@ function krsort(array &$array, int $flags = SORT_REGULAR) {}
  * @param array &$array <p>
  * The input array.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
 function natsort(array &$array) {}
@@ -429,6 +432,7 @@ function natsort(array &$array) {}
  * @param array &$array <p>
  * The input array.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
 function natcasesort(array &$array) {}
@@ -444,6 +448,7 @@ function natcasesort(array &$array) {}
  * parameter sort_flags, for details
  * see sort.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
 function asort(array &$array, int $flags = SORT_REGULAR) {}
@@ -459,6 +464,7 @@ function asort(array &$array, int $flags = SORT_REGULAR) {}
  * sort_flags, for details see
  * sort.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
 function arsort(array &$array, int $flags = SORT_REGULAR) {}
@@ -477,6 +483,7 @@ function arsort(array &$array, int $flags = SORT_REGULAR) {}
  * Sorting type flags:<br>
  * SORT_REGULAR - compare items normally
  * (don't change types)</p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
 function sort(array &$array, int $flags = SORT_REGULAR) {}
@@ -492,6 +499,7 @@ function sort(array &$array, int $flags = SORT_REGULAR) {}
  * parameter sort_flags, for details see
  * sort.
  * </p>
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.3' => 'true'], default: 'bool')]
 function rsort(array &$array, int $flags = SORT_REGULAR) {}
@@ -660,6 +668,7 @@ function count(Countable|array $value, int $mode = COUNT_NORMAL): int {}
  * </p>
  * @return mixed|false the value of the last element or false for empty array.
  * @meta
+ * @pure
  */
 function end(object|array &$array): mixed {}
 
@@ -673,6 +682,7 @@ function end(object|array &$array): mixed {}
  * the internal array pointer, or false if there are no more
  * elements.
  * @meta
+ * @pure
  */
 function prev(object|array &$array): mixed {}
 
@@ -685,6 +695,7 @@ function prev(object|array &$array): mixed {}
  * @return mixed|false the array value in the next place that's pointed to by the
  * internal array pointer, or false if there are no more elements.
  * @meta
+ * @pure
  */
 function next(object|array &$array): mixed {}
 
@@ -697,6 +708,7 @@ function next(object|array &$array): mixed {}
  * @return mixed|false the value of the first array element, or false if the array is
  * empty.
  * @meta
+ * @pure
  */
 function reset(object|array &$array): mixed {}
 
@@ -965,6 +977,7 @@ function array_multisort(
  * The pushed variables.
  * </p>
  * @return int the number of elements in the array.
+ * @pure
  */
 function array_push(
     array &$array,
@@ -982,6 +995,7 @@ function array_push(
  * If array is empty (or is not an array),
  * null will be returned.
  * @meta
+ * @pure
  */
 function array_pop(array &$array): mixed {}
 
@@ -994,6 +1008,7 @@ function array_pop(array &$array): mixed {}
  * @return mixed|null the shifted value, or null if array is
  * empty or is not an array.
  * @meta
+ * @pure
  */
 function array_shift(array &$array): mixed {}
 
@@ -1009,6 +1024,7 @@ function array_shift(array &$array): mixed {}
  * The prepended variables.
  * </p>
  * @return int the number of elements in the array.
+ * @pure
  */
 function array_unshift(array &$array, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.2')] $values, mixed ...$values): int {}
 
@@ -1055,6 +1071,7 @@ function array_unshift(array &$array, #[PhpStormStubsElementAvailable(from: '5.3
  * around it, unless the element is an array itself.
  * </p>
  * @return array the array consisting of the extracted elements.
+ * @pure
  */
 function array_splice(array &$array, int $offset, ?int $length = null, mixed $replacement = []): array {}
 

@@ -190,6 +190,7 @@ function soundex(string $string): string {}
  * @return int This function returns the Levenshtein-Distance between the
  * two argument strings or -1, if one of the argument strings
  * is longer than the limit of 255 characters.
+ * @pure
  */
 function levenshtein(string $string1, string $string2, int $insertion_cost = 1, int $replacement_cost = 1, int $deletion_cost = 1): int {}
 
@@ -229,6 +230,7 @@ function ord(string $character): int {}
  * @param-out array $result A pure out-param: the incoming value is never read (the
  * same variable can be reused, e.g. `parse_str($s, $s)`), only overwritten.
  * @return void
+ * @pure
  */
 function parse_str(
     string $string,
@@ -487,6 +489,7 @@ function fscanf($stream, string $format, mixed &...$vars): array|int|false|null 
  * <p>
  * If the component parameter is specified a string is returned instead of an array.
  * If the requested component doesn't exist within the given URL, null will be returned.
+ * @pure
  */
 #[ArrayShape(["scheme" => "string", "host" => "string", "port" => "int", "user" => "string", "pass" => "string", "query" => "string", "path" => "string", "fragment" => "string"])]
 function parse_url(string $url, int $component = -1): array|string|int|false|null {}

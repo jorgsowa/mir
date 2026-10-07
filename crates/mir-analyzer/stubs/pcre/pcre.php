@@ -155,6 +155,7 @@ use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
  * @return int|false <b>preg_match</b> returns 1 if the <i>pattern</i>
  * matches given <i>subject</i>, 0 if it does not, or <b>FALSE</b>
  * if an error occurred.
+ * @pure
  */
 function preg_match(string $pattern, string $subject, &$matches = null, int $flags = 0, int $offset = 0): int|false {}
 
@@ -213,6 +214,7 @@ function preg_match(string $pattern, string $subject, &$matches = null, int $fla
  * </p>
  * @return int|false|null the number of full pattern matches (which might be zero),
  * or <b>FALSE</b> if an error occurred.
+ * @pure
  */
 #[LanguageLevelTypeAware(['8.0' => 'int|false'], default: 'int|false|null')]
 function preg_match_all(string $pattern, string $subject, &$matches = null, int $flags = 0, int $offset = 0) {}
@@ -302,6 +304,7 @@ function preg_match_all(string $pattern, string $subject, &$matches = null, int 
  * If matches are found, the new <i>subject</i> will
  * be returned, otherwise <i>subject</i> will be
  * returned unchanged or <b>NULL</b> if an error occurred.
+ * @pure
  */
 function preg_replace(array|string $pattern, array|string $replacement, array|string $subject, int $limit = -1, &$count = null): array|string|null {}
 
@@ -417,6 +420,7 @@ function preg_replace_callback_array(
  * If no matches are found or an error occurred, an empty array
  * is returned when <i>subject</i> is an array
  * or <b>NULL</b> otherwise.
+ * @pure
  */
 function preg_filter(array|string $pattern, array|string $replacement, array|string $subject, int $limit = -1, &$count = null): array|string|null {}
 

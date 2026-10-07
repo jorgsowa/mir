@@ -891,6 +891,7 @@ function key_exists($key, array $array): bool {}
  * @param string $description [optional]
  * <p>An optional description that will be included in the failure message if the assertion fails.</p>
  * @return bool false if the assertion is false, true otherwise.
+ * @pure
  */
 function assert(
     mixed $assertion,

@@ -202,5 +202,6 @@ function class_uses($object_or_class, bool $autoload = true): array|false {}
  * @param object $object
  * @return int
  * @since 7.2
+ * @pure
  */
 function spl_object_id(object $object): int {}
