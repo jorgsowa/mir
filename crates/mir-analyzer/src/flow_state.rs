@@ -205,6 +205,10 @@ pub struct FlowState {
     /// received as parameters (but allows `$this` mutations).
     pub is_in_external_mutation_free_method: bool,
 
+    /// Whether we are inside the constructor of a `@psalm-immutable` class.
+    /// Triggers `ImpurePropertyAssignment` on writes to a parameter's properties.
+    pub is_in_immutable_ctor: bool,
+
     /// Whether we are inside a static method body.
     pub inside_static_method: bool,
 
@@ -590,6 +594,7 @@ impl FlowState {
             is_in_pure_fn: false,
             is_in_immutable_method: false,
             is_in_external_mutation_free_method: false,
+            is_in_immutable_ctor: false,
             inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashSet::default(),

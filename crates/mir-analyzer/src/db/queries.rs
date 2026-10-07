@@ -203,8 +203,8 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
 }
 
 /// Whether `fqcn` (or any ancestor up its native `extends` chain) is
-/// `@psalm-immutable`. A subclass that doesn't redeclare the tag is just as
-/// immutable as its ancestor — PHP/Psalm don't require re-annotating an
+/// `@psalm-immutable`; a trait counts only by its own tag. A subclass that
+/// doesn't redeclare the tag is just as immutable as its ancestor — PHP/Psalm don't require re-annotating an
 /// inherited class-level contract, the same reasoning `class_template_params`
 /// already documents for `@template`. Previously this was read straight off
 /// `ClassDef::is_immutable` (own declaration only) at both call sites, so a
@@ -225,6 +225,7 @@ pub fn class_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
                 }
                 current = cls.parent.clone();
             }
+            Some(crate::db::ClassLike::Trait(tr)) => return tr.is_immutable,
             _ => break,
         }
     }

@@ -566,6 +566,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         closure_ctx.is_in_pure_fn = ctx.is_in_pure_fn;
         closure_ctx.is_in_immutable_method = ctx.is_in_immutable_method;
         closure_ctx.is_in_external_mutation_free_method = ctx.is_in_external_mutation_free_method;
+        closure_ctx.is_in_immutable_ctor = ctx.is_in_immutable_ctor;
         propagate_readonly_prop_refinements(self.db, ctx, &mut closure_ctx);
         for p in c.params.iter() {
             if let Some(raw) = p.name.as_deref() {
@@ -669,6 +670,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if closure_ctx.is_in_pure_fn
             || closure_ctx.is_in_immutable_method
             || closure_ctx.is_in_external_mutation_free_method
+            || closure_ctx.is_in_immutable_ctor
         {
             let mut extended_param_names = (*closure_ctx.param_names).clone();
             // A by-ref capture of the enclosing function's OWN by-ref
@@ -871,6 +873,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         arrow_ctx.is_in_pure_fn = ctx.is_in_pure_fn;
         arrow_ctx.is_in_immutable_method = ctx.is_in_immutable_method;
         arrow_ctx.is_in_external_mutation_free_method = ctx.is_in_external_mutation_free_method;
+        arrow_ctx.is_in_immutable_ctor = ctx.is_in_immutable_ctor;
         propagate_readonly_prop_refinements(self.db, ctx, &mut arrow_ctx);
         // Arrow functions auto-capture every outer variable by value (no
         // explicit `use()` list), so taint on any of them must carry over too.
@@ -906,6 +909,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if arrow_ctx.is_in_pure_fn
             || arrow_ctx.is_in_immutable_method
             || arrow_ctx.is_in_external_mutation_free_method
+            || arrow_ctx.is_in_immutable_ctor
         {
             let mut extended_param_names = (*arrow_ctx.param_names).clone();
             extended_param_names.extend(ctx.param_names.iter().copied());

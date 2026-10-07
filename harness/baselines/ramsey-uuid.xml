@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/Guid/Fields.php">
+  <file src="src/Fields/SerializableFieldsTrait.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->getVariant()]]></code>
+      <code><![CDATA[$this->__construct($data)]]></code>
+      <code><![CDATA[$this->__construct(base64_decode($data))]]></code>
     </ImpureMethodCall>
   </file>
   <file src="src/Lazy/LazyUuidFromString.php">
@@ -18,11 +19,6 @@
       <code><![CDATA[shell_exec('net user %username% | findstr /b /i "Local Group Memberships"')]]></code>
       <code><![CDATA[shell_exec('wmic group get name,sid | findstr /b /i ' . escapeshellarg($firstGroup))]]></code>
     </ForbiddenCode>
-  </file>
-  <file src="src/Rfc4122/Fields.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->getVariant()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/Type/Decimal.php">
     <ImpureMethodCall>

@@ -785,6 +785,9 @@ pub struct TraitDef {
     /// `use` a generic trait).
     #[serde(default)]
     pub trait_use_type_args: Vec<(Arc<str>, Vec<Type>)>,
+    /// Set when the trait carries `@psalm-immutable`.
+    #[serde(default)]
+    pub is_immutable: bool,
     /// `@psalm-require-extends` / `@phpstan-require-extends` — FQCNs that using classes must extend.
     #[serde(default)]
     pub require_extends: Vec<Arc<str>>,

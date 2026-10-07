@@ -1086,8 +1086,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
         }
         // External-mutation-free check: assigning to a parameter's property in
-        // a @psalm-external-mutation-free method is forbidden.
-        if ctx.is_in_external_mutation_free_method
+        // a @psalm-external-mutation-free method or an immutable constructor is forbidden.
+        if (ctx.is_in_external_mutation_free_method || ctx.is_in_immutable_ctor)
             && recv_stripped != "this"
             && ctx
                 .param_names

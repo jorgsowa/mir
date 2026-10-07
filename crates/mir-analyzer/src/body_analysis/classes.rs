@@ -1233,6 +1233,11 @@ impl<'a> BodyAnalyzer<'a> {
         if !is_ctor && !method.is_static && crate::db::class_is_immutable(self.db, fqcn) {
             ctx.is_in_immutable_method = true;
         }
+        // An immutable constructor may initialize `$this` but not mutate its arguments,
+        // which callers rely on when constructing it from an immutable context.
+        if is_ctor && crate::db::class_is_immutable(self.db, fqcn) {
+            ctx.is_in_immutable_ctor = true;
+        }
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
         record_param_symbols(

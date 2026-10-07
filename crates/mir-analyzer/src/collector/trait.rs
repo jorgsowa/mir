@@ -369,6 +369,7 @@ impl<'a> DefinitionCollector<'a> {
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             trait_use_locations,
             trait_use_type_args,
+            is_immutable: trait_doc.is_immutable,
             require_extends,
             require_implements,
             deprecated: Self::deprecated_from_doc_or_attrs(
