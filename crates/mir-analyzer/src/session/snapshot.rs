@@ -103,12 +103,13 @@ const MIN_PARALLEL_FILES: usize = 4;
 /// Stages `files` on dedicated analysis threads, each with its own clone of
 /// the frozen `db`, pulling paths from a shared cursor (rust-analyzer's
 /// cache-priming shape). Output keeps `files` order. `None` when `cancel`
-/// fired; a salsa [`Cancelled`] on any worker stops the rest and is re-raised
-/// on the caller.
+/// fired. The first panic on any worker, a salsa [`Cancelled`] included,
+/// stops the rest and is re-raised unchanged on the caller.
 fn stage_in_parallel(
     db: &MirDbStorage,
     files: &[Arc<str>],
     cancel: &crate::IndexCancel,
+    parallel: bool,
     stage: impl Fn(&MirDbStorage, &Arc<str>) -> Option<AnalyzedFile> + Sync,
 ) -> Option<Vec<AnalyzedFile>> {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -117,7 +118,7 @@ fn stage_in_parallel(
     let threads = std::thread::available_parallelism()
         .map_or(1, |n| n.get())
         .min(files.len());
-    if threads < 2 || files.len() < MIN_PARALLEL_FILES {
+    if !parallel || threads < 2 || files.len() < MIN_PARALLEL_FILES {
         let mut analyzed = Vec::with_capacity(files.len());
         for path in files {
             if cancel.is_cancelled() {
@@ -130,7 +131,7 @@ fn stage_in_parallel(
 
     let next = AtomicUsize::new(0);
     let stop = AtomicBool::new(false);
-    let cancelled = Mutex::new(None::<Cancelled>);
+    let panic = Mutex::new(None::<Box<dyn std::any::Any + Send>>);
     let slots: Vec<Mutex<Option<AnalyzedFile>>> = files.iter().map(|_| Mutex::new(None)).collect();
 
     let work = |db: MirDbStorage| loop {
@@ -143,11 +144,11 @@ fn stage_in_parallel(
         }
         let i = next.fetch_add(1, Ordering::Relaxed);
         let Some(path) = files.get(i) else { return };
-        match catch(|| stage(&db, path)) {
+        match std::panic::catch_unwind(AssertUnwindSafe(|| stage(&db, path))) {
             Ok(staged) => *slots[i].lock().unwrap() = staged,
-            Err(c) => {
+            Err(payload) => {
                 stop.store(true, Ordering::Relaxed);
-                cancelled.lock().unwrap().get_or_insert(c);
+                panic.lock().unwrap().get_or_insert(payload);
                 return;
             }
         }
@@ -167,14 +168,12 @@ fn stage_in_parallel(
             work(db.clone());
         }
         for h in handles {
-            if let Err(panic) = h.join() {
-                std::panic::resume_unwind(panic);
-            }
+            let _ = h.join();
         }
     });
 
-    if let Some(c) = cancelled.into_inner().unwrap() {
-        unwind(c);
+    if let Some(payload) = panic.into_inner().unwrap() {
+        std::panic::resume_unwind(payload);
     }
     if stop.load(Ordering::Relaxed) {
         return None;
@@ -668,9 +667,12 @@ impl AnalysisSnapshot {
         stale
     }
 
-    /// Analyze `stale` and commit their postings and class edges.
+    /// Analyze `stale` and commit their postings and class edges. Serial: a
+    /// request runs on its caller's thread, and concurrent requests fanning
+    /// out workers would starve one another and the background warm sweep.
     pub(super) fn commit_reference_candidates(&self, stale: &[Arc<str>]) -> Result<(), Cancelled> {
-        self.warm_pass(stale, &crate::IndexCancel::new()).map(drop)
+        self.warm_pass(stale, &crate::IndexCancel::new(), false)
+            .map(drop)
     }
 
     /// Analyze `files` and commit their reference postings, class edges and
@@ -684,7 +686,7 @@ impl AnalysisSnapshot {
         files: &[Arc<str>],
         cancel: &crate::IndexCancel,
     ) -> Result<bool, Cancelled> {
-        Ok(self.warm_pass(files, cancel)?.is_some())
+        Ok(self.warm_pass(files, cancel, true)?.is_some())
     }
 
     /// The read half of [`super::AnalysisSession::reanalyze_files_cancellable`]:
@@ -702,7 +704,7 @@ impl AnalysisSnapshot {
         files: &[Arc<str>],
         cancel: &crate::IndexCancel,
     ) -> Result<Option<Vec<(Arc<str>, crate::FileAnalysis)>>, Cancelled> {
-        Ok(self.warm_pass(files, cancel)?.map(|analyzed| {
+        Ok(self.warm_pass(files, cancel, true)?.map(|analyzed| {
             analyzed
                 .into_iter()
                 .map(|a| {
@@ -722,8 +724,9 @@ impl AnalysisSnapshot {
         &self,
         files: &[Arc<str>],
         cancel: &crate::IndexCancel,
+        parallel: bool,
     ) -> Result<Option<Vec<AnalyzedFile>>, Cancelled> {
-        let Some(mut pass) = self.stage_warm(files, cancel)? else {
+        let Some(mut pass) = self.stage_warm(files, cancel, parallel)? else {
             return Ok(None);
         };
         self.commit_warm(&mut pass)?;
@@ -738,6 +741,7 @@ impl AnalysisSnapshot {
         &self,
         files: &[Arc<str>],
         cancel: &crate::IndexCancel,
+        parallel: bool,
     ) -> Result<Option<WarmPass>, Cancelled> {
         catch(|| {
             let mut db = self.db.clone();
@@ -748,7 +752,7 @@ impl AnalysisSnapshot {
             let scanner = mention_scanner.as_deref();
             let stage =
                 |db: &MirDbStorage, path: &Arc<str>| index.stage_analyzed(db, cache, scanner, path);
-            let analyzed = stage_in_parallel(&db, files, cancel, stage)?;
+            let analyzed = stage_in_parallel(&db, files, cancel, parallel, stage)?;
             Some(WarmPass {
                 mention_scanner,
                 analyzed,
@@ -1487,7 +1491,7 @@ mod tests {
         let (mut session, files) = prepared_workspace(CALLS_RUN);
         let snap = session.snapshot();
         let mut pass = snap
-            .stage_warm(&files[1..], &IndexCancel::new())
+            .stage_warm(&files[1..], &IndexCancel::new(), false)
             .unwrap()
             .unwrap();
 
@@ -1538,6 +1542,42 @@ mod tests {
     }
 
     #[test]
+    fn worker_panic_stops_the_pass_and_reaches_the_caller() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let files: Vec<Arc<str>> = (0..4000).map(|i| Arc::from(format!("f{i}.php"))).collect();
+        let started = AtomicUsize::new(0);
+        let db = MirDbStorage::default();
+        let outcome = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            stage_in_parallel(&db, &files, &IndexCancel::new(), true, |_, _| {
+                if started.fetch_add(1, Ordering::Relaxed) == 2 {
+                    std::panic::resume_unwind(Box::new("worker boom"));
+                }
+                std::thread::sleep(std::time::Duration::from_micros(200));
+                None
+            })
+        }));
+
+        let Err(payload) = outcome else {
+            panic!("panic must reach the caller");
+        };
+        assert_eq!(payload.downcast_ref::<&str>(), Some(&"worker boom"));
+        assert!(started.load(Ordering::Relaxed) < files.len());
+    }
+
+    #[test]
+    fn serial_mode_never_spawns_workers() {
+        let files: Vec<Arc<str>> = (0..16).map(|i| Arc::from(format!("f{i}.php"))).collect();
+        let caller = std::thread::current().id();
+        let db = MirDbStorage::default();
+        let staged = stage_in_parallel(&db, &files, &IndexCancel::new(), false, |_, _| {
+            assert_eq!(std::thread::current().id(), caller);
+            None
+        });
+        assert!(staged.is_some());
+    }
+
+    #[test]
     fn parallel_warm_stops_when_cancelled() {
         let (session, callers) = many_callers_workspace(24);
         let cancel = IndexCancel::new();
@@ -1551,7 +1591,7 @@ mod tests {
         let (session, files) = prepared_workspace(CALLS_RUN);
         let snap = session.snapshot();
         let mut pass = snap
-            .stage_warm(&files[1..], &IndexCancel::new())
+            .stage_warm(&files[1..], &IndexCancel::new(), false)
             .unwrap()
             .unwrap();
 
@@ -1577,7 +1617,7 @@ mod tests {
         let (session, files) = prepared_workspace(CHILD_CALLS_RUN);
         let snap = session.snapshot();
         let mut pass = snap
-            .stage_warm(&files[1..], &IndexCancel::new())
+            .stage_warm(&files[1..], &IndexCancel::new(), false)
             .unwrap()
             .unwrap();
         let parsed = php_rs_parser::parse(CHILD_CALLS_RUN);
