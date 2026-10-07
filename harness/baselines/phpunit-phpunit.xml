@@ -5,11 +5,6 @@
       <code><![CDATA[$negatedString !== null]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Framework/Exception/Exception.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->serializableTrace = $this->getTrace()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Framework/TestCase.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$testResult]]></code>
