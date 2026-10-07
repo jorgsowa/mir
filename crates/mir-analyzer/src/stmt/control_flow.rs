@@ -1220,51 +1220,36 @@ impl<'a> StatementsAnalyzer<'a> {
             if finally_ctx.diverges {
                 result.diverges = true;
             }
-            if tc.catches.is_empty() {
-                // With no catch clause, an exception thrown in `try` propagates
-                // past the whole statement (after `finally` runs) instead of
-                // reaching code after it — so `result` (still the try-succeeded
-                // state here, since the catch-merge loop above never ran) is
-                // already the right base. Fold onto it only the variables
-                // `finally` itself touched — identified by comparing against
-                // `finally_start`, since an untouched var's Arc entry is
-                // reused unchanged — rather than the whole pessimistic
-                // `finally_start` state finally was merely seeded from.
-                for (name, ty) in finally_ctx.vars.iter() {
-                    let untouched = finally_start
-                        .vars
-                        .get(name)
-                        .is_some_and(|orig| Arc::ptr_eq(orig, ty));
-                    if untouched {
-                        continue;
-                    }
-                    Arc::make_mut(&mut result.vars).insert(*name, ty.clone());
-                    if finally_ctx.assigned_vars.contains(name) {
-                        Arc::make_mut(&mut result.assigned_vars).insert(*name);
-                        Arc::make_mut(&mut result.possibly_assigned_vars).remove(name);
-                    } else if finally_ctx.possibly_assigned_vars.contains(name) {
-                        Arc::make_mut(&mut result.possibly_assigned_vars).insert(*name);
-                    }
+            // Code after the statement is reached only through `result` (try
+            // success or a completed catch): an uncaught exception propagates
+            // past it. Fold onto `result` only the variables `finally` touched —
+            // an untouched var's Arc entry is reused from `finally_start` —
+            // not the pessimistic state finally was seeded from.
+            for (name, ty) in finally_ctx.vars.iter() {
+                let untouched = finally_start
+                    .vars
+                    .get(name)
+                    .is_some_and(|orig| Arc::ptr_eq(orig, ty));
+                if untouched {
+                    continue;
                 }
-                for name in finally_start.vars.keys() {
-                    if !finally_ctx.vars.contains_key(name) {
-                        Arc::make_mut(&mut result.vars).remove(name);
-                        Arc::make_mut(&mut result.assigned_vars).remove(name);
-                        Arc::make_mut(&mut result.possibly_assigned_vars).remove(name);
-                    }
+                Arc::make_mut(&mut result.vars).insert(*name, ty.clone());
+                if finally_ctx.assigned_vars.contains(name) {
+                    Arc::make_mut(&mut result.assigned_vars).insert(*name);
+                    Arc::make_mut(&mut result.possibly_assigned_vars).remove(name);
+                } else if finally_ctx.possibly_assigned_vars.contains(name) {
+                    Arc::make_mut(&mut result.possibly_assigned_vars).insert(*name);
                 }
-                for (name, loc) in finally_ctx.var_locations.iter() {
-                    result.var_locations.entry(*name).or_insert(*loc);
+            }
+            for name in finally_start.vars.keys() {
+                if !finally_ctx.vars.contains_key(name) {
+                    Arc::make_mut(&mut result.vars).remove(name);
+                    Arc::make_mut(&mut result.assigned_vars).remove(name);
+                    Arc::make_mut(&mut result.possibly_assigned_vars).remove(name);
                 }
-            } else {
-                // finally executes last, so its own variable assignments are
-                // authoritative for code after the try statement — propagate them
-                // back onto `result`, which otherwise only reflects the pre-finally
-                // state.
-                result.vars = finally_ctx.vars.clone();
-                result.assigned_vars = finally_ctx.assigned_vars.clone();
-                result.possibly_assigned_vars = finally_ctx.possibly_assigned_vars.clone();
-                result.var_locations = finally_ctx.var_locations.clone();
+            }
+            for (name, loc) in finally_ctx.var_locations.iter() {
+                result.var_locations.entry(*name).or_insert(*loc);
             }
             result.has_dynamic_var_def =
                 result.has_dynamic_var_def || finally_ctx.has_dynamic_var_def;
