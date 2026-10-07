@@ -1,5 +1,5 @@
-//! Unused-variable kinds are reported only under `findUnusedVariables`, `findUnusedCode`
-//! or `--find-dead-code`, as in Psalm.
+//! Unused-variable kinds are reported only under `findUnusedVariablesAndParams`,
+//! `findUnusedVariables`, `findUnusedCode`, `errorLevel="1"` or `--find-dead-code`, as in Psalm.
 
 use std::path::Path;
 use std::process::Command;
@@ -81,4 +81,22 @@ fn find_unused_code_attribute_enables() {
 fn find_dead_code_flag_enables() {
     let dir = fixture("<mir></mir>");
     assert!(reports_both(&run(dir.path(), &["--find-dead-code"])));
+}
+
+#[test]
+fn psalm_find_unused_variables_and_params_attribute_enables() {
+    let dir = fixture(r#"<psalm findUnusedVariablesAndParams="true"></psalm>"#);
+    assert!(reports_both(&run(dir.path(), &[])));
+}
+
+#[test]
+fn error_level_one_enables() {
+    let dir = fixture(r#"<psalm errorLevel="1"></psalm>"#);
+    assert!(reports_both(&run(dir.path(), &[])));
+}
+
+#[test]
+fn error_level_one_respects_explicit_opt_out() {
+    let dir = fixture(r#"<psalm errorLevel="1" findUnusedVariablesAndParams="false"></psalm>"#);
+    assert!(reports_neither(&run(dir.path(), &[])));
 }

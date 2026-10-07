@@ -136,6 +136,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
     let mut path: Vec<String> = Vec::new();
     // Accumulated text content for the current element
     let mut text_buf = String::new();
+    let mut unused_variables_explicit = false;
 
     loop {
         match reader.read_event() {
@@ -164,8 +165,19 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                         attr_value(&e, "memoizeMethodCallResults").as_deref(),
                         Some("true" | "1")
                     );
-                    config.find_unused_code |= is_true_attr(&e, "findUnusedCode");
-                    config.find_unused_variables |= is_true_attr(&e, "findUnusedVariables");
+                    // As in Psalm, findUnusedCode also sets unused-variable checks and
+                    // findUnusedVariablesAndParams overrides it.
+                    if let Some(v) = attr_value(&e, "findUnusedCode") {
+                        config.find_unused_code = is_true(&v);
+                        config.find_unused_variables = config.find_unused_code;
+                        unused_variables_explicit = true;
+                    }
+                    for attr in ["findUnusedVariablesAndParams", "findUnusedVariables"] {
+                        if let Some(v) = attr_value(&e, attr) {
+                            config.find_unused_variables = is_true(&v);
+                            unused_variables_explicit = true;
+                        }
+                    }
                 }
 
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
@@ -295,8 +307,9 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     ("findUnusedCode", _) => {
                         config.find_unused_code = text_buf == "true";
                     }
-                    ("findUnusedVariables", _) => {
+                    ("findUnusedVariables" | "findUnusedVariablesAndParams", _) => {
                         config.find_unused_variables = text_buf == "true";
+                        unused_variables_explicit = true;
                     }
                     _ => {}
                 }
@@ -307,6 +320,11 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             Err(e) => return Err(ConfigError::Parse(e.to_string())),
             _ => {}
         }
+    }
+
+    // Psalm turns unused-variable checks on at level 1 unless configured explicitly.
+    if !unused_variables_explicit && config.error_level == Some(1) {
+        config.find_unused_variables = true;
     }
 
     Ok(config)
@@ -394,8 +412,8 @@ fn attr_value(e: &quick_xml::events::BytesStart<'_>, name: &str) -> Option<Strin
     })
 }
 
-fn is_true_attr(e: &quick_xml::events::BytesStart<'_>, name: &str) -> bool {
-    matches!(attr_value(e, name).as_deref(), Some("true" | "1"))
+fn is_true(value: &str) -> bool {
+    matches!(value, "true" | "1")
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +646,34 @@ mod tests {
         assert!(cfg.find_unused_code && cfg.find_unused_variables);
         let cfg = Config::parse(r#"<psalm findUnusedCode="false"></psalm>"#).unwrap();
         assert!(!cfg.find_unused_code && !cfg.find_unused_variables);
+        let cfg = Config::parse(r#"<psalm findUnusedVariablesAndParams="true"></psalm>"#).unwrap();
+        assert!(!cfg.find_unused_code && cfg.find_unused_variables);
+        let cfg = Config::parse(
+            r#"<psalm findUnusedCode="true" findUnusedVariablesAndParams="false"></psalm>"#,
+        )
+        .unwrap();
+        assert!(cfg.find_unused_code && !cfg.find_unused_variables);
+    }
+
+    #[test]
+    fn error_level_one_enables_unused_variables_unless_configured() {
+        assert!(
+            Config::parse(r#"<psalm errorLevel="1"></psalm>"#)
+                .unwrap()
+                .find_unused_variables
+        );
+        assert!(
+            !Config::parse(r#"<psalm errorLevel="2"></psalm>"#)
+                .unwrap()
+                .find_unused_variables
+        );
+        assert!(
+            !Config::parse(
+                r#"<psalm errorLevel="1" findUnusedVariablesAndParams="false"></psalm>"#
+            )
+            .unwrap()
+            .find_unused_variables
+        );
     }
 
     #[test]

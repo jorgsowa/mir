@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `findUnusedVariablesAndParams`, and `errorLevel="1"` without an explicit setting, enable `UnusedVariable` and `UnusedForeachValue`, as in Psalm.
 - `string|non-empty-string` collapses to `string` at branch joins.
 - `NullableReturnStatement` renders an unbound class template as its bound instead of the raw template name.
 - A flag set to a literal in the same branch that defines a variable proves it defined wherever the flag holds that value again (`$mode === 'x'`, `$found`, `$mode !== null`), including across loops.
