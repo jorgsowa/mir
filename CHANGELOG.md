@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `AnalysisSnapshot::warm_files` and `reanalyze_files` analyse files on dedicated worker threads, each with its own frozen db clone. A full Symfony warm sweep drops from ~5.9s to ~1.7s on 18 cores; passes under 4 files stay serial.
+
 ### Fixed
 
 - `findUnusedVariablesAndParams`, and `errorLevel="1"` without an explicit setting, enable `UnusedVariable` and `UnusedForeachValue`, as in Psalm.

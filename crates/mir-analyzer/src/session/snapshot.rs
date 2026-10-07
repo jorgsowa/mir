@@ -97,6 +97,96 @@ struct WarmPass {
 /// after the pass so later gate checks become set lookups.
 type MentionScanRecord = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
 
+/// Below this many files the serial loop beats spawning workers.
+const MIN_PARALLEL_FILES: usize = 4;
+
+/// Stages `files` on dedicated analysis threads, each with its own clone of
+/// the frozen `db`, pulling paths from a shared cursor (rust-analyzer's
+/// cache-priming shape). Output keeps `files` order. `None` when `cancel`
+/// fired; a salsa [`Cancelled`] on any worker stops the rest and is re-raised
+/// on the caller.
+fn stage_in_parallel(
+    db: &MirDbStorage,
+    files: &[Arc<str>],
+    cancel: &crate::IndexCancel,
+    stage: impl Fn(&MirDbStorage, &Arc<str>) -> Option<AnalyzedFile> + Sync,
+) -> Option<Vec<AnalyzedFile>> {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    let threads = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .min(files.len());
+    if threads < 2 || files.len() < MIN_PARALLEL_FILES {
+        let mut analyzed = Vec::with_capacity(files.len());
+        for path in files {
+            if cancel.is_cancelled() {
+                return None;
+            }
+            analyzed.extend(stage(db, path));
+        }
+        return Some(analyzed);
+    }
+
+    let next = AtomicUsize::new(0);
+    let stop = AtomicBool::new(false);
+    let cancelled = Mutex::new(None::<Cancelled>);
+    let slots: Vec<Mutex<Option<AnalyzedFile>>> = files.iter().map(|_| Mutex::new(None)).collect();
+
+    let work = |db: MirDbStorage| loop {
+        if stop.load(Ordering::Relaxed) {
+            return;
+        }
+        if cancel.is_cancelled() {
+            stop.store(true, Ordering::Relaxed);
+            return;
+        }
+        let i = next.fetch_add(1, Ordering::Relaxed);
+        let Some(path) = files.get(i) else { return };
+        match catch(|| stage(&db, path)) {
+            Ok(staged) => *slots[i].lock().unwrap() = staged,
+            Err(c) => {
+                stop.store(true, Ordering::Relaxed);
+                cancelled.lock().unwrap().get_or_insert(c);
+                return;
+            }
+        }
+    };
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..threads)
+            .filter_map(|n| {
+                let db = db.clone();
+                std::thread::Builder::new()
+                    .name(format!("mir-warm-{n}"))
+                    .stack_size(crate::recursion::STACK_SIZE)
+                    .spawn_scoped(scope, || work(db))
+                    .ok()
+            })
+            .collect();
+        if handles.is_empty() {
+            work(db.clone());
+        }
+        for h in handles {
+            if let Err(panic) = h.join() {
+                std::panic::resume_unwind(panic);
+            }
+        }
+    });
+
+    if let Some(c) = cancelled.into_inner().unwrap() {
+        unwind(c);
+    }
+    if stop.load(Ordering::Relaxed) {
+        return None;
+    }
+    Some(
+        slots
+            .into_iter()
+            .filter_map(|s| s.into_inner().unwrap())
+            .collect(),
+    )
+}
+
 pub(super) fn catch<T>(f: impl FnOnce() -> T) -> Result<T, Cancelled> {
     Cancelled::catch(AssertUnwindSafe(f))
 }
@@ -654,18 +744,11 @@ impl AnalysisSnapshot {
             db.freeze_workspace_index();
             let mention_scanner = db.class_mention_scanner();
             let cache = self.cache.as_deref();
-            let mut analyzed = Vec::with_capacity(files.len());
-            for path in files {
-                if cancel.is_cancelled() {
-                    return None;
-                }
-                analyzed.extend(self.index.stage_analyzed(
-                    &db,
-                    cache,
-                    mention_scanner.as_deref(),
-                    path,
-                ));
-            }
+            let index = &self.index;
+            let scanner = mention_scanner.as_deref();
+            let stage =
+                |db: &MirDbStorage, path: &Arc<str>| index.stage_analyzed(db, cache, scanner, path);
+            let analyzed = stage_in_parallel(&db, files, cancel, stage)?;
             Some(WarmPass {
                 mention_scanner,
                 analyzed,
@@ -1420,6 +1503,47 @@ mod tests {
 
         assert_eq!(callers_of(&mut session, &files, "stop"), [files[1].clone()]);
         assert!(callers_of(&mut session, &files, "run").is_empty());
+    }
+
+    fn many_callers_workspace(count: usize) -> (AnalysisSession, Vec<Arc<str>>) {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        session.ingest_file(Arc::from("base.php"), Arc::from(BASE));
+        let callers: Vec<Arc<str>> = (0..count)
+            .map(|i| Arc::from(format!("caller{i}.php")))
+            .collect();
+        for caller in &callers {
+            session.ingest_file(caller.clone(), Arc::from(CALLS_RUN));
+        }
+        session.prepare_for_query(None);
+        (session, callers)
+    }
+
+    #[test]
+    fn parallel_warm_keeps_file_order_and_commits_every_file() {
+        let (mut session, callers) = many_callers_workspace(24);
+        let snap = session.snapshot();
+        let analyzed = snap
+            .reanalyze_files(&callers, &IndexCancel::new())
+            .unwrap()
+            .unwrap();
+        drop(snap);
+
+        let order: Vec<_> = analyzed.into_iter().map(|(file, _)| file).collect();
+        assert_eq!(order, callers);
+        let mut found = callers_of(&mut session, &callers, "run");
+        found.sort();
+        let mut expected = callers.clone();
+        expected.sort();
+        assert_eq!(found, expected);
+    }
+
+    #[test]
+    fn parallel_warm_stops_when_cancelled() {
+        let (session, callers) = many_callers_workspace(24);
+        let cancel = IndexCancel::new();
+        cancel.cancel();
+        let snap = session.snapshot();
+        assert!(!snap.warm_files(&callers, &cancel).unwrap());
     }
 
     #[test]
