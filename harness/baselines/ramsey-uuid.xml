@@ -29,17 +29,11 @@
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
     </ImpureMethodCall>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Type/Integer.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
     </ImpureMethodCall>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Type/Time.php">
     <ImpureMethodCall>

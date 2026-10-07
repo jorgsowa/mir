@@ -280,7 +280,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
-                if is_non_empty_when_concat(&inner_ty) {
+                if let Some(ty) = self.to_string_return_type(&inner_ty) {
+                    ty
+                } else if is_non_empty_when_concat(&inner_ty) {
                     Type::single(Atomic::TNonEmptyString)
                 } else {
                     Type::single(Atomic::TString)
@@ -356,5 +358,33 @@ impl<'a> ExpressionAnalyzer<'a> {
             CastKind::Object => Type::single(Atomic::TObject),
             CastKind::Unset | CastKind::Void => Type::single(Atomic::TNull),
         }
+    }
+
+    /// `(string) $obj` evaluates `__toString()`, so its declared return type
+    /// (e.g. `non-empty-string`) is the result; other atoms cast as usual.
+    /// `None` without an object atom or when one lacks a string-typed `__toString`.
+    fn to_string_return_type(&self, inner_ty: &Type) -> Option<Type> {
+        let mut result = Type::empty();
+        let mut has_object = false;
+        for atom in inner_ty.types.iter() {
+            let Some(fqcn) = atom.named_object_fqcn() else {
+                let single = Type::single(atom.clone());
+                result.add_type(if is_non_empty_when_concat(&single) {
+                    Atomic::TNonEmptyString
+                } else {
+                    Atomic::TString
+                });
+                continue;
+            };
+            let here = crate::db::Fqcn::from_str(self.db, fqcn);
+            let (_, method) = crate::db::find_method_in_chain(self.db, here, "__tostring")?;
+            let ret = method.return_type.as_deref()?;
+            if ret.types.is_empty() || !ret.types.iter().all(|t| t.is_string()) {
+                return None;
+            }
+            result.merge_with(ret);
+            has_object = true;
+        }
+        has_object.then_some(result)
     }
 }
