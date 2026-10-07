@@ -918,6 +918,7 @@ impl Type {
                 result.add_type(Atomic::TCallable {
                     params: None,
                     return_type: None,
+                    is_pure: false,
                 });
             } else {
                 result.add_type(atomic);
@@ -1190,16 +1191,20 @@ impl Type {
                 Atomic::TCallable {
                     params,
                     return_type,
+                    is_pure,
                 } => {
                     result.add_type(Atomic::TCallable {
                         params: params.as_ref().map(|ps| {
-                            ps.iter()
-                                .map(|p| substitute_in_fn_param(p, bindings))
-                                .collect()
+                            Box::new(
+                                ps.iter()
+                                    .map(|p| substitute_in_fn_param(p, bindings))
+                                    .collect(),
+                            )
                         }),
                         return_type: return_type
                             .as_ref()
                             .map(|r| Box::new(r.substitute_templates(bindings))),
+                        is_pure: *is_pure,
                     });
                 }
                 Atomic::TClosure { data } => {
@@ -1215,6 +1220,7 @@ impl Type {
                                 .this_type
                                 .as_ref()
                                 .map(|t| t.substitute_templates(bindings)),
+                            is_pure: data.is_pure,
                         }),
                     });
                 }
@@ -3022,7 +3028,7 @@ mod tests {
     fn substitute_callable_params_and_return() {
         use crate::atomic::FnParam;
         let ty = Type::single(Atomic::TCallable {
-            params: Some(Box::new([FnParam {
+            params: Some(Box::new(vec![FnParam {
                 name: Name::new("x"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 out_ty: None,
@@ -3032,11 +3038,13 @@ mod tests {
                 is_optional: false,
             }])),
             return_type: Some(Box::new(t_param("T"))),
+            is_pure: false,
         });
         let result = ty.substitute_templates(&bindings_t_string());
         let Atomic::TCallable {
             params,
             return_type,
+            ..
         } = &result.types[0]
         else {
             panic!("expected TCallable");
@@ -3054,13 +3062,15 @@ mod tests {
         let ty = Type::single(Atomic::TCallable {
             params: None,
             return_type: None,
+            is_pure: false,
         });
         let result = ty.substitute_templates(&bindings_t_string());
         assert!(matches!(
             result.types[0],
             Atomic::TCallable {
                 params: None,
-                return_type: None
+                return_type: None,
+                ..
             }
         ));
     }
@@ -3081,6 +3091,7 @@ mod tests {
                 }]),
                 return_type: t_param("T"),
                 this_type: Some(t_param("T")),
+                is_pure: false,
             }),
         });
         let result = ty.substitute_templates(&bindings_t_string());

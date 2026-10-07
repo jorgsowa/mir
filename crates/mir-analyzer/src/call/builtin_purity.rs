@@ -2,6 +2,7 @@
 //! can't express that condition; unconditionally pure builtins are tagged in
 //! the stubs instead.
 
+use mir_types::{Atomic, Type};
 use php_ast::owned::{Arg, CallableCreateKind, Expr, ExprKind};
 
 use mir_codebase::definitions::DeclaredParam;
@@ -57,6 +58,15 @@ pub(crate) fn callback_builtin_call_is_pure(
 fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -> bool {
     match &expr.kind {
         ExprKind::Null => true,
+        ExprKind::Variable(name) => {
+            let ty = ctx.get_var(name.as_ref().trim_start_matches('$'));
+            !ty.types.is_empty()
+                && ty.types.iter().all(|a| match a {
+                    Atomic::TCallable { is_pure, .. } => *is_pure,
+                    Atomic::TClosure { data } => data.is_pure,
+                    _ => false,
+                })
+        }
         // Their bodies inherit the pure context and are checked where declared.
         ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => ctx.is_in_pure_fn,
         // Callable strings always name a global function.
@@ -107,4 +117,45 @@ fn function_is_pure(ea: &ExpressionAnalyzer<'_>, fqn: &str, fallback: Option<&st
         return false;
     };
     f.is_pure
+}
+
+/// Whether invoking a value of type `ty` may have side effects, judged only from
+/// atoms that carry purity; objects and unknown types are left to other checks.
+pub(crate) fn invoked_type_is_impure(ea: &ExpressionAnalyzer<'_>, ty: &Type) -> bool {
+    ty.types.iter().any(|a| match a {
+        Atomic::TCallable { is_pure, .. } => !is_pure,
+        Atomic::TClosure { data } => !data.is_pure,
+        Atomic::TCallableString => true,
+        Atomic::TLiteralString(name) => {
+            !name.contains("::") && !function_is_pure(ea, name.trim_start_matches('\\'), None)
+        }
+        _ => false,
+    })
+}
+
+/// Purity of a builtin that depends on its argument types rather than its stub.
+pub(crate) fn arg_dependent_builtin_purity(fqn: &str, arg_types: &[Type]) -> Option<bool> {
+    let name = fqn.strip_prefix('\\').unwrap_or(fqn);
+    if !name.eq_ignore_ascii_case("is_callable") {
+        return None;
+    }
+    // A string or array argument can name a class, which is_callable() autoloads.
+    let value = arg_types.first()?;
+    Some(
+        !value.types.is_empty()
+            && value.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TNamedObject { .. }
+                        | Atomic::TObject
+                        | Atomic::TStaticObject { .. }
+                        | Atomic::TSelf { .. }
+                        | Atomic::TParent { .. }
+                        | Atomic::TLiteralEnumCase { .. }
+                        | Atomic::TClosure { .. }
+                        | Atomic::TCallable { .. }
+                        | Atomic::TNull
+                )
+            }),
+    )
 }

@@ -1014,6 +1014,7 @@ fn atomic_contains_unresolvable_named_type(
         Atomic::TCallable {
             params,
             return_type,
+            ..
         } => {
             params.as_ref().is_some_and(|ps| {
                 ps.iter().any(|p| {

@@ -7,4 +7,4 @@ symbol
 $f = str<CURSOR>len(...);
 ===expect===
 kind: function call strlen
-type: Closure(string): int<0, max>
+type: pure-Closure(string): int<0, max>

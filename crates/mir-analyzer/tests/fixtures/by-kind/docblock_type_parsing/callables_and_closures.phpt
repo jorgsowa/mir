@@ -23,7 +23,7 @@ function check_bare_callable($x) {
 function check_pure_callable_bare($x) {
     /**
      * @var pure-callable $x
-     * @mir-check $x is callable
+     * @mir-check $x is pure-callable
      */
     var_dump($x);
 }

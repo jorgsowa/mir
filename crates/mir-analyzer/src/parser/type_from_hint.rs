@@ -60,6 +60,7 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
         BuiltinType::Callable => Type::single(Atomic::TCallable {
             params: None,
             return_type: None,
+            is_pure: false,
         }),
         BuiltinType::Iterable => {
             let mut u = Type::single(Atomic::TArray {

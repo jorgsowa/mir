@@ -240,6 +240,7 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
         Atomic::TCallable {
             params,
             return_type,
+            is_pure,
         } => {
             Atomic::TCallable {
                 params: params.map(|ps| {
@@ -254,9 +255,10 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
                             ..p.clone()
                         })
                         .collect::<Vec<_>>()
-                        .into_boxed_slice()
+                        .into()
                 }),
                 return_type: return_type.map(|rt| Box::new(ru!(*rt))),
+                is_pure,
             }
         }
         Atomic::TClosure { data } => {
@@ -278,6 +280,7 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
                         .into_boxed_slice(),
                     return_type: ru!(data.return_type),
                     this_type: data.this_type.map(|t| ru!(t)),
+                    is_pure: data.is_pure,
                 }),
             }
         }

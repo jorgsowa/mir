@@ -186,27 +186,30 @@ impl fmt::Display for Atomic {
             Atomic::TParent { fqcn } => write!(f, "parent({fqcn})"),
 
             Atomic::TCallable {
-                params: None,
-                return_type: None,
-            } => write!(f, "callable"),
-            Atomic::TCallable {
-                params: Some(params),
+                params,
                 return_type,
+                is_pure,
             } => {
-                f.write_str("callable(")?;
-                write_param_types(f, params)?;
-                match return_type {
-                    Some(r) => write!(f, "): {r}"),
-                    None => f.write_str("): mixed"),
+                if *is_pure {
+                    f.write_str("pure-")?;
+                }
+                match (params, return_type) {
+                    (None, None) => f.write_str("callable"),
+                    (Some(params), return_type) => {
+                        f.write_str("callable(")?;
+                        write_param_types(f, params)?;
+                        match return_type {
+                            Some(r) => write!(f, "): {r}"),
+                            None => f.write_str("): mixed"),
+                        }
+                    }
+                    (None, Some(ret)) => write!(f, "callable(): {ret}"),
                 }
             }
-            Atomic::TCallable {
-                params: None,
-                return_type: Some(ret),
-            } => {
-                write!(f, "callable(): {ret}")
-            }
             Atomic::TClosure { data } => {
+                if data.is_pure {
+                    f.write_str("pure-")?;
+                }
                 f.write_str("Closure(")?;
                 write_param_types(f, &data.params)?;
                 write!(f, "): {}", data.return_type)

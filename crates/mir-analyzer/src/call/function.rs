@@ -18,7 +18,9 @@ use super::args::{
     check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
     expr_can_be_passed_by_reference_owned, spread_element_type, CheckArgsParams,
 };
-use super::builtin_purity::callback_builtin_call_is_pure;
+use super::builtin_purity::{
+    arg_dependent_builtin_purity, callback_builtin_call_is_pure, invoked_type_is_impure,
+};
 use super::callable::extract_callable_params;
 use super::CallAnalyzer;
 
@@ -96,6 +98,18 @@ impl CallAnalyzer {
 
                 if callee_ty.is_mixed() {
                     ea.emit(IssueKind::MixedFunctionCall, Severity::Info, span);
+                }
+
+                if ctx.is_in_pure_fn && invoked_type_is_impure(ea, &callee_ty) {
+                    let fn_name = match &call.name.kind {
+                        ExprKind::Variable(name) => format!("${}", name.trim_start_matches('$')),
+                        _ => "{closure}".to_string(),
+                    };
+                    ea.emit(
+                        IssueKind::ImpureFunctionCall { fn_name },
+                        Severity::Warning,
+                        span,
+                    );
                 }
 
                 // Extract typed params once — used for both pre-marking (before arg
@@ -682,7 +696,8 @@ impl CallAnalyzer {
             let template_params = resolved.template_params;
             let return_ty_raw = resolved.return_ty_raw;
             let no_named_arguments = resolved.no_named_arguments;
-            let is_pure = resolved.is_pure;
+            let is_pure =
+                arg_dependent_builtin_purity(&resolved.fqn, &arg_types).unwrap_or(resolved.is_pure);
             let is_mutation_free = resolved.is_mutation_free;
             let taint_sink_params = resolved.taint_sink_params;
 

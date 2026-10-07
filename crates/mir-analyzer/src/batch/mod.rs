@@ -668,9 +668,10 @@ pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
         Atomic::TCallable {
             params,
             return_type,
+            ..
         } => {
             if let Some(ps) = params {
-                for p in ps {
+                for p in ps.iter() {
                     if let Some(t) = &p.ty {
                         collect_fqcns_in_simple(t, out);
                     }

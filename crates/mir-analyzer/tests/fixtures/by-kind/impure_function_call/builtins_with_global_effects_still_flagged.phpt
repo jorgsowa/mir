@@ -24,6 +24,8 @@ final class Probe {
 //                ^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function enum_exists() in a @pure function
         $property = new ReflectionProperty($value, 'id');
 //                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function ReflectionProperty::__construct() in a @pure function
+        $named = is_callable($class);
+//               ^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function is_callable() in a @pure function
         return class_exists($class);
 //             ^^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function class_exists() in a @pure function
     }

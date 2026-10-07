@@ -100,6 +100,8 @@ pub struct ClosureData {
     pub params: Box<[FnParam]>,
     pub return_type: Type,
     pub this_type: Option<Type>,
+    /// `pure-Closure(...)`, or a closure literal whose body is checked as pure.
+    pub is_pure: bool,
 }
 
 /// Payload of [`Atomic::TConditional`].
@@ -196,10 +198,13 @@ pub enum Atomic {
     // --- Callables ---
     /// `callable` or `callable(T): R`
     TCallable {
-        /// Boxed slice: a `Vec` here would make this the largest variant and
-        /// grow every `Atomic` (and `Type` inlines two of them).
-        params: Option<Box<[FnParam]>>,
+        /// Thin box: an inline `Vec` or boxed slice here, next to `is_pure`,
+        /// would make this the largest variant and grow every `Atomic` (and
+        /// `Type` inlines two of them).
+        params: Option<Box<Vec<FnParam>>>,
         return_type: Option<Box<Type>>,
+        /// `pure-callable`.
+        is_pure: bool,
     },
     /// `Closure` or `Closure(T): R` — more specific than TCallable.
     /// Payload boxed to keep `Atomic` at 32 bytes (see [`ClosureData`]).
@@ -647,10 +652,12 @@ impl Hash for Atomic {
             Atomic::TCallable {
                 params,
                 return_type,
+                is_pure,
             } => {
                 (T::TCallable as u8).hash(state);
                 params.hash(state);
                 return_type.hash(state);
+                is_pure.hash(state);
             }
             Atomic::TClosure { data } => {
                 (T::TClosure as u8).hash(state);

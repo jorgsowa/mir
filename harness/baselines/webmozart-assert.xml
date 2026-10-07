@@ -4,6 +4,7 @@
     <ImpureFunctionCall>
       <code><![CDATA[\class_exists($value)]]></code>
       <code><![CDATA[new ReflectionProperty($value, $property)]]></code>
+      <code><![CDATA[\is_callable($value)]]></code>
       <code><![CDATA[\iterator_to_array($classes)]]></code>
       <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
       <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
@@ -24,6 +25,8 @@
       <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
       <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
       <code><![CDATA[\enum_exists(\get_class($value))]]></code>
+      <code><![CDATA[\is_callable($message)]]></code>
+      <code><![CDATA[$message()]]></code>
     </ImpureFunctionCall>
     <ImpureMethodCall>
       <code><![CDATA[static::strlen($value)]]></code>

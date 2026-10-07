@@ -375,6 +375,7 @@ where
         Atomic::TCallable {
             params,
             return_type,
+            is_pure,
         } => Type::single(Atomic::TCallable {
             params: params.map(|ps| {
                 ps.iter()
@@ -394,9 +395,10 @@ where
                         ..p.clone()
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice()
+                    .into()
             }),
             return_type: return_type.map(|rt| Box::new(expand_aliases_only(*rt, aliases))),
+            is_pure,
         }),
         Atomic::TClosure { data } => Type::single(Atomic::TClosure {
             data: Box::new(mir_types::atomic::ClosureData {
@@ -422,6 +424,7 @@ where
                     .into_boxed_slice(),
                 return_type: expand_aliases_only(data.return_type, aliases),
                 this_type: data.this_type.map(|t| expand_aliases_only(t, aliases)),
+                is_pure: data.is_pure,
             }),
         }),
         // `@return ($param is X ? A : B)` — a type alias used in either
@@ -1271,12 +1274,14 @@ impl<'a> DefinitionCollector<'a> {
                                 template_params,
                             ),
                             this_type: data.this_type.clone(),
+                            is_pure: data.is_pure,
                         }),
                     });
                 }
                 mir_types::Atomic::TCallable {
                     params,
                     return_type,
+                    is_pure,
                 } => {
                     let new_params = params.as_ref().map(|ps| {
                         ps.iter()
@@ -1294,7 +1299,8 @@ impl<'a> DefinitionCollector<'a> {
                                 });
                                 p
                             })
-                            .collect()
+                            .collect::<Vec<_>>()
+                            .into()
                     });
                     let new_return_type = return_type.as_deref().map(|t| {
                         Box::new(self.resolve_union_doc_with_templates(
@@ -1307,6 +1313,7 @@ impl<'a> DefinitionCollector<'a> {
                     result.add_type(mir_types::Atomic::TCallable {
                         params: new_params,
                         return_type: new_return_type,
+                        is_pure: *is_pure,
                     });
                 }
                 // `class-string<T>`/`interface-string<T>` where `T` matches a

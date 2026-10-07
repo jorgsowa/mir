@@ -22,7 +22,7 @@ final class Codec {
     }
 
     /** @pure */
-    public static function isInvokable(mixed $value): bool {
+    public static function isInvokable(object $value): bool {
         return is_callable($value, false, $name);
     }
 

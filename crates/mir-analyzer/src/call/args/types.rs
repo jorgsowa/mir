@@ -96,6 +96,7 @@ pub(crate) fn check_one(
             Atomic::TCallable {
                 params: Some(expected_params),
                 return_type,
+                ..
             } => (&expected_params[..], return_type.as_deref()),
             Atomic::TClosure { data } => (&data.params[..], Some(&data.return_type)),
             _ => continue,

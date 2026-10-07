@@ -855,6 +855,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             &f.template_params,
                             &empty_fqcn,
                             &[],
+                            f.is_pure,
                         ));
                         // Hover on the name shows the Closure the expression produces.
                         self.record_symbol(
@@ -959,6 +960,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             &resolved.template_params,
                             &fqcn_arc,
                             &receiver_type_params,
+                            resolved.is_pure,
                         );
                         return if nullsafe {
                             Type::nullable(closure)
@@ -1130,6 +1132,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &resolved.template_params,
                         &fqcn_arc,
                         &receiver_type_params,
+                        resolved.is_pure,
                     ));
                 }
                 self.emit_undefined_static_method_for_callable(
@@ -1214,6 +1217,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_closure_from_resolved_params(
         db: &dyn crate::db::MirDatabase,
         params: &[mir_codebase::definitions::DeclaredParam],
@@ -1222,6 +1226,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         own_template_params: &[mir_codebase::definitions::TemplateParam],
         receiver_fqcn: &Arc<str>,
         receiver_type_params: &[Type],
+        is_pure: bool,
     ) -> Atomic {
         // A method-level `@template` SHADOWS a same-named class template, so it
         // must not get the class-level binding baked in here. Unlike a direct
@@ -1280,6 +1285,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 params: fn_params,
                 return_type: resolve(return_ty),
                 this_type: None,
+                is_pure,
             }),
         }
     }

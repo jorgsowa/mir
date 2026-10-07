@@ -337,8 +337,8 @@ pub(crate) fn callback_param_hints(
         Atomic::TCallable {
             params: Some(params),
             ..
-        } => Some(params),
-        Atomic::TClosure { data } => Some(&data.params),
+        } => Some(&params[..]),
+        Atomic::TClosure { data } => Some(&data.params[..]),
         _ => None,
     });
     let fn_params = callables.next()?;

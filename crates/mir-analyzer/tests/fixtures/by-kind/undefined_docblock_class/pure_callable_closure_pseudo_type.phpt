@@ -1,7 +1,7 @@
 ===description===
 `pure-callable(...)` and `pure-Closure(...)` parse with the same structural
-shape as `callable(...)`/`Closure(...)` (purity qualifier is dropped) instead
-of being misparsed as a bogus named class.
+shape as `callable(...)`/`Closure(...)`, keeping their purity, instead of
+being misparsed as a bogus named class.
 ===config===
 <mir>
   <issueHandlers>
@@ -22,5 +22,5 @@ function makeClosure() {
 }
 
 $closure = makeClosure();
-/** @mir-check $closure is Closure(int): string */
+/** @mir-check $closure is pure-Closure(int): string */
 $_ = 1;

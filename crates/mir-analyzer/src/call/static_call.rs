@@ -450,6 +450,7 @@ impl CallAnalyzer {
                                 params: data.params.clone(),
                                 return_type: data.return_type.clone(),
                                 this_type,
+                                is_pure: data.is_pure,
                             }),
                         });
                         result.add_type(mir_types::Atomic::TNull);

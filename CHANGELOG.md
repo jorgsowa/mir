@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `findUnusedVariablesAndParams`, and `errorLevel="1"` without an explicit setting, enable `UnusedVariable` and `UnusedForeachValue`, as in Psalm.
+- Calling a callable not known to be pure (`$f()` on a `callable`/`Closure(...)` value, or a first-class callable of an impure function) in a `@pure` function reports `ImpureFunctionCall`. `pure-callable`/`pure-Closure(...)` keep their purity in types, and array callback builtins accept a pure-callable variable.
+- `is_callable()` reports `ImpureFunctionCall` in a `@pure` function when its argument may be a string or array, which can trigger autoloading.
 - `string|non-empty-string` collapses to `string` at branch joins.
 - `NullableReturnStatement` renders an unbound class template as its bound instead of the raw template name.
 - A flag set to a literal in the same branch that defines a variable proves it defined wherever the flag holds that value again (`$mode === 'x'`, `$found`, `$mode !== null`), including across loops.

@@ -147,6 +147,7 @@ fn is_bare_callable_hint(a: &Atomic) -> bool {
         Atomic::TCallable {
             params,
             return_type,
+            ..
         } => params.is_none() && return_type.is_none(),
         _ => false,
     }
@@ -881,6 +882,7 @@ impl CallAnalyzer {
                                     params: data.params.clone(),
                                     return_type: data.return_type.clone(),
                                     this_type,
+                                    is_pure: data.is_pure,
                                 }),
                             });
                             bound.add_type(mir_types::Atomic::TNull);

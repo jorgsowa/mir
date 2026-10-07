@@ -805,8 +805,11 @@ fn resolve_atomic_for_file(
         Atomic::TCallable {
             params,
             return_type,
+            is_pure,
         } => Atomic::TCallable {
-            params: params.map(|ps| resolve_fn_params(&ps, db, file, allow_builtin_shortcut)),
+            params: params.map(|ps| {
+                Box::new(resolve_fn_params(&ps, db, file, allow_builtin_shortcut).into_vec())
+            }),
             return_type: return_type.map(|rt| {
                 Box::new(resolve_union_for_file_inner(
                     *rt,
@@ -815,6 +818,7 @@ fn resolve_atomic_for_file(
                     allow_builtin_shortcut,
                 ))
             }),
+            is_pure,
         },
         Atomic::TClosure { data } => {
             let data = *data;
@@ -830,6 +834,7 @@ fn resolve_atomic_for_file(
                     this_type: data
                         .this_type
                         .map(|t| resolve_union_for_file_inner(t, db, file, allow_builtin_shortcut)),
+                    is_pure: data.is_pure,
                 }),
             }
         }

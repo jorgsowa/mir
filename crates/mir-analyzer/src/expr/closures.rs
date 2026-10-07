@@ -608,6 +608,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Type::single(mir_types::Atomic::TCallable {
                                 params: None,
                                 return_type: None,
+                                is_pure: false,
                             })
                         } else {
                             Type::mixed()
@@ -783,6 +784,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         type_params: mir_types::union::empty_type_params(),
                     })
                 }),
+                is_pure: ctx.is_in_pure_fn,
             }),
         })
     }
@@ -1060,6 +1062,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         })
                     })
                 },
+                is_pure: ctx.is_in_pure_fn,
             }),
         })
     }

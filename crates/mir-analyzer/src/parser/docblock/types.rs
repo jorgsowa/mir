@@ -279,7 +279,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
     // A `[]` after a callable's `: ret` belongs to the return type
     // (`Closure(): string[]` returns `string[]`), so it is not an array-of-callable.
     let callable_return_suffix =
-        split_callable_signature(s).is_some_and(|(_, _, after)| after.starts_with(':'));
+        split_callable_signature(s).is_some_and(|(_, _, _, after)| after.starts_with(':'));
     if let Some(value_str) = s.strip_suffix("[]").filter(|_| !callable_return_suffix) {
         let value = parse_type_string(value_str);
         return Type::single(Atomic::TArray {
@@ -407,10 +407,16 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         // (which already strips the purity qualifier), but a bare keyword
         // with no signature never reaches it and would otherwise fall through
         // to the named-class catch-all below as a bogus class literally named
-        // "pure-callable". Purity is tracked separately at the function level.
-        "callable" | "pure-callable" => Type::single(Atomic::TCallable {
+        // "pure-callable".
+        "callable" => Type::single(Atomic::TCallable {
             params: None,
             return_type: None,
+            is_pure: false,
+        }),
+        "pure-callable" => Type::single(Atomic::TCallable {
+            params: None,
+            return_type: None,
+            is_pure: true,
         }),
         // Bare `Closure` isn't listed here — it's a real PHP class, so it
         // already resolves correctly via the named-class fallthrough below.
@@ -1014,13 +1020,14 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     })
 }
 
-/// Splits `Closure(params): ret` / `callable(params)` into (is_closure, params, text after `)`).
-fn split_callable_signature(s: &str) -> Option<(bool, &str, &str)> {
+/// Splits `[pure-]Closure(params): ret` / `[pure-]callable(params)` into
+/// (is_closure, is_pure, params, text after `)`).
+fn split_callable_signature(s: &str) -> Option<(bool, bool, &str, &str)> {
     let s = s.trim_start_matches('\\');
-    // `pure-callable(...)` / `pure-Closure(...)` — mir does not track purity
-    // on the type itself, so parse the structural shape and drop the
-    // purity qualifier (purity is tracked separately at the function level).
-    let s_after_pure = strip_ascii_ci_prefix(s, "pure-").unwrap_or(s);
+    let (is_pure, s_after_pure) = match strip_ascii_ci_prefix(s, "pure-") {
+        Some(rest) => (true, rest),
+        None => (false, s),
+    };
     let (is_closure, rest) = if let Some(rest) = strip_ascii_ci_prefix(s_after_pure, "closure") {
         (true, rest)
     } else {
@@ -1032,11 +1039,16 @@ fn split_callable_signature(s: &str) -> Option<(bool, &str, &str)> {
         return None;
     }
     let close = find_matching_paren(rest)?;
-    Some((is_closure, &rest[1..close], rest[close + 1..].trim()))
+    Some((
+        is_closure,
+        is_pure,
+        &rest[1..close],
+        rest[close + 1..].trim(),
+    ))
 }
 
 pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
-    let (is_closure, params_str, after) = split_callable_signature(s)?;
+    let (is_closure, is_pure, params_str, after) = split_callable_signature(s)?;
     let return_type = after
         .strip_prefix(':')
         .map(|ret_str| Box::new(parse_type_string(ret_str.trim())));
@@ -1087,12 +1099,14 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
                 return_type: return_type
                     .map_or_else(|| Type::single(Atomic::TVoid), |boxed| *boxed),
                 this_type: None,
+                is_pure,
             }),
         }))
     } else {
         Some(Type::single(Atomic::TCallable {
-            params: Some(params),
+            params: Some(Box::new(params.into_vec())),
             return_type,
+            is_pure,
         }))
     }
 }

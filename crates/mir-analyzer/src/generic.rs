@@ -657,6 +657,7 @@ fn atomic_carries_template(a: &Atomic, template_names: &FxHashSet<Name>) -> bool
         Atomic::TCallable {
             params,
             return_type,
+            ..
         } => {
             params.iter().flat_map(|ps| ps.iter()).any(|p| {
                 p.ty.as_ref().is_some_and(|t| {
@@ -1093,6 +1094,7 @@ fn infer_from_pair(
                         Atomic::TCallable {
                             params: Some(a_params),
                             return_type: Some(a_ret),
+                            ..
                         } => {
                             infer_from_callable_params(
                                 db,
@@ -1120,12 +1122,14 @@ fn infer_from_pair(
             Atomic::TCallable {
                 params: Some(p_params),
                 return_type: Some(p_ret),
+                ..
             } => {
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
                         Atomic::TCallable {
                             params: Some(a_params),
                             return_type: Some(a_ret),
+                            ..
                         } => {
                             infer_from_callable_params(
                                 db,
