@@ -16,12 +16,13 @@ class Identity {
     public ?int $accountId = null;
 }
 class Context {
+    private int $resets = 0;
     /** @psalm-mutation-free */
     public function getIdentity(): Identity { return new Identity(); }
     /** @psalm-mutation-free */
     public function byKey(string $key): Identity { return new Identity(); }
     public function unstable(): Context { return $this; }
-    public function reset(): void {}
+    public function reset(): void { $this->resets++; }
 
     public function afterImpureCall(): int {
         if ($this->getIdentity()->accountId === null) {

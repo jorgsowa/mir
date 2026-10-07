@@ -23,12 +23,14 @@ class Base {
 
 class DelegatesToHelper {
     public string $value;
+    private int $created = 0;
 
     public function __construct(string $v) {
         $this->logCreation();
     }
 
     private function logCreation(): void {
+        $this->created++;
     }
 }
 

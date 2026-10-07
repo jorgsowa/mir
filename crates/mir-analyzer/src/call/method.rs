@@ -91,6 +91,7 @@ pub(crate) struct ResolvedMethod {
     pub(crate) is_pure: bool,
     pub(crate) is_mutation_free: bool,
     pub(crate) is_external_mutation_free: bool,
+    pub(crate) inferred_mutation_free: bool,
     pub(crate) params: Vec<DeclaredParam>,
     pub(crate) template_params: Vec<TemplateParam>,
     pub(crate) return_ty_raw: Type,
@@ -405,6 +406,7 @@ pub(crate) fn resolve_method_from_db(
                         owner_fqcn.as_ref(),
                     )),
             is_external_mutation_free: storage.is_external_mutation_free,
+            inferred_mutation_free: storage.inferred_mutation_free,
             params: params
                 .into_iter()
                 .map(|p| crate::util::reconcile_declared_param_docblock_shadow(db, param_file, p))
@@ -1424,7 +1426,11 @@ fn resolve_method_return<'a>(
         // this receiver), staling any narrowing recorded before the call —
         // e.g. `$this->user = $u; $this->reset(); $this->user->getId();`
         // must not still see `$this->user` as non-null after `reset()`.
-        if !resolved.is_static && !resolved.is_pure && !resolved.is_mutation_free {
+        if !resolved.is_static
+            && !resolved.is_pure
+            && !resolved.is_mutation_free
+            && !resolved.inferred_mutation_free
+        {
             if let ExprKind::Variable(recv_name) = &call.object.kind {
                 if call.args.is_empty() && ea.db.memoize_method_call_results() {
                     let own_key = crate::narrowing::method_call_key(method_name);

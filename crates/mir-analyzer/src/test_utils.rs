@@ -360,10 +360,7 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         }
     );
     let (header_region, expect_content) = match content.rfind(EXPECT_MARKER) {
-        Some(pos) => (
-            &content[..pos],
-            content[pos + EXPECT_MARKER.len()..].trim(),
-        ),
+        Some(pos) => (&content[..pos], content[pos + EXPECT_MARKER.len()..].trim()),
         None => (content, ""),
     };
 
@@ -1694,9 +1691,7 @@ fn drop_expect_section(path: &str, content: &str) {
 
 /// Rewrite only the `===expect===` section, preserving everything before it.
 fn rewrite_expect_section(path: &str, content: &str, lines: &[String]) {
-    let exp_pos = content
-        .find(EXPECT_MARKER)
-        .unwrap_or(content.len());
+    let exp_pos = content.find(EXPECT_MARKER).unwrap_or(content.len());
 
     let mut out = content[..exp_pos].to_string();
     if !out.ends_with('\n') {

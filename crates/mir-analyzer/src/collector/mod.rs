@@ -30,6 +30,7 @@ mod r#enum;
 mod function;
 mod interface;
 mod literal_types;
+mod mutation_free;
 mod resolution;
 mod r#trait;
 mod version_attrs;
@@ -1813,6 +1814,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_inherit_doc: false,
                     is_mutation_free: false,
                     is_external_mutation_free: false,
+                    inferred_mutation_free: false,
                     data_provider_targets: vec![],
                 }),
             );
@@ -2576,6 +2578,7 @@ impl<'a> DefinitionCollector<'a> {
             is_inherit_doc: doc.is_inherit_doc,
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,
+            inferred_mutation_free: false,
             data_provider_targets,
         })
     }

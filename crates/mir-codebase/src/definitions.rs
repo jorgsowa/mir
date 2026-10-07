@@ -526,6 +526,11 @@ pub struct MethodDef {
     /// passed as arguments, but is allowed to modify `$this`.
     #[serde(default)]
     pub is_external_mutation_free: bool,
+    /// The body provably never writes a property, so a call leaves the
+    /// receiver's property narrowing intact. Derived from the body, unlike
+    /// `is_mutation_free`, which comes from the annotation.
+    #[serde(default)]
+    pub inferred_mutation_free: bool,
     /// Method names referenced via `@dataProvider name` / `#[DataProvider('name')]`
     /// (PHPUnit) — treated as used by dead-code analysis, since PHPUnit invokes
     /// them by name through reflection rather than a direct call site.

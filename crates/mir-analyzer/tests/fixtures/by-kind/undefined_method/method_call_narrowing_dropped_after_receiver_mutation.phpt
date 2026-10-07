@@ -5,9 +5,10 @@ An impure call on the receiver invalidates a narrowed mutation-free call result.
 class Y { public function m(): int { return 1; } }
 class Z {}
 class X {
+    private int $resets = 0;
     /** @psalm-mutation-free */
     public function get(): Y|Z { return new Y; }
-    public function reset(): void {}
+    public function reset(): void { $this->resets++; }
 }
 
 function f(X $x): void {

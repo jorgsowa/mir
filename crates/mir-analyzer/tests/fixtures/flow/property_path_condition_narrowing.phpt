@@ -12,12 +12,14 @@ class Cfg {
     public bool $isLocal = false;
     public ?string $domain = null;
     public ?Cfg $next = null;
-    public function reset(): void {}
+    public int $resets = 0;
+    public function reset(): void { $this->resets++; }
 }
 
 class A {
     private Cfg $cfg;
     private ?Cfg $maybe = null;
+    private int $touched = 0;
 
     public function andTernary(): string {
         if ($this->cfg->isLocal && $this->cfg->domain) {
@@ -114,5 +116,5 @@ class A {
         return null;
     }
 
-    private function touch(): void {}
+    private function touch(): void { $this->touched++; }
 }

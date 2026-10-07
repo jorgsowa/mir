@@ -5,11 +5,6 @@
       <code><![CDATA[$negatedString !== null]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Framework/TestSuite.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->providedTests;]]></code>
-    </NullableReturnStatement>
-  </file>
   <file src="src/Logging/JUnit/JunitXmlLogger.php">
     <InvalidTemplateParam>
       <code><![CDATA[$this->currentTestCase->appendChild($fault)]]></code>

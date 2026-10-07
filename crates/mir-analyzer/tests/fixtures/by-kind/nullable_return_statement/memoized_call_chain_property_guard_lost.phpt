@@ -14,8 +14,9 @@ class Identity {
     public ?int $accountId = null;
 }
 class Context {
+    private int $resets = 0;
     public function getIdentity(): Identity { return new Identity(); }
-    public function reset(): void {}
+    public function reset(): void { $this->resets++; }
 
     public function afterImpureCall(): int {
         if ($this->getIdentity()->accountId === null) {
