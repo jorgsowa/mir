@@ -54,6 +54,6 @@ function literalNullKey(): void {
 
 function dynamicBoolKeyFallsBackToInt(bool $b): void {
     $arr = [$b => 1];
-    /** @mir-check $arr is array<int, 1> */
+    /** @mir-check $arr is non-empty-array<int, 1> */
     $_ = $arr;
 }

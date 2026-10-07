@@ -39,6 +39,6 @@ function test_later_key_overwrites_spread(array $defaults): void {
 /** @param list<int> $items */
 function test_int_keyed_spread_falls_back(array $items): void {
     $merged = ['c' => true, ...$items];
-    /** @mir-check $merged is array<"c"|int, true|int> */
+    /** @mir-check $merged is non-empty-array<"c"|int, true|int> */
     $_ = $merged;
 }

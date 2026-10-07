@@ -24,6 +24,6 @@ function test(array $x, string $dynamicKey): void {
     $_ = $merged;
 
     $withDynamicKey = [$before, $dynamicKey => 'mid', $after];
-    /** @mir-check $withDynamicKey is array<int|string, 1|"mid"|"z"> */
+    /** @mir-check $withDynamicKey is non-empty-array<int|string, 1|"mid"|"z"> */
     $_ = $withDynamicKey;
 }

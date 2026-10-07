@@ -511,10 +511,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         if key_union.is_empty() {
             key_union.add(Atomic::TInt);
         }
-        Type::single(Atomic::TArray {
-            key: Box::new(key_union.build()),
-            value: Box::new(all_value_types.build()),
-        })
+        let key = Box::new(key_union.build());
+        let value = Box::new(all_value_types.build());
+        // Only spreads can contribute zero entries.
+        if elements.iter().any(|e| !e.unpack) {
+            Type::single(Atomic::TNonEmptyArray { key, value })
+        } else {
+            Type::single(Atomic::TArray { key, value })
+        }
     }
 
     /// Resolve and record a method reference for the `[receiver, 'method']`

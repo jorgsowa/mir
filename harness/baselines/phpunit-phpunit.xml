@@ -23,14 +23,4 @@
       <code><![CDATA[$this->constraint->asString()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Runner/TestResult/Issue.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->triggeringTests = [
-            $triggeringTest->id() => [
-                'test'  => $triggeringTest,
-                'count' => 1,
-            ],
-        ]]]></code>
-    </InvalidPropertyAssignment>
-  </file>
 </files>
