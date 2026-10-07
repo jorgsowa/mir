@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/Builder/DegradedUuidBuilder.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new DegradedUuid(new Rfc4122Fields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
-    </ImpureFunctionCall>
-  </file>
   <file src="src/Guid/Fields.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
-      <code><![CDATA[$this->getTimeMid()]]></code>
-      <code><![CDATA[$this->getTimeLow()]]></code>
       <code><![CDATA[$this->getVariant()]]></code>
     </ImpureMethodCall>
   </file>
@@ -17,18 +9,6 @@
     <MethodSignatureMismatch>
       <code><![CDATA[unserialize]]></code>
     </MethodSignatureMismatch>
-  </file>
-  <file src="src/Nonstandard/Fields.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
-      <code><![CDATA[$this->getTimeMid()]]></code>
-      <code><![CDATA[$this->getTimeLow()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Nonstandard/UuidV6.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->getHex()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/Provider/Dce/SystemDceSecurityProvider.php">
     <ForbiddenCode>
@@ -41,36 +21,17 @@
   </file>
   <file src="src/Rfc4122/Fields.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
-      <code><![CDATA[$this->getTimeMid()]]></code>
-      <code><![CDATA[$this->getTimeLow()]]></code>
-      <code><![CDATA[$this->getTimeMid()]]></code>
-      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
-      <code><![CDATA[$this->getTimeLow()]]></code>
-      <code><![CDATA[$this->getTimeMid()]]></code>
-      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
-      <code><![CDATA[$this->getTimeMid()]]></code>
-      <code><![CDATA[$this->getTimeLow()]]></code>
       <code><![CDATA[$this->getVariant()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Rfc4122/UuidV2.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->getFields()]]></code>
-      <code><![CDATA[$this->getLocalDomain()]]></code>
-      <code><![CDATA[$this->getFields()]]></code>
     </ImpureMethodCall>
   </file>
   <file src="src/Type/Decimal.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
-      <code><![CDATA[$this->unserialize($data['string'])]]></code>
     </ImpureMethodCall>
   </file>
   <file src="src/Type/Hexadecimal.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
-      <code><![CDATA[$this->unserialize($data['string'])]]></code>
     </ImpureMethodCall>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
@@ -79,32 +40,15 @@
   <file src="src/Type/Integer.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
-      <code><![CDATA[$this->unserialize($data['string'])]]></code>
     </ImpureMethodCall>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Type/Time.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[json_encode($this)]]></code>
-    </ImpureFunctionCall>
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($time['seconds'], $time['microseconds'])]]></code>
       <code><![CDATA[$this->__construct($data['seconds'], $data['microseconds'])]]></code>
     </ImpureMethodCall>
-  </file>
-  <file src="src/Uuid.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->serialize()]]></code>
-      <code><![CDATA[$this->unserialize($data['bytes'])]]></code>
-      <code><![CDATA[$this->compareTo($other)]]></code>
-      <code><![CDATA[$this->getHex()]]></code>
-    </ImpureMethodCall>
-    <ImpureStaticPropertyAssignment>
-      <code><![CDATA[self::$factory = new UuidFactory()]]></code>
-      <code><![CDATA[self::$factoryReplaced = ($factory != new UuidFactory())]]></code>
-      <code><![CDATA[self::$factory = $factory]]></code>
-    </ImpureStaticPropertyAssignment>
   </file>
 </files>

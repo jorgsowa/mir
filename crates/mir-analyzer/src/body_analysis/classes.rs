@@ -1228,8 +1228,9 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         // Set is_in_immutable_method for non-constructor methods of @psalm-immutable
-        // classes (own declaration, or inherited from an ancestor).
-        if !is_ctor && crate::db::class_is_immutable(self.db, fqcn) {
+        // classes (own declaration, or inherited from an ancestor). Static methods
+        // are exempt: immutability covers instance state only.
+        if !is_ctor && !method.is_static && crate::db::class_is_immutable(self.db, fqcn) {
             ctx.is_in_immutable_method = true;
         }
 

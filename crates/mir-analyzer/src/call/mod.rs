@@ -18,6 +18,19 @@ pub(crate) use static_call::resolve_literal_class_scope;
 
 pub struct CallAnalyzer;
 
+/// Whether an argument of type `ty` holds an object a callee could mutate.
+pub(crate) fn arg_object_is_mutable(db: &dyn crate::db::MirDatabase, ty: &mir_types::Type) -> bool {
+    ty.types.iter().any(|atom| match atom {
+        mir_types::Atomic::TNamedObject { fqcn, .. }
+        | mir_types::Atomic::TSelf { fqcn }
+        | mir_types::Atomic::TStaticObject { fqcn }
+        | mir_types::Atomic::TParent { fqcn } => {
+            !crate::db::object_type_is_immutable(db, fqcn.as_ref())
+        }
+        _ => false,
+    })
+}
+
 /// Resolve a declared parameter's own textual argument position at a call
 /// site — the index into `arg_types` (built in call-site TEXTUAL order),
 /// not the parameter's own DECLARED index. The two differ when a named

@@ -1,6 +1,6 @@
 ===description===
-Calling a non-mutation-free instance method on $this inside a @psalm-immutable
-class emits ImpureMethodCall, because the callee may mutate object state.
+A helper of a @psalm-immutable class is itself checked as mutation-free, so a
+mutation is reported where it happens, not at the `$this->helper()` call.
 ===file===
 <?php
 
@@ -13,7 +13,6 @@ class Point {
 
     public function reset(): void {
         $this->doReset();
-//      ^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method doReset() in a pure or immutable context
     }
 
     private function doReset(): void {

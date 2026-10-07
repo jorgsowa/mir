@@ -1,18 +1,25 @@
 ===description===
-A static call (self::/parent::) had no immutable-enforcement mirror of
-method.rs's `$this->method()` check — only `is_pure` was ever checked for
-a static call, so calling a non-mutation-free helper via self:: from
-inside an immutable-class method silently bypassed the check that the
-identical `$this->mutateHelper()` form already caught.
+A `self::` call to a helper of the same @psalm-immutable class is not
+flagged: the helper is checked as mutation-free, so its write is reported
+where it happens. A `self::` call to a mutable parent's method stays flagged.
 ===file===
 <?php
+class MutableBase {
+    public int $y = 0;
+
+    public function bump(): void {
+        $this->y++;
+    }
+}
+
 /** @psalm-immutable */
-class C {
+class C extends MutableBase {
     public int $x = 0;
 
     public function f(): void {
         self::mutateHelper();
-//      ^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutateHelper() in a pure or immutable context
+        parent::bump();
+//      ^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
     }
 
     public function mutateHelper(): void {

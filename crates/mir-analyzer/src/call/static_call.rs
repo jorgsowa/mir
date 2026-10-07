@@ -534,6 +534,11 @@ impl CallAnalyzer {
                 && !resolved.is_pure
                 && !resolved.is_static
                 && is_self_parent_call
+                && !crate::db::method_is_immutable_class_member(
+                    ea.db,
+                    &resolved.owner_fqcn,
+                    &resolved.name,
+                )
             {
                 ea.emit(
                     IssueKind::ImpureMethodCall {
@@ -568,21 +573,11 @@ impl CallAnalyzer {
                     if !reachable {
                         continue;
                     }
-                    let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
+                    let arg_mutation_risk = crate::expr::assignment::resolve_chained_receiver_type(
                         value, ctx, ea.db, &ea.file,
                     )
-                    .is_some_and(|ty| {
-                        ty.types.iter().any(|a| {
-                            matches!(
-                                a,
-                                Atomic::TNamedObject { .. }
-                                    | Atomic::TSelf { .. }
-                                    | Atomic::TStaticObject { .. }
-                                    | Atomic::TParent { .. }
-                            )
-                        })
-                    });
-                    if arg_is_object {
+                    .is_some_and(|ty| crate::call::arg_object_is_mutable(ea.db, &ty));
+                    if arg_mutation_risk {
                         ea.emit(
                             IssueKind::ImpureMethodCall {
                                 method: method_name.to_string(),

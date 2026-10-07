@@ -1116,13 +1116,19 @@ fn resolve_method_return<'a>(
         }
         // Immutability check: calling a non-mutation-free instance method on $this
         // inside a @psalm-immutable class or @psalm-mutation-free method is forbidden
-        // because it may indirectly mutate object state.
+        // because it may indirectly mutate object state. Methods of an immutable
+        // class are themselves checked as mutation-free.
         if ctx.is_in_immutable_method
             && !resolved.is_mutation_free
             && !resolved.is_pure
             && !resolved.is_static
             && crate::expr::root_receiver_var(&call.object)
                 .is_some_and(|n| n.trim_start_matches('$') == "this")
+            && !crate::db::method_is_immutable_class_member(
+                ea.db,
+                &resolved.owner_fqcn,
+                &resolved.name,
+            )
         {
             ea.emit(
                 IssueKind::ImpureMethodCall {
@@ -1211,21 +1217,11 @@ fn resolve_method_return<'a>(
                 if !reachable {
                     continue;
                 }
-                let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
+                let arg_mutation_risk = crate::expr::assignment::resolve_chained_receiver_type(
                     value, ctx, ea.db, &ea.file,
                 )
-                .is_some_and(|ty| {
-                    ty.types.iter().any(|a| {
-                        matches!(
-                            a,
-                            mir_types::Atomic::TNamedObject { .. }
-                                | mir_types::Atomic::TSelf { .. }
-                                | mir_types::Atomic::TStaticObject { .. }
-                                | mir_types::Atomic::TParent { .. }
-                        )
-                    })
-                });
-                if arg_is_object {
+                .is_some_and(|ty| crate::call::arg_object_is_mutable(ea.db, &ty));
+                if arg_mutation_risk {
                     ea.emit(
                         IssueKind::ImpureMethodCall {
                             method: method_name.to_string(),

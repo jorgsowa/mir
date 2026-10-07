@@ -6,7 +6,8 @@ only a plain @pure function's `new` calls were checked at all. Passing
 free lets it store and later mutate that object, the same risk an
 impure METHOD call on it already catches. Contrast with passing a plain
 VALUE read off `$this` (not an object), which must stay unflagged — the
-standard immutable "wither" idiom.
+standard immutable "wither" idiom. An immutable object argument is covered
+by impure_function_call/immutable_object_argument_ok.
 ===config===
 <mir>
   <issueHandlers>
@@ -20,15 +21,16 @@ class Wrapper {
     public function __construct(public Config $cfg) {}
 }
 
-/** @psalm-immutable */
 class Config {
     public int $timeout = 30;
 
+    /** @psalm-mutation-free */
     public function wrapSelf(): Wrapper {
         return new Wrapper($this);
 //             ^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function Wrapper::__construct() in a @pure function
     }
 
+    /** @psalm-mutation-free */
     public function withTimeout(int $timeout): self {
         return new self();
     }

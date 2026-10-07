@@ -270,10 +270,11 @@ pub use self::queries::{
     class_template_params, collect_file_definitions, collect_file_definitions_uncached,
     constant_exists, declared_template_params, extends_or_implements, function_exists,
     has_unknown_ancestor, infer_file_return_types, inherited_template_bindings, is_final,
-    is_unchecked_exception, member_location, owner_type_is_mutation_free_by_construction,
-    parse_file, prepare_analysis_file, rebind_scope_templates, resolve_docblock_type_name,
-    resolve_name, resolve_receiver_fqcn, template_bindings_for_ancestor, trait_alias_original_name,
-    ClassKind, InferredFileTypes, TrackedParseResult,
+    is_unchecked_exception, member_location, method_is_immutable_class_member,
+    object_type_is_immutable, owner_type_is_mutation_free_by_construction, parse_file,
+    prepare_analysis_file, rebind_scope_templates, resolve_docblock_type_name, resolve_name,
+    resolve_receiver_fqcn, template_bindings_for_ancestor, trait_alias_original_name, ClassKind,
+    InferredFileTypes, TrackedParseResult,
 };
 pub use self::ref_index::{FileNo, RefIndex};
 pub use self::reference_locations::*;

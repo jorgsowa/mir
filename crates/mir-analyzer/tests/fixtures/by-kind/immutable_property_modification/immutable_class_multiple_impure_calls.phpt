@@ -1,6 +1,6 @@
 ===description===
-Each call to a non-mutation-free method on $this inside a @psalm-immutable method
-is reported individually, just like multiple property writes.
+Each mutation inside helpers of a @psalm-immutable class is reported individually
+where it happens; the `$this->helper()` calls themselves are not flagged.
 ===file===
 <?php
 
@@ -11,9 +11,7 @@ class Cache {
 
     public function refresh(): void {
         $this->clearData();
-//      ^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method clearData() in a pure or immutable context
         $this->resetHits();
-//      ^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method resetHits() in a pure or immutable context
     }
 
     private function clearData(): void {

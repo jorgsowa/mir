@@ -231,6 +231,22 @@ pub fn class_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
     false
 }
 
+/// Whether instances of `fqcn` can't be mutated from outside their own methods:
+/// native readonly, enum, or `@psalm-immutable`.
+pub fn object_type_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    owner_type_is_mutation_free_by_construction(db, fqcn) || class_is_immutable(db, fqcn)
+}
+
+/// Whether instance method `method_name` declared on `owner_fqcn` is checked as
+/// mutation-free because its class is `@psalm-immutable` (constructors excluded).
+pub fn method_is_immutable_class_member(
+    db: &dyn MirDatabase,
+    owner_fqcn: &str,
+    method_name: &str,
+) -> bool {
+    !method_name.eq_ignore_ascii_case("__construct") && class_is_immutable(db, owner_fqcn)
+}
+
 /// Whether `fqcn` (or any ancestor up its native `extends` chain) is a PHP 8.2+
 /// native `readonly` class. Native readonlyness enforces at the language level
 /// that no property may be reassigned after construction, so every non-constructor

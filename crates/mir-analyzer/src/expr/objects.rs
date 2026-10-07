@@ -430,7 +430,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                         "__construct",
                     )
-                    .map(|(_, s)| {
+                    .map(|(owner, s)| {
                         (
                             s.params.to_vec(),
                             s.template_params.clone(),
@@ -438,6 +438,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             s.taint_sink_params.clone(),
                             s.is_pure,
                             s.is_mutation_free,
+                            owner,
                         )
                     });
                     // `new static`/`new self`/`new parent` inside a trait binds
@@ -455,6 +456,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ctor_taint_sink_params,
                         ctor_is_pure,
                         ctor_is_mutation_free,
+                        ctor_owner,
                     )) = &ctor_params_and_templates
                     {
                         // Taint sink check: `new Sink($tainted)` reaching a
@@ -537,9 +539,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // the standard immutable "wither" idiom) is not a
                         // mutation risk at all — only an object reference the
                         // constructor could hold onto and later mutate is.
+                        // An immutable class's constructor only initializes
+                        // the new instance.
                         if (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
                             && !ctor_is_pure
                             && !ctor_is_mutation_free
+                            && !crate::db::class_is_immutable(self.db, ctor_owner)
                         {
                             for arg in n.args.iter() {
                                 let Some(value) = &arg.value else { continue };
@@ -559,34 +564,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     crate::expr::assignment::resolve_chained_receiver_type(
                                         value, ctx, self.db, &self.file,
                                     );
-                                // Flag only if any object atom could be mutated by the callee.
-                                // An argument that is mutation-free *by construction* (a native-readonly
-                                // class or a PHP enum) cannot have its state changed even inside an impure
-                                // constructor thanks to language-level enforcement on THAT owner. When every
-                                // resolved object atom is such an owner — the common immutable "wrap $this in
-                                // a value holder" iterator idiom (`new X($this)` copying readonly state off the
-                                // receiver) — there is no mutation risk at all, so nothing to flag.
+                                // An immutable argument (readonly, enum or `@psalm-immutable`) can't
+                                // have its state changed even by an impure constructor.
                                 let arg_mutation_risk = resolved.is_some_and(|ty| {
-                                    for atom in ty.types.iter() {
-                                        match atom {
-                                            Atomic::TNamedObject { fqcn, .. }
-                                            | Atomic::TSelf { fqcn }
-                                            | Atomic::TStaticObject { fqcn }
-                                            | Atomic::TParent { fqcn } => {
-                                                if crate::db::
-                                                    owner_type_is_mutation_free_by_construction(
-                                                        self.db,
-                                                        fqcn.as_ref(),
-                                                    )
-                                                {
-                                                    continue;
-                                                }
-                                                return true;
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                    false
+                                    crate::call::arg_object_is_mutable(self.db, &ty)
                                 });
                                 if arg_mutation_risk {
                                     self.emit(
@@ -727,7 +708,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &fqcn,
                         ctor_params_and_templates
                             .as_ref()
-                            .map(|(p, _, _, _, _, _)| p.as_slice()),
+                            .map(|(p, ..)| p.as_slice()),
                         &arg_types,
                         &arg_names,
                         call_span,
