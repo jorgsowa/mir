@@ -11,15 +11,6 @@
       <code><![CDATA[unserialize]]></code>
     </MethodSignatureMismatch>
   </file>
-  <file src="src/Provider/Dce/SystemDceSecurityProvider.php">
-    <ForbiddenCode>
-      <code><![CDATA[shell_exec('id -u')]]></code>
-      <code><![CDATA[shell_exec('id -g')]]></code>
-      <code><![CDATA[shell_exec('whoami /user /fo csv /nh')]]></code>
-      <code><![CDATA[shell_exec('net user %username% | findstr /b /i "Local Group Memberships"')]]></code>
-      <code><![CDATA[shell_exec('wmic group get name,sid | findstr /b /i ' . escapeshellarg($firstGroup))]]></code>
-    </ForbiddenCode>
-  </file>
   <file src="src/Type/Decimal.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
