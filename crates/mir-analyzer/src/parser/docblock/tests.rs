@@ -1030,7 +1030,7 @@ fn param_descriptions_cover_typed_untyped_byref_and_variadic() {
      * @param array<string, int> $e Generic, with $dollar in prose
      * @param int $f
      */";
-    let parsed = DocblockParser::parse(doc);
+    let parsed = DocblockParser::parse_with_descriptions(doc);
     let described: Vec<_> = parsed
         .param_descriptions
         .iter()
@@ -1050,22 +1050,33 @@ fn param_descriptions_cover_typed_untyped_byref_and_variadic() {
 
 #[test]
 fn return_description_follows_the_type() {
-    let parsed = DocblockParser::parse("/** @return array<string, int> Counts by key */");
+    let parsed =
+        DocblockParser::parse_with_descriptions("/** @return array<string, int> Counts by key */");
     assert_eq!(parsed.return_description.as_deref(), Some("Counts by key"));
-    let parsed = DocblockParser::parse("/** @return int|null */");
+    let parsed = DocblockParser::parse_with_descriptions("/** @return int|null */");
     assert_eq!(parsed.return_description, None);
 }
 
 #[test]
 fn throws_description_applies_to_each_union_member() {
-    let parsed = DocblockParser::parse("/** @throws A|B When broken */");
+    let parsed = DocblockParser::parse_with_descriptions("/** @throws A|B When broken */");
     let described: Vec<_> = parsed
         .throws_descriptions
         .iter()
         .map(|(c, d)| (c.as_str(), d.as_str()))
         .collect();
     assert_eq!(described, [("A", "When broken"), ("B", "When broken")]);
-    assert!(DocblockParser::parse("/** @throws A */")
+    assert!(DocblockParser::parse_with_descriptions("/** @throws A */")
         .throws_descriptions
         .is_empty());
+}
+
+#[test]
+fn plain_parse_skips_tag_descriptions() {
+    let parsed = DocblockParser::parse(
+        "/** @param int $a Some prose\n * @return int Result\n * @throws E Boom */",
+    );
+    assert!(parsed.param_descriptions.is_empty());
+    assert_eq!(parsed.return_description, None);
+    assert!(parsed.throws_descriptions.is_empty());
 }

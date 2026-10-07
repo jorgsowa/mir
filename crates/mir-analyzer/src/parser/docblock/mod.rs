@@ -14,6 +14,15 @@ pub struct DocblockParser;
 
 impl DocblockParser {
     pub fn parse(text: &str) -> ParsedDocblock {
+        Self::parse_inner(text, false)
+    }
+
+    /// Like `parse`, also filling `@param`/`@return`/`@throws` descriptions.
+    pub fn parse_with_descriptions(text: &str) -> ParsedDocblock {
+        Self::parse_inner(text, true)
+    }
+
+    fn parse_inner(text: &str, capture_descriptions: bool) -> ParsedDocblock {
         let doc = parse_phpdoc(text);
         let mut result = ParsedDocblock {
             description: extract_description(text),
@@ -70,9 +79,11 @@ impl DocblockParser {
                                     .param_type_strings
                                     .push((name.trim_start_matches('$').to_string(), ty_s.clone()));
                                 let bare = name.trim_start_matches('$').to_string();
-                                let desc = param_description(&body_str, &ty_s, &bare);
-                                if !desc.is_empty() {
-                                    result.param_descriptions.push((bare.clone(), desc));
+                                if capture_descriptions {
+                                    let desc = param_description(&body_str, &ty_s, &bare);
+                                    if !desc.is_empty() {
+                                        result.param_descriptions.push((bare.clone(), desc));
+                                    }
                                 }
                                 result.params.push((bare, parse_type_string(&ty_s)));
                             }
@@ -103,9 +114,11 @@ impl DocblockParser {
                             result.invalid_annotations.push(msg);
                         }
                         result.return_type = Some(parse_type_string(&ty_s));
-                        let desc = description_after(&body_str, &ty_s);
-                        if !desc.is_empty() {
-                            result.return_description = Some(desc);
+                        if capture_descriptions {
+                            let desc = description_after(&body_str, &ty_s);
+                            if !desc.is_empty() {
+                                result.return_description = Some(desc);
+                            }
                         }
                     }
                 }
@@ -151,7 +164,11 @@ impl DocblockParser {
                 "throws" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         let first_word = body_str.split_whitespace().next().unwrap_or("");
-                        let desc = description_after(&body_str, first_word);
+                        let desc = if capture_descriptions {
+                            description_after(&body_str, first_word)
+                        } else {
+                            String::new()
+                        };
                         for class in first_word.split('|') {
                             if !class.is_empty() {
                                 record_backslash_keyword_types(

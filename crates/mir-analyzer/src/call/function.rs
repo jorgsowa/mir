@@ -51,15 +51,23 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             .as_ref()
             .map(|loc| loc.file.as_ref())
             .unwrap_or(ea.file.as_ref());
+        // Inference analyzes the whole declaring file; bundled stub bodies never refine.
+        let inferred_return = || {
+            (!crate::stubs::is_stub_path(param_file))
+                .then(|| crate::db::inferred_function_return_type_from(db, &ea.file, fqn))
+                .flatten()
+        };
         let return_ty_raw = f
             .return_type
             .clone()
             .map(|native| {
-                crate::db::inferred_function_return_type_from(db, &ea.file, fqn)
+                super::method::native_may_refine_to_literals(&native)
+                    .then(inferred_return)
+                    .flatten()
                     .filter(|t| super::method::inferred_literals_refine_native(&native, t))
                     .unwrap_or(native)
             })
-            .or_else(|| crate::db::inferred_function_return_type_from(db, &ea.file, fqn))
+            .or_else(inferred_return)
             .map(|t| (*t).clone())
             .unwrap_or_else(Type::mixed);
         return Some(ResolvedFn {

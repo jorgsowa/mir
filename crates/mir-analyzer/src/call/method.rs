@@ -123,6 +123,11 @@ fn inferred_refines_bare_object(native_fqcn: &mir_types::Name, inferred: &Type) 
     )
 }
 
+/// A bare native `int`/`string` hint, the only kind `inferred_literals_refine_native` can refine.
+pub(crate) fn native_may_refine_to_literals(native: &Type) -> bool {
+    !native.from_docblock && matches!(native.types.as_slice(), [Atomic::TInt] | [Atomic::TString])
+}
+
 /// A native `int`/`string` hint whose body returns only 2+ literals of that kind.
 pub(crate) fn inferred_literals_refine_native(native: &Type, inferred: &Type) -> bool {
     if native.from_docblock || inferred.types.len() < 2 {
@@ -266,10 +271,12 @@ pub(crate) fn resolve_method_from_db(
                 .or_else(|| {
                     // Not overridable, so the body's literals are the full result set.
                     let sealed = storage.is_final || storage.visibility == Visibility::Private;
-                    sealed
-                        .then(inferred)
-                        .flatten()
-                        .filter(|t| inferred_literals_refine_native(&native, t))
+                    (sealed
+                        && !crate::stubs::is_stub_path(return_type_file)
+                        && native_may_refine_to_literals(&native))
+                    .then(inferred)
+                    .flatten()
+                    .filter(|t| inferred_literals_refine_native(&native, t))
                 });
             Some(refined.unwrap_or(native))
         } else {

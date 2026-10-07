@@ -885,6 +885,24 @@ impl<'a> DefinitionCollector<'a> {
             .unwrap_or_default()
     }
 
+    /// Tag descriptions are only kept for user code; bundled stubs are re-collected
+    /// on every session and nothing reads their descriptions.
+    fn parse_callable_docblock(
+        &self,
+        doc_comment: Option<&php_ast::owned::Comment>,
+    ) -> crate::parser::ParsedDocblock {
+        let capture = !crate::stubs::is_stub_path(&self.file);
+        doc_comment
+            .map(|c| {
+                if capture {
+                    crate::parser::DocblockParser::parse_with_descriptions(&c.text)
+                } else {
+                    crate::parser::DocblockParser::parse(&c.text)
+                }
+            })
+            .unwrap_or_default()
+    }
+
     /// Writes accumulated namespace and import data into `self.slice` so that
     /// `file_namespace()` and `file_imports()` can derive them via
     /// `collect_file_definitions`. Called at the end of `collect_slice`.
@@ -2144,11 +2162,7 @@ impl<'a> DefinitionCollector<'a> {
         aliases: Option<&FxHashMap<String, Type>>,
         class_template_params: &[TemplateParam],
     ) -> Option<MethodDef> {
-        let doc = m
-            .doc_comment
-            .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(&c.text))
-            .unwrap_or_default();
+        let doc = self.parse_callable_docblock(m.doc_comment.as_ref());
 
         if let Some(c) = m.doc_comment.as_ref() {
             self.emit_docblock_issues(&doc, c.span.start);
