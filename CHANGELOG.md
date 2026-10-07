@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `method_exists('Foo', 'm')` / `method_exists(Foo::class, 'm')` suppresses `UndefinedMethod` on `$x->m()` when `$x` is typed `Foo`.
 - Calls to bundled stub functions, and to methods with a native `int`/`string` return, no longer analyze whole stub files to infer return types, cutting about 13 MB of memory and 7% CPU on large projects.
 - Tag descriptions are no longer built for bundled stub docblocks, restoring cold-start latency (about 1.15 ms back to 0.7 ms for the first LSP query) and about 6 MB of resident memory.
 - `findUnusedVariablesAndParams`, and `errorLevel="1"` without an explicit setting, enable `UnusedVariable` and `UnusedForeachValue`, as in Psalm.

@@ -642,6 +642,21 @@ impl FlowState {
         self.class_exists_guards.contains(fqcn) || !self.extension_loaded_guards.is_empty()
     }
 
+    /// True when `method_exists()` proves `method_lc` on the receiver: keyed by its
+    /// expression, or by class name (`method_exists('Foo', ..)`) for a receiver typed exactly `fqcn`.
+    pub fn is_method_guarded(
+        &self,
+        receiver_key: Option<Arc<str>>,
+        fqcn: &str,
+        method_lc: &str,
+    ) -> bool {
+        let guarded = |key: Arc<str>| {
+            self.method_exists_guards
+                .contains(&(key, Arc::from(method_lc)))
+        };
+        receiver_key.is_some_and(&guarded) || guarded(Arc::from(format!("cls:{fqcn}").as_str()))
+    }
+
     /// Create a context seeded with the given parameters.
     #[allow(clippy::too_many_arguments)]
     pub fn for_function(

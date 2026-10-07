@@ -1890,14 +1890,11 @@ fn resolve_method_return<'a>(
         // A trait body's $this is the future consuming class — the method may
         // be provided by the consumer, so an unresolved call is not undefined.
         // Also suppress when caller guarded with `method_exists($obj, 'method')`.
-        let guarded_by_method_exists = extract_expr_guard_key(&call.object, ctx, ea.db, &ea.file)
-            .map(|key| {
-                ctx.method_exists_guards.contains(&(
-                    key,
-                    Arc::from(crate::util::php_ident_lowercase(method_name)),
-                ))
-            })
-            .unwrap_or(false);
+        let guarded_by_method_exists = ctx.is_method_guarded(
+            extract_expr_guard_key(&call.object, ctx, ea.db, &ea.file),
+            fqcn,
+            &crate::util::php_ident_lowercase(method_name),
+        );
         if is_trait {
             // The call may be satisfied by whichever class ends up consuming
             // this trait — record a per-trait marker so DeadCodeAnalyzer can

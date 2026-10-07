@@ -1166,13 +1166,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|k| (k.is_interface, k.is_abstract, k.is_trait))
             .unwrap_or((false, false, false));
         let has_call_magic = crate::db::has_method_in_chain(self.db, fqcn, "__call");
-        let guarded_by_method_exists =
-            crate::narrowing::extract_expr_guard_key(object, ctx, self.db, &self.file)
-                .map(|key| {
-                    ctx.method_exists_guards
-                        .contains(&(key, Arc::from(method_name_lower)))
-                })
-                .unwrap_or(false);
+        let guarded_by_method_exists = ctx.is_method_guarded(
+            crate::narrowing::extract_expr_guard_key(object, ctx, self.db, &self.file),
+            fqcn,
+            method_name_lower,
+        );
         if is_interface || is_abstract || is_trait || has_call_magic || guarded_by_method_exists {
             return;
         }
