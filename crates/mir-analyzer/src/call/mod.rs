@@ -1,5 +1,6 @@
 mod args;
 mod array_builtins;
+mod builtin_purity;
 mod callable;
 mod function;
 pub(crate) mod method;

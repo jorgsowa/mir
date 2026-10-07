@@ -11,14 +11,6 @@
     </ImpureStaticVariable>
   </file>
   <file src="src/BigInteger.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[preg_match($pattern, $number, $matches)]]></code>
-      <code><![CDATA[preg_match($pattern, $number, $matches)]]></code>
-      <code><![CDATA[hex2bin($hex)]]></code>
-      <code><![CDATA[assert($bin !== false)]]></code>
-      <code><![CDATA[hex2bin($hex)]]></code>
-      <code><![CDATA[assert($result !== false)]]></code>
-    </ImpureFunctionCall>
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[$zero = new BigInteger('0')]]></code>
@@ -27,14 +19,6 @@
       <code><![CDATA[]]></code>
       <code><![CDATA[$ten = new BigInteger('10')]]></code>
     </ImpureStaticVariable>
-  </file>
-  <file src="src/BigNumber.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[assert($value instanceof static)]]></code>
-      <code><![CDATA[assert($sum instanceof static)]]></code>
-      <code><![CDATA[preg_match(self::PARSE_REGEXP_RATIONAL, $value, $matches, PREG_UNMATCHED_AS_NULL)]]></code>
-      <code><![CDATA[preg_match(self::PARSE_REGEXP_NUMERICAL, $value, $matches, PREG_UNMATCHED_AS_NULL)]]></code>
-    </ImpureFunctionCall>
   </file>
   <file src="src/BigRational.php">
     <ImpureStaticVariable>
@@ -45,10 +29,5 @@
       <code><![CDATA[]]></code>
       <code><![CDATA[$ten = new BigRational(BigInteger::ten(), BigInteger::one(), false, false)]]></code>
     </ImpureStaticVariable>
-  </file>
-  <file src="src/Internal/Calculator/NativeCalculator.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[assert($carry === 0)]]></code>
-    </ImpureFunctionCall>
   </file>
 </files>
