@@ -27,9 +27,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$value !== null]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidReturnType>
-      <code><![CDATA[return $options;]]></code>
-    </InvalidReturnType>
   </file>
   <file src="src/functions.php">
     <ForbiddenCode>

@@ -603,6 +603,67 @@ fn try_insert_new_shape_key(
     Some(result)
 }
 
+/// `$arr[$k] = v` where `$k` is a union of literal string keys grows the shape
+/// by every key, as Psalm does: optional only on an empty array outside a loop,
+/// definite otherwise. Int keys keep the generic path.
+fn try_insert_literal_union_keys(
+    current: &Type,
+    new_key: &Type,
+    new_value: &Type,
+    inside_loop: bool,
+) -> Option<Type> {
+    let keys: Vec<ArrayKey> = new_key
+        .types
+        .iter()
+        .map(|a| match a {
+            Atomic::TLiteralString(s) => Some(ArrayKey::String(s.clone())),
+            _ => None,
+        })
+        .collect::<Option<_>>()?;
+    if keys.len() < 2 || current.types.is_empty() {
+        return None;
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+    for atomic in &current.types {
+        let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } = atomic
+        else {
+            return None;
+        };
+        let optional = properties.is_empty() && !inside_loop;
+        let mut new_properties = properties.clone();
+        for key in &keys {
+            match new_properties.get_mut(key) {
+                Some(prop) => prop.ty = Type::merge(&prop.ty, new_value),
+                None => {
+                    new_properties.insert(
+                        key.clone(),
+                        mir_types::atomic::KeyedProperty {
+                            ty: new_value.clone(),
+                            optional,
+                        },
+                    );
+                }
+            }
+        }
+        if new_properties.len() > MAX_SHAPE_KEYS {
+            return None;
+        }
+        let next_is_list = *is_list && new_properties.len() == properties.len();
+        result.add_type(Atomic::TKeyedArray {
+            properties: new_properties,
+            is_open: *is_open,
+            is_list: next_is_list,
+        });
+    }
+    Some(result)
+}
+
 /// Like [`try_insert_new_shape_key`], but for push notation (`$arr[] = v`):
 /// the new key is always the next sequential integer index, so this only
 /// applies to atoms that are still list-shaped (an assoc shape can't be
@@ -721,6 +782,10 @@ pub fn widen_array_with_value_and_key(
         if let Some(grown) = try_insert_new_shape_key(current, key, new_value, !inside_loop) {
             return grown;
         }
+    } else if let Some(grown) =
+        try_insert_literal_union_keys(current, new_key, new_value, inside_loop)
+    {
+        return grown;
     }
 
     let mut result = Type::empty();
