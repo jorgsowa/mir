@@ -115,7 +115,7 @@ pub(super) fn extract_generic_content(s: &str) -> Option<(&str, &str)> {
     }
     let after_lt = &s[lt + 1..];
     let mut depth = 1i32;
-    for (i, ch) in after_lt.char_indices() {
+    for (i, ch) in unquoted_char_indices(after_lt) {
         match ch {
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => {

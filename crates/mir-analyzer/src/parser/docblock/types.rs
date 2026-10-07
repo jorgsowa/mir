@@ -968,7 +968,7 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
         let colon_pos = {
             let mut depth = 0i32;
             let mut found = None;
-            for (i, ch) in item.char_indices() {
+            for (i, ch) in unquoted_char_indices(item) {
                 match ch {
                     '<' | '(' | '{' => depth += 1,
                     '>' | ')' | '}' => depth -= 1,
@@ -1102,7 +1102,7 @@ pub(super) fn find_matching_paren(s: &str) -> Option<usize> {
         return None;
     }
     let mut depth = 0i32;
-    for (i, ch) in s.char_indices() {
+    for (i, ch) in unquoted_char_indices(s) {
         match ch {
             '(' | '<' | '{' => depth += 1,
             ')' | '>' | '}' => {
@@ -1323,7 +1323,7 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
 
     let mut depth: i32 = 0;
 
-    for (i, ch) in s.char_indices() {
+    for (i, ch) in unquoted_char_indices(s) {
         match ch {
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => depth = (depth - 1).max(0),
@@ -1365,7 +1365,7 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
 pub(super) fn parse_var_line(s: &str) -> Option<(String, String)> {
     let mut depth: i32 = 0;
 
-    for (i, ch) in s.char_indices() {
+    for (i, ch) in unquoted_char_indices(s) {
         match ch {
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => depth = (depth - 1).max(0),
@@ -1424,8 +1424,21 @@ pub(super) fn extract_return_type(s: &str) -> String {
     let mut depth: i32 = 0;
     let mut current_token = String::new();
 
+    let track_quotes = !has_unterminated_quote(s);
+    let mut in_quote: Option<char> = None;
     for (i, ch) in s.char_indices() {
+        if let Some(q) = in_quote {
+            current_token.push(ch);
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
         match ch {
+            '\'' | '"' if track_quotes => {
+                in_quote = Some(ch);
+                current_token.push(ch);
+            }
             '<' | '(' | '{' => {
                 depth += 1;
                 current_token.push(ch);
@@ -1511,8 +1524,21 @@ pub(super) fn split_intersection(s: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut depth = 0i32;
     let mut current = String::new();
+    let track_quotes = !has_unterminated_quote(s);
+    let mut in_quote: Option<char> = None;
     for ch in s.chars() {
+        if let Some(q) = in_quote {
+            current.push(ch);
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
         match ch {
+            '\'' | '"' if track_quotes => {
+                in_quote = Some(ch);
+                current.push(ch);
+            }
             '<' | '(' | '{' => {
                 depth += 1;
                 current.push(ch);
@@ -1542,9 +1568,8 @@ pub(super) fn is_balanced_parens(s: &str) -> bool {
         return false;
     }
     let mut depth = 0i32;
-    let chars: Vec<char> = s.chars().collect();
-    let last = chars.len() - 1;
-    for (i, ch) in chars.iter().enumerate() {
+    let last = s.len() - 1;
+    for (i, ch) in unquoted_char_indices(s) {
         match ch {
             '(' => depth += 1,
             ')' => {
@@ -1565,8 +1590,21 @@ pub(super) fn split_generics(s: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut depth = 0;
     let mut current = String::new();
+    let track_quotes = !has_unterminated_quote(s);
+    let mut in_quote: Option<char> = None;
     for ch in s.chars() {
+        if let Some(q) = in_quote {
+            current.push(ch);
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
         match ch {
+            '\'' | '"' if track_quotes => {
+                in_quote = Some(ch);
+                current.push(ch);
+            }
             '<' | '(' | '{' => {
                 depth += 1;
                 current.push(ch);
@@ -1593,7 +1631,7 @@ pub(super) fn split_generics(s: &str) -> Vec<String> {
 pub(super) fn extract_type_prefix(s: &str) -> &str {
     let mut depth = 0i32;
     let mut end = s.len();
-    for (i, ch) in s.char_indices() {
+    for (i, ch) in unquoted_char_indices(s) {
         match ch {
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => depth -= 1,
@@ -1621,6 +1659,30 @@ pub(super) fn extract_type_prefix(s: &str) -> &str {
         }
     }
     &s[..end]
+}
+
+/// `s.char_indices()` minus quoted literals (delimiters included), so a
+/// bracket or separator inside `'->'` or `'a,b'` isn't treated as syntax.
+/// An unterminated quote is scanned as plain text.
+pub(super) fn unquoted_char_indices(s: &str) -> impl Iterator<Item = (usize, char)> + '_ {
+    let skip_quotes = !has_unterminated_quote(s);
+    let mut in_quote: Option<char> = None;
+    s.char_indices().filter(move |&(_, ch)| {
+        if !skip_quotes {
+            return true;
+        }
+        if let Some(q) = in_quote {
+            if ch == q {
+                in_quote = None;
+            }
+            return false;
+        }
+        if ch == '\'' || ch == '"' {
+            in_quote = Some(ch);
+            return false;
+        }
+        true
+    })
 }
 
 /// Whether `target` occurs anywhere in `s` outside a single- or
