@@ -370,13 +370,16 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- b2. A @mutation-free override must re-declare it -----------
+            // An override whose body provably writes no property already honours the contract.
             // Same unsoundness as b2: call/method.rs resolves `is_mutation_free`
             // against the receiver's declared type, so a silently-dropped
             // re-declaration lets a mutating override slip through a caller
             // holding an ancestor-typed reference.
             if let Some((parent_fqcn, _)) = all_parent_methods
                 .iter()
-                .find(|(_, p)| p.is_mutation_free && !own.is_mutation_free)
+                .find(|(_, p)| {
+                    p.is_mutation_free && !own.is_mutation_free && !own.inferred_mutation_free
+                })
             {
                 let mut issue = Issue::new(
                     IssueKind::MethodSignatureMismatch {
@@ -398,7 +401,11 @@ impl<'a> ClassAnalyzer<'a> {
             // ---- b4. An @external-mutation-free override must re-declare it -
             if let Some((parent_fqcn, _)) = all_parent_methods
                 .iter()
-                .find(|(_, p)| p.is_external_mutation_free && !own.is_external_mutation_free)
+                .find(|(_, p)| {
+                    p.is_external_mutation_free
+                        && !own.is_external_mutation_free
+                        && !own.inferred_mutation_free
+                })
             {
                 let mut issue = Issue::new(
                     IssueKind::MethodSignatureMismatch {
