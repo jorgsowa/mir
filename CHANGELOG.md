@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Vendored the `grpc` and `opentelemetry` extension stubs, so `Grpc\*` classes and constants and `OpenTelemetry\Instrumentation\hook()` resolve instead of reporting `UndefinedClass`/`UndefinedConstant`/`UndefinedFunction`.
 - An override of a `@mutation-free`/`@external-mutation-free` method is no longer reported by `MethodSignatureMismatch` when its body provably writes no property; mutating overrides still are.
 - `array_fill()` returns `array<int, TValue>` (literal values widened) instead of a bare `array`, removing false `InvalidPropertyAssignment`.
 - A method `@return T` on a bare generic receiver (no type arguments) returns its native return hint (or the template bound) instead of a raw `T`, removing false `InvalidPropertyAssignment`.
