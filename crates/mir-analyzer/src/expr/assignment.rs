@@ -752,6 +752,39 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// non-assignment write path on the same property (array-index write,
     /// `unset()`) that resolves to the same receiver+property but doesn't go
     /// through `assign_to_target`'s own `PropertyAccess` arm.
+    /// After `$obj->prop['k'] = $v` on a shape-typed property, `k` is definitely set to `$v`.
+    fn refine_property_shape_write(
+        &self,
+        pa: &php_ast::owned::PropertyAccessExpr,
+        prop_ty: &Type,
+        key: &mir_types::ArrayKey,
+        value: &Type,
+        ctx: &mut FlowState,
+    ) {
+        let (Some(obj_key), Some(prop_name)) = (
+            crate::narrowing::chained_prop_receiver_key(&pa.object)
+                .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, self.db)),
+            extract_string_from_expr(&pa.property),
+        ) else {
+            return;
+        };
+        let fits_existing = !prop_ty.types.is_empty()
+            && prop_ty.types.iter().all(|a| match a {
+                Atomic::TKeyedArray { properties, .. } => properties
+                    .get(key)
+                    .is_some_and(|p| crate::subtype::is_subtype(self.db, value, &p.ty)),
+                _ => false,
+            });
+        if !fits_existing {
+            return;
+        }
+        if let Some(updated) =
+            super::helpers::set_nested_keyed_value(prop_ty, std::slice::from_ref(key), value)
+        {
+            ctx.set_prop_refined(&obj_key, &prop_name, updated);
+        }
+    }
+
     pub(crate) fn check_property_write_purity(
         &mut self,
         pa: &php_ast::owned::PropertyAccessExpr,
@@ -2213,7 +2246,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // a plain `$obj->items = …` assignment.
                             self.check_property_write_purity(pa, ctx, span);
                             self.check_property_readonly_write(pa, ctx, span, true);
-                            let _ = self.analyze(base, ctx);
+                            let prop_ty = self.analyze(base, ctx);
+                            if let (1, Some(Some(key))) =
+                                (key_chain.len(), literal_key_chain.first())
+                            {
+                                self.refine_property_shape_write(pa, &prop_ty, key, &ty, ctx);
+                            }
                             break;
                         }
                         ExprKind::StaticPropertyAccess(spa) => {

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A literal-key write to a shape-typed property (`$this->opts['k'] = $v`) makes that key definitely set for later reads, removing false `NullableReturnStatement` on optional keys.
 - `sscanf()` returns `array|null` without output variables and `int|null` with them, instead of the blanket `array|int|null` that produced false `PossiblyInvalidArrayAccess`/`PossiblyInvalidOperand`/`PossiblyInvalidArgument`.
 - A defensive `=== false` guard on an `iconv()` result no longer reports `ImpossibleIdenticalComparison`, `RedundantCast` or `RedundantCondition`.
 - A closure literal rebound via `bindTo`/`Closure::bind`/`call()` to another object with a dynamic or omitted scope no longer has its `$this` checked against the enclosing class (false `UndefinedMethod`).

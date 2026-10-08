@@ -669,6 +669,12 @@ impl<'a> StatementsAnalyzer<'a> {
                                     .check_property_write_purity(pa, ctx, var.span);
                                 self.expr_analyzer(ctx)
                                     .check_property_readonly_write(pa, ctx, var.span, true);
+                                if let (Some(obj_key), Some(prop)) = (
+                                    crate::narrowing::chained_prop_receiver_key(&pa.object),
+                                    crate::expr::helpers::extract_string_from_expr(&pa.property),
+                                ) {
+                                    ctx.clear_prop_refined(&obj_key, &prop);
+                                }
                                 break;
                             }
                             // `unset(self::$store[$k])` / `unset(Foo::$store[$k])`
