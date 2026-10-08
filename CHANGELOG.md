@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `new $class()` where `$class` holds known `class-string<X>` values is typed as an instance of X (`H|P` for a union) instead of `object`, removing false `InvalidArgument` and `InvalidReturnType`.
 - An intersection element (`A&B`) fits `A` inside array, list, shape, `iterable` and `Traversable` parameters, removing false `InvalidArgument`.
 - A subclass instance is assignable to a `self`/`parent`-typed property, and assigning it to a `?self` static property narrows it, removing false `InvalidPropertyAssignment` and `NullableReturnStatement`.
 - Calling a `static` closure value no longer clears narrowing of `$this` properties (false `NullableReturnStatement`); other callables still do.

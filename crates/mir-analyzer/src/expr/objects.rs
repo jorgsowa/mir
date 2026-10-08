@@ -773,7 +773,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 }
-                Type::single(Atomic::TObject)
+                // Every atom a known `class-string<X>`: instantiates one of the X.
+                let mut instances = Type::empty();
+                for atomic in &ty.types {
+                    let Some(fqcn) = ctx.class_string_target(atomic) else {
+                        return Type::single(Atomic::TObject);
+                    };
+                    instances.add_type(Atomic::TNamedObject {
+                        fqcn: mir_types::Name::from(fqcn),
+                        type_params: mir_types::union::empty_type_params(),
+                    });
+                }
+                if instances.is_empty() {
+                    Type::single(Atomic::TObject)
+                } else {
+                    instances
+                }
             }
         };
         class_ty
