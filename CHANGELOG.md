@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An intersection element (`A&B`) fits `A` inside array, list, shape, `iterable` and `Traversable` parameters, removing false `InvalidArgument`.
 - A subclass instance is assignable to a `self`/`parent`-typed property, and assigning it to a `?self` static property narrows it, removing false `InvalidPropertyAssignment` and `NullableReturnStatement`.
 - Calling a `static` closure value no longer clears narrowing of `$this` properties (false `NullableReturnStatement`); other callables still do.
 - A `for` condition's assignments (`for (...; ($p = f()) < $n; ...)`) are defined in the body, the step expression and after the loop, removing false `PossiblyUndefinedVariable`.

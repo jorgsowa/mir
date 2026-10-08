@@ -944,6 +944,11 @@ fn strict_named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer
         let arg_fqcn: &Name = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TNever => return true,
+            Atomic::TIntersection { parts } => {
+                return parts
+                    .iter()
+                    .any(|part| strict_named_object_subtype(part, param, ea))
+            }
             _ => return false,
         };
         param.types.iter().any(|p_atomic| {
@@ -1322,6 +1327,10 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                     Atomic::TKeyedArray { .. } => true,
                     _ => *is_open,
                 });
+            }
+            // `A&B` fits whatever any one of its parts fits.
+            Atomic::TIntersection { parts } => {
+                return parts.iter().any(|part| union_compatible(part, param_ty, ea))
             }
             // A nested template is judged by its bound: an unbound one is `mixed` and fits anything.
             Atomic::TTemplateParam { as_type, .. } => {
