@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `if (A || ($s[$e = f()] ?? null) !== x) return;` leaves `$e` defined afterwards: assignments under `??` on the always-evaluated side are promoted, removing false `PossiblyUndefinedVariable`.
 - `$fn(...)` where `$fn` holds a single literal function name is analyzed like a direct call: reports `UndefinedFunction` and checks arity and argument types. `function_exists($fn)`/`is_callable($fn)` guards suppress it.
 - `@param-closure-this` is honored: a closure literal passed for that parameter (static call, method call or function) analyzes `$this` as the named class (`static` = the called class), removing false `UndefinedMethod`.
 - A literal-key write to a shape-typed property (`$this->opts['k'] = $v`) makes that key definitely set for later reads, removing false `NullableReturnStatement` on optional keys.

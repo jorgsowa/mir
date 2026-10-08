@@ -753,7 +753,7 @@ pub(super) fn extract_class_name(
 /// Conservative for internal short-circuit operators: only recurses into the
 /// guaranteed-evaluated side (LHS) of nested `&&`/`||` sub-expressions, since
 /// we cannot know whether the RHS of those was reached.
-pub(super) fn promote_assignment_effects(
+pub(crate) fn promote_assignment_effects(
     expr: &php_ast::owned::Expr,
     ctx: &mut FlowState,
     db: &dyn crate::db::MirDatabase,
@@ -846,6 +846,31 @@ pub(super) fn promote_assignment_effects(
         }
         ExprKind::Parenthesized(inner) => {
             promote_assignment_effects(inner, ctx, db, file);
+        }
+        // The condition always runs; the branches are conditional.
+        ExprKind::Ternary(t) => {
+            promote_assignment_effects(&t.condition, ctx, db, file);
+        }
+        ExprKind::Cast(_, inner) => {
+            promote_assignment_effects(inner, ctx, db, file);
+        }
+        // `isset` stops at the first unset operand, so only the first is certain to run.
+        ExprKind::Isset(args) => {
+            if let Some(first) = args.first() {
+                promote_assignment_effects(first, ctx, db, file);
+            }
+        }
+        ExprKind::Array(elements) => {
+            for element in elements.iter() {
+                if let Some(key) = &element.key {
+                    promote_assignment_effects(key, ctx, db, file);
+                }
+                promote_assignment_effects(&element.value, ctx, db, file);
+            }
+        }
+        // `a ?? b`: only `a` is certain to run — `b` is skipped when `a` is set.
+        ExprKind::NullCoalesce(nc) => {
+            promote_assignment_effects(&nc.left, ctx, db, file);
         }
         // Array access: both base and index are evaluated; assignments inside either matter.
         ExprKind::ArrayAccess(aa) => {
