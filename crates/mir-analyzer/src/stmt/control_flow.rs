@@ -12,7 +12,7 @@ use super::StatementsAnalyzer;
 use crate::db;
 use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
-use crate::narrowing::{established_guard, narrow_from_condition};
+use crate::narrowing::{established_guard, narrow_from_condition, promote_assignment_effects};
 use crate::parser;
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -333,10 +333,15 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Only the last condition decides whether the loop continues.
         let is_infinite = f.condition.last().is_none_or(is_always_true_literal);
-        let post = self.analyze_loop_widened(
+        let mut post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
+                // Widening demotes variables assigned in a condition, which always runs
+                // before the body and the update.
+                for cond in f.condition.iter() {
+                    promote_assignment_effects(cond, iter, sa.db, &sa.file);
+                }
                 sa.analyze_stmt(&f.body, iter);
                 // The update only runs once the condition held, e.g. `$c = $c->getPrevious()`
                 // after `$c !== null`.
@@ -354,6 +359,10 @@ impl<'a> StatementsAnalyzer<'a> {
             is_infinite,
             f.condition.last(),
         );
+        // Every exit path evaluated the condition at least once.
+        for cond in f.condition.iter() {
+            promote_assignment_effects(cond, &mut post, self.db, &self.file);
+        }
         *ctx = post;
     }
 
