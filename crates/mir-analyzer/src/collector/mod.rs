@@ -2469,11 +2469,13 @@ impl<'a> DefinitionCollector<'a> {
         // A `@return T` hides the native hint, which is the only bound an unbound `T` has.
         let native_return = return_type
             .as_ref()
-            .filter(|ty| ty.types.iter().any(|a| matches!(a, Atomic::TTemplateParam { .. })))
-            .and(m.return_type.as_ref())
-            .and_then(|h| {
-                self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
+            .filter(|ty| {
+                ty.types
+                    .iter()
+                    .any(|a| matches!(a, Atomic::TTemplateParam { .. }))
             })
+            .and(m.return_type.as_ref())
+            .and_then(|h| self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn)))))
             .filter(|ty| !ty.is_mixed())
             .map(Box::new);
 

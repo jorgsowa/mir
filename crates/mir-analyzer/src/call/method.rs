@@ -145,7 +145,11 @@ fn bound_unbound_class_templates(
                 as_type,
                 defining_entity,
             } if defining_entity.as_ref() == template_scope && !in_scope.contains(name) => {
-                let bound = if as_type.is_mixed() { native } else { &**as_type };
+                let bound = if as_type.is_mixed() {
+                    native
+                } else {
+                    &**as_type
+                };
                 for bounded in &bound.types {
                     out.add_type(bounded.clone());
                 }

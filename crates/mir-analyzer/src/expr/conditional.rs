@@ -376,7 +376,13 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// match looking non-exhaustive.
     fn resolve_class_const_literal(&self, cond: &Expr, ctx: &FlowState) -> Option<Atomic> {
         let cdef = self.find_arm_class_constant(cond, ctx)?;
-        match cdef.literal_value.as_ref().unwrap_or(&cdef.ty).types.as_slice() {
+        match cdef
+            .literal_value
+            .as_ref()
+            .unwrap_or(&cdef.ty)
+            .types
+            .as_slice()
+        {
             [Atomic::TLiteralString(s)] => Some(Atomic::TLiteralString(s.clone())),
             [Atomic::TLiteralInt(n)] => Some(Atomic::TLiteralInt(*n)),
             _ => None,

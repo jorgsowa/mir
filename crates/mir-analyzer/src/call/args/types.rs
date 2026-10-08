@@ -1330,7 +1330,9 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
             }
             // `A&B` fits whatever any one of its parts fits.
             Atomic::TIntersection { parts } => {
-                return parts.iter().any(|part| union_compatible(part, param_ty, ea))
+                return parts
+                    .iter()
+                    .any(|part| union_compatible(part, param_ty, ea))
             }
             // A nested template is judged by its bound: an unbound one is `mixed` and fits anything.
             Atomic::TTemplateParam { as_type, .. } => {

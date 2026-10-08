@@ -375,12 +375,9 @@ impl<'a> ClassAnalyzer<'a> {
             // against the receiver's declared type, so a silently-dropped
             // re-declaration lets a mutating override slip through a caller
             // holding an ancestor-typed reference.
-            if let Some((parent_fqcn, _)) = all_parent_methods
-                .iter()
-                .find(|(_, p)| {
-                    p.is_mutation_free && !own.is_mutation_free && !own.inferred_mutation_free
-                })
-            {
+            if let Some((parent_fqcn, _)) = all_parent_methods.iter().find(|(_, p)| {
+                p.is_mutation_free && !own.is_mutation_free && !own.inferred_mutation_free
+            }) {
                 let mut issue = Issue::new(
                     IssueKind::MethodSignatureMismatch {
                         class: fqcn.to_string(),
@@ -399,14 +396,11 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- b4. An @external-mutation-free override must re-declare it -
-            if let Some((parent_fqcn, _)) = all_parent_methods
-                .iter()
-                .find(|(_, p)| {
-                    p.is_external_mutation_free
-                        && !own.is_external_mutation_free
-                        && !own.inferred_mutation_free
-                })
-            {
+            if let Some((parent_fqcn, _)) = all_parent_methods.iter().find(|(_, p)| {
+                p.is_external_mutation_free
+                    && !own.is_external_mutation_free
+                    && !own.inferred_mutation_free
+            }) {
                 let mut issue = Issue::new(
                     IssueKind::MethodSignatureMismatch {
                         class: fqcn.to_string(),

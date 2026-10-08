@@ -435,7 +435,7 @@ impl<'a> DefinitionCollector<'a> {
                     let constant = ConstantDef {
                         name: Arc::from(const_name),
                         ty: const_ty,
-                            literal_value,
+                        literal_value,
                         visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                         is_final: c.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
