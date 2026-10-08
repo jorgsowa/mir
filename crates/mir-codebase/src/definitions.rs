@@ -636,6 +636,9 @@ pub struct PropertyDef {
 pub struct ConstantDef {
     pub name: Arc<str>,
     pub ty: Type,
+    /// Literal initializer when a `@var` makes `ty` wider than the value.
+    #[serde(default)]
+    pub literal_value: Option<Type>,
     pub visibility: Option<Visibility>,
     #[serde(default)]
     pub is_final: bool,

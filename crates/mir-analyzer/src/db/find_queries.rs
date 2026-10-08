@@ -1216,6 +1216,7 @@ pub fn find_class_constant_in_class<'db>(
                     fqcn: Name::new(e.fqcn.as_ref()),
                     type_params: mir_types::union::empty_type_params(),
                 }),
+                literal_value: None,
                 visibility: None,
                 is_final: false,
                 location: case.location.clone(),

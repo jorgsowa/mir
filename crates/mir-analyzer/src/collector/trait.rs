@@ -252,6 +252,11 @@ impl<'a> DefinitionCollector<'a> {
                             .as_ref()
                             .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                     );
+                    let literal_value = const_doc
+                        .var_type
+                        .is_some()
+                        .then(|| super::infer_const_value(self, &c.value.kind))
+                        .flatten();
                     let const_ty = const_doc
                         .var_type
                         .map(|t| {
@@ -274,6 +279,7 @@ impl<'a> DefinitionCollector<'a> {
                         ConstantDef {
                             name: Arc::from(const_name),
                             ty: const_ty,
+                            literal_value,
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
