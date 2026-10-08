@@ -1657,7 +1657,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
 
 /// Whether a conditional discriminant subject can be decided by value class.
 ///
-/// Only the bare family kinds qualify. A refined subject (a named object, a
+/// Only the bare family kinds and scalar literals qualify. A refined subject (a named object, a
 /// shape, a non-empty list, an enum case, …) carries value-level constraints
 /// the class lattice cannot express — an argument that is *some* object is
 /// not necessarily *that* class — so refined subjects stay undecidable, the
@@ -1672,6 +1672,9 @@ fn subject_is_decidable(subject: &Atomic) -> bool {
             | Atomic::TString
             | Atomic::TInt
             | Atomic::TFloat
+            | Atomic::TLiteralString(_)
+            | Atomic::TLiteralInt(_)
+            | Atomic::TLiteralFloat(..)
             | Atomic::TArray { .. }
             | Atomic::TList { .. }
             | Atomic::TObject
