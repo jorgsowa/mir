@@ -21,6 +21,6 @@ class Timer {
 
     public function dynamic(bool $flag): void {
         $this->start = hrtime($flag);
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $start expects 'int|null', cannot assign 'int|array{0: int, 1: int}|false'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $start expects 'int|null', cannot assign 'int|array{0: int, 1: int}'
     }
 }
