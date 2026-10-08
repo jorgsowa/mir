@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ReflectionClass::getConstants()` and `getConstant()` return `mixed` (constants can hold null, objects and enum cases), removing a false `InvalidTemplateParam` when the result feeds `array_flip()`.
 - Vendored the `grpc` and `opentelemetry` extension stubs, so `Grpc\*` classes and constants and `OpenTelemetry\Instrumentation\hook()` resolve instead of reporting `UndefinedClass`/`UndefinedConstant`/`UndefinedFunction`.
 - An override of a `@mutation-free`/`@external-mutation-free` method is no longer reported by `MethodSignatureMismatch` when its body provably writes no property; mutating overrides still are.
 - `array_fill()` returns `array<int, TValue>` (literal values widened) instead of a bare `array`, removing false `InvalidPropertyAssignment`.
