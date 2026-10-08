@@ -1100,6 +1100,7 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
                     .map_or_else(|| Type::single(Atomic::TVoid), |boxed| *boxed),
                 this_type: None,
                 is_pure,
+                is_static: false,
             }),
         }))
     } else {

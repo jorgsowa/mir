@@ -937,6 +937,7 @@ impl CallAnalyzer {
                                     return_type: data.return_type.clone(),
                                     this_type,
                                     is_pure: data.is_pure,
+                                    is_static: data.is_static,
                                 }),
                             });
                             bound.add_type(mir_types::Atomic::TNull);

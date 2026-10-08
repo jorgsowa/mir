@@ -353,8 +353,16 @@ impl CallAnalyzer {
                         // carries no purity metadata to consult — the callee's body
                         // is opaque here, and a bound closure can freely mutate the
                         // `$this` it captured. Conservatively assume it may mutate
-                        // `$this` and any object passed as an argument.
-                        ctx.invalidate_prop_refined_receiver("this");
+                        // `$this` and any object passed as an argument. A `static`
+                        // closure has no `$this`.
+                        let only_static_closures = !callee_ty.types.is_empty()
+                            && callee_ty
+                                .types
+                                .iter()
+                                .all(|a| matches!(a, Atomic::TClosure { data } if data.is_static));
+                        if !only_static_closures {
+                            ctx.invalidate_prop_refined_receiver("this");
+                        }
                         for arg in call.args.iter() {
                             if let Some(ExprKind::Variable(name)) =
                                 arg.value.as_ref().map(|v| &v.kind)

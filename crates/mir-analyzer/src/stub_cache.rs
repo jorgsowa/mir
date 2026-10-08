@@ -45,7 +45,7 @@ const MAGIC: u32 = 0x0152_494D;
 /// `inferred_return_type: Option<Type>` → `Option<Arc<Type>>`), so stale
 /// entries are rejected. Also bumped whenever the trailing payload shape
 /// changes (e.g. adding the `Vec<Issue>` section).
-const FORMAT_VERSION: u8 = 14;
+const FORMAT_VERSION: u8 = 15;
 
 /// Cache header. Any mismatch (magic, version, content_hash, php_version)
 /// forces the consumer to treat the entry as a miss and recompute.

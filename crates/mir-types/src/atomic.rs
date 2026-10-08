@@ -102,6 +102,8 @@ pub struct ClosureData {
     pub this_type: Option<Type>,
     /// `pure-Closure(...)`, or a closure literal whose body is checked as pure.
     pub is_pure: bool,
+    /// A `static` closure literal, which has no `$this` to mutate.
+    pub is_static: bool,
 }
 
 /// Payload of [`Atomic::TConditional`].

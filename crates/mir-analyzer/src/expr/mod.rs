@@ -1284,6 +1284,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 return_type: resolve(return_ty),
                 this_type: None,
                 is_pure,
+                is_static: false,
             }),
         }
     }
