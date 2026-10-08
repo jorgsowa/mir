@@ -1808,6 +1808,7 @@ impl<'a> DefinitionCollector<'a> {
                     params,
                     return_type: wrap_return_type(return_type_opt),
                     inferred_return_type: None,
+                    native_return: None,
                     visibility: Visibility::Public,
                     is_static: method.is_static,
                     is_abstract: false,
@@ -2465,6 +2466,16 @@ impl<'a> DefinitionCollector<'a> {
             }
             (None, None) => None,
         };
+        // A `@return T` hides the native hint, which is the only bound an unbound `T` has.
+        let native_return = return_type
+            .as_ref()
+            .filter(|ty| ty.types.iter().any(|a| matches!(a, Atomic::TTemplateParam { .. })))
+            .and(m.return_type.as_ref())
+            .and_then(|h| {
+                self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
+            })
+            .filter(|ty| !ty.is_mixed())
+            .map(Box::new);
 
         let throws = self.resolve_throws(&doc.throws, effective_aliases);
 
@@ -2562,6 +2573,7 @@ impl<'a> DefinitionCollector<'a> {
             params: Arc::from(params.into_boxed_slice()),
             return_type: wrap_return_type(return_type),
             inferred_return_type: None,
+            native_return,
             visibility: Self::convert_visibility(m.visibility),
             is_static: m.is_static,
             is_abstract: m.is_abstract,

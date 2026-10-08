@@ -469,6 +469,9 @@ pub struct MethodDef {
         serialize_with = "serialize_return_type"
     )]
     pub inferred_return_type: Option<Arc<Type>>,
+    /// Native return hint kept beside a `@return` that names a template, to bound it when unbound.
+    #[serde(default)]
+    pub native_return: Option<Box<Type>>,
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_abstract: bool,

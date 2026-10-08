@@ -116,12 +116,44 @@ pub(crate) struct ResolvedMethod {
     pub(crate) params: Vec<DeclaredParam>,
     pub(crate) template_params: Vec<TemplateParam>,
     pub(crate) return_ty_raw: Type,
+    /// Native hint bounding an unbound class template in `return_ty_raw`.
+    pub(crate) native_return: Option<Type>,
     pub(crate) throws: Arc<[Arc<str>]>,
     pub(crate) no_named_arguments: bool,
     pub(crate) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
     pub(crate) if_this_is: Option<Arc<Type>>,
     pub(crate) self_out: Option<Arc<Type>>,
     pub(crate) assertions: Vec<Assertion>,
+}
+
+/// A class template left unbound by a bare receiver (`Foo` for `@template T`) is only as wide as
+/// its bound; an unbounded one falls back to the native return hint. Templates in the caller's
+/// own scope stay raw.
+fn bound_unbound_class_templates(
+    ret: Type,
+    template_scope: &str,
+    in_scope: &rustc_hash::FxHashSet<Name>,
+    native: &Type,
+) -> Type {
+    let mut out = Type::empty();
+    out.possibly_undefined = ret.possibly_undefined;
+    out.from_docblock = ret.from_docblock;
+    for atomic in &ret.types {
+        match atomic {
+            Atomic::TTemplateParam {
+                name,
+                as_type,
+                defining_entity,
+            } if defining_entity.as_ref() == template_scope && !in_scope.contains(name) => {
+                let bound = if as_type.is_mixed() { native } else { &**as_type };
+                for bounded in &bound.types {
+                    out.add_type(bounded.clone());
+                }
+            }
+            other => out.add_type(other.clone()),
+        }
+    }
+    out
 }
 
 /// FQCN of a native (non-docblock) bare object hint like `: Collection`, which
@@ -441,6 +473,11 @@ pub(crate) fn resolve_method_from_db(
                 .collect(),
             template_params,
             return_ty_raw,
+            native_return: if own_has_docblock_return {
+                storage.native_return.as_deref().cloned()
+            } else {
+                None
+            },
             throws,
             no_named_arguments: storage.no_named_arguments,
             taint_sink_params: storage.taint_sink_params.clone(),
@@ -1900,6 +1937,14 @@ fn resolve_method_return<'a>(
         );
         if dom_create_element_has_valid_literal_name {
             return_ty = return_ty.remove_false();
+        }
+        if let Some(native) = &resolved.native_return {
+            return_ty = bound_unbound_class_templates(
+                return_ty,
+                &resolved.template_scope,
+                &ctx.template_param_names,
+                native,
+            );
         }
         ea.apply_method_call_plugins(
             fqcn.as_ref(),
