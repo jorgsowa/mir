@@ -2336,6 +2336,13 @@ impl IssueBuffer {
         }
     }
 
+    /// Mark issues added since index `from` as suppressed when `pred` holds.
+    pub fn suppress_range_where(&mut self, from: usize, pred: impl Fn(&Issue) -> bool) {
+        for issue in self.issues[from..].iter_mut().filter(|i| pred(i)) {
+            issue.suppressed = true;
+        }
+    }
+
     /// Current number of buffered issues. Use before analyzing a statement to
     /// get the `from` index for `suppress_range`.
     pub fn issue_count(&self) -> usize {

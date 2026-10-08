@@ -795,6 +795,21 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                 }
             }
+            // A non-mixed `@var` on `$x = expr` is the author's explicit type for `$x`.
+            if !ann.ty.is_mixed() {
+                if let (Some(lhs), php_ast::owned::StmtKind::Expression(e)) =
+                    (simple_assignment_lhs(stmt), &stmt.kind)
+                {
+                    if ann.name.as_deref().is_none_or(|n| n == lhs) {
+                        let (line, _, col, _) = self.span_to_location(e.span);
+                        self.issues.suppress_range_where(before, |i| {
+                            matches!(&i.kind, IssueKind::MixedAssignment { var } if var == lhs)
+                                && i.location.line == line
+                                && i.location.col_start == col
+                        });
+                    }
+                }
+            }
             apply_post_narrow(stmt, ann, ctx);
         }
 
