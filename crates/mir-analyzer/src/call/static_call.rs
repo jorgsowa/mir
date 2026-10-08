@@ -202,6 +202,34 @@ pub(crate) fn closure_rebind(
     }
 }
 
+/// `@param-closure-this` rebind for a closure literal passed to `params[index]`;
+/// `static`/`self` resolve to `receiver` (the called class) when known.
+pub(crate) fn closure_this_param_rebind(
+    params: &[DeclaredParam],
+    index: usize,
+    arg: &php_ast::owned::Arg,
+    receiver: Option<&str>,
+) -> Option<ClosureRebind> {
+    if arg.unpack || arg.name.is_some() || !arg.value.as_ref().is_some_and(is_closure_literal) {
+        return None;
+    }
+    let param = params
+        .get(index)
+        .or_else(|| params.last().filter(|p| p.is_variadic))?;
+    let ty = param.closure_this.as_deref()?;
+    let [atom] = ty.types.as_slice() else {
+        return None;
+    };
+    let scope = match atom {
+        Atomic::TNamedObject { fqcn, .. } => fqcn.as_ref(),
+        Atomic::TStaticObject { fqcn } | Atomic::TSelf { fqcn } => {
+            receiver.unwrap_or(fqcn.as_ref())
+        }
+        _ => return None,
+    };
+    Some(ClosureRebind::Scope(Arc::from(scope)))
+}
+
 pub(crate) fn is_closure_literal(expr: &php_ast::owned::Expr) -> bool {
     match &expr.kind {
         ExprKind::Parenthesized(inner) => is_closure_literal(inner),
@@ -415,6 +443,9 @@ impl CallAnalyzer {
             None
         };
 
+        let closure_this_params = resolve_method_from_db(ea.db, &fqcn_arc, &method_name_lower)
+            .map(|r| r.params)
+            .unwrap_or_default();
         let mut sole_spread_ty: Option<Type> = None;
         let mut arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
         for (i, arg) in call.args.iter().enumerate() {
@@ -424,13 +455,15 @@ impl CallAnalyzer {
                 arg_types.push(Type::mixed());
                 continue;
             };
-            let ty = if i == 0 {
-                match &bind_scope {
-                    Some(scope) => analyze_with_scope_override(ea, value, ctx, scope),
-                    None => ea.analyze_arg(value, ctx),
-                }
+            let rebind = if i == 0 && bind_scope.is_some() {
+                bind_scope.as_ref()
             } else {
-                ea.analyze_arg(value, ctx)
+                None
+            };
+            let param_rebind = closure_this_param_rebind(&closure_this_params, i, arg, Some(&fqcn));
+            let ty = match rebind.or(param_rebind.as_ref()) {
+                Some(scope) => analyze_with_scope_override(ea, value, ctx, scope),
+                None => ea.analyze_arg(value, ctx),
             };
             super::consume_arg_assignment(value, ctx);
             if arg.unpack {

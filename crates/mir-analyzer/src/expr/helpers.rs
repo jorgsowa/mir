@@ -1292,6 +1292,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
                 .map(|h| crate::parser::type_from_hint_owned(h, self_fqcn))
                 .map(|u| resolve_named_objects_in_union_native(u, db, file));
             mir_codebase::DeclaredParam {
+                closure_this: None,
                 name: Name::new(name_str),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: None,

@@ -44,6 +44,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let params: Vec<mir_codebase::DeclaredParam> =
                 if hook.params.is_empty() && matches!(hook.kind, PropertyHookKind::Set) {
                     vec![mir_codebase::DeclaredParam {
+                        closure_this: None,
                         name: Name::new("value"),
                         ty: mir_codebase::wrap_param_type(property_ty.clone()),
                         out_ty: None,
@@ -71,6 +72,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 }
                             });
                             mir_codebase::DeclaredParam {
+                                closure_this: None,
                                 name: Name::new(
                                     p.name.as_deref().unwrap_or("").trim_start_matches('$'),
                                 ),
@@ -185,6 +187,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::DeclaredParam {
+                        closure_this: None,
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,
@@ -206,6 +209,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 .params
                 .iter()
                 .map(|p| mir_codebase::DeclaredParam {
+                    closure_this: None,
                     name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                     ty: None,
                     out_ty: None,
@@ -430,6 +434,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::DeclaredParam {
+                        closure_this: None,
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,

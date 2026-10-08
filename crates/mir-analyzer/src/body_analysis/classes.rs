@@ -174,6 +174,7 @@ impl<'a> BodyAnalyzer<'a> {
                 && matches!(hook.kind, php_ast::ast::PropertyHookKind::Set)
             {
                 vec![mir_codebase::DeclaredParam {
+                    closure_this: None,
                     name: mir_types::Name::new("value"),
                     ty: mir_codebase::wrap_param_type(property_ty.clone()),
                     out_ty: None,
@@ -202,6 +203,7 @@ impl<'a> BodyAnalyzer<'a> {
                             }
                         });
                         mir_codebase::DeclaredParam {
+                            closure_this: None,
                             name: mir_types::Name::new(
                                 p.name.as_deref().unwrap_or("").trim_start_matches('$'),
                             ),

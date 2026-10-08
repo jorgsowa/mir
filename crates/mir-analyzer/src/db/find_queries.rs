@@ -1114,6 +1114,7 @@ pub fn find_method_in_class<'db>(
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
             let value_param = DeclaredParam {
+                closure_this: None,
                 name: Name::from("value"),
                 ty: e.scalar_type.as_ref().map(|t| Arc::new(t.clone())),
                 out_ty: None,

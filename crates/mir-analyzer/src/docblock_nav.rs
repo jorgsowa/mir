@@ -67,6 +67,7 @@ fn is_type_tag(tag: &str) -> bool {
             | "template-covariant"
             | "template-contravariant"
             | "param-out"
+            | "param-closure-this"
             | "assert"
             | "assert-if-true"
             | "assert-if-false"

@@ -1784,6 +1784,7 @@ impl<'a> DefinitionCollector<'a> {
                         ))
                     };
                     DeclaredParam {
+                        closure_this: None,
                         name: Name::new(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
                         out_ty: None,
@@ -2364,11 +2365,22 @@ impl<'a> DefinitionCollector<'a> {
                 resolved.from_docblock = true;
                 Self::fill_self_static_parent(resolved, class_fqcn)
             });
+            let closure_this = doc.get_closure_this_type(param_name).cloned().map(|u| {
+                let mut resolved = self.resolve_union_doc_with_templates(
+                    u,
+                    &template_names,
+                    class_fqcn,
+                    template_params_for_resolve,
+                );
+                resolved.from_docblock = true;
+                Self::fill_self_static_parent(resolved, class_fqcn)
+            });
             let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: mir_codebase::wrap_param_type(out_ty),
+                closure_this: mir_codebase::wrap_param_type(closure_this),
                 doc_type_raw: doc_type_raw.filter(|_| ty_is_docblock),
                 doc_type_file: ty_is_docblock.then(|| self.file.clone()),
                 has_default,
@@ -2402,6 +2414,7 @@ impl<'a> DefinitionCollector<'a> {
                 .unwrap_or_default();
             if crate::collector::function::stmts_use_func_get_args(body_stmts) {
                 params.push(DeclaredParam {
+                    closure_this: None,
                     name: mir_types::Name::new("..."),
                     ty: None,
                     out_ty: None,

@@ -581,6 +581,10 @@ impl CallAnalyzer {
             );
             Some((resolved.params.clone(), bindings))
         });
+        let receiver_fqcn: Option<String> = match obj_ty.remove_null().types.as_slice() {
+            [a] => a.named_object_fqcn().map(|f| f.to_string()),
+            _ => None,
+        };
         for (arg_index, arg) in call.args.iter().enumerate() {
             // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
             // — not yet modeled; keep positional slots aligned with `mixed`.
@@ -598,7 +602,18 @@ impl CallAnalyzer {
                     super::callback_param_hints(ea, params.get(arg_index)?, bindings)
                 });
             }
-            let ty = ea.analyze_arg(value, ctx);
+            let param_rebind = premark_resolved.as_ref().and_then(|r| {
+                super::closure_this_param_rebind(
+                    &r.params,
+                    arg_index,
+                    arg,
+                    receiver_fqcn.as_deref(),
+                )
+            });
+            let ty = match &param_rebind {
+                Some(rebind) => super::analyze_with_scope_override(ea, value, ctx, rebind),
+                None => ea.analyze_arg(value, ctx),
+            };
             ea.callback_param_hints = None;
             super::consume_arg_assignment(value, ctx);
             if arg.unpack && call.args.len() == 1 {

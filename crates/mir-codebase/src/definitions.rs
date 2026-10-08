@@ -237,6 +237,13 @@ pub struct DeclaredParam {
         serialize_with = "serialize_param_type"
     )]
     pub out_ty: Option<Arc<Type>>,
+    /// `@param-closure-this Type`: the `$this` type of a closure literal passed for this parameter.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub closure_this: Option<Arc<Type>>,
     /// Raw `@param` type spelling when `ty` came from a docblock rather than a
     /// native hint. Preserved so later analysis can resolve ambiguous
     /// pseudo-type aliases (e.g. `integer`) against same-named classes once the
@@ -275,6 +282,7 @@ impl std::hash::Hash for DeclaredParam {
         // are backed by different Arc allocations.
         self.ty.as_deref().hash(state);
         self.out_ty.as_deref().hash(state);
+        self.closure_this.as_deref().hash(state);
     }
 }
 

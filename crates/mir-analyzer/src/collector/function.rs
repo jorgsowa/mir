@@ -313,11 +313,22 @@ impl DefinitionCollector<'_> {
                 doc_ty.from_docblock = true;
                 doc_ty
             });
+            let closure_this = doc.get_closure_this_type(param_name).cloned().map(|u| {
+                let mut resolved = self.resolve_union_doc_with_templates(
+                    u,
+                    &template_names,
+                    &fqn,
+                    &template_params,
+                );
+                resolved.from_docblock = true;
+                resolved
+            });
             let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: mir_codebase::wrap_param_type(out_ty),
+                closure_this: mir_codebase::wrap_param_type(closure_this),
                 doc_type_raw: doc_type_raw.filter(|_| ty_is_docblock),
                 doc_type_file: ty_is_docblock.then(|| self.file.clone()),
                 has_default,
@@ -350,6 +361,7 @@ impl DefinitionCollector<'_> {
         let last_is_variadic = params.last().is_some_and(|p| p.is_variadic);
         if !last_is_variadic && stmts_use_func_get_args(&decl.body.stmts) {
             params.push(DeclaredParam {
+                closure_this: None,
                 name: Name::new("..."),
                 ty: None,
                 out_ty: None,

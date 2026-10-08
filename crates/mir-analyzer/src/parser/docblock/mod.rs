@@ -55,6 +55,20 @@ impl DocblockParser {
                         }
                     }
                 }
+                "param-closure-this"
+                | "psalm-param-closure-this"
+                | "phpstan-param-closure-this" => {
+                    if let Some((ty_s, name)) = body_text(&tag.body)
+                        .as_deref()
+                        .and_then(parse_param_line)
+                        .filter(|(ty_s, _)| validate_type_str(ty_s, "param-closure-this").is_none())
+                    {
+                        result.closure_this_params.push((
+                            name.trim_start_matches('$').to_string(),
+                            parse_type_string(&ty_s),
+                        ));
+                    }
+                }
                 "param" | "psalm-param" | "phpstan-param" | "phan-param" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
@@ -862,6 +876,8 @@ pub struct ParsedDocblock {
     /// `@param-out Type $name` / `@psalm-param-out Type $name` — the type written
     /// back to the caller's by-ref argument after the call.
     pub out_params: Vec<(String, Type)>,
+    /// `@param-closure-this Type $name` — `$this` type inside a closure literal passed for `$name`.
+    pub closure_this_params: Vec<(String, Type)>,
     /// `@return Type`
     pub return_type: Option<Type>,
     /// `@var Type` or `@var Type $name` — type and optional variable name (last tag wins)
@@ -1008,6 +1024,14 @@ impl ParsedDocblock {
             .iter()
             .rfind(|(n, _)| n.trim_start_matches('$') == name)
             .map(|(_, ty)| ty.as_str())
+    }
+
+    pub fn get_closure_this_type(&self, name: &str) -> Option<&Type> {
+        let name = name.trim_start_matches('$');
+        self.closure_this_params
+            .iter()
+            .rfind(|(n, _)| n.trim_start_matches('$') == name)
+            .map(|(_, ty)| ty)
     }
 
     /// Returns the `@param-out` / `@psalm-param-out` type for a given parameter

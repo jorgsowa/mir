@@ -402,6 +402,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
     params
         .iter()
         .map(|p| mir_codebase::DeclaredParam {
+            closure_this: None,
             name: Name::new(p.name.as_deref().unwrap_or("")),
             ty: None,
             out_ty: None,

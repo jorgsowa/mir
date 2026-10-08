@@ -518,12 +518,18 @@ impl CallAnalyzer {
             .unwrap_or_default();
         arg_types.clear();
         let mut sole_spread_ty: Option<Type> = None;
-        for arg in call.args.iter() {
+        for (arg_index, arg) in call.args.iter().enumerate() {
             let Some(value) = &arg.value else {
                 arg_types.push(Type::mixed());
                 continue;
             };
-            let ty = ea.analyze_arg(value, ctx);
+            let param_rebind = resolved
+                .as_ref()
+                .and_then(|r| super::closure_this_param_rebind(&r.params, arg_index, arg, None));
+            let ty = match &param_rebind {
+                Some(rebind) => super::analyze_with_scope_override(ea, value, ctx, rebind),
+                None => ea.analyze_arg(value, ctx),
+            };
             super::consume_arg_assignment(value, ctx);
             if arg.unpack {
                 if call.args.len() == 1 {
@@ -1660,6 +1666,7 @@ fn extract_docblock_case_insensitive<'a>(src: &'a str, pattern: &str) -> Option<
 /// so they can be passed to `check_args`.
 fn type_param_to_storage_param(p: &TypeFnParam) -> DeclaredParam {
     DeclaredParam {
+        closure_this: None,
         name: p.name,
         ty: p.ty.as_ref().map(|t| Arc::new(t.to_union())),
         out_ty: p.out_ty.as_ref().map(|t| Arc::new(t.to_union())),
