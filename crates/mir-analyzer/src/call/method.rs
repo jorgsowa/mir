@@ -61,6 +61,27 @@ fn receiver_class_bindings(
     bindings
 }
 
+/// Rebind of an inline closure literal receiver: `(function () {...})->bindTo($o, ...)`/`->call($o)`.
+fn inline_closure_rebind(
+    ea: &ExpressionAnalyzer<'_>,
+    call: &MethodCallExpr,
+) -> Option<super::ClosureRebind> {
+    let ExprKind::Identifier(method) = &call.method.kind else {
+        return None;
+    };
+    if !super::is_closure_literal(&call.object) {
+        return None;
+    }
+    let arg = |i: usize| call.args.get(i).and_then(|a| a.value.as_ref());
+    if method.eq_ignore_ascii_case("bindTo") {
+        super::closure_rebind(ea.db, &ea.file, arg(0), arg(1))
+    } else if method.eq_ignore_ascii_case("call") {
+        super::closure_rebind(ea.db, &ea.file, arg(0), None)
+    } else {
+        None
+    }
+}
+
 fn extract_namespace(fqcn: &str) -> Option<&str> {
     if let Some(pos) = fqcn.rfind('\\') {
         Some(&fqcn[..pos])
@@ -440,7 +461,16 @@ impl CallAnalyzer {
         span: Span,
         nullsafe: bool,
     ) -> Type {
-        let obj_ty = ea.analyze(&call.object, ctx);
+        let obj_ty = match inline_closure_rebind(ea, call) {
+            Some(rebind) => {
+                let guard =
+                    crate::flow_state::ScopeOverrideGuard::apply_rebind(ctx, ea.db, &rebind);
+                let ty = ea.analyze(&call.object, ctx);
+                guard.restore(ctx);
+                ty
+            }
+            None => ea.analyze(&call.object, ctx),
+        };
 
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),

@@ -133,18 +133,18 @@ fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ct
 /// $copy = function (...) use (...) { ... };
 /// return Closure::bind($copy, $newThis, Scope::class); // or `$x = ...`, or `$copy->bindTo($newThis, Scope::class)`
 /// ```
-/// and resolves the literal rebound scope, so the closure body (analyzed as
-/// part of `stmt`, the assignment) is checked against it instead of its
-/// lexically enclosing class — see `crate::call::resolve_literal_class_scope`.
+/// (or `$copy->call($newThis)`) and classifies the rebind, so the closure body
+/// (analyzed as part of `stmt`, the assignment) is checked against the rebound
+/// scope/`$this` instead of its lexically enclosing class.
 /// Deliberately narrow: only the statement immediately following the
 /// assignment is considered, so nothing in between could have reassigned the
 /// variable or invalidated the rebind.
-fn closure_var_bind_scope(
+fn closure_var_rebind(
     db: &dyn MirDatabase,
     file: &str,
     stmt: &php_ast::owned::Stmt,
     next: Option<&php_ast::owned::Stmt>,
-) -> Option<Arc<str>> {
+) -> Option<crate::call::ClosureRebind> {
     let StmtKind::Expression(e) = &stmt.kind else {
         return None;
     };
@@ -192,8 +192,8 @@ fn closure_var_bind_scope(
             if !matches!(&first_arg.kind, ExprKind::Variable(v) if v == var_name) {
                 return None;
             }
-            let scope_expr = smc.args.get(2)?.value.as_ref()?;
-            crate::call::resolve_literal_class_scope(db, file, scope_expr)
+            let arg = |i: usize| smc.args.get(i).and_then(|a| a.value.as_ref());
+            crate::call::closure_rebind(db, file, arg(1), arg(2))
         }
         ExprKind::MethodCall(mc) => {
             if !matches!(&mc.object.kind, ExprKind::Variable(v) if v == var_name) {
@@ -202,11 +202,14 @@ fn closure_var_bind_scope(
             let ExprKind::Identifier(method_name) = &mc.method.kind else {
                 return None;
             };
-            if !method_name.eq_ignore_ascii_case("bindTo") {
-                return None;
+            let arg = |i: usize| mc.args.get(i).and_then(|a| a.value.as_ref());
+            if method_name.eq_ignore_ascii_case("bindTo") {
+                crate::call::closure_rebind(db, file, arg(0), arg(1))
+            } else if method_name.eq_ignore_ascii_case("call") {
+                crate::call::closure_rebind(db, file, arg(0), None)
+            } else {
+                None
             }
-            let scope_expr = mc.args.get(1)?.value.as_ref()?;
-            crate::call::resolve_literal_class_scope(db, file, scope_expr)
         }
         _ => None,
     }
@@ -400,9 +403,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 break;
             }
 
-            match closure_var_bind_scope(self.db, &self.file, stmt, stmts.get(i + 1)) {
-                Some(scope) => {
-                    let guard = crate::flow_state::ScopeOverrideGuard::apply(ctx, self.db, &scope);
+            match closure_var_rebind(self.db, &self.file, stmt, stmts.get(i + 1)) {
+                Some(rebind) => {
+                    let guard =
+                        crate::flow_state::ScopeOverrideGuard::apply_rebind(ctx, self.db, &rebind);
                     self.analyze_stmt(stmt, ctx);
                     guard.restore(ctx);
                 }

@@ -176,28 +176,61 @@ pub(crate) fn resolve_literal_class_scope(
     crate::db::class_exists(db, &resolved).then(|| Arc::from(resolved.as_str()))
 }
 
-/// Resolve `Closure::bind`'s third (`$newScope`) argument — see
-/// `resolve_literal_class_scope` for which shapes are recognized. An omitted
-/// arg (defaulting to `$newThis`'s class) is left unresolved.
-fn static_closure_bind_scope(
-    ea: &ExpressionAnalyzer<'_>,
-    call: &StaticMethodCallExpr,
-) -> Option<Arc<str>> {
-    let scope_expr = call.args.get(2)?.value.as_ref()?;
-    resolve_literal_class_scope(ea.db, &ea.file, scope_expr)
+/// How a closure literal is rebound by `bind`/`bindTo`/`call`.
+pub(crate) enum ClosureRebind {
+    /// Rebound to a literal class scope.
+    Scope(Arc<str>),
+    /// Rebound to another object; `$this` is no longer the enclosing class.
+    UnknownThis,
 }
 
-/// Analyze `value` with `ctx.self_fqcn`/`parent_fqcn`/`static_fqcn` temporarily
-/// overridden to `scope` — used for the closure-literal argument of
-/// `Closure::bind`, whose body must be checked against the rebound scope
-/// rather than its lexically enclosing class (see `static_closure_bind_scope`).
+/// Classify a rebind from its `$newThis`/`$newScope` args. Rebinding to `$this`
+/// (or unbinding with `null`) keeps the enclosing class.
+pub(crate) fn closure_rebind(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    new_this: Option<&php_ast::owned::Expr>,
+    scope: Option<&php_ast::owned::Expr>,
+) -> Option<ClosureRebind> {
+    if let Some(scope) = scope.and_then(|e| resolve_literal_class_scope(db, file, e)) {
+        return Some(ClosureRebind::Scope(scope));
+    }
+    match &new_this?.kind {
+        ExprKind::Null => None,
+        ExprKind::Variable(v) if v.trim_start_matches('$') == "this" => None,
+        _ => Some(ClosureRebind::UnknownThis),
+    }
+}
+
+pub(crate) fn is_closure_literal(expr: &php_ast::owned::Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) => is_closure_literal(inner),
+        ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => true,
+        _ => false,
+    }
+}
+
+/// Rebind of `Closure::bind($closure, $newThis, $newScope)`.
+fn static_closure_bind_rebind(
+    ea: &ExpressionAnalyzer<'_>,
+    call: &StaticMethodCallExpr,
+) -> Option<ClosureRebind> {
+    let arg = |i: usize| call.args.get(i).and_then(|a| a.value.as_ref());
+    let rebind = closure_rebind(ea.db, &ea.file, arg(1), arg(2))?;
+    // Only a closure literal is known to receive the rebound `$this`.
+    let literal_closure = arg(0).is_some_and(is_closure_literal);
+    (literal_closure || matches!(rebind, ClosureRebind::Scope(_))).then_some(rebind)
+}
+
+/// Analyze `value` (the closure argument of `Closure::bind`) against its rebound
+/// scope/`$this` instead of its lexically enclosing class.
 pub(crate) fn analyze_with_scope_override(
     ea: &mut ExpressionAnalyzer<'_>,
     value: &php_ast::owned::Expr,
     ctx: &mut FlowState,
-    scope: &Arc<str>,
+    rebind: &ClosureRebind,
 ) -> Type {
-    let guard = crate::flow_state::ScopeOverrideGuard::apply(ctx, ea.db, scope);
+    let guard = crate::flow_state::ScopeOverrideGuard::apply_rebind(ctx, ea.db, rebind);
     let ty = ea.analyze(value, ctx);
     guard.restore(ctx);
     ty
@@ -374,12 +407,10 @@ impl CallAnalyzer {
         // `Closure::bind($closure, $newThis, $newScope)` rebinds not just
         // `$this` but the lexical scope used for private/protected
         // member-visibility checks inside the closure body (see `bind_scope`
-        // below and its use in the arg loop). The literal-class-name arg is
-        // the common, syntactically-resolvable case (`Foo::class`/`'Foo'`); a
-        // dynamic scope (an object expression, or a defaulted 2-arg call)
-        // isn't handled here — same scope as the rest of this pass.
+        // below and its use in the arg loop). A literal class name (`Foo::class`/
+        // `'Foo'`) resolves the scope; any other rebind only leaves `$this` unknown.
         let bind_scope = if fqcn_arc.as_ref() == "Closure" && method_name_lower == "bind" {
-            static_closure_bind_scope(ea, call)
+            static_closure_bind_rebind(ea, call)
         } else {
             None
         };

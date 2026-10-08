@@ -543,7 +543,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         // `Closure::bind()`/`bindTo()`/`call()` — a common macro/PHPUnit idiom.
         // Model that by seeding `$this` as an object of unknown type rather than
         // leaving it undefined, which would otherwise misfire `InvalidScope`.
-        if ctx.self_fqcn.is_none() && !c.is_static {
+        if std::mem::take(&mut ctx.rebound_closure_this) && !c.is_static {
+            closure_ctx.set_unknown_this();
+        } else if ctx.self_fqcn.is_none() && !c.is_static {
             let this_sym = Name::from("this");
             Arc::make_mut(&mut closure_ctx.vars).insert(
                 this_sym,
@@ -881,6 +883,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         // explicit `use()` list), so taint on any of them must carry over too.
         arrow_ctx.tainted_vars = ctx.tainted_vars.clone();
         let this_sym = mir_types::Name::from("this");
+        if std::mem::take(&mut ctx.rebound_closure_this) && !af.is_static {
+            arrow_ctx.set_unknown_this();
+        }
         for (name, ty) in ctx.vars.iter() {
             // Static arrow functions don't capture $this from the outer scope.
             if af.is_static && *name == this_sym {

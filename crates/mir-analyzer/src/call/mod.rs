@@ -14,7 +14,7 @@ pub use args::{
 };
 pub(crate) use callable::callable_string_token_span;
 pub(crate) use function::extract_class_docblock;
-pub(crate) use static_call::resolve_literal_class_scope;
+pub(crate) use static_call::{closure_rebind, is_closure_literal, ClosureRebind};
 
 pub struct CallAnalyzer;
 

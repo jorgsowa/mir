@@ -404,6 +404,8 @@ pub struct FlowState {
     /// guard. Used to suppress `UndefinedMethod` inside guarded branches.
     /// `expr_key` is a compact string like `"this->notification"` or `"foo"`.
     pub method_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
+    /// Set around the next closure literal analyzed: it is rebound, so `$this` is not the enclosing class.
+    pub(crate) rebound_closure_this: bool,
 
     /// `(expr_key, property_name)` pairs proven to exist via a
     /// `property_exists($expr, 'prop')` or `isset($expr->prop)` guard. Used to
@@ -543,7 +545,27 @@ impl ScopeOverrideGuard {
         }
     }
 
+    /// Like [`Self::apply`], but a rebind with no resolvable scope only makes `$this` an unknown object.
+    pub(crate) fn apply_rebind(
+        ctx: &mut FlowState,
+        db: &dyn crate::db::MirDatabase,
+        rebind: &crate::call::ClosureRebind,
+    ) -> Self {
+        match rebind {
+            crate::call::ClosureRebind::Scope(scope) => Self::apply(ctx, db, scope),
+            crate::call::ClosureRebind::UnknownThis => {
+                ctx.rebound_closure_this = true;
+                Self {
+                    saved_self: ctx.self_fqcn.clone(),
+                    saved_parent: ctx.parent_fqcn.clone(),
+                    saved_static: ctx.static_fqcn.clone(),
+                }
+            }
+        }
+    }
+
     pub(crate) fn restore(self, ctx: &mut FlowState) {
+        ctx.rebound_closure_this = false;
         ctx.self_fqcn = self.saved_self;
         ctx.parent_fqcn = self.saved_parent;
         ctx.static_fqcn = self.saved_static;
@@ -551,6 +573,15 @@ impl ScopeOverrideGuard {
 }
 
 impl FlowState {
+    pub(crate) fn set_unknown_this(&mut self) {
+        let this = Name::from("this");
+        Arc::make_mut(&mut self.vars).insert(
+            this,
+            mir_codebase::definitions::wrap_var_type(Type::single(Atomic::TObject)),
+        );
+        Arc::make_mut(&mut self.assigned_vars).insert(this);
+    }
+
     pub fn template_method(&self) -> Option<&Arc<str>> {
         self.current_method_name
             .as_ref()
@@ -623,6 +654,7 @@ impl FlowState {
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
             method_exists_guards: FxHashSet::default(),
+            rebound_closure_this: false,
             property_exists_guards: FxHashSet::default(),
             reflection_throws_guards: FxHashSet::default(),
             extension_loaded_guards: FxHashSet::default(),
