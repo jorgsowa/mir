@@ -62,6 +62,23 @@ final class Holder {
         return $this->bc;
     }
 
+    public function reboundStatic(): \stdClass {
+        if ($this->bc === null) {
+            $this->bc = new \stdClass();
+            (static fn (\stdClass $o): \stdClass => $o)->bindTo(null, self::class)($this->bc);
+        }
+        /** @mir-check $this->bc is stdClass */
+        return $this->bc;
+    }
+
+    public function reboundNonStatic(): \stdClass {
+        if ($this->bc === null) {
+            $this->bc = new \stdClass();
+            (fn (\stdClass $o): \stdClass => $o)->bindTo($this)($this->bc);
+        }
+        return $this->bc;
+    }
+
     public function staticOrNot(bool $flag): \stdClass {
         if ($this->bc === null) {
             $this->bc = new \stdClass();
@@ -80,4 +97,5 @@ NullableReturnStatement@30:8-30:25: Return type 'stdClass|null' is not compatibl
 NullableReturnStatement@39:8-39:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
 NullableReturnStatement@48:8-48:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
 NullableReturnStatement@57:8-57:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
-NullableReturnStatement@66:8-66:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
+NullableReturnStatement@74:8-74:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
+NullableReturnStatement@83:8-83:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'

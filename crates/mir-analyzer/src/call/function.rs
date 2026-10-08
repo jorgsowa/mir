@@ -354,9 +354,11 @@ impl CallAnalyzer {
                         // is opaque here, and a bound closure can freely mutate the
                         // `$this` it captured. Conservatively assume it may mutate
                         // `$this` and any object passed as an argument. A `static`
-                        // closure has no `$this`.
-                        let only_static_closures = !callee_ty.types.is_empty()
-                            && callee_ty
+                        // closure has no `$this`. `bindTo()` yields `?Closure`; the null
+                        // part cannot be invoked.
+                        let callee_non_null = callee_ty.remove_null();
+                        let only_static_closures = !callee_non_null.types.is_empty()
+                            && callee_non_null
                                 .types
                                 .iter()
                                 .all(|a| matches!(a, Atomic::TClosure { data } if data.is_static));
