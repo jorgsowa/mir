@@ -5,6 +5,6 @@ Variable-held literal function name premarks by-ref out-param
 function a(string $re, string $s): int {
     $fn = 'preg_match';
     $fn($re, $s, $m);
-    /** @mir-check $m is array<int|string, string> */
+    /** @mir-check $m is list<string> */
     return count($m);
 }

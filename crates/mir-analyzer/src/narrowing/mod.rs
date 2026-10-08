@@ -1417,6 +1417,20 @@ pub fn narrow_from_condition(
             };
             if let Some(fn_name) = fn_name_opt {
                 let bare = fn_name.trim_start_matches('\\');
+                if is_true && bare.eq_ignore_ascii_case("is_callable") {
+                    if let Some(ExprKind::Variable(var)) = call
+                        .args
+                        .first()
+                        .and_then(|arg| arg.value.as_ref())
+                        .map(|v| &v.kind)
+                    {
+                        ctx.function_exists_guards
+                            .insert(std::sync::Arc::from(format!(
+                                "${}",
+                                var.trim_start_matches('$')
+                            )));
+                    }
+                }
                 if matches!(
                     bare.to_ascii_lowercase().as_str(),
                     "class_exists" | "interface_exists" | "trait_exists" | "enum_exists"
@@ -1521,6 +1535,13 @@ pub fn narrow_from_condition(
                                     ctx.function_exists_guards
                                         .insert(std::sync::Arc::from(name));
                                 }
+                            } else if let ExprKind::Variable(var) = &value.kind {
+                                // `$var` marker: a `$var(...)` call is proven to exist.
+                                ctx.function_exists_guards
+                                    .insert(std::sync::Arc::from(format!(
+                                        "${}",
+                                        var.trim_start_matches('$')
+                                    )));
                             }
                         }
                     }

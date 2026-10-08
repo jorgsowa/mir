@@ -104,293 +104,311 @@ impl CallAnalyzer {
             _ => {
                 let callee_ty = ea.analyze(&call.name, ctx);
 
-                if callee_ty.is_mixed() {
-                    ea.emit(IssueKind::MixedFunctionCall, Severity::Info, span);
-                }
-
-                if ctx.is_in_pure_fn && invoked_type_is_impure(ea, &callee_ty) {
-                    let fn_name = match &call.name.kind {
-                        ExprKind::Variable(name) => format!("${}", name.trim_start_matches('$')),
-                        _ => "{closure}".to_string(),
-                    };
-                    ea.emit(
-                        IssueKind::ImpureFunctionCall { fn_name },
-                        Severity::Warning,
-                        span,
-                    );
-                }
-
-                // Extract typed params once — used for both pre-marking (before arg
-                // analysis) and output writeback (after the call).
-                let callee_params = typed_params_from_callee(&callee_ty, ea);
-
-                // `$obj(...)` invoking an object's __invoke() is a real reference to
-                // that method — record it, or find-references/go-to-definition on
-                // __invoke never sees call sites reached only this way (unlike every
-                // other call form, which always records the resolved method).
-                for atomic in &callee_ty.types {
-                    if let Atomic::TNamedObject { fqcn, .. } = atomic {
-                        if let Some((_, storage)) = crate::db::find_method_respecting_precedence(
-                            ea.db,
-                            crate::db::Fqcn::from_str(ea.db, fqcn.as_ref()),
-                            "__invoke",
-                        ) {
-                            ea.record_ref(
-                                Arc::from(format!(
-                                    "meth:{}::{}",
-                                    fqcn,
-                                    crate::util::php_ident_lowercase(&storage.name)
-                                )),
-                                call.name.span,
-                            );
-                            ea.record_symbol(
-                                call.name.span,
-                                ReferenceKind::MethodCall {
-                                    class: Arc::from(fqcn.as_ref()),
-                                    method: Arc::from("__invoke"),
-                                },
-                                callee_ty.clone(),
-                            );
+                match literal_function_name(&callee_ty, ctx, &call.name) {
+                    Some(name) => name,
+                    None => {
+                        if callee_ty.is_mixed() {
+                            ea.emit(IssueKind::MixedFunctionCall, Severity::Info, span);
                         }
-                    }
-                }
 
-                // Pre-mark by-ref parameter variables as defined BEFORE evaluating
-                // args, so a previously-undefined variable passed to an out-param
-                // (e.g. `$fn($x, $out)` where $out is fresh) is not flagged as
-                // UndefinedVariable when the argument expression is analyzed.
-                if let Some((_, ref params)) = callee_params {
-                    super::premark_byref_arg_vars(params, &call.args, ctx);
-                } else if let Some(f) = literal_named_function(&callee_ty, ea) {
-                    super::premark_byref_arg_vars(&f.params, &call.args, ctx);
-                }
-
-                // Collect arg types, spans, names and byref flags for type checking.
-                let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
-                let mut sole_spread_ty: Option<Type> = None;
-                for arg in call.args.iter() {
-                    // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
-                    // — not yet modeled; keep positional slots aligned with `mixed`.
-                    let Some(value) = &arg.value else {
-                        inner_arg_types.push(Type::mixed());
-                        continue;
-                    };
-                    let ty = ea.analyze_arg(value, ctx);
-                    super::consume_arg_assignment(value, ctx);
-                    if arg.unpack {
-                        if call.args.len() == 1 {
-                            sole_spread_ty = Some(ty.clone());
-                        }
-                        inner_arg_types.push(spread_element_type(ea.db, &ty));
-                    } else {
-                        inner_arg_types.push(ty);
-                    }
-                }
-                let mut inner_arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
-                let mut inner_arg_names: Vec<Option<String>> = call
-                    .args
-                    .iter()
-                    .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
-                    .collect();
-                let mut inner_arg_byref: Vec<bool> = call
-                    .args
-                    .iter()
-                    .map(|a| {
-                        a.value
-                            .as_ref()
-                            .is_some_and(expr_can_be_passed_by_reference_owned)
-                    })
-                    .collect();
-                let mut has_spread = call.args.iter().any(|a| a.unpack);
-                let mut arity_unknown = has_spread;
-                // A sole spread arg over a literal, sequentially-keyed shape can be
-                // expanded into one binding per element so each parameter is checked
-                // individually instead of only the first (see expand_sole_spread_arg).
-                // `arity_unknown` stays true even after expansion — PHP allows
-                // extra/spread positional args, so a concretely-known count still
-                // shouldn't trigger TooFew/TooManyArguments.
-                if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
-                    inner_arg_spans =
-                        distinct_spans_for_expansion(inner_arg_spans[0], expanded.len());
-                    inner_arg_names = expanded
-                        .iter()
-                        .map(|(name, _)| name.as_ref().map(|n| n.to_string()))
-                        .collect();
-                    inner_arg_byref = vec![false; expanded.len()];
-                    inner_arg_types = expanded.into_iter().map(|(_, ty)| ty).collect();
-                    has_spread = false;
-                    arity_unknown = true;
-                }
-
-                if let Some((ref callee_fn_name, ref params)) = callee_params {
-                    // Full type + arity checking via check_args.
-                    check_args(
-                        ea,
-                        CheckArgsParams {
-                            fn_name: callee_fn_name,
-                            params,
-                            arg_types: &inner_arg_types,
-                            arg_spans: &inner_arg_spans,
-                            arg_names: &inner_arg_names,
-                            arg_can_be_byref: &inner_arg_byref,
-                            call_span: span,
-                            has_spread,
-                            arity_unknown,
-                            too_many_arity_unknown: false,
-                            template_params: &[],
-                            no_named_arguments: false,
-                            ctx,
-                            args: &call.args,
-                        },
-                    );
-                } else if let Some(params) = extract_callable_params(&callee_ty, ea) {
-                    // Arity-only fallback when full param types are unavailable.
-                    // A spread arg (`...$args`) makes the real argument count
-                    // unknowable from `call.args.len()` alone — same
-                    // `arity_unknown` signal `check_args` above uses to skip
-                    // TooFew/TooManyArguments for the exact same reason.
-                    let required_count = params
-                        .iter()
-                        .filter(|p| !p.is_optional && !p.is_variadic)
-                        .count();
-                    let has_variadic = params.iter().any(|p| p.is_variadic);
-                    let max_params = params.len();
-                    let actual_count = call.args.len();
-
-                    if arity_unknown {
-                        // Skip TooFew/TooManyArguments — can't be checked precisely.
-                    } else if actual_count < required_count {
-                        ea.emit(
-                            IssueKind::TooFewArguments {
-                                fn_name: "callable".to_string(),
-                                expected: required_count,
-                                actual: actual_count,
-                            },
-                            Severity::Error,
-                            span,
-                        );
-                    } else if !has_variadic && actual_count > max_params {
-                        ea.emit(
-                            IssueKind::TooManyArguments {
-                                fn_name: "callable".to_string(),
-                                expected: max_params,
-                                actual: actual_count,
-                            },
-                            Severity::Error,
-                            span,
-                        );
-                    }
-                }
-
-                // Write back output types to by-ref argument variables.
-                if let Some((_, ref params)) = callee_params {
-                    let any_arg_tainted = call.args.iter().any(|arg| {
-                        arg.value
-                            .as_ref()
-                            .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
-                    });
-                    for (i, param) in params.iter().enumerate() {
-                        if param.is_byref {
-                            let output_ty = param
-                                .out_ty
-                                .as_ref()
-                                .or(param.ty.as_ref())
-                                .map(|t| (**t).clone())
-                                .unwrap_or_else(Type::mixed);
-                            if param.is_variadic {
-                                for arg in call.args.iter().skip(i) {
-                                    let Some(value) = &arg.value else { continue };
-                                    if let ExprKind::Variable(name) = &value.kind {
-                                        let var_name = name.trim_start_matches('$');
-                                        ea.check_var_write_purity(var_name, ctx, value.span);
-                                        ctx.set_var(var_name, output_ty.clone());
-                                        if any_arg_tainted {
-                                            ctx.taint_var(var_name);
-                                        } else {
-                                            ctx.clear_var_taint(var_name);
-                                        }
-                                    } else {
-                                        ea.check_byref_arg_purity(value, ctx, value.span);
-                                    }
+                        if ctx.is_in_pure_fn && invoked_type_is_impure(ea, &callee_ty) {
+                            let fn_name = match &call.name.kind {
+                                ExprKind::Variable(name) => {
+                                    format!("${}", name.trim_start_matches('$'))
                                 }
-                            } else if let Some(value) =
-                                crate::call::resolve_named_arg_type_index(params, &call.args, i)
-                                    .and_then(|idx| call.args.get(idx))
-                                    .and_then(|arg| arg.value.as_ref())
-                            {
-                                if let ExprKind::Variable(name) = &value.kind {
-                                    let var_name = name.trim_start_matches('$');
-                                    ea.check_var_write_purity(var_name, ctx, value.span);
-                                    ctx.set_var(var_name, output_ty);
-                                    if any_arg_tainted {
-                                        ctx.taint_var(var_name);
-                                    } else {
-                                        ctx.clear_var_taint(var_name);
-                                    }
-                                } else {
-                                    ea.check_byref_arg_purity(value, ctx, value.span);
+                                _ => "{closure}".to_string(),
+                            };
+                            ea.emit(
+                                IssueKind::ImpureFunctionCall { fn_name },
+                                Severity::Warning,
+                                span,
+                            );
+                        }
+
+                        // Extract typed params once — used for both pre-marking (before arg
+                        // analysis) and output writeback (after the call).
+                        let callee_params = typed_params_from_callee(&callee_ty, ea);
+
+                        // `$obj(...)` invoking an object's __invoke() is a real reference to
+                        // that method — record it, or find-references/go-to-definition on
+                        // __invoke never sees call sites reached only this way (unlike every
+                        // other call form, which always records the resolved method).
+                        for atomic in &callee_ty.types {
+                            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                                if let Some((_, storage)) =
+                                    crate::db::find_method_respecting_precedence(
+                                        ea.db,
+                                        crate::db::Fqcn::from_str(ea.db, fqcn.as_ref()),
+                                        "__invoke",
+                                    )
+                                {
+                                    ea.record_ref(
+                                        Arc::from(format!(
+                                            "meth:{}::{}",
+                                            fqcn,
+                                            crate::util::php_ident_lowercase(&storage.name)
+                                        )),
+                                        call.name.span,
+                                    );
+                                    ea.record_symbol(
+                                        call.name.span,
+                                        ReferenceKind::MethodCall {
+                                            class: Arc::from(fqcn.as_ref()),
+                                            method: Arc::from("__invoke"),
+                                        },
+                                        callee_ty.clone(),
+                                    );
                                 }
                             }
                         }
-                    }
-                }
 
-                // Invoking a closure/callable value (`$fn(...)`, `$obj(...)`)
-                // carries no purity metadata to consult — the callee's body
-                // is opaque here, and a bound closure can freely mutate the
-                // `$this` it captured. Conservatively assume it may mutate
-                // `$this` and any object passed as an argument.
-                ctx.invalidate_prop_refined_receiver("this");
-                for arg in call.args.iter() {
-                    if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
-                        ctx.invalidate_prop_refined_receiver(name);
-                    }
-                }
+                        // Pre-mark by-ref parameter variables as defined BEFORE evaluating
+                        // args, so a previously-undefined variable passed to an out-param
+                        // (e.g. `$fn($x, $out)` where $out is fresh) is not flagged as
+                        // UndefinedVariable when the argument expression is analyzed.
+                        if let Some((_, ref params)) = callee_params {
+                            super::premark_byref_arg_vars(params, &call.args, ctx);
+                        } else if let Some(f) = literal_named_function(&callee_ty, ea) {
+                            super::premark_byref_arg_vars(&f.params, &call.args, ctx);
+                        }
 
-                for atomic in &callee_ty.types {
-                    match atomic {
-                        Atomic::TClosure { data } => return data.return_type.clone(),
-                        Atomic::TCallable {
-                            return_type: Some(rt),
-                            ..
-                        } => return *rt.clone(),
-                        // `$obj(...)` invokes `$obj`'s __invoke() — its declared
-                        // return type was never consulted here, so every
-                        // invocation-via-object fell through to `mixed` even
-                        // when __invoke() has a concrete return type (e.g. a
-                        // recursive `return $this(...)` inside __invoke()
-                        // itself). Mirrors the __invoke lookup already done
-                        // above (for arg-checking/reference recording).
-                        //
-                        // Excludes the builtin `Closure` class itself: a
-                        // structural `TClosure`/`TCallable` atom carrying the
-                        // real per-instance signature is handled by the arms
-                        // above, but a plain `Closure`-named `TNamedObject`
-                        // (the shape a flow-merge can collapse a closure value
-                        // into when unioned with another callable-shaped atom)
-                        // has no such signature attached — its stub's
-                        // `__invoke(...$_)` declares no return type at all, so
-                        // resolving it here would short-circuit the loop with
-                        // `mixed` before ever reaching a sibling atom (e.g. a
-                        // `TCallable { return_type: Some(_) }`) that actually
-                        // knows the answer.
-                        Atomic::TNamedObject { fqcn, .. }
-                            if !fqcn
-                                .as_ref()
-                                .trim_start_matches('\\')
-                                .eq_ignore_ascii_case("Closure") =>
+                        // Collect arg types, spans, names and byref flags for type checking.
+                        let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
+                        let mut sole_spread_ty: Option<Type> = None;
+                        for arg in call.args.iter() {
+                            // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
+                            // — not yet modeled; keep positional slots aligned with `mixed`.
+                            let Some(value) = &arg.value else {
+                                inner_arg_types.push(Type::mixed());
+                                continue;
+                            };
+                            let ty = ea.analyze_arg(value, ctx);
+                            super::consume_arg_assignment(value, ctx);
+                            if arg.unpack {
+                                if call.args.len() == 1 {
+                                    sole_spread_ty = Some(ty.clone());
+                                }
+                                inner_arg_types.push(spread_element_type(ea.db, &ty));
+                            } else {
+                                inner_arg_types.push(ty);
+                            }
+                        }
+                        let mut inner_arg_spans: Vec<Span> =
+                            call.args.iter().map(|a| a.span).collect();
+                        let mut inner_arg_names: Vec<Option<String>> = call
+                            .args
+                            .iter()
+                            .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
+                            .collect();
+                        let mut inner_arg_byref: Vec<bool> = call
+                            .args
+                            .iter()
+                            .map(|a| {
+                                a.value
+                                    .as_ref()
+                                    .is_some_and(expr_can_be_passed_by_reference_owned)
+                            })
+                            .collect();
+                        let mut has_spread = call.args.iter().any(|a| a.unpack);
+                        let mut arity_unknown = has_spread;
+                        // A sole spread arg over a literal, sequentially-keyed shape can be
+                        // expanded into one binding per element so each parameter is checked
+                        // individually instead of only the first (see expand_sole_spread_arg).
+                        // `arity_unknown` stays true even after expansion — PHP allows
+                        // extra/spread positional args, so a concretely-known count still
+                        // shouldn't trigger TooFew/TooManyArguments.
+                        if let Some(expanded) =
+                            sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t))
                         {
-                            let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
-                            if let Some(resolved) =
-                                super::method::resolve_method_from_db(ea.db, &fqcn_arc, "__invoke")
-                            {
-                                return resolved.return_ty_raw;
+                            inner_arg_spans =
+                                distinct_spans_for_expansion(inner_arg_spans[0], expanded.len());
+                            inner_arg_names = expanded
+                                .iter()
+                                .map(|(name, _)| name.as_ref().map(|n| n.to_string()))
+                                .collect();
+                            inner_arg_byref = vec![false; expanded.len()];
+                            inner_arg_types = expanded.into_iter().map(|(_, ty)| ty).collect();
+                            has_spread = false;
+                            arity_unknown = true;
+                        }
+
+                        if let Some((ref callee_fn_name, ref params)) = callee_params {
+                            // Full type + arity checking via check_args.
+                            check_args(
+                                ea,
+                                CheckArgsParams {
+                                    fn_name: callee_fn_name,
+                                    params,
+                                    arg_types: &inner_arg_types,
+                                    arg_spans: &inner_arg_spans,
+                                    arg_names: &inner_arg_names,
+                                    arg_can_be_byref: &inner_arg_byref,
+                                    call_span: span,
+                                    has_spread,
+                                    arity_unknown,
+                                    too_many_arity_unknown: false,
+                                    template_params: &[],
+                                    no_named_arguments: false,
+                                    ctx,
+                                    args: &call.args,
+                                },
+                            );
+                        } else if let Some(params) = extract_callable_params(&callee_ty, ea) {
+                            // Arity-only fallback when full param types are unavailable.
+                            // A spread arg (`...$args`) makes the real argument count
+                            // unknowable from `call.args.len()` alone — same
+                            // `arity_unknown` signal `check_args` above uses to skip
+                            // TooFew/TooManyArguments for the exact same reason.
+                            let required_count = params
+                                .iter()
+                                .filter(|p| !p.is_optional && !p.is_variadic)
+                                .count();
+                            let has_variadic = params.iter().any(|p| p.is_variadic);
+                            let max_params = params.len();
+                            let actual_count = call.args.len();
+
+                            if arity_unknown {
+                                // Skip TooFew/TooManyArguments — can't be checked precisely.
+                            } else if actual_count < required_count {
+                                ea.emit(
+                                    IssueKind::TooFewArguments {
+                                        fn_name: "callable".to_string(),
+                                        expected: required_count,
+                                        actual: actual_count,
+                                    },
+                                    Severity::Error,
+                                    span,
+                                );
+                            } else if !has_variadic && actual_count > max_params {
+                                ea.emit(
+                                    IssueKind::TooManyArguments {
+                                        fn_name: "callable".to_string(),
+                                        expected: max_params,
+                                        actual: actual_count,
+                                    },
+                                    Severity::Error,
+                                    span,
+                                );
                             }
                         }
-                        _ => {}
+
+                        // Write back output types to by-ref argument variables.
+                        if let Some((_, ref params)) = callee_params {
+                            let any_arg_tainted = call.args.iter().any(|arg| {
+                                arg.value
+                                    .as_ref()
+                                    .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
+                            });
+                            for (i, param) in params.iter().enumerate() {
+                                if param.is_byref {
+                                    let output_ty = param
+                                        .out_ty
+                                        .as_ref()
+                                        .or(param.ty.as_ref())
+                                        .map(|t| (**t).clone())
+                                        .unwrap_or_else(Type::mixed);
+                                    if param.is_variadic {
+                                        for arg in call.args.iter().skip(i) {
+                                            let Some(value) = &arg.value else { continue };
+                                            if let ExprKind::Variable(name) = &value.kind {
+                                                let var_name = name.trim_start_matches('$');
+                                                ea.check_var_write_purity(
+                                                    var_name, ctx, value.span,
+                                                );
+                                                ctx.set_var(var_name, output_ty.clone());
+                                                if any_arg_tainted {
+                                                    ctx.taint_var(var_name);
+                                                } else {
+                                                    ctx.clear_var_taint(var_name);
+                                                }
+                                            } else {
+                                                ea.check_byref_arg_purity(value, ctx, value.span);
+                                            }
+                                        }
+                                    } else if let Some(value) =
+                                        crate::call::resolve_named_arg_type_index(
+                                            params, &call.args, i,
+                                        )
+                                        .and_then(|idx| call.args.get(idx))
+                                        .and_then(|arg| arg.value.as_ref())
+                                    {
+                                        if let ExprKind::Variable(name) = &value.kind {
+                                            let var_name = name.trim_start_matches('$');
+                                            ea.check_var_write_purity(var_name, ctx, value.span);
+                                            ctx.set_var(var_name, output_ty);
+                                            if any_arg_tainted {
+                                                ctx.taint_var(var_name);
+                                            } else {
+                                                ctx.clear_var_taint(var_name);
+                                            }
+                                        } else {
+                                            ea.check_byref_arg_purity(value, ctx, value.span);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Invoking a closure/callable value (`$fn(...)`, `$obj(...)`)
+                        // carries no purity metadata to consult — the callee's body
+                        // is opaque here, and a bound closure can freely mutate the
+                        // `$this` it captured. Conservatively assume it may mutate
+                        // `$this` and any object passed as an argument.
+                        ctx.invalidate_prop_refined_receiver("this");
+                        for arg in call.args.iter() {
+                            if let Some(ExprKind::Variable(name)) =
+                                arg.value.as_ref().map(|v| &v.kind)
+                            {
+                                ctx.invalidate_prop_refined_receiver(name);
+                            }
+                        }
+
+                        for atomic in &callee_ty.types {
+                            match atomic {
+                                Atomic::TClosure { data } => return data.return_type.clone(),
+                                Atomic::TCallable {
+                                    return_type: Some(rt),
+                                    ..
+                                } => return *rt.clone(),
+                                // `$obj(...)` invokes `$obj`'s __invoke() — its declared
+                                // return type was never consulted here, so every
+                                // invocation-via-object fell through to `mixed` even
+                                // when __invoke() has a concrete return type (e.g. a
+                                // recursive `return $this(...)` inside __invoke()
+                                // itself). Mirrors the __invoke lookup already done
+                                // above (for arg-checking/reference recording).
+                                //
+                                // Excludes the builtin `Closure` class itself: a
+                                // structural `TClosure`/`TCallable` atom carrying the
+                                // real per-instance signature is handled by the arms
+                                // above, but a plain `Closure`-named `TNamedObject`
+                                // (the shape a flow-merge can collapse a closure value
+                                // into when unioned with another callable-shaped atom)
+                                // has no such signature attached — its stub's
+                                // `__invoke(...$_)` declares no return type at all, so
+                                // resolving it here would short-circuit the loop with
+                                // `mixed` before ever reaching a sibling atom (e.g. a
+                                // `TCallable { return_type: Some(_) }`) that actually
+                                // knows the answer.
+                                Atomic::TNamedObject { fqcn, .. }
+                                    if !fqcn
+                                        .as_ref()
+                                        .trim_start_matches('\\')
+                                        .eq_ignore_ascii_case("Closure") =>
+                                {
+                                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
+                                    if let Some(resolved) = super::method::resolve_method_from_db(
+                                        ea.db, &fqcn_arc, "__invoke",
+                                    ) {
+                                        return resolved.return_ty_raw;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        return Type::mixed();
                     }
                 }
-                return Type::mixed();
             }
         };
 
@@ -1687,6 +1705,34 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> DeclaredParam {
 ///
 /// Returns `None` if the union contains a bare `TCallable { params: None }` (unknown arity),
 /// same guard as `extract_callable_params`.
+/// Plain function name held by a single literal-string callee, when `$fn(...)`
+/// can be analyzed like a direct call. `Class::method` strings and callees
+/// proven by `function_exists($fn)` are left to the dynamic path.
+fn literal_function_name(
+    callee_ty: &Type,
+    ctx: &FlowState,
+    callee_expr: &php_ast::owned::Expr,
+) -> Option<String> {
+    let [Atomic::TLiteralString(name)] = callee_ty.types.as_slice() else {
+        return None;
+    };
+    let name = name.trim_start_matches('\\');
+    let is_plain_name = !name.is_empty()
+        && name
+            .split('\\')
+            .all(|seg| !seg.is_empty() && seg.chars().all(|c| c.is_alphanumeric() || c == '_'));
+    if !is_plain_name {
+        return None;
+    }
+    if let ExprKind::Variable(var) = &callee_expr.kind {
+        let guard = format!("${}", var.trim_start_matches('$'));
+        if ctx.function_exists_guards.contains(guard.as_str()) {
+            return None;
+        }
+    }
+    Some(format!("\\{name}"))
+}
+
 /// Function named by a single literal-string callee (`$fn = 'preg_match'; $fn(...)`).
 fn literal_named_function(
     callee_ty: &Type,
