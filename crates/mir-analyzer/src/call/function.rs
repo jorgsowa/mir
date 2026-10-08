@@ -1375,6 +1375,9 @@ impl CallAnalyzer {
                         .unwrap_or(return_ty)
                         .falsy_stripped()
                 }
+                // PHP 8 removed the failure return (`false`/`null`) of these, but pre-8 code
+                // still guards against it; don't flag that guard as impossible.
+                "substr" | "mysqli_init" | "fgetcsv" => return_ty.falsy_stripped(),
                 // preg_replace/preg_replace_callback: strip |null when subject is a string.
                 // The null case only fires on a regex error, which PHP code rarely handles.
                 // `falsy_stripped()` keeps a defensive `=== null`/`(string)` guard against
