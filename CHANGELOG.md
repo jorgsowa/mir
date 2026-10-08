@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `sscanf()` returns `array|null` without output variables and `int|null` with them, instead of the blanket `array|int|null` that produced false `PossiblyInvalidArrayAccess`/`PossiblyInvalidOperand`/`PossiblyInvalidArgument`.
 - A defensive `=== false` guard on an `iconv()` result no longer reports `ImpossibleIdenticalComparison`, `RedundantCast` or `RedundantCondition`.
 - A closure literal rebound via `bindTo`/`Closure::bind`/`call()` to another object with a dynamic or omitted scope no longer has its `$this` checked against the enclosing class (false `UndefinedMethod`).
 - In non-strict mode a `numeric-string` or numeric string literal is accepted by `float` and `int|float` params, and `(string)` of an int is `numeric-string`.

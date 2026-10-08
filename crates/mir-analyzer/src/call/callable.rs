@@ -1428,6 +1428,29 @@ pub(crate) fn getenv_return_type(arg_types: &[Type]) -> Option<Type> {
     None
 }
 
+/// `sscanf($s, $f)` returns the parsed array (or null at EOF); with output
+/// variables it returns the assigned count (or null). The stub's blanket union
+/// covers both.
+pub(crate) fn sscanf_return_type(arg_types: &[Type], return_ty: &Type) -> Option<Type> {
+    let with_vars = match arg_types.len() {
+        2 => false,
+        n if n > 2 => true,
+        _ => return None,
+    };
+    let mut result = Type::empty();
+    for atomic in &return_ty.types {
+        let keep = if with_vars {
+            atomic.is_int() || matches!(atomic, Atomic::TNull)
+        } else {
+            atomic.is_array() || matches!(atomic, Atomic::TNull)
+        };
+        if keep {
+            result.add_type(atomic.clone());
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
+}
+
 /// Infer the return type of `count_chars($string, $mode)`.
 ///
 /// Modes 0/1/2 always return `array`; modes 3/4 always return `string` — the

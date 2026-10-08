@@ -1401,6 +1401,10 @@ impl CallAnalyzer {
                 "filter_var" => {
                     super::callable::filter_var_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // sscanf: the return shape depends on whether output variables are passed.
+                "sscanf" if !has_spread => {
+                    super::callable::sscanf_return_type(&arg_types, &return_ty).unwrap_or(return_ty)
+                }
                 "curl_getinfo" => {
                     super::callable::curl_getinfo_return_type(&arg_types).unwrap_or(return_ty)
                 }
