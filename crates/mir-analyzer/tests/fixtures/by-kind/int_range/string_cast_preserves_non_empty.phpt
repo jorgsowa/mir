@@ -1,5 +1,5 @@
 ===description===
-(string) cast returns non-empty-string when the source type guarantees a non-empty output.
+(string) cast returns non-empty-string (numeric-string for ints) when the source type guarantees a non-empty output.
 Ints, floats, and true all stringify to non-empty results.
 ===config===
 <mir>
@@ -14,7 +14,7 @@ Ints, floats, and true all stringify to non-empty results.
 /** @param positive-int $n */
 function test_positive_int(int $n): void {
     $s = (string) $n;
-    /** @mir-check $s is non-empty-string */
+    /** @mir-check $s is numeric-string */
     $_ = $s;
 }
 
@@ -27,7 +27,7 @@ function test_literal_int(): void {
 /** @param int $n */
 function test_int(int $n): void {
     $s = (string) $n;
-    /** @mir-check $s is non-empty-string */
+    /** @mir-check $s is numeric-string */
     $_ = $s;
 }
 

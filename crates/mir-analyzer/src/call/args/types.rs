@@ -210,6 +210,10 @@ pub(crate) fn check_one(
         return;
     }
 
+    if numeric_string_coercion_ok(arg_ty, param_ty, ea) {
+        return;
+    }
+
     // Check for float → int implicit coercion.
     // In non-strict mode PHP silently truncates (deprecated in 8.1+), so
     // ImplicitFloatToIntCast (Warning) is the right diagnostic — InvalidArgument
@@ -428,6 +432,19 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
         });
     }
     false
+}
+
+/// Non-strict mode coerces any numeric string to a `float` param (so `int|float` too).
+/// Int-only params stay flagged: `"1.5"` is a fractional-int deprecation.
+fn numeric_string_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    if ea.strict_types || !param.contains(|p| matches!(p, Atomic::TFloat)) {
+        return false;
+    }
+    arg.types.iter().all(|a| match a {
+        Atomic::TNumericString => true,
+        Atomic::TLiteralString(s) => crate::narrowing::is_numeric_string(s),
+        _ => false,
+    })
 }
 
 // ---------------------------------------------------------------------------

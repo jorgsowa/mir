@@ -282,6 +282,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 if let Some(ty) = self.to_string_return_type(&inner_ty) {
                     ty
+                } else if !inner_ty.types.is_empty() && inner_ty.types.iter().all(|a| a.is_int()) {
+                    Type::single(Atomic::TNumericString)
                 } else if is_non_empty_when_concat(&inner_ty) {
                     Type::single(Atomic::TNonEmptyString)
                 } else {
