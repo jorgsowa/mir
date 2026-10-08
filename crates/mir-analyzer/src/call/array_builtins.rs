@@ -304,8 +304,8 @@ fn resolve_opaque_callback_via_callers(
 /// When the count argument is provably >= 1, the result is
 /// `non-empty-list<T>` if `$start_index` is provably `0`, or
 /// `non-empty-array<int, T>` if it's provably nonzero (T is the type of
-/// `$value`). Falls through to `None` otherwise so the stub's generic
-/// `array` is used.
+/// `$value`). Otherwise it is `array<int, T>` with
+/// literal `T` widened; `None` only when the arguments are missing.
 pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
     let start = arg_types.first()?;
     let count = arg_types.get(1)?;
@@ -318,7 +318,7 @@ pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
             _ => false,
         });
     if !count_is_positive {
-        return None;
+        return Some(filled_array(value));
     }
     // A list (keys 0..count-1) only when $start_index is provably exactly
     // 0 — any other start makes the result a non-list int-keyed array (PHP
@@ -346,7 +346,7 @@ pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
             value: Box::new(value.clone()),
         }));
     }
-    None
+    Some(filled_array(value))
 }
 
 /// Infer the return type of `array_keys($array)`.
@@ -1709,5 +1709,21 @@ pub(crate) fn array_push_unshift_byref_type(
     Type::single(Atomic::TNonEmptyArray {
         key: Box::new(key),
         value: Box::new(value),
+    })
+}
+
+/// `array<int, T>` with literal `T` widened so the array stays writable (`array_fill(0, $n, 0)`
+/// then `$a[1] = 5`).
+fn filled_array(value: &Type) -> Type {
+    let mut widened = Type::empty();
+    for atomic in crate::stmt::widen_for_check(value.clone()).types {
+        widened.add_type(match atomic {
+            Atomic::TTrue | Atomic::TFalse => Atomic::TBool,
+            other => other,
+        });
+    }
+    Type::single(Atomic::TArray {
+        key: Box::new(Type::single(Atomic::TInt)),
+        value: Box::new(widened),
     })
 }

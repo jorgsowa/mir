@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `array_fill()` returns `array<int, TValue>` (literal values widened) instead of a bare `array`, removing false `InvalidPropertyAssignment`.
 - A method `@return T` on a bare generic receiver (no type arguments) returns its native return hint (or the template bound) instead of a raw `T`, removing false `InvalidPropertyAssignment`.
 - A `@var string`/`@var int` on a class constant no longer hides its literal value from `match` exhaustiveness, removing false `UnhandledMatchCondition`.
 - `new $class()` where `$class` holds known `class-string<X>` values is typed as an instance of X (`H|P` for a union) instead of `object`, removing false `InvalidArgument` and `InvalidReturnType`.

@@ -889,6 +889,7 @@ function compact(#[PhpStormStubsElementAvailable(from: '8.0')] $var_name, #[PhpS
 
 /**
  * Fill an array with values
+ * @template TValue
  * @link https://php.net/manual/en/function.array-fill.php
  * @param int $start_index <p>
  * The first index of the returned array.
@@ -897,10 +898,10 @@ function compact(#[PhpStormStubsElementAvailable(from: '8.0')] $var_name, #[PhpS
  * @param int $count <p>
  * Number of elements to insert
  * </p>
- * @param mixed $value <p>
+ * @param TValue $value <p>
  * Value to use for filling
  * </p>
- * @return array the filled array
+ * @return array<int, TValue> the filled array
  * @pure
  */
 function array_fill(int $start_index, int $count, mixed $value): array {}

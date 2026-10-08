@@ -26,6 +26,6 @@ function test_positive_int_count(int $n): void {
 function test_plain_int_count(int $n): void {
     $arr = array_fill(0, $n, 'v');
     // When count is a plain int (could be 0), falls back to stub's array type.
-    /** @mir-check $arr is array<mixed, mixed> */
+    /** @mir-check $arr is array<int, string> */
     $_ = $arr;
 }
