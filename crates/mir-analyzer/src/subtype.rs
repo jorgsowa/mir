@@ -278,6 +278,11 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     named_object_type_params_ok(db, sub_fqcn, sub_params, sup_fqcn, sup_params)
                         && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
                 }
+                // `self`/`parent` in a declared type name that class, so any subclass fits.
+                (
+                    Atomic::TNamedObject { fqcn: sub_fqcn, .. },
+                    Atomic::TSelf { fqcn: sup_fqcn } | Atomic::TParent { fqcn: sup_fqcn },
+                ) => extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref()),
                 // An invokable object (one with an __invoke() method) satisfies a
                 // callable(...): R / Closure(...): R target — mirrors the same
                 // leniency `call/args/types.rs::named_object_subtype` already

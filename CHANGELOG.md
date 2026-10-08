@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A subclass instance is assignable to a `self`/`parent`-typed property, and assigning it to a `?self` static property narrows it, removing false `InvalidPropertyAssignment` and `NullableReturnStatement`.
 - Calling a `static` closure value no longer clears narrowing of `$this` properties (false `NullableReturnStatement`); other callables still do.
 - A `for` condition's assignments (`for (...; ($p = f()) < $n; ...)`) are defined in the body, the step expression and after the loop, removing false `PossiblyUndefinedVariable`.
 - `if (A || ($s[$e = f()] ?? null) !== x) return;` leaves `$e` defined afterwards: assignments under `??` on the always-evaluated side are promoted, removing false `PossiblyUndefinedVariable`.
