@@ -1370,7 +1370,10 @@ impl CallAnalyzer {
                     .unwrap_or(return_ty),
                 "iconv" => {
                     // iconv($from_encoding, $to_encoding, $str) — $str is arg 2
-                    super::callable::string_if_string_arg(&arg_types, 2).unwrap_or(return_ty)
+                    // The stub already omits `false`; flag the result regardless of arg types.
+                    super::callable::string_if_string_arg(&arg_types, 2)
+                        .unwrap_or(return_ty)
+                        .falsy_stripped()
                 }
                 // preg_replace/preg_replace_callback: strip |null when subject is a string.
                 // The null case only fires on a regex error, which PHP code rarely handles.
