@@ -1,8 +1,6 @@
 ===description===
-Negative control: the sibling atom having the method directly (with no
-`__call` anywhere in the union) must NOT suppress UndefinedMethod on the atom
-that lacks it — the fix is scoped to a magic-`__call` sibling specifically,
-not a blanket "some union member has it" relaxation.
+A sibling declaring the method (no `__call` anywhere) downgrades the atom
+lacking it to Info PossiblyUndefinedMethod rather than suppressing it.
 ===file===
 <?php
 class ServiceA {
@@ -13,5 +11,5 @@ class ServiceB {
 }
 function test(ServiceA|ServiceB $service): void {
     $service->reveal();
-//  ^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method ServiceB::reveal() does not exist
+//  ^^^^^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method ServiceB::reveal() might not exist
 }

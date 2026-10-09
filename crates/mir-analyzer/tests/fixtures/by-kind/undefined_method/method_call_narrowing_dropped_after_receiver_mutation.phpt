@@ -15,7 +15,7 @@ function f(X $x): void {
     if ($x->get() instanceof Y) {
         $x->reset();
         $x->get()->m();
-//      ^^^^^^^^^^^^^^ UndefinedMethod: Method Z::m() does not exist
+//      ^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method Z::m() might not exist
     }
 }
 
@@ -23,6 +23,6 @@ function reassigned(X $x, X $other): void {
     if ($x->get() instanceof Y) {
         $x = $other;
         $x->get()->m();
-//      ^^^^^^^^^^^^^^ UndefinedMethod: Method Z::m() does not exist
+//      ^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method Z::m() might not exist
     }
 }

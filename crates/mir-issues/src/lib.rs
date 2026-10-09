@@ -63,6 +63,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/static_call.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/`.
     UndefinedMethod { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_method/`.
+    PossiblyUndefinedMethod { class: String, method: String },
     /// Emitted by `mir-analyzer/src/batch/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_class/`.
     UndefinedClass { name: String },
@@ -957,6 +960,7 @@ impl IssueKind {
             | IssueKind::PossiblyInvalidArgument { .. }
             | IssueKind::PossiblyNullPropertyFetch { .. }
             | IssueKind::PossiblyNullMethodCall { .. }
+            | IssueKind::PossiblyUndefinedMethod { .. }
             | IssueKind::PossiblyNullArrayAccess
             | IssueKind::PossiblyInvalidArrayAccess { .. }
             | IssueKind::PossiblyInvalidClone { .. }
@@ -1071,6 +1075,7 @@ impl IssueKind {
             IssueKind::UndefinedVariable { .. } => "MIR0002",
             IssueKind::UndefinedFunction { .. } => "MIR0003",
             IssueKind::UndefinedMethod { .. } => "MIR0004",
+            IssueKind::PossiblyUndefinedMethod { .. } => "MIR0015",
             IssueKind::UndefinedClass { .. } => "MIR0005",
             IssueKind::UndefinedProperty { .. } => "MIR0006",
             IssueKind::UndefinedConstant { .. } => "MIR0007",
@@ -1301,16 +1306,16 @@ impl IssueKind {
             | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" => Some(Severity::Warning),
 
             // Info
-            "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
-            | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400" | "MIR0401"
-            | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504" | "MIR0505"
-            | "MIR0507" | "MIR0508" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003"
-            | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010"
-            | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105"
-            | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208"
-            | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507"
-            | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406"
-            | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
+            "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
+            | "MIR0209" | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400"
+            | "MIR0401" | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504"
+            | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002"
+            | "MIR1003" | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009"
+            | "MIR1010" | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104"
+            | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
+            | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
+            | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
+            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1325,6 +1330,7 @@ impl IssueKind {
             IssueKind::UndefinedVariable { .. } => "UndefinedVariable",
             IssueKind::UndefinedFunction { .. } => "UndefinedFunction",
             IssueKind::UndefinedMethod { .. } => "UndefinedMethod",
+            IssueKind::PossiblyUndefinedMethod { .. } => "PossiblyUndefinedMethod",
             IssueKind::UndefinedClass { .. } => "UndefinedClass",
             IssueKind::UndefinedProperty { .. } => "UndefinedProperty",
             IssueKind::UndefinedConstant { .. } => "UndefinedConstant",
@@ -1532,6 +1538,9 @@ impl IssueKind {
             IssueKind::UndefinedFunction { name } => format!("Function {name}() is not defined"),
             IssueKind::UndefinedMethod { class, method } => {
                 format!("Method {class}::{method}() does not exist")
+            }
+            IssueKind::PossiblyUndefinedMethod { class, method } => {
+                format!("Method {class}::{method}() might not exist")
             }
             IssueKind::UndefinedClass { name } => format!("Class {name} does not exist"),
             IssueKind::UndefinedProperty { class, property } => {
@@ -2446,6 +2455,10 @@ mod code_tests {
                 class: s(),
                 method: s(),
             },
+            IssueKind::PossiblyUndefinedMethod {
+                class: s(),
+                method: s(),
+            },
             IssueKind::UndefinedClass { name: s() },
             IssueKind::NotAnInterface { name: s() },
             IssueKind::UndefinedProperty {
@@ -2903,6 +2916,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 162);
+        assert_eq!(one_of_each().len(), 163);
     }
 }

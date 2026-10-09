@@ -11,6 +11,6 @@ class X {
 function f(X $x): void {
     if ($x->get() instanceof Y) {
         $x->get()->m();
-//      ^^^^^^^^^^^^^^ UndefinedMethod: Method Z::m() does not exist
+//      ^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method Z::m() might not exist
     }
 }

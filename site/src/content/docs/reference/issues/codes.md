@@ -56,6 +56,7 @@ issues keep their code.
 | MIR0012  | TraitConstantAccessedDirectly | [undefined/trait-constant-accessed-directly](../undefined/trait-constant-accessed-directly/) |
 | MIR0013  | UndefinedTraitAliasMethod     | [undefined/undefined-trait-alias-method](../undefined/undefined-trait-alias-method/) |
 | MIR0014  | InaccessibleProperty          | [undefined/inaccessible-property](../undefined/inaccessible-property/) |
+| MIR0015  | PossiblyUndefinedMethod       | [undefined/possibly-undefined-method](../undefined/possibly-undefined-method/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](../nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](../nullability/null-property-fetch/) |
 | MIR0102  | NullMethodCall                | [nullability/null-method-call](../nullability/null-method-call/) |

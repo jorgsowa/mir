@@ -13,6 +13,7 @@ All issue types mir can emit, grouped by category.
 | `UndefinedVariable` | A variable is used before it has been assigned. |
 | `UndefinedFunction` | A call targets a function that does not exist in the codebase or stubs. |
 | `UndefinedMethod` | A method is called on a type that does not declare that method. |
+| `PossiblyUndefinedMethod` | A method is called on a union where only some members declare it. |
 | `UndefinedClass` | A reference is made to a class or interface that does not exist. |
 | `UndefinedProperty` | A property is accessed that is not declared on the class. |
 | `UndefinedConstant` | A reference is made to a constant that has not been defined. |

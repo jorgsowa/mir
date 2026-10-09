@@ -18,5 +18,5 @@ function reasonLocation(Good1|Bad1|Bad2 $reason): string
     }
     return $reason->file();
 //  ^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
-//         ^^^^^^^^^^^^^^^ UndefinedMethod: Method Bad1::file() does not exist
+//         ^^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method Bad1::file() might not exist
 }

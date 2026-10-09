@@ -781,6 +781,23 @@ impl CallAnalyzer {
                 .any(&has_call_magic),
             _ => false,
         });
+        // Some union members declare the method: atoms lacking it are only
+        // "possibly undefined", not certainly undefined.
+        let union_declares_method = receiver.types.len() > 1
+            && receiver.types.iter().any(|atomic| match atomic {
+                mir_types::Atomic::TNamedObject { fqcn, .. }
+                | mir_types::Atomic::TSelf { fqcn }
+                | mir_types::Atomic::TStaticObject { fqcn }
+                | mir_types::Atomic::TParent { fqcn } => {
+                    let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
+                    crate::db::has_method_in_chain(
+                        ea.db,
+                        &Arc::from(resolved.as_str()),
+                        method_name,
+                    )
+                }
+                _ => false,
+            });
         let mut result = Type::empty();
         // Declaring class of the resolved method, threaded out of
         // `resolve_method_return` so the symbol-recording loop below does not
@@ -840,6 +857,7 @@ impl CallAnalyzer {
                         &mut this_self_out,
                         None,
                         union_has_call_magic || sibling_accepts_arity,
+                        union_declares_method,
                     ));
                     match this_self_out {
                         Some(ty) => {
@@ -875,6 +893,7 @@ impl CallAnalyzer {
                         &mut this_self_out,
                         None,
                         union_has_call_magic,
+                        union_declares_method,
                     ));
                     match this_self_out {
                         Some(ty) => {
@@ -918,6 +937,7 @@ impl CallAnalyzer {
                                         &mut this_self_out,
                                         Some(&full_receiver_ty),
                                         union_has_call_magic,
+                                        false,
                                     ));
                                     if declaring.is_none() {
                                         declaring = part_declaring;
@@ -1007,6 +1027,7 @@ impl CallAnalyzer {
                                 &mut None,
                                 None,
                                 union_has_call_magic,
+                                false,
                             ));
                         }
                     }
@@ -1169,6 +1190,7 @@ fn resolve_method_return<'a>(
     self_out_out: &mut Option<Type>,
     full_receiver: Option<&Type>,
     sibling_has_call_magic: bool,
+    sibling_declares_method: bool,
 ) -> Type {
     let method_name_lower = crate::util::php_ident_lowercase(method_name);
     let resolved = resolve_method_from_db(ea.db, fqcn, &method_name_lower);
@@ -2022,14 +2044,24 @@ fn resolve_method_return<'a>(
         {
             Type::mixed()
         } else {
-            ea.emit(
-                IssueKind::UndefinedMethod {
-                    class: fqcn.to_string(),
-                    method: method_name.to_string(),
-                },
-                Severity::Error,
-                span,
-            );
+            let (kind, severity) = if sibling_declares_method {
+                (
+                    IssueKind::PossiblyUndefinedMethod {
+                        class: fqcn.to_string(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Info,
+                )
+            } else {
+                (
+                    IssueKind::UndefinedMethod {
+                        class: fqcn.to_string(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Error,
+                )
+            };
+            ea.emit(kind, severity, span);
             Type::mixed()
         }
     } else {

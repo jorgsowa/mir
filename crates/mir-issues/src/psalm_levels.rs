@@ -45,6 +45,7 @@ pub fn psalm_error_level(name: &str) -> Option<u8> {
         | "PossiblyNullArrayAccess"
         | "PossiblyNullMethodCall"
         | "PossiblyNullPropertyFetch"
+        | "PossiblyUndefinedMethod"
         | "PossiblyUndefinedVariable"
         | "PropertyTypeCoercion" => 3,
         "ForbiddenCode"

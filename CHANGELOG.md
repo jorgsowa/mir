@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AnalysisSnapshot::warm_files` and `reanalyze_files` analyse files on dedicated worker threads, each with its own frozen db clone. A full Symfony warm sweep drops from ~5.9s to ~1.7s on 18 cores; passes under 4 files stay serial. Warm passes reuse the cached mention scanner while the name universe grows slightly, instead of rebuilding the automaton per chunk.
 
+### Added
+
+- `PossiblyUndefinedMethod` (MIR0015, Info): a method call on a union where another member declares the method no longer reports an `UndefinedMethod` Error on the members lacking it. Unions where no member declares it still error.
+
 ### Fixed
 
 - `ReflectionClass::getConstants()` and `getConstant()` return `mixed` (constants can hold null, objects and enum cases), removing a false `InvalidTemplateParam` when the result feeds `array_flip()`.

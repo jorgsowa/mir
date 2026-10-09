@@ -64,6 +64,6 @@ function falseBranchDoesNotNarrow(mixed $obj): void {
         // narrows on the false branch, so $obj stays Duck|Animal here;
         // Animal has no onlyOnDuck(), so this must still be flagged.
         $obj->onlyOnDuck();
-//      ^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Animal::onlyOnDuck() does not exist
+//      ^^^^^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method Animal::onlyOnDuck() might not exist
     }
 }

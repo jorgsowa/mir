@@ -23,7 +23,7 @@ function describe(ErrorA|ErrorB $error, string $dynamicClass): string {
     return match ($error::class) {
 //  ^ +3:6 MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
         $dynamicClass => $error->aOnlyMethod(),
-//                       ^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method ErrorB::aOnlyMethod() does not exist
+//                       ^^^^^^^^^^^^^^^^^^^^^ PossiblyUndefinedMethod: Method ErrorB::aOnlyMethod() might not exist
         default => 'x',
     };
 }
