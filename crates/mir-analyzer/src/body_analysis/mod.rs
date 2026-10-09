@@ -1,3 +1,4 @@
+use crate::util::param_name_span;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -1275,28 +1276,6 @@ fn method_header_name_span(source: &str, method: &php_ast::owned::MethodDecl) ->
             }
         }
         None => fallback,
-    }
-}
-
-/// Return the tight byte-offset span for only the `$name` token in a
-/// parameter declaration. Falls back to the full param span when not found.
-fn param_name_span(source: &str, p: &php_ast::owned::Param) -> php_ast::Span {
-    let Some(raw) = p.name.as_deref() else {
-        return p.span;
-    };
-    let bare = raw.trim_start_matches('$');
-    let range_start = p.span.start as usize;
-    let range_end = (p.span.end as usize).min(source.len());
-    let slice = &source[range_start..range_end];
-    let needle = format!("${bare}");
-    if let Some(rel) = slice.find(needle.as_str()) {
-        let start = p.span.start + rel as u32;
-        php_ast::Span {
-            start,
-            end: start + needle.len() as u32,
-        }
-    } else {
-        p.span
     }
 }
 

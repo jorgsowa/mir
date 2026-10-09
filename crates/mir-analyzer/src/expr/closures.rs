@@ -5,10 +5,10 @@ use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::stmt::{mir_check_matches, return_type_is_invalid, widen_for_check};
 use crate::symbol::ReferenceKind;
+use crate::util::param_name_span;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
-use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind, Param};
-use php_ast::Span;
+use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind};
 use std::sync::Arc;
 
 /// A by-ref capture (`use (&$var)`) is the same variable the closure body
@@ -112,26 +112,6 @@ fn generalise_written_lists(written: &Type) -> Type {
         }
     }
     out
-}
-
-fn param_name_span(source: &str, p: &Param) -> Span {
-    let Some(raw) = p.name.as_deref() else {
-        return p.span;
-    };
-    let bare = raw.trim_start_matches('$');
-    let range_start = p.span.start as usize;
-    let range_end = (p.span.end as usize).min(source.len());
-    let slice = &source[range_start..range_end];
-    let needle = format!("${bare}");
-    if let Some(rel) = slice.find(needle.as_str()) {
-        let start = p.span.start + rel as u32;
-        Span {
-            start,
-            end: start + needle.len() as u32,
-        }
-    } else {
-        p.span
-    }
 }
 
 /// Carry a `$this->prop` narrowing proven before a closure/arrow function

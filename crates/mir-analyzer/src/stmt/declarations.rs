@@ -1,5 +1,6 @@
 use super::StatementsAnalyzer;
 use crate::flow_state::FlowState;
+use crate::util::param_name_span;
 use mir_issues::{Issue, IssueKind, Location};
 use mir_types::Name;
 use php_ast::ast::PropertyHookKind;
@@ -8,28 +9,6 @@ use php_ast::owned::{
 };
 use php_ast::Span;
 use std::sync::Arc;
-
-/// Return the tight byte-offset span covering only the `$name` token within a
-/// parameter declaration, falling back to the full param span when not found.
-fn param_name_span(source: &str, p: &Param) -> Span {
-    let Some(raw) = p.name.as_deref() else {
-        return p.span;
-    };
-    let bare = raw.trim_start_matches('$');
-    let range_start = p.span.start as usize;
-    let range_end = (p.span.end as usize).min(source.len());
-    let slice = &source[range_start..range_end];
-    let needle = format!("${bare}");
-    if let Some(rel) = slice.find(needle.as_str()) {
-        let start = p.span.start + rel as u32;
-        Span {
-            start,
-            end: start + needle.len() as u32,
-        }
-    } else {
-        p.span
-    }
-}
 
 impl<'a> StatementsAnalyzer<'a> {
     fn analyze_property_hooks_stmt(

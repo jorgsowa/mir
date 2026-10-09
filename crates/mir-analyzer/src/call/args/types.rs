@@ -16,10 +16,6 @@ fn type_exists(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
     crate::db::class_exists(ea.db, fqcn)
 }
 
-fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    crate::db::class_kind(ea.db, fqcn).is_some_and(|k| k.is_interface)
-}
-
 /// Walks up to the nearest ancestor that declares `@template` when `fqcn`
 /// itself doesn't — a bare subclass (`class IntBox extends Box {}`) still
 /// inherits `Box`'s template slots (and their `@template-covariant`/
@@ -575,9 +571,11 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     // A class-string is a valid interface-string when the name it
                     // holds actually names an interface (e.g. `SomeInterface::class`
                     // types as `class-string<SomeInterface>`, not `interface-string`).
-                    Atomic::TInterfaceString(None) => is_interface(ea, arg_cls.as_ref()),
+                    Atomic::TInterfaceString(None) => {
+                        crate::db::is_interface(ea.db, arg_cls.as_ref())
+                    }
                     Atomic::TInterfaceString(Some(param_cls)) => {
-                        is_interface(ea, arg_cls.as_ref())
+                        crate::db::is_interface(ea.db, arg_cls.as_ref())
                             && (arg_cls == param_cls
                                 || crate::db::extends_or_implements(
                                     ea.db,
@@ -850,9 +848,9 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                 }
             }
 
-            let iface_key = if is_interface(ea, arg_fqcn.as_ref()) {
+            let iface_key = if crate::db::is_interface(ea.db, arg_fqcn.as_ref()) {
                 Some(arg_fqcn.as_ref())
-            } else if is_interface(ea, resolved_arg.as_str()) {
+            } else if crate::db::is_interface(ea.db, resolved_arg.as_str()) {
                 Some(resolved_arg.as_str())
             } else {
                 None
@@ -1815,7 +1813,7 @@ fn validate_interface_string_argument(
                 Severity::Error,
                 arg_span,
             );
-        } else if !is_interface(ea, &resolved) {
+        } else if !crate::db::is_interface(ea.db, &resolved) {
             ea.emit(
                 IssueKind::NotAnInterface { name: resolved },
                 Severity::Error,

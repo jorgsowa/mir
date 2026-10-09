@@ -17,7 +17,8 @@ use rustc_hash::FxHashMap;
 use mir_types::{Atomic, Name, Type, Variance};
 
 use crate::db::{
-    class_template_params, extends_or_implements, inherited_template_bindings, MirDatabase,
+    class_template_params, extends_or_implements, inherited_template_bindings, is_interface,
+    MirDatabase,
 };
 
 /// A supertype type-parameter that's effectively wildcarded — an unbound
@@ -585,10 +586,6 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
 
 fn is_only_key_zero(key: &Type) -> bool {
     matches!(key.types.as_slice(), [Atomic::TLiteralInt(0)])
-}
-
-fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
 }
 
 fn atomic_mentions_enum_case(a: &Atomic) -> bool {

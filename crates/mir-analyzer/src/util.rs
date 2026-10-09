@@ -352,3 +352,23 @@ pub(crate) fn is_unresolved_class(
         "self" | "static" | "parent"
     ) && !crate::db::class_exists(db, crate::diagnostics::docblock_class_part(fqcn.as_ref()))
 }
+
+/// Tight span of the `$name` token within a parameter declaration; the full param span when not found.
+pub(crate) fn param_name_span(source: &str, p: &php_ast::owned::Param) -> php_ast::Span {
+    let Some(raw) = p.name.as_deref() else {
+        return p.span;
+    };
+    let needle = format!("${}", raw.trim_start_matches('$'));
+    let range_end = (p.span.end as usize).min(source.len());
+    let slice = &source[p.span.start as usize..range_end];
+    match slice.find(needle.as_str()) {
+        Some(rel) => {
+            let start = p.span.start + rel as u32;
+            php_ast::Span {
+                start,
+                end: start + needle.len() as u32,
+            }
+        }
+        None => p.span,
+    }
+}

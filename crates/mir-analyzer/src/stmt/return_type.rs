@@ -1,6 +1,6 @@
 use mir_types::{Atomic, Name, Type};
 
-use crate::db::{extends_or_implements, MirDatabase};
+use crate::db::{extends_or_implements, is_interface, MirDatabase};
 
 /// Bare `object` (e.g. an anonymous class instance) fits a named-class element, as it
 /// does in a non-nested return position.
@@ -10,10 +10,6 @@ fn bare_object_fits(actual: &Atomic, declared: &Type) -> bool {
             .types
             .iter()
             .any(|d| matches!(d, Atomic::TNamedObject { .. }))
-}
-
-fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
 }
 
 /// Value of a shape property: object/class-string leaves need hierarchy awareness, and a

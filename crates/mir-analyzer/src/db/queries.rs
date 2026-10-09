@@ -28,6 +28,10 @@ pub fn class_kind(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
     })
 }
 
+pub fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    class_kind(db, fqcn).is_some_and(|k| k.is_interface)
+}
+
 pub fn class_exists(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     crate::db::find_class_like(db, here).is_some()
