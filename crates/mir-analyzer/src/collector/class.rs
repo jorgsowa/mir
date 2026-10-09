@@ -787,8 +787,9 @@ fn resolve_attribute_constant(name: &str) -> Option<i64> {
 /// Merge two overloaded method definitions into one permissive signature.
 ///
 /// PHP stubs represent constructor/method overloads as repeated declarations.
-/// We keep the longest param list and mark any param at index ≥ min_required
-/// (the minimum required count across both overloads) as optional.
+/// We keep the longest param list, mark any param at index ≥ min_required
+/// (the minimum required count across both overloads) as optional, and union
+/// the types of params both overloads declare (untyped in either → untyped).
 fn merge_method_overloads(existing: &Arc<MethodDef>, new_def: &MethodDef) -> Arc<MethodDef> {
     let count_required = |params: &[DeclaredParam]| {
         params
@@ -809,15 +810,18 @@ fn merge_method_overloads(existing: &Arc<MethodDef>, new_def: &MethodDef) -> Arc
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            if i >= min_required {
-                DeclaredParam {
-                    has_default: true,
-                    is_optional: true,
-                    ..p.clone()
-                }
-            } else {
-                p.clone()
+            let mut p = p.clone();
+            if let (Some(a), Some(b)) = (existing.params.get(i), new_def.params.get(i)) {
+                p.ty = match (&a.ty, &b.ty) {
+                    (Some(x), Some(y)) => Some(Arc::new(mir_types::Type::merge(x, y))),
+                    _ => None,
+                };
             }
+            if i >= min_required {
+                p.has_default = true;
+                p.is_optional = true;
+            }
+            p
         })
         .collect::<Vec<_>>()
         .into();

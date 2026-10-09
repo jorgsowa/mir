@@ -218,12 +218,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Restricted to classes declared outside the bundled stubs: a stub
         // constructor with multiple declared PHP overloads (e.g. DatePeriod's
         // DateTimeInterface-pair vs. ISO-8601-string forms) is collapsed by
-        // `merge_method_overloads` into a single permissive signature that
-        // keeps only the longest overload's param *types* — the other
-        // overload's own param types are discarded entirely, not unioned in.
-        // Binding a template from an argument that actually satisfies a
-        // *different, now-invisible* overload would be a false positive that
-        // this approximation can't distinguish from a real violation.
+        // `merge_method_overloads` into a single permissive signature whose
+        // param types are the union across overloads. A template bound from a
+        // union-typed param can't be told apart from a real violation.
         let violations = crate::generic::check_template_bounds_with_inheritance(
             self.db,
             &bindings,
