@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use mir_issues::{Issue, Severity};
@@ -51,7 +51,7 @@ pub fn run_output(
 ) {
     // --set-baseline: write every issue to the baseline file and exit 0.
     if let Some(path) = &cli.set_baseline {
-        let bl = baseline_from_issues(&result.issues);
+        let bl = baseline_from_issues(&result.issues, path);
         match bl.write(path) {
             Ok(()) => {
                 if !cli.quiet {
@@ -88,22 +88,24 @@ pub fn run_output(
     // accumulate the consumed entries into a new baseline. Hidden info-level
     // diagnostics must not keep baseline entries fresh for default output.
     let mut new_baseline = Baseline::default();
+    let baseline_dir = baseline_path.as_deref().and_then(baseline_dir);
     let suppressed_by_baseline: std::collections::HashSet<usize> =
         if let Some(bl) = &mut baseline_data {
             visible_candidates
                 .iter()
                 .filter_map(|(idx, issue, _)| {
-                    let file = issue.location.file.as_ref();
+                    let file = baseline_key(issue.location.file.as_ref(), baseline_dir.as_deref());
+                    let file = file.as_str();
                     let kind = issue.kind.display_name();
                     let snippet = issue.snippet.as_deref().unwrap_or("");
                     let matched = bl.consume(file, kind, snippet);
-                    if matched {
+                    if let Some(matched_kind) = matched {
                         if cli.update_baseline {
                             new_baseline
                                 .entries
                                 .entry(file.to_string())
                                 .or_default()
-                                .entry(kind.to_string())
+                                .entry(matched_kind)
                                 .or_default()
                                 .push(snippet.to_string());
                         }
@@ -320,15 +322,39 @@ fn downgraded_by_psalm_level(issue: &Issue, config: &Config) -> bool {
         .is_some_and(|issue_level| issue_level < configured)
 }
 
-fn baseline_from_issues(issues: &[Issue]) -> Baseline {
+fn baseline_from_issues(issues: &[Issue], baseline_path: &Path) -> Baseline {
+    let dir = baseline_dir(baseline_path);
     let mut bl = Baseline::default();
     for issue in issues {
         bl.entries
-            .entry(issue.location.file.to_string())
+            .entry(baseline_key(issue.location.file.as_ref(), dir.as_deref()))
             .or_default()
             .entry(issue.kind.display_name().to_string())
             .or_default()
             .push(issue.snippet.clone().unwrap_or_default());
     }
     bl
+}
+
+fn baseline_dir(baseline_path: &Path) -> Option<PathBuf> {
+    let dir = baseline_path
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+        .map_or_else(|| std::env::current_dir().ok(), |d| Some(d.to_path_buf()))?;
+    let dir = if dir.is_absolute() {
+        dir
+    } else {
+        std::env::current_dir().ok()?.join(dir)
+    };
+    Some(dir.canonicalize().unwrap_or(dir))
+}
+
+/// Baseline keys are relative to the baseline's directory, but composer-root runs report absolute paths.
+fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
+    baseline_dir
+        .and_then(|dir| Path::new(file).strip_prefix(dir).ok())
+        .map_or_else(
+            || file.to_string(),
+            |rel| rel.to_string_lossy().into_owned(),
+        )
 }

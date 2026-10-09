@@ -448,10 +448,10 @@ impl Baseline {
         parse_baseline_xml(xml)
     }
 
-    /// Return true if the given (file, issue_kind, snippet) triple is present
-    /// in the baseline.  Each matching entry is consumed once so duplicate
-    /// suppressions work correctly.
-    pub fn consume(&mut self, file: &str, issue_kind: &str, snippet: &str) -> bool {
+    /// Consume the entry matching (file, issue_kind, snippet), falling back to
+    /// Psalm's names for the same finding. Returns the baseline kind it matched.
+    /// Each entry is used once so duplicate suppressions work correctly.
+    pub fn consume(&mut self, file: &str, issue_kind: &str, snippet: &str) -> Option<String> {
         let baseline_file = self
             .entries
             .contains_key(file)
@@ -461,17 +461,17 @@ impl Baseline {
                     .keys()
                     .find(|candidate| std::path::Path::new(candidate) == std::path::Path::new(file))
                     .cloned()
-            });
+            })?;
+        let by_kind = self.entries.get_mut(&baseline_file)?;
 
-        if let Some(by_kind) = baseline_file.and_then(|file| self.entries.get_mut(&file)) {
-            if let Some(snippets) = by_kind.get_mut(issue_kind) {
-                if let Some(pos) = snippets.iter().position(|s| s == snippet) {
-                    snippets.remove(pos);
-                    return true;
-                }
-            }
-        }
-        false
+        std::iter::once(issue_kind)
+            .chain(psalm_kind_aliases(issue_kind).iter().copied())
+            .find_map(|kind| {
+                let snippets = by_kind.get_mut(kind)?;
+                let pos = snippets.iter().position(|s| s == snippet)?;
+                snippets.remove(pos);
+                Some(kind.to_owned())
+            })
     }
 
     /// Serialize this baseline to a Psalm-compatible XML file.
@@ -501,6 +501,20 @@ impl Baseline {
         out.push_str("</files>\n");
 
         std::fs::write(path, out).map_err(|e| ConfigError::Io(e.to_string()))
+    }
+}
+
+/// Psalm kinds that report the same finding as a mir kind.
+fn psalm_kind_aliases(mir_kind: &str) -> &'static [&'static str] {
+    match mir_kind {
+        "PossiblyUndefinedVariable" => &["PossiblyUndefinedGlobalVariable"],
+        "ImpossibleIdenticalComparison" => &[
+            "RedundantCondition",
+            "RedundantConditionGivenDocblockType",
+            "TypeDoesNotContainType",
+            "TypeDoesNotContainNull",
+        ],
+        _ => &[],
     }
 }
 
@@ -845,7 +859,9 @@ mod tests {
         .unwrap();
 
         let platform_path = std::path::Path::new(".").join("src").join("Foo.php");
-        assert!(baseline.consume(platform_path.to_str().unwrap(), "UndefinedVariable", "$x"));
+        assert!(baseline
+            .consume(platform_path.to_str().unwrap(), "UndefinedVariable", "$x")
+            .is_some());
         assert!(baseline.entries["./src/Foo.php"]["UndefinedVariable"].is_empty());
     }
 }
