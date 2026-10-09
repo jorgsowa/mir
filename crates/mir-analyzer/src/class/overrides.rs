@@ -794,7 +794,10 @@ impl<'a> ClassAnalyzer<'a> {
                             && Self::is_array_only(parent_ty)
                             && Self::is_array_only(child_ty)
                             && child_ty.is_subtype_structural(parent_ty);
+                        // `{@inheritDoc}` marks a docblock `@param` refinement as intentional.
+                        let inherit_doc_refinement = own.is_inherit_doc && child_ty.from_docblock;
                         !docblock_array_refinement
+                            && !inherit_doc_refinement
                             && Self::scalar_param_type_narrowed(parent_ty, child_ty)
                     };
 

@@ -6,11 +6,6 @@
       <code><![CDATA[$this->__construct(base64_decode($data))]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Lazy/LazyUuidFromString.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[unserialize]]></code>
-    </MethodSignatureMismatch>
-  </file>
   <file src="src/Type/Decimal.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
