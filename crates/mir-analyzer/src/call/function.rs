@@ -546,11 +546,30 @@ impl CallAnalyzer {
             .unwrap_or_default();
         arg_types.clear();
         let mut sole_spread_ty: Option<Type> = None;
+        // A closure literal callback is analyzed after the array args so its
+        // params can be seeded from their element types.
+        let deferred_callback = super::array_builtins::element_callback_arg_index(
+            resolved_fn_name.as_str(),
+        )
+        .filter(|&i| {
+            call.args.iter().all(|a| !a.unpack && a.name.is_none())
+                && call
+                    .args
+                    .get(i)
+                    .and_then(|a| a.value.as_ref())
+                    .is_some_and(|v| {
+                        matches!(v.kind, ExprKind::Closure(_) | ExprKind::ArrowFunction(_))
+                    })
+        });
         for (arg_index, arg) in call.args.iter().enumerate() {
             let Some(value) = &arg.value else {
                 arg_types.push(Type::mixed());
                 continue;
             };
+            if deferred_callback == Some(arg_index) {
+                arg_types.push(Type::mixed());
+                continue;
+            }
             let param_rebind = resolved
                 .as_ref()
                 .and_then(|r| super::closure_this_param_rebind(&r.params, arg_index, arg, None));
@@ -566,6 +585,23 @@ impl CallAnalyzer {
                 arg_types.push(spread_element_type(ea.db, &ty));
             } else {
                 arg_types.push(ty);
+            }
+        }
+        if let Some(i) = deferred_callback {
+            if let Some(value) = &call.args[i].value {
+                ea.callback_param_hints = super::array_builtins::element_callback_param_hints(
+                    resolved_fn_name.as_str(),
+                    &arg_types,
+                )
+                .map(|hints| {
+                    hints
+                        .into_iter()
+                        .map(|h| h.map(|t| super::callable::resolve_enum_case_refs(&t, ea)))
+                        .collect()
+                });
+                arg_types[i] = ea.analyze_arg(value, ctx);
+                ea.callback_param_hints = None;
+                super::consume_arg_assignment(value, ctx);
             }
         }
 

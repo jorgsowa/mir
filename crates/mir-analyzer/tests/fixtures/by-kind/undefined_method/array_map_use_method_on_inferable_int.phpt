@@ -1,5 +1,5 @@
 ===description===
-Array map use method on inferable int
+Array map callback param is seeded as int, so the method call is not reported as mixed
 ===config===
 <mir>
   <issueHandlers>
@@ -10,4 +10,3 @@ Array map use method on inferable int
 ===file===
 <?php
 $a = array_map(function ($i) { return $i->foo(); }, [1, 2, 3, 4]);
-//                                    ^^^^^^^^^ MixedMethodCall: Method foo() called on mixed type

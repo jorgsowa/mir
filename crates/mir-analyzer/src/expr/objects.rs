@@ -2171,6 +2171,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     return Type::mixed();
                 }
+                // Widened to the backing type: the first atom decides a union's result.
+                Atomic::TLiteralEnumCase { enum_fqcn, .. }
+                    if matches!(prop_name, "name" | "value") =>
+                {
+                    if prop_name == "name" {
+                        return Type::single(Atomic::TNonEmptyString);
+                    }
+                    let here = crate::db::Fqcn::from_str(self.db, enum_fqcn.as_ref());
+                    return crate::db::find_class_like(self.db, here)
+                        .and_then(|c| c.enum_scalar_type().cloned())
+                        .unwrap_or_else(Type::mixed);
+                }
                 Atomic::TNamedObject { fqcn, .. }
                     if crate::db::class_kind(self.db, fqcn.as_ref()).is_some_and(|k| k.is_enum) =>
                 {

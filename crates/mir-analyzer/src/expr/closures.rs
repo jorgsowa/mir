@@ -410,7 +410,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         (template_names, template_params, defining_entity)
     }
 
-    /// Narrows natively-typed params to the types the callee actually passes in
+    /// Seeds untyped params and narrows natively-typed ones to the types the callee passes in
     /// (`callable(Err::NotFound)` for a closure declared `Err $e`). Docblock
     /// `@param` types win. Non-null unions stay as declared: the closure may
     /// still be handed the other members.
@@ -419,14 +419,21 @@ impl<'a> ExpressionAnalyzer<'a> {
             return;
         };
         for (param, hint) in params.iter_mut().zip(hints) {
-            let (Some(declared), Some(hint)) = (&param.ty, hint) else {
+            let Some(hint) = hint.filter(|h| !h.is_mixed() && !h.is_never()) else {
                 continue;
             };
-            if param.is_byref
-                || param.is_variadic
+            if param.is_byref || param.is_variadic {
+                continue;
+            }
+            let Some(declared) = &param.ty else {
+                if !crate::call::has_unbound_template(&hint) {
+                    param.ty = mir_codebase::wrap_param_type(Some(hint));
+                }
+                continue;
+            };
+            if declared.is_mixed()
                 || !declared.remove_null().is_single()
                 || declared.from_docblock
-                || hint.is_never()
                 || hint == **declared
                 || !crate::subtype::is_subtype(self.db, &hint, declared)
             {

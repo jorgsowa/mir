@@ -1,5 +1,5 @@
 ===description===
-Array filter use method on inferable int
+Array filter callback param is seeded as int, so the method call is not reported as mixed
 ===config===
 <mir>
   <issueHandlers>
@@ -10,4 +10,3 @@ Array filter use method on inferable int
 ===file===
 <?php
 $a = array_filter([1, 2, 3, 4], function ($i) { return $i->foo(); });
-//                                                     ^^^^^^^^^ MixedMethodCall: Method foo() called on mixed type

@@ -58,6 +58,70 @@ pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
     })
 }
 
+/// Index of the closure argument whose params are seeded from the array arguments.
+pub(crate) fn element_callback_arg_index(fn_name: &str) -> Option<usize> {
+    match fn_name {
+        "array_map" => Some(0),
+        "array_filter" | "array_reduce" | "array_walk" | "usort" | "uasort" | "uksort" => Some(1),
+        _ => None,
+    }
+}
+
+/// Param types the builtin passes to its callback, from the array arguments'
+/// key/value types. `None` unless every source is a plain array.
+pub(crate) fn element_callback_param_hints(
+    fn_name: &str,
+    arg_types: &[Type],
+) -> Option<Vec<Option<Type>>> {
+    let kv = |ty: &Type| -> Option<(Type, Type)> {
+        let plain_array = !ty.types.is_empty()
+            && ty.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TArray { .. }
+                        | Atomic::TNonEmptyArray { .. }
+                        | Atomic::TList { .. }
+                        | Atomic::TNonEmptyList { .. }
+                        | Atomic::TKeyedArray { .. }
+                )
+            });
+        plain_array.then(|| crate::stmt::infer_foreach_types(ty))
+    };
+    match fn_name {
+        "array_map" => arg_types
+            .get(1..)
+            .filter(|arrays| !arrays.is_empty())?
+            .iter()
+            .map(|t| kv(t).map(|(_, v)| Some(v)))
+            .collect(),
+        "array_filter" => {
+            let (k, v) = kv(arg_types.first()?)?;
+            match arg_types.get(2) {
+                None => Some(vec![Some(v)]),
+                Some(mode) => match mode.types.as_slice() {
+                    [Atomic::TLiteralInt(2)] => Some(vec![Some(k)]),
+                    [Atomic::TLiteralInt(1)] => Some(vec![Some(v), Some(k)]),
+                    _ => None,
+                },
+            }
+        }
+        "array_reduce" => Some(vec![None, Some(kv(arg_types.first()?)?.1)]),
+        "array_walk" => {
+            let (k, v) = kv(arg_types.first()?)?;
+            Some(vec![Some(v), Some(k)])
+        }
+        "usort" | "uasort" => {
+            let v = kv(arg_types.first()?)?.1;
+            Some(vec![Some(v.clone()), Some(v)])
+        }
+        "uksort" => {
+            let k = kv(arg_types.first()?)?.0;
+            Some(vec![Some(k.clone()), Some(k)])
+        }
+        _ => None,
+    }
+}
+
 /// Validate array_map callback: arity must match the number of arrays passed.
 /// array_map(callback, array1, array2, ...) → callback receives one element from each array.
 pub(crate) fn check_array_map_callback(
