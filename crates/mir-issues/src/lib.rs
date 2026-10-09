@@ -200,6 +200,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_property_fetch/bad_fetch.phpt`.
     InvalidPropertyFetch { ty: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_method_call/`.
+    InvalidMethodCall { method: String, ty: String },
     /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_array_access/`.
     InvalidArrayAccess { ty: String },
@@ -918,6 +921,7 @@ impl IssueKind {
             | IssueKind::NullArrayAccess
             | IssueKind::NullableReturnStatement { .. }
             | IssueKind::InvalidPropertyFetch { .. }
+            | IssueKind::InvalidMethodCall { .. }
             | IssueKind::InvalidArrayAccess { .. }
             | IssueKind::InvalidArrayAssignment { .. }
             | IssueKind::InvalidPropertyAssignment { .. }
@@ -1118,6 +1122,7 @@ impl IssueKind {
             IssueKind::PossiblyInvalidOperand { .. } => "MIR0213",
             IssueKind::PossiblyNullOperand { .. } => "MIR0214",
             IssueKind::DivisionByZero { .. } => "MIR0229",
+            IssueKind::InvalidMethodCall { .. } => "MIR0230",
             IssueKind::RawObjectIteration { .. } => "MIR0222",
             IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
@@ -1299,11 +1304,13 @@ impl IssueKind {
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
-            | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
-            | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405" | "MIR0408"
-            | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502"
-            | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706"
-            | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" => Some(Severity::Warning),
+            | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0230" | "MIR0219" | "MIR0220"
+            | "MIR0222" | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405"
+            | "MIR0408" | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501"
+            | "MIR1502" | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705"
+            | "MIR1706" | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" => {
+                Some(Severity::Warning)
+            }
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1361,6 +1368,7 @@ impl IssueKind {
             IssueKind::InvalidNamedArguments { .. } => "InvalidNamedArguments",
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
+            IssueKind::InvalidMethodCall { .. } => "InvalidMethodCall",
             IssueKind::InvalidArrayAccess { .. } => "InvalidArrayAccess",
             IssueKind::PossiblyInvalidArrayAccess { .. } => "PossiblyInvalidArrayAccess",
             IssueKind::InvalidArrayAssignment { .. } => "InvalidArrayAssignment",
@@ -1668,6 +1676,9 @@ impl IssueKind {
             }
             IssueKind::InvalidPropertyFetch { ty } => {
                 format!("Cannot fetch property on non-object type '{ty}'")
+            }
+            IssueKind::InvalidMethodCall { method, ty } => {
+                format!("Cannot call method {method}() on non-object type '{ty}'")
             }
             IssueKind::InvalidArrayAccess { ty } => {
                 format!("Cannot use [] operator on non-array type '{ty}'")
@@ -2540,6 +2551,10 @@ mod code_tests {
                 param: s(),
             },
             IssueKind::InvalidPropertyFetch { ty: s() },
+            IssueKind::InvalidMethodCall {
+                method: s(),
+                ty: s(),
+            },
             IssueKind::InvalidArrayAccess { ty: s() },
             IssueKind::PossiblyInvalidArrayAccess { ty: s() },
             IssueKind::InvalidArrayAssignment { ty: s() },
@@ -2916,6 +2931,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 163);
+        assert_eq!(one_of_each().len(), 164);
     }
 }

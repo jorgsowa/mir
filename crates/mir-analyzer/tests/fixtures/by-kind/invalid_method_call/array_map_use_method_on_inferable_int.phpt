@@ -1,5 +1,5 @@
 ===description===
-Array map callback param is seeded as int, so the method call is not reported as mixed
+Array map callback param is seeded as int, so a method call on it is InvalidMethodCall
 ===config===
 <mir>
   <issueHandlers>
@@ -10,3 +10,4 @@ Array map callback param is seeded as int, so the method call is not reported as
 ===file===
 <?php
 $a = array_map(function ($i) { return $i->foo(); }, [1, 2, 3, 4]);
+//                                    ^^^^^^^^^ InvalidMethodCall: Cannot call method foo() on non-object type '1|2|3|4'

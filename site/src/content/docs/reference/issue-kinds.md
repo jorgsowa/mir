@@ -61,6 +61,7 @@ All issue types mir can emit, grouped by category.
 | `NonStaticSelfCall` | `self::method()` called when the method is not static. |
 | `DirectConstructorCall` | Direct call to `__construct()` outside of a constructor chain. |
 | `InvalidPropertyFetch` | Property access on a non-object type. |
+| `InvalidMethodCall` | Method call on a non-object type. |
 | `InvalidArrayAccess` | Array-style access on a non-array, non-string, non-`ArrayAccess` type. |
 | `InvalidArrayAssignment` | Array-style assignment on a non-array type. |
 | `Trace` | Internal/debug output of the `@trace` annotation, showing the inferred type of an expression. Not a project diagnostic. |

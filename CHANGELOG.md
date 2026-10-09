@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `InvalidMethodCall` (MIR0230, Error): a method call on a receiver that is only scalar or array types (`$int->foo()`, including seeded closure params like `array_map(fn($i) => $i->foo(), [1, 2])`) is reported instead of silently typed `mixed`. Unions that include an object, `mixed` or `null` are unaffected.
 - `PossiblyUndefinedMethod` (MIR0015, Info): a method call on a union where another member declares the method no longer reports an `UndefinedMethod` Error on the members lacking it. Unions where no member declares it still error.
 
 ### Fixed

@@ -669,6 +669,21 @@ impl CallAnalyzer {
 
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
+        if !obj_ty.is_mixed()
+            && obj_ty.types.iter().all(is_non_object_atom)
+            && !obj_ty.types.is_empty()
+        {
+            ea.emit(
+                IssueKind::InvalidMethodCall {
+                    method: method_name.to_string(),
+                    ty: obj_ty.to_string(),
+                },
+                Severity::Error,
+                span,
+            );
+            return Type::mixed();
+        }
+
         // `mixed` already subsumes `null`, so a `mixed | null` receiver is just `mixed`.
         // Such unions arise un-normalized from type inference (e.g. a @template TValue
         // accessor declared @return TValue|null used unbound: TValue → mixed). Skip the
@@ -2128,4 +2143,30 @@ fn is_xml_name_start_char(ch: char) -> bool {
 fn is_xml_name_char(ch: char) -> bool {
     is_xml_name_start_char(ch)
         || matches!(ch, '-' | '.' | '0'..='9' | '\u{b7}' | '\u{300}'..='\u{36f}' | '\u{203f}'..='\u{2040}')
+}
+
+/// Scalar and array atoms: values that can never be an object.
+fn is_non_object_atom(a: &mir_types::Atomic) -> bool {
+    use mir_types::Atomic::*;
+    matches!(
+        a,
+        TInt | TLiteralInt(_)
+            | TIntRange { .. }
+            | TPositiveInt
+            | TFloat
+            | TIntegralFloat
+            | TLiteralFloat(_, _)
+            | TString
+            | TNonEmptyString
+            | TNumericString
+            | TLiteralString(_)
+            | TBool
+            | TTrue
+            | TFalse
+            | TArray { .. }
+            | TNonEmptyArray { .. }
+            | TList { .. }
+            | TNonEmptyList { .. }
+            | TKeyedArray { .. }
+    )
 }
