@@ -40,9 +40,8 @@ function endpoint(string $signal): string {
 /** @param 'trace'|'logs'|'metrics' $signal */
 function missingArm(string $signal): string {
     return match ($signal) {
+//         ^ +3:5 UnhandledMatchCondition: Unhandled match condition: "metrics"
         Signals::TRACE => '/v1/traces',
         Signals::LOGS => '/v1/logs',
     };
 }
-===expect===
-UnhandledMatchCondition@38:11-41:5: Unhandled match condition: "metrics"

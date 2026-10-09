@@ -37,11 +37,13 @@ final class Reader implements Ctx {
     }
 
     public function touched(): int {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Reader::touched() signature mismatch: Ctx::touched() is declared @mutation-free and must be re-declared @mutation-free when overridden
         $this->hits++;
         return $this->hits;
     }
 
     public function unknownCall(): int {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Reader::unknowncall() signature mismatch: Ctx::unknowncall() is declared @mutation-free and must be re-declared @mutation-free when overridden
         return $this->mutate();
     }
 
@@ -49,6 +51,3 @@ final class Reader implements Ctx {
 
     private function mutate(): int { $this->hits++; return $this->hits; }
 }
-===expect===
-MethodSignatureMismatch@34:4-34:36: Method Reader::touched() signature mismatch: Ctx::touched() is declared @mutation-free and must be re-declared @mutation-free when overridden
-MethodSignatureMismatch@39:4-39:40: Method Reader::unknowncall() signature mismatch: Ctx::unknowncall() is declared @mutation-free and must be re-declared @mutation-free when overridden

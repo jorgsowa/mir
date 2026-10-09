@@ -69,6 +69,7 @@ function finallyUnsets(): int {
         unset($r);
     }
     return $r;
+//         ^^ UndefinedVariable: Variable $r is not defined
 }
 
 function catchFallsThrough(): int {
@@ -80,7 +81,5 @@ function catchFallsThrough(): int {
         echo 'cleanup';
     }
     return $r;
+//         ^^ PossiblyUndefinedVariable: Variable $r might not be defined
 }
-===expect===
-UndefinedVariable@58:11-58:13: Variable $r is not defined
-PossiblyUndefinedVariable@69:11-69:13: Variable $r might not be defined

@@ -33,6 +33,7 @@ final class Holder {
             $f($this->bc);
         }
         return $this->bc;
+//      ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'stdClass|null' is not compatible with declared 'stdClass'
     }
 
     public function staticReceivesThis(): \stdClass {
@@ -42,6 +43,7 @@ final class Holder {
             $f($this);
         }
         return $this->bc;
+//      ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'stdClass|null' is not compatible with declared 'stdClass'
     }
 
     /** @param \Closure(\stdClass): \stdClass $f */
@@ -51,6 +53,7 @@ final class Holder {
             $f($this->bc);
         }
         return $this->bc;
+//      ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'stdClass|null' is not compatible with declared 'stdClass'
     }
 
     public function methodCallable(): \stdClass {
@@ -60,6 +63,7 @@ final class Holder {
             $f();
         }
         return $this->bc;
+//      ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'stdClass|null' is not compatible with declared 'stdClass'
     }
 
     public function reboundStatic(): \stdClass {
@@ -77,6 +81,7 @@ final class Holder {
             (fn (\stdClass $o): \stdClass => $o)->bindTo($this)($this->bc);
         }
         return $this->bc;
+//      ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'stdClass|null' is not compatible with declared 'stdClass'
     }
 
     public function staticOrNot(bool $flag): \stdClass {
@@ -86,16 +91,10 @@ final class Holder {
             $f($this->bc);
         }
         return $this->bc;
+//      ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'stdClass|null' is not compatible with declared 'stdClass'
     }
 
     private function reset(): void {
         $this->bc = null;
     }
 }
-===expect===
-NullableReturnStatement@30:8-30:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
-NullableReturnStatement@39:8-39:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
-NullableReturnStatement@48:8-48:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
-NullableReturnStatement@57:8-57:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
-NullableReturnStatement@74:8-74:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'
-NullableReturnStatement@83:8-83:25: Return type 'stdClass|null' is not compatible with declared 'stdClass'

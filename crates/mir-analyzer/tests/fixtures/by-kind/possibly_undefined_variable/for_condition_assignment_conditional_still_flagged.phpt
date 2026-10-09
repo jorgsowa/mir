@@ -8,13 +8,12 @@ function bodyAssigned(int $n): void {
         $seen = $i;
     }
     echo $seen;
+//       ^^^^^ PossiblyUndefinedVariable: Variable $seen might not be defined
 }
 
 function stepAssigned(int $n): void {
     for ($i = 0; $i < $n; $last = $i, $i++) {
     }
     echo $last;
+//       ^^^^^ PossiblyUndefinedVariable: Variable $last might not be defined
 }
-===expect===
-PossiblyUndefinedVariable@6:9-6:14: Variable $seen might not be defined
-PossiblyUndefinedVariable@12:9-12:14: Variable $last might not be defined

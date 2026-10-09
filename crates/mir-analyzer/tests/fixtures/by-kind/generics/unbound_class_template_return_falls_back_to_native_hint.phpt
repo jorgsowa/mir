@@ -66,7 +66,6 @@ final class Holder {
         $r = $c->maybe('x');
         /** @mir-check $r is Config|null */
         return $r;
+//      ^^^^^^^^^^ NullableReturnStatement: Return type 'Config|null' is not compatible with declared 'Config'
     }
 }
-===expect===
-NullableReturnStatement@57:8-57:18: Return type 'Config|null' is not compatible with declared 'Config'

@@ -38,6 +38,7 @@ function ternaryBranchNotPromoted(bool $f, bool $g): int {
         return 0;
     }
     return $b;
+//         ^^ PossiblyUndefinedVariable: Variable $b might not be defined
 }
 
 function laterIssetOperandNotPromoted(bool $f, array $arr): int {
@@ -45,7 +46,5 @@ function laterIssetOperandNotPromoted(bool $f, array $arr): int {
         return 0;
     }
     return $l;
+//         ^^ PossiblyUndefinedVariable: Variable $l might not be defined
 }
-===expect===
-PossiblyUndefinedVariable@35:11-35:13: Variable $b might not be defined
-PossiblyUndefinedVariable@42:11-42:13: Variable $l might not be defined
