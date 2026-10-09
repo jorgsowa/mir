@@ -42,6 +42,41 @@ struct ResolvedFn {
     taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
 }
 
+/// Weak mode coerces a numeric string to `int|float` for a template bounded by `int|float`.
+fn coerce_numeric_strings_to_number_bounds(
+    bindings: &mut rustc_hash::FxHashMap<Name, Type>,
+    template_params: &[TemplateParam],
+) {
+    for tp in template_params {
+        let is_number_bound = tp.bound.as_ref().is_some_and(|b| {
+            b.types
+                .iter()
+                .all(|a| matches!(a, Atomic::TInt | Atomic::TFloat))
+        });
+        let Some(inferred) = bindings.get_mut(&tp.name).filter(|_| is_number_bound) else {
+            continue;
+        };
+        let is_numeric_string = |a: &Atomic| match a {
+            Atomic::TNumericString => true,
+            Atomic::TLiteralString(s) => crate::narrowing::is_numeric_string(s),
+            _ => false,
+        };
+        if !inferred.types.iter().any(is_numeric_string) {
+            continue;
+        }
+        let mut coerced = Type::empty();
+        for a in inferred.types.iter() {
+            if is_numeric_string(a) {
+                coerced.add_type(Atomic::TInt);
+                coerced.add_type(Atomic::TFloat);
+            } else {
+                coerced.add_type(a.clone());
+            }
+        }
+        *inferred = coerced;
+    }
+}
+
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let here = crate::db::Fqcn::from_str(db, fqn);
@@ -964,13 +999,16 @@ impl CallAnalyzer {
             }
 
             let template_bindings = if !template_params.is_empty() {
-                let (bindings, unchecked) = infer_template_bindings(
+                let (mut bindings, unchecked) = infer_template_bindings(
                     ea.db,
                     &template_params,
                     &params,
                     &arg_types,
                     &arg_names,
                 );
+                if !ea.strict_types {
+                    coerce_numeric_strings_to_number_bounds(&mut bindings, &template_params);
+                }
                 for (name, inferred, bound) in check_template_bounds_with_inheritance(
                     ea.db,
                     &bindings,

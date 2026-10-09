@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A numeric string passed to a function whose template is bounded by `int|float` (`abs('5')`) coerces to `int|float` in weak mode, removing false `InvalidTemplateParam`; `strict_types=1` still rejects it.
 - `ReflectionClass::getConstants()` and `getConstant()` return `mixed` (constants can hold null, objects and enum cases), removing a false `InvalidTemplateParam` when the result feeds `array_flip()`.
 - Vendored the `grpc` and `opentelemetry` extension stubs, so `Grpc\*` classes and constants and `OpenTelemetry\Instrumentation\hook()` resolve instead of reporting `UndefinedClass`/`UndefinedConstant`/`UndefinedFunction`.
 - An override of a `@mutation-free`/`@external-mutation-free` method is no longer reported by `MethodSignatureMismatch` when its body provably writes no property; mutating overrides still are.
