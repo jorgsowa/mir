@@ -5,6 +5,7 @@ use mir_issues::{Issue, Severity};
 
 use crate::config::{Baseline, Config, ErrorLevel};
 use crate::format::{format_issue, format_junit, format_sarif};
+use crate::path_util::normalize_for_compare;
 use crate::{color, Cli, OutputFormat};
 
 /// Load baseline from `--baseline` flag or auto-discover `psalm-baseline.xml`.
@@ -346,15 +347,23 @@ fn baseline_dir(baseline_path: &Path) -> Option<PathBuf> {
     } else {
         std::env::current_dir().ok()?.join(dir)
     };
-    Some(dir.canonicalize().unwrap_or(dir))
+    Some(normalize_for_compare(&dir))
 }
 
 /// Baseline keys are relative to the baseline's directory, but composer-root runs report absolute paths.
 fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
-    baseline_dir
-        .and_then(|dir| Path::new(file).strip_prefix(dir).ok())
-        .map_or_else(
-            || file.to_string(),
-            |rel| rel.to_string_lossy().into_owned(),
-        )
+    let path = Path::new(file);
+    let Some(dir) = baseline_dir else {
+        return file.to_string();
+    };
+    if let Ok(rel) = path.strip_prefix(dir) {
+        return rel.to_string_lossy().into_owned();
+    }
+    if path.is_absolute() {
+        let normalized = normalize_for_compare(path);
+        if let Ok(rel) = normalized.strip_prefix(dir) {
+            return rel.to_string_lossy().into_owned();
+        }
+    }
+    file.to_string()
 }

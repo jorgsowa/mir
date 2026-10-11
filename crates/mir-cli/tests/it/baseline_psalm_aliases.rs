@@ -135,8 +135,19 @@ fn composer_root_run_matches_baseline_keys_relative_to_the_baseline_dir() {
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_mir"));
     cmd.env_clear().current_dir(dir.path());
-    cmd.args(["--no-cache", "--no-progress", "--format", "json"]);
+    cmd.args([
+        "--no-cache",
+        "--no-progress",
+        "--format",
+        "json",
+        "--report-stale-baseline",
+    ]);
     let out = cmd.output().expect("failed to run mir binary");
 
     assert_eq!(emitted_kinds(&out), Vec::<String>::new());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
