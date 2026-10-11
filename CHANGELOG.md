@@ -5,11 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.87.0] - 2026-10-11
 
 ### Changed
 
 - `AnalysisSnapshot::warm_files` and `reanalyze_files` analyse files on dedicated worker threads, each with its own frozen db clone. A full Symfony warm sweep drops from ~5.9s to ~1.7s on 18 cores; passes under 4 files stay serial. Warm passes reuse the cached mention scanner while the name universe grows slightly, instead of rebuilding the automaton per chunk.
+- The diagnostic fixture harness now supports inline `^^^` span annotations without an `===expect===` section. Existing fixtures were converted, and docblock and zero-width diagnostics point to more precise source spans.
+- Bundled PHPStorm stubs were refreshed, including purity annotations for side-effect-free builtins. Stale Guzzle and Ramsey harness baseline entries were removed.
+- Workspace and internal crate versions were updated to `0.87.0`.
 
 ### Added
 
@@ -48,6 +51,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `string|non-empty-string` collapses to `string` at branch joins.
 - `NullableReturnStatement` renders an unbound class template as its bound instead of the raw template name.
 - A flag set to a literal in the same branch that defines a variable proves it defined wherever the flag holds that value again (`$mode === 'x'`, `$found`, `$mode !== null`), including across loops.
+- Calls to methods inferred to be mutation-free preserve narrowed property types.
+- Writes through a union of literal string keys grow array shapes, and array literals with dynamic keys retain their non-empty status.
+- State established in `try`/`catch` is preserved through `finally` instead of leaking its pessimistic seed into later analysis.
+- String casts use the declared return type of `__toString()`, and `Exception::getTrace()` frames use the literal `->` or `::` value for `type`.
+- Quoted literals in docblock types no longer split at separators inside the literal.
+- `@psalm-immutable` on classes and traits participates in mutation-free analysis, including checks for constructor parameter writes.
+- An explicit `@var` on an assigned variable avoids a false `MixedAssignment`, and conditional return types resolve predicates that compare against scalar literals.
+- `hrtime()` in array mode no longer includes `false` in its return type.
+- Stub constructor overloads combine their parameter types, and inherited `{@inheritDoc}` documentation may refine scalar parameter types in overrides.
+- A bound static closure ignores the nullable part of its bound receiver when invoked.
+- Psalm baseline entries match paths relative to the baseline file and recognize Psalm issue-kind names.
 
 ## [0.86.0] - 2026-10-06
 
