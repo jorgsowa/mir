@@ -29,7 +29,7 @@ pub fn ensure_stack<R>(f: impl FnOnce() -> R) -> R {
     grow(RED_ZONE, SEGMENT_SIZE, f)
 }
 
-/// Runs `f` with at least [`PHASE_RED_ZONE`] of stack available.
+/// Runs `f` with enough stack for an unguarded analysis phase.
 #[inline]
 pub fn ensure_phase_stack<R>(f: impl FnOnce() -> R) -> R {
     grow(PHASE_RED_ZONE, PHASE_SEGMENT_SIZE, f)

@@ -1016,7 +1016,8 @@ pub(crate) fn function_loc_from(
     Some(own.unwrap_or(global))
 }
 
-/// [`find_function`] as seen from `file` (see [`function_loc_from`]).
+/// [`find_function`] as seen from `file`, preferring a declaration in that file
+/// over a workspace-wide declaration with the same name.
 pub fn find_function_from<'db>(
     db: &'db dyn MirDatabase,
     file: &str,
