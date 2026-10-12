@@ -60,7 +60,7 @@ jobs:
 
       - name: Install cargo-outdated
         if: steps.outdated-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-outdated --locked
+        run: cargo install cargo-outdated --locked --force
 
       - name: Check dependencies
         # owo-colors intentionally depends on supports-color 2.x and 3.x;
