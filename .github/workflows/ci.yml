@@ -63,7 +63,9 @@ jobs:
         run: cargo install cargo-outdated --locked
 
       - name: Check dependencies
-        run: cargo deny check && cargo outdated --format list
+        # owo-colors intentionally depends on supports-color 2.x and 3.x;
+        # cargo-outdated incorrectly reports 3.x as older than 2.x.
+        run: cargo deny check && cargo outdated --ignore supports-color --format list
 
       - name: Build mir
         run: cargo build --release -p mir-php
