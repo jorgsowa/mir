@@ -636,7 +636,7 @@ mod filter_to_dirs_tests {
             PathBuf::from("/proj/src/B.php"),
             PathBuf::from("/proj/srcB/C.php"),
         ];
-        let ignore = vec![PathBuf::from("/proj/src/B.php"), PathBuf::from("/proj/src")];
+        let ignore = [PathBuf::from("/proj/src/B.php"), PathBuf::from("/proj/src")];
         assert_eq!(
             filter_ignore(files.clone(), &ignore[..1], &PathBuf::from("/proj")),
             vec![
