@@ -102,3 +102,62 @@ fn ignore_files_accepts_an_individual_file() {
         "src/Optional.php is under an <ignoreFiles> file entry and must not be analyzed, got:\n{combined}"
     );
 }
+
+/// Ignore matching compares canonicalized paths, so a path argument that is a
+/// symlink — to a file, or to a directory — is ignored when its target lives
+/// under an `<ignoreFiles>` directory. (Directory walks skip symlinks, so
+/// explicit arguments are how they reach the filter.)
+#[cfg(unix)]
+#[test]
+fn ignore_files_follows_symlinked_path_arguments() {
+    use std::os::unix::fs::symlink;
+
+    let dir = TempDir::new().expect("failed to create temp dir");
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::create_dir_all(dir.path().join("generated/Nested")).unwrap();
+    std::fs::write(
+        dir.path().join("generated/Linked.php"),
+        "<?php class Linked { public function f(): int { return 'not an int'; } }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("generated/Nested/Deep.php"),
+        "<?php class Deep { public function g(): int { return 'not an int'; } }\n",
+    )
+    .unwrap();
+    symlink("../generated/Linked.php", dir.path().join("src/Linked.php")).unwrap();
+    symlink("../generated/Nested", dir.path().join("src/Nested")).unwrap();
+
+    let run = |config: &str| {
+        std::fs::write(dir.path().join("mir.xml"), config).unwrap();
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_mir"));
+        cmd.env_clear();
+        cmd.current_dir(dir.path());
+        cmd.args([
+            "--no-cache",
+            "--no-progress",
+            "-c",
+            "mir.xml",
+            "src/Linked.php",
+            "src/Nested",
+        ]);
+        stdout_and_stderr(&cmd.output().expect("failed to run mir binary"))
+    };
+
+    let unfiltered = run("<mir/>");
+    assert_eq!(
+        unfiltered.matches("InvalidReturnType").count(),
+        2,
+        "without <ignoreFiles> both symlinked paths are analyzed, got:\n{unfiltered}"
+    );
+    let filtered = run(r#"<mir>
+    <ignoreFiles>
+        <directory name="generated"/>
+    </ignoreFiles>
+</mir>"#);
+    assert!(
+        !filtered.contains("InvalidReturnType"),
+        "src/Linked.php and src/Nested resolve into the ignored generated/ dir and \
+         must not be analyzed, got:\n{filtered}"
+    );
+}

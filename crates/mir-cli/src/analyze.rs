@@ -178,26 +178,14 @@ pub fn run_plain_flow(
     };
 
     let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let normalized_ignore_dirs: Vec<PathBuf> = ignore_dirs
-        .iter()
-        .map(|ig| normalize_for_compare(ig))
-        .collect();
-    let files: Vec<PathBuf> = scan_roots
-        .iter()
-        .flat_map(|p| discover_files_with_extensions(p, &extensions))
-        .filter(|p| {
-            if normalized_ignore_dirs.is_empty() {
-                return true;
-            }
-            let abs = if p.is_absolute() {
-                p.clone()
-            } else {
-                cwd_abs.join(p)
-            };
-            let abs = normalize_for_compare(&abs);
-            !normalized_ignore_dirs.iter().any(|ig| abs.starts_with(ig))
-        })
-        .collect();
+    let files = filter_ignore(
+        scan_roots
+            .iter()
+            .flat_map(|p| discover_files_with_extensions(p, &extensions))
+            .collect(),
+        &ignore_dirs,
+        &cwd_abs,
+    );
 
     if files.is_empty() {
         if !cli.quiet {
@@ -506,45 +494,65 @@ fn filter_ignore(
     ignore_dirs: &[PathBuf],
     base: &std::path::Path,
 ) -> Vec<PathBuf> {
-    if ignore_dirs.is_empty() {
-        return files;
-    }
-    let ignore_dirs: Vec<PathBuf> = ignore_dirs
-        .iter()
-        .map(|ig| normalize_for_compare(ig))
-        .collect();
-    files
-        .into_iter()
-        .filter(|p| {
-            let abs = if p.is_absolute() {
-                p.clone()
-            } else {
-                base.join(p)
-            };
-            let abs = normalize_for_compare(&abs);
-            !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
-        })
-        .collect()
+    retain_by_dirs(files, ignore_dirs, base, false)
 }
 
 /// Keep only files under one of `roots` (resolved `<projectFiles>` directories) — the
 /// inverse of `filter_ignore`'s exclude-list semantics.
 fn filter_to_dirs(files: Vec<PathBuf>, roots: &[PathBuf], base: &std::path::Path) -> Vec<PathBuf> {
-    if roots.is_empty() {
+    retain_by_dirs(files, roots, base, true)
+}
+
+/// Keep the files that are (`inside`) or aren't under one of `dirs`, comparing
+/// canonicalized paths. Runs on the rayon pool: glob entries like
+/// `src/*/*/Tests` expand to hundreds of dirs, and a `realpath` per file plus
+/// a prefix check per dir took ~0.9s serially on Symfony's 12k files before
+/// analysis could start.
+fn retain_by_dirs(
+    files: Vec<PathBuf>,
+    dirs: &[PathBuf],
+    base: &std::path::Path,
+    inside: bool,
+) -> Vec<PathBuf> {
+    use rayon::prelude::*;
+
+    if dirs.is_empty() {
         return files;
     }
-    let roots: Vec<PathBuf> = roots.iter().map(|r| normalize_for_compare(r)).collect();
+    let dirs: Vec<PathBuf> = dirs.par_iter().map(|d| normalize_for_compare(d)).collect();
+    // Files share parents, so canonicalize each parent once and only resolve
+    // a file on its own when it is itself a symlink.
+    let parents: std::collections::HashSet<&std::path::Path> =
+        files.iter().filter_map(|p| p.parent()).collect();
+    let canonical_parents: std::collections::HashMap<&std::path::Path, PathBuf> = parents
+        .into_par_iter()
+        .map(|parent| {
+            let abs = if parent.is_absolute() {
+                parent.to_path_buf()
+            } else {
+                base.join(parent)
+            };
+            (parent, normalize_for_compare(&abs))
+        })
+        .collect();
+    let keep: Vec<bool> = files
+        .par_iter()
+        .map(|p| {
+            let is_symlink = p
+                .symlink_metadata()
+                .is_ok_and(|m| m.file_type().is_symlink());
+            let abs = match (p.parent(), p.file_name()) {
+                (Some(parent), Some(name)) if !is_symlink => canonical_parents[parent].join(name),
+                _ if p.is_absolute() => normalize_for_compare(p),
+                _ => normalize_for_compare(&base.join(p)),
+            };
+            dirs.iter().any(|d| abs.starts_with(d)) == inside
+        })
+        .collect();
     files
         .into_iter()
-        .filter(|p| {
-            let abs = if p.is_absolute() {
-                p.clone()
-            } else {
-                base.join(p)
-            };
-            let abs = normalize_for_compare(&abs);
-            roots.iter().any(|r| abs.starts_with(r))
-        })
+        .zip(keep)
+        .filter_map(|(p, keep)| keep.then_some(p))
         .collect()
 }
 
