@@ -125,9 +125,14 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
 /// such as `\Foo` is not a keyword, so the strip cannot hide a real class.
 pub(crate) fn is_docblock_type_keyword(name: &str) -> bool {
     let name = name.strip_prefix('\\').unwrap_or(name);
-    DOCBLOCK_TYPE_KEYWORDS
-        .iter()
-        .any(|k| *k == name.to_lowercase().as_str())
+    // The keywords are ASCII, so an ASCII name needs no lowercased copy.
+    if name.is_ascii() {
+        return DOCBLOCK_TYPE_KEYWORDS
+            .iter()
+            .any(|k| k.eq_ignore_ascii_case(name));
+    }
+    let lower = name.to_lowercase();
+    DOCBLOCK_TYPE_KEYWORDS.iter().any(|k| *k == lower)
 }
 
 /// Parse an assertion annotation's type, recognizing the leading `!` negation

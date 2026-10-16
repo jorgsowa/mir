@@ -1080,3 +1080,14 @@ fn plain_parse_skips_tag_descriptions() {
     assert_eq!(parsed.return_description, None);
     assert!(parsed.throws_descriptions.is_empty());
 }
+
+#[test]
+fn docblock_type_keyword_match_is_case_insensitive() {
+    use super::is_docblock_type_keyword;
+    assert!(is_docblock_type_keyword("non-empty-string"));
+    assert!(is_docblock_type_keyword("Non-Empty-String"));
+    assert!(is_docblock_type_keyword("\\INT"));
+    assert!(!is_docblock_type_keyword("\\Foo"));
+    assert!(!is_docblock_type_keyword("intx"));
+    assert!(!is_docblock_type_keyword("ïnt"));
+}
