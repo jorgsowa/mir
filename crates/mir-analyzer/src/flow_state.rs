@@ -124,6 +124,11 @@ impl Guard {
     }
 }
 
+/// Pending write locations of one variable. Almost always exactly one, so
+/// it is kept inline: cloning a [`FlowState`] for each branch then does not
+/// allocate once per pending variable.
+pub type WriteLocs = smallvec::SmallVec<[(u32, u16, u32, u16); 1]>;
+
 #[derive(Debug, Clone)]
 pub struct FlowState {
     /// Types of variables at this point in execution.
@@ -329,7 +334,7 @@ pub struct FlowState {
     /// Multiple locations arise from branch merges where different paths left
     /// different writes pending (e.g. a pre-loop write and a loop-body write):
     /// a later read consumes ALL of them, since any could be the live value.
-    pub last_write_locs: FxHashMap<Name, Vec<(u32, u16, u32, u16)>>,
+    pub last_write_locs: FxHashMap<Name, WriteLocs>,
 
     /// Dead writes collected during analysis: writes that were overwritten
     /// without being read first. Accumulated via union across branches.
@@ -1351,7 +1356,7 @@ impl FlowState {
             }
         }
         self.last_write_locs
-            .insert(sym, vec![(line, col_start, line_end, col_end)]);
+            .insert(sym, smallvec::smallvec![(line, col_start, line_end, col_end)]);
     }
 
     /// Mark a variable as consumed by an r-value read.
@@ -1872,7 +1877,7 @@ impl FlowState {
         result.last_write_locs = FxHashMap::default();
         {
             let consumed = &result.consumed_write_locs;
-            let add = |map: &mut FxHashMap<Name, Vec<(u32, u16, u32, u16)>>,
+            let add = |map: &mut FxHashMap<Name, WriteLocs>,
                        name: &Name,
                        loc: &(u32, u16, u32, u16)| {
                 if !consumed.contains(&(*name, *loc)) {
