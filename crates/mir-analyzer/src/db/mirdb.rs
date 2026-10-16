@@ -698,6 +698,12 @@ impl MirDatabase for MirDbStorage {
             .collect()
     }
 
+    fn is_user_stub_source_file(&self, file: SourceFile) -> bool {
+        let path = file.path(self);
+        self.user_stub_paths.read().contains(path.as_ref())
+            && self.source_files.get(path.as_ref()) == Some(&file)
+    }
+
     fn stub_cache(&self) -> Option<Arc<crate::stub_cache::StubSliceCache>> {
         self.stub_cache.read().clone()
     }

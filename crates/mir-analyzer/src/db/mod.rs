@@ -208,6 +208,10 @@ pub trait MirDatabase: salsa::Database {
     /// over native stubs for the same symbol.
     fn user_stub_source_files(&self) -> Vec<SourceFile>;
 
+    /// Whether `file` is one of [`Self::user_stub_source_files`], without
+    /// collecting them — per-class queries ask this for every class.
+    fn is_user_stub_source_file(&self, file: SourceFile) -> bool;
+
     /// Return the disk-backed stub slice cache, if configured. **Side channel**
     /// — not salsa-tracked. Safe to use inside tracked queries because the
     /// cache is content-addressed: same `(path, hash, php_version)` always

@@ -646,7 +646,7 @@ pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<
     let defs = collect_file_definitions(db, file);
     let class = def_at(&defs.slice.classes, idx)?;
     let class = resolve_cross_file_imports(db, class);
-    if db.user_stub_source_files().contains(&file) {
+    if db.is_user_stub_source_file(file) {
         if let Some(real) = real_class_shadowed_by_stub(db, &class) {
             return Some(Arc::new(merge_stub_over_real(&class, &real)));
         }
@@ -903,7 +903,7 @@ pub fn interface_def_at(
     let defs = collect_file_definitions(db, file);
     let def = def_at(&defs.slice.interfaces, idx)?;
     let def = resolve_interface_cross_file_imports(db, def);
-    if db.user_stub_source_files().contains(&file) {
+    if db.is_user_stub_source_file(file) {
         if let Some(real) = real_interface_shadowed_by_stub(db, &def) {
             return Some(Arc::new(merge_interface_stub_over_real(&def, &real)));
         }
