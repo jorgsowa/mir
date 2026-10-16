@@ -44,15 +44,10 @@ pub(crate) fn offset_to_line_col(
     let lc = source_map.offset_to_line_col(offset);
     let line = lc.line + 1;
 
+    // The map splits lines on `\n` like PHP, so `lc.col` is the byte column
+    // and the line starts that many bytes back; no need to rescan for it.
     let byte_offset = offset as usize;
-    let line_start_byte = if byte_offset == 0 {
-        0
-    } else {
-        source[..byte_offset]
-            .rfind('\n')
-            .map(|p| p + 1)
-            .unwrap_or(0)
-    };
+    let line_start_byte = byte_offset - lc.col as usize;
 
     let col = source[line_start_byte..byte_offset].chars().count() as u16;
 
@@ -819,6 +814,25 @@ pub(crate) fn emit_unused_variables(
 #[cfg(test)]
 mod tests {
     use super::is_view_template_path;
+
+    #[test]
+    fn offset_to_line_col_counts_chars_from_the_line_start() {
+        let source = "<?php\r\n$a = 'é';\n\n  $b = 1;\n";
+        let map = php_rs_parser::source_map::SourceMap::new(source);
+        let at = |needle: &str| {
+            let offset = source.find(needle).unwrap() as u32;
+            super::offset_to_line_col(source, offset, &map)
+        };
+        assert_eq!(super::offset_to_line_col(source, 0, &map), (1, 0));
+        assert_eq!(at("\r"), (1, 5));
+        assert_eq!(at("$a"), (2, 0));
+        // `é` is two bytes but one column.
+        assert_eq!(at("';"), (2, 7));
+        assert_eq!(at("\n\n"), (2, 9));
+        assert_eq!(at("$b"), (4, 2));
+        let end = source.len() as u32;
+        assert_eq!(super::offset_to_line_col(source, end, &map), (5, 0));
+    }
 
     #[test]
     fn blade_file_is_view_template() {
