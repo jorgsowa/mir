@@ -1355,8 +1355,10 @@ impl FlowState {
                     .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
             }
         }
-        self.last_write_locs
-            .insert(sym, smallvec::smallvec![(line, col_start, line_end, col_end)]);
+        self.last_write_locs.insert(
+            sym,
+            smallvec::smallvec![(line, col_start, line_end, col_end)],
+        );
     }
 
     /// Mark a variable as consumed by an r-value read.
@@ -1877,16 +1879,15 @@ impl FlowState {
         result.last_write_locs = FxHashMap::default();
         {
             let consumed = &result.consumed_write_locs;
-            let add = |map: &mut FxHashMap<Name, WriteLocs>,
-                       name: &Name,
-                       loc: &(u32, u16, u32, u16)| {
-                if !consumed.contains(&(*name, *loc)) {
-                    let entry = map.entry(*name).or_default();
-                    if !entry.contains(loc) {
-                        entry.push(*loc);
+            let add =
+                |map: &mut FxHashMap<Name, WriteLocs>, name: &Name, loc: &(u32, u16, u32, u16)| {
+                    if !consumed.contains(&(*name, *loc)) {
+                        let entry = map.entry(*name).or_default();
+                        if !entry.contains(loc) {
+                            entry.push(*loc);
+                        }
                     }
-                }
-            };
+                };
             // Branch contexts inherit pre's pending entries, so unioning the two
             // branch maps already covers pre-existing writes: a pre write still
             // pending in either branch survives; one overwritten in BOTH
