@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::sync::{Arc, OnceLock};
 
-use crate::atomic::Atomic;
+use crate::atomic::{ArrayKey, Atomic, KeyedProperty};
 use crate::symbol::Name;
+use indexmap::IndexMap;
 
 /// Returns a cached empty `Arc<[Type]>` for `type_params` / `parts` fields.
 /// Re-uses a single Arc allocation so all empty parameter lists share one
@@ -99,6 +100,79 @@ fn bounds_contain(outer: IntBounds, inner: IntBounds) -> bool {
         (Some(_), None) => false,
     };
     lo_ok && hi_ok
+}
+
+/// Shapes a union keeps apart before [`Type::add_type`] starts folding them.
+/// Each `if` that optionally sets a key doubles the shapes in a union, and
+/// flow merges compare every pair, so a long run of such branches went
+/// exponential (Symfony's `MandrillApiTransport::getPayload` took 17s).
+/// Below the limit shapes stay apart: `count($a) === N` narrowing picks among
+/// them, and a key set on only some paths reads without `null`.
+const MAX_KEYED_SHAPES: usize = 8;
+
+/// One shape covering `a | b`: keys of both, with those set on one side only
+/// made optional and value types unioned. `None` when the shapes disagree on
+/// openness, list-ness or emptiness — folding `array{} | array{0: X}` to
+/// `array{0?: X}` would stop `if ($arr)` narrowing.
+fn combine_keyed_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
+    let (
+        Atomic::TKeyedArray {
+            properties: pa,
+            is_open: oa,
+            is_list: la,
+        },
+        Atomic::TKeyedArray {
+            properties: pb,
+            is_open: ob,
+            is_list: lb,
+        },
+    ) = (a, b)
+    else {
+        return None;
+    };
+    let non_empty = |p: &IndexMap<ArrayKey, KeyedProperty>| p.values().any(|v| !v.optional);
+    if oa != ob || la != lb || non_empty(pa) != non_empty(pb) {
+        return None;
+    }
+    let mut properties = IndexMap::with_capacity(pa.len().max(pb.len()));
+    for (key, x) in pa.iter() {
+        let prop = match pb.get(key) {
+            Some(y) => {
+                let mut ty = x.ty.clone();
+                ty.merge_with(&y.ty);
+                KeyedProperty {
+                    ty,
+                    optional: x.optional || y.optional,
+                }
+            }
+            // An open shape already admits the missing key with any value,
+            // so keeping the other side's type for it would be unsound.
+            None if *oa => continue,
+            None => KeyedProperty {
+                ty: x.ty.clone(),
+                optional: true,
+            },
+        };
+        properties.insert(key.clone(), prop);
+    }
+    if !*oa {
+        for (key, y) in pb.iter() {
+            if !pa.contains_key(key) {
+                properties.insert(
+                    key.clone(),
+                    KeyedProperty {
+                        ty: y.ty.clone(),
+                        optional: true,
+                    },
+                );
+            }
+        }
+    }
+    Some(Atomic::TKeyedArray {
+        properties: Box::new(properties),
+        is_open: *oa,
+        is_list: *la,
+    })
 }
 
 impl Type {
@@ -332,6 +406,29 @@ impl Type {
         } else {
             atomic
         };
+
+        // Past the limit, fold a new shape into a compatible existing one
+        // rather than growing the union (see `MAX_KEYED_SHAPES`).
+        let mut atomic = atomic;
+        if matches!(atomic, Atomic::TKeyedArray { .. })
+            && !self.types.contains(&atomic)
+            && self
+                .types
+                .iter()
+                .filter(|t| matches!(t, Atomic::TKeyedArray { .. }))
+                .count()
+                >= MAX_KEYED_SHAPES
+        {
+            if let Some((idx, combined)) = self
+                .types
+                .iter()
+                .enumerate()
+                .find_map(|(i, t)| combine_keyed_arrays(t, &atomic).map(|c| (i, c)))
+            {
+                self.types.remove(idx);
+                atomic = combined;
+            }
+        }
 
         // Avoid exact duplicates.
         if self.types.contains(&atomic) {
@@ -3778,6 +3875,105 @@ mod tests {
         assert_eq!(parts.len(), 2);
         assert!(matches!(parts[0].types[0], Atomic::TNamedObject { .. }));
         assert!(matches!(parts[1].types[0], Atomic::TString));
+    }
+
+    fn shape(props: &[(&str, Atomic, bool)], is_open: bool) -> Atomic {
+        Atomic::TKeyedArray {
+            properties: Box::new(
+                props
+                    .iter()
+                    .map(|(k, ty, optional)| {
+                        (
+                            ArrayKey::String(Arc::from(*k)),
+                            KeyedProperty {
+                                ty: Type::single(ty.clone()),
+                                optional: *optional,
+                            },
+                        )
+                    })
+                    .collect(),
+            ),
+            is_open,
+            is_list: false,
+        }
+    }
+
+    /// A closed shape `{a: int}` plus key `k{i}` for each bit set in `bits`.
+    fn shape_with_bits(bits: u32, is_open: bool) -> Atomic {
+        let names: Vec<String> = (0..5).map(|i| format!("k{i}")).collect();
+        let mut props = vec![("a", Atomic::TInt, false)];
+        props.extend(
+            (0..5)
+                .filter(|i| bits & (1 << i) != 0)
+                .map(|i| (names[i].as_str(), Atomic::TString, false)),
+        );
+        shape(&props, is_open)
+    }
+
+    fn keyed_count(ty: &Type) -> usize {
+        ty.types
+            .iter()
+            .filter(|t| matches!(t, Atomic::TKeyedArray { .. }))
+            .count()
+    }
+
+    #[test]
+    fn add_type_keeps_few_shapes_apart() {
+        let mut ty = Type::empty();
+        for bits in 0..MAX_KEYED_SHAPES as u32 {
+            ty.add_type(shape_with_bits(bits, false));
+        }
+        assert_eq!(keyed_count(&ty), MAX_KEYED_SHAPES);
+    }
+
+    #[test]
+    fn add_type_folds_shapes_past_the_limit() {
+        let mut ty = Type::empty();
+        for bits in 0..32 {
+            ty.add_type(shape_with_bits(bits, false));
+        }
+        assert!(keyed_count(&ty) <= MAX_KEYED_SHAPES);
+        // Every key stays reachable; `a` stays required everywhere.
+        for t in &ty.types {
+            let Atomic::TKeyedArray { properties, .. } = t else {
+                continue;
+            };
+            assert!(!properties[&ArrayKey::String(Arc::from("a"))].optional);
+        }
+        for i in 0..5 {
+            let key = ArrayKey::String(Arc::from(format!("k{i}").as_str()));
+            assert!(ty.types.iter().any(|t| matches!(
+                t,
+                Atomic::TKeyedArray { properties, .. } if properties.contains_key(&key)
+            )));
+        }
+    }
+
+    #[test]
+    fn combine_keeps_emptiness_and_open_shape_soundness() {
+        // `array{}` and `array{a: int}` differ in emptiness.
+        assert!(combine_keyed_arrays(
+            &shape(&[], false),
+            &shape(&[("a", Atomic::TInt, false)], false)
+        )
+        .is_none());
+        // Open and closed shapes don't mix.
+        assert!(combine_keyed_arrays(
+            &shape(&[("a", Atomic::TInt, false)], true),
+            &shape(&[("a", Atomic::TInt, false)], false)
+        )
+        .is_none());
+        // An open shape missing `k` already admits any `k`: drop it.
+        assert_eq!(
+            combine_keyed_arrays(
+                &shape(&[("a", Atomic::TInt, false)], true),
+                &shape(
+                    &[("a", Atomic::TInt, false), ("k", Atomic::TString, false)],
+                    true
+                )
+            ),
+            Some(shape(&[("a", Atomic::TInt, false)], true))
+        );
     }
 
     #[test]
