@@ -11,7 +11,10 @@
 //! Scope granularity is the *declaration*, not the method: intra-file
 //! invalidation is file-granular either way (every scope depends on
 //! `parse_file`), so per-method keys would only multiply memo count without
-//! finer invalidation. Closures and anonymous classes stay inline in their
+//! finer invalidation. On-demand type inference is the exception:
+//! [`infer_member`] analyzes just the one method a caller needs, since a
+//! caller usually needs one or two methods of a class and analyzing all of
+//! them costs far more than the extra memos. Closures and anonymous classes stay inline in their
 //! enclosing scope — their analysis input is the flow-sensitive variable
 //! environment at their syntactic position, which is an output of analyzing
 //! the enclosing body.
@@ -28,7 +31,7 @@ use mir_issues::Issue;
 
 use rustc_hash::FxHashSet;
 
-use crate::body_analysis::BodyAnalyzer;
+use crate::body_analysis::{BodyAnalyzer, InferredTypes};
 
 use super::*;
 
@@ -198,9 +201,7 @@ fn infer_scope_body(
     scope: ScopeKey,
 ) -> Arc<ScopeInferenceResult> {
     let prepared = super::queries::prepare_analysis_file(db, file);
-    let path = &prepared.path;
-    let text = &prepared.text;
-    let parsed = prepared.parse_result();
+    let path = prepared.path;
 
     if prepared.has_hard_parse_errors {
         return ScopeInferenceResult::empty();
@@ -217,14 +218,111 @@ fn infer_scope_body(
     // inference on the same handle can't leak into (or consume) them.
     db.push_ref_loc_frame();
 
-    match &scope {
+    analyze_scope(db, &driver, &prepared, &scope, &mut issues);
+
+    let ref_locs = db.pop_ref_loc_frame();
+    let inferred_types = Arc::new(driver.take_inferred_types());
+    crate::metrics::record_scope_analysis(path.as_ref(), 0);
+    db.note_work(crate::db::Work::ScopeAnalysis, 1);
+    crate::metrics::record_infer_scope_retained(
+        issues.len(),
+        ref_locs.len(),
+        inferred_types.functions.len(),
+        inferred_types.methods.len(),
+        inferred_types.properties.len(),
+    );
+
+    Arc::new(ScopeInferenceResult {
+        issues: issues.into(),
+        ref_locs: ref_locs.into(),
+        inferred_types,
+    })
+}
+
+/// Inference-only analysis of part of one scope, backing the on-demand
+/// inferred return and property type lookups in [`super::inferred_types`].
+///
+/// `method` (ASCII-lowercased) limits a class-like scope to that one method;
+/// `None` analyzes the whole scope. A caller needing one method's return
+/// type therefore analyzes that method alone, not every method of its class
+/// as [`infer_scope`] would, and the analysis records neither issues nor
+/// references. Cycles fixpoint-iterate and widen like [`infer_scope`].
+#[salsa::tracked(cycle_fn = infer_member_cycle, cycle_initial = infer_member_initial)]
+pub(crate) fn infer_member(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    scope: ScopeKey,
+    method: Option<Arc<str>>,
+) -> Arc<InferredTypes> {
+    crate::recursion::ensure_phase_stack(|| {
+        let prepared = super::queries::prepare_analysis_file(db, file);
+        if prepared.has_hard_parse_errors {
+            return Arc::new(InferredTypes::default());
+        }
+        let mut driver = BodyAnalyzer::new_inference_only(db, prepared.php_version);
+        driver.collect_symbols = false;
+        driver.only_method = method;
+
+        let mut issues: Vec<Issue> = Vec::new();
+        db.push_ref_loc_frame();
+        analyze_scope(db, &driver, &prepared, &scope, &mut issues);
+        db.pop_ref_loc_frame();
+        crate::metrics::record_scope_analysis(prepared.path.as_ref(), 0);
+        db.note_work(crate::db::Work::ScopeAnalysis, 1);
+        Arc::new(driver.take_inferred_types())
+    })
+}
+
+fn infer_member_initial(
+    _db: &dyn MirDatabase,
+    _id: salsa::Id,
+    _file: SourceFile,
+    _scope: ScopeKey,
+    _method: Option<Arc<str>>,
+) -> Arc<InferredTypes> {
+    Arc::new(InferredTypes::default())
+}
+
+fn infer_member_cycle(
+    _db: &dyn MirDatabase,
+    cycle: &salsa::Cycle,
+    last: &Arc<InferredTypes>,
+    value: Arc<InferredTypes>,
+    _file: SourceFile,
+    _scope: ScopeKey,
+    _method: Option<Arc<str>>,
+) -> Arc<InferredTypes> {
+    if !super::inferred_types::should_widen(cycle) {
+        return value;
+    }
+    use super::inferred_types::widen_unstable;
+    let mut next = (*value).clone();
+    widen_unstable(&last.functions, &mut next.functions, |e| &mut e.1);
+    widen_unstable(&last.methods, &mut next.methods, |e| &mut e.2);
+    widen_unstable(&last.properties, &mut next.properties, |e| &mut e.2);
+    Arc::new(next)
+}
+
+/// Dispatch `scope` of the prepared file to the `BodyAnalyzer::analyze_*`
+/// method the whole-file walk would call for it.
+fn analyze_scope(
+    db: &dyn MirDatabase,
+    driver: &BodyAnalyzer<'_>,
+    prepared: &super::queries::PreparedAnalysisFile<'_>,
+    scope: &ScopeKey,
+    issues: &mut Vec<Issue>,
+) {
+    let path = prepared.path;
+    let text = prepared.text;
+    let parsed = prepared.parse_result();
+    match scope {
         ScopeKey::FileHeader => {
             crate::body_analysis::check_duplicate_declarations(
                 &parsed.program.stmts,
                 path,
                 text.as_ref(),
                 &parsed.source_map,
-                &mut issues,
+                issues,
             );
             check_use_decls(
                 &parsed.program.stmts,
@@ -232,7 +330,7 @@ fn infer_scope_body(
                 path,
                 text.as_ref(),
                 &parsed.source_map,
-                &mut issues,
+                issues,
                 true,
             );
         }
@@ -242,7 +340,7 @@ fn infer_scope_body(
                 path,
                 text.as_ref(),
                 &parsed.source_map,
-                &mut issues,
+                issues,
                 None,
             );
         }
@@ -292,7 +390,7 @@ fn infer_scope_body(
                             path,
                             text.as_ref(),
                             &parsed.source_map,
-                            &mut issues,
+                            issues,
                             None,
                         ),
                         StmtKind::Class(decl) => driver.analyze_class_decl(
@@ -300,7 +398,7 @@ fn infer_scope_body(
                             path,
                             text.as_ref(),
                             &parsed.source_map,
-                            &mut issues,
+                            issues,
                             None,
                             guards,
                         ),
@@ -309,7 +407,7 @@ fn infer_scope_body(
                             path,
                             text.as_ref(),
                             &parsed.source_map,
-                            &mut issues,
+                            issues,
                             None,
                         ),
                         StmtKind::Interface(decl) => driver.analyze_interface_decl(
@@ -317,7 +415,7 @@ fn infer_scope_body(
                             path,
                             text.as_ref(),
                             &parsed.source_map,
-                            &mut issues,
+                            issues,
                             guards,
                             None,
                         ),
@@ -326,7 +424,7 @@ fn infer_scope_body(
                             path,
                             text.as_ref(),
                             &parsed.source_map,
-                            &mut issues,
+                            issues,
                             None,
                         ),
                         _ => {}
@@ -335,24 +433,6 @@ fn infer_scope_body(
             );
         }
     }
-
-    let ref_locs = db.pop_ref_loc_frame();
-    let inferred_types = Arc::new(driver.take_inferred_types());
-    crate::metrics::record_scope_analysis(path.as_ref(), 0);
-    db.note_work(crate::db::Work::ScopeAnalysis, 1);
-    crate::metrics::record_infer_scope_retained(
-        issues.len(),
-        ref_locs.len(),
-        inferred_types.functions.len(),
-        inferred_types.methods.len(),
-        inferred_types.properties.len(),
-    );
-
-    Arc::new(ScopeInferenceResult {
-        issues: issues.into(),
-        ref_locs: ref_locs.into(),
-        inferred_types,
-    })
 }
 
 fn infer_scope_initial(

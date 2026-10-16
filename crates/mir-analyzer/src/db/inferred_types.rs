@@ -9,7 +9,8 @@ use std::sync::Arc;
 
 use mir_types::Type;
 
-use crate::db::{Fqcn, MirDatabase};
+use crate::body_analysis::InferredTypes;
+use crate::db::{Fqcn, MirDatabase, ScopeKey, SourceFile};
 
 /// Fixpoint iterations after which a cycle head's still-changing inferred
 /// types widen to `mixed`, so an ever-growing type (`return [$this->f()];`)
@@ -41,8 +42,7 @@ pub(crate) fn widen_unstable<T: PartialEq>(
 /// Returns `None` when the function is unknown.
 pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Type>> {
     let sf = crate::db::function_loc(db, Fqcn::from_str(db, fqn))?.file();
-    let inferred = crate::db::infer_file_return_types(db, sf);
-    inferred.functions.get(fqn).cloned()
+    function_return_type_in(db, sf, fqn)
 }
 
 /// [`inferred_function_return_type_demand`] as seen from `file`: resolves the
@@ -53,48 +53,128 @@ pub fn inferred_function_return_type_from(
     fqn: &str,
 ) -> Option<Arc<Type>> {
     let sf = crate::db::function_loc_from(db, file, Fqcn::from_str(db, fqn))?.file();
-    let inferred = crate::db::infer_file_return_types(db, sf);
-    inferred.functions.get(fqn).cloned()
+    function_return_type_in(db, sf, fqn)
+}
+
+/// Inferred return type of function `fqn` declared in `sf`, analyzing only
+/// its own scope.
+fn function_return_type_in(db: &dyn MirDatabase, sf: SourceFile, fqn: &str) -> Option<Arc<Type>> {
+    let Some(inferred) = infer_scopes_matching(
+        db,
+        sf,
+        |key| matches!(key, ScopeKey::Function(name, _) if name.as_ref() == fqn),
+        None,
+    ) else {
+        return crate::db::infer_file_return_types(db, sf)
+            .functions
+            .get(fqn)
+            .cloned();
+    };
+    inferred
+        .iter()
+        .flat_map(|types| types.functions.iter())
+        .rfind(|(name, _)| name.as_ref() == fqn)
+        .map(|(_, ty)| mir_codebase::definitions::wrap_var_type(ty.clone()))
+}
+
+/// Run [`crate::db::infer_member`] on every declaration scope of `sf` that
+/// `matches`, in source order. `None` when no scope matches — the symbol is
+/// not a top-level declaration (e.g. an anonymous class), so callers fall
+/// back to inferring the whole file.
+fn infer_scopes_matching(
+    db: &dyn MirDatabase,
+    sf: SourceFile,
+    matches: impl Fn(&ScopeKey) -> bool,
+    method: Option<&str>,
+) -> Option<Vec<Arc<InferredTypes>>> {
+    let method: Option<Arc<str>> = method.map(Arc::from);
+    let inferred: Vec<Arc<InferredTypes>> = crate::db::file_scopes(db, sf)
+        .iter()
+        .filter(|key| matches(key))
+        .map(|key| crate::db::infer_member(db, sf, key.clone(), method.clone()).clone())
+        .collect();
+    (!inferred.is_empty()).then_some(inferred)
 }
 
 /// Demand-driven inferred return type lookup for a method.
 ///
 /// Locates the file that declares the class (the symbol index, else on
-/// demand), then calls `infer_file_return_types` on that file.
-/// `method_name_lower` must already be ASCII-lowercased (PHP semantics).
-/// Returns `None` when the class or method is unknown.
+/// demand), then analyzes just that method of the class via
+/// [`crate::db::infer_member`]. `method_name_lower` must already be
+/// ASCII-lowercased (PHP semantics). Returns `None` when the class or method
+/// is unknown.
 pub fn inferred_method_return_type_demand(
     db: &dyn MirDatabase,
     fqcn: &str,
     method_name_lower: &str,
 ) -> Option<Arc<Type>> {
     let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, fqcn))?.file();
-    let inferred = crate::db::infer_file_return_types(db, sf);
+    let Some(inferred) = infer_scopes_matching(
+        db,
+        sf,
+        |key| matches!(key, ScopeKey::ClassLike(name, _) if name.as_ref() == fqcn),
+        Some(method_name_lower),
+    ) else {
+        return crate::db::infer_file_return_types(db, sf)
+            .methods
+            .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(method_name_lower)))
+            .cloned();
+    };
     inferred
-        .methods
-        .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(method_name_lower)))
-        .cloned()
+        .iter()
+        .flat_map(|types| types.methods.iter())
+        .rfind(|(class, name, _)| {
+            class.as_ref() == fqcn && name.eq_ignore_ascii_case(method_name_lower)
+        })
+        .map(|(_, _, ty)| mir_codebase::definitions::wrap_var_type(ty.clone()))
 }
 
 /// Demand-driven inferred property type lookup, for a property with no
 /// native type hint and no `@var` docblock (see `PropertyDef::ty`).
 ///
 /// Locates the file that declares `fqcn` (the symbol index, else on demand),
-/// then calls `infer_file_return_types` on that file — the same
-/// inference-only body-analysis pass also collects the union of types
-/// directly assigned to the property in `fqcn`'s own constructor. `fqcn`
-/// must be the property's DECLARING class (e.g. `find_property_in_chain`'s
-/// owner), and `name` is case-sensitive (PHP property names are). Returns
-/// `None` when the class is unknown or nothing was inferred for it.
+/// then analyzes the constructors of every class-like declared in that file
+/// via [`crate::db::infer_member`], collecting the union of types they
+/// directly assign to the property (a subclass constructor in the same file
+/// may assign it too). `fqcn` must be the property's DECLARING class (e.g.
+/// `find_property_in_chain`'s owner), and `name` is case-sensitive (PHP
+/// property names are). Returns `None` when the class is unknown or nothing
+/// was inferred for it.
 pub fn inferred_property_type_demand(
     db: &dyn MirDatabase,
     fqcn: &str,
     name: &str,
 ) -> Option<Arc<Type>> {
     let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, fqcn))?.file();
-    let inferred = crate::db::infer_file_return_types(db, sf);
-    inferred
-        .properties
-        .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(name)))
-        .cloned()
+    let declared_here = crate::db::file_scopes(db, sf)
+        .iter()
+        .any(|key| matches!(key, ScopeKey::ClassLike(class, _) if class.as_ref() == fqcn));
+    let inferred = declared_here
+        .then(|| {
+            infer_scopes_matching(
+                db,
+                sf,
+                |key| matches!(key, ScopeKey::ClassLike(..)),
+                Some("__construct"),
+            )
+        })
+        .flatten();
+    let Some(inferred) = inferred else {
+        return crate::db::infer_file_return_types(db, sf)
+            .properties
+            .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(name)))
+            .cloned();
+    };
+    let mut merged: Option<Type> = None;
+    for (_, _, ty) in inferred
+        .iter()
+        .flat_map(|types| types.properties.iter())
+        .filter(|(class, prop, _)| class.as_ref() == fqcn && prop.as_ref() == name)
+    {
+        match &mut merged {
+            Some(existing) => existing.merge_with(ty),
+            None => merged = Some(ty.clone()),
+        }
+    }
+    merged.map(mir_codebase::definitions::wrap_var_type)
 }

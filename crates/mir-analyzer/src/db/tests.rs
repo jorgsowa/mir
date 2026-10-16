@@ -249,6 +249,63 @@ mod tests {
     }
 
     #[test]
+    fn infer_member_analyzes_only_the_requested_method() {
+        let db = MirDbStorage::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_member.php"),
+            Arc::from(
+                "<?php\nclass Pair { public function first() { return 1; } public function Second() { return 'b'; } }\n",
+            ),
+        );
+        let _ = collect_file_definitions(&db, file);
+        let scope = ScopeKey::ClassLike(Arc::from("Pair"), 0);
+
+        let inferred = infer_member(&db, file, scope, Some(Arc::from("second")));
+        let methods: Vec<(String, String)> = inferred
+            .methods
+            .iter()
+            .map(|(_, name, ty)| (name.to_string(), ty.to_string()))
+            .collect();
+        assert_eq!(methods, vec![("Second".to_string(), "\"b\"".to_string())]);
+        assert_eq!(db.work_count(Work::WholeFileWalk), 0);
+    }
+
+    #[test]
+    fn member_demand_reads_constructors_and_single_methods() {
+        let mut session = crate::AnalysisSession::new(crate::PhpVersion::LATEST);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("demand.php");
+        std::fs::write(
+            &path,
+            "<?php\nclass Base { public $v; public function other() { return 'x'; } }\n\
+             class Child extends Base { public function __construct() { $this->v = 1; } }\n\
+             function helper() { return 2; }\n",
+        )
+        .unwrap();
+        let _ = session.analyze_paths(
+            std::slice::from_ref(&path),
+            &crate::BatchOptions::new().without_symbols(),
+        );
+        let db = session.snapshot_db();
+
+        let show = |ty: Option<Arc<mir_types::Type>>| ty.map(|ty| ty.to_string());
+        // A subclass constructor in the same file assigns the parent's property.
+        assert_eq!(
+            show(inferred_property_type_demand(&db, "Base", "v")),
+            Some("1".to_string())
+        );
+        assert_eq!(
+            show(inferred_method_return_type_demand(&db, "Base", "other")),
+            Some("\"x\"".to_string())
+        );
+        assert_eq!(
+            show(inferred_function_return_type_demand(&db, "helper")),
+            Some("2".to_string())
+        );
+    }
+
+    #[test]
     fn infer_function_returns_some_for_existing_free_fn() {
         let db = MirDbStorage::default();
         let file = SourceFile::new(

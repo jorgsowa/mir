@@ -918,6 +918,16 @@ impl<'a> BodyAnalyzer<'a> {
         use crate::stmt::StatementsAnalyzer;
         let fqcn: &str = cx.fqcn.as_ref();
 
+        if let Some(only) = &self.only_method {
+            if !method
+                .name
+                .as_deref()
+                .is_some_and(|name| name.eq_ignore_ascii_case(only))
+            {
+                return;
+            }
+        }
+
         if self.collect_navigation_facts {
             if let Some(name) = method.name.as_deref() {
                 let span = super::method_decl_name_span(source, member_span, method);

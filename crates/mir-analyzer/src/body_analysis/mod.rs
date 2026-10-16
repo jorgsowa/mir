@@ -120,7 +120,7 @@ pub(crate) enum AnalysisMode {
     InferenceOnly,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct InferredTypes {
     pub(crate) functions: Vec<(Arc<str>, Type)>,
     pub(crate) methods: Vec<(Arc<str>, Arc<str>, Type)>,
@@ -629,6 +629,9 @@ pub(crate) struct BodyAnalyzer<'a> {
     pub(crate) collect_resolved_navigation_facts: bool,
     /// When true, retain compact inferred return/property facts from the walk.
     pub(crate) collect_inferred_types: bool,
+    /// When set, class-like scopes analyze only the method with this
+    /// ASCII-lowercased name and skip every other method body.
+    pub(crate) only_method: Option<Arc<str>>,
     inferred_types: Arc<Mutex<InferredTypes>>,
     reference_key_cache: Arc<Mutex<ReferenceKeyCache>>,
     navigation_facts: RefCell<Vec<NavigationFact>>,
@@ -648,6 +651,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_navigation_facts: false,
             collect_resolved_navigation_facts: false,
             collect_inferred_types: false,
+            only_method: None,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
@@ -671,6 +675,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_navigation_facts: false,
             collect_resolved_navigation_facts: false,
             collect_inferred_types: true,
+            only_method: None,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),

@@ -283,6 +283,7 @@ pub use self::queries::{
 pub use self::ref_index::{FileNo, RefIndex};
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
+pub(crate) use self::scopes::infer_member;
 pub use self::scopes::{
     analyze_file_per_scope, file_scopes, infer_scope, ScopeInferenceResult, ScopeKey,
 };
