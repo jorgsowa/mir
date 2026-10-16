@@ -856,25 +856,17 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                 None
             };
             if let Some(iface_fqcn) = iface_key {
-                let class_fqcns: Vec<mir_types::Name> = crate::db::workspace_classes(ea.db)
-                    .iter()
-                    .filter(|fqcn| {
-                        let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_str());
-                        crate::db::find_class_like(ea.db, here).is_some_and(|c| c.is_class())
-                    })
-                    .copied()
-                    .collect();
-                let compatible = class_fqcns.iter().any(|cls_fqcn| {
-                    crate::db::extends_or_implements(ea.db, cls_fqcn.as_str(), iface_fqcn)
-                        && (crate::db::extends_or_implements(
-                            ea.db,
-                            cls_fqcn.as_str(),
-                            param_fqcn.as_ref(),
-                        ) || crate::db::extends_or_implements(
+                let implementors = crate::db::classes_implementing(
+                    ea.db,
+                    crate::db::Fqcn::from_str(ea.db, iface_fqcn),
+                );
+                let compatible = implementors.iter().any(|cls_fqcn| {
+                    crate::db::extends_or_implements(ea.db, cls_fqcn.as_str(), param_fqcn.as_ref())
+                        || crate::db::extends_or_implements(
                             ea.db,
                             cls_fqcn.as_str(),
                             &resolved_param,
-                        ))
+                        )
                 });
                 if compatible {
                     return true;

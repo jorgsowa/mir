@@ -647,6 +647,27 @@ pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) 
     result
 }
 
+/// Every workspace class (not interface, trait or enum) that extends or
+/// implements `ancestor`, in workspace order.
+///
+/// Memoized per ancestor, so a caller that asks "could some class be both an
+/// `ancestor` and something else" scans the workspace once per ancestor
+/// instead of on every check. Uses the uncached subtype walk: this memo
+/// outlives the pass-scoped subtype cache and must record its dependencies.
+#[salsa::tracked]
+pub fn classes_implementing<'db>(db: &'db dyn MirDatabase, ancestor: Fqcn<'db>) -> Arc<[Name]> {
+    let ancestor = ancestor.name(db);
+    crate::db::workspace_classes(db)
+        .iter()
+        .filter(|fqcn| {
+            let here = Fqcn::from_str(db, fqcn.as_str());
+            crate::db::find_class_like(db, here).is_some_and(|c| c.is_class())
+                && extends_or_implements_uncached(db, fqcn.as_str(), ancestor.as_str())
+        })
+        .copied()
+        .collect()
+}
+
 fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, child);
     let Some(class) = crate::db::find_class_like(db, here) else {
