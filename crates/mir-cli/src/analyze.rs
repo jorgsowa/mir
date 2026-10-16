@@ -302,7 +302,7 @@ fn index_vendor_chunked(session: &mut AnalysisSession, vendor_files: &[PathBuf])
         let pairs: Vec<(Arc<str>, Arc<str>)> = paths
             .par_iter()
             .filter_map(|p| {
-                let src = std::fs::read_to_string(p).ok()?;
+                let src = mir_analyzer::read_php_source(p).ok()?;
                 Some((
                     Arc::from(p.to_string_lossy().as_ref()),
                     Arc::from(src.as_str()),

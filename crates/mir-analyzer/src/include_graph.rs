@@ -42,7 +42,7 @@ pub fn include_closure(
         let Some(dir) = file.parent().map(Path::to_path_buf) else {
             continue;
         };
-        let Ok(text) = std::fs::read_to_string(&file) else {
+        let Ok(text) = crate::read_php_source(&file) else {
             continue;
         };
         // Cheap bailout: skip the full parse for the (common) majority of

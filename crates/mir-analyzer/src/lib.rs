@@ -61,7 +61,7 @@ pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};
 pub use session::{AnalysisSession, AnalysisSnapshot, ReferenceIncludes, SubtypeClassSite};
-pub use source_provider::{FsSourceProvider, SourceProvider};
+pub use source_provider::{read_php_source, FsSourceProvider, SourceProvider};
 
 /// Returns `Some((used, canonical))` when `written` and `canonical` FQCNs differ only in casing.
 /// Uses the short (last-segment) form when only the final segment is wrong and the namespace

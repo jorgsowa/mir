@@ -96,7 +96,7 @@ impl AnalysisSession {
             let prepared: Vec<Option<(bool, crate::analyzer_db::PreparedIngest)>> = to_load
                 .par_iter()
                 .map_with(db_template, |db, (_, path)| {
-                    let Ok(src) = std::fs::read_to_string(path) else {
+                    let Ok(src) = crate::read_php_source(path) else {
                         return None;
                     };
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
@@ -163,7 +163,7 @@ impl AnalysisSession {
             loaded.extend(to_load.keys().cloned());
 
             for path in to_load.values() {
-                if let Ok(src) = std::fs::read_to_string(path) {
+                if let Ok(src) = crate::read_php_source(path) {
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let _ = self.collect_and_ingest_source(file, &src, php_version);
                 }

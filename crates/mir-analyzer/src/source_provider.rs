@@ -13,7 +13,19 @@
 //! Consumers can therefore reason about exactly which paths the analyzer
 //! might ask for, and serve them from whatever source they prefer.
 
+use std::path::Path;
 use std::sync::Arc;
+
+/// Read a PHP source file as text. PHP doesn't care about encoding, so a file
+/// with non-UTF-8 bytes (e.g. a Latin-1 string literal) is still valid PHP:
+/// rather than rejecting it, each invalid sequence becomes U+FFFD.
+pub fn read_php_source(path: impl AsRef<Path>) -> std::io::Result<String> {
+    let bytes = std::fs::read(path)?;
+    Ok(match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(e) => String::from_utf8_lossy(e.as_bytes()).into_owned(),
+    })
+}
 
 /// Read a file's source text on demand. Returns `None` if the path is
 /// unreadable or doesn't exist — the analyzer treats that as "this class is
@@ -46,7 +58,7 @@ impl SourceProvider for FsSourceProvider {
         if let Some(text) = self.prefetched.lock().remove(path) {
             return text;
         }
-        std::fs::read_to_string(path).ok().map(Arc::from)
+        read_php_source(path).ok().map(Arc::from)
     }
 
     // Opens right after a burst of file opens are slow on macOS but scale across threads.
@@ -54,12 +66,7 @@ impl SourceProvider for FsSourceProvider {
         use rayon::prelude::*;
         let fetched: Vec<(String, Option<Arc<str>>)> = paths
             .par_iter()
-            .map(|path| {
-                (
-                    path.clone(),
-                    std::fs::read_to_string(path).ok().map(Arc::from),
-                )
-            })
+            .map(|path| (path.clone(), read_php_source(path).ok().map(Arc::from)))
             .collect();
         self.prefetched.lock().extend(fetched);
     }

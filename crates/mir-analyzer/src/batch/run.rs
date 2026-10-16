@@ -18,7 +18,7 @@ impl AnalysisSession {
         // ---- Read files in parallel ----------------------------------
         let parsed_files: Vec<ParsedProjectFile> = paths
             .par_iter()
-            .filter_map(|path| match std::fs::read_to_string(path) {
+            .filter_map(|path| match crate::read_php_source(path) {
                 Ok(src) => {
                     let file = Arc::from(path.to_string_lossy().as_ref());
                     Some(ParsedProjectFile::new(file, Arc::from(src), php_version))
@@ -765,7 +765,7 @@ impl AnalysisSession {
         let entries: Vec<FileEntry> = paths
             .par_iter()
             .filter_map(|path| {
-                let src = std::fs::read_to_string(path).ok()?;
+                let src = crate::read_php_source(path).ok()?;
                 let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                 let src: Arc<str> = Arc::from(src);
                 let hash = hash_source(&src);

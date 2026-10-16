@@ -115,7 +115,11 @@ fn main() {
         .collect();
     let file_contents: std::collections::HashMap<PathBuf, String> = all_paths
         .par_iter()
-        .map(|p| (p.clone(), fs::read_to_string(p).unwrap_or_default()))
+        .map(|p| {
+            // Lossy: a fixture may hold non-UTF-8 PHP (see `run_fixture`).
+            let bytes = fs::read(p).unwrap_or_default();
+            (p.clone(), String::from_utf8_lossy(&bytes).into_owned())
+        })
         .collect();
 
     // Emit code, opening/closing outer mod blocks as the outer_mod changes.

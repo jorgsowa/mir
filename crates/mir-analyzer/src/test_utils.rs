@@ -247,6 +247,9 @@ struct FixtureConfig {
     /// `<findUnusedVariables>`: `false` hides the unused-variable kinds unless
     /// `findUnusedCode` is set; absent leaves them reported.
     find_unused_variables: Option<bool>,
+    /// Set when the `.phpt` file itself isn't valid UTF-8: it was decoded as
+    /// Latin-1, and its files are written back to disk as Latin-1 bytes.
+    latin1: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -1035,10 +1038,15 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 ///
 /// Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
 pub fn run_fixture(path: &str) {
-    let content = std::fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("failed to read fixture {path}: {e}"));
+    let bytes =
+        std::fs::read(path).unwrap_or_else(|e| panic!("failed to read fixture {path}: {e}"));
+    let (content, latin1) = match String::from_utf8(bytes) {
+        Ok(content) => (content, false),
+        Err(e) => (e.as_bytes().iter().map(|&b| char::from(b)).collect(), true),
+    };
 
     let mut fixture = parse_phpt(&content, path);
+    fixture.config.latin1 = latin1;
     match fixture.cursor.take() {
         Some(cursor) => run_cursor_fixture(path, &content, &fixture, &cursor),
         None if !fixture.edits.is_empty() => run_edit_fixture(path, &content, fixture),
@@ -1090,7 +1098,7 @@ fn run_edit_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
                 .map(|p| Arc::from(p.to_string_lossy().as_ref()))
                 .collect();
             let read = |file: &str| -> Arc<str> {
-                std::fs::read_to_string(file)
+                crate::read_php_source(file)
                     .unwrap_or_else(|e| panic!("failed to read {file}: {e}"))
                     .into()
             };
@@ -1431,7 +1439,12 @@ fn with_fixture_session<R>(
                 std::fs::create_dir_all(parent)
                     .unwrap_or_else(|e| panic!("failed to create dir for {name}: {e}"));
             }
-            std::fs::write(&path, src).unwrap_or_else(|e| panic!("failed to write {name}: {e}"));
+            let bytes = if config.latin1 {
+                encode_latin1(src)
+            } else {
+                src.as_bytes().to_vec()
+            };
+            std::fs::write(&path, bytes).unwrap_or_else(|e| panic!("failed to write {name}: {e}"));
             path
         })
         .collect();
@@ -1530,6 +1543,23 @@ fn with_fixture_session<R>(
     };
     std::fs::remove_dir_all(&ws.dir).ok();
     result
+}
+
+fn encode_latin1(text: &str) -> Vec<u8> {
+    text.chars()
+        .map(|c| u8::try_from(c).expect("Latin-1 fixture text holds only U+0000..=U+00FF"))
+        .collect()
+}
+
+/// Rewrite a fixture, keeping a non-UTF-8 (Latin-1) fixture in its encoding.
+fn write_fixture(path: &str, out: &str) {
+    let latin1 = std::fs::read(path).is_ok_and(|b| std::str::from_utf8(&b).is_err());
+    let bytes = if latin1 {
+        encode_latin1(out)
+    } else {
+        out.as_bytes().to_vec()
+    };
+    std::fs::write(path, bytes).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
 }
 
 fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
@@ -1686,7 +1716,7 @@ fn fmt_expect_lines(actual: &[Issue], is_multi: bool) -> Vec<String> {
 fn drop_expect_section(path: &str, content: &str) {
     let end = content.find(EXPECT_MARKER).unwrap_or(content.len());
     let out = format!("{}\n", content[..end].trim_end());
-    std::fs::write(path, out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
+    write_fixture(path, &out);
 }
 
 /// Rewrite only the `===expect===` section, preserving everything before it.
@@ -1704,7 +1734,7 @@ fn rewrite_expect_section(path: &str, content: &str, lines: &[String]) {
         out.push('\n');
     }
 
-    std::fs::write(path, &out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
+    write_fixture(path, &out);
 }
 
 /// Edit-fixture expect lines, where an empty section must read `<<none>>`.
@@ -1747,7 +1777,7 @@ fn rewrite_edit_expect_sections(path: &str, content: &str, before: &[String], af
         out.push_str(following);
     }
 
-    std::fs::write(path, &out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
+    write_fixture(path, &out);
 }
 
 // ---------------------------------------------------------------------------

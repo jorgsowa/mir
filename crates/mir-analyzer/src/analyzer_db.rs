@@ -110,7 +110,7 @@ impl AnalyzerDb {
         }
         let path_sources: Vec<(PathBuf, String)> = all_paths
             .into_iter()
-            .filter_map(|p| match std::fs::read_to_string(&p) {
+            .filter_map(|p| match crate::read_php_source(&p) {
                 Ok(s) => Some((p, s)),
                 Err(e) => {
                     eprintln!(
