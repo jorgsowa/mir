@@ -203,3 +203,32 @@ echo $b;
 "#,
     );
 }
+
+#[test]
+fn parity_class_exists_guarded_declarations() {
+    // A top-level `if (!interface_exists(X)) { throw ...; }` proves X exists
+    // for the declarations after it, so neither path reports it undefined.
+    assert_scope_parity(
+        "class_exists_guard",
+        r#"<?php
+namespace App;
+
+use Vendor\Missing\ClientInterface;
+use Vendor\Missing\Plugin;
+
+if (!interface_exists(ClientInterface::class)) {
+    throw new \LogicException('install vendor/missing');
+}
+
+final class Client implements ClientInterface {
+}
+
+if (!interface_exists(Plugin::class)) {
+    throw new \LogicException('install vendor/missing');
+}
+
+interface Extension extends Plugin {
+}
+"#,
+    );
+}

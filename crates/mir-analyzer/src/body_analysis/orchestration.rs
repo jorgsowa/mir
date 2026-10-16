@@ -462,7 +462,7 @@ impl<'a> BodyAnalyzer<'a> {
 /// If `stmt` is an `if (!class_exists('X')) { throw/return; }` guard, insert
 /// the proven-to-exist FQCN into `guards` so the immediately following class
 /// declaration can skip the UndefinedClass check for that name.
-fn accumulate_class_exists_guard(
+pub(crate) fn accumulate_class_exists_guard(
     stmt: &php_ast::owned::Stmt,
     db: &dyn crate::db::MirDatabase,
     file: &str,

@@ -26,6 +26,8 @@ use std::sync::Arc;
 
 use mir_issues::Issue;
 
+use rustc_hash::FxHashSet;
+
 use crate::body_analysis::BodyAnalyzer;
 
 use super::*;
@@ -136,6 +138,38 @@ fn for_each_top_level_decl<'a>(
     }
 }
 
+/// Like [`for_each_top_level_decl`], but also hands each declaration the
+/// `class_exists` guards (`if (!class_exists(X)) { throw ...; }`) seen
+/// before it at its nesting level — the same set `analyze_top_level_stmts`
+/// threads through, so a scope analyzed on its own skips the same
+/// UndefinedClass checks as the whole-file walk.
+fn for_each_top_level_decl_guarded<'a>(
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    stmts: &'a [php_ast::owned::Stmt],
+    f: &mut impl FnMut(&'a php_ast::owned::Stmt, &FxHashSet<Arc<str>>),
+) {
+    use php_ast::owned::StmtKind;
+    let mut guards: FxHashSet<Arc<str>> = FxHashSet::default();
+    for stmt in stmts.iter() {
+        match &stmt.kind {
+            StmtKind::Function(_)
+            | StmtKind::Class(_)
+            | StmtKind::Enum(_)
+            | StmtKind::Interface(_)
+            | StmtKind::Trait(_) => f(stmt, &guards),
+            StmtKind::Namespace(ns) => {
+                if let php_ast::owned::NamespaceBody::Braced(inner) = &ns.body {
+                    for_each_top_level_decl_guarded(db, file, &inner.stmts, f);
+                }
+            }
+            _ => {}
+        }
+        let _scope = crate::db::ns_scope::enter(db, file, stmt.span.start);
+        crate::body_analysis::accumulate_class_exists_guard(stmt, db, file, &mut guards);
+    }
+}
+
 /// Per-scope tracked inference: run body analysis for one scope of `file`
 /// and memoize its issues + reference locations.
 ///
@@ -216,82 +250,89 @@ fn infer_scope_body(
             let want_fn = matches!(scope, ScopeKey::Function(..));
             let mut seen: u32 = 0;
             let mut found = false;
-            for_each_top_level_decl(&parsed.program.stmts, &mut |stmt| {
-                use php_ast::owned::StmtKind;
-                if found {
-                    return;
-                }
-                let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
-                let (is_fn, name) = match &stmt.kind {
-                    StmtKind::Function(decl) => (true, decl.name.as_deref().unwrap_or("")),
-                    StmtKind::Class(decl) => (
-                        false,
-                        decl.name
-                            .as_ref()
-                            .and_then(|i| i.as_deref())
-                            .unwrap_or("<anonymous>"),
-                    ),
-                    StmtKind::Enum(decl) => (false, decl.name.as_deref().unwrap_or("<anonymous>")),
-                    StmtKind::Interface(decl) => {
-                        (false, decl.name.as_deref().unwrap_or("<anonymous>"))
+            for_each_top_level_decl_guarded(
+                db,
+                path,
+                &parsed.program.stmts,
+                &mut |stmt, guards| {
+                    use php_ast::owned::StmtKind;
+                    if found {
+                        return;
                     }
-                    StmtKind::Trait(decl) => (false, decl.name.as_deref().unwrap_or("")),
-                    _ => return,
-                };
-                if is_fn != want_fn || resolve_name(db, path.as_ref(), name) != fqn.as_ref() {
-                    return;
-                }
-                if seen != *occ {
-                    seen += 1;
-                    return;
-                }
-                found = true;
-                match &stmt.kind {
-                    StmtKind::Function(decl) => driver.analyze_fn_decl(
-                        decl,
-                        path,
-                        text.as_ref(),
-                        &parsed.source_map,
-                        &mut issues,
-                        None,
-                    ),
-                    StmtKind::Class(decl) => driver.analyze_class_decl(
-                        decl,
-                        path,
-                        text.as_ref(),
-                        &parsed.source_map,
-                        &mut issues,
-                        None,
-                        &Default::default(),
-                    ),
-                    StmtKind::Enum(decl) => driver.analyze_enum_decl(
-                        decl,
-                        path,
-                        text.as_ref(),
-                        &parsed.source_map,
-                        &mut issues,
-                        None,
-                    ),
-                    StmtKind::Interface(decl) => driver.analyze_interface_decl(
-                        decl,
-                        path,
-                        text.as_ref(),
-                        &parsed.source_map,
-                        &mut issues,
-                        &Default::default(),
-                        None,
-                    ),
-                    StmtKind::Trait(decl) => driver.analyze_trait_decl(
-                        decl,
-                        path,
-                        text.as_ref(),
-                        &parsed.source_map,
-                        &mut issues,
-                        None,
-                    ),
-                    _ => {}
-                }
-            });
+                    let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
+                    let (is_fn, name) = match &stmt.kind {
+                        StmtKind::Function(decl) => (true, decl.name.as_deref().unwrap_or("")),
+                        StmtKind::Class(decl) => (
+                            false,
+                            decl.name
+                                .as_ref()
+                                .and_then(|i| i.as_deref())
+                                .unwrap_or("<anonymous>"),
+                        ),
+                        StmtKind::Enum(decl) => {
+                            (false, decl.name.as_deref().unwrap_or("<anonymous>"))
+                        }
+                        StmtKind::Interface(decl) => {
+                            (false, decl.name.as_deref().unwrap_or("<anonymous>"))
+                        }
+                        StmtKind::Trait(decl) => (false, decl.name.as_deref().unwrap_or("")),
+                        _ => return,
+                    };
+                    if is_fn != want_fn || resolve_name(db, path.as_ref(), name) != fqn.as_ref() {
+                        return;
+                    }
+                    if seen != *occ {
+                        seen += 1;
+                        return;
+                    }
+                    found = true;
+                    match &stmt.kind {
+                        StmtKind::Function(decl) => driver.analyze_fn_decl(
+                            decl,
+                            path,
+                            text.as_ref(),
+                            &parsed.source_map,
+                            &mut issues,
+                            None,
+                        ),
+                        StmtKind::Class(decl) => driver.analyze_class_decl(
+                            decl,
+                            path,
+                            text.as_ref(),
+                            &parsed.source_map,
+                            &mut issues,
+                            None,
+                            guards,
+                        ),
+                        StmtKind::Enum(decl) => driver.analyze_enum_decl(
+                            decl,
+                            path,
+                            text.as_ref(),
+                            &parsed.source_map,
+                            &mut issues,
+                            None,
+                        ),
+                        StmtKind::Interface(decl) => driver.analyze_interface_decl(
+                            decl,
+                            path,
+                            text.as_ref(),
+                            &parsed.source_map,
+                            &mut issues,
+                            guards,
+                            None,
+                        ),
+                        StmtKind::Trait(decl) => driver.analyze_trait_decl(
+                            decl,
+                            path,
+                            text.as_ref(),
+                            &parsed.source_map,
+                            &mut issues,
+                            None,
+                        ),
+                        _ => {}
+                    }
+                },
+            );
         }
     }
 

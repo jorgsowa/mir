@@ -927,6 +927,7 @@ pub(crate) mod class_like_plugins;
 mod classes;
 mod functions;
 mod orchestration;
+pub(crate) use orchestration::accumulate_class_exists_guard;
 mod plugin_hooks;
 
 /// Seed `ctx.var_locations` for function/method parameters using their AST spans.
