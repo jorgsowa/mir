@@ -520,11 +520,16 @@ fn retain_by_dirs(
         return files;
     }
     let dirs: Vec<PathBuf> = dirs.par_iter().map(|d| normalize_for_compare(d)).collect();
-    // Files share parents, so canonicalize each parent once and only resolve
-    // a file on its own when it is itself a symlink.
+    let under = |abs: &std::path::Path| dirs.iter().any(|d| abs.starts_with(d));
+    // Files share parents, so canonicalize each parent once, and check it
+    // against `dirs` once: a file is under a dir exactly when its parent is,
+    // or when the entry names the file itself. Only a file that is itself a
+    // symlink is resolved and checked on its own.
+    let exact: std::collections::HashSet<&std::path::Path> =
+        dirs.iter().map(PathBuf::as_path).collect();
     let parents: std::collections::HashSet<&std::path::Path> =
         files.iter().filter_map(|p| p.parent()).collect();
-    let canonical_parents: std::collections::HashMap<&std::path::Path, PathBuf> = parents
+    let canonical_parents: std::collections::HashMap<&std::path::Path, (PathBuf, bool)> = parents
         .into_par_iter()
         .map(|parent| {
             let abs = if parent.is_absolute() {
@@ -532,7 +537,9 @@ fn retain_by_dirs(
             } else {
                 base.join(parent)
             };
-            (parent, normalize_for_compare(&abs))
+            let abs = normalize_for_compare(&abs);
+            let parent_under = under(&abs);
+            (parent, (abs, parent_under))
         })
         .collect();
     let keep: Vec<bool> = files
@@ -541,12 +548,15 @@ fn retain_by_dirs(
             let is_symlink = p
                 .symlink_metadata()
                 .is_ok_and(|m| m.file_type().is_symlink());
-            let abs = match (p.parent(), p.file_name()) {
-                (Some(parent), Some(name)) if !is_symlink => canonical_parents[parent].join(name),
-                _ if p.is_absolute() => normalize_for_compare(p),
-                _ => normalize_for_compare(&base.join(p)),
+            let is_under = match (p.parent(), p.file_name()) {
+                (Some(parent), Some(name)) if !is_symlink => {
+                    let (abs_parent, parent_under) = &canonical_parents[parent];
+                    *parent_under || exact.contains(abs_parent.join(name).as_path())
+                }
+                _ if p.is_absolute() => under(&normalize_for_compare(p)),
+                _ => under(&normalize_for_compare(&base.join(p))),
             };
-            dirs.iter().any(|d| abs.starts_with(d)) == inside
+            is_under == inside
         })
         .collect();
     files
@@ -615,6 +625,29 @@ mod filter_to_dirs_tests {
                 PathBuf::from("/proj/src/A.php"),
                 PathBuf::from("/proj/src/Sub/C.php"),
             ]
+        );
+    }
+
+    #[test]
+    fn ignore_entry_may_name_a_single_file() {
+        use super::filter_ignore;
+        let files = vec![
+            PathBuf::from("/proj/src/A.php"),
+            PathBuf::from("/proj/src/B.php"),
+            PathBuf::from("/proj/srcB/C.php"),
+        ];
+        let ignore = vec![PathBuf::from("/proj/src/B.php"), PathBuf::from("/proj/src")];
+        assert_eq!(
+            filter_ignore(files.clone(), &ignore[..1], &PathBuf::from("/proj")),
+            vec![
+                PathBuf::from("/proj/src/A.php"),
+                PathBuf::from("/proj/srcB/C.php"),
+            ]
+        );
+        // A dir entry is a path-component prefix, not a string prefix.
+        assert_eq!(
+            filter_ignore(files, &ignore[1..], &PathBuf::from("/proj")),
+            vec![PathBuf::from("/proj/srcB/C.php")]
         );
     }
 }
