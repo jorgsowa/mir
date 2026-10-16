@@ -820,6 +820,16 @@ impl MirDbStorage {
         let mut new_snapshots: FxHashMap<SourceFile, crate::db::FileDeclarations> =
             FxHashMap::default();
 
+        // Files registered since the last rebuild (lazy-loaded classes, on-demand
+        // reads) have no declarations memo yet; computing them in the serial
+        // loop below would parse and collect each one on this thread.
+        {
+            use rayon::prelude::*;
+            files.par_iter().for_each_with(self.clone(), |db, &file| {
+                let _ = collect_file_declarations(&*db as &dyn MirDatabase, file);
+            });
+        }
+
         let db: &dyn MirDatabase = &*self;
         for &file in &files {
             let decls = collect_file_declarations(db, file);
