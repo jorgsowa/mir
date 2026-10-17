@@ -691,7 +691,7 @@ impl FlowState {
             self.method_exists_guards
                 .contains(&(key, Arc::from(method_lc)))
         };
-        receiver_key.is_some_and(&guarded) || guarded(Arc::from(format!("cls:{fqcn}").as_str()))
+        receiver_key.is_some_and(guarded) || guarded(Arc::from(format!("cls:{fqcn}").as_str()))
     }
 
     /// Create a context seeded with the given parameters.
