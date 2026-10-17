@@ -10,8 +10,8 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
 use super::arrays::{
-    get_shape_path_type, resolve_shape_base_current_type, set_shape_base_narrowed, set_shape_path,
-    ShapeBase,
+    ShapeBase, get_shape_path_type, resolve_shape_base_current_type, set_shape_base_narrowed,
+    set_shape_path,
 };
 use super::core::{
     extract_any_prop_access, extract_chained_prop_access, extract_class_fqcn_from_expr,
@@ -320,10 +320,11 @@ pub(crate) fn apply_one_assertion(
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
             };
+            let current = ctx.get_var(&var_name);
             let ty = if assertion.negated {
-                negate_assertion_type(&ctx.get_var(&var_name), &ty, db)
+                negate_assertion_type(&current, &ty, db)
             } else {
-                ty
+                positive_assertion_type(&current, ty, db)
             };
             ctx.narrow_var(&var_name, ty);
             applied = true;
@@ -332,11 +333,11 @@ pub(crate) fn apply_one_assertion(
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
             };
+            let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
             let ty = if assertion.negated {
-                let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                 negate_assertion_type(&current, &ty, db)
             } else {
-                ty
+                positive_assertion_type(&current, ty, db)
             };
             // `$obj->prop` on a null `$obj` reads as null, so proving
             // the property itself is non-nullable also proves `$obj`
@@ -350,11 +351,11 @@ pub(crate) fn apply_one_assertion(
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
             };
+            let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
             let ty = if assertion.negated {
-                let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
                 negate_assertion_type(&current, &ty, db)
             } else {
-                ty
+                positive_assertion_type(&current, ty, db)
             };
             ctx.set_prop_refined(&fqcn, &prop, ty);
             applied = true;
@@ -517,6 +518,23 @@ pub(super) fn resolve_static_call_class_fqcn(
         )),
         "parent" => Some(std::sync::Arc::from(ctx.parent_fqcn.as_deref()?)),
         s => Some(std::sync::Arc::from(s)),
+    }
+}
+
+/// Compute the narrowed type for a positive assertion: an assertion only
+/// narrows, so a `current` type strictly within `asserted` (`array<string>`
+/// asserted `iterable`) keeps its own, more precise type. Both directions
+/// are checked because `mixed` type params match either way: plain `array`
+/// asserted `array<string>` still takes the assertion.
+fn positive_assertion_type(current: &Type, asserted: Type, db: &dyn MirDatabase) -> Type {
+    if !current.types.is_empty()
+        && !current.is_mixed()
+        && crate::subtype::is_subtype(db, current, &asserted)
+        && !crate::subtype::is_subtype(db, &asserted, current)
+    {
+        current.clone()
+    } else {
+        asserted
     }
 }
 
