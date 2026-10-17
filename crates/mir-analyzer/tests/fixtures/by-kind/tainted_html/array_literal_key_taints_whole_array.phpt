@@ -7,13 +7,15 @@ ever inspected `el.value`, never `el.key`.
   <issueHandlers>
     <MixedArrayAccess errorLevel="suppress"/>
     <MixedArgument errorLevel="suppress"/>
+    <UnusedForeachValue errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===
 <?php
 function test(): void {
     $config = [$_GET['env'] => 'active'];
-    $active = $config['active'] ?? null;
-    echo $active;
-//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
+    foreach ($config as $env => $state) {
+        echo $env;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
+    }
 }

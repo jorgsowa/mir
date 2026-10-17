@@ -267,6 +267,35 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
 // Expression taint checker
 // ---------------------------------------------------------------------------
 
+/// A value of this type can't carry an injection payload: numbers, booleans,
+/// numeric strings, or string literals the program itself spells out (e.g. after
+/// `is_numeric($x)` or `in_array($x, ['a', 'b'], true)` narrowing).
+pub fn is_injection_safe_type(ty: &mir_types::Type) -> bool {
+    use mir_types::Atomic;
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TInt
+                    | Atomic::TLiteralInt(_)
+                    | Atomic::TIntRange { .. }
+                    | Atomic::TPositiveInt
+                    | Atomic::TNegativeInt
+                    | Atomic::TNonNegativeInt
+                    | Atomic::TFloat
+                    | Atomic::TIntegralFloat
+                    | Atomic::TLiteralFloat(..)
+                    | Atomic::TBool
+                    | Atomic::TTrue
+                    | Atomic::TFalse
+                    | Atomic::TNull
+                    | Atomic::TNumeric
+                    | Atomic::TNumericString
+                    | Atomic::TLiteralString(_)
+            )
+        })
+}
+
 /// Strip any number of redundant parens (`((expr))` -> `expr`) — a call
 /// target keeps its parens in the AST (`(fn() => ...)()`), unlike most
 /// other expression positions.
@@ -296,16 +325,21 @@ pub fn is_expr_tainted(
     match &expr.kind {
         ExprKind::Variable(name) => {
             let n = name.trim_start_matches('$');
-            is_superglobal(n)
-                || ctx.is_tainted(n)
+            if is_superglobal(n) {
+                return true;
+            }
+            let sym = mir_types::Name::from(n);
+            if ctx.vars.get(&sym).is_some_and(|ty| is_injection_safe_type(ty)) {
+                return false;
+            }
+            ctx.is_tainted(n)
                 // A variable with no tracked definition at all may be one
                 // `extract()` just defined from a tainted source array —
                 // its name isn't known statically, so this can't be a
                 // specific per-name taint lookup like `is_tainted` above.
                 // Doesn't apply to an already-tracked variable: that one has
                 // its own real, independently-computed taint state.
-                || (ctx.has_dynamic_tainted_var_def
-                    && !ctx.var_is_defined_sym(mir_types::Name::from(n)))
+                || (ctx.has_dynamic_tainted_var_def && !ctx.var_is_defined_sym(sym))
         }
 
         // `$$name` where `$name` holds a known literal string resolves to

@@ -225,6 +225,7 @@ pub(crate) fn narrow_in_array_condition(
     // be narrowed under loose comparison: the string "1"
     // loosely equals the int 1, so a haystack of `[1, 2]`
     // doesn't rule out $needle being the string "1".
+    // A strict match pins even a `mixed` needle to one of the haystack literals.
     let strict = call
         .args
         .get(2)
@@ -242,7 +243,7 @@ pub(crate) fn narrow_in_array_condition(
             if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
                 let current = ctx.get_var(&var_name);
                 let loose_safe = strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
-                if !current.is_mixed() && is_true && loose_safe {
+                if (!current.is_mixed() || strict) && is_true && loose_safe {
                     // intersect: keep only types that could match a haystack value
                     let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
                     if !narrowed.is_empty() && narrowed != current {
@@ -282,7 +283,7 @@ pub(crate) fn narrow_in_array_condition(
                 }
                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                 let loose_safe = strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
-                if !current.is_mixed() && is_true && loose_safe {
+                if (!current.is_mixed() || strict) && is_true && loose_safe {
                     let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
                     if !narrowed.is_empty() {
                         apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
@@ -312,7 +313,7 @@ pub(crate) fn narrow_in_array_condition(
                 // `static::` is never itself null).
                 let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
                 let loose_safe = strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
-                if !current.is_mixed() && is_true && loose_safe {
+                if (!current.is_mixed() || strict) && is_true && loose_safe {
                     let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
                     if !narrowed.is_empty() {
                         apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, false);
