@@ -77,7 +77,7 @@ fn function_return_type_in(db: &dyn MirDatabase, sf: SourceFile, fqn: &str) -> O
         .map(|(_, ty)| mir_codebase::definitions::wrap_var_type(ty.clone()))
 }
 
-/// Run [`crate::db::infer_member`] on every declaration scope of `sf` that
+/// Run `infer_member` on every declaration scope of `sf` that
 /// `matches`, in source order. `None` when no scope matches — the symbol is
 /// not a top-level declaration (e.g. an anonymous class), so callers fall
 /// back to inferring the whole file.
@@ -100,7 +100,7 @@ fn infer_scopes_matching(
 ///
 /// Locates the file that declares the class (the symbol index, else on
 /// demand), then analyzes just that method of the class via
-/// [`crate::db::infer_member`]. `method_name_lower` must already be
+/// `infer_member`. `method_name_lower` must already be
 /// ASCII-lowercased (PHP semantics). Returns `None` when the class or method
 /// is unknown.
 pub fn inferred_method_return_type_demand(
@@ -134,7 +134,7 @@ pub fn inferred_method_return_type_demand(
 ///
 /// Locates the file that declares `fqcn` (the symbol index, else on demand),
 /// then analyzes the constructors of every class-like declared in that file
-/// via [`crate::db::infer_member`], collecting the union of types they
+/// via `infer_member`, collecting the union of types they
 /// directly assign to the property (a subclass constructor in the same file
 /// may assign it too). `fqcn` must be the property's DECLARING class (e.g.
 /// `find_property_in_chain`'s owner), and `name` is case-sensitive (PHP
