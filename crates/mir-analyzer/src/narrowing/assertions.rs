@@ -10,8 +10,8 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
 use super::arrays::{
-    ShapeBase, get_shape_path_type, resolve_shape_base_current_type, set_shape_base_narrowed,
-    set_shape_path,
+    get_shape_path_type, resolve_shape_base_current_type, set_shape_base_narrowed, set_shape_path,
+    ShapeBase,
 };
 use super::core::{
     extract_any_prop_access, extract_chained_prop_access, extract_class_fqcn_from_expr,
