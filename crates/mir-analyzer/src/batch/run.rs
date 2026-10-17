@@ -74,17 +74,15 @@ impl AnalysisSession {
         let _t_salsa_reg = _t0.elapsed();
 
         // ---- Definition collection from the already-parsed AST -------
-        // Returns (FileDefinitions, content_hash, has_hard_parse_errors) so we
+        // Returns (FileDefinitions, content_hash, skip_cache) so we
         // can prime the parse cache before the pre-warm loop below.
         type Pass1Entry = (FileDefinitions, [u8; 32], bool, String);
         let file_defs: Vec<Pass1Entry> = parsed_files
             .par_iter()
             .map(|parsed| {
                 let content_hash = hash_source(parsed.source());
-                let has_hard_parse_errors = parsed
-                    .errors()
-                    .iter()
-                    .any(crate::parser::is_hard_parse_error);
+                let skip_cache =
+                    crate::parser::parse_errors_block_cache(&parsed.file, parsed.errors());
                 let mut all_issues: Vec<Issue> = parsed
                     .errors()
                     .iter()
@@ -111,7 +109,7 @@ impl AnalysisSession {
                     issues: Arc::new(all_issues),
                 };
                 let surface_hash = surface_fingerprint(parsed.source(), parsed.owned());
-                (defs, content_hash, has_hard_parse_errors, surface_hash)
+                (defs, content_hash, skip_cache, surface_hash)
             })
             .collect();
         let _t_collect_defs = _t0.elapsed();
@@ -195,8 +193,8 @@ impl AnalysisSession {
         {
             let db = &self.db.salsa;
             let php_v = php_version.cache_byte();
-            for (defs, hash, has_hard_parse_errors, _surface) in &file_defs {
-                if !*has_hard_parse_errors {
+            for (defs, hash, skip_cache, _surface) in &file_defs {
+                if !*skip_cache {
                     db.prime_parse_cache(
                         *hash,
                         php_v,

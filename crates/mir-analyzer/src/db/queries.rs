@@ -823,7 +823,7 @@ pub fn collect_file_definitions_uncached(
 
     let parsed = php_rs_parser::parse(text);
 
-    let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+    let skip_cache = crate::parser::parse_errors_block_cache(path, &parsed.errors);
 
     let mut all_issues: Vec<Issue> = parsed
         .errors
@@ -853,7 +853,7 @@ pub fn collect_file_definitions_uncached(
     // re-parse on every subsequent session for any vendor file with so much
     // as a docblock warning. Only hard parse errors (incomplete AST) block
     // caching.
-    if !has_hard_parse_errors {
+    if !skip_cache {
         // In-process cache: prevents re-parsing in the same session, and
         // preserves these exact issues for a later hit.
         db.parse_cache().insert(

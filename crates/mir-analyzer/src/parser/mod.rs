@@ -79,6 +79,39 @@ pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) 
         && !is_spurious_reserved_class_error(err)
 }
 
+/// Message of the one `Forbidden` diagnostic that discards part of the AST:
+/// past the parser's nesting limit the subtree becomes `ExprKind::Error`.
+const EXPR_DEPTH_EXCEEDED: &str = "maximum expression nesting depth exceeded";
+
+/// Returns `true` for parser diagnostics that leave the AST incomplete.
+/// Narrower than [`is_hard_parse_error`]: `Forbidden` diagnostics (redeclared
+/// method, reserved function name, valued case on a pure enum, ...) are
+/// emitted after the node is fully built.
+fn leaves_ast_incomplete(err: &php_rs_parser::diagnostics::ParseError) -> bool {
+    match err {
+        php_rs_parser::diagnostics::ParseError::Forbidden { message, .. } => {
+            message == EXPR_DEPTH_EXCEEDED
+        }
+        _ => is_hard_parse_error(err),
+    }
+}
+
+/// Whether `errors` keep the definition slice collected from `path` out of
+/// the parse and stub caches. Bundled stubs only need a complete AST: several
+/// (`Core.php`, `intl.php`, ...) trip `Forbidden` checks because they declare
+/// per-version variants side by side, and would otherwise be re-parsed every
+/// session. Every other file keeps the stricter [`is_hard_parse_error`] rule.
+pub(crate) fn parse_errors_block_cache(
+    path: &str,
+    errors: &[php_rs_parser::diagnostics::ParseError],
+) -> bool {
+    if crate::stubs::is_stub_path(path) {
+        errors.iter().any(leaves_ast_incomplete)
+    } else {
+        errors.iter().any(is_hard_parse_error)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Source location helpers
 // ---------------------------------------------------------------------------
@@ -190,6 +223,79 @@ pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> String {
         format!("\\{}", joined)
     } else {
         joined
+    }
+}
+
+#[cfg(test)]
+mod ast_incomplete_tests {
+    use super::{is_hard_parse_error, leaves_ast_incomplete, parse_errors_block_cache};
+
+    fn classify(src: &str) -> (bool, bool) {
+        let parsed = php_rs_parser::parse(src);
+        (
+            parsed.errors.iter().any(is_hard_parse_error),
+            parsed.errors.iter().any(leaves_ast_incomplete),
+        )
+    }
+
+    #[test]
+    fn redeclared_method_is_hard_but_ast_complete() {
+        let src = "<?php\nclass A { function f() {} function f() {} }\n";
+        assert_eq!(classify(src), (true, false));
+    }
+
+    #[test]
+    fn reserved_function_name_is_hard_but_ast_complete() {
+        assert_eq!(classify("<?php\nfunction exit() {}\n"), (true, false));
+    }
+
+    #[test]
+    fn syntax_error_leaves_ast_incomplete() {
+        assert_eq!(classify("<?php\nfunction f( {}\n"), (true, true));
+    }
+
+    #[test]
+    fn forbidden_errors_block_caching_only_outside_bundled_stubs() {
+        let parsed = php_rs_parser::parse("<?php\nclass A { function f() {} function f() {} }\n");
+        assert!(!parse_errors_block_cache(
+            "stubs/Core/Core.php",
+            &parsed.errors
+        ));
+        assert!(parse_errors_block_cache("src/A.php", &parsed.errors));
+        // A user file that merely mirrors a stub's virtual path is still user code.
+        assert!(parse_errors_block_cache(
+            "/app/stubs/Core/Core.php",
+            &parsed.errors
+        ));
+    }
+
+    #[test]
+    fn syntax_errors_block_caching_for_bundled_stubs() {
+        let parsed = php_rs_parser::parse("<?php\nfunction f( {}\n");
+        assert!(parse_errors_block_cache(
+            "stubs/Core/Core.php",
+            &parsed.errors
+        ));
+    }
+
+    /// Pins the parser's depth-limit message: if it is reworded, this fails
+    /// instead of silently caching a slice built from a truncated AST. (The
+    /// limit currently also triggers follow-on syntax errors, but the depth
+    /// diagnostic must block caching on its own.)
+    #[test]
+    fn expression_depth_limit_leaves_ast_incomplete() {
+        let src = format!("<?php\n$x = {}1{};\n", "(".repeat(200), ")".repeat(200));
+        let parsed = php_rs_parser::parse(&src);
+        let depth_err = parsed
+            .errors
+            .iter()
+            .find(|e| e.to_string() == super::EXPR_DEPTH_EXCEEDED)
+            .expect("parser no longer emits the depth-limit message");
+        assert!(matches!(
+            depth_err,
+            php_rs_parser::diagnostics::ParseError::Forbidden { .. }
+        ));
+        assert!(leaves_ast_incomplete(depth_err));
     }
 }
 

@@ -267,7 +267,7 @@ impl AnalyzerDb {
 
         let parsed = crate::recursion::parse_versioned(source, php_version.parser_version());
 
-        let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+        let skip_cache = crate::parser::parse_errors_block_cache(&file, &parsed.errors);
 
         let mut all_issues: Vec<Issue> = parsed
             .errors
@@ -292,7 +292,7 @@ impl AnalyzerDb {
         // diagnostics (docblock warnings, etc.) leave the slice complete and
         // valid, so they should not block caching — see the matching comment
         // in `db::queries::collect_file_definitions_uncached`.
-        if !has_hard_parse_errors {
+        if !skip_cache {
             // In-process cache: prevents re-parsing in the same session, and
             // preserves these exact issues for a later hit (re-ingesting this
             // same file unchanged, or a different consumer querying it).
