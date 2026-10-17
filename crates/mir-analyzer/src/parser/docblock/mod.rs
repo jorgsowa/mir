@@ -669,7 +669,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "taint-sink" => {
+                "taint-sink" | "psalm-taint-sink" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         // Format: `kind $param` or `kind $param1 $param2`
                         let mut tokens = body_str.split_whitespace();
@@ -684,7 +684,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "taint-source" => result.is_taint_source = true,
+                "taint-source" | "psalm-taint-source" => result.is_taint_source = true,
                 _ => {}
             }
         }
