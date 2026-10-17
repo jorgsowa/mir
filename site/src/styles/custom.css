@@ -1271,9 +1271,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
 
 .pg-gutter {
   padding: 1rem 0.625rem;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font: 0.875rem/1.6 'IBM Plex Mono', ui-monospace, monospace;
   text-align: right;
   color: rgba(200, 168, 75, 0.5);
   background: #0a0a16;
@@ -1294,9 +1292,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   inset: 0;
   margin: 0;
   padding: 1rem;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font: 0.875rem/1.6 'IBM Plex Mono', ui-monospace, monospace;
   color: var(--hl-default);
   background: transparent;
   white-space: pre;
@@ -1335,7 +1331,10 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   outline: none;
   resize: vertical;
   tab-size: 4;
+  /* Never soft-wrap: the gutter and highlight layer assume one visual row per line */
+  white-space: pre;
   overflow-wrap: normal;
+  word-break: keep-all;
   overflow-x: auto;
   overflow-y: hidden;
   box-sizing: border-box;

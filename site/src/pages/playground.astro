@@ -380,7 +380,8 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
 
   function updateInputHeight() {
     input.style.height = 'auto';
-    input.style.height = input.scrollHeight + 'px';
+    // scrollHeight excludes a horizontal scrollbar; add it so the last line isn't covered.
+    input.style.height = input.scrollHeight + (input.offsetHeight - input.clientHeight) + 'px';
   }
 
   input.addEventListener('input', () => { updateGutter(); updateInputHeight(); });
