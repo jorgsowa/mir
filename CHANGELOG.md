@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.88.0] - 2026-10-17
+
+### Changed
+
+- Array unions fold past eight shapes: each `if` that optionally sets a key no longer doubles the shapes in a union. A new shape merges into a compatible one (keys from both, one-sided keys optional, values unioned). A full Symfony run drops from ~21s to ~3.4s wall; below eight shapes nothing changes.
+- A call to a method without a docblock return type infers just that method instead of analyzing every method in the callee's file. Symfony: wall 2.01s -> 1.53s, peak RSS 653MB -> 583MB, allocated 5.7GiB -> 3.8GiB; Laravel: 0.73s -> 0.65s, RSS 275MB -> 261MB.
+- Filtering discovered files against ignore dirs runs in parallel and checks each parent directory once, cutting Symfony's filter step from ~0.9s to ~0.1s.
+- User-stub membership is a direct set lookup instead of a walk over every source file, cutting Symfony's lazy-load pass from 340ms to 45ms.
+- Declarations of newly registered files are collected in parallel before the workspace symbol index is rebuilt.
+- Classes implementing an interface are memoized, column positions come straight from the source map, docblock keyword checks no longer allocate per keyword, and pending write locations stay inline, trimming CPU and allocations (Laravel allocation count 17.8M -> 13.4M).
+- Dependencies were updated.
+- Workspace and internal crate versions were updated to `0.88.0`.
+
+### Fixed
+
+- PHP files containing non-UTF-8 bytes (for example Latin-1 string literals) are analyzed instead of skipped; batch runs, lazy loading, include following, user stubs and vendor indexing all decode them lossily.
+- `if (!class_exists(X)) { throw ...; }` guards are honored in per-scope analysis, removing false `UndefinedClass` on a later `implements X`.
+
 ## [0.87.0] - 2026-10-11
 
 ### Changed
