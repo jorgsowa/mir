@@ -1035,12 +1035,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 span,
             );
         } else if ctx.static_var_names.contains(&name_sym)
+            && !ctx.is_in_pure_fn
             && (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
         {
             // A `static $var` mutated via `.=`/`++`/`--`/`unset()`/a by-ref
             // call argument — the same persistent cross-call state a plain
             // `$n = value` overwrite mutates (see `assign_to_target`'s
-            // identical `else if` branch).
+            // identical `else if` branch). Under @pure the declaration site
+            // already reported it.
             self.emit(
                 IssueKind::ImpureStaticVariable {
                     variable: name.to_string(),
@@ -1269,7 +1271,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // @mutation-free/@external-mutation-free forbid for a
                     // global-variable write (their contract is about writes,
                     // not reads, unlike @pure's declaration-site-only check).
-                    if ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method {
+                    // @pure also sets is_in_immutable_method, but its
+                    // declaration-site report already covers the variable.
+                    if !ctx.is_in_pure_fn
+                        && (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+                    {
                         self.emit(
                             IssueKind::ImpureStaticVariable {
                                 variable: name_str.clone(),

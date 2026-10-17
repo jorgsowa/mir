@@ -3,31 +3,22 @@
   <file src="src/BigDecimal.php">
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$zero = new BigDecimal('0')]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$one = new BigDecimal('1')]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$ten = new BigDecimal('10')]]></code>
     </ImpureStaticVariable>
   </file>
   <file src="src/BigInteger.php">
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$zero = new BigInteger('0')]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$one = new BigInteger('1')]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$ten = new BigInteger('10')]]></code>
     </ImpureStaticVariable>
   </file>
   <file src="src/BigRational.php">
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$zero = new BigRational(BigInteger::zero(), BigInteger::one(), false, false)]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$one = new BigRational(BigInteger::one(), BigInteger::one(), false, false)]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[$ten = new BigRational(BigInteger::ten(), BigInteger::one(), false, false)]]></code>
     </ImpureStaticVariable>
   </file>
 </files>
