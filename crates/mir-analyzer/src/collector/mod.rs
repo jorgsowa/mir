@@ -233,6 +233,27 @@ pub(crate) fn preserve_native_nullability(native: &Type, mut doc: Type) -> Type 
     doc
 }
 
+/// In a bundled stub, a by-ref param with a default and no `@param-out` is an
+/// out-param: PHP's arginfo leaves every such param untyped and never checks
+/// the incoming value (`preg_match($p, $s, $matches)` with a string `$matches`
+/// is fine). Its declared type only describes what the call writes back, so it
+/// moves to the out-type and the in-type becomes `mixed`. In/out params that
+/// read the incoming value declare `@param-out` explicitly and keep their type.
+pub(crate) fn stub_out_param_types(
+    file: &str,
+    by_ref: bool,
+    has_default: bool,
+    ty: Option<Type>,
+    out_ty: Option<Type>,
+) -> (Option<Type>, Option<Type>) {
+    if by_ref && has_default && out_ty.is_none() && ty.is_some() && crate::stubs::is_stub_path(file)
+    {
+        (Some(Type::mixed()), ty)
+    } else {
+        (ty, out_ty)
+    }
+}
+
 /// True for type keywords/pseudo-types that must never be namespace-
 /// qualified (even as TNamedObject, e.g. inside generic params). Delegates to
 /// the docblock parser's keyword table, the single source of truth.
@@ -2379,6 +2400,7 @@ impl<'a> DefinitionCollector<'a> {
                 Self::fill_self_static_parent(resolved, class_fqcn)
             });
             let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
+            let (ty, out_ty) = stub_out_param_types(&self.file, p.by_ref, has_default, ty, out_ty);
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),

@@ -324,6 +324,8 @@ impl DefinitionCollector<'_> {
                 resolved
             });
             let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
+            let (ty, out_ty) =
+                super::stub_out_param_types(&self.file, p.by_ref, has_default, ty, out_ty);
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),

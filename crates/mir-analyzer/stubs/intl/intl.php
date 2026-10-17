@@ -1091,6 +1091,7 @@ class NumberFormatter
      * formatting type to use. By default,
      * <b>NumberFormatter::TYPE_DOUBLE</b> is used.
      * </p>
+     * @param-out int $offset
      * @param int &$offset [optional] <p>
      * Offset in the string at which to begin parsing. On return, this value
      * will hold the offset at which parsing ended.
@@ -1132,6 +1133,7 @@ class NumberFormatter
      * Parameter to receive the currency name (3-letter ISO 4217 currency
      * code).
      * </p>
+     * @param-out int $offset
      * @param int &$offset [optional] <p>
      * Offset in the string at which to begin parsing. On return, this value
      * will hold the offset at which parsing ended.
@@ -2418,6 +2420,7 @@ class IntlDateFormatter
      * @param string $string <p>
      * string to convert to a time
      * </p>
+     * @param-out int $offset
      * @param int &$offset [optional] <p>
      * Position at which to start the parsing in $value (zero-based).
      * If no error occurs before $value is consumed, $parse_pos will contain -1
@@ -2437,6 +2440,7 @@ class IntlDateFormatter
      * @param string $string <p>
      * string to convert to a time
      * </p>
+     * @param-out int $offset
      * @param int &$offset [optional] <p>
      * Position at which to start the parsing in $value (zero-based).
      * If no error occurs before $value is consumed, $parse_pos will contain -1
@@ -4468,6 +4472,7 @@ function numfmt_format(NumberFormatter $formatter, int|float $num, int $type = 0
  * formatting type to use. By default,
  * <b>NumberFormatter::TYPE_DOUBLE</b> is used.
  * </p>
+ * @param-out int $offset
  * @param int &$offset [optional] <p>
  * Offset in the string at which to begin parsing. On return, this value
  * will hold the offset at which parsing ended.
@@ -4503,6 +4508,7 @@ function numfmt_format_currency(NumberFormatter $formatter, float $amount, strin
  * Parameter to receive the currency name (3-letter ISO 4217 currency
  * code).
  * </p>
+ * @param-out int $offset
  * @param int &$offset [optional] <p>
  * Offset in the string at which to begin parsing. On return, this value
  * will hold the offset at which parsing ended.
@@ -5446,6 +5452,7 @@ function datefmt_format_object($datetime, $format = null, ?string $locale = null
  * @param string $string <p>
  * string to convert to a time
  * </p>
+ * @param-out int $offset
  * @param int &$offset [optional] <p>
  * Position at which to start the parsing in $value (zero-based).
  * If no error occurs before $value is consumed, $parse_pos will contain -1
@@ -5465,6 +5472,7 @@ function datefmt_parse(IntlDateFormatter $formatter, string $string, &$offset = 
  * @param string $string <p>
  * string to convert to a time
  * </p>
+ * @param-out int $offset
  * @param int &$offset [optional] <p>
  * Position at which to start the parsing in $value (zero-based).
  * If no error occurs before $value is consumed, $parse_pos will contain -1
