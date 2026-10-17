@@ -491,8 +491,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 };
                                 for arg in args {
                                     let Some(value) = &arg.value else { continue };
-                                    if crate::taint::is_expr_tainted(
-                                        value, ctx, self.db, &self.file,
+                                    if crate::taint::reaches_sink(
+                                        value,
+                                        crate::taint::taint_sink_kind(sink_kind),
+                                        ctx,
+                                        self.db,
+                                        &self.file,
                                     ) {
                                         self.emit(
                                             crate::taint::taint_sink_issue(sink_kind),

@@ -4,7 +4,9 @@ use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use crate::narrowing::{extract_any_prop_access, extract_expr_guard_key};
-use crate::taint::{classify_method_sink, is_expr_tainted, taint_sink_issue, SinkKind};
+use crate::taint::{
+    classify_method_sink, reaches_sink, taint_sink_issue, taint_sink_kind, SinkKind,
+};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
 };
@@ -1625,7 +1627,7 @@ fn resolve_method_return<'a>(
                 };
                 for arg in args {
                     let Some(value) = &arg.value else { continue };
-                    if is_expr_tainted(value, ctx, ea.db, &ea.file) {
+                    if reaches_sink(value, taint_sink_kind(sink_kind), ctx, ea.db, &ea.file) {
                         ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                     }
                 }
@@ -1637,7 +1639,7 @@ fn resolve_method_return<'a>(
         if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
             for arg in call.args.iter() {
                 let Some(value) = &arg.value else { continue };
-                if is_expr_tainted(value, ctx, ea.db, &ea.file) {
+                if reaches_sink(value, sink_kind.taint(), ctx, ea.db, &ea.file) {
                     let issue_kind = match sink_kind {
                         SinkKind::Sql => IssueKind::TaintedSql,
                         _ => unreachable!("classify_method_sink only returns SinkKind::Sql"),
@@ -1842,11 +1844,7 @@ fn resolve_method_return<'a>(
         // "sticky" way `.=`/`??=` already treat their own result, rather
         // than leaving its taint bit untouched from whatever it happened to
         // hold before the call.
-        let any_arg_tainted = call.args.iter().any(|arg| {
-            arg.value
-                .as_ref()
-                .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
-        });
+        let args_taint = crate::taint::args_taint(&call.args, ctx, ea.db, &ea.file);
         for (i, param) in resolved.params.iter().enumerate() {
             let Some(out_ty) = super::byref_written_type(param) else {
                 continue;
@@ -1870,11 +1868,7 @@ fn resolve_method_return<'a>(
                     {
                         let var_name = name.as_ref().trim_start_matches('$');
                         ctx.set_var(var_name, out_ty.clone());
-                        if any_arg_tainted {
-                            ctx.taint_var(var_name);
-                        } else {
-                            ctx.clear_var_taint(var_name);
-                        }
+                        ctx.set_var_taint(var_name, args_taint);
                     }
                 }
             } else if let Some(value) =
@@ -1885,11 +1879,7 @@ fn resolve_method_return<'a>(
                 if let php_ast::owned::ExprKind::Variable(name) = &value.kind {
                     let var_name = name.as_ref().trim_start_matches('$');
                     ctx.set_var(var_name, out_ty);
-                    if any_arg_tainted {
-                        ctx.taint_var(var_name);
-                    } else {
-                        ctx.clear_var_taint(var_name);
-                    }
+                    ctx.set_var_taint(var_name, args_taint);
                 }
             }
         }

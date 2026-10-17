@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use mir_types::{Atomic, Name, Type};
 
+use crate::taint::Taint;
+
 /// FQCNs known to exist in the current branch due to a `class_exists()` /
 /// `interface_exists()` / `trait_exists()` guard.  Not Arc-wrapped — it is
 /// small and branch-local (cleared at merge unless one branch diverges).
@@ -222,20 +224,20 @@ pub struct FlowState {
 
     /// Variables that carry tainted (user-controlled) values at this point.
     /// Used by taint analysis.
-    pub tainted_vars: FxHashSet<Name>,
+    pub tainted_vars: FxHashMap<Name, Taint>,
 
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
     /// assignment (`$obj->prop = $_GET['x']`); read by `taint::is_expr_tainted`
     /// so a later `$obj->prop` access is recognized as tainted.
-    pub tainted_props: FxHashSet<(Name, Name)>,
+    pub tainted_props: FxHashMap<(Name, Name), Taint>,
 
     /// Static properties that carry tainted (user-controlled) values at this
     /// point. Key: `(fqcn, prop_name)`, mirroring how `prop_refined`'s static
     /// counterpart is keyed by FQCN instead of a receiver variable name (a
     /// FQCN can never collide with a real PHP variable name).
-    pub tainted_static_props: FxHashSet<(Name, Name)>,
+    pub tainted_static_props: FxHashMap<(Name, Name), Taint>,
 
     /// Local variables ref-aliased directly to a var-receiver property
     /// (`$x =& $this->prop;`), keyed by the alias variable name, value is
@@ -633,9 +635,9 @@ impl FlowState {
             is_in_immutable_ctor: false,
             inside_static_method: false,
             strict_types: false,
-            tainted_vars: FxHashSet::default(),
-            tainted_props: FxHashSet::default(),
-            tainted_static_props: FxHashSet::default(),
+            tainted_vars: FxHashMap::default(),
+            tainted_props: FxHashMap::default(),
+            tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),
             cloned_local_vars: FxHashSet::default(),
             read_vars: FxHashSet::default(),
@@ -1211,72 +1213,75 @@ impl FlowState {
         }
     }
 
-    /// Mark a variable as carrying tainted (user-controlled) data.
-    pub fn taint_var(&mut self, name: &str) {
-        let name = Name::from(name.trim_start_matches('$'));
-        self.tainted_vars.insert(name);
+    /// Add `taint` to whatever the variable already carries.
+    pub fn taint_var(&mut self, name: &str, taint: Taint) {
+        add_taint(
+            &mut self.tainted_vars,
+            Name::from(name.trim_start_matches('$')),
+            taint,
+        );
     }
 
-    /// Returns true if the variable is known to carry tainted data.
-    pub fn is_tainted(&self, name: &str) -> bool {
+    /// Replace the variable's taint; `Taint::NONE` clears it.
+    pub fn set_var_taint(&mut self, name: &str, taint: Taint) {
+        set_taint(
+            &mut self.tainted_vars,
+            Name::from(name.trim_start_matches('$')),
+            taint,
+        );
+    }
+
+    pub fn var_taint(&self, name: &str) -> Taint {
         let sym = Name::from(name.trim_start_matches('$'));
-        self.tainted_vars.contains(&sym)
+        self.tainted_vars.get(&sym).copied().unwrap_or_default()
     }
 
-    /// Clear a previously-recorded variable taint — used when the variable is
-    /// overwritten with a value proven not tainted, so stale taint doesn't
-    /// survive the reassignment.
-    pub fn clear_var_taint(&mut self, name: &str) {
-        let sym = Name::from(name.trim_start_matches('$'));
-        self.tainted_vars.remove(&sym);
-    }
-
-    /// Mark an instance property as carrying tainted (user-controlled) data.
-    pub fn taint_prop(&mut self, obj_var: &str, prop: &str) {
+    pub fn taint_prop(&mut self, obj_var: &str, prop: &str, taint: Taint) {
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
         );
-        self.tainted_props.insert(key);
+        add_taint(&mut self.tainted_props, key, taint);
     }
 
-    /// Returns true if the instance property is known to carry tainted data.
-    pub fn is_prop_tainted(&self, obj_var: &str, prop: &str) -> bool {
+    pub fn set_prop_taint(&mut self, obj_var: &str, prop: &str, taint: Taint) {
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
         );
-        self.tainted_props.contains(&key)
+        set_taint(&mut self.tainted_props, key, taint);
     }
 
-    /// Clear a previously-recorded property taint — used when the property is
-    /// overwritten with a value proven not tainted, so stale taint doesn't
-    /// survive the reassignment.
-    pub fn clear_prop_taint(&mut self, obj_var: &str, prop: &str) {
+    pub fn prop_taint(&self, obj_var: &str, prop: &str) -> Taint {
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
         );
-        self.tainted_props.remove(&key);
+        self.tainted_props.get(&key).copied().unwrap_or_default()
     }
 
-    /// Mark a static property as carrying tainted (user-controlled) data.
-    pub fn taint_static_prop(&mut self, fqcn: &str, prop: &str) {
-        let key = (Name::from(fqcn), Name::from(prop));
-        self.tainted_static_props.insert(key);
+    pub fn taint_static_prop(&mut self, fqcn: &str, prop: &str, taint: Taint) {
+        add_taint(
+            &mut self.tainted_static_props,
+            (Name::from(fqcn), Name::from(prop)),
+            taint,
+        );
     }
 
-    /// Returns true if the static property is known to carry tainted data.
-    pub fn is_static_prop_tainted(&self, fqcn: &str, prop: &str) -> bool {
-        let key = (Name::from(fqcn), Name::from(prop));
-        self.tainted_static_props.contains(&key)
+    pub fn set_static_prop_taint(&mut self, fqcn: &str, prop: &str, taint: Taint) {
+        set_taint(
+            &mut self.tainted_static_props,
+            (Name::from(fqcn), Name::from(prop)),
+            taint,
+        );
     }
 
-    /// Clear a previously-recorded static-property taint — used when the
-    /// property is overwritten with a value proven not tainted.
-    pub fn clear_static_prop_taint(&mut self, fqcn: &str, prop: &str) {
+    pub fn static_prop_taint(&self, fqcn: &str, prop: &str) -> Taint {
         let key = (Name::from(fqcn), Name::from(prop));
-        self.tainted_static_props.remove(&key);
+        self.tainted_static_props
+            .get(&key)
+            .copied()
+            .unwrap_or_default()
     }
 
     /// Record `var_name` as ref-aliased to `recv_name`'s `prop` property
@@ -1775,30 +1780,26 @@ impl FlowState {
         }
 
         // Taint: conservative union — if either branch taints a var, it stays tainted
-        for name in if_ctx
+        for (name, taint) in if_ctx
             .tainted_vars
             .iter()
             .chain(else_ctx.tainted_vars.iter())
         {
-            result.tainted_vars.insert(*name);
+            add_taint(&mut result.tainted_vars, *name, *taint);
         }
-
-        // Same conservative union for tainted instance properties.
-        for key in if_ctx
+        for (key, taint) in if_ctx
             .tainted_props
             .iter()
             .chain(else_ctx.tainted_props.iter())
         {
-            result.tainted_props.insert(*key);
+            add_taint(&mut result.tainted_props, *key, *taint);
         }
-
-        // Same conservative union for tainted static properties.
-        for key in if_ctx
+        for (key, taint) in if_ctx
             .tainted_static_props
             .iter()
             .chain(else_ctx.tainted_static_props.iter())
         {
-            result.tainted_static_props.insert(*key);
+            add_taint(&mut result.tainted_static_props, *key, *taint);
         }
 
         // Same conservative union for ref-aliases — once either branch
@@ -1928,4 +1929,18 @@ pub(crate) fn self_is_trait(db: &dyn crate::db::MirDatabase, ctx: &FlowState) ->
     ctx.self_fqcn
         .as_deref()
         .is_some_and(|f| crate::db::class_kind(db, f).is_some_and(|k| k.is_trait))
+}
+
+fn add_taint<K: std::hash::Hash + Eq>(map: &mut FxHashMap<K, Taint>, key: K, taint: Taint) {
+    if !taint.is_empty() {
+        *map.entry(key).or_default() |= taint;
+    }
+}
+
+fn set_taint<K: std::hash::Hash + Eq>(map: &mut FxHashMap<K, Taint>, key: K, taint: Taint) {
+    if taint.is_empty() {
+        map.remove(&key);
+    } else {
+        map.insert(key, taint);
+    }
 }

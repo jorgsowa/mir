@@ -637,9 +637,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if use_var.by_ref {
                 byref_captures.push((name, captured_ty));
             }
-            if ctx.is_tainted(name) {
-                closure_ctx.taint_var(name);
-            }
+            closure_ctx.taint_var(name, ctx.var_taint(name));
             // Mark the captured variable as read in the parent context, and
             // consume its pending write so it isn't reported as a dead write.
             ctx.read_vars.insert(mir_types::Name::from(name));

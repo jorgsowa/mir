@@ -7,6 +7,7 @@ use super::helpers::{
 use super::ExpressionAnalyzer;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
+use crate::taint::Taint;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::{AssignOp, BinaryOp};
@@ -20,14 +21,17 @@ use rustc_hash::{FxHashMap, FxHashSet};
 /// `ArrayAccess` element (`[$obj->prop] = $tainted;`) is conservatively
 /// skipped, matching how the plain-assignment case only taints a bare
 /// variable or property, never an arbitrary nested write target.
-pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
+pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState, taint: Taint) {
     let ExprKind::Array(elements) = &target.kind else {
         return;
     };
+    if taint.is_empty() {
+        return;
+    }
     for elem in elements.iter() {
         match &elem.value.kind {
-            ExprKind::Variable(name) => ctx.taint_var(name.as_ref()),
-            ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx),
+            ExprKind::Variable(name) => ctx.taint_var(name.as_ref(), taint),
+            ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx, taint),
             _ => {}
         }
     }
@@ -74,25 +78,21 @@ pub(crate) fn resolve_static_prop_target(
 /// (tainted afterwards if either the old value or the new RHS was), the
 /// same semantics `.=` already applies to a bare variable, but generalized
 /// to every trackable target shape for the arithmetic/`??=` arms below.
-fn target_is_currently_tainted(
-    target: &Expr,
-    ctx: &FlowState,
-    db: &dyn MirDatabase,
-    file: &str,
-) -> bool {
+fn current_target_taint(target: &Expr, ctx: &FlowState, db: &dyn MirDatabase, file: &str) -> Taint {
     match &target.kind {
-        ExprKind::Variable(name) => ctx.is_tainted(name.trim_start_matches('$')),
-        ExprKind::PropertyAccess(pa) => {
-            if let ExprKind::Variable(obj_var) = &pa.object.kind {
-                extract_string_from_expr(&pa.property)
-                    .is_some_and(|prop| ctx.is_prop_tainted(obj_var.trim_start_matches('$'), &prop))
-            } else {
-                false
-            }
-        }
+        ExprKind::Variable(name) => ctx.var_taint(name.trim_start_matches('$')),
+        ExprKind::PropertyAccess(pa) => match &pa.object.kind {
+            ExprKind::Variable(obj_var) => extract_string_from_expr(&pa.property)
+                .map_or(Taint::NONE, |prop| {
+                    ctx.prop_taint(obj_var.trim_start_matches('$'), &prop)
+                }),
+            _ => Taint::NONE,
+        },
         ExprKind::StaticPropertyAccess(spa) => resolve_static_prop_target(spa, ctx, db, file)
-            .is_some_and(|(fqcn, prop)| ctx.is_static_prop_tainted(&fqcn, &prop)),
-        _ => false,
+            .map_or(Taint::NONE, |(fqcn, prop)| {
+                ctx.static_prop_taint(&fqcn, &prop)
+            }),
+        _ => Taint::NONE,
     }
 }
 
@@ -104,19 +104,28 @@ fn target_is_currently_tainted(
 /// for a property or static-property base (`$this->items['id'] =
 /// $tainted;`, `self::$items['id'] = $tainted;`), even though the READ
 /// side already supports both.
-fn taint_array_write_base(base: &Expr, ctx: &mut FlowState, db: &dyn MirDatabase, file: &str) {
+fn taint_array_write_base(
+    base: &Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    taint: Taint,
+) {
+    if taint.is_empty() {
+        return;
+    }
     match &base.kind {
-        ExprKind::Variable(name) => ctx.taint_var(name.trim_start_matches('$')),
+        ExprKind::Variable(name) => ctx.taint_var(name.trim_start_matches('$'), taint),
         ExprKind::PropertyAccess(pa) => {
             if let ExprKind::Variable(obj_var) = &pa.object.kind {
                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                    ctx.taint_prop(obj_var.trim_start_matches('$'), &prop_name);
+                    ctx.taint_prop(obj_var.trim_start_matches('$'), &prop_name, taint);
                 }
             }
         }
         ExprKind::StaticPropertyAccess(spa) => {
             if let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, db, file) {
-                ctx.taint_static_prop(&fqcn, &prop_name);
+                ctx.taint_static_prop(&fqcn, &prop_name, taint);
             }
         }
         _ => {}
@@ -130,28 +139,17 @@ fn taint_array_write_base(base: &Expr, ctx: &mut FlowState, db: &dyn MirDatabase
 /// concat-specific string-length logic).
 fn apply_compound_assign_taint(
     target: &Expr,
-    should_taint: bool,
+    taint: Taint,
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
 ) {
     match &target.kind {
-        ExprKind::Variable(name) => {
-            if should_taint {
-                ctx.taint_var(name.as_ref());
-            } else {
-                ctx.clear_var_taint(name.as_ref());
-            }
-        }
+        ExprKind::Variable(name) => ctx.set_var_taint(name.as_ref(), taint),
         ExprKind::PropertyAccess(pa) => {
             if let ExprKind::Variable(obj_var) = &pa.object.kind {
                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                    let obj_var = obj_var.trim_start_matches('$');
-                    if should_taint {
-                        ctx.taint_prop(obj_var, &prop_name);
-                    } else {
-                        ctx.clear_prop_taint(obj_var, &prop_name);
-                    }
+                    ctx.set_prop_taint(obj_var.trim_start_matches('$'), &prop_name, taint);
                 }
             }
         }
@@ -159,16 +157,12 @@ fn apply_compound_assign_taint(
         // taint-propagating array-element arm) — only ever set, never
         // cleared, since a single tainted element must not clean the whole
         // container just because THIS write happened to be untainted.
-        ExprKind::ArrayAccess(aa) if should_taint => {
-            taint_array_write_base(&aa.array, ctx, db, file);
+        ExprKind::ArrayAccess(aa) => {
+            taint_array_write_base(&aa.array, ctx, db, file, taint);
         }
         ExprKind::StaticPropertyAccess(spa) => {
             if let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, db, file) {
-                if should_taint {
-                    ctx.taint_static_prop(&fqcn, &prop_name);
-                } else {
-                    ctx.clear_static_prop_taint(&fqcn, &prop_name);
-                }
+                ctx.set_static_prop_taint(&fqcn, &prop_name, taint);
             }
         }
         _ => {}
@@ -345,7 +339,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr_span: Span,
         ctx: &mut FlowState,
     ) -> Type {
-        let rhs_tainted = crate::taint::is_expr_tainted(&a.value, ctx, self.db, &self.file);
+        let rhs_taint = crate::taint::expr_taint(&a.value, ctx, self.db, &self.file);
         // Snapshot which variables were already in consumed_write_locs before
         // analyzing the RHS. When the LHS target variable is consumed DURING RHS
         // analysis (e.g. `$x = f($x)`) the new write to `$x` must be re-armed so it
@@ -456,25 +450,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match &a.target.kind {
                     ExprKind::Variable(name) => {
                         ctx.invalidate_prop_refined_receiver(name);
-                        if rhs_tainted {
-                            ctx.taint_var(name.as_ref());
-                        } else {
-                            // Overwritten with a proven-clean value —
-                            // don't let stale taint survive.
-                            ctx.clear_var_taint(name.as_ref());
-                        }
+                        ctx.set_var_taint(name.as_ref(), rhs_taint);
                     }
                     ExprKind::PropertyAccess(pa) => {
                         if let ExprKind::Variable(obj_var) = &pa.object.kind {
                             if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                                 let obj_var = obj_var.trim_start_matches('$');
-                                if rhs_tainted {
-                                    ctx.taint_prop(obj_var, &prop_name);
-                                } else {
-                                    // Overwritten with a proven-clean value —
-                                    // don't let stale taint survive.
-                                    ctx.clear_prop_taint(obj_var, &prop_name);
-                                }
+                                ctx.set_prop_taint(obj_var, &prop_name, rhs_taint);
                             }
                         }
                     }
@@ -483,8 +465,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // every destructured variable — this was the one target
                     // shape with no taint propagation at all, unlike plain
                     // variable/property assignment just above.
-                    ExprKind::Array(_) if rhs_tainted => {
-                        taint_destructured_targets(&a.target, ctx);
+                    ExprKind::Array(_) => {
+                        taint_destructured_targets(&a.target, ctx, rhs_taint);
                     }
                     // `$arr['k'] = $tainted;` — taint the whole array (same
                     // coarse, whole-container granularity the Array-literal
@@ -492,8 +474,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // a later read of ANY key sees it as tainted. Only a
                     // simple-variable base is tracked, matching every other
                     // taint-propagating target arm above.
-                    ExprKind::ArrayAccess(aa) if rhs_tainted => {
-                        taint_array_write_base(&aa.array, ctx, self.db, &self.file);
+                    ExprKind::ArrayAccess(aa) => {
+                        taint_array_write_base(&aa.array, ctx, self.db, &self.file, rhs_taint);
                     }
                     // `self::$prop = $tainted;` / `Foo::$prop = $tainted;` —
                     // static properties were entirely untracked for taint,
@@ -502,11 +484,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some((fqcn, prop_name)) =
                             resolve_static_prop_target(spa, ctx, self.db, &self.file)
                         {
-                            if rhs_tainted {
-                                ctx.taint_static_prop(&fqcn, &prop_name);
-                            } else {
-                                ctx.clear_static_prop_taint(&fqcn, &prop_name);
-                            }
+                            ctx.set_static_prop_taint(&fqcn, &prop_name, rhs_taint);
                         }
                     }
                     _ => {}
@@ -543,11 +521,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // `.=`'s result keeps the OLD value's content (unlike plain
                     // `=`, which fully replaces it) — so it stays tainted if
                     // either side was, not just the RHS.
-                    if rhs_tainted || ctx.is_tainted(&var_name) {
-                        ctx.taint_var(&var_name);
-                    } else {
-                        ctx.clear_var_taint(&var_name);
-                    }
+                    ctx.taint_var(&var_name, rhs_taint);
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
@@ -584,26 +558,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                             if let ExprKind::Variable(obj_var) = &pa.object.kind {
                                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                                     let obj_var = obj_var.trim_start_matches('$');
-                                    if rhs_tainted || ctx.is_prop_tainted(obj_var, &prop_name) {
-                                        ctx.taint_prop(obj_var, &prop_name);
-                                    } else {
-                                        ctx.clear_prop_taint(obj_var, &prop_name);
-                                    }
+                                    ctx.taint_prop(obj_var, &prop_name, rhs_taint);
                                 }
                             }
                         }
-                        ExprKind::ArrayAccess(aa) if rhs_tainted => {
-                            taint_array_write_base(&aa.array, ctx, self.db, &self.file);
+                        ExprKind::ArrayAccess(aa) => {
+                            taint_array_write_base(&aa.array, ctx, self.db, &self.file, rhs_taint);
                         }
                         ExprKind::StaticPropertyAccess(spa) => {
                             if let Some((fqcn, prop_name)) =
                                 resolve_static_prop_target(spa, ctx, self.db, &self.file)
                             {
-                                if rhs_tainted || ctx.is_static_prop_tainted(&fqcn, &prop_name) {
-                                    ctx.taint_static_prop(&fqcn, &prop_name);
-                                } else {
-                                    ctx.clear_static_prop_taint(&fqcn, &prop_name);
-                                }
+                                ctx.taint_static_prop(&fqcn, &prop_name, rhs_taint);
                             }
                         }
                         _ => {}
@@ -650,7 +616,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // tainted if either side was, unlike plain `=` which fully
                 // replaces the value.
                 let should_taint =
-                    rhs_tainted || target_is_currently_tainted(&a.target, ctx, self.db, &self.file);
+                    rhs_taint | current_target_taint(&a.target, ctx, self.db, &self.file);
                 self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                 apply_compound_assign_taint(&a.target, should_taint, ctx, self.db, &self.file);
                 if let (Some(name), Some(pre_count)) = (&target_var_name, pre_lhs_consumed_count) {
@@ -706,14 +672,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let should_taint = if is_undefined_var
                     || matches!(literal_offset_state, Some(DefiniteKeyState::Absent))
                 {
-                    Some(rhs_tainted)
+                    Some(rhs_taint)
                 } else if matches!(literal_offset_state, Some(DefiniteKeyState::Present(_))) {
                     None
                 } else {
-                    Some(
-                        rhs_tainted
-                            || target_is_currently_tainted(&a.target, ctx, self.db, &self.file),
-                    )
+                    Some(rhs_taint | current_target_taint(&a.target, ctx, self.db, &self.file))
                 };
                 let merged = if is_undefined_var
                     || matches!(literal_offset_state, Some(DefiniteKeyState::Absent))

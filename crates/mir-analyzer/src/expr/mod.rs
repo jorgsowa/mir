@@ -450,7 +450,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::ShellExec(parts) => {
                 // The backtick operator is a shell-exec sink exactly like
                 // `shell_exec()`/`exec()`, which already run their argument
-                // through `is_expr_tainted` -> `TaintedShell` — this arm used
+                // through `reaches_sink` -> `TaintedShell` — this arm used
                 // to discard `parts` entirely (`_`), so an interpolated
                 // tainted value never got analyzed OR taint-checked here.
                 for part in parts.iter() {
@@ -459,7 +459,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                     }
                 }
-                if crate::taint::is_expr_tainted(expr, ctx, self.db, &self.file) {
+                if crate::taint::reaches_sink(
+                    expr,
+                    crate::taint::Taint::SHELL,
+                    ctx,
+                    self.db,
+                    &self.file,
+                ) {
                     self.emit(IssueKind::TaintedShell, Severity::Error, expr.span);
                 }
                 if self.db.is_forbidden_function("shell_exec") {
@@ -528,7 +534,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.check_interpolation_implicit_to_string_cast(&expr_ty, inner.span);
                 // `print` is an HTML sink exactly like `echo` — both write
                 // straight to the response body.
-                if crate::taint::is_expr_tainted(inner, ctx, self.db, &self.file) {
+                if crate::taint::reaches_sink(
+                    inner,
+                    crate::taint::Taint::HTML,
+                    ctx,
+                    self.db,
+                    &self.file,
+                ) {
                     self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
                 }
                 // @pure implies no side effects at all — same purity
@@ -715,7 +727,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // File-sink risk as fopen()/file_get_contents(), but this is
                 // its own AST node (not a FunctionCall), so classify_sink's
                 // dispatch never sees it.
-                if crate::taint::is_expr_tainted(inner, ctx, self.db, &self.file) {
+                if crate::taint::reaches_sink(
+                    inner,
+                    crate::taint::Taint::FILE,
+                    ctx,
+                    self.db,
+                    &self.file,
+                ) {
                     self.emit(
                         IssueKind::TaintedInput {
                             sink: "include".to_string(),
@@ -747,7 +765,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // classify_sink's name-based dispatch never sees it — tainted
                 // code reaching it is arbitrary code execution, the most
                 // dangerous sink this analyzer models.
-                if crate::taint::is_expr_tainted(inner, ctx, self.db, &self.file) {
+                if crate::taint::reaches_sink(
+                    inner,
+                    crate::taint::Taint::EVAL,
+                    ctx,
+                    self.db,
+                    &self.file,
+                ) {
                     self.emit(
                         IssueKind::TaintedInput {
                             sink: "eval".to_string(),
@@ -768,7 +792,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .types
                         .iter()
                         .all(|a| matches!(a, Atomic::TInt | Atomic::TLiteralInt(_)));
-                    if !is_status && crate::taint::is_expr_tainted(e, ctx, self.db, &self.file) {
+                    if !is_status
+                        && crate::taint::reaches_sink(
+                            e,
+                            crate::taint::Taint::HTML,
+                            ctx,
+                            self.db,
+                            &self.file,
+                        )
+                    {
                         self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
                     }
                 }

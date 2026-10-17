@@ -375,7 +375,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Taint check before the expression is analyzed further below —
         // `is_expr_tainted` only needs the iterable expression + current
         // taint state, same timing as an assignment's RHS taint check.
-        let iterable_tainted = crate::taint::is_expr_tainted(&fe.expr, ctx, self.db, &self.file);
+        let iterable_taint = crate::taint::expr_taint(&fe.expr, ctx, self.db, &self.file);
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 
@@ -404,9 +404,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // `foreach ($_GET as $k => $v)`: the key is attacker-controlled
                 // exactly as much as the value (a reflected-XSS vector via GET
                 // param NAMES).
-                if iterable_tainted {
-                    entry.taint_var(&var_name);
-                }
+                entry.taint_var(&var_name, iterable_taint);
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
             }
@@ -433,9 +431,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(ref vname) = value_var {
             let intentionally_unused = is_intentionally_unused_foreach_value(vname, &fe.body);
             entry.set_var(vname.as_str(), value_ty.clone());
-            if iterable_tainted {
-                entry.taint_var(vname.as_str());
-            }
+            entry.taint_var(vname.as_str(), iterable_taint);
             if value_is_by_ref {
                 // By-reference iteration: writes to this variable always mutate
                 // the source array through the reference, so they are never dead.
@@ -487,9 +483,11 @@ impl<'a> StatementsAnalyzer<'a> {
             // taint entirely — reuse the same helper `analyze_assign`'s
             // `Array` target arm already calls for a plain destructuring
             // assignment.
-            if iterable_tainted {
-                crate::expr::assignment::taint_destructured_targets(&fe.value, &mut entry);
-            }
+            crate::expr::assignment::taint_destructured_targets(
+                &fe.value,
+                &mut entry,
+                iterable_taint,
+            );
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
@@ -500,16 +498,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(key_expr) = &fe.key {
                     if let Some(var_name) = extract_simple_var(key_expr) {
                         iter.set_var(&var_name, key_ty.clone());
-                        if iterable_tainted {
-                            iter.taint_var(&var_name);
-                        }
+                        iter.taint_var(&var_name, iterable_taint);
                     }
                 }
                 if let Some(ref vname) = value_var {
                     iter.set_var(vname.as_str(), value_ty.clone());
-                    if iterable_tainted {
-                        iter.taint_var(vname.as_str());
-                    }
+                    iter.taint_var(vname.as_str(), iterable_taint);
                 } else {
                     sa.expr_analyzer(iter).assign_to_target(
                         &fe.value,
@@ -517,9 +511,11 @@ impl<'a> StatementsAnalyzer<'a> {
                         iter,
                         fe.value.span,
                     );
-                    if iterable_tainted {
-                        crate::expr::assignment::taint_destructured_targets(&fe.value, iter);
-                    }
+                    crate::expr::assignment::taint_destructured_targets(
+                        &fe.value,
+                        iter,
+                        iterable_taint,
+                    );
                 }
                 sa.analyze_stmt(&fe.body, iter);
             },

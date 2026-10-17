@@ -1,14 +1,63 @@
 /// Taint analysis helpers.
 ///
-/// A value is "tainted" when it originates from user-controlled superglobals
-/// (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`, `$_FILES`, `$_SERVER`, `$_ENV`).
-/// Taint propagates through assignments, string concatenation, and array access.
+/// A value is "tainted" when it originates from user-controlled input
+/// (superglobals, request headers, `@taint-source` calls). Taint is tracked
+/// per [`Taint`] kind and propagates through assignments, string operations,
+/// array access and pass-through builtins; a sanitizer removes only the kinds
+/// it neutralizes.
 ///
-/// When tainted data reaches a sink (HTML output, SQL query, shell command),
-/// the appropriate `TaintedHtml`, `TaintedSql`, or `TaintedShell` issue is emitted.
+/// When data tainted for a sink's kind reaches it, the matching `Tainted*`
+/// issue is emitted.
 use php_ast::owned::{Expr, ExprKind, StringPart};
 
 use crate::flow_state::FlowState;
+
+/// Set of sink kinds a value is still dangerous for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct Taint(u16);
+
+impl Taint {
+    pub const NONE: Taint = Taint(0);
+    pub const HTML: Taint = Taint(1 << 0);
+    pub const SQL: Taint = Taint(1 << 1);
+    pub const SHELL: Taint = Taint(1 << 2);
+    pub const HEADER: Taint = Taint(1 << 3);
+    pub const COOKIE: Taint = Taint(1 << 4);
+    pub const FILE: Taint = Taint(1 << 5);
+    pub const UNSERIALIZE: Taint = Taint(1 << 6);
+    pub const EVAL: Taint = Taint(1 << 7);
+    pub const LLM_PROMPT: Taint = Taint(1 << 8);
+    pub const LDAP: Taint = Taint(1 << 9);
+    pub const XPATH: Taint = Taint(1 << 10);
+    /// Any `@taint-sink` kind without a dedicated bit.
+    pub const OTHER: Taint = Taint(1 << 11);
+    pub const ALL: Taint = Taint((1 << 12) - 1);
+
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    pub const fn intersects(self, other: Taint) -> bool {
+        self.0 & other.0 != 0
+    }
+
+    pub const fn without(self, other: Taint) -> Taint {
+        Taint(self.0 & !other.0)
+    }
+}
+
+impl std::ops::BitOr for Taint {
+    type Output = Taint;
+    fn bitor(self, rhs: Taint) -> Taint {
+        Taint(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for Taint {
+    fn bitor_assign(&mut self, rhs: Taint) {
+        self.0 |= rhs.0;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Superglobal names (without the $ prefix, as stored in FlowState::vars)
@@ -51,6 +100,18 @@ pub enum SinkKind {
 }
 
 impl SinkKind {
+    pub fn taint(self) -> Taint {
+        match self {
+            SinkKind::Html => Taint::HTML,
+            SinkKind::Sql => Taint::SQL,
+            SinkKind::Shell => Taint::SHELL,
+            SinkKind::File => Taint::FILE,
+            SinkKind::Unserialize => Taint::UNSERIALIZE,
+            SinkKind::Header => Taint::HEADER,
+            SinkKind::Cookie => Taint::COOKIE,
+        }
+    }
+
     /// The argument indices whose taint should be reported for this sink.
     ///
     /// `None` means "any argument" — used for output/query/command sinks where
@@ -263,6 +324,35 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
     }
 }
 
+/// The taint kind a `@taint-sink <kind>` parameter checks for.
+pub fn taint_sink_kind(kind: &str) -> Taint {
+    match kind {
+        "llm_prompt" => Taint::LLM_PROMPT,
+        "html" => Taint::HTML,
+        "header" => Taint::HEADER,
+        "cookie" => Taint::COOKIE,
+        "sql" => Taint::SQL,
+        "shell" => Taint::SHELL,
+        "file" | "include" => Taint::FILE,
+        "unserialize" => Taint::UNSERIALIZE,
+        "eval" | "callable" => Taint::EVAL,
+        "ldap" => Taint::LDAP,
+        "xpath" => Taint::XPATH,
+        _ => Taint::OTHER,
+    }
+}
+
+/// Whether `expr` carries taint the given sink kind cares about.
+pub fn reaches_sink(
+    expr: &Expr,
+    sink: Taint,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    expr_taint(expr, ctx, db, file).intersects(sink)
+}
+
 // ---------------------------------------------------------------------------
 // Expression taint checker
 // ---------------------------------------------------------------------------
@@ -307,7 +397,29 @@ fn unwrap_parens(expr: &Expr) -> &Expr {
     e
 }
 
-/// Returns `true` if the expression could carry tainted data, given the
+/// Whether the expression could carry tainted data of any kind.
+pub fn is_expr_tainted(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    !expr_taint(expr, ctx, db, file).is_empty()
+}
+
+/// Union of the taint every argument of a call carries.
+pub fn args_taint(
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    args.iter()
+        .filter_map(|a| a.value.as_ref())
+        .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file))
+}
+
+/// The kinds of attacker-controlled data the expression could carry, given the
 /// current `FlowState` taint state.
 ///
 /// This is a conservative over-approximation:
@@ -316,334 +428,216 @@ fn unwrap_parens(expr: &Expr) -> &Expr {
 /// - Binary string-concat or arithmetic on tainted operands propagates taint.
 /// - Interpolated strings are tainted if any embedded variable is tainted.
 /// - A call to a `@taint-source`-annotated function/method is tainted.
-pub fn is_expr_tainted(
+/// - A sanitizer (`htmlspecialchars`, `escapeshellarg`, …) removes only its own kinds.
+pub fn expr_taint(
     expr: &Expr,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
-) -> bool {
+) -> Taint {
     match &expr.kind {
         ExprKind::Variable(name) => {
             let n = name.trim_start_matches('$');
             if is_superglobal(n) {
-                return true;
+                return Taint::ALL;
             }
             let sym = mir_types::Name::from(n);
-            if ctx.vars.get(&sym).is_some_and(|ty| is_injection_safe_type(ty)) {
-                return false;
+            if ctx
+                .vars
+                .get(&sym)
+                .is_some_and(|ty| is_injection_safe_type(ty))
+            {
+                return Taint::NONE;
             }
-            ctx.is_tainted(n)
-                // A variable with no tracked definition at all may be one
-                // `extract()` just defined from a tainted source array —
-                // its name isn't known statically, so this can't be a
-                // specific per-name taint lookup like `is_tainted` above.
-                // Doesn't apply to an already-tracked variable: that one has
-                // its own real, independently-computed taint state.
-                || (ctx.has_dynamic_tainted_var_def && !ctx.var_is_defined_sym(sym))
+            // A variable with no tracked definition may be one `extract()`
+            // defined from a tainted array; its name isn't known statically.
+            if ctx.has_dynamic_tainted_var_def && !ctx.var_is_defined_sym(sym) {
+                return Taint::ALL;
+            }
+            ctx.var_taint(n)
         }
 
         // `$$name` where `$name` holds a known literal string resolves to
         // that variable's own taint state.
         ExprKind::VariableVariable(inner) => {
-            if let Some(var_name) = crate::expr::helpers::extract_simple_var(inner) {
-                let inner_ty = ctx.get_var(&var_name);
-                inner_ty.types.iter().any(|atomic| {
-                    matches!(atomic, mir_types::Atomic::TLiteralString(accessed)
-                        if ctx.is_tainted(accessed.as_ref()))
+            let Some(var_name) = crate::expr::helpers::extract_simple_var(inner) else {
+                return Taint::NONE;
+            };
+            ctx.get_var(&var_name)
+                .types
+                .iter()
+                .fold(Taint::NONE, |acc, atomic| match atomic {
+                    mir_types::Atomic::TLiteralString(accessed) => {
+                        acc | ctx.var_taint(accessed.as_ref())
+                    }
+                    _ => acc,
                 })
-            } else {
-                false
-            }
         }
 
         ExprKind::ArrayAccess(aa) => {
-            // $_GET['key'] — tainted if the array is tainted/superglobal
-            !is_server_generated_upload_field(aa) && is_expr_tainted(&aa.array, ctx, db, file)
+            if is_server_generated_upload_field(aa) {
+                Taint::NONE
+            } else {
+                expr_taint(&aa.array, ctx, db, file)
+            }
         }
 
-        ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx, db, file),
+        // The error-suppression operator only silences a notice, it doesn't
+        // sanitize the value.
+        ExprKind::Parenthesized(inner) | ExprKind::ErrorSuppress(inner) => {
+            expr_taint(inner, ctx, db, file)
+        }
 
-        // @$_GET['x'] — the error-suppression operator only silences a
-        // notice/warning, it doesn't sanitize the value.
-        ExprKind::ErrorSuppress(inner) => is_expr_tainted(inner, ctx, db, file),
-
-        // $obj->prop / $obj?->prop — tainted if this property was previously
-        // assigned a tainted value (see FlowState::taint_prop, set on
-        // property writes in expr/assignment.rs). Only a simple-variable
-        // receiver is tracked, matching prop_refined's narrowing scope.
-        // `NullsafePropertyAccess` wraps the identical `PropertyAccessExpr`
-        // shape as `PropertyAccess` (PHP forbids `?->` as a write target, so
-        // only the read side needs this pairing — unlike the taint-source
-        // method-call check below, which pairs both because calls ARE valid
-        // through either).
+        // Only a simple-variable receiver is tracked, matching prop_refined's
+        // narrowing scope.
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
             if let ExprKind::Variable(obj_var) = &pa.object.kind {
                 if let Some(prop_name) =
                     crate::expr::helpers::extract_string_from_expr(&pa.property)
                 {
-                    return ctx.is_prop_tainted(obj_var.trim_start_matches('$'), &prop_name);
+                    return ctx.prop_taint(obj_var.trim_start_matches('$'), &prop_name);
                 }
             }
-            false
+            Taint::NONE
         }
 
-        ExprKind::Assign(a) => is_expr_tainted(&a.value, ctx, db, file),
+        ExprKind::Assign(a) => expr_taint(&a.value, ctx, db, file),
 
         ExprKind::Binary(op) => {
-            is_expr_tainted(&op.left, ctx, db, file) || is_expr_tainted(&op.right, ctx, db, file)
+            expr_taint(&op.left, ctx, db, file) | expr_taint(&op.right, ctx, db, file)
         }
 
-        ExprKind::UnaryPrefix(u) => is_expr_tainted(&u.operand, ctx, db, file),
+        ExprKind::UnaryPrefix(u) => expr_taint(&u.operand, ctx, db, file),
 
         ExprKind::InterpolatedString(parts)
         | ExprKind::Heredoc { parts, .. }
-        | ExprKind::ShellExec(parts) => parts.iter().any(|p| match p {
-            StringPart::Expr(e) => is_expr_tainted(e, ctx, db, file),
-            StringPart::Literal(_) => false,
+        | ExprKind::ShellExec(parts) => parts.iter().fold(Taint::NONE, |acc, p| match p {
+            StringPart::Expr(e) => acc | expr_taint(e, ctx, db, file),
+            StringPart::Literal(_) => acc,
         }),
 
-        ExprKind::Ternary(t) => match &t.then_expr {
-            Some(then_e) => {
-                is_expr_tainted(then_e, ctx, db, file)
-                    || is_expr_tainted(&t.else_expr, ctx, db, file)
-            }
-            // Short ternary (`$x ?: $y`): the true branch's VALUE is the
-            // condition itself, not a separate expression — `then_expr` is
-            // `None` for this form, so the condition's own taint must be
-            // checked too, not just skipped.
-            None => {
-                is_expr_tainted(&t.condition, ctx, db, file)
-                    || is_expr_tainted(&t.else_expr, ctx, db, file)
-            }
-        },
-
-        // `$x ?? $default` — tainted if either side could be, same as a
-        // ternary. This is the single most common superglobal-read idiom
-        // (`$_GET['x'] ?? 'default'`), so missing it left a large real-world
-        // coverage hole.
-        ExprKind::NullCoalesce(nc) => {
-            is_expr_tainted(&nc.left, ctx, db, file) || is_expr_tainted(&nc.right, ctx, db, file)
+        // Short ternary (`$x ?: $y`): the true branch's value is the condition itself.
+        ExprKind::Ternary(t) => {
+            let then_taint = match &t.then_expr {
+                Some(then_e) => expr_taint(then_e, ctx, db, file),
+                None => expr_taint(&t.condition, ctx, db, file),
+            };
+            then_taint | expr_taint(&t.else_expr, ctx, db, file)
         }
 
-        // Numeric/boolean casts sanitize: PHP coerces the value to that scalar
-        // type, so a subsequent SQL/shell/HTML sink can no longer receive
-        // arbitrary attacker-controlled text through it. String/array/object
-        // casts don't remove the payload, so taint still propagates.
+        ExprKind::NullCoalesce(nc) => {
+            expr_taint(&nc.left, ctx, db, file) | expr_taint(&nc.right, ctx, db, file)
+        }
+
+        // Numeric/boolean casts sanitize; string/array/object casts keep the payload.
         ExprKind::Cast(kind, inner) => match kind {
             php_ast::ast::CastKind::Int
             | php_ast::ast::CastKind::Float
-            | php_ast::ast::CastKind::Bool => false,
-            _ => is_expr_tainted(inner, ctx, db, file),
+            | php_ast::ast::CastKind::Bool => Taint::NONE,
+            _ => expr_taint(inner, ctx, db, file),
         },
 
-        ExprKind::Match(m) => m
-            .arms
-            .iter()
-            .any(|arm| is_expr_tainted(&arm.body, ctx, db, file)),
-
-        // An element's KEY can carry taint just as much as its value
-        // (`[$_GET['env'] => 'active']` — the attacker controls which key
-        // exists), but only `el.value` was ever checked here.
-        ExprKind::Array(elements) => elements.iter().any(|el| {
-            is_expr_tainted(&el.value, ctx, db, file)
-                || el
-                    .key
-                    .as_ref()
-                    .is_some_and(|k| is_expr_tainted(k, ctx, db, file))
+        ExprKind::Match(m) => m.arms.iter().fold(Taint::NONE, |acc, arm| {
+            acc | expr_taint(&arm.body, ctx, db, file)
         }),
 
-        // `@taint-source`-annotated function/method calls are themselves a
-        // taint source, mirroring `@taint-sink`'s mechanism on the source
-        // side. A general "any call result could be tainted" pass-through
-        // (e.g. htmlspecialchars-style sanitizers, or an unannotated call
-        // whose body reads a superglobal) is NOT modeled — that's a much
-        // bigger, deliberately deferred change.
+        // An element's key can carry taint just as much as its value.
+        ExprKind::Array(elements) => elements.iter().fold(Taint::NONE, |acc, el| {
+            let key = el
+                .key
+                .as_ref()
+                .map_or(Taint::NONE, |k| expr_taint(k, ctx, db, file));
+            acc | key | expr_taint(&el.value, ctx, db, file)
+        }),
+
         ExprKind::FunctionCall(fc) => {
             if let ExprKind::Identifier(name) = &fc.name.kind {
-                // `getallheaders()`/`apache_request_headers()` return the raw
-                // HTTP request headers — as attacker-controlled as any
-                // superglobal, but neither was ever treated as a source
-                // (unlike $_SERVER, which only covers some of the same data).
+                let lower_name = crate::util::php_ident_lowercase(name.as_ref());
                 if matches!(
-                    crate::util::php_ident_lowercase(name.as_ref()).as_str(),
+                    lower_name.as_str(),
                     "getallheaders" | "apache_request_headers"
                 ) {
-                    return true;
+                    return Taint::ALL;
                 }
-                // `sprintf`/`vsprintf` interpolate every argument straight
-                // into the returned string — a tainted format string OR any
-                // tainted interpolated value makes the result tainted, the
-                // same pass-through `call/function.rs`/`call/callable.rs`
-                // already special-case for these two builtins' return-type
-                // inference.
+                if let Some(removed) = sanitized_kinds(&lower_name) {
+                    return args_taint(&fc.args, ctx, db, file).without(removed);
+                }
+                // `compact('id')` copies `$id`'s current value into the
+                // returned array; only literal names are resolved, matching
+                // `compact_return_type`.
+                if lower_name == "compact" {
+                    return fc.args.iter().filter_map(|a| a.value.as_ref()).fold(
+                        Taint::NONE,
+                        |acc, v| match &v.kind {
+                            ExprKind::String(var_name) => acc | ctx.var_taint(var_name.as_ref()),
+                            _ => acc,
+                        },
+                    );
+                }
+                if is_taint_pass_through(&lower_name) {
+                    return args_taint(&fc.args, ctx, db, file);
+                }
+                // The callback's body isn't analyzed: the result is tainted
+                // whenever the source array is. `array_map`'s arrays start at
+                // index 1, `array_filter`/`array_reduce`'s at index 0.
+                if lower_name == "array_map" {
+                    return args_taint(fc.args.get(1..).unwrap_or_default(), ctx, db, file);
+                }
                 if matches!(
-                    crate::util::php_ident_lowercase(name.as_ref()).as_str(),
-                    "sprintf" | "vsprintf"
-                ) && fc.args.iter().any(|a| {
-                    a.value
-                        .as_ref()
-                        .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
-                }) {
-                    return true;
-                }
-                // `compact('id')` copies `$id`'s CURRENT value into the
-                // returned array under key `'id'` — `call/array_builtins.rs`'s
-                // `compact_return_type` already reads each named variable's
-                // TYPE this same way for shape inference; do the same lookup
-                // for taint so `$data = compact('id'); echo $data['id'];`
-                // is recognized as tainted when `$id` is. Only literal
-                // string argument names are handled, matching
-                // `compact_return_type`'s own scope (a dynamic/computed name
-                // bails there too).
-                if crate::util::php_ident_lowercase(name.as_ref()) == "compact"
-                    && fc.args.iter().any(|a| {
-                        a.value.as_ref().is_some_and(|v| {
-                            matches!(&v.kind, ExprKind::String(var_name) if ctx.is_tainted(var_name.as_ref()))
-                        })
-                    })
-                {
-                    return true;
-                }
-                // A broad set of non-sanitizing string-transform builtins pass
-                // taint straight through, unchanged — same "any tainted
-                // argument taints the result" rule already established for
-                // sprintf/vsprintf above. Deliberately excludes genuine
-                // sanitizers/encoders (htmlspecialchars, htmlentities,
-                // addslashes, urlencode, rawurlencode,
-                // quoted_printable_encode, …), which correctly stay untainted.
-                if matches!(
-                    crate::util::php_ident_lowercase(name.as_ref()).as_str(),
-                    "str_replace"
-                        | "str_ireplace"
-                        | "preg_replace"
-                        | "preg_replace_callback"
-                        | "substr_replace"
-                        | "trim"
-                        | "ltrim"
-                        | "rtrim"
-                        | "explode"
-                        | "implode"
-                        | "join"
-                        | "strtolower"
-                        | "strtoupper"
-                        | "mb_strtolower"
-                        | "mb_strtoupper"
-                        | "ucfirst"
-                        | "ucwords"
-                        | "wordwrap"
-                        | "chunk_split"
-                        | "str_pad"
-                        | "str_rot13"
-                        | "nl2br"
-                ) && fc.args.iter().any(|a| {
-                    a.value
-                        .as_ref()
-                        .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
-                }) {
-                    return true;
-                }
-                // `array_map`/`array_filter`/`array_reduce` don't need their
-                // callback's BODY analyzed to know the result can carry
-                // taint — same "check the args, not the callee" shortcut
-                // `compact` above already relies on: the result is tainted
-                // whenever the SOURCE array argument is, regardless of what
-                // the callback does to individual elements (conservative,
-                // since the callback could just pass a value through).
-                // `array_map`'s array arguments start at index 1 (any of
-                // 2+ parallel arrays counts); `array_filter`/`array_reduce`
-                // take theirs at index 0.
-                let lower_name = crate::util::php_ident_lowercase(name.as_ref());
-                if lower_name == "array_map"
-                    && fc.args.iter().skip(1).any(|a| {
-                        a.value
-                            .as_ref()
-                            .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
-                    })
-                {
-                    return true;
-                }
-                if matches!(lower_name.as_str(), "array_filter" | "array_reduce")
-                    && fc.args.first().is_some_and(|a| {
-                        a.value
-                            .as_ref()
-                            .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
-                    })
-                {
-                    return true;
-                }
-                // `json_decode($_GET['payload'], true)` — attacker fully
-                // controls the decoded structure's keys/values, but a call
-                // result is never tainted unless matched here; JSON-body web
-                // APIs are a common real-world route for this.
-                if lower_name == "json_decode"
-                    && fc.args.first().is_some_and(|a| {
-                        a.value
-                            .as_ref()
-                            .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
-                    })
-                {
-                    return true;
+                    lower_name.as_str(),
+                    "array_filter" | "array_reduce" | "json_decode"
+                ) {
+                    return args_taint(fc.args.get(..1).unwrap_or_default(), ctx, db, file);
                 }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
-                    return true;
+                    return Taint::ALL;
                 }
             } else if let ExprKind::ArrowFunction(af) = &unwrap_parens(&fc.name).kind {
-                // An immediately-invoked, argument-less arrow function
-                // (`(fn() => $_GET['x'])()`) is tainted iff its single
-                // expression body is — narrower than the general
-                // "any call result could be tainted" pass-through this
-                // module deliberately doesn't model (see the comment
-                // above), since an arrow function's body is a single
-                // expression evaluated with no params to shadow the outer
-                // scope, so checking it directly against the SAME `ctx`
-                // is sound here specifically. A closure (`function(){...}`)
-                // or an arrow function taking arguments is NOT covered —
-                // both need real per-callee analysis, not a same-ctx check.
+                // An immediately-invoked, argument-less arrow function has no
+                // params to shadow the outer scope, so its body can be checked
+                // against the same `ctx`.
                 if af.params.is_empty() && fc.args.is_empty() {
-                    return is_expr_tainted(&af.body, ctx, db, file);
+                    return expr_taint(&af.body, ctx, db, file);
                 }
             }
-            false
+            Taint::NONE
         }
 
-        // self::$prop / Foo::$prop — tainted if this static property was
-        // previously assigned a tainted value (see FlowState::taint_static_prop,
-        // set on static-property writes in expr/assignment.rs).
         ExprKind::StaticPropertyAccess(spa) => {
             crate::expr::assignment::resolve_static_prop_target(spa, ctx, db, file)
-                .is_some_and(|(fqcn, prop_name)| ctx.is_static_prop_tainted(&fqcn, &prop_name))
+                .map_or(Taint::NONE, |(fqcn, prop_name)| {
+                    ctx.static_prop_taint(&fqcn, &prop_name)
+                })
         }
 
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             if let ExprKind::Identifier(method_name) = &mc.method.kind {
-                // Chain-walk the receiver (`$this->req->getParam()`) the same
-                // way the purity checks already do for a write, instead of
-                // requiring `mc.object` to literally BE a bare variable.
                 if let Some(recv_ty) = crate::expr::assignment::resolve_chained_receiver_type(
                     &mc.object, ctx, db, file,
                 ) {
                     let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                     for atom in &recv_ty.types {
                         if let mir_types::Atomic::TNamedObject { fqcn, .. } = atom {
+                            if let Some(removed) =
+                                sanitized_method_kinds(db, fqcn.as_ref(), &method_lower)
+                            {
+                                return args_taint(&mc.args, ctx, db, file).without(removed);
+                            }
                             let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                             if crate::db::find_method_respecting_precedence(db, here, &method_lower)
                                 .is_some_and(|(_, m)| m.is_taint_source)
                             {
-                                return true;
+                                return Taint::ALL;
                             }
                         }
                     }
                 }
             }
-            false
+            Taint::NONE
         }
 
-        // Foo::getQuery() / self::getQuery() with @taint-source — static-call
-        // counterpart of the instance-method arm above, which this had no
-        // pairing for at all (unlike the read-side StaticPropertyAccess arm
-        // right below, which already handles self/static/parent).
         ExprKind::StaticMethodCall(smc) => {
             let fqcn_opt: Option<std::sync::Arc<str>> = if let ExprKind::Identifier(id) =
                 &smc.class.kind
@@ -655,10 +649,7 @@ pub fn is_expr_tainted(
                     s => Some(std::sync::Arc::from(s)),
                 }
             } else {
-                // `$class::method()` / `$this::method()` — a variable
-                // holding a class-string or object instance. Mirrors the
-                // instance-method arm's chained-receiver resolution above
-                // instead of requiring a literal class name.
+                // `$class::method()` / `$this::method()`.
                 crate::expr::assignment::resolve_chained_receiver_type(&smc.class, ctx, db, file)
                     .and_then(|ty| {
                         ty.types.iter().find_map(|atom| match atom {
@@ -679,14 +670,94 @@ pub fn is_expr_tainted(
                 if crate::db::find_method_respecting_precedence(db, here, &method_lower)
                     .is_some_and(|(_, m)| m.is_taint_source)
                 {
-                    return true;
+                    return Taint::ALL;
                 }
             }
-            false
+            Taint::NONE
         }
 
-        // Conservative: function call results are not tracked as tainted
-        // unless it's a known pass-through built-in (htmlspecialchars sanitizes)
-        _ => false,
+        _ => Taint::NONE,
     }
+}
+
+/// Builtins whose result carries every argument's taint unchanged.
+fn is_taint_pass_through(fn_name_lower: &str) -> bool {
+    matches!(
+        fn_name_lower,
+        "sprintf"
+            | "vsprintf"
+            | "str_replace"
+            | "str_ireplace"
+            | "preg_replace"
+            | "preg_replace_callback"
+            | "substr_replace"
+            | "trim"
+            | "ltrim"
+            | "rtrim"
+            | "explode"
+            | "implode"
+            | "join"
+            | "strtolower"
+            | "strtoupper"
+            | "mb_strtolower"
+            | "mb_strtoupper"
+            | "ucfirst"
+            | "ucwords"
+            | "wordwrap"
+            | "chunk_split"
+            | "str_pad"
+            | "str_rot13"
+            | "nl2br"
+    )
+}
+
+/// Taint kinds a sanitizing builtin removes from its arguments' taint.
+fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
+    Some(match fn_name_lower {
+        "htmlspecialchars" | "htmlentities" | "strip_tags" => Taint::HTML,
+        "addslashes"
+        | "mysqli_real_escape_string"
+        | "mysqli_escape_string"
+        | "mysql_real_escape_string"
+        | "mysql_escape_string"
+        | "pg_escape_string"
+        | "pg_escape_literal"
+        | "pg_escape_identifier"
+        | "pg_escape_bytea"
+        | "sqlite_escape_string"
+        | "db2_escape_string" => Taint::SQL,
+        "escapeshellarg" | "escapeshellcmd" => Taint::SHELL,
+        "ldap_escape" => Taint::LDAP,
+        // Output is limited to `[A-Za-z0-9%+._~-]`.
+        "urlencode" | "rawurlencode" => {
+            Taint::HTML
+                | Taint::SQL
+                | Taint::SHELL
+                | Taint::HEADER
+                | Taint::COOKIE
+                | Taint::LDAP
+                | Taint::XPATH
+        }
+        "md5" | "sha1" | "crc32" | "hash" | "hash_hmac" | "password_hash" | "bin2hex"
+        | "dechex" | "decbin" | "decoct" | "number_format" | "uniqid" => Taint::ALL,
+        _ => return None,
+    })
+}
+
+/// Taint kinds an escaping method of a builtin database class removes.
+fn sanitized_method_kinds(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_lower: &str,
+) -> Option<Taint> {
+    let is_a = |base: &str| {
+        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+    };
+    let escapes = match method_lower {
+        "quote" => is_a("PDO"),
+        "real_escape_string" | "escape_string" => is_a("mysqli"),
+        "escapestring" => is_a("SQLite3"),
+        _ => false,
+    };
+    escapes.then_some(Taint::SQL)
 }
