@@ -8,6 +8,23 @@ const YAML_ANY_BREAK = 0;
 const YAML_CR_BREAK = 1;
 const YAML_LN_BREAK = 2;
 const YAML_CRLN_BREAK = 3;
+const YAML_ANY_SCALAR_STYLE = 0;
+const YAML_PLAIN_SCALAR_STYLE = 1;
+const YAML_SINGLE_QUOTED_SCALAR_STYLE = 2;
+const YAML_DOUBLE_QUOTED_SCALAR_STYLE = 3;
+const YAML_LITERAL_SCALAR_STYLE = 4;
+const YAML_FOLDED_SCALAR_STYLE = 5;
+const YAML_NULL_TAG = 'tag:yaml.org,2002:null';
+const YAML_BOOL_TAG = 'tag:yaml.org,2002:bool';
+const YAML_STR_TAG = 'tag:yaml.org,2002:str';
+const YAML_INT_TAG = 'tag:yaml.org,2002:int';
+const YAML_FLOAT_TAG = 'tag:yaml.org,2002:float';
+const YAML_TIMESTAMP_TAG = 'tag:yaml.org,2002:timestamp';
+const YAML_SEQ_TAG = 'tag:yaml.org,2002:seq';
+const YAML_MAP_TAG = 'tag:yaml.org,2002:map';
+const YAML_PHP_TAG = '!php/object';
+const YAML_MERGE_TAG = 'tag:yaml.org,2002:merge';
+const YAML_BINARY_TAG = 'tag:yaml.org,2002:binary';
 
 /**
  * Parse a YAML string.

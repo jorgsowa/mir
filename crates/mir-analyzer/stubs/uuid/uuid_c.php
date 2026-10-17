@@ -1,11 +1,17 @@
 <?php
 
+const UUID_VARIANT_NCS = 0;
+const UUID_VARIANT_DCE = 1;
+const UUID_VARIANT_MICROSOFT = 2;
+const UUID_VARIANT_OTHER = 3;
 const UUID_TYPE_DEFAULT = 0;
 const UUID_TYPE_TIME = 1;
-const UUID_TYPE_DCE = 2;
-const UUID_TYPE_NAME_MD5 = 3;
+const UUID_TYPE_NAME = 1;
+const UUID_TYPE_SECURITY = 2;
+const UUID_TYPE_MD5 = 3;
+const UUID_TYPE_DCE = 4;
 const UUID_TYPE_RANDOM = 4;
-const UUID_TYPE_NAME_SHA1 = 5;
+const UUID_TYPE_SHA1 = 5;
 const UUID_TYPE_NULL = -1;
 const UUID_TYPE_INVALID = -42;
 
@@ -40,6 +46,22 @@ function uuid_compare(string $uuid1, string $uuid2): int {}
 function uuid_is_null(string $uuid): bool {}
 
 /**
+ * Generate an MD5-hashed (version 3) UUID from a namespace UUID and a name.
+ *
+ * @param string $uuid_ns
+ * @param string $name
+ */
+function uuid_generate_md5(string $uuid_ns, string $name): string {}
+
+/**
+ * Generate a SHA1-hashed (version 5) UUID from a namespace UUID and a name.
+ *
+ * @param string $uuid_ns
+ * @param string $name
+ */
+function uuid_generate_sha1(string $uuid_ns, string $name): string {}
+
+/**
  * Return the UUID type.
  *
  * @param string $uuid
@@ -51,6 +73,7 @@ function uuid_type(string $uuid): int {}
  * Return the UUID variant.
  *
  * @param string $uuid
+ * @return int One of the UUID_VARIANT_* constants.
  */
 function uuid_variant(string $uuid): int {}
 
@@ -58,27 +81,27 @@ function uuid_variant(string $uuid): int {}
  * Extract the time from a time-based UUID.
  *
  * @param string $uuid A UUID_TYPE_TIME UUID.
- * @return int Unix timestamp encoded in the UUID.
+ * @return int|false Unix timestamp encoded in the UUID, or false on failure.
  */
-function uuid_time(string $uuid): int {}
+function uuid_time(string $uuid): int|false {}
 
 /**
  * Extract the MAC address from a time-based UUID.
  *
  * @param string $uuid A UUID_TYPE_TIME UUID.
  */
-function uuid_mac(string $uuid): string {}
+function uuid_mac(string $uuid): string|false {}
 
 /**
  * Convert a UUID string to a binary representation.
  *
  * @param string $uuid
  */
-function uuid_parse(string $uuid): string {}
+function uuid_parse(string $uuid): string|false {}
 
 /**
  * Convert a binary UUID to its string representation.
  *
  * @param string $uuid Binary UUID (16 bytes).
  */
-function uuid_unparse(string $uuid): string {}
+function uuid_unparse(string $uuid): string|false {}
