@@ -559,8 +559,22 @@ pub fn expr_taint(
                 ) {
                     return Taint::ALL;
                 }
+                if reads_raw_request_body(&lower_name, &fc.args) {
+                    return Taint::ALL;
+                }
+                if let Some(taint) = filter_call_taint(&lower_name, &fc.args, ctx, db, file) {
+                    return taint;
+                }
                 if let Some(removed) = sanitized_kinds(&lower_name) {
                     return args_taint(&fc.args, ctx, db, file).without(removed);
+                }
+                if let Some(restored) = unescaped_kinds(&lower_name) {
+                    let taint = args_taint(&fc.args, ctx, db, file);
+                    return if taint.is_empty() {
+                        taint
+                    } else {
+                        taint | restored
+                    };
                 }
                 // `compact('id')` copies `$id`'s current value into the
                 // returned array; only literal names are resolved, matching
@@ -574,25 +588,28 @@ pub fn expr_taint(
                         },
                     );
                 }
-                if is_taint_pass_through(&lower_name) {
-                    return args_taint(&fc.args, ctx, db, file);
-                }
-                // The callback's body isn't analyzed: the result is tainted
-                // whenever the source array is. `array_map`'s arrays start at
-                // index 1, `array_filter`/`array_reduce`'s at index 0.
-                if lower_name == "array_map" {
-                    return args_taint(fc.args.get(1..).unwrap_or_default(), ctx, db, file);
-                }
-                if matches!(
-                    lower_name.as_str(),
-                    "array_filter" | "array_reduce" | "json_decode"
-                ) {
-                    return args_taint(fc.args.get(..1).unwrap_or_default(), ctx, db, file);
-                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
-                if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
+                let func = crate::db::find_function(db, here);
+                if func.as_ref().is_some_and(|f| f.is_taint_source) {
                     return Taint::ALL;
+                }
+                // A builtin's result is derived from its arguments unless it can
+                // only return values that carry no payload (`strlen`, `is_numeric`).
+                let global = resolved.trim_start_matches('\\');
+                if !global.contains('\\')
+                    && crate::stubs::is_builtin_function(&crate::util::php_ident_lowercase(global))
+                {
+                    let safe_return = func
+                        .as_ref()
+                        .and_then(|f| f.return_type.as_deref())
+                        .is_some_and(|ty| ty.is_void() || is_injection_safe_type(ty));
+                    // A path sink returns file data, not the path; a tainted path
+                    // is reported at the call itself.
+                    let reads_path = classify_sink(&lower_name) == Some(SinkKind::File);
+                    if !safe_return && !reads_path {
+                        return args_taint(&fc.args, ctx, db, file);
+                    }
                 }
             } else if let ExprKind::ArrowFunction(af) = &unwrap_parens(&fc.name).kind {
                 // An immediately-invoked, argument-less arrow function has no
@@ -680,35 +697,57 @@ pub fn expr_taint(
     }
 }
 
-/// Builtins whose result carries every argument's taint unchanged.
-fn is_taint_pass_through(fn_name_lower: &str) -> bool {
+/// `file_get_contents('php://input')` and friends read the raw request body.
+fn reads_raw_request_body(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
     matches!(
         fn_name_lower,
-        "sprintf"
-            | "vsprintf"
-            | "str_replace"
-            | "str_ireplace"
-            | "preg_replace"
-            | "preg_replace_callback"
-            | "substr_replace"
-            | "trim"
-            | "ltrim"
-            | "rtrim"
-            | "explode"
-            | "implode"
-            | "join"
-            | "strtolower"
-            | "strtoupper"
-            | "mb_strtolower"
-            | "mb_strtoupper"
-            | "ucfirst"
-            | "ucwords"
-            | "wordwrap"
-            | "chunk_split"
-            | "str_pad"
-            | "str_rot13"
-            | "nl2br"
+        "file_get_contents" | "fopen" | "file" | "readfile" | "stream_get_contents"
+    ) && matches!(
+        args.first().and_then(|a| a.value.as_ref()).map(|v| &v.kind),
+        Some(ExprKind::String(path))
+            if path.eq_ignore_ascii_case("php://input") || path.eq_ignore_ascii_case("php://stdin")
     )
+}
+
+/// Taint of a `filter_var()`/`filter_input()` result: validating filters
+/// (`FILTER_VALIDATE_INT`, …) leave nothing injectable, escaping ones remove
+/// their own kind, everything else passes the input through.
+fn filter_call_taint(
+    fn_name_lower: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    let arg = |i: usize| args.get(i).and_then(|a| a.value.as_ref());
+    let (input, filter) = match fn_name_lower {
+        "filter_var" => (
+            arg(0).map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file)),
+            arg(1),
+        ),
+        "filter_input" => (Taint::ALL, arg(2)),
+        "filter_input_array" => return Some(Taint::ALL),
+        _ => return None,
+    };
+    let filter_name = match filter.map(|f| &f.kind) {
+        Some(ExprKind::Identifier(name)) => name.trim_start_matches('\\').to_ascii_uppercase(),
+        _ => return Some(input),
+    };
+    Some(match filter_name.as_str() {
+        "FILTER_VALIDATE_INT"
+        | "FILTER_VALIDATE_FLOAT"
+        | "FILTER_VALIDATE_BOOLEAN"
+        | "FILTER_VALIDATE_BOOL"
+        | "FILTER_VALIDATE_IP"
+        | "FILTER_VALIDATE_MAC"
+        | "FILTER_SANITIZE_NUMBER_INT"
+        | "FILTER_SANITIZE_NUMBER_FLOAT" => Taint::NONE,
+        "FILTER_SANITIZE_SPECIAL_CHARS" | "FILTER_SANITIZE_FULL_SPECIAL_CHARS" => {
+            input.without(Taint::HTML)
+        }
+        "FILTER_SANITIZE_ENCODED" => input.without(sanitized_kinds("urlencode")?),
+        _ => input,
+    })
 }
 
 /// Taint kinds a sanitizing builtin removes from its arguments' taint.
@@ -740,6 +779,16 @@ fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
         }
         "md5" | "sha1" | "crc32" | "hash" | "hash_hmac" | "password_hash" | "bin2hex"
         | "dechex" | "decbin" | "decoct" | "number_format" | "uniqid" => Taint::ALL,
+        _ => return None,
+    })
+}
+
+/// Taint kinds a decoding builtin restores on already-tainted input.
+fn unescaped_kinds(fn_name_lower: &str) -> Option<Taint> {
+    Some(match fn_name_lower {
+        "html_entity_decode" | "htmlspecialchars_decode" => Taint::HTML,
+        "stripslashes" | "stripcslashes" => Taint::SQL,
+        "urldecode" | "rawurldecode" => sanitized_kinds("urlencode")?,
         _ => return None,
     })
 }
