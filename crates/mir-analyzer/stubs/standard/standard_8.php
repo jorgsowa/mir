@@ -949,6 +949,7 @@ function range(
 /**
  * Sort multiple or multi-dimensional arrays
  * @link https://php.net/manual/en/function.array-multisort.php
+ * @param-out array $array
  * @param array &$array <p>
  * An array being sorted.
  * </p>

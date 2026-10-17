@@ -238,6 +238,8 @@ impl DefinitionCollector<'_> {
                 continue;
             }
             let param_name = p.name.as_deref().unwrap_or_default();
+            let has_native_type =
+                p.type_hint.is_some() || self.version_attr_type_string(&p.attributes).is_some();
             let native_ty =
                 self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint_owned(h, None)));
             let doc_type_raw = doc
@@ -324,8 +326,14 @@ impl DefinitionCollector<'_> {
                 resolved
             });
             let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
-            let (ty, out_ty) =
-                super::stub_out_param_types(&self.file, p.by_ref, has_default, ty, out_ty);
+            let (ty, out_ty) = super::stub_out_param_types(
+                &self.file,
+                p.by_ref,
+                has_default,
+                has_native_type,
+                ty,
+                out_ty,
+            );
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),

@@ -233,20 +233,30 @@ pub(crate) fn preserve_native_nullability(native: &Type, mut doc: Type) -> Type 
     doc
 }
 
-/// In a bundled stub, a by-ref param with a default and no `@param-out` is an
-/// out-param: PHP's arginfo leaves every such param untyped and never checks
-/// the incoming value (`preg_match($p, $s, $matches)` with a string `$matches`
-/// is fine). Its declared type only describes what the call writes back, so it
-/// moves to the out-type and the in-type becomes `mixed`. In/out params that
-/// read the incoming value declare `@param-out` explicitly and keep their type.
+/// In a bundled stub, a by-ref param with a default or without a native type,
+/// and with no `@param-out`, is an out-param: PHP's arginfo leaves such params
+/// untyped and never checks the incoming value (`preg_match($p, $s, $matches)`
+/// with a string `$matches`, `openssl_sign($d, $sig, $k)` with a null `$sig`).
+/// Its declared type only describes what the call writes back, so it moves to
+/// the out-type and the in-type becomes `mixed`. In/out params that read the
+/// incoming value declare `@param-out` explicitly and keep their type. A
+/// template-typed param is left alone, so an unbound template is still never
+/// written back.
 pub(crate) fn stub_out_param_types(
     file: &str,
     by_ref: bool,
     has_default: bool,
+    has_native_type: bool,
     ty: Option<Type>,
     out_ty: Option<Type>,
 ) -> (Option<Type>, Option<Type>) {
-    if by_ref && has_default && out_ty.is_none() && ty.is_some() && crate::stubs::is_stub_path(file)
+    if by_ref
+        && (has_default || !has_native_type)
+        && out_ty.is_none()
+        && ty
+            .as_ref()
+            .is_some_and(|t| !crate::call::has_unbound_template(t))
+        && crate::stubs::is_stub_path(file)
     {
         (Some(Type::mixed()), ty)
     } else {
@@ -2302,6 +2312,8 @@ impl<'a> DefinitionCollector<'a> {
                 continue;
             }
             let param_name = p.name.as_deref().unwrap_or_default();
+            let has_native_type =
+                p.type_hint.is_some() || self.version_attr_type_string(&p.attributes).is_some();
             let native_ty = self.resolve_union_opt(
                 p.type_hint
                     .as_ref()
@@ -2400,7 +2412,14 @@ impl<'a> DefinitionCollector<'a> {
                 Self::fill_self_static_parent(resolved, class_fqcn)
             });
             let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
-            let (ty, out_ty) = stub_out_param_types(&self.file, p.by_ref, has_default, ty, out_ty);
+            let (ty, out_ty) = stub_out_param_types(
+                &self.file,
+                p.by_ref,
+                has_default,
+                has_native_type,
+                ty,
+                out_ty,
+            );
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
