@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, FileAnalyzer, PhpVersion};
 
 const SMALL_STACK: usize = 512 * 1024;
 
@@ -12,7 +12,7 @@ fn analyze_on_small_stack(files: Vec<(&'static str, String)>) -> Vec<String> {
     std::thread::Builder::new()
         .stack_size(SMALL_STACK)
         .spawn(move || {
-            let mut session = AnalysisSession::new(PhpVersion::LATEST);
+            let mut session = fresh_session(PhpVersion::LATEST);
             for (path, src) in &files {
                 session.ingest_file(Arc::from(*path), Arc::from(src.as_str()));
             }

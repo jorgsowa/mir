@@ -5,7 +5,7 @@
 /// downstream recomputation.
 ///
 /// Run with: cargo test --test it benchmark_noop_save:: -- --nocapture --ignored
-use mir_analyzer::AnalysisSession;
+use mir_analyzer::{test_utils::fresh_session, AnalysisSession};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -214,7 +214,7 @@ fn benchmark_no_op_file_save() {
 #[test]
 fn verify_no_op_correctness() {
     // Verify that no-op file saves produce identical results
-    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = fresh_session(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("test_file.php");
@@ -240,7 +240,7 @@ fn verify_no_op_correctness() {
 
 #[test]
 fn no_op_ingest_preserves_reference_postings() {
-    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = fresh_session(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let base: Arc<str> = Arc::from("base.php");

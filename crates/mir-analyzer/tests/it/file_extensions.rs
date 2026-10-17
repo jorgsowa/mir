@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use mir_analyzer::{
     composer::Psr4Map, discover_files, discover_files_with_extensions, include_closure,
-    AnalysisSession, BatchOptions, PhpFileExtensions, PhpVersion, VendorTargets,
+    test_utils::fresh_session, BatchOptions, PhpFileExtensions, PhpVersion, VendorTargets,
 };
 use mir_issues::IssueKind;
 
@@ -42,7 +42,7 @@ fn module_and_inc_fixture() -> Fixture {
 }
 
 fn undefined_functions(files: &[PathBuf]) -> Vec<String> {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
     let result = session.analyze_paths(files, &BatchOptions::new().without_symbols());
     result

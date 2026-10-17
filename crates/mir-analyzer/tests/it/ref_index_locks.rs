@@ -5,7 +5,10 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, IndexCancel, Name, PhpVersion, ReferenceIncludes};
+use mir_analyzer::{
+    test_utils::{fresh_session, TestSession},
+    AnalysisSession, IndexCancel, Name, PhpVersion, ReferenceIncludes,
+};
 
 const TARGET: &str = "<?php\nclass Target { public function process(): void {} }\n";
 
@@ -15,8 +18,8 @@ fn target_with(edit: usize) -> Arc<str> {
 
 /// A declaring class plus `noise` classes that all mention `process`, so the
 /// reference gate admits every file as a candidate.
-fn workspace(noise: usize) -> (AnalysisSession, Vec<Arc<str>>) {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+fn workspace(noise: usize) -> (TestSession, Vec<Arc<str>>) {
+    let mut session = fresh_session(PhpVersion::LATEST);
     let mut files: Vec<Arc<str>> = vec![Arc::from("Target.php")];
     session.ingest_file(files[0].clone(), target_with(0));
     for i in 0..noise {

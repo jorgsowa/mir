@@ -9,12 +9,15 @@ use std::fs;
 use std::sync::Arc;
 
 use mir_analyzer::symbol::ReferenceKind;
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+use mir_analyzer::{
+    test_utils::{fresh_session, TestSession},
+    AnalysisSession, FileAnalyzer, PhpVersion,
+};
 
 use crate::common::create_temp_dir;
 
 fn parse_and_analyze(source: &str) -> mir_analyzer::FileAnalysis {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(source));
 
@@ -29,7 +32,7 @@ fn parse_and_analyze(source: &str) -> mir_analyzer::FileAnalysis {
 }
 
 fn parse_and_analyze_diagnostics(source: &str) -> mir_analyzer::FileAnalysis {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(source));
 
@@ -48,8 +51,8 @@ fn parse_and_analyze_diagnostics(source: &str) -> mir_analyzer::FileAnalysis {
     )
 }
 
-fn session_for_source(path: &str, source: &str) -> (AnalysisSession, Arc<str>) {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+fn session_for_source(path: &str, source: &str) -> (TestSession, Arc<str>) {
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from(path);
     session.ingest_file(file.clone(), Arc::from(source));
     (session, file)
@@ -118,7 +121,7 @@ function demo(): void {
     totally_undefined_function();
 }
 ";
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/demo.php");
     session.ingest_file(file.clone(), Arc::from(src));
 
@@ -162,7 +165,7 @@ function demo(): void {
     totally_undefined_function();
 }
 ";
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let analysis = session.analyze_file_diagnostics("/proj/helper.php", src);
 
     assert!(
@@ -183,7 +186,7 @@ fn analysis_session_diagnostics_helper_preserves_parse_errors() {
     let src = "<?php
 function broken( {
 ";
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let analysis = session.analyze_file_diagnostics("/proj/broken.php", src);
 
     assert!(
@@ -353,7 +356,7 @@ fn symbol_at_finds_use_import_symbol() {
     let main = crate::common::write_file(&dir, "Main.php", main_src);
     let main_str = crate::common::path_to_str(&main).to_string();
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from(crate::common::path_to_str(&dep)),
         Arc::from(fs::read_to_string(&dep).unwrap()),
@@ -474,7 +477,7 @@ fn name_at_resolves_use_import_via_navigation_facts() {
     let main = crate::common::write_file(&dir, "Main.php", main_src);
     let main_str = crate::common::path_to_str(&main).to_string();
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from(crate::common::path_to_str(&dep)),
         Arc::from(fs::read_to_string(&dep).unwrap()),
@@ -574,7 +577,7 @@ fn version_test_issues(session: &mut AnalysisSession, src: &str) -> Vec<String> 
 /// than a blanket load failure.
 #[test]
 fn version_filter_since_php74_rejects_php80_function() {
-    let mut session = AnalysisSession::new(PhpVersion::new(7, 4));
+    let mut session = fresh_session(PhpVersion::new(7, 4));
     session.ensure_all_stubs();
 
     assert!(
@@ -599,7 +602,7 @@ fn version_filter_since_php74_rejects_php80_function() {
 /// proving Core.php was loaded and the symbol passed the version filter.
 #[test]
 fn version_filter_since_php80_accepts_php80_function() {
-    let mut session = AnalysisSession::new(PhpVersion::new(8, 0));
+    let mut session = fresh_session(PhpVersion::new(8, 0));
     session.ensure_all_stubs();
 
     assert!(
@@ -623,7 +626,7 @@ fn version_filter_since_php80_accepts_php80_function() {
 /// `hebrevc` is `@removed 8.0`. It must be resolvable on PHP 7.4 …
 #[test]
 fn version_filter_removed_php74_accepts_hebrevc() {
-    let mut session = AnalysisSession::new(PhpVersion::new(7, 4));
+    let mut session = fresh_session(PhpVersion::new(7, 4));
     session.ensure_all_stubs();
 
     assert!(
@@ -641,7 +644,7 @@ fn version_filter_removed_php74_accepts_hebrevc() {
 /// … and must be absent (and raise `UndefinedFunction`) on PHP 8.0.
 #[test]
 fn version_filter_removed_php80_rejects_hebrevc() {
-    let mut session = AnalysisSession::new(PhpVersion::new(8, 0));
+    let mut session = fresh_session(PhpVersion::new(8, 0));
     session.ensure_all_stubs();
 
     assert!(
@@ -663,7 +666,7 @@ fn version_filter_removed_php80_rejects_hebrevc() {
 /// regardless of the configured target version.
 #[test]
 fn version_filter_since_php83_rejects_php84_enum() {
-    let mut session = AnalysisSession::new(PhpVersion::new(8, 3));
+    let mut session = fresh_session(PhpVersion::new(8, 3));
     session.ensure_all_stubs();
 
     assert!(
@@ -676,7 +679,7 @@ fn version_filter_since_php83_rejects_php84_enum() {
 /// must be collected once the target version reaches @since.
 #[test]
 fn version_filter_since_php84_accepts_php84_enum() {
-    let mut session = AnalysisSession::new(PhpVersion::new(8, 4));
+    let mut session = fresh_session(PhpVersion::new(8, 4));
     session.ensure_all_stubs();
 
     assert!(
@@ -783,7 +786,7 @@ fn version_filter_independent_sessions_do_not_share_state() {
 /// behavior.
 #[test]
 fn definition_of_resolves_class_declaration_via_session() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/decls.php");
     let src = "<?php
 class Greeter {
@@ -829,7 +832,7 @@ function build(): Greeter { return new Greeter(); }
 fn document_symbols_lists_file_declarations() {
     use mir_analyzer::DeclarationKind;
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/outline.php");
     let src = "<?php
 class Cat { public function meow(): void {} }
@@ -853,7 +856,7 @@ function pet_count(): int { return 0; }
 /// `references_to` returns every recorded use of a symbol after Pass 2.
 #[test]
 fn references_to_returns_recorded_call_sites() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/refs.php");
     let src = "<?php
 function helper(): string { return 'a'; }
@@ -962,7 +965,7 @@ function caller(): string { return helper(); }
     let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/loc.php");
     session.ingest_file(file.clone(), Arc::from(src));
     let _analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
@@ -996,7 +999,7 @@ function caller(): string { return helper(); }
 /// real PHP built-ins.
 #[test]
 fn truly_unknown_function_still_emits_undefined_function() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/unknown_fn.php");
     let src = "<?php
 function caller(): void {
@@ -1049,7 +1052,7 @@ fn ensure_stub_for_unknown_symbol_returns_false() {
 /// Ingested definitions must be observable via the public query API.
 #[test]
 fn ingested_definitions_are_observable() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ingest_file(Arc::from("<test>"), Arc::from("<?php\nclass Foo {}\n"));
 
     assert!(
@@ -1064,7 +1067,7 @@ fn ingested_definitions_are_observable() {
 /// function without an explicit return-type hint.
 #[test]
 fn analyze_infers_return_types_without_prior_sweep() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/A.php");
     let src = "<?php
 function bar() { return 'hello'; }
@@ -1179,7 +1182,7 @@ fn invalidate_file_releases_all_per_file_state() {
 /// trace of the original `foo()` reference in `f.php`.
 #[test]
 fn re_ingesting_a_file_drops_its_stale_reference_locations() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/use_funcs.php");
 
     let v1 = "<?php
@@ -1377,7 +1380,7 @@ fn file_analyzer_self_loads_psr4_classes_without_pre_enumeration() {
 /// publish; the analyzer reports the facts).
 #[test]
 fn file_analyzer_reports_undefined_class_unconditionally() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
 
     let src = "<?php\nfunction probe(): void { new NotDefined(); }\n";
     let file: Arc<str> = Arc::from("<scan-test>");
@@ -1485,7 +1488,7 @@ fn vendor_autoload_files_functions_lazy_loaded_automatically() {
 /// doing any warm-up or analysis work.
 #[test]
 fn indexed_references_to_aborts_when_cancelled() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/cancel_refs.php");
     let src = "<?php
 function helper(): string { return 'a'; }
@@ -1507,7 +1510,7 @@ function caller(): string { return helper(); }
 /// warm-up skip set) keep returning the same locations.
 #[test]
 fn indexed_references_to_warm_repeat_is_stable() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/warm_refs.php");
     let src = "<?php
 function helper(): string { return 'a'; }
@@ -1558,7 +1561,7 @@ function caller(): string { return helper(); }
 /// new text are found by the next query.
 #[test]
 fn indexed_references_to_sees_new_refs_after_edit() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/edit_refs.php");
     let v1 = "<?php
 function helper(): string { return 'a'; }
@@ -1608,7 +1611,7 @@ function caller2(): string { return helper(); }
 /// that internal cycle handling to callers.
 #[test]
 fn indexed_references_to_handles_recursive_inference_candidates() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let mut files = Vec::new();
     for i in 0..8 {
         let next = (i + 1) % 8;
@@ -1653,7 +1656,7 @@ class C{i} {{
 /// exists, even though its own text never changes.
 #[test]
 fn indexed_references_to_recovers_from_commit_before_dependency_registered() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let caller_path: Arc<str> = Arc::from("/proj/caller.php");
     let caller_src = "<?php
 namespace App;
@@ -1720,7 +1723,7 @@ class Svc { public function run(): void {} }
 /// the ingest of a newly-defined symbol must advance the generation itself.
 #[test]
 fn indexed_references_to_recovers_when_dependency_appears_in_existing_file() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let caller_path: Arc<str> = Arc::from("/proj/caller.php");
     let caller_src = "<?php
 namespace App;

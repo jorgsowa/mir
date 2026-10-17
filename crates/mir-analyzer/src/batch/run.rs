@@ -859,12 +859,13 @@ impl AnalysisSession {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::fresh_session;
     use rustc_hash::FxHashMap as HashMap;
     use std::fs;
     use std::sync::Arc;
 
     use crate::db::Work;
-    use crate::{AnalysisSession, BatchOptions, PhpVersion};
+    use crate::{BatchOptions, PhpVersion};
 
     fn write_php(dir: &tempfile::TempDir, name: &str, contents: &str) -> std::path::PathBuf {
         let path = dir.path().join(name);
@@ -880,7 +881,7 @@ mod tests {
             "Example.php",
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
         );
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = fresh_session(PhpVersion::LATEST);
         let opts = BatchOptions::new().without_symbols();
         let hash = crate::cache::hash_content(
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
@@ -922,7 +923,7 @@ mod tests {
             "Example.php",
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
         );
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = fresh_session(PhpVersion::LATEST);
         let opts = BatchOptions::new();
         let hash = crate::cache::hash_content(
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
@@ -961,7 +962,7 @@ mod tests {
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
         );
         let file_arc: Arc<str> = Arc::from(file.to_string_lossy().as_ref());
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = fresh_session(PhpVersion::LATEST);
         let opts = BatchOptions::new().without_symbols();
 
         let _ = session.analyze_paths(std::slice::from_ref(&file), &opts);

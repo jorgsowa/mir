@@ -10,7 +10,7 @@
 //! premise the firewall relies on, and would fail loudly if a body-derived
 //! cross-file channel ever appeared.
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, BatchOptions, PhpVersion};
 
 use crate::common::{create_temp_dir, write_file};
 
@@ -21,7 +21,7 @@ fn consumer_issue_kinds(provider_src: &str, consumer_src: &str) -> Vec<String> {
     let provider = write_file(&dir, "provider.php", provider_src);
     let consumer = write_file(&dir, "consumer.php", consumer_src);
     // No cache: we are probing the analyzer's intrinsic behavior, not caching.
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let result = session.analyze_paths(
         &[provider, consumer.clone()],
         &BatchOptions::new().without_symbols(),

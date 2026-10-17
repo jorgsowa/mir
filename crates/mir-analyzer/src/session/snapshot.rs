@@ -1475,6 +1475,7 @@ impl AnalysisSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::{fresh_session, TestSession};
     use crate::{AnalysisSession, IndexCancel, Name, ReferenceIncludes};
     use salsa::Database as _;
 
@@ -1509,8 +1510,8 @@ mod tests {
         assert!(callers_of(&mut session, &files, "run").is_empty());
     }
 
-    fn many_callers_workspace(count: usize) -> (AnalysisSession, Vec<Arc<str>>) {
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    fn many_callers_workspace(count: usize) -> (TestSession, Vec<Arc<str>>) {
+        let mut session = fresh_session(PhpVersion::LATEST);
         session.ingest_file(Arc::from("base.php"), Arc::from(BASE));
         let callers: Vec<Arc<str>> = (0..count)
             .map(|i| Arc::from(format!("caller{i}.php")))
@@ -1672,8 +1673,8 @@ mod tests {
     /// A workspace whose `routes.php` is registered and committed by a
     /// references query but was never passed through `ingest_file` — the
     /// state of a file an editor opens after the initial scan.
-    fn registered_routes_workspace() -> (AnalysisSession, Vec<Arc<str>>) {
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    fn registered_routes_workspace() -> (TestSession, Vec<Arc<str>>) {
+        let mut session = fresh_session(PhpVersion::LATEST);
         let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("routes.php")];
         session.ingest_file(files[0].clone(), Arc::from(BASE));
         session.upsert_source_file(
@@ -1766,8 +1767,8 @@ mod tests {
         assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
     }
 
-    fn prepared_workspace(caller_text: &str) -> (AnalysisSession, Vec<Arc<str>>) {
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    fn prepared_workspace(caller_text: &str) -> (TestSession, Vec<Arc<str>>) {
+        let mut session = fresh_session(PhpVersion::LATEST);
         let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
         session.ingest_file(files[0].clone(), Arc::from(BASE));
         session.ingest_file(files[1].clone(), Arc::from(caller_text));

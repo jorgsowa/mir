@@ -2,10 +2,13 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{
+    test_utils::{fresh_session, TestSession},
+    AnalysisSession, BatchOptions, PhpVersion,
+};
 
-fn new_session() -> AnalysisSession {
-    AnalysisSession::new(PhpVersion::LATEST)
+fn new_session() -> TestSession {
+    fresh_session(PhpVersion::LATEST)
 }
 
 use crate::common::{create_temp_dir, write_file};
@@ -370,7 +373,7 @@ fn file_analyzer_sees_fresh_return_type_after_ingest() {
     // Read $x so that a Variable("x") symbol is emitted by body analysis.
     let b_src = "<?php\n$x = (new Maker)->make();\n$_ = $x;\n";
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file_a: Arc<str> = Arc::from("a.php");
     let file_b: Arc<str> = Arc::from("b.php");
 

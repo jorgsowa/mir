@@ -11,7 +11,7 @@
 use std::fs;
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, BatchOptions, PhpVersion};
 
 use crate::common::create_temp_dir;
 
@@ -32,7 +32,7 @@ fn vendor_tree_implementor_reaches_subtype_index() {
     )
     .unwrap();
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     // Vendor ingestion: type definitions only, no body analysis.
@@ -73,7 +73,7 @@ fn batch_project_implementor_reaches_subtype_index_without_ingest_file() {
     )
     .unwrap();
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     // Pure CLI batch pipeline — no `ingest_file` call anywhere.

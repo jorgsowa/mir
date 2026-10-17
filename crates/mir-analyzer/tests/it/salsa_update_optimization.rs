@@ -1,10 +1,4 @@
-/// Benchmark to measure FileDefinitions Update optimization.
-///
-/// Tests the claim: "No-op file saves should skip Pass 2 recomputation
-/// when FileDefinitions::maybe_update returns false for identical content."
-///
-/// Run with: cargo test --test it salsa_update_optimization:: -- --nocapture --ignored
-use mir_analyzer::AnalysisSession;
+use mir_analyzer::test_utils::fresh_session;
 use std::sync::Arc;
 
 #[test]
@@ -40,7 +34,7 @@ class User {
 }
 "#;
 
-    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = fresh_session(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("app/UserRepository.php");
@@ -105,7 +99,7 @@ function getData(): stdClass {
 }
 "#;
 
-    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = fresh_session(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("helpers.php");
@@ -145,12 +139,9 @@ function getData(): stdClass {
 
 #[test]
 fn verify_file_definitions_update_equality() {
-    /// Verify that FileDefinitions uses PartialEq correctly.
-    /// This is a unit test that confirms the optimization works.
-    use mir_analyzer::AnalysisSession;
     use std::sync::Arc;
 
-    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = fresh_session(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("test.php");

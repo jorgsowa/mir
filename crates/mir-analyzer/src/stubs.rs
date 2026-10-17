@@ -494,6 +494,7 @@ pub fn is_builtin_constant(name: &str) -> bool {
 mod tests {
     use super::*;
     use crate::db::{class_exists, constant_exists, function_exists, MirDatabase, MirDbStorage};
+    use crate::test_utils::fresh_session;
 
     fn stubs_codebase() -> MirDbStorage {
         let mut db = MirDbStorage::default();
@@ -613,14 +614,14 @@ mod tests {
     #[test]
     fn sscanf_output_vars_not_undefined() {
         use crate::batch::BatchOptions;
-        use crate::session::AnalysisSession;
+
         use crate::PhpVersion;
         use mir_issues::IssueKind;
 
         let src = "<?php\nfunction test($str) {\n    sscanf($str, \"%d %d\", $row, $col);\n    return $row + $col;\n}\n";
         let tmp = std::env::temp_dir().join("mir_test_sscanf_undefined.php");
         std::fs::write(&tmp, src).unwrap();
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = fresh_session(PhpVersion::LATEST);
         let result = session.analyze_paths(
             std::slice::from_ref(&tmp),
             &BatchOptions::new().without_symbols(),

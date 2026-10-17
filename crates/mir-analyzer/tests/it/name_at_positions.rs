@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, Name, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, Name, PhpVersion};
 
 const FILE: &str = "/proj/names.php";
 const CURSOR: char = '‸';
@@ -10,7 +10,7 @@ const CURSOR: char = '‸';
 fn name_at(marked: &str) -> Option<Name> {
     let offset = marked.find(CURSOR).expect("cursor marker present");
     let src = marked.replacen(CURSOR, "", 1);
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ingest_file(Arc::from(FILE), Arc::from(src.as_str()));
     session.name_at(FILE, offset as u32)
 }

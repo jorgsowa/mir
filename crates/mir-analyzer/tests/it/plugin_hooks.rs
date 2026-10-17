@@ -6,7 +6,7 @@
 use std::fs;
 use std::sync::Once;
 
-use mir_analyzer::{analyze_source_with_options, BatchOptions};
+use mir_analyzer::{analyze_source_with_options, test_utils::fresh_session, BatchOptions};
 use mir_issues::{Issue, IssueKind, Severity};
 use mir_plugin::php_ast::owned::{ExprKind, StmtKind};
 use mir_plugin::{
@@ -435,7 +435,7 @@ function s(): void {
 
 #[test]
 fn after_class_like_hook_reports_suppresses_and_marks_used() {
-    use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+    use mir_analyzer::{BatchOptions, PhpVersion};
     setup();
 
     let dir = crate::common::create_temp_dir("class-like-hook");
@@ -449,7 +449,7 @@ class PluginOther { public int $count; }
     )
     .unwrap();
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let result = session.analyze_paths(&[path], &BatchOptions::new().without_symbols());
 
     let seen: Vec<_> = result

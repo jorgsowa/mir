@@ -5,6 +5,7 @@ use super::*;
 #[allow(clippy::module_inception)]
 mod tests {
     use super::*;
+    use crate::test_utils::fresh_session;
     use std::sync::Arc;
 
     #[test]
@@ -273,7 +274,7 @@ mod tests {
 
     #[test]
     fn member_demand_reads_constructors_and_single_methods() {
-        let mut session = crate::AnalysisSession::new(crate::PhpVersion::LATEST);
+        let mut session = fresh_session(crate::PhpVersion::LATEST);
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("demand.php");
         std::fs::write(

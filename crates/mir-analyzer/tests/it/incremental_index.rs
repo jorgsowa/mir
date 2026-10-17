@@ -5,7 +5,9 @@ use std::fs;
 use std::sync::Arc;
 
 use mir_analyzer::db::{analyze_file, MirDatabase, Work};
-use mir_analyzer::{AnalysisSession, IndexCancel, IndexParallelism, PhpVersion};
+use mir_analyzer::{
+    test_utils::fresh_session, AnalysisSession, IndexCancel, IndexParallelism, PhpVersion,
+};
 
 use crate::common::create_temp_dir;
 
@@ -230,7 +232,7 @@ fn duplicate_winner_rename_preserves_surviving_symbol() {
 /// Adding or removing a class re-runs only the scopes whose symbol lookups it changes.
 #[test]
 fn declaration_edit_reruns_only_scopes_whose_lookups_changed() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from("/proj/Dep.php"),
         Arc::from("<?php\nnamespace App;\nclass Dep { public function go(): int { return 1; } }\n"),
@@ -276,7 +278,7 @@ fn declaration_edit_reruns_only_scopes_whose_lookups_changed() {
 /// Rebuilding an index with unchanged contents leaves the singleton input untouched.
 #[test]
 fn rebuild_with_unchanged_declarations_does_not_write_the_index() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from("/proj/Dep.php"),
         Arc::from("<?php\nnamespace App;\nclass Dep {}\nfunction dep(): void {}\n"),

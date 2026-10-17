@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, FileAnalyzer, PhpVersion};
 
 const ENUM_WITH_MISMATCHED_CASE: &str = "<?php
 enum Suit: string {
@@ -23,7 +23,7 @@ enum Suit: string {
 
 #[test]
 fn collector_issues_surfaces_backed_enum_case_type_mismatch() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));
 
@@ -42,7 +42,7 @@ fn collector_issues_surfaces_backed_enum_case_type_mismatch() {
 /// (as php-lsp's `get_semantic_issues_salsa` used to) drops the diagnostic.
 #[test]
 fn body_analysis_alone_misses_backed_enum_case_type_mismatch() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));
 
@@ -87,7 +87,7 @@ fn body_analysis_alone_misses_backed_enum_case_type_mismatch() {
 /// second call.
 #[test]
 fn collector_issues_survive_a_second_ingest_of_unchanged_content() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
 
     session.ingest_file(file.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));
@@ -109,7 +109,7 @@ fn collector_issues_survive_a_second_ingest_of_unchanged_content() {
 /// file happened to be ingested first.
 #[test]
 fn collector_issues_for_two_files_sharing_identical_content_point_at_their_own_path() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file_a: Arc<str> = Arc::from("/proj/a.php");
     let file_b: Arc<str> = Arc::from("/proj/b.php");
 
@@ -131,7 +131,7 @@ fn collector_issues_for_two_files_sharing_identical_content_point_at_their_own_p
 /// like its siblings `class_issues`/`document_symbols`.
 #[test]
 fn collector_issues_works_for_a_file_only_ever_set_via_set_file_text() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/lazy.php");
 
     session.set_file_text(file.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));

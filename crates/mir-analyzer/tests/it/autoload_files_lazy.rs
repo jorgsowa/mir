@@ -10,7 +10,10 @@
 use std::fs;
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, IndexCancel, IndexParallelism, PhpVersion};
+use mir_analyzer::{
+    test_utils::fresh_session, AnalysisSession, FileAnalyzer, IndexCancel, IndexParallelism,
+    PhpVersion,
+};
 
 use crate::common::create_temp_dir;
 
@@ -153,7 +156,7 @@ fn file_analyzer_lazy_load_is_idempotent_across_calls() {
 /// no psr4 map is attached.
 #[test]
 fn file_analyzer_no_psr4_does_not_panic() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let src = "<?php\necho 1 + 1;\n";
     let path: Arc<str> = Arc::from("plain.php");
     session.ingest_file(path.clone(), Arc::from(src));

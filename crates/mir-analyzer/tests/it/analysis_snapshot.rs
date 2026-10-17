@@ -5,15 +5,18 @@
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-use mir_analyzer::{AnalysisSession, IssueKind, Name, PhpVersion, ReferenceIncludes};
+use mir_analyzer::{
+    test_utils::{fresh_session, TestSession},
+    AnalysisSession, IssueKind, Name, PhpVersion, ReferenceIncludes,
+};
 
 const BASE: &str = "<?php\nnamespace App;\nclass Base { public function run(): void {} }\n";
 const CHILD: &str = "<?php\nnamespace App;\nclass Child extends Base {}\n";
 const CALLER: &str =
     "<?php\nnamespace App;\nfunction go(Base $b): void { $b->run(); missing(); }\n";
 
-fn workspace() -> (AnalysisSession, Vec<Arc<str>>) {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+fn workspace() -> (TestSession, Vec<Arc<str>>) {
+    let mut session = fresh_session(PhpVersion::LATEST);
     let files: Vec<Arc<str>> = ["base.php", "child.php", "caller.php"]
         .into_iter()
         .map(Arc::from)
@@ -460,7 +463,7 @@ fn snapshot_declaration_name_range_matches_the_session() {
 }
 
 fn declaration_name_range_of(src: &str, class: &str, method: &str) -> (u32, u32, u32) {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("a.php");
     session.ingest_file(file.clone(), Arc::from(src));
     session.prepare_for_query(Some(&file));

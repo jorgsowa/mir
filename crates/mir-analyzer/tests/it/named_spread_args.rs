@@ -10,10 +10,10 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, FileAnalyzer, PhpVersion};
 
 fn issues_for(source: &str) -> Vec<String> {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(source));
 

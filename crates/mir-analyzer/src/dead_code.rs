@@ -258,7 +258,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::AnalysisSession;
+
+    use crate::test_utils::fresh_session;
     use crate::PhpVersion;
 
     #[test]
@@ -267,7 +268,7 @@ mod tests {
         // (strlen, array_map, etc.) even when they are never called in user code.
         // This test bypasses the fixture runner's file-path filter to verify the
         // fix directly on the DeadCodeAnalyzer output.
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = fresh_session(PhpVersion::LATEST);
         session.ensure_all_stubs();
         let db = session.snapshot_db();
         let issues = DeadCodeAnalyzer::new(&db).analyze();

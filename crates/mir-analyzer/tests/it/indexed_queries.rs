@@ -7,7 +7,10 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, Name, PhpVersion};
+use mir_analyzer::{
+    test_utils::{fresh_session, TestSession},
+    AnalysisSession, Name, PhpVersion,
+};
 
 fn codepoint_span(line: &str, needle: &str) -> (u32, u32) {
     let line = line.strip_suffix('\r').unwrap_or(line);
@@ -17,8 +20,8 @@ fn codepoint_span(line: &str, needle: &str) -> (u32, u32) {
     (start, end)
 }
 
-fn session_with(files: &[(&str, &str)]) -> AnalysisSession {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+fn session_with(files: &[(&str, &str)]) -> TestSession {
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
     for (path, text) in files {
         session.set_file_text(Arc::from(*path), Arc::from(*text));

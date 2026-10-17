@@ -10,6 +10,7 @@ use crate::db::{
     class_in_file, find_class_constant_in_chain, find_class_constant_in_class,
     find_global_constant, find_property_in_chain, find_property_in_class, function_in_file, Fqcn,
 };
+use crate::test_utils::fresh_session;
 use crate::{AnalysisSession, ClassResolver, PhpVersion};
 
 struct StubResolver {
@@ -32,7 +33,7 @@ fn make_resolver(entries: &[(&str, &str)]) -> Arc<dyn ClassResolver> {
 
 #[test]
 fn class_in_file_finds_class_after_set_file_text_only() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
         Arc::from("<?php\nnamespace App;\nclass Foo {}\n"),
@@ -53,7 +54,7 @@ fn class_in_file_finds_class_after_set_file_text_only() {
 
 #[test]
 fn function_in_file_finds_function_after_set_file_text_only() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/helpers.php"),
         Arc::from("<?php\nnamespace App;\nfunction greet(string $n): string { return $n; }\n"),

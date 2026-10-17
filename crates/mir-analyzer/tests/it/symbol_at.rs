@@ -5,7 +5,7 @@
 // format used by Codebase::symbol_reference_locations.
 
 use mir_analyzer::symbol::ReferenceKind;
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, AnalysisSession, BatchOptions, PhpVersion};
 
 use crate::common::{create_temp_dir, path_to_str, write_file};
 
@@ -27,7 +27,7 @@ fn symbol_at_finds_function_call() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet()
@@ -49,7 +49,7 @@ fn symbol_at_returns_none_for_unknown_offset() {
     let file = write_file(&dir, "b.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Offset 0 is '<?php', before any symbol spans
@@ -74,7 +74,7 @@ fn symbol_at_matches_at_span_start() {
     let file = write_file(&dir, "c.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Locate the exact span start from the recorded symbol
@@ -99,7 +99,7 @@ fn symbol_at_matches_at_last_byte_of_span() {
     let file = write_file(&dir, "d.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
@@ -123,7 +123,7 @@ fn symbol_at_returns_none_one_past_span_end() {
     let file = write_file(&dir, "e.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
@@ -170,7 +170,7 @@ fn symbol_at_isolates_symbols_by_file() {
     let file_a_str = path_to_str(&file_a);
     let file_b_str = path_to_str(&file_b);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(&[file_a.clone(), file_b.clone()], &BatchOptions::new());
 
     // Collect all FunctionCall(run) symbols per file
@@ -228,7 +228,7 @@ fn symbol_at_finds_this_method_call() {
     let file = write_file(&dir, "this_call.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Point cursor at 'helper' in '$this->helper()'
@@ -256,7 +256,7 @@ fn symbol_at_finds_dynamic_invoke_call() {
     let src = "<?php\nclass Svc { public function __invoke(): void {} }\nfunction caller(Svc $s): void { $s(); }\n";
     let file = write_file(&dir, "dyn_invoke.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let found = result.symbols.iter().any(|s| {
@@ -277,7 +277,7 @@ fn symbol_at_finds_first_class_callable_function() {
     let file = write_file(&dir, "fcc_fn.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("greet(...)").unwrap() as u32 + 1;
@@ -304,7 +304,7 @@ fn symbol_at_finds_use_function_import() {
     let main = write_file(&dir, "main.php", main_src);
     let main_str = path_to_str(&main);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new().without_symbols());
 
     let offset = main_src.find("greet;").unwrap() as u32 + 1;
@@ -334,7 +334,7 @@ fn symbol_at_finds_use_const_import() {
     let main = write_file(&dir, "main.php", main_src);
     let main_str = path_to_str(&main);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new().without_symbols());
 
     let offset = main_src.find("GREETING;").unwrap() as u32 + 1;
@@ -361,7 +361,7 @@ fn symbol_at_finds_first_class_callable_method() {
     let file = write_file(&dir, "fcc_method.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("run(...)").unwrap() as u32 + 1;
@@ -384,7 +384,7 @@ fn symbol_at_finds_first_class_callable_static_method() {
     let file = write_file(&dir, "fcc_static.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("sq(...)").unwrap() as u32 + 1;
@@ -408,7 +408,7 @@ fn symbol_at_finds_this_property_access() {
     let file = write_file(&dir, "this_prop.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
@@ -437,7 +437,7 @@ fn symbol_at_finds_property_write_target() {
     let file = write_file(&dir, "prop_write.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("->count = 0;").unwrap() as u32 + 2; // +2 skips '->'
@@ -466,7 +466,7 @@ fn symbol_at_finds_variable_write_target() {
     let file = write_file(&dir, "var_write.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("$x = 5").unwrap() as u32 + 1; // +1 skips '$'
@@ -490,7 +490,7 @@ fn symbol_at_finds_array_destructuring_write_target() {
     let file = write_file(&dir, "destructure_write.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("$a, $b").unwrap() as u32 + 1; // +1 skips '$'
@@ -514,7 +514,7 @@ fn symbol_at_this_method_call_full_lsp_flow() {
     let file = write_file(&dir, "this_flow.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
@@ -547,7 +547,7 @@ fn symbol_at_this_in_non_static_closure() {
     let file = write_file(&dir, "closure_this.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
@@ -573,7 +573,7 @@ fn symbol_at_returns_innermost_symbol() {
     let file = write_file(&dir, "f.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Find the offset of "run" in "$s->run()"
@@ -600,7 +600,7 @@ fn codebase_key_for_function_call_matches_reference_index() {
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
     let file = write_file(&dir, "g.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -626,7 +626,7 @@ fn codebase_key_for_method_call_is_lowercased() {
     let src = "<?php\nclass Svc { public function Run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->Run(); }\n";
     let file = write_file(&dir, "h.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -652,7 +652,7 @@ fn codebase_key_for_static_call_matches_reference_index() {
     let src = "<?php\nclass Math { public static function square(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::square(3); }\n";
     let file = write_file(&dir, "i.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -677,7 +677,7 @@ fn codebase_key_for_property_access_matches_reference_index() {
     let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
     let file = write_file(&dir, "j.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -702,7 +702,7 @@ fn codebase_key_for_class_reference_matches_reference_index() {
     let src = "<?php\nclass Widget {}\nfunction make(): void { $w = new Widget(); }\n";
     let file = write_file(&dir, "k.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -747,7 +747,7 @@ fn full_flow_cursor_to_reference_locations() {
     let src = "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); }\n";
     let file = write_file(&dir, "l.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
     let file_str = path_to_str(&file);
 
@@ -776,7 +776,7 @@ fn symbol_at_function_call_span_is_identifier_only() {
     let file = write_file(&dir, "span_fn.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
@@ -815,7 +815,7 @@ fn symbol_at_method_call_span_is_identifier_only() {
     let file = write_file(&dir, "span_method.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
@@ -854,7 +854,7 @@ fn symbol_at_static_call_span_is_identifier_only() {
     let file = write_file(&dir, "span_static.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
@@ -897,7 +897,7 @@ fn symbol_at_finds_property_access() {
     let file = write_file(&dir, "m.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Point cursor at 'count' in '$c->count'
@@ -931,7 +931,7 @@ fn symbol_at_finds_nullsafe_property_access() {
     let file = write_file(&dir, "n.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Point cursor at 'val' in '$b?->val'
@@ -964,7 +964,7 @@ fn symbol_at_finds_nullsafe_method_call() {
     let file = write_file(&dir, "o.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Point cursor at 'run' in '$s?->run()'
@@ -1000,7 +1000,7 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
     let file = write_file(&dir, "span_eq_method.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("->run").unwrap() as u32 + 2; // points at 'r' of run
@@ -1032,7 +1032,7 @@ fn symbol_at_function_call_span_matches_reference_location_span() {
     let file = write_file(&dir, "span_eq_fn.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet
@@ -1064,7 +1064,7 @@ fn class_const_access_records_symbol() {
     let src = "<?php\nclass Config { const string VERSION = '1.0'; }\nfunction ver(): string { return Config::VERSION; }\n";
     let file = write_file(&dir, "const_sym.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -1091,7 +1091,7 @@ fn inherited_static_call_symbol_keys_by_declaring_class() {
     let src = "<?php\nclass Base { public static function foo(): void {} }\nclass Child extends Base {}\nfunction caller(): void { Child::foo(); }\n";
     let file = write_file(&dir, "inherited_static_sym.php", src);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -1140,7 +1140,7 @@ function caller(): void { $obj = new MyClass(); $obj->hello(); }\n";
     let file = write_file(&dir, "insteadof.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
@@ -1193,7 +1193,7 @@ fn symbol_at_chain_gap_returns_innermost_enclosing_call() {
     let file = write_file(&dir, "chain_gap.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Cursor on `where` identifier — exact match.
@@ -1419,7 +1419,7 @@ fn symbol_at_attribute_class_name_resolves_to_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.rfind("MyAttr").unwrap() as u32;
@@ -1446,7 +1446,7 @@ fn symbol_at_interface_method_attribute_class_name_resolves_to_class_reference()
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.rfind("MyAttr").unwrap() as u32;
@@ -1472,7 +1472,7 @@ fn symbol_at_use_import_name_resolves_to_class_reference() {
     let user_file = write_file(&dir, "user.php", user_src);
     let user_file_str = path_to_str(&user_file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyzer.analyze_paths(
         &[base_file.clone(), user_file.clone()],
         &BatchOptions::new().without_symbols(),
@@ -1693,7 +1693,7 @@ fn symbol_at_parent_keyword_in_static_call_resolves_to_parent_class() {
     let file = write_file(&dir, "parent_kw.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("parent::greet").unwrap() as u32;
@@ -1821,7 +1821,7 @@ fn symbol_at_finds_interface_declared_property_access() {
     let file = write_file(&dir, "o.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.find("->name").unwrap() as u32 + 2; // +2 skips '->'
@@ -1856,7 +1856,7 @@ fn symbol_at_attribute_argument_does_not_resolve_to_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.rfind("\"/x\"").unwrap() as u32 + 2; // inside the string literal argument
@@ -1879,7 +1879,7 @@ fn symbol_at_class_extends_name_resolves() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.rfind("Base {}").unwrap() as u32;
@@ -1901,7 +1901,7 @@ fn symbol_at_class_implements_name_resolves() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.rfind("Greets {}").unwrap() as u32;
@@ -1923,7 +1923,7 @@ fn symbol_at_interface_extends_name_resolves() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.rfind("Base {}").unwrap() as u32;
@@ -1945,7 +1945,7 @@ fn symbol_at_enum_implements_name_resolves() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     let offset = src.rfind("HasLabel {").unwrap() as u32;
@@ -1975,7 +1975,7 @@ fn symbol_at_property_access_gap_returns_receiver_type() {
     let file = write_file(&dir, "p.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Cursor right after `$obj`, on the `-` of `->`.
@@ -2012,7 +2012,7 @@ fn symbol_at_nullsafe_property_access_gap_returns_receiver_type() {
     let file = write_file(&dir, "np.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Cursor right after `$b`, on the `?` of `?->`.
@@ -2040,7 +2040,7 @@ fn symbol_at_static_property_access_gap_returns_receiver_type() {
     let file = write_file(&dir, "sp.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Cursor right after `Config`, on the first `:` of `::`.
@@ -2178,7 +2178,7 @@ fn symbol_at_self_static_property_access_gap_returns_receiver_type() {
     let file = write_file(&dir, "ssp.php", src);
     let file_str = path_to_str(&file);
 
-    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = fresh_session(PhpVersion::LATEST);
     analyze_single_file(&mut analyzer, &file);
 
     // Cursor right after `self`, on the first `:` of `::`.

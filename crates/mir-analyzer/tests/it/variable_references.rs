@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, PhpVersion, Severity};
+use mir_analyzer::{test_utils::fresh_session, PhpVersion, Severity};
 
 const FILE: &str = "vars.php";
 const CURSOR: char = '‸';
@@ -12,7 +12,7 @@ const CURSOR: char = '‸';
 fn refs(marked: &str) -> Vec<(u32, u32)> {
     let offset = marked.find(CURSOR).expect("cursor marker present");
     let src = marked.replacen(CURSOR, "", 1);
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.set_file_text(Arc::from(FILE), Arc::from(src.as_str()));
 

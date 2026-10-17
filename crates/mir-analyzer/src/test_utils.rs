@@ -1374,6 +1374,92 @@ fn return_base_session(version: PhpVersion, session: AnalysisSession) {
     SESSION_POOL.lock().push((version, session));
 }
 
+/// Pool behind [`fresh_session`]. Unlike [`SESSION_POOL`], these sessions
+/// carry only the definition-slice cache: the body-analysis issue cache is
+/// keyed by path, and tests reuse fixed paths like `a.php` with different
+/// neighbours, so a cached issue list could leak between them.
+static TEST_SESSION_POOL: Mutex<Vec<AnalysisSession>> = Mutex::new(Vec::new());
+
+/// A warm stubs-only session for a test: every embedded stub ingested and the
+/// workspace symbol index built, with default configuration and no files.
+///
+/// Building the stdlib stub index costs ~0.3s per session in debug builds —
+/// the dominant cost of most session tests. Under `cargo test` a pooled
+/// session already has it; under nextest (one process per test) the pool is
+/// empty and the shared on-disk definition cache halves the build.
+///
+/// A new session is warmed up front so tests see the same state whether or
+/// not one was pooled. Tests that observe cold-session behaviour — lazy stub
+/// loading, `set_file_text` before the index exists, cumulative work counters,
+/// cache attachment, `with_*` builders — must use [`AnalysisSession::new`].
+pub fn fresh_session(version: PhpVersion) -> TestSession {
+    let pooled = session_pool_enabled()
+        .then(|| {
+            let mut pool = TEST_SESSION_POOL.lock();
+            let pos = pool.iter().position(|s| s.php_version == version)?;
+            Some(pool.swap_remove(pos))
+        })
+        .flatten();
+    let session = pooled.unwrap_or_else(|| {
+        let mut session = AnalysisSession::new(version);
+        if std::env::var_os("MIR_TEST_NO_STUB_CACHE").is_none() {
+            session.db.attach_cache_dir(&fixture_stub_cache_dir());
+        }
+        session.ensure_all_stubs();
+        session.rebuild_workspace_symbol_index();
+        session
+    });
+    TestSession {
+        session: Some(session),
+    }
+}
+
+/// A session from [`fresh_session`]; returns to the pool when dropped.
+pub struct TestSession {
+    session: Option<AnalysisSession>,
+}
+
+impl std::ops::Deref for TestSession {
+    type Target = AnalysisSession;
+
+    fn deref(&self) -> &AnalysisSession {
+        self.session.as_ref().expect("session present until drop")
+    }
+}
+
+impl std::ops::DerefMut for TestSession {
+    fn deref_mut(&mut self) -> &mut AnalysisSession {
+        self.session.as_mut().expect("session present until drop")
+    }
+}
+
+impl Drop for TestSession {
+    fn drop(&mut self) {
+        let Some(mut session) = self.session.take() else {
+            return;
+        };
+        // A failed test may have left the session mid-edit; never recycle it.
+        if std::thread::panicking() || !session_pool_enabled() {
+            return;
+        }
+        if reset_to_stubs(&mut session) {
+            TEST_SESSION_POOL.lock().push(session);
+        }
+    }
+}
+
+/// Invalidate every non-stub file, restoring the stubs-only state a pooled
+/// session is handed out in. `false` when anything else survives, in which
+/// case the session must not be reused.
+fn reset_to_stubs(session: &mut AnalysisSession) -> bool {
+    for path in session.db.salsa.source_file_paths() {
+        if !crate::stubs::is_stub_path(&path) {
+            session.invalidate_file(&path);
+        }
+    }
+    session.tracked_file_count() == session.loaded_stub_count()
+}
+
 /// A fixture's files written to a temp directory.
 struct FixtureWorkspace {
     dir: PathBuf,
@@ -1903,6 +1989,98 @@ fn fmt_lines(lines: &[String]) -> String {
 // ---------------------------------------------------------------------------
 // Fixture parser validation tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test_session_pool {
+    use std::sync::Arc;
+
+    use super::{fresh_session, reset_to_stubs};
+    use crate::{AnalysisSession, PhpVersion};
+
+    const DECL: &str = "<?php\nclass Foo { function h() { return 1; } }\n";
+    const USE: &str = "<?php\nfunction test(): string { return (new Foo)->h(); }\n";
+
+    fn issue_names(session: &mut AnalysisSession, file: &str, src: &str) -> Vec<String> {
+        let mut names: Vec<String> = session
+            .analyze_file_diagnostics(file, src)
+            .issues
+            .iter()
+            .map(|i| i.kind.name().to_string())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn reset_forgets_every_file_and_its_declarations() {
+        let mut session = fresh_session(PhpVersion::LATEST);
+        session.ingest_file(Arc::from("decl.php"), Arc::from(DECL));
+        session.set_file_text(Arc::from("use.php"), Arc::from(USE));
+        assert!(session.contains_class("Foo"));
+
+        assert!(
+            reset_to_stubs(&mut session),
+            "only stubs may survive a reset"
+        );
+        assert!(!session.contains_class("Foo"));
+        assert!(session.contains_function("strlen"), "stubs stay loaded");
+        assert!(
+            issue_names(&mut session, "use.php", USE).contains(&"UndefinedClass".to_string()),
+            "a reset session must not resolve the previous test's classes"
+        );
+    }
+
+    #[test]
+    fn reset_session_reports_what_a_cold_session_reports() {
+        let mut warm = fresh_session(PhpVersion::LATEST);
+        warm.ingest_file(Arc::from("decl.php"), Arc::from("<?php\nclass Foo {}\n"));
+        warm.analyze_file_diagnostics("use.php", USE);
+        assert!(reset_to_stubs(&mut warm));
+
+        let mut cold = AnalysisSession::new(PhpVersion::LATEST);
+        for session in [&mut *warm, &mut cold] {
+            session.ingest_file(Arc::from("decl.php"), Arc::from(DECL));
+        }
+        let expected = issue_names(&mut cold, "use.php", USE);
+        assert!(
+            expected.contains(&"InvalidReturnType".to_string()),
+            "{expected:?}"
+        );
+        assert_eq!(issue_names(&mut warm, "use.php", USE), expected);
+    }
+
+    #[test]
+    fn new_sessions_start_as_warm_as_pooled_ones() {
+        let session = fresh_session(PhpVersion::LATEST);
+        assert!(session.workspace_symbol_index_ready());
+        assert_eq!(session.tracked_file_count(), session.loaded_stub_count());
+    }
+
+    /// Once the index exists, `set_file_text` only queues the file; the query
+    /// prelude must settle it before snapshots see it.
+    #[test]
+    fn set_file_text_on_a_warm_session_is_visible_after_the_query_prelude() {
+        let mut session = fresh_session(PhpVersion::LATEST);
+        session.set_file_text(Arc::from("decl.php"), Arc::from(DECL));
+        session.prepare_for_query(None);
+        assert!(session.contains_class("Foo"));
+        let found = session.snapshot().find_method_in_chain("Foo", "h");
+        assert!(matches!(found, Ok(Some(_))), "{found:?}");
+    }
+
+    #[test]
+    fn pooled_sessions_keep_their_php_version() {
+        let old = PhpVersion::new(7, 4);
+        drop(fresh_session(old));
+        drop(fresh_session(PhpVersion::LATEST));
+        let mut session = fresh_session(old);
+        session.ingest_file(Arc::from("v.php"), Arc::from("<?php\n"));
+        assert!(
+            !session.contains_function("str_contains"),
+            "a PHP 7.4 session must not see 8.0 functions"
+        );
+    }
+}
 
 #[cfg(test)]
 mod parser_validation {

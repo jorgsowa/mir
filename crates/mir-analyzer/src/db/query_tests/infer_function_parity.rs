@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::hash::{Hash, Hasher};
 
 use crate::db::{collect_file_definitions, infer_function, parse_file, MirDatabase};
+use crate::test_utils::fresh_session;
 use crate::PhpVersion;
 
 /// Sources crafted to exercise: a clean fn, an undefined-variable fn, a
@@ -38,9 +39,9 @@ fn old_path_issues_for(
     fn_name: &str,
     source: &str,
 ) -> (Vec<mir_issues::Issue>, std::ops::Range<u32>) {
-    use crate::{AnalysisSession, BatchOptions};
+    use crate::BatchOptions;
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();
@@ -86,8 +87,8 @@ fn old_path_issues_for(
 
 fn new_path_issues_for(fn_name: &str, source: &str) -> Vec<mir_issues::Issue> {
     // Mirror AnalysisSession setup minimally: ingest stubs so resolution works.
-    use crate::{AnalysisSession, BatchOptions};
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    use crate::BatchOptions;
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();

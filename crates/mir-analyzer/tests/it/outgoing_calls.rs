@@ -2,12 +2,12 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, Name, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, Name, PhpVersion};
 
 const FILE: &str = "calls.php";
 
 fn callees(src: &str, marker: &str) -> Vec<Name> {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.set_file_text(Arc::from(FILE), Arc::from(src));
     let offset = src.find(marker).expect("marker present") as u32;
@@ -90,7 +90,7 @@ fn offset_outside_a_body_yields_nothing() {
 #[test]
 fn ranges_cover_the_callee_name_token_in_source_order() {
     let src = "<?php\nfunction a(): void {}\nfunction b(): void {}\nfunction run(): void {\n    b(); a();\n}\n";
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.set_file_text(Arc::from(FILE), Arc::from(src));
     let calls = session.outgoing_calls(FILE, src.find("run()").unwrap() as u32);

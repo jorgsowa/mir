@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, PhpVersion};
 
 const A: &str = "<?php\nclass A { function f() { return B::g(); } function h() { return 1; } }\n";
 const B: &str = "<?php\nclass B { static function g() { return (new A)->h(); } }\n";
@@ -11,7 +11,7 @@ const Z: &str = "<?php\nfunction test(): string { return B::g(); }\n";
 
 fn z_issues_after_analyzing(order: &[&str]) -> Vec<String> {
     let files = [("a.php", A), ("b.php", B), ("z.php", Z)];
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     for (path, src) in files {
         session.ingest_file(Arc::from(path), Arc::from(src));
     }

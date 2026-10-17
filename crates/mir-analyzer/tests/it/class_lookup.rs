@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use mir_analyzer::db::ClassLike;
-use mir_analyzer::{AnalysisSession, ClassResolver, PhpVersion};
+use mir_analyzer::{test_utils::fresh_session, AnalysisSession, ClassResolver, PhpVersion};
 
 struct StubResolver {
     mapping: std::collections::HashMap<String, PathBuf>,
@@ -253,7 +253,7 @@ fn ancestor_walk_handles_cycles() {
 
 #[test]
 fn subtype_files_resolves_plain_fqn_and_aliased_extends() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Base.php"),
         Arc::from("<?php\nnamespace App;\nclass Base { protected function boot() {} }\n"),

@@ -7,11 +7,12 @@
 use std::sync::Arc;
 
 use crate::db::{analyze_file_per_scope, MirDatabase, RefLoc};
-use crate::{AnalysisSession, BatchOptions, PhpVersion};
+use crate::test_utils::fresh_session;
+use crate::{BatchOptions, PhpVersion};
 
 /// Run both paths over `source` and assert exact equality.
 fn assert_scope_parity(name: &str, source: &str) {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = fresh_session(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();
