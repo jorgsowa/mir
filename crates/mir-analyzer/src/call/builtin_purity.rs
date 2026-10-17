@@ -136,6 +136,11 @@ pub(crate) fn invoked_type_is_impure(ea: &ExpressionAnalyzer<'_>, ty: &Type) -> 
 /// Purity of a builtin that depends on its argument types rather than its stub.
 pub(crate) fn arg_dependent_builtin_purity(fqn: &str, arg_types: &[Type]) -> Option<bool> {
     let name = fqn.strip_prefix('\\').unwrap_or(fqn);
+    if name.eq_ignore_ascii_case("iterator_to_array") {
+        // Only a Traversable runs (possibly impure) iterator methods.
+        let value = arg_types.first()?;
+        return Some(!value.types.is_empty() && value.types.iter().all(Atomic::is_array));
+    }
     if !name.eq_ignore_ascii_case("is_callable") {
         return None;
     }
