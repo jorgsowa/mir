@@ -531,8 +531,6 @@ namespace Random
      */
     enum IntervalBoundary implements \UnitEnum
     {
-        public string $name;
-
         case ClosedOpen;
         case ClosedClosed;
         case OpenClosed;
