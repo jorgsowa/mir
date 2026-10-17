@@ -8,8 +8,6 @@
 
 [![Docs](https://img.shields.io/badge/docs-jorgsowa.github.io%2Fmir-blue)](https://jorgsowa.github.io/mir/)
 
-> ⚠️ **Experimental.** mir is under active development and not yet production-ready. APIs, CLI flags, issue codes, and output formats may change between releases; expect false positives and rough edges.
-
 **[Try the Playground →](https://jorgsowa.github.io/mir/playground)**
 
 A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](https://psalm.dev).
