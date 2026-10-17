@@ -120,8 +120,8 @@ class ReflectionProperty implements Reflector
      * @link https://php.net/manual/en/reflectionproperty.tostring.php
      * @return string A string representation of this ReflectionProperty instance.
      */
-    #[TentativeType]
-    public function __toString(): string {}
+    #[LanguageLevelTypeAware(['7.0' => 'string'], default: '')]
+    public function __toString() {}
 
     /**
      * Gets property name
@@ -263,7 +263,6 @@ class ReflectionProperty implements Reflector
      * @param bool $accessible A boolean {@see true} to allow accessibility, or {@see false}
      * @return void No value is returned.
      */
-    #[Pure]
     #[PhpStormStubsElementAvailable(from: "8.1")]
     #[TentativeType]
     #[Deprecated('Deprecated: it has no effect', since: '8.5')]

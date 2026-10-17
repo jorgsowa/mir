@@ -6,6 +6,7 @@ namespace {
     use FFI\CData;
     use FFI\CType;
     use FFI\ParserException;
+    use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 
     /**
      * FFI class provides access to a simple way to call native functions,
@@ -153,10 +154,11 @@ namespace {
          *        the PHP request heap (using `emalloc()`).
          *
          * @return CData|null Returns the freshly created {@see FFI\CData}
-         *         object, or {@see null} on failure.
+         *         object, or {@see null} on failure for PHP versions prior to 8.4.
          * @throws ParserException
          */
-        public function new(CType|string $type, bool $owned = true, bool $persistent = false): ?CData {}
+        #[LanguageLevelTypeAware(['8.4' => '\FFI\CData'], default: '\FFI\CData|null')]
+        public function new(CType|string $type, bool $owned = true, bool $persistent = false) {}
 
         /**
          * Manually removes previously created "not-owned" data structure.
@@ -191,14 +193,18 @@ namespace {
          * @param CData|int|float|bool|null $ptr The handle of the pointer
          *        to a C data structure.
          *
-         * @return CData|null Returns the freshly created {@see FFI\CData} object.
+         * @return CData|null Returns the freshly created {@see FFI\CData} object,
+         * or {@see null} on failure for PHP versions prior to 8.4.
          */
-        public function cast(CType|string $type, $ptr): ?CData {}
+        #[LanguageLevelTypeAware(['8.4' => '\FFI\CData'], default: '\FFI\CData|null')]
+        public function cast(CType|string $type, $ptr) {}
 
         /**
          * This function creates and returns a {@see FFI\CType} object for
          * the given string containing a C type declaration. Any type
          * declared for the instance is allowed.
+         *
+         * Note: Calling {@see FFI::type()} statically is deprecated since PHP 8.3.
          *
          * ```php
          * $ffi = FFI::cdef();
@@ -210,9 +216,10 @@ namespace {
          *
          * @param string $type A valid C declaration as {@see string}.
          * @return CType|null Returns the freshly created {@see FFI\CType}
-         *         object, or {@see null} on failure.
+         *         object, or {@see null} on failure for PHP versions prior to 8.4.
          */
-        public function type(string $type): ?CType {}
+        #[LanguageLevelTypeAware(['8.4' => '\FFI\CType'], default: '\FFI\CType|null')]
+        public function type(string $type) {}
 
         /**
          * This function returns the FFI\CType object, representing the type of
@@ -260,6 +267,7 @@ namespace {
          * @param CData $ptr The handle of the pointer to a C data structure.
          *
          * @return CData Returns the freshly created {@see FFI\CData} object.
+         * @meta
          */
         public static function addr(CData $ptr): CData {}
 
@@ -373,7 +381,7 @@ namespace FFI {
      *
      * @since 7.4
      */
-    class ParserException extends Exception {}
+    final class ParserException extends Exception {}
 
     /**
      * Proxy object that provides access to compiled structures.
@@ -460,7 +468,7 @@ namespace FFI {
      *
      * @since 7.4
      */
-    class CType
+    final class CType
     {
         /**
          * @since 8.1

@@ -1,6 +1,7 @@
 <?php
 
 use JetBrains\PhpStorm\ArrayShape;
+use JetBrains\PhpStorm\FileReference;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 
@@ -623,7 +624,7 @@ function linkinfo(string $path): int|false {}
  * </p>
  * @return bool true on success or false on failure.
  */
-function symlink(string $target, string $link): bool {}
+function symlink(#[FileReference] string $target, #[FileReference] string $link): bool {}
 
 /**
  * Create a hard link
@@ -632,7 +633,7 @@ function symlink(string $target, string $link): bool {}
  * @param string $link The link name.
  * @return bool true on success or false on failure.
  */
-function link(string $target, string $link): bool {}
+function link(#[FileReference] string $target, #[FileReference] string $link): bool {}
 
 /**
  * Deletes a file
@@ -643,7 +644,7 @@ function link(string $target, string $link): bool {}
  * @param resource $context [optional]
  * @return bool true on success or false on failure.
  */
-function unlink(string $filename, $context = null): bool {}
+function unlink(#[FileReference] string $filename, $context = null): bool {}
 
 /**
  * Execute an external program
@@ -728,7 +729,7 @@ function escapeshellarg(string $arg): string {}
  * @return bool|null null on success or false on failure.
  */
 #[LanguageLevelTypeAware(['8.2' => 'null|false'], default: 'null|bool')]
-function passthru(string $command, &$result_code = null): ?bool {}
+function passthru(string $command, &$result_code = null) {}
 
 /**
  * Execute command via shell and return the complete output as a string

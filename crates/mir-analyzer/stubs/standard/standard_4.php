@@ -2,6 +2,7 @@
 
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
+use JetBrains\PhpStorm\FileReference;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 
@@ -308,10 +309,9 @@ function memory_reset_peak_usage(): void {}
  * It is possible to pass parameters to the shutdown function by passing
  * additional parameters.
  * </p>
- * @return bool|null
  */
 #[LanguageLevelTypeAware(['8.2' => 'void'], default: 'null|bool')]
-function register_shutdown_function(callable $callback, mixed ...$args): ?bool {}
+function register_shutdown_function(callable $callback, mixed ...$args) {}
 
 /**
  * Register a function for execution on each tick
@@ -351,7 +351,7 @@ function unregister_tick_function(callable $callback): void {}
  * code as a string instead of printing it out. Otherwise, it will return
  * true on success, false on failure.
  */
-function highlight_file(string $filename, bool $return = false): string|bool {}
+function highlight_file(#[FileReference] string $filename, bool $return = false): string|bool {}
 
 /**
  * Alias:
@@ -361,7 +361,7 @@ function highlight_file(string $filename, bool $return = false): string|bool {}
  * @param bool $return [optional]
  * @return string|bool
  */
-function show_source(string $filename, bool $return = false): string|bool {}
+function show_source(#[FileReference] string $filename, bool $return = false): string|bool {}
 
 /**
  * Syntax highlighting of a string

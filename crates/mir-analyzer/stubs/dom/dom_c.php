@@ -171,6 +171,7 @@ class DOMNode
      * appended to the children.
      * </p>
      * @return TNode|false The inserted node.
+     * @meta
      */
     public function insertBefore(
         DOMNode $node,
@@ -190,6 +191,7 @@ class DOMNode
      * The old node.
      * </p>
      * @return TNode|false The old node or false if an error occur.
+     * @meta
      */
     public function replaceChild(DOMNode $node, DOMNode $child) {}
 
@@ -201,6 +203,7 @@ class DOMNode
      * The removed child.
      * </p>
      * @return TNode|false If the child could be removed the functions returns the old child.
+     * @meta
      */
     public function removeChild(DOMNode $child) {}
 
@@ -212,6 +215,7 @@ class DOMNode
      * The appended child.
      * </p>
      * @return TNode|false The node added.
+     * @meta
      */
     public function appendChild(DOMNode $node) {}
 
@@ -393,8 +397,8 @@ class DOMNode
     public function C14N(
         #[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $exclusive = false,
         #[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $withComments = false,
-        #[LanguageLevelTypeAware(['8.0' => 'array|null'], default: 'array')] $xpath = null,
-        #[LanguageLevelTypeAware(['8.0' => 'array|null'], default: 'array')] $nsPrefixes = null
+        #[LanguageLevelTypeAware(['7.1' => 'array|null'], default: '')] $xpath = null,
+        #[LanguageLevelTypeAware(['7.1' => 'array|null'], default: '')] $nsPrefixes = null
     ): string|false {}
 
     /**
@@ -412,8 +416,8 @@ class DOMNode
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $uri,
         #[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $exclusive = false,
         #[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $withComments = false,
-        #[LanguageLevelTypeAware(['8.0' => 'array|null'], default: 'array')] $xpath = null,
-        #[LanguageLevelTypeAware(['8.0' => 'array|null'], default: 'array')] $nsPrefixes = null
+        #[LanguageLevelTypeAware(['7.1' => 'array|null'], default: '')] $xpath = null,
+        #[LanguageLevelTypeAware(['7.1' => 'array|null'], default: '')] $nsPrefixes = null
     ): int|false {}
 
     /**
@@ -549,7 +553,11 @@ class DOMImplementation
      * </p>
      * @return bool true on success or false on failure.
      */
-    public function hasFeature($feature, $version) {}
+    #[TentativeType]
+    public function hasFeature(
+        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $feature,
+        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $version
+    ): bool {}
 
     /**
      * Creates an empty DOMDocumentType object
@@ -885,7 +893,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * The <classname>DOMDocument</classname> object associated with this node, or NULL if this node is a <classname>DOMDocument</classname>.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.ownerdocument
      */
-    #[LanguageLevelTypeAware(['8.1' => 'null'], default: '')]
+    #[LanguageLevelTypeAware(['8.1' => 'DOMDocument|null'], default: '')]
     public $ownerDocument;
 
     /**
@@ -1018,6 +1026,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * To copy the nodes attributes deep needs to be set to true
      * </p>
      * @return DOMNode|false The copied node or false, if it cannot be copied.
+     * @meta
      */
     public function importNode(
         DOMNode $node,
@@ -1139,6 +1148,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * @param DOMNode $node
      * @param $namespace
      * @param $qualifiedName
+     * @removed 8.0
      */
     public function renameNode(DOMNode $node, $namespace, $qualifiedName) {}
 
@@ -1174,7 +1184,11 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * </p>
      * @return int|false the number of bytes written or false if an error occurred.
      */
-    public function save($filename, $options = null) {}
+    #[TentativeType]
+    public function save(
+        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $filename,
+        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $options = null
+    ): int|false {}
 
     /**
      * Load XML from a string
@@ -1295,7 +1309,8 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * @param null|DOMNode $node [optional] parameter to output a subset of the document.
      * @return string|false The HTML, or false if an error occurred.
      */
-    public function saveHTML(DOMNode $node = null) {}
+    #[TentativeType]
+    public function saveHTML(#[LanguageLevelTypeAware(['8.0' => 'DOMNode|null'], default: '')] $node = null): string|false {}
 
     /**
      * Dumps the internal document into a file using HTML formatting
@@ -1318,7 +1333,11 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * value is LIBXML_SCHEMA_CREATE. Available since Libxml 2.6.14.
      * @return bool true on success or false on failure.
      */
-    public function schemaValidate($filename, $options = null) {}
+    #[TentativeType]
+    public function schemaValidate(
+        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $filename,
+        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $flags = null
+    ): bool {}
 
     /**
      * Validates a document based on a schema
@@ -1442,6 +1461,14 @@ class DOMNodeList implements IteratorAggregate, Countable
  */
 class DOMNamedNodeMap implements IteratorAggregate, Countable
 {
+    /**
+     * @var int The number of nodes in the map. The valid child node indices range from 0 to length - 1 inclusive.
+     * @readonly
+     * @link https://php.net/manual/en/class.domnamednodemap.php#domnamednodemap.props.length
+     */
+    #[PhpStormStubsElementAvailable(from: '8.1')]
+    public int $length;
+
     /**
      * Retrieves a node specified by name
      * @link https://php.net/manual/en/domnamednodemap.getnameditem.php
@@ -1627,7 +1654,7 @@ class DOMCharacterData extends DOMNode implements DOMChildNode
      * offset and count exceeds
      * the length, then all characters to the end of the data are deleted.
      * </p>
-     * @return void
+     * @return bool Returns true on success or false on failure.
      */
     #[TentativeType]
     public function deleteData(
@@ -1766,6 +1793,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * The parent of this node. If there is no such node, this returns NULL.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.parentnode
      */
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNode|null'], default: '')]
     public $parentNode;
 
     /**
@@ -1773,6 +1801,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * The first child of this node. If there is no such node, this returns NULL.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.firstchild
      */
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNode|null'], default: '')]
     public $firstChild;
 
     /**
@@ -1780,6 +1809,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * The last child of this node. If there is no such node, this returns NULL.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.lastchild
      */
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNode|null'], default: '')]
     public $lastChild;
 
     /**
@@ -1787,6 +1817,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * The node immediately preceding this node. If there is no such node, this returns NULL.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.previoussibling
      */
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNode|null'], default: '')]
     public $previousSibling;
 
     /**
@@ -1794,6 +1825,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * The node immediately following this node. If there is no such node, this returns NULL.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.nextsibling
      */
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNode|null'], default: '')]
     public $nextSibling;
 
     /**
@@ -1801,7 +1833,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * A <classname>DOMNamedNodeMap</classname> containing the attributes of this node (if it is a <classname>DOMElement</classname>) or NULL otherwise.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.attributes
      */
-    #[LanguageLevelTypeAware(['8.1' => 'DOMNamedNodeMap'], default: '')]
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNamedNodeMap|null'], default: '')]
     public $attributes;
 
     /**
@@ -1968,7 +2000,7 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * @param string $localName <p>
      * The local name.
      * </p>
-     * @return bool true on success or false on failure.
+     * @return void No value is returned.
      */
     #[TentativeType]
     public function removeAttributeNS(
@@ -2241,6 +2273,7 @@ class DOMText extends DOMCharacterData
 
     /**
      * @param $content
+     * @removed 8.0
      */
     public function replaceWholeText($content) {}
 
@@ -2639,7 +2672,8 @@ class DOMXPath
      * </p>
      * @return void No value is returned.
      */
-    public function registerPhpFunctions($restrict = null) {}
+    #[TentativeType]
+    public function registerPhpFunctions(#[LanguageLevelTypeAware(['8.0' => 'string|array|null'], default: '')] $restrict = null): void {}
 
     /**
      * Register a PHP functions as namespaced XPath function

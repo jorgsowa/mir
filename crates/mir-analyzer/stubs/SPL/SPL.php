@@ -265,7 +265,7 @@ class RecursiveIteratorIterator implements OuterIterator
      * or IteratorAggregate.
      * @param int $mode [optional] The operation mode. See class constants for details.
      * @param int $flags [optional] A bitmask of special flags. See class constants for details.
-     * @since 5.1.3
+     * @since 5.1
      */
     public function __construct(
         Traversable $iterator,
@@ -535,21 +535,24 @@ abstract class FilterIterator extends IteratorIterator
      * @link https://php.net/manual/en/filteriterator.valid.php
      * @return bool true if the current element is valid, otherwise false
      */
-    public function valid() {}
+    #[TentativeType]
+    public function valid(): bool {}
 
     /**
      * Get the current key
      * @link https://php.net/manual/en/filteriterator.key.php
      * @return mixed The key of the current element.
      */
-    public function key() {}
+    #[TentativeType]
+    public function key(): mixed {}
 
     /**
      * Get the current element value
      * @link https://php.net/manual/en/filteriterator.current.php
      * @return mixed The current element value.
      */
-    public function current() {}
+    #[TentativeType]
+    public function current(): mixed {}
 
     /**
      * Move the iterator forward
@@ -564,7 +567,8 @@ abstract class FilterIterator extends IteratorIterator
      * @link https://php-legacy-docs.zend.com/manual/php5/en/filteriterator.getinneriterator
      * @return Iterator The inner iterator.
      */
-    public function getInnerIterator() {}
+    #[TentativeType]
+    public function getInnerIterator(): ?Iterator {}
 }
 
 /**
@@ -625,14 +629,16 @@ class ParentIterator extends RecursiveFilterIterator
      * @link https://php.net/manual/en/recursivefilteriterator.haschildren.php
      * @return bool true if the inner iterator has children, otherwise false
      */
-    public function hasChildren() {}
+    #[TentativeType]
+    public function hasChildren(): bool {}
 
     /**
      * Return the inner iterator's children contained in a RecursiveFilterIterator
      * @link https://php.net/manual/en/recursivefilteriterator.getchildren.php
      * @return ParentIterator containing the inner iterator's children.
      */
-    public function getChildren() {}
+    #[TentativeType]
+    public function getChildren(): ?RecursiveFilterIterator {}
 }
 
 /**
@@ -699,14 +705,16 @@ class LimitIterator extends IteratorIterator
      * @link https://php.net/manual/en/limititerator.key.php
      * @return mixed The key of the current element.
      */
-    public function key() {}
+    #[TentativeType]
+    public function key(): mixed {}
 
     /**
      * Get current element
      * @link https://php.net/manual/en/limititerator.current.php
      * @return mixed the current element or null if there is none.
      */
-    public function current() {}
+    #[TentativeType]
+    public function current(): mixed {}
 
     /**
      * Move the iterator forward
@@ -742,7 +750,8 @@ class LimitIterator extends IteratorIterator
      * @link https://php-legacy-docs.zend.com/manual/php5/en/limititerator.getinneriterator
      * @return Iterator The inner iterator passed to <b>LimitIterator::__construct</b>.
      */
-    public function getInnerIterator() {}
+    #[TentativeType]
+    public function getInnerIterator(): ?Iterator {}
 }
 
 /**
@@ -813,14 +822,16 @@ class CachingIterator extends IteratorIterator implements ArrayAccess, Countable
      * @link https://php.net/manual/en/cachingiterator.key.php
      * @return mixed The key of the current element.
      */
-    public function key() {}
+    #[TentativeType]
+    public function key(): mixed {}
 
     /**
      * Return the current element
      * @link https://php.net/manual/en/cachingiterator.current.php
      * @return mixed
      */
-    public function current() {}
+    #[TentativeType]
+    public function current(): mixed {}
 
     /**
      * Move the iterator forward
@@ -843,15 +854,16 @@ class CachingIterator extends IteratorIterator implements ArrayAccess, Countable
      * @link https://php.net/manual/en/cachingiterator.tostring.php
      * @return string The string representation of the current iteration based on the flag being used.
      */
-    #[TentativeType]
-    public function __toString(): string {}
+    #[LanguageLevelTypeAware(['7.0' => 'string'], default: '')]
+    public function __toString() {}
 
     /**
      * Returns the inner iterator
      * @link https://php-legacy-docs.zend.com/manual/php5/en/cachingiterator.getinneriterator
      * @return Iterator an object implementing the Iterator interface.
      */
-    public function getInnerIterator() {}
+    #[TentativeType]
+    public function getInnerIterator(): ?Iterator {}
 
     /**
      * Get flags used
@@ -925,7 +937,7 @@ class CachingIterator extends IteratorIterator implements ArrayAccess, Countable
      * @link https://php.net/manual/en/cachingiterator.count.php
      * @return int The count of the elements iterated over.
      * @throws BadMethodCallException when the {@see CachingIterator::FULL_CACHE} flag is not being used.
-     * @since 5.2.2
+     * @since 5.2
      */
     #[TentativeType]
     public function count(): int {}
@@ -1020,7 +1032,8 @@ class NoRewindIterator extends IteratorIterator
      * @link https://php-legacy-docs.zend.com/manual/php5/en/norewinditerator.getinneriterator
      * @return Iterator The inner iterator, as passed to <b>NoRewindIterator::__construct</b>.
      */
-    public function getInnerIterator() {}
+    #[TentativeType]
+    public function getInnerIterator(): ?Iterator {}
 }
 
 /**
@@ -1067,7 +1080,8 @@ class AppendIterator extends IteratorIterator
      * @link https://php.net/manual/en/appenditerator.key.php
      * @return mixed The key of the current element.
      */
-    public function key() {}
+    #[TentativeType]
+    public function key(): mixed {}
 
     /**
      * Gets the current value
@@ -1090,7 +1104,8 @@ class AppendIterator extends IteratorIterator
      * @link https://php-legacy-docs.zend.com/manual/php5/en/appenditerator.getinneriterator
      * @return Iterator the current inner Iterator.
      */
-    public function getInnerIterator() {}
+    #[TentativeType]
+    public function getInnerIterator(): ?Iterator {}
 
     /**
      * Gets an index of iterators
@@ -1395,7 +1410,7 @@ class RecursiveTreeIterator extends RecursiveIteratorIterator
      * @param int $mode [optional] Flags to affect the behavior of the {@see RecursiveIteratorIterator} used internally.
      */
     public function __construct(
-        #[LanguageLevelTypeAware(['8.5' => 'RecursiveIterator|IteratorAggregate'], default: '')] $iterator,
+        #[LanguageLevelTypeAware(['8.5' => 'RecursiveIterator|IteratorAggregate', '7.1' => 'Traversable'], default: '')] $iterator,
         #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $flags = self::BYPASS_KEY,
         #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $cachingIteratorFlags = CachingIterator::CATCH_GET_CHILD,
         #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $mode = RecursiveIteratorIterator::SELF_FIRST
@@ -1406,14 +1421,16 @@ class RecursiveTreeIterator extends RecursiveIteratorIterator
      * @link https://php.net/manual/en/recursivetreeiterator.rewind.php
      * @return void
      */
-    public function rewind() {}
+    #[TentativeType]
+    public function rewind(): void {}
 
     /**
      * Check validity
      * @link https://php.net/manual/en/recursivetreeiterator.valid.php
      * @return bool true if the current position is valid, otherwise false
      */
-    public function valid() {}
+    #[TentativeType]
+    public function valid(): bool {}
 
     /**
      * Get the key of the current element
@@ -1436,56 +1453,64 @@ class RecursiveTreeIterator extends RecursiveIteratorIterator
      * @link https://php.net/manual/en/recursivetreeiterator.next.php
      * @return void
      */
-    public function next() {}
+    #[TentativeType]
+    public function next(): void {}
 
     /**
      * Begin iteration
      * @link https://php.net/manual/en/recursivetreeiterator.beginiteration.php
-     * @return RecursiveIterator A <b>RecursiveIterator</b>.
+     * @return void
      */
-    public function beginIteration() {}
+    #[TentativeType]
+    public function beginIteration(): void {}
 
     /**
      * End iteration
      * @link https://php.net/manual/en/recursivetreeiterator.enditeration.php
      * @return void
      */
-    public function endIteration() {}
+    #[TentativeType]
+    public function endIteration(): void {}
 
     /**
      * Has children
      * @link https://php.net/manual/en/recursivetreeiterator.callhaschildren.php
      * @return bool true if there are children, otherwise false
      */
-    public function callHasChildren() {}
+    #[TentativeType]
+    public function callHasChildren(): bool {}
 
     /**
      * Get children
      * @link https://php.net/manual/en/recursivetreeiterator.callgetchildren.php
-     * @return RecursiveIterator A <b>RecursiveIterator</b>.
+     * @return RecursiveIterator|null A <b>RecursiveIterator</b>.
      */
-    public function callGetChildren() {}
+    #[TentativeType]
+    public function callGetChildren(): ?RecursiveIterator {}
 
     /**
      * Begin children
      * @link https://php.net/manual/en/recursivetreeiterator.beginchildren.php
      * @return void
      */
-    public function beginChildren() {}
+    #[TentativeType]
+    public function beginChildren(): void {}
 
     /**
      * End children
      * @link https://php.net/manual/en/recursivetreeiterator.endchildren.php
      * @return void
      */
-    public function endChildren() {}
+    #[TentativeType]
+    public function endChildren(): void {}
 
     /**
      * Next element
      * @link https://php.net/manual/en/recursivetreeiterator.nextelement.php
      * @return void
      */
-    public function nextElement() {}
+    #[TentativeType]
+    public function nextElement(): void {}
 
     /**
      * Get the prefix
@@ -1848,6 +1873,10 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
  * This iterator allows to unset and modify values and keys while iterating
  * over Arrays and Objects.
  * @link https://php.net/manual/en/class.arrayiterator.php
+ * @template TKey of array-key
+ * @template TValue
+ * @template-implements SeekableIterator<TKey, TValue>
+ * @template-implements ArrayAccess<TKey, TValue>
  */
 class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Countable
 {
@@ -1857,7 +1886,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Construct an ArrayIterator
      * @link https://php.net/manual/en/arrayiterator.construct.php
-     * @param array $array The array or object to be iterated on.
+     * @param array<TKey, TValue>|object $array The array or object to be iterated on.
      * @param int $flags Flags to control the behaviour of the ArrayObject object.
      * @see ArrayObject::setFlags()
      */
@@ -1870,7 +1899,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Check if offset exists
      * @link https://php.net/manual/en/arrayiterator.offsetexists.php
-     * @param string $key <p>
+     * @param TKey $key <p>
      * The offset being checked.
      * </p>
      * @return bool true if the offset exists, otherwise false
@@ -1881,10 +1910,10 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Get value for an offset
      * @link https://php.net/manual/en/arrayiterator.offsetget.php
-     * @param string $key <p>
+     * @param TKey $key <p>
      * The offset to get the value from.
      * </p>
-     * @return mixed The value at offset <i>index</i>.
+     * @return TValue|null The value at offset <i>index</i>.
      */
     #[TentativeType]
     public function offsetGet(#[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $key): mixed {}
@@ -1892,10 +1921,10 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Set value for an offset
      * @link https://php.net/manual/en/arrayiterator.offsetset.php
-     * @param string $key <p>
+     * @param TKey $key <p>
      * The index to set for.
      * </p>
-     * @param string $value <p>
+     * @param TValue $value <p>
      * The new value to store at the index.
      * </p>
      * @return void
@@ -1909,7 +1938,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Unset value for an offset
      * @link https://php.net/manual/en/arrayiterator.offsetunset.php
-     * @param string $key <p>
+     * @param TKey $key <p>
      * The offset to unset.
      * </p>
      * @return void No value is returned.
@@ -1920,7 +1949,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Append an element
      * @link https://php.net/manual/en/arrayiterator.append.php
-     * @param mixed $value <p>
+     * @param TValue $value <p>
      * The value to append.
      * </p>
      * @return void
@@ -1931,7 +1960,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Get array copy
      * @link https://php.net/manual/en/arrayiterator.getarraycopy.php
-     * @return array A copy of the array, or array of public properties
+     * @return array<TKey, TValue> A copy of the array, or array of public properties
      * if ArrayIterator refers to an object.
      */
     #[TentativeType]
@@ -1957,7 +1986,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Set behaviour flags
      * @link https://php.net/manual/en/arrayiterator.setflags.php
-     * @param string $flags <p>
+     * @param int $flags <p>
      * A bitmask as follows:
      * 0 = Properties of the object have their normal functionality
      * when accessed as list (var_dump, foreach, etc.).
@@ -1987,7 +2016,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * User defined sort
      * @link https://php.net/manual/en/arrayiterator.uasort.php
-     * @param callable $callback <p>
+     * @param callable(TValue, TValue):int $callback <p>
      * The compare function used for the sort.
      * </p>
      */
@@ -1998,7 +2027,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * User defined sort
      * @link https://php.net/manual/en/arrayiterator.uksort.php
-     * @param callable $callback <p>
+     * @param callable(TKey, TKey):int $callback <p>
      * The compare function used for the sort.
      * </p>
      */
@@ -2052,7 +2081,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Return current array entry
      * @link https://php.net/manual/en/arrayiterator.current.php
-     * @return mixed The current array entry.
+     * @return TValue The current array entry.
      */
     #[TentativeType]
     public function current(): mixed {}
@@ -2060,7 +2089,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * Return current array key
      * @link https://php.net/manual/en/arrayiterator.key.php
-     * @return string|int|null The key of the current element.
+     * @return TKey|null The key of the current element.
      */
     #[TentativeType]
     public function key(): string|int|null {}

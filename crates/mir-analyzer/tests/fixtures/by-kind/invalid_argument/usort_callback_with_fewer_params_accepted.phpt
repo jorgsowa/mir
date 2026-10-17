@@ -30,5 +30,5 @@ function too_many_required_params(): void {
     usort($items, static fn(int $a, int $b, int $c): int => 0);
 //                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of usort() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
     array_reduce($items, static fn(int $a, int $b, int $c): int => 0, 0);
-//                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of array_reduce() expects 'callable accepting at most 2 arguments', got 'callable accepting 3 arguments'
+//                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of array_reduce() expects 'callable with 2 required parameter(s)', got 'callable with 3 required parameter(s)'
 }

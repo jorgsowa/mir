@@ -59,7 +59,7 @@ class ReflectionClassConstant implements Reflector
     /**
      * @since 8.1
      */
-    public const IS_FINAL = 5;
+    public const IS_FINAL = 32;
 
     /**
      * ReflectionClassConstant constructor.

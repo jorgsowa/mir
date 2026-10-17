@@ -169,7 +169,6 @@ function mb_http_output(?string $encoding = null): string|bool {}
  * When getting the encoding detection order, an ordered array
  * of the encodings is returned.
  */
-#[LanguageLevelTypeAware(['8.2' => 'array|true'], default: 'array|bool')]
 function mb_detect_order(array|string|null $encoding = null): array|bool {}
 
 /**
@@ -952,6 +951,7 @@ function mb_check_encoding(array|string|null $value = null, ?string $encoding = 
  * is NOT changed. If encoding is omitted, then the current character
  * encoding name for a multibyte regex is returned.
  */
+#[Deprecated(since: '8.6')]
 function mb_regex_encoding(?string $encoding = null): string|bool {}
 
 /**
@@ -963,6 +963,7 @@ function mb_regex_encoding(?string $encoding = null): string|bool {}
  * @return string The previous options. If options is omitted,
  * it returns the string that describes the current options.
  */
+#[Deprecated(since: '8.6')]
 function mb_regex_set_options(?string $options = null): string {}
 
 /**
@@ -979,6 +980,7 @@ function mb_regex_set_options(?string $options = null): string {}
  * </p>
  * @return bool Returns whether pattern matches string.
  */
+#[Deprecated(since: '8.6')]
 function mb_ereg(string $pattern, string $string, &$matches = null): bool {}
 
 /**
@@ -996,7 +998,8 @@ function mb_ereg(string $pattern, string $string, &$matches = null): bool {}
  * @return bool|int Returns whether pattern matches string.
  */
 #[LanguageLevelTypeAware(["8.0" => "bool"], default: "false|int")]
-function mb_eregi(string $pattern, string $string, &$matches = null): bool {}
+#[Deprecated(since: '8.6')]
+function mb_eregi(string $pattern, string $string, &$matches = null) {}
 
 /**
  * Replace regular expression with multibyte support
@@ -1070,8 +1073,9 @@ function mb_ereg_replace(string $pattern, string $replacement, string $string, ?
  * @return string|false|null <p>
  * The resultant string on success, or <b>FALSE</b> on error.
  * </p>
- * @since 5.4.1
+ * @since 5.4
  */
+#[Deprecated(since: '8.6')]
 function mb_ereg_replace_callback(string $pattern, callable $callback, string $string, ?string $options = null): string|false|null {}
 
 /**
@@ -1195,6 +1199,7 @@ function mb_ereg_search_regs(?string $pattern = null, ?string $options = null): 
  * </p>
  * @return bool Returns true on success or false on failure.
  */
+#[Deprecated(since: '8.6')]
 function mb_ereg_search_init(string $string, ?string $pattern = null, ?string $options = null): bool {}
 
 /**
@@ -1397,7 +1402,7 @@ function mb_ord(string $string, ?string $encoding = null): int|false {}
  * @pure
  */
 #[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
-function mb_scrub(string $string, ?string $encoding = null): false|string {}
+function mb_scrub(string $string, ?string $encoding = null) {}
 
 /**
  * @link https://php.net/manual/en/function.mb-ereg-search-setpos.php

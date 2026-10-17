@@ -21,7 +21,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * @param string $namespaceOrPrefix Namespace prefix or URI.
      * @param bool $isPrefix TRUE if ns is a prefix, FALSE if it's a URI; defaults to FALSE.
      * @throws Exception if the XML data could not be parsed.
-     * @since 5.0.1
+     * @since 5.0
      */
     #[Pure]
     public function __construct(
@@ -51,7 +51,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * returns a string on success and <b>FALSE</b> on error. If the
      * parameter is specified, it returns <b>TRUE</b> if the file was written
      * successfully and <b>FALSE</b> otherwise.
-     * @since 5.0.1
+     * @since 5.0
      */
     #[TentativeType]
     public function asXML(#[LanguageLevelTypeAware(['8.0' => 'string|null'], default: '')] $filename = null): string|bool {}
@@ -119,7 +119,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * <p>
      * Returns <b>NULL</b> if called on a <b>SimpleXMLElement</b>
      * object that already represents an attribute and not a tag.
-     * @since 5.0.1
+     * @since 5.0
      */
     #[TentativeType]
     public function attributes(
@@ -141,7 +141,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * </p>
      * @return static|null a <b>SimpleXMLElement</b> element, whether the node
      * has children or not.
-     * @since 5.0.1
+     * @since 5.0
      */
     #[Pure]
     #[TentativeType]
@@ -159,7 +159,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * </p>
      * @return array The getNamespaces method returns an array of
      * namespace names with their associated URIs.
-     * @since 5.1.2
+     * @since 5.1
      */
     #[Pure]
     #[TentativeType]
@@ -178,7 +178,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * </p>
      * @return array The getDocNamespaces method returns an array
      * of namespace names with their associated URIs.
-     * @since 5.1.2
+     * @since 5.1
      */
     #[Pure]
     #[TentativeType]
@@ -192,7 +192,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * @link https://php.net/manual/en/simplexmlelement.getname.php
      * @return string The getName method returns as a string the
      * name of the XML tag referenced by the SimpleXMLElement object.
-     * @since 5.1.3
+     * @since 5.1
      */
     #[Pure]
     #[TentativeType]
@@ -212,7 +212,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * </p>
      * @return static|null The addChild method returns a SimpleXMLElement
      * object representing the child added to the XML node.
-     * @since 5.1.3
+     * @since 5.1
      */
     #[TentativeType]
     public function addChild(
@@ -234,7 +234,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * If specified, the namespace to which the attribute belongs.
      * </p>
      * @return void No value is returned.
-     * @since 5.1.3
+     * @since 5.1
      */
     #[TentativeType]
     public function addAttribute(
@@ -250,8 +250,8 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
      * @return string the string content on success or an empty string on failure.
      * @since 5.3
      */
-    #[TentativeType]
-    public function __toString(): string {}
+    #[LanguageLevelTypeAware(['7.0' => 'string'], default: '')]
+    public function __toString() {}
 
     /**
      * Counts the children of an element
@@ -317,11 +317,11 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
     /**
      * Returns the current element
      * @link https://php.net/manual/en/simplexmliterator.current.php
-     * @return static|null the current element as a <b>SimpleXMLElement</b> object or <b>NULL</b> on failure.
+     * @return static the current element as a <b>SimpleXMLElement</b> object.
      */
     #[Pure]
     #[TentativeType]
-    public function current(): ?static {}
+    public function current(): SimpleXMLElement {}
 
     /**
      * Return current key
@@ -369,7 +369,8 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
     /**
      * @since 8.3
      */
-    public function __debugInfo(): ?array {}
+    #[LanguageLevelTypeAware(['8.6' => 'array'], default: 'array|null')]
+    public function __debugInfo() {}
 }
 
 /**
@@ -383,6 +384,8 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
      * @link https://php.net/manual/en/simplexmliterator.rewind.php
      * @return void No value is returned.
      */
+    #[LanguageLevelTypeAware(['8.1' => 'void'], default: '')]
+    #[TentativeType]
     public function rewind() {}
 
     /**
@@ -391,21 +394,26 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
      * @return bool <b>TRUE</b> if the current element is valid, otherwise <b>FALSE</b>
      */
     #[Pure]
+    #[LanguageLevelTypeAware(['8.1' => 'bool'], default: '')]
+    #[TentativeType]
     public function valid() {}
 
     /**
      * Returns the current element
      * @link https://php.net/manual/en/simplexmliterator.current.php
-     * @return static|null the current element as a <b>SimpleXMLIterator</b> object or <b>NULL</b> on failure.
+     * @return SimpleXMLElement the current element as a <b>SimpleXMLElement</b> object.
      */
     #[Pure]
-    public function current() {}
+    #[TentativeType]
+    public function current(): SimpleXMLElement {}
 
     /**
      * Return current key
      * @link https://php.net/manual/en/simplexmliterator.key.php
      * @return string|false the XML tag name of the element referenced by the current <b>SimpleXMLIterator</b> object or <b>FALSE</b>
      */
+    #[LanguageLevelTypeAware(['8.1' => 'string'], default: '')]
+    #[TentativeType]
     public function key() {}
 
     /**
@@ -413,6 +421,8 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
      * @link https://php.net/manual/en/simplexmliterator.next.php
      * @return void No value is returned.
      */
+    #[LanguageLevelTypeAware(['8.1' => 'void'], default: '')]
+    #[TentativeType]
     public function next() {}
 
     /**
@@ -421,15 +431,19 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
      * @return bool <b>TRUE</b> if the current element has sub-elements, otherwise <b>FALSE</b>
      */
     #[Pure]
+    #[LanguageLevelTypeAware(['8.1' => 'bool'], default: '')]
+    #[TentativeType]
     public function hasChildren() {}
 
     /**
      * Returns the sub-elements of the current element
      * @link https://php.net/manual/en/simplexmliterator.getchildren.php
-     * @return SimpleXMLIterator a <b>SimpleXMLIterator</b> object containing
+     * @return SimpleXMLElement|null a <b>SimpleXMLElement</b> object containing
      * the sub-elements of the current element.
      */
     #[Pure]
+    #[LanguageLevelTypeAware(['8.1' => 'SimpleXMLElement|null'], default: '')]
+    #[TentativeType]
     public function getChildren() {}
 
     /**
@@ -438,6 +452,7 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
      * @return string the string content on success or an empty string on failure.
      * @since 5.3
      */
+    #[LanguageLevelTypeAware(['7.0' => 'string'], default: '')]
     public function __toString() {}
 
     /**
@@ -446,6 +461,8 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
      * @return int the number of elements of an element.
      */
     #[Pure]
+    #[LanguageLevelTypeAware(['8.1' => 'int'], default: '')]
+    #[TentativeType]
     public function count() {}
 }
 
@@ -482,6 +499,7 @@ class SimpleXMLIterator extends SimpleXMLElement implements RecursiveIterator, C
  * </p>
  * @return SimpleXMLElement|false an object of class SimpleXMLElement with
  * properties containing the data held within the XML document, or <b>FALSE</b> on failure.
+ * @meta
  */
 function simplexml_load_file(string $filename, ?string $class_name = "SimpleXMLElement", int $options = 0, string $namespace_or_prefix = "", bool $is_prefix = false): SimpleXMLElement|false {}
 
@@ -510,6 +528,7 @@ function simplexml_load_file(string $filename, ?string $class_name = "SimpleXMLE
  * </p>
  * @return SimpleXMLElement|false an object of class SimpleXMLElement with
  * properties containing the data held within the xml document, or <b>FALSE</b> on failure.
+ * @meta
  */
 function simplexml_load_string(string $data, ?string $class_name = "SimpleXMLElement", int $options = 0, string $namespace_or_prefix = "", bool $is_prefix = false): SimpleXMLElement|false {}
 
@@ -525,7 +544,9 @@ function simplexml_load_string(string $data, ?string $class_name = "SimpleXMLEle
  * the specified class. That class should extend the
  * SimpleXMLElement class.
  * </p>
- * @return SimpleXMLElement|null a SimpleXMLElement or <b>FALSE</b> on failure.
+ * @return SimpleXMLElement|null a SimpleXMLElement, or <b>NULL</b> on failure. Prior to PHP 8.0,
+ * <b>FALSE</b> was returned instead of <b>NULL</b>.
+ * @meta
  */
 function simplexml_import_dom(#[LanguageLevelTypeAware(['8.4' => 'object'], default: 'SimpleXMLElement|DOMNode')] $node, ?string $class_name = "SimpleXMLElement"): ?SimpleXMLElement {}
 

@@ -13,7 +13,7 @@ use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
  * @param string $subject <p>
  * The input string.
  * </p>
- * @param string[] &$matches [optional] <p>
+ * @param null|string[] &$matches [optional] <p>
  * If <i>matches</i> is provided, then it is filled with
  * the results of search. $matches[0] will contain the
  * text that matched the full pattern, $matches[1]
@@ -157,7 +157,7 @@ use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
  * if an error occurred.
  * @pure
  */
-function preg_match(string $pattern, string $subject, &$matches = null, int $flags = 0, int $offset = 0): int|false {}
+function preg_match(string $pattern, string $subject, ?array &$matches = null, int $flags = 0, int $offset = 0): int|false {}
 
 /**
  * Perform a global regular expression match
@@ -168,7 +168,7 @@ function preg_match(string $pattern, string $subject, &$matches = null, int $fla
  * @param string $subject <p>
  * The input string.
  * </p>
- * @param string[][] &$matches [optional] <p>
+ * @param null|string[][] &$matches [optional] <p>
  * Array of all matches in multi-dimensional array ordered according to flags.
  * </p>
  * @param int $flags <p>
@@ -217,7 +217,7 @@ function preg_match(string $pattern, string $subject, &$matches = null, int $fla
  * @pure
  */
 #[LanguageLevelTypeAware(['8.0' => 'int|false'], default: 'int|false|null')]
-function preg_match_all(string $pattern, string $subject, &$matches = null, int $flags = 0, int $offset = 0) {}
+function preg_match_all(string $pattern, string $subject, ?array &$matches = null, int $flags = 0, int $offset = 0) {}
 
 /**
  * Perform a regular expression search and replace

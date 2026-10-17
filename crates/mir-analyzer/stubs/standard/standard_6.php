@@ -2,6 +2,7 @@
 
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
+use JetBrains\PhpStorm\FileReference;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 
@@ -83,7 +84,8 @@ function stream_select(
     ?array &$write,
     ?array &$except,
     ?int $seconds,
-    #[LanguageLevelTypeAware(['8.1' => 'int|null'], default: 'int')] $microseconds = null
+    #[LanguageLevelTypeAware(['8.1' => 'int|null'], default: 'int')] $microseconds = null,
+    #[PhpStormStubsElementAvailable(from: '8.6')] $context = null
 ): int|false {}
 
 /**
@@ -521,7 +523,7 @@ function stream_socket_enable_crypto($stream, bool $enable, ?int $crypto_method 
  * transmissions).
  * </p>
  * @return bool true on success or false on failure.
- * @since 5.2.1
+ * @since 5.2
  */
 function stream_socket_shutdown($stream, int $mode): bool {}
 
@@ -551,7 +553,7 @@ function stream_socket_shutdown($stream, int $mode): bool {}
  * @return array|false an array with the two socket resources on success, or
  * false on failure.
  */
-function stream_socket_pair(int $domain, int $type, int $protocol): array|false {}
+function stream_socket_pair(int $domain, int $type, int $protocol, #[PhpStormStubsElementAvailable(from: '8.6')] $context = null): array|false {}
 
 /**
  * Copies data from one stream to another
@@ -570,7 +572,7 @@ function stream_socket_pair(int $domain, int $type, int $protocol): array|false 
  * </p>
  * @return int|false the total count of bytes copied, or false on failure.
  */
-function stream_copy_to_stream($from, $to, ?int $length = null, int $offset = 0): int|false {}
+function stream_copy_to_stream($from, $to, ?int $length = null, int $offset = 0, #[PhpStormStubsElementAvailable(from: '8.6')] $context = null): int|false {}
 
 /**
  * Reads remainder of a stream into a string
@@ -970,7 +972,7 @@ function stream_register_wrapper(string $protocol, string $class, int $flags = 0
  * @link https://php.net/manual/en/function.stream-resolve-include-path.php
  * @param string $filename The filename to resolve.
  * @return string|false containing the resolved absolute filename, or FALSE on failure.
- * @since 5.3.2
+ * @since 5.3
  */
 function stream_resolve_include_path(string $filename): string|false {}
 

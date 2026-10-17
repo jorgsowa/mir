@@ -668,8 +668,6 @@ final class HTMLDocument extends Document
      * @return int|false The number of bytes written on success, or false on failure.
      */
     public function saveHtmlFile(string $filename): int|false {}
-
-    public function debugGetTemplateCount(): int {}
 }
 /**
  * Represents an XML document.

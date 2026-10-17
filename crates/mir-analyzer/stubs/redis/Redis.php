@@ -106,6 +106,12 @@ class Redis
      */
     public function __construct(?array $options = null) {}
 
+    /**
+     * Destructor to clean up the Redis object.
+     *
+     * This method will disconnect from Redis. If the connection is persistent
+     * it will be stashed for future reuse.
+     */
     public function __destruct() {}
 
     /**
@@ -285,6 +291,23 @@ class Redis
      */
     public function bitcount(string $key, int $start = 0, int $end = -1, bool $bybit = false): Redis|int|false {}
 
+    /**
+     * Perform a bitwise operation on one or more keys, storing the result in a destination key.
+     *
+     * @param string $operation   The bitwise operation to perform. One of 'AND', 'OR', 'XOR', or 'NOT'.
+     * @param string $deskey       The destination key where the result will be stored.
+     * @param string $srckey       The first source key to operate on.
+     * @param string ...$other_keys Any additional source keys to operate on.
+     *
+     * @return Redis|int|false The size of the string stored in the destination key.
+     *
+     * @see https://redis.io/docs/latest/commands/bitop/
+     *
+     * @example
+     * $redis->set('bit1', 'abc');
+     * $redis->set('bit2', 'abd');
+     * $redis->bitop('AND', 'bit-and', 'bit1', 'bit2');
+     */
     public function bitop(string $operation, string $deskey, string $srckey, string ...$other_keys): Redis|int|false {}
 
     /**
@@ -957,6 +980,20 @@ class Redis
      */
     public function expireAt(string $key, int $timestamp, ?string $mode = null): Redis|bool {}
 
+    /**
+     * Start a coordinated failover between the currently connected primary and one of its replicas.
+     *
+     * @param array|null $to      An optional array describing the replica to fail over to
+     *                            (e.g. ['host' => '127.0.0.1', 'port' => 6379]).
+     * @param bool       $abort   Whether to abort a failover currently in progress.
+     * @param int        $timeout A timeout, in milliseconds, after which the failover is aborted.
+     *
+     * @return Redis|bool True if the failover was started (or aborted) and false on failure.
+     *
+     * @see https://redis.io/docs/latest/commands/failover/
+     *
+     * @example $redis->failover(['host' => '127.0.0.1', 'port' => 6380]);
+     */
     public function failover(?array $to = null, bool $abort = false, int $timeout = 0): Redis|bool {}
 
     /**
@@ -1587,6 +1624,18 @@ class Redis
      */
     public function hExists(string $key, string $field): Redis|bool {}
 
+    /**
+     * Get the value of a single field in a hash.
+     *
+     * @param string $key    The hash to query.
+     * @param string $member The field to retrieve.
+     *
+     * @return mixed The value of the field, or false if the field or hash does not exist.
+     *
+     * @see https://redis.io/docs/latest/commands/hget/
+     *
+     * @example $redis->hGet('communication', 'Alice');
+     */
     public function hGet(string $key, string $member): mixed {}
 
     /**

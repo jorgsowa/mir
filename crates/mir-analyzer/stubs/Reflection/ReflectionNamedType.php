@@ -15,7 +15,8 @@ class ReflectionNamedType extends ReflectionType
      * @since 7.1
      */
     #[Pure]
-    public function getName() {}
+    #[TentativeType]
+    public function getName(): string {}
 
     /**
      * Checks if it is a built-in type

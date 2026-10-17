@@ -5,6 +5,7 @@
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\ExpectedValues;
+use JetBrains\PhpStorm\FileReference;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 use JetBrains\PhpStorm\Internal\TentativeType;
@@ -180,8 +181,8 @@ class Directory
      * @param resource $dir_handle [optional]
      * @link https://php.net/manual/en/directory.close.php
      */
-    #[TentativeType]
-    public function close(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $dir_handle = null): void {}
+    #[LanguageLevelTypeAware(['8.0' => 'void'], default: '')]
+    public function close(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $dir_handle = null) {}
 
     /**
      * Rewind directory handle.
@@ -189,8 +190,8 @@ class Directory
      * @param resource $dir_handle [optional]
      * @link https://php.net/manual/en/directory.rewind.php
      */
-    #[TentativeType]
-    public function rewind(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $dir_handle = null): void {}
+    #[LanguageLevelTypeAware(['8.0' => 'void'], default: '')]
+    public function rewind(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $dir_handle = null) {}
 
     /**
      * Read entry from directory handle.
@@ -199,8 +200,8 @@ class Directory
      * @return string|false
      * @link https://php.net/manual/en/directory.read.php
      */
-    #[TentativeType]
-    public function read(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $dir_handle = null): string|false {}
+    #[LanguageLevelTypeAware(['8.0' => 'string|false'], default: '')]
+    public function read(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $dir_handle = null) {}
 }
 
 /**
@@ -1001,7 +1002,7 @@ function iptcembed(string $iptc_data, string $filename, int $spool = 0): string|
  * </p>
  */
 #[ArrayShape([0 => "int", 1 => "int", 2 => "int", 3 => "string", "bits" => "int", "channels" => "int", "mime" => "string"])]
-function getimagesize(string $filename, &$image_info = null): array|false {}
+function getimagesize(#[FileReference] string $filename, &$image_info = null): array|false {}
 
 /**
  * Get Mime-Type for image-type returned by getimagesize, exif_read_data, exif_thumbnail, exif_imagetype
@@ -1191,7 +1192,7 @@ function image_type_to_extension(int $image_type, bool $include_dot = true): str
  * @return bool true on success or false on failure.
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
-function phpinfo(#[ExpectedValues(flags: [INFO_GENERAL, INFO_CREDITS, INFO_CONFIGURATION, INFO_MODULES, INFO_ENVIRONMENT, INFO_VARIABLES, INFO_LICENSE, INFO_ALL])] int $flags = INFO_ALL): bool {}
+function phpinfo(#[ExpectedValues(flags: [INFO_GENERAL, INFO_CREDITS, INFO_CONFIGURATION, INFO_MODULES, INFO_ENVIRONMENT, INFO_VARIABLES, INFO_LICENSE, INFO_ALL])] int $flags = INFO_ALL) {}
 
 /**
  * Gets the current PHP version
@@ -1271,7 +1272,7 @@ function phpversion(?string $extension = null): string|false {}
  * @return bool true on success or false on failure.
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
-function phpcredits(int $flags = CREDITS_ALL): bool {}
+function phpcredits(int $flags = CREDITS_ALL) {}
 
 /**
  * Gets the logo guid

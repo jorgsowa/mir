@@ -969,11 +969,35 @@ class NumberFormatter
      * @since 8.4
      */
     public const ROUND_HALFODD = 8;
+
+    /**
+     * @since 8.5
+     */
     public const DECIMAL_COMPACT_SHORT = 14;
+
+    /**
+     * @since 8.5
+     */
     public const DECIMAL_COMPACT_LONG = 15;
+
+    /**
+     * @since 8.5
+     */
     public const CURRENCY_ISO = 10;
+
+    /**
+     * @since 8.5
+     */
     public const CURRENCY_PLURAL = 11;
+
+    /**
+     * @since 8.5
+     */
     public const CASH_CURRENCY = 13;
+
+    /**
+     * @since 8.5
+     */
     public const CURRENCY_STANDARD = 16;
 
     /**
@@ -2594,9 +2618,16 @@ class Transliterator
     public const REVERSE = 1;
 
     /**
-     * Starting 8.2 $id is readonly to unlock subclassing it
+     * @since 5.4
+     * @removed 8.2
      */
     #[LanguageAware(['8.1' => 'string'], default: '')]
+    public string $id;
+
+    /**
+     * @since 8.2
+     * Starting 8.2 $id is readonly to unlock subclassing it
+     */
     public readonly string $id;
 
     /**
@@ -2748,8 +2779,8 @@ class Spoofchecker
     public const MINIMALLY_RESTRICTIVE = 1342177280;
     public const UNRESTRICTIVE = 1610612736;
     public const SINGLE_SCRIPT_RESTRICTIVE = 536870912;
-    public const MIXED_NUMBERS = 1;
-    public const HIDDEN_OVERLAY = 2;
+    public const MIXED_NUMBERS = 128;
+    public const HIDDEN_OVERLAY = 256;
 
     /**
      * @since 8.4
@@ -2879,14 +2910,8 @@ class IntlGregorianCalendar extends IntlCalendar
     public function __construct($timezoneOrYear, $localeOrMonth, $day, $hour, $minute, $second) {}
 
     /**
-     * (PHP 5 &gt;=5.5.0 PECL intl &gt;= 3.0.0a1)<br/>
-     * @param mixed $timeZone
-     * @param string $locale
-     * @return IntlGregorianCalendar
-     */
-    public static function createInstance($timeZone = null, $locale = null) {}
-
-    /**
+     * Set the Gregorian Calendar the change date
+     * @link https://php.net/manual/en/intlgregoriancalendar.setgregorianchange.php
      * @param float $timestamp
      */
     #[TentativeType]
@@ -2961,7 +2986,7 @@ class IntlCalendar
     public const FIELD_JULIAN_DAY = 20;
     public const FIELD_MILLISECONDS_IN_DAY = 21;
     public const FIELD_IS_LEAP_MONTH = 22;
-    public const FIELD_FIELD_COUNT = 23;
+    public const FIELD_FIELD_COUNT = 24;
     public const FIELD_DAY_OF_MONTH = 5;
     public const DOW_SUNDAY = 1;
     public const DOW_MONDAY = 2;
@@ -3470,8 +3495,8 @@ class IntlCalendar
     /**
      * (PHP 5 &gt;=5.5.0 PECL intl &gt;= 3.0.0a1)<br/>
      * Get time of the day at which weekend begins or ends
-     * @link https://secure.php.net/manual/en/intlcalendar.getweekendtransition.php
-     * @param string $dayOfWeek <p>
+     * @link https://php.net/manual/en/intlcalendar.getweekendtransition.php
+     * @param int $dayOfWeek <p>
      * One of the constants <b>IntlCalendar::DOW_SUNDAY</b>,
      * <b>IntlCalendar::DOW_MONDAY</b>, ...,
      * <b>IntlCalendar::DOW_SATURDAY</b>.
@@ -3609,7 +3634,16 @@ class IntlCalendar
      * </p>
      * @return bool Returns <b>TRUE</b> on success and <b>FALSE</b> on failure.
      */
-    public function set($year, $month, $dayOfMonth = null, $hour = null, $minute = null, $second = null) {}
+    #[TentativeType]
+    #[LanguageAware(['8.4' => 'true'], default: 'bool')]
+    public function set(
+        #[LanguageAware(['8.0' => 'int'], default: '')] $year,
+        #[LanguageAware(['8.0' => 'int'], default: '')] $month,
+        #[LanguageAware(['8.0' => 'int'], default: '')] $dayOfMonth = null,
+        #[LanguageAware(['8.0' => 'int'], default: '')] $hour = null,
+        #[LanguageAware(['8.0' => 'int'], default: '')] $minute = null,
+        #[LanguageAware(['8.0' => 'int'], default: '')] $second = null
+    ) {}
 
     /**
      * (PHP 5 >= 5.5.0 PECL intl >= 3.0.0a1)<br/>
@@ -3620,6 +3654,8 @@ class IntlCalendar
      * @return bool Returns <b>TRUE</b> on success and <b>FALSE</b> on failure.
      * @since 5.5
      */
+    #[TentativeType]
+    #[LanguageAware(['8.4' => 'true'], default: 'bool')]
     public function set($field, $value) {}
 
     /**
@@ -6060,7 +6096,7 @@ function intlcal_roll(
  * @since 5.5
  */
 #[LanguageAware(['8.3' => 'true'], default: 'bool')]
-function intlcal_clear(IntlCalendar $calendar, ?int $field = null): bool {}
+function intlcal_clear(IntlCalendar $calendar, ?int $field = null) {}
 
 /**
  * (PHP 5 &gt;=5.5.0 PECL intl &gt;= 3.0.0a1)<br/>
@@ -7247,7 +7283,7 @@ function intltz_get_region(string $timezoneId): string|false {}
  * @param int $days
  * @return bool
  *
- * @since 5.5.1
+ * @since 5.5
  */
 #[LanguageAware(['8.3' => 'true'], default: 'bool')]
 function intlcal_set_minimal_days_in_first_week(IntlCalendar $calendar, int $days) {}
@@ -7767,8 +7803,8 @@ class IntlBreakIterator implements IteratorAggregate
     /**
      * (PHP 5 &gt;=5.5.0)<br/>
      * Get the locale associated with the object
-     * @link https://secure.php.net/manual/en/intlbreakiterator.getlocale.php
-     * @param string $type
+     * @link https://php.net/manual/en/intlbreakiterator.getlocale.php
+     * @param int $type
      */
     #[Pure]
     #[TentativeType]
@@ -7777,8 +7813,8 @@ class IntlBreakIterator implements IteratorAggregate
     /**
      * (PHP 5 &gt;=5.5.0)<br/>
      * Create iterator for navigating fragments between boundaries
-     * @link https://secure.php.net/manual/en/intlbreakiterator.getpartsiterator.php
-     * @param int $type [optional]
+     * @link https://php.net/manual/en/intlbreakiterator.getpartsiterator.php
+     * @param int|string $type [optional]
      * <p>
      * Optional key type. Possible values are:
      * </p><ul>
@@ -7799,7 +7835,7 @@ class IntlBreakIterator implements IteratorAggregate
     #[Pure]
     #[TentativeType]
     public function getPartsIterator(
-        #[LanguageAware(['8.0' => 'int', '8.3' => 'string'], default: '')] #[EV([IntlPartsIterator::KEY_SEQUENTIAL, IntlPartsIterator::KEY_LEFT, IntlPartsIterator::KEY_RIGHT])] $type = IntlPartsIterator::KEY_SEQUENTIAL
+        #[LanguageAware(['8.6' => 'int', '8.0' => 'string'], default: '')] #[EV([IntlPartsIterator::KEY_SEQUENTIAL, IntlPartsIterator::KEY_LEFT, IntlPartsIterator::KEY_RIGHT])] $type = IntlPartsIterator::KEY_SEQUENTIAL
     ): IntlPartsIterator {}
 
     /**
@@ -7889,7 +7925,7 @@ class IntlRuleBasedBreakIterator extends IntlBreakIterator implements Traversabl
      * (PHP 5 &gt;=5.5.0)<br/>
      * @link https://php.net/manual/en/intlbreakiterator.construct.php
      * @param string $rules
-     * @param string $compiled [optional]
+     * @param bool $compiled [optional]
      */
     #[Pure]
     public function __construct(
@@ -7899,60 +7935,7 @@ class IntlRuleBasedBreakIterator extends IntlBreakIterator implements Traversabl
 
     /**
      * (PHP 5 &gt;=5.5.0)<br/>
-     * Create break iterator for boundaries of combining character sequences
-     * @link https://secure.php.net/manual/en/intlbreakiterator.createcharacterinstance.php
-     * @param string $locale
-     * @return IntlRuleBasedBreakIterator
-     */
-    public static function createCharacterInstance($locale) {}
-
-    /**
-     * (PHP 5 &gt;=5.5.0)<br/>
-     * Create break iterator for boundaries of code points
-     * @link https://secure.php.net/manual/en/intlbreakiterator.createcodepointinstance.php
-     * @return IntlRuleBasedBreakIterator
-     */
-    public static function createCodePointInstance() {}
-
-    /**
-     * (PHP 5 &gt;=5.5.0)<br/>
-     * Create break iterator for logically possible line breaks
-     * @link https://secure.php.net/manual/en/intlbreakiterator.createlineinstance.php
-     * @param string $locale [optional]
-     * @return IntlRuleBasedBreakIterator
-     */
-    public static function createLineInstance($locale) {}
-
-    /**
-     * (PHP 5 &gt;=5.5.0)<br/>
-     * Create break iterator for sentence breaks
-     * @link https://secure.php.net/manual/en/intlbreakiterator.createsentenceinstance.php
-     * @param string $locale [optional]
-     * @return IntlRuleBasedBreakIterator
-     */
-    public static function createSentenceInstance($locale) {}
-
-    /**
-     * (PHP 5 &gt;=5.5.0)<br/>
-     * Create break iterator for title-casing breaks
-     * @link https://secure.php.net/manual/en/intlbreakiterator.createtitleinstance.php
-     * @param string $locale [optional]
-     * @return IntlRuleBasedBreakIterator
-     */
-    public static function createTitleInstance($locale) {}
-
-    /**
-     * (PHP 5 &gt;=5.5.0)<br/>
-     * Create break iterator for word breaks
-     * @link https://secure.php.net/manual/en/intlbreakiterator.createwordinstance.php
-     * @param string $locale [optional]
-     * @return IntlRuleBasedBreakIterator
-     */
-    public static function createWordInstance($locale) {}
-
-    /**
-     * (PHP 5 &gt;=5.5.0)<br/>
-     * @link https://secure.php.net/manual/en/intlrulebasedbreakiterator.getbinaryrules.php
+     * @link https://php.net/manual/en/intlrulebasedbreakiterator.getbinaryrules.php
      * Get the binary form of compiled rules
      * @return string|false
      */
@@ -8120,8 +8103,8 @@ class UConverter
      * Default "from" callback function
      * @link https://php.net/manual/en/uconverter.fromucallback.php
      * @param int $reason
-     * @param string $source
-     * @param string $codePoint
+     * @param array $source
+     * @param int $codePoint
      * @param int &$error
      * @return array|string|int|null
      */
@@ -8315,7 +8298,7 @@ class UConverter
         #[LanguageAware(['8.0' => 'string'], default: '')] $str,
         #[LanguageAware(['8.0' => 'string'], default: '')] $toEncoding,
         #[LanguageAware(['8.0' => 'string'], default: '')] $fromEncoding,
-        #[LanguageAware(['8.0' => 'array|null'], default: '')] $options = null
+        #[LanguageAware(['7.1' => 'array|null'], default: '')] $options = null
     ): string|false {}
 }
 // End of intl v.1.1.0

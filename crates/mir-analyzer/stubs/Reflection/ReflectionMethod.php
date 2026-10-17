@@ -18,6 +18,7 @@ class ReflectionMethod extends ReflectionFunctionAbstract
      * @var string Name of the method, same as calling the {@see ReflectionMethod::getName()} method
      */
     #[Immutable]
+    #[LanguageLevelTypeAware(['8.1' => 'string'], default: '')]
     public $name;
 
     /**
@@ -101,8 +102,8 @@ class ReflectionMethod extends ReflectionFunctionAbstract
      * @link https://php.net/manual/en/reflectionmethod.tostring.php
      * @return string A string representation of this {@see ReflectionMethod} instance.
      */
-    #[TentativeType]
-    public function __toString(): string {}
+    #[LanguageLevelTypeAware(['7.0' => 'string'], default: '')]
+    public function __toString() {}
 
     /**
      * Checks if method is public
@@ -236,7 +237,11 @@ class ReflectionMethod extends ReflectionFunctionAbstract
      * instance of the class that this method was declared in or the method
      * invocation failed.
      */
-    public function invoke($object, ...$args) {}
+    #[TentativeType]
+    public function invoke(
+        #[LanguageLevelTypeAware(['8.0' => 'object|null'], default: '')] $object,
+        mixed ...$args
+    ): mixed {}
 
     /**
      * Invokes the reflected method and pass its arguments as array.
@@ -294,7 +299,6 @@ class ReflectionMethod extends ReflectionFunctionAbstract
      * @param bool $accessible {@see true} to allow accessibility, or {@see false}
      * @return void No value is returned.
      */
-    #[Pure]
     #[PhpStormStubsElementAvailable(from: "8.1")]
     #[TentativeType]
     #[Deprecated('Deprecated: it has no effect', since: '8.5')]
