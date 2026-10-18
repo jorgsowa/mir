@@ -183,6 +183,53 @@ fn scan_top_level(scan: &mut Scan<'_>, stmts: &[php_ast::owned::Stmt]) {
     }
 }
 
+/// Files the static `require`/`include` targets of `file` name.
+#[salsa::tracked]
+fn included_files(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
+    let text = file.text(db);
+    if !crate::include_graph::may_include(text) {
+        return Arc::from([]);
+    }
+    let parsed = crate::recursion::parse(text.as_ref());
+    let path = std::path::Path::new(file.path(db).as_ref());
+    crate::include_graph::static_include_paths(&parsed.program, path)
+        .iter()
+        .filter_map(|target| db.lookup_source_file(&target.to_string_lossy()))
+        .filter(|target| *target != file)
+        .collect()
+}
+
+/// Include edges between every pair of workspace files, both directions.
+#[salsa::tracked]
+fn workspace_include_links(db: &dyn MirDatabase) -> Arc<FxHashMap<SourceFile, Vec<SourceFile>>> {
+    let _ = db.workspace_revision().revision(db);
+    let mut links: FxHashMap<SourceFile, Vec<SourceFile>> = FxHashMap::default();
+    for file in db.all_source_files() {
+        for target in included_files(db, file).iter() {
+            links.entry(file).or_default().push(*target);
+            links.entry(*target).or_default().push(file);
+        }
+    }
+    Arc::new(links)
+}
+
+/// `file` and the files joined to it by includes, which share its globals.
+#[salsa::tracked]
+pub(crate) fn include_group(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
+    let links = workspace_include_links(db);
+    let mut group = vec![file];
+    let mut next = 0;
+    while let Some(current) = group.get(next).copied() {
+        next += 1;
+        for linked in links.get(&current).into_iter().flatten() {
+            if !group.contains(linked) {
+                group.push(*linked);
+            }
+        }
+    }
+    Arc::from(group)
+}
+
 /// Whether top-level code of `file` may store source data in the global `var`.
 pub(crate) fn global_may_read_source(db: &dyn MirDatabase, file: SourceFile, var: Name) -> bool {
     let facts = file_source_facts(db, file);

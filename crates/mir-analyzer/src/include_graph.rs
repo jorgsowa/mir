@@ -39,30 +39,14 @@ pub fn include_closure(
     let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
     let mut queue: Vec<PathBuf> = out.clone();
     while let Some(file) = queue.pop() {
-        let Some(dir) = file.parent().map(Path::to_path_buf) else {
-            continue;
-        };
         let Ok(text) = crate::read_php_source(&file) else {
             continue;
         };
-        // Cheap bailout: skip the full parse for the (common) majority of
-        // files that don't even mention require/include.
-        if !text.contains("require") && !text.contains("include") {
+        if !may_include(&text) {
             continue;
         }
         let parsed = php_rs_parser::parse(&text);
-        let mut scanner = IncludeTargetScanner {
-            file: &file,
-            targets: Vec::new(),
-        };
-        let _ = scanner.visit_program(&parsed.program);
-        for target in scanner.targets {
-            let resolved = if Path::new(&target).is_absolute() {
-                PathBuf::from(target)
-            } else {
-                dir.join(target)
-            };
-            let resolved = lexically_normalize(&resolved);
+        for resolved in static_include_paths(&parsed.program, &file) {
             if !extensions.is_php_source(&resolved) {
                 continue;
             }
@@ -81,6 +65,36 @@ pub fn include_closure(
         }
     }
     out
+}
+
+/// Cheap bailout: the (common) majority of files don't even mention require/include.
+pub(crate) fn may_include(text: &str) -> bool {
+    text.contains("require") || text.contains("include")
+}
+
+/// Paths the statically resolvable `require`/`include` targets in `program`
+/// name, a relative one taken from `file`'s directory.
+pub(crate) fn static_include_paths(program: &php_ast::owned::Program, file: &Path) -> Vec<PathBuf> {
+    let Some(dir) = file.parent() else {
+        return Vec::new();
+    };
+    let mut scanner = IncludeTargetScanner {
+        file,
+        targets: Vec::new(),
+    };
+    let _ = scanner.visit_program(program);
+    scanner
+        .targets
+        .into_iter()
+        .map(|target| {
+            let resolved = if Path::new(&target).is_absolute() {
+                PathBuf::from(target)
+            } else {
+                dir.join(target)
+            };
+            lexically_normalize(&resolved)
+        })
+        .collect()
 }
 
 /// Collapses `.`/`..` components lexically instead of relying on the OS to

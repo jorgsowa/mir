@@ -271,18 +271,25 @@ pub fn method_param_sinks(
         .flatten()
 }
 
-/// Source taint the global `var` holds after the top-level code of `file`.
+/// Source taint the global `var` holds after the top-level code of `file`
+/// or of the files joined to it by includes.
 pub fn global_var_taint(db: &dyn MirDatabase, file: &str, var: &str) -> crate::taint::Taint {
     let var = mir_types::Name::new(var);
     let Some(sf) = db.lookup_source_file(file) else {
         return crate::taint::Taint::NONE;
     };
-    if !super::taint_sources::global_may_read_source(db, sf, var) {
-        return crate::taint::Taint::NONE;
+    let mut taint = crate::taint::Taint::NONE;
+    for member in super::taint_sources::include_group(db, sf).iter() {
+        if !super::taint_sources::global_may_read_source(db, *member, var) {
+            continue;
+        }
+        for (name, member_taint) in
+            &crate::db::infer_member(db, *member, ScopeKey::FileExec, None).global_taint
+        {
+            if *name == var {
+                taint |= *member_taint;
+            }
+        }
     }
-    crate::db::infer_member(db, sf, ScopeKey::FileExec, None)
-        .global_taint
-        .iter()
-        .filter(|(name, _)| *name == var)
-        .fold(crate::taint::Taint::NONE, |acc, (_, taint)| acc | *taint)
+    taint
 }
