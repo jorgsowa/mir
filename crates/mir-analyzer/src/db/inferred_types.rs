@@ -245,16 +245,16 @@ pub fn function_param_sinks(
         .flatten()
 }
 
-/// [`method_taint_summary`] for reporting arguments at a call; an abstract
-/// method's merges those of its implementations.
+/// [`method_taint_summary`] for reporting arguments at a call on an instance
+/// of `class`; an abstract method's merges those of its implementations.
 pub fn method_param_sinks(
     db: &dyn MirDatabase,
     file: &str,
-    owner_fqcn: &str,
+    class: &str,
     method_name_lower: &str,
 ) -> Option<crate::taint::TaintSummary> {
     let implementations =
-        super::taint_sources::method_implementations(db, owner_fqcn, method_name_lower);
+        super::taint_sources::method_implementations(db, class, method_name_lower);
     if !implementations.is_empty() {
         return implementations
             .iter()
@@ -266,8 +266,13 @@ pub fn method_param_sinks(
                 merged
             });
     }
-    super::taint_sources::method_may_reach_sink(db, file, owner_fqcn, method_name_lower)
-        .then(|| method_taint_summary(db, file, owner_fqcn, method_name_lower))
+    let (owner, _) = crate::db::find_method_respecting_precedence(
+        db,
+        Fqcn::from_str(db, class),
+        method_name_lower,
+    )?;
+    super::taint_sources::method_may_reach_sink(db, file, &owner, method_name_lower)
+        .then(|| method_taint_summary(db, file, &owner, method_name_lower))
         .flatten()
 }
 

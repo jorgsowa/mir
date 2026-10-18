@@ -144,6 +144,14 @@ impl std::ops::BitOrAssign for Taint {
     }
 }
 
+/// What a label slot past the parameters stands for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SlotLabel {
+    Prop(mir_types::Name),
+    /// The parameter's own value, once proven an object.
+    Guard(usize),
+}
+
 /// A parameter whose value reaches a sink inside the callee.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParamSink {
@@ -199,28 +207,51 @@ impl TaintSummary {
 
     /// Combine with another body's summary, for a call that may run either.
     pub fn merge(&mut self, mut other: TaintSummary) {
-        for (slot, prop) in std::mem::take(&mut other.prop_labels) {
-            match self.prop_label(slot) {
-                Some(own) if own == prop => {}
-                None => {
-                    self.unguard(slot);
-                    self.prop_labels.push((slot, prop));
-                }
-                _ => other.drop_label(slot),
+        // Parameters keep their slots, which line up with a call's arguments;
+        // a guard's parameter stays free for its flows to fall back to.
+        let mut reserved = [false; MAX_TRACKED_PARAMS];
+        for summary in [&*self, &other] {
+            for (slot, reserve) in reserved.iter_mut().enumerate() {
+                *reserve |= summary.reads_slot(slot) && summary.slot_label(slot).is_none();
+            }
+            for (_, param) in &summary.object_guards {
+                reserved[*param] = true;
             }
         }
-        for (slot, param) in other.object_guards.clone() {
-            let taken = self.prop_label(slot).is_some()
-                || self
-                    .object_guards
+        let mut placed: Vec<(usize, SlotLabel)> = Vec::new();
+        let mut moves: [Vec<(usize, Option<usize>)>; 2] = Default::default();
+        for (side, summary) in [&*self, &other].into_iter().enumerate() {
+            for (slot, label) in summary.slot_labels() {
+                let free = |s: usize| !reserved[s] && !placed.iter().any(|(p, _)| *p == s);
+                let target = placed
                     .iter()
-                    .any(|(s, p)| *s == slot && *p != param);
-            if taken {
-                other.unguard(slot);
-            } else if !self.object_guards.contains(&(slot, param)) {
-                self.object_guards.push((slot, param));
+                    .find(|(_, l)| *l == label)
+                    .map(|(s, _)| *s)
+                    .or_else(|| free(slot).then_some(slot))
+                    .or_else(|| (0..MAX_TRACKED_PARAMS).find(|s| free(*s)));
+                if let Some(target) = target.filter(|t| !placed.contains(&(*t, label))) {
+                    placed.push((target, label));
+                }
+                moves[side].push((slot, target));
             }
         }
+        let [self_moves, other_moves] = moves;
+        self.move_labels(&self_moves);
+        other.move_labels(&other_moves);
+        self.prop_labels = placed
+            .iter()
+            .filter_map(|(slot, label)| match label {
+                SlotLabel::Prop(prop) => Some((*slot, *prop)),
+                SlotLabel::Guard(_) => None,
+            })
+            .collect();
+        self.object_guards = placed
+            .iter()
+            .filter_map(|(slot, label)| match label {
+                SlotLabel::Guard(param) => Some((*slot, *param)),
+                SlotLabel::Prop(_) => None,
+            })
+            .collect();
         let computed = |s: &TaintSummary| s.returns.label_slots().difference(s.return_parts);
         self.return_parts =
             (self.return_parts | other.return_parts).difference(computed(self) | computed(&other));
@@ -246,6 +277,80 @@ impl TaintSummary {
             .iter()
             .filter(|(k, _)| *k == key)
             .fold(Taint::NONE, |acc, (_, t)| acc | t.concrete())
+    }
+
+    /// Move each label slot to its new slot; a guard with none falls back to its
+    /// parameter, and a property's flows are lost.
+    fn move_labels(&mut self, moves: &[(usize, Option<usize>)]) {
+        for (slot, target) in moves {
+            if target.is_none() {
+                match self.slot_label(*slot) {
+                    Some(SlotLabel::Guard(_)) => self.unguard(*slot),
+                    _ => self.drop_label(*slot),
+                }
+            }
+        }
+        let target = |slot: usize| match moves.iter().find(|(s, _)| *s == slot) {
+            Some((_, target)) => *target,
+            None => Some(slot),
+        };
+        let relabel = |taint: Taint| {
+            (0..MAX_TRACKED_PARAMS).fold(taint.concrete(), |acc, slot| match target(slot) {
+                Some(to) => acc | Taint::label(to, taint.param_kinds(slot)),
+                None => acc,
+            })
+        };
+        self.returns = relabel(self.returns);
+        self.return_parts = relabel(self.return_parts);
+        for (_, taint) in &mut self.prop_writes {
+            *taint = relabel(*taint);
+        }
+        for sink in std::mem::take(&mut self.param_sinks) {
+            let Some(param) = target(sink.param) else {
+                continue;
+            };
+            match self
+                .param_sinks
+                .iter_mut()
+                .find(|s| s.param == param && s.issue == sink.issue)
+            {
+                Some(existing) => existing.kinds |= sink.kinds,
+                None => self.param_sinks.push(ParamSink { param, ..sink }),
+            }
+        }
+    }
+
+    /// The property or guard label slot `slot` stands for.
+    fn slot_label(&self, slot: usize) -> Option<SlotLabel> {
+        self.prop_label(slot).map(SlotLabel::Prop).or_else(|| {
+            self.object_guards
+                .iter()
+                .find(|(s, _)| *s == slot)
+                .map(|(_, param)| SlotLabel::Guard(*param))
+        })
+    }
+
+    fn slot_labels(&self) -> Vec<(usize, SlotLabel)> {
+        let props = self
+            .prop_labels
+            .iter()
+            .map(|(slot, prop)| (*slot, SlotLabel::Prop(*prop)));
+        let guards = self
+            .object_guards
+            .iter()
+            .map(|(slot, param)| (*slot, SlotLabel::Guard(*param)));
+        props.chain(guards).collect()
+    }
+
+    /// Whether some flow of this body comes from label slot `slot`.
+    fn reads_slot(&self, slot: usize) -> bool {
+        let label = Taint::param(slot);
+        self.returns.intersects(label)
+            || self
+                .prop_writes
+                .iter()
+                .any(|(_, taint)| taint.intersects(label))
+            || self.param_sinks.iter().any(|sink| sink.param == slot)
     }
 
     /// Let what flows from object guard slot `slot` flow from its parameter
@@ -1401,7 +1506,7 @@ pub fn check_call_sinks(
     summary: impl FnOnce(&dyn crate::db::MirDatabase, &str) -> Option<TaintSummary>,
     span: php_ast::Span,
 ) {
-    let mut sinks: Vec<ParamSink> = sink_params
+    let annotated: Vec<ParamSink> = sink_params
         .iter()
         .filter_map(|(name, kind)| {
             Some(ParamSink {
@@ -1417,14 +1522,19 @@ pub fn check_call_sinks(
     if !demanding_taint(args_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
         || receiver_demands_summary(receiver, ctx)
     {
-        if let Some(mut summary) = summary(ea.db, &ea.file) {
-            sinks.append(&mut summary.param_sinks);
+        if let Some(summary) = summary(ea.db, &ea.file) {
             callee = summary;
         }
     }
+    // Annotations name declared parameters; only the summary's slots may be labels.
+    let unlabelled = TaintSummary::default();
+    let sinks = annotated
+        .iter()
+        .map(|sink| (sink, &unlabelled))
+        .chain(callee.param_sinks.iter().map(|sink| (sink, &callee)));
     let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
-    for sink in &sinks {
-        if let Some(prop) = callee.prop_label(sink.param) {
+    for (sink, labels) in sinks {
+        if let Some(prop) = labels.prop_label(sink.param) {
             let (Some(receiver), taint) = (receiver, receiver_prop_taint(receiver, prop, ctx))
             else {
                 continue;
@@ -1437,8 +1547,8 @@ pub fn check_call_sinks(
             }
             continue;
         }
-        let guarded = callee.is_object_guard(sink.param);
-        for value in callee.slot_args(sink.param, params, args, arg_types, ctx, ea.db, &ea.file) {
+        let guarded = labels.is_object_guard(sink.param);
+        for value in labels.slot_args(sink.param, params, args, arg_types, ctx, ea.db, &ea.file) {
             let taint = if guarded {
                 object_arg_taint(value, ctx, ea.db, &ea.file)
             } else {
@@ -3073,8 +3183,11 @@ fn method_call_taint(
         return None;
     }
     if m.taint.is_none() {
-        let implementations =
-            crate::db::taint_sources::method_implementations(db, owner.as_ref(), method_lower);
+        let implementations = crate::db::taint_sources::method_implementations(
+            db,
+            class.name(db).as_str(),
+            method_lower,
+        );
         if !implementations.is_empty() {
             let taint = implementations
                 .iter()

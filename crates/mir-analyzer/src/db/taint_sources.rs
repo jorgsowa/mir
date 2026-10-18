@@ -860,7 +860,7 @@ fn callee_may_reach_sink(db: &dyn MirDatabase, from: &str, callee: &Callee) -> b
             ) else {
                 return false;
             };
-            let implementations = method_implementations(db, owner.as_ref(), method.as_str());
+            let implementations = method_implementations(db, class.as_str(), method.as_str());
             if !implementations.is_empty() && def.taint_sink_params.is_empty() {
                 return implementations.iter().any(|implementor| {
                     callee_may_reach_sink(db, from, &Callee::Method(*implementor, *method))
@@ -886,16 +886,17 @@ fn callee_may_reach_sink(db: &dyn MirDatabase, from: &str, callee: &Callee) -> b
 /// summaries to say anything about one call.
 const MAX_IMPLEMENTATIONS: usize = 8;
 
-/// Declaring classes of the bodies implementing `owner::method_lower`; empty
-/// unless that method is abstract or declared on an interface.
+/// Declaring classes of the bodies `class::method_lower` may run on an
+/// instance of `class`; empty unless that method is abstract there or declared
+/// on an interface.
 pub(crate) fn method_implementations(
     db: &dyn MirDatabase,
-    owner: &str,
+    class: &str,
     method_lower: &str,
 ) -> Arc<[Name]> {
     let Some((owner, def)) = crate::db::find_method_respecting_precedence(
         db,
-        crate::db::Fqcn::from_str(db, owner),
+        crate::db::Fqcn::from_str(db, class),
         method_lower,
     ) else {
         return Arc::from([]);
@@ -903,7 +904,7 @@ pub(crate) fn method_implementations(
     if !def.is_abstract && !crate::db::is_interface(db, owner.as_ref()) {
         return Arc::from([]);
     }
-    implementations(db, Name::new(owner.as_ref()), Name::new(method_lower)).clone()
+    implementations(db, Name::new(class), Name::new(method_lower)).clone()
 }
 
 /// Workspace classes under each of their ancestors, keyed by lowercased FQCN.
@@ -1071,7 +1072,7 @@ pub(crate) fn method_reads_source(
     if def.is_taint_source {
         return true;
     }
-    let implementations = method_implementations(db, owner.as_ref(), method_lower);
+    let implementations = method_implementations(db, class, method_lower);
     if !implementations.is_empty() {
         return implementations
             .iter()
