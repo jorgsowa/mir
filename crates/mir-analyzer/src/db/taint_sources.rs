@@ -852,15 +852,28 @@ pub(crate) fn method_implementations(
     implementations(db, Name::new(owner.as_ref()), Name::new(method_lower)).clone()
 }
 
+/// Workspace classes under each of their ancestors, keyed by lowercased FQCN.
+#[salsa::tracked]
+fn workspace_subtypes(db: &dyn MirDatabase) -> Arc<FxHashMap<Name, Vec<Name>>> {
+    let mut subtypes: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
+    for class in crate::db::workspace_classes(db).iter() {
+        let here = crate::db::Fqcn::from_str(db, class.as_str());
+        for ancestor in crate::db::class_ancestors_by_fqcn(db, here).iter().skip(1) {
+            subtypes
+                .entry(Name::new(&ancestor.to_ascii_lowercase()))
+                .or_default()
+                .push(*class);
+        }
+    }
+    Arc::new(subtypes)
+}
+
 #[salsa::tracked]
 fn implementations(db: &dyn MirDatabase, owner: Name, method: Name) -> Arc<[Name]> {
+    let subtypes = workspace_subtypes(db);
     let mut out: Vec<Name> = Vec::new();
-    for class in crate::db::workspace_classes(db).iter() {
-        if class.as_str().eq_ignore_ascii_case(owner.as_str())
-            || !crate::db::extends_or_implements(db, class.as_str(), owner.as_str())
-        {
-            continue;
-        }
+    let owner_key = Name::new(&owner.as_str().to_ascii_lowercase());
+    for class in subtypes.get(&owner_key).into_iter().flatten() {
         let Some((declarer, def)) = crate::db::find_method_respecting_precedence(
             db,
             crate::db::Fqcn::from_str(db, class.as_str()),
