@@ -229,7 +229,7 @@ pub struct FlowState {
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
-    /// assignment (`$obj->prop = $_GET['x']`); read by `taint::is_expr_tainted`
+    /// assignment (`$obj->prop = $_GET['x']`); read by `taint::expr_taint`
     /// so a later `$obj->prop` access is recognized as tainted.
     pub tainted_props: FxHashMap<(Name, Name), Taint>,
 

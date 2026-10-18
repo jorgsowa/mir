@@ -127,6 +127,9 @@ pub(crate) struct InferredTypes {
     /// `(declaring_fqcn, property_name, inferred_type)` — see
     /// `BodyAnalyzer::record_property_inference`.
     pub(crate) properties: Vec<(Arc<str>, Arc<str>, Type)>,
+    /// Non-empty taint summaries, keyed like `functions` / `methods`.
+    pub(crate) function_taint: Vec<(Arc<str>, crate::taint::TaintSummary)>,
+    pub(crate) method_taint: Vec<(Arc<str>, Arc<str>, crate::taint::TaintSummary)>,
 }
 
 /// Nearest ancestor `@param` docblock type for parameter `index` that refines
@@ -652,11 +655,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_resolved_navigation_facts: false,
             collect_inferred_types: false,
             only_method: None,
-            inferred_types: Arc::new(Mutex::new(InferredTypes {
-                functions: Vec::new(),
-                methods: Vec::new(),
-                properties: Vec::new(),
-            })),
+            inferred_types: Arc::new(Mutex::new(InferredTypes::default())),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
             navigation_facts: RefCell::new(Vec::new()),
             resolved_navigation_facts: RefCell::new(Vec::new()),
@@ -676,11 +675,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_resolved_navigation_facts: false,
             collect_inferred_types: true,
             only_method: None,
-            inferred_types: Arc::new(Mutex::new(InferredTypes {
-                functions: Vec::new(),
-                methods: Vec::new(),
-                properties: Vec::new(),
-            })),
+            inferred_types: Arc::new(Mutex::new(InferredTypes::default())),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
             navigation_facts: RefCell::new(Vec::new()),
             resolved_navigation_facts: RefCell::new(Vec::new()),
@@ -737,6 +732,25 @@ impl<'a> BodyAnalyzer<'a> {
         if self.collect_inferred_types {
             let mut types = self.inferred_types.lock();
             types.functions.push((fqn.clone(), inferred.clone()));
+        }
+    }
+
+    fn record_function_taint(&self, fqn: &Arc<str>, summary: crate::taint::TaintSummary) {
+        if self.collect_inferred_types && !summary.is_empty() {
+            self.inferred_types
+                .lock()
+                .function_taint
+                .push((fqn.clone(), summary));
+        }
+    }
+
+    fn record_method_taint(&self, fqcn: &str, name: &str, summary: crate::taint::TaintSummary) {
+        if self.collect_inferred_types && !summary.is_empty() {
+            self.inferred_types.lock().method_taint.push((
+                Arc::from(fqcn),
+                Arc::from(name),
+                summary,
+            ));
         }
     }
 

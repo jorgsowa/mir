@@ -373,7 +373,7 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut FlowState,
     ) {
         // Taint check before the expression is analyzed further below —
-        // `is_expr_tainted` only needs the iterable expression + current
+        // `expr_taint` only needs the iterable expression + current
         // taint state, same timing as an assignment's RHS taint check.
         let iterable_taint = crate::taint::expr_taint(&fe.expr, ctx, self.db, &self.file);
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);

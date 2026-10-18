@@ -108,6 +108,8 @@ pub struct ExpressionAnalyzer<'a> {
     /// while walking one function body. Read back by `body_analysis` to
     /// build the function's inferred `Generator<K, V, S, R>` return type.
     pub(crate) yielded_types: &'a mut Vec<(Type, Type)>,
+    /// Borrowed from the owning `StatementsAnalyzer`, like `yielded_types`.
+    pub(crate) taint_summary: &'a mut crate::taint::TaintSummary,
     /// Snapshot of the installed plugin registry (`None` when no plugins are
     /// loaded — the common case, making every hook site a single check).
     pub(crate) plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
@@ -141,6 +143,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         php_version: PhpVersion,
         mode: AnalysisMode,
         yielded_types: &'a mut Vec<(Type, Type)>,
+        taint_summary: &'a mut crate::taint::TaintSummary,
         reference_key_cache: &'a mut ReferenceKeyCache,
     ) -> Self {
         Self {
@@ -165,6 +168,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             callback_param_hints: None,
             in_array_access_base: false,
             yielded_types,
+            taint_summary,
             plugins: mir_plugin::snapshot(),
             reference_key_cache,
         }
@@ -462,9 +466,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::reaches_sink(
                     expr,
                     crate::taint::Taint::SHELL,
+                    &IssueKind::TaintedShell,
                     ctx,
                     self.db,
                     &self.file,
+                    self.taint_summary,
                 ) {
                     self.emit(IssueKind::TaintedShell, Severity::Error, expr.span);
                 }
@@ -537,9 +543,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::reaches_sink(
                     inner,
                     crate::taint::Taint::HTML,
+                    &IssueKind::TaintedHtml,
                     ctx,
                     self.db,
                     &self.file,
+                    self.taint_summary,
                 ) {
                     self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
                 }
@@ -730,9 +738,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::reaches_sink(
                     inner,
                     crate::taint::Taint::FILE,
+                    &IssueKind::TaintedInput {
+                        sink: "include".to_string(),
+                    },
                     ctx,
                     self.db,
                     &self.file,
+                    self.taint_summary,
                 ) {
                     self.emit(
                         IssueKind::TaintedInput {
@@ -768,9 +780,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::reaches_sink(
                     inner,
                     crate::taint::Taint::EVAL,
+                    &IssueKind::TaintedInput {
+                        sink: "eval".to_string(),
+                    },
                     ctx,
                     self.db,
                     &self.file,
+                    self.taint_summary,
                 ) {
                     self.emit(
                         IssueKind::TaintedInput {
@@ -796,9 +812,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         && crate::taint::reaches_sink(
                             e,
                             crate::taint::Taint::HTML,
+                            &IssueKind::TaintedHtml,
                             ctx,
                             self.db,
                             &self.file,
+                            self.taint_summary,
                         )
                     {
                         self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);

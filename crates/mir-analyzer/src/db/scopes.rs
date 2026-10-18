@@ -67,11 +67,7 @@ impl ScopeInferenceResult {
         Arc::new(Self {
             issues: Arc::from([]),
             ref_locs: Arc::from([]),
-            inferred_types: Arc::new(crate::body_analysis::InferredTypes {
-                functions: Vec::new(),
-                methods: Vec::new(),
-                properties: Vec::new(),
-            }),
+            inferred_types: Arc::new(crate::body_analysis::InferredTypes::default()),
         })
     }
 }

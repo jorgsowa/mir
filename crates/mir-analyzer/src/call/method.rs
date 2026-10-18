@@ -4,9 +4,7 @@ use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use crate::narrowing::{extract_any_prop_access, extract_expr_guard_key};
-use crate::taint::{
-    classify_method_sink, reaches_sink, taint_sink_issue, taint_sink_kind, SinkKind,
-};
+use crate::taint::{classify_method_sink, reaches_sink, taint_sink_issue, taint_sink_kind};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
 };
@@ -1627,8 +1625,17 @@ fn resolve_method_return<'a>(
                 };
                 for arg in args {
                     let Some(value) = &arg.value else { continue };
-                    if reaches_sink(value, taint_sink_kind(sink_kind), ctx, ea.db, &ea.file) {
-                        ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
+                    let issue = taint_sink_issue(sink_kind);
+                    if reaches_sink(
+                        value,
+                        taint_sink_kind(sink_kind),
+                        &issue,
+                        ctx,
+                        ea.db,
+                        &ea.file,
+                        ea.taint_summary,
+                    ) {
+                        ea.emit(issue, Severity::Error, span);
                     }
                 }
             }
@@ -1639,12 +1646,17 @@ fn resolve_method_return<'a>(
         if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
             for arg in call.args.iter() {
                 let Some(value) = &arg.value else { continue };
-                if reaches_sink(value, sink_kind.taint(), ctx, ea.db, &ea.file) {
-                    let issue_kind = match sink_kind {
-                        SinkKind::Sql => IssueKind::TaintedSql,
-                        _ => unreachable!("classify_method_sink only returns SinkKind::Sql"),
-                    };
-                    ea.emit(issue_kind, Severity::Error, span);
+                let issue = sink_kind.issue();
+                if reaches_sink(
+                    value,
+                    sink_kind.taint(),
+                    &issue,
+                    ctx,
+                    ea.db,
+                    &ea.file,
+                    ea.taint_summary,
+                ) {
+                    ea.emit(issue, Severity::Error, span);
                     break;
                 }
             }

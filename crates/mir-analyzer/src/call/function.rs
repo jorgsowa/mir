@@ -12,7 +12,7 @@ use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::generic::{check_template_bounds_with_inheritance, infer_template_bindings};
 use crate::symbol::ReferenceKind;
-use crate::taint::{classify_sink, reaches_sink, taint_sink_issue, taint_sink_kind, SinkKind};
+use crate::taint::{classify_sink, reaches_sink, taint_sink_issue, taint_sink_kind};
 
 use super::args::{
     check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
@@ -484,21 +484,17 @@ impl CallAnalyzer {
             };
             for arg in target_args {
                 let Some(value) = &arg.value else { continue };
-                if reaches_sink(value, sink_kind.taint(), ctx, ea.db, &ea.file) {
-                    let issue_kind = match sink_kind {
-                        SinkKind::Html => IssueKind::TaintedHtml,
-                        SinkKind::Sql => IssueKind::TaintedSql,
-                        SinkKind::Shell => IssueKind::TaintedShell,
-                        SinkKind::Header => IssueKind::TaintedHeader,
-                        SinkKind::Cookie => IssueKind::TaintedCookie,
-                        SinkKind::File => IssueKind::TaintedInput {
-                            sink: "file".to_string(),
-                        },
-                        SinkKind::Unserialize => IssueKind::TaintedInput {
-                            sink: "unserialize".to_string(),
-                        },
-                    };
-                    ea.emit(issue_kind, Severity::Error, span);
+                let issue = sink_kind.issue();
+                if reaches_sink(
+                    value,
+                    sink_kind.taint(),
+                    &issue,
+                    ctx,
+                    ea.db,
+                    &ea.file,
+                    ea.taint_summary,
+                ) {
+                    ea.emit(issue, Severity::Error, span);
                     break;
                 }
             }
@@ -785,7 +781,10 @@ impl CallAnalyzer {
             // possibly holding a tainted dynamically-defined variable rather
             // than trying (and failing) to taint a specific name.
             if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
-                if crate::taint::is_expr_tainted(value, ctx, ea.db, &ea.file) {
+                if !crate::taint::expr_taint(value, ctx, ea.db, &ea.file)
+                    .concrete()
+                    .is_empty()
+                {
                     ctx.has_dynamic_tainted_var_def = true;
                 }
             }
@@ -841,8 +840,17 @@ impl CallAnalyzer {
                     };
                     for arg in args {
                         let Some(value) = &arg.value else { continue };
-                        if reaches_sink(value, taint_sink_kind(sink_kind), ctx, ea.db, &ea.file) {
-                            ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
+                        let issue = taint_sink_issue(sink_kind);
+                        if reaches_sink(
+                            value,
+                            taint_sink_kind(sink_kind),
+                            &issue,
+                            ctx,
+                            ea.db,
+                            &ea.file,
+                            ea.taint_summary,
+                        ) {
+                            ea.emit(issue, Severity::Error, span);
                         }
                     }
                 }

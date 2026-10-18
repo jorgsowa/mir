@@ -13,8 +13,29 @@ use php_ast::owned::{Expr, ExprKind, StringPart};
 use crate::flow_state::FlowState;
 
 /// Set of sink kinds a value is still dangerous for.
+///
+/// The low [`KIND_BITS`] hold taint from real sources. While a function body
+/// is analyzed for its [`TaintSummary`], each of the first
+/// [`MAX_TRACKED_PARAMS`] parameters gets its own slot of the same width, so a
+/// sanitizer applied to a parameter is remembered per parameter.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct Taint(u16);
+pub struct Taint(u128);
+
+const KIND_BITS: u32 = 12;
+const KIND_MASK: u128 = (1 << KIND_BITS) - 1;
+pub const MAX_TRACKED_PARAMS: usize = 9;
+
+/// `kinds` copied into the source slot and every parameter slot.
+const fn replicate(kinds: u128) -> u128 {
+    let kinds = kinds & KIND_MASK;
+    let mut out = 0;
+    let mut slot = 0;
+    while slot <= MAX_TRACKED_PARAMS as u32 {
+        out |= kinds << (slot * KIND_BITS);
+        slot += 1;
+    }
+    out
+}
 
 impl Taint {
     pub const NONE: Taint = Taint(0);
@@ -31,7 +52,7 @@ impl Taint {
     pub const XPATH: Taint = Taint(1 << 10);
     /// Any `@taint-sink` kind without a dedicated bit.
     pub const OTHER: Taint = Taint(1 << 11);
-    pub const ALL: Taint = Taint((1 << 12) - 1);
+    pub const ALL: Taint = Taint(KIND_MASK);
 
     pub const fn is_empty(self) -> bool {
         self.0 == 0
@@ -41,8 +62,40 @@ impl Taint {
         self.0 & other.0 != 0
     }
 
-    pub const fn without(self, other: Taint) -> Taint {
-        Taint(self.0 & !other.0)
+    /// Remove `kinds` from the source slot and every parameter slot.
+    pub const fn without(self, kinds: Taint) -> Taint {
+        Taint(self.0 & !replicate(kinds.0))
+    }
+
+    /// Keep only `kinds` in every slot.
+    pub const fn restrict_to(self, kinds: Taint) -> Taint {
+        Taint(self.0 & replicate(kinds.0))
+    }
+
+    /// Add `kinds` to every slot that is already tainted.
+    pub fn restore(self, kinds: Taint) -> Taint {
+        let mut out = self.0;
+        for slot in 0..=MAX_TRACKED_PARAMS as u32 {
+            if (self.0 >> (slot * KIND_BITS)) & KIND_MASK != 0 {
+                out |= (kinds.0 & KIND_MASK) << (slot * KIND_BITS);
+            }
+        }
+        Taint(out)
+    }
+
+    /// Taint from real sources only.
+    pub const fn concrete(self) -> Taint {
+        Taint(self.0 & KIND_MASK)
+    }
+
+    /// The label seeded into parameter `index` for summary analysis.
+    pub const fn param(index: usize) -> Taint {
+        Taint(KIND_MASK << ((index as u32 + 1) * KIND_BITS))
+    }
+
+    /// Kinds of parameter `index`'s label this value still carries.
+    pub const fn param_kinds(self, index: usize) -> Taint {
+        Taint((self.0 >> ((index as u32 + 1) * KIND_BITS)) & KIND_MASK)
     }
 }
 
@@ -56,6 +109,84 @@ impl std::ops::BitOr for Taint {
 impl std::ops::BitOrAssign for Taint {
     fn bitor_assign(&mut self, rhs: Taint) {
         self.0 |= rhs.0;
+    }
+}
+
+/// A parameter whose value reaches a sink inside the callee.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamSink {
+    pub param: usize,
+    pub kinds: Taint,
+    pub issue: mir_issues::IssueKind,
+}
+
+/// How a function or method moves taint, seen from its call sites.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TaintSummary {
+    /// Taint of the return value: the source slot is taint the body reads
+    /// itself, each parameter slot the kinds of that argument that flow out.
+    pub returns: Taint,
+    pub param_sinks: Vec<ParamSink>,
+}
+
+impl TaintSummary {
+    pub fn is_empty(&self) -> bool {
+        self.returns.is_empty() && self.param_sinks.is_empty()
+    }
+
+    /// Record that `taint`, reaching a sink of `kinds`, carries parameter labels.
+    pub fn record_param_sinks(
+        &mut self,
+        taint: Taint,
+        kinds: Taint,
+        issue: &mir_issues::IssueKind,
+    ) {
+        for param in 0..MAX_TRACKED_PARAMS {
+            let reached = taint.param_kinds(param).restrict_to(kinds);
+            if reached.is_empty() {
+                continue;
+            }
+            match self
+                .param_sinks
+                .iter_mut()
+                .find(|s| s.param == param && s.issue == *issue)
+            {
+                Some(existing) => existing.kinds |= reached,
+                None => self.param_sinks.push(ParamSink {
+                    param,
+                    kinds: reached,
+                    issue: issue.clone(),
+                }),
+            }
+        }
+    }
+
+    /// Taint of a call's result, given the taint of the argument bound to each parameter.
+    pub fn call_result(&self, arg_taint: impl Fn(usize) -> Taint) -> Taint {
+        let mut out = self.returns.concrete();
+        for param in 0..MAX_TRACKED_PARAMS {
+            let kinds = self.returns.param_kinds(param);
+            if !kinds.is_empty() {
+                out |= arg_taint(param).restrict_to(kinds);
+            }
+        }
+        out
+    }
+}
+
+/// Take the body's summary; a generator's `return` value isn't the call result.
+pub fn finish_summary(summary: &mut TaintSummary, is_generator: bool) -> TaintSummary {
+    let mut summary = std::mem::take(summary);
+    if is_generator {
+        summary.returns = Taint::NONE;
+    }
+    summary
+}
+
+/// Label each parameter so the body's summary can tell which arguments flow where.
+pub fn seed_param_labels(ctx: &mut FlowState, params: &[mir_codebase::DeclaredParam]) {
+    for (index, param) in params.iter().take(MAX_TRACKED_PARAMS).enumerate() {
+        ctx.set_var_taint(param.name.as_ref(), Taint::param(index));
     }
 }
 
@@ -100,6 +231,23 @@ pub enum SinkKind {
 }
 
 impl SinkKind {
+    pub fn issue(self) -> mir_issues::IssueKind {
+        use mir_issues::IssueKind;
+        match self {
+            SinkKind::Html => IssueKind::TaintedHtml,
+            SinkKind::Sql => IssueKind::TaintedSql,
+            SinkKind::Shell => IssueKind::TaintedShell,
+            SinkKind::Header => IssueKind::TaintedHeader,
+            SinkKind::Cookie => IssueKind::TaintedCookie,
+            SinkKind::File => IssueKind::TaintedInput {
+                sink: "file".to_string(),
+            },
+            SinkKind::Unserialize => IssueKind::TaintedInput {
+                sink: "unserialize".to_string(),
+            },
+        }
+    }
+
     pub fn taint(self) -> Taint {
         match self {
             SinkKind::Html => Taint::HTML,
@@ -342,15 +490,21 @@ pub fn taint_sink_kind(kind: &str) -> Taint {
     }
 }
 
-/// Whether `expr` carries taint the given sink kind cares about.
+/// Whether `expr` carries source taint the given sink kind cares about.
+/// Parameter labels reaching the sink are recorded in `summary` instead.
+#[allow(clippy::too_many_arguments)]
 pub fn reaches_sink(
     expr: &Expr,
     sink: Taint,
+    issue: &mir_issues::IssueKind,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
+    summary: &mut TaintSummary,
 ) -> bool {
-    expr_taint(expr, ctx, db, file).intersects(sink)
+    let taint = expr_taint(expr, ctx, db, file);
+    summary.record_param_sinks(taint, sink, issue);
+    taint.concrete().intersects(sink)
 }
 
 // ---------------------------------------------------------------------------
@@ -395,16 +549,6 @@ fn unwrap_parens(expr: &Expr) -> &Expr {
         e = inner;
     }
     e
-}
-
-/// Whether the expression could carry tainted data of any kind.
-pub fn is_expr_tainted(
-    expr: &Expr,
-    ctx: &FlowState,
-    db: &dyn crate::db::MirDatabase,
-    file: &str,
-) -> bool {
-    !expr_taint(expr, ctx, db, file).is_empty()
 }
 
 /// Union of the taint every argument of a call carries.

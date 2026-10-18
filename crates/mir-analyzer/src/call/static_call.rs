@@ -944,8 +944,17 @@ impl CallAnalyzer {
                     };
                     for arg in args {
                         let Some(value) = &arg.value else { continue };
-                        if reaches_sink(value, taint_sink_kind(sink_kind), ctx, ea.db, &ea.file) {
-                            ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
+                        let issue = taint_sink_issue(sink_kind);
+                        if reaches_sink(
+                            value,
+                            taint_sink_kind(sink_kind),
+                            &issue,
+                            ctx,
+                            ea.db,
+                            &ea.file,
+                            ea.taint_summary,
+                        ) {
+                            ea.emit(issue, Severity::Error, span);
                         }
                     }
                 }

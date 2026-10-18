@@ -71,8 +71,15 @@ impl<'a> StatementsAnalyzer<'a> {
         for expr in exprs.iter() {
             let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
             self.check_echo_implicit_to_string_cast(&expr_ty, expr.span);
-            if crate::taint::reaches_sink(expr, crate::taint::Taint::HTML, ctx, self.db, &self.file)
-            {
+            if crate::taint::reaches_sink(
+                expr,
+                crate::taint::Taint::HTML,
+                &IssueKind::TaintedHtml,
+                ctx,
+                self.db,
+                &self.file,
+                &mut self.taint_summary,
+            ) {
                 let (line, col_start) = self.offset_to_line_col(stmt_span.start);
                 let (line_end, col_end) = if stmt_span.start < stmt_span.end {
                     let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);

@@ -1252,6 +1252,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
+        crate::taint::seed_param_labels(&mut ctx, &params);
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
@@ -1396,6 +1397,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
+        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
         drop(sa);
 
         if let Some(type_envs) = type_envs {
@@ -1476,6 +1478,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         self.record_method_inference(fqcn, method_name, &inferred);
+        self.record_method_taint(fqcn, method_name, taint_summary);
     }
 
     #[allow(clippy::too_many_arguments)]

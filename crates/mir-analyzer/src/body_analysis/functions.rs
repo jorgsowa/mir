@@ -201,6 +201,7 @@ impl<'a> BodyAnalyzer<'a> {
             .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
+        crate::taint::seed_param_labels(&mut ctx, &params);
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
@@ -253,6 +254,7 @@ impl<'a> BodyAnalyzer<'a> {
             build_generator_return_type(&sa.yielded_types, inferred)
         };
         let body_diverges = ctx.diverges;
+        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
         drop(sa);
 
         if self.mode == AnalysisMode::Full {
@@ -277,6 +279,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
+            self.record_function_taint(&fqn, taint_summary);
         }
     }
 
@@ -976,6 +979,7 @@ impl<'a> BodyAnalyzer<'a> {
             .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
+        crate::taint::seed_param_labels(&mut ctx, &params);
         record_param_symbols(
             Some(all_symbols),
             file,
@@ -1013,6 +1017,7 @@ impl<'a> BodyAnalyzer<'a> {
         } else {
             build_generator_return_type(&sa.yielded_types, inferred)
         };
+        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
         drop(sa);
 
         let scope_name = fqn.clone().unwrap_or_else(|| Arc::from(fn_name));
@@ -1032,6 +1037,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
+            self.record_function_taint(&fqn, taint_summary);
         }
     }
 }

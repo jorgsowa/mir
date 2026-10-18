@@ -251,6 +251,8 @@ pub struct StatementsAnalyzer<'a> {
     /// `(key type, value type)` for every `yield`/`yield from` seen so far in
     /// the current function body — see `ExpressionAnalyzer::yielded_types`.
     pub yielded_types: Vec<(Type, Type)>,
+    /// Taint flow of the current function body — see `crate::taint::TaintSummary`.
+    pub taint_summary: crate::taint::TaintSummary,
     /// Break-context stack: one entry per active loop/switch nesting level
     /// (both count towards break/continue level targeting in PHP).
     /// Each entry collects the context states at every `break`/switch-scoped
@@ -317,6 +319,7 @@ impl<'a> StatementsAnalyzer<'a> {
             collect_resolved_navigation_facts: false,
             return_types: Vec::new(),
             yielded_types: Vec::new(),
+            taint_summary: crate::taint::TaintSummary::default(),
             break_ctx_stack: Vec::new(),
             continue_ctx_stack: Vec::new(),
             loop_kind_stack: Vec::new(),
@@ -888,6 +891,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.php_version,
             self.mode,
             &mut self.yielded_types,
+            &mut self.taint_summary,
             &mut self.reference_key_cache,
         );
         ea.strict_types = ctx.strict_types;
