@@ -126,6 +126,12 @@ pub fn narrow_from_condition(
             std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
         }
     }
+    if is_true {
+        if let Some((var, safe)) = crate::taint_guard::guarded_var(expr) {
+            let taint = ctx.var_taint(var).without(safe);
+            ctx.set_var_taint(var, taint);
+        }
+    }
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {

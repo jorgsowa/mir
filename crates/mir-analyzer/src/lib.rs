@@ -46,6 +46,7 @@ pub mod stubs;
 pub(crate) mod subtype;
 pub mod suppression;
 pub(crate) mod taint;
+pub(crate) mod taint_guard;
 mod tmp_suffix;
 pub(crate) mod type_env;
 pub(crate) mod util;
