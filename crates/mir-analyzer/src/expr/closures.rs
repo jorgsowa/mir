@@ -707,6 +707,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         sa.record_reference_locations = self.record_reference_locations;
         sa.collect_navigation_facts = self.collect_navigation_facts;
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
+        closure_ctx.summarizing_taint = ctx.summarizing_taint;
         crate::taint::label_params(&mut closure_ctx, params.iter().map(|p| p.name.as_ref()));
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
         ctx.record_closure(
@@ -893,6 +894,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
         }
         arrow_ctx.closures = ctx.closures.clone();
+        arrow_ctx.summarizing_taint = ctx.summarizing_taint;
         let summary = crate::taint::arrow_summary(af, ctx, self.db, &self.file);
         ctx.record_closure(expr_span.start, summary);
         let this_sym = mir_types::Name::from("this");

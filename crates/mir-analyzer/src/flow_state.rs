@@ -236,6 +236,10 @@ pub struct FlowState {
     /// How source data reached each tainted variable, source first.
     pub taint_trails: FxHashMap<Name, Arc<[TrailStep]>>,
 
+    /// Whether this body is being analyzed for its taint summary, so
+    /// arguments carrying only parameter labels still need callee summaries.
+    pub summarizing_taint: bool,
+
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
@@ -649,6 +653,7 @@ impl FlowState {
             tainted_keys: FxHashMap::default(),
             closures: Arc::default(),
             taint_trails: FxHashMap::default(),
+            summarizing_taint: false,
             tainted_props: FxHashMap::default(),
             tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),

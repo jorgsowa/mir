@@ -214,6 +214,7 @@ pub fn seed_param_labels(
     mode: crate::body_analysis::AnalysisMode,
 ) {
     if mode == crate::body_analysis::AnalysisMode::InferenceOnly {
+        ctx.summarizing_taint = true;
         label_params(ctx, params.iter().map(|p| p.name.as_ref()));
     }
 }
@@ -366,6 +367,16 @@ impl CalleeBody {
     }
 }
 
+/// The part of an argument's taint worth inferring a callee summary for:
+/// parameter labels only matter while a summary is being built.
+fn demanding_taint(taint: Taint, ctx: &FlowState) -> Taint {
+    if ctx.summarizing_taint {
+        taint
+    } else {
+        taint.concrete()
+    }
+}
+
 /// Taint of a call to user code, from the callee's annotations and inferred summary.
 #[allow(clippy::too_many_arguments)]
 fn user_call_taint(
@@ -386,8 +397,10 @@ fn user_call_taint(
     }
     let arg_taint = |index| param_arg_taint(params, args, index, ctx, db, file);
     // Inferring a summary only pays off when it can return source data or tainted arguments.
-    let worth_summary =
-        || (returns_param() && !args_taint(args, ctx, db, file).is_empty()) || reads_source();
+    let worth_summary = || {
+        (returns_param() && !demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty())
+            || reads_source()
+    };
     let mut taint = match body {
         CalleeBody::Summarized if worth_summary() => {
             summary().map_or(Taint::NONE, |s| s.call_result(arg_taint))
@@ -457,7 +470,7 @@ pub fn check_call_sinks(
             })
         })
         .collect();
-    if !args_taint(args, ctx, ea.db, &ea.file).is_empty() {
+    if !demanding_taint(args_taint(args, ctx, ea.db, &ea.file), ctx).is_empty() {
         if let Some(summary) = summary(ea.db, &ea.file) {
             sinks.extend(summary.param_sinks);
         }
@@ -1848,8 +1861,11 @@ fn callback_result(
         return Taint::NONE;
     }
     match CalleeBody::of(func.location.as_ref(), file) {
-        CalleeBody::Summarized => crate::db::function_taint_summary(db, file, func.fqn.as_ref())
-            .map_or(Taint::NONE, |s| s.call_result(input)),
+        CalleeBody::Summarized if !demanding_taint(all, ctx).is_empty() => {
+            crate::db::function_taint_summary(db, file, func.fqn.as_ref())
+                .map_or(Taint::NONE, |s| s.call_result(input))
+        }
+        CalleeBody::Summarized => Taint::NONE,
         _ => all,
     }
 }
