@@ -139,6 +139,7 @@ impl CallAnalyzer {
             _ => {
                 crate::taint::check_callable_target(ea, &call.name, ctx, span);
                 let callee_ty = ea.analyze(&call.name, ctx);
+                crate::taint::check_closure_call_sinks(ea, &call.name, &call.args, ctx, span);
 
                 match literal_function_name(&callee_ty, ctx, &call.name) {
                     Some(name) => name,
@@ -808,6 +809,7 @@ impl CallAnalyzer {
                 |db, file| crate::db::function_param_sinks(db, file, &resolved.fqn),
                 span,
             );
+            crate::taint::check_callback_sinks(ea, &fn_name_lower, &call.args, ctx, span);
 
             if ctx.is_in_pure_fn
                 && !is_pure

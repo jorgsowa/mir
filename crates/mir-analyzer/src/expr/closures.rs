@@ -637,7 +637,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             if use_var.by_ref {
                 byref_captures.push((name, captured_ty));
             }
-            closure_ctx.taint_var(name, ctx.var_taint(name));
+            // Outer parameter labels can't be told apart from the closure's own.
+            closure_ctx.taint_var(name, ctx.var_taint(name).concrete());
+            if let Some(closure) = ctx.closures.by_var.get(&Name::from(name)) {
+                closure_ctx.bind_closure(name, closure.clone());
+            }
             // Mark the captured variable as read in the parent context, and
             // consume its pending write so it isn't reported as a dead write.
             ctx.read_vars.insert(mir_types::Name::from(name));
@@ -703,7 +707,21 @@ impl<'a> ExpressionAnalyzer<'a> {
         sa.record_reference_locations = self.record_reference_locations;
         sa.collect_navigation_facts = self.collect_navigation_facts;
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
+        crate::taint::label_params(&mut closure_ctx, params.iter().map(|p| p.name.as_ref()));
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
+        ctx.record_closure(
+            expr_span.start,
+            crate::flow_state::ClosureSummary {
+                params: params
+                    .iter()
+                    .map(|p| (Name::from(p.name.as_ref()), p.is_variadic))
+                    .collect(),
+                summary: crate::taint::finish_summary(
+                    &mut sa.taint_summary,
+                    closure_ctx.is_generator,
+                ),
+            },
+        );
         let inferred_return =
             crate::body_analysis::merge_return_types(&sa.return_types, closure_ctx.diverges);
         // A closure containing `yield` always returns a Generator, regardless
@@ -868,6 +886,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Arrow functions auto-capture every outer variable by value (no
         // explicit `use()` list), so taint on any of them must carry over too.
         arrow_ctx.tainted_vars = ctx.tainted_vars.clone();
+        for param in af.params.iter() {
+            arrow_ctx.set_var_taint(
+                param.name.as_deref().unwrap_or(""),
+                crate::taint::Taint::NONE,
+            );
+        }
+        arrow_ctx.closures = ctx.closures.clone();
+        let summary = crate::taint::arrow_summary(af, ctx, self.db, &self.file);
+        ctx.record_closure(expr_span.start, summary);
         let this_sym = mir_types::Name::from("this");
         if std::mem::take(&mut ctx.rebound_closure_this) && !af.is_static {
             arrow_ctx.set_unknown_this();

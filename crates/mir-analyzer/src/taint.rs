@@ -213,11 +213,15 @@ pub fn seed_param_labels(
     params: &[mir_codebase::DeclaredParam],
     mode: crate::body_analysis::AnalysisMode,
 ) {
-    if mode != crate::body_analysis::AnalysisMode::InferenceOnly {
-        return;
+    if mode == crate::body_analysis::AnalysisMode::InferenceOnly {
+        label_params(ctx, params.iter().map(|p| p.name.as_ref()));
     }
-    for (index, param) in params.iter().take(MAX_TRACKED_PARAMS).enumerate() {
-        ctx.set_var_taint(param.name.as_ref(), Taint::param(index));
+}
+
+/// Give each parameter its label, replacing whatever taint the name had.
+pub fn label_params<'p>(ctx: &mut FlowState, names: impl Iterator<Item = &'p str>) {
+    for (index, name) in names.take(MAX_TRACKED_PARAMS).enumerate() {
+        ctx.set_var_taint(name, Taint::param(index));
     }
 }
 
@@ -1285,6 +1289,9 @@ pub fn expr_taint(
         }),
 
         ExprKind::FunctionCall(fc) => {
+            if let Some(closure) = callee_closure(&fc.name, ctx, db, file) {
+                return closure_call_taint(&closure, &fc.args, ctx, db, file);
+            }
             if let ExprKind::Identifier(name) = &fc.name.kind {
                 let lower_name =
                     crate::util::php_ident_lowercase(name.as_ref().trim_start_matches('\\'));
@@ -1326,6 +1333,9 @@ pub fn expr_taint(
                     } else {
                         taint
                     };
+                }
+                if let Some(taint) = callback_builtin_taint(&lower_name, &fc.args, ctx, db, file) {
+                    return taint;
                 }
                 // `compact('id')` copies `$id`'s current value into the
                 // returned array; only literal names are resolved, matching
@@ -1400,13 +1410,6 @@ pub fn expr_taint(
                     if !safe_return && !reads_path {
                         return args_taint(&fc.args, ctx, db, file);
                     }
-                }
-            } else if let ExprKind::ArrowFunction(af) = &unwrap_parens(&fc.name).kind {
-                // An immediately-invoked, argument-less arrow function has no
-                // params to shadow the outer scope, so its body can be checked
-                // against the same `ctx`.
-                if af.params.is_empty() && fc.args.is_empty() {
-                    return expr_taint(&af.body, ctx, db, file);
                 }
             }
             Taint::NONE
@@ -1533,6 +1536,305 @@ fn receiver_classes(
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Whether a call in `expr` takes a `function () {}` literal argument.
+pub fn has_closure_argument(expr: &Expr) -> bool {
+    let args = match &unwrap_parens(expr).kind {
+        ExprKind::FunctionCall(fc) => &fc.args,
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => &mc.args,
+        ExprKind::StaticMethodCall(smc) => &smc.args,
+        _ => return false,
+    };
+    args.iter().any(|a| {
+        a.value.as_ref().is_some_and(|v| {
+            matches!(unwrap_parens(v).kind, ExprKind::Closure(_)) || has_closure_argument(v)
+        })
+    })
+}
+
+/// The closure a call target evaluates to: a variable bound to one, or a literal.
+fn callee_closure(
+    callee: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<crate::flow_state::ClosureSummary>> {
+    let callee = unwrap_parens(callee);
+    match &callee.kind {
+        ExprKind::Variable(name) => ctx
+            .closures
+            .by_var
+            .get(&mir_types::Name::from(name.trim_start_matches('$')))
+            .cloned(),
+        ExprKind::Closure(_) => ctx.closures.by_span.get(&callee.span.start).cloned(),
+        ExprKind::ArrowFunction(af) => Some(
+            ctx.closures
+                .by_span
+                .get(&callee.span.start)
+                .cloned()
+                .unwrap_or_else(|| std::sync::Arc::new(arrow_summary(af, ctx, db, file))),
+        ),
+        _ => None,
+    }
+}
+
+/// An arrow function's summary, from its body evaluated with labelled parameters.
+pub fn arrow_summary(
+    af: &php_ast::owned::ArrowFunctionExpr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> crate::flow_state::ClosureSummary {
+    let params: Vec<(mir_types::Name, bool)> = af
+        .params
+        .iter()
+        .map(|p| {
+            (
+                mir_types::Name::new(p.name.as_deref().unwrap_or("")),
+                p.variadic,
+            )
+        })
+        .collect();
+    let mut body_ctx = ctx.clone();
+    for (name, _) in &params {
+        body_ctx.set_var(name.as_str(), mir_types::Type::mixed());
+    }
+    label_params(&mut body_ctx, params.iter().map(|(n, _)| n.as_str()));
+    // Outer labels can't be told apart from the arrow function's own.
+    for (name, taint) in body_ctx.tainted_vars.iter_mut() {
+        if !params.iter().any(|(p, _)| p == name) {
+            *taint = taint.concrete();
+        }
+    }
+    crate::flow_state::ClosureSummary {
+        params,
+        summary: TaintSummary {
+            returns: expr_taint(&af.body, &body_ctx, db, file),
+            ..TaintSummary::default()
+        },
+    }
+}
+
+/// Expressions passed for a closure's parameter `index`.
+fn closure_param_args<'e>(
+    params: &[(mir_types::Name, bool)],
+    args: &'e [php_ast::owned::Arg],
+    index: usize,
+) -> Vec<&'e Expr> {
+    let Some((name, variadic)) = params.get(index) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut position = 0;
+    for arg in args {
+        let Some(value) = &arg.value else {
+            position += 1;
+            continue;
+        };
+        match &arg.name {
+            Some(arg_name) => {
+                if crate::parser::name_to_string_owned(arg_name) == name.as_str() {
+                    out.push(value);
+                }
+            }
+            None => {
+                if arg.unpack || position == index || (*variadic && position >= index) {
+                    out.push(value);
+                }
+                position += 1;
+            }
+        }
+    }
+    out
+}
+
+fn closure_call_taint(
+    closure: &crate::flow_state::ClosureSummary,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    closure.summary.call_result(|index| {
+        closure_param_args(&closure.params, args, index)
+            .into_iter()
+            .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file))
+    })
+}
+
+/// A callback named by a string (`'trim'`) or a first-class callable (`trim(...)`).
+fn callback_function_name(callback: &Expr) -> Option<&str> {
+    match &unwrap_parens(callback).kind {
+        ExprKind::String(name) if !name.contains("::") => Some(name.as_ref()),
+        ExprKind::CallableCreate(c) => match &c.kind {
+            php_ast::owned::CallableCreateKind::Function(callee) => match &callee.kind {
+                ExprKind::Identifier(name) => Some(name.as_ref()),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Taint of what calling `callback` returns when it receives `inputs`.
+fn callback_result(
+    callback: &Expr,
+    inputs: &[Taint],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    let all = inputs.iter().fold(Taint::NONE, |acc, t| acc | *t);
+    let input = |index: usize| inputs.get(index).copied().unwrap_or_default();
+    if let Some(closure) = callee_closure(callback, ctx, db, file) {
+        return closure.summary.call_result(input);
+    }
+    let Some(name) = callback_function_name(callback) else {
+        return all;
+    };
+    let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
+    if let Some(removed) = sanitized_kinds(&lower) {
+        return all.without(removed);
+    }
+    if let Some(restored) = unescaped_kinds(&lower) {
+        return all.restore(restored);
+    }
+    let resolved = crate::db::resolve_name(db, file, name);
+    let Some(func) =
+        crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
+    else {
+        return all;
+    };
+    if func
+        .return_type
+        .as_deref()
+        .is_some_and(|ty| ty.is_void() || is_injection_safe_type(ty))
+    {
+        return Taint::NONE;
+    }
+    match CalleeBody::of(func.location.as_ref(), file) {
+        CalleeBody::Summarized => crate::db::function_taint_summary(db, file, func.fqn.as_ref())
+            .map_or(Taint::NONE, |s| s.call_result(input)),
+        _ => all,
+    }
+}
+
+/// Builtins that call a callback on an array's elements: the callback's
+/// argument index and, for each of its parameters, the argument it receives.
+fn callback_inputs(
+    fn_name_lower: &str,
+    args: &[php_ast::owned::Arg],
+) -> Option<(usize, Vec<usize>)> {
+    Some(match fn_name_lower {
+        "array_map" => (0, (1..args.len().max(2)).collect()),
+        "array_filter" | "array_walk" | "array_walk_recursive" => (1, vec![0]),
+        "usort" | "uasort" | "uksort" => (1, vec![0, 0]),
+        "array_reduce" => (1, vec![2, 0]),
+        "preg_replace_callback" => (1, vec![2]),
+        _ => return None,
+    })
+}
+
+/// Result taint of a builtin that calls a callback on its input.
+fn callback_builtin_taint(
+    fn_name_lower: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    let arg_taint = |index: usize| {
+        args.get(index)
+            .and_then(|a| a.value.as_ref())
+            .map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file))
+    };
+    let (callback_index, input_args) = callback_inputs(fn_name_lower, args)?;
+    let inputs: Vec<Taint> = input_args.iter().map(|i| arg_taint(*i)).collect();
+    let callback = args.get(callback_index).and_then(|a| a.value.as_ref());
+    let called = || {
+        callback.map_or(Taint::NONE, |cb| {
+            callback_result(cb, &inputs, ctx, db, file)
+        })
+    };
+    Some(match fn_name_lower {
+        "array_map" => called(),
+        "array_filter" => arg_taint(0),
+        "array_reduce" => arg_taint(2) | called(),
+        "preg_replace_callback" => arg_taint(2) | called(),
+        _ => return None,
+    })
+}
+
+/// Report data a callback builtin hands to a callback whose body reaches a sink.
+pub fn check_callback_sinks(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    fn_name_lower: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let Some((callback_index, input_args)) = callback_inputs(fn_name_lower, args) else {
+        return;
+    };
+    let Some(callback) = args.get(callback_index).and_then(|a| a.value.as_ref()) else {
+        return;
+    };
+    let param_sinks = match callee_closure(callback, ctx, ea.db, &ea.file) {
+        Some(closure) => closure.summary.param_sinks.clone(),
+        None => {
+            let Some(name) = callback_function_name(callback) else {
+                return;
+            };
+            let resolved = crate::db::resolve_name(ea.db, &ea.file, name);
+            crate::db::function_param_sinks(ea.db, &ea.file, &resolved)
+                .map(|s| s.param_sinks)
+                .unwrap_or_default()
+        }
+    };
+    let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
+    for sink in &param_sinks {
+        let Some(value) = input_args
+            .get(sink.param)
+            .and_then(|i| args.get(*i))
+            .and_then(|a| a.value.as_ref())
+        else {
+            continue;
+        };
+        let taint = expr_taint(value, ctx, ea.db, &ea.file);
+        ea.taint_summary
+            .record_param_sinks(taint, sink.kinds, &sink.issue);
+        if taint.concrete().intersects(sink.kinds) && !emitted.contains(&sink.issue) {
+            emitted.push(sink.issue.clone());
+            ea.emit(sink.issue.clone(), mir_issues::Severity::Error, span);
+        }
+    }
+}
+
+/// Report arguments a call of a closure passes to a sink inside it.
+pub fn check_closure_call_sinks(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    callee: &Expr,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let Some(closure) = callee_closure(callee, ctx, ea.db, &ea.file) else {
+        return;
+    };
+    let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
+    for sink in &closure.summary.param_sinks {
+        for value in closure_param_args(&closure.params, args, sink.param) {
+            let taint = expr_taint(value, ctx, ea.db, &ea.file);
+            ea.taint_summary
+                .record_param_sinks(taint, sink.kinds, &sink.issue);
+            if taint.concrete().intersects(sink.kinds) && !emitted.contains(&sink.issue) {
+                emitted.push(sink.issue.clone());
+                ea.emit(sink.issue.clone(), mir_issues::Severity::Error, span);
+            }
+        }
+    }
 }
 
 /// Whether a declaration at `location` has a body worth summarizing.

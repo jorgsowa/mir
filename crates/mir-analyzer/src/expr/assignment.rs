@@ -439,6 +439,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         if rhs_ty.is_never() {
             return rhs_ty;
         }
+        // A closure passed as a callback has a summary only once it was analyzed.
+        let rhs_taint = if crate::taint::has_closure_argument(&a.value) {
+            crate::taint::expr_taint(&a.value, ctx, self.db, &self.file)
+        } else {
+            rhs_taint
+        };
         if let Some(key) = crate::taint::own_property_written(&a.target, ctx, self.db, &self.file) {
             self.taint_summary.record_prop_write(key, rhs_taint);
         }
@@ -531,6 +537,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                         match keys {
                             Some(keys) if !a.by_ref => ctx.set_key_taints(name.as_ref(), keys),
                             _ => ctx.set_var_taint(name.as_ref(), rhs_taint),
+                        }
+                        let mut value = a.value.as_ref();
+                        while let ExprKind::Parenthesized(inner) = &value.kind {
+                            value = inner;
+                        }
+                        let closure = match &value.kind {
+                            ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => {
+                                ctx.closures.by_span.get(&value.span.start).cloned()
+                            }
+                            ExprKind::Variable(source) => ctx
+                                .closures
+                                .by_var
+                                .get(&mir_types::Name::from(source.trim_start_matches('$')))
+                                .cloned(),
+                            _ => None,
+                        };
+                        if let Some(closure) = closure.filter(|_| !a.by_ref) {
+                            ctx.bind_closure(name.as_ref(), closure);
                         }
                     }
                     ExprKind::PropertyAccess(pa) => {

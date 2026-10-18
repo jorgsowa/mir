@@ -230,6 +230,9 @@ pub struct FlowState {
     /// a variable's `tainted_vars` entry stays the union of its keys.
     pub tainted_keys: FxHashMap<Name, KeyTaint>,
 
+    /// Taint summaries of closures analyzed in this scope.
+    pub closures: Arc<ClosureSummaries>,
+
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
@@ -641,6 +644,7 @@ impl FlowState {
             strict_types: false,
             tainted_vars: FxHashMap::default(),
             tainted_keys: FxHashMap::default(),
+            closures: Arc::default(),
             tainted_props: FxHashMap::default(),
             tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),
@@ -1231,7 +1235,24 @@ impl FlowState {
     pub fn set_var_taint(&mut self, name: &str, taint: Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
         self.tainted_keys.remove(&sym);
+        if self.closures.by_var.contains_key(&sym) {
+            Arc::make_mut(&mut self.closures).by_var.remove(&sym);
+        }
         set_taint(&mut self.tainted_vars, sym, taint);
+    }
+
+    /// Remember the summary of the closure literal starting at `offset`.
+    pub fn record_closure(&mut self, offset: u32, closure: ClosureSummary) {
+        Arc::make_mut(&mut self.closures)
+            .by_span
+            .insert(offset, Arc::new(closure));
+    }
+
+    /// Bind `name` to a closure's summary.
+    pub fn bind_closure(&mut self, name: &str, closure: Arc<ClosureSummary>) {
+        Arc::make_mut(&mut self.closures)
+            .by_var
+            .insert(Name::from(name.trim_start_matches('$')), closure);
     }
 
     /// Replace an array variable's taint with known per-key taint.
@@ -1833,6 +1854,7 @@ impl FlowState {
         }
 
         result.tainted_keys = merge_key_taints(&if_ctx, &else_ctx);
+        result.closures = merge_closures(&if_ctx.closures, &else_ctx.closures);
         // Taint: conservative union — if either branch taints a var, it stays tainted
         for (name, taint) in if_ctx
             .tainted_vars
@@ -1983,6 +2005,44 @@ pub(crate) fn self_is_trait(db: &dyn crate::db::MirDatabase, ctx: &FlowState) ->
     ctx.self_fqcn
         .as_deref()
         .is_some_and(|f| crate::db::class_kind(db, f).is_some_and(|k| k.is_trait))
+}
+
+/// How a closure literal moves taint, with the parameters its summary's labels refer to.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClosureSummary {
+    /// Parameter names, and whether each is variadic.
+    pub params: Vec<(Name, bool)>,
+    pub summary: crate::taint::TaintSummary,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ClosureSummaries {
+    /// Keyed by the closure expression's start offset.
+    pub by_span: FxHashMap<u32, Arc<ClosureSummary>>,
+    pub by_var: FxHashMap<Name, Arc<ClosureSummary>>,
+}
+
+fn merge_closures(a: &Arc<ClosureSummaries>, b: &Arc<ClosureSummaries>) -> Arc<ClosureSummaries> {
+    if Arc::ptr_eq(a, b) || b.by_span.is_empty() && b.by_var.is_empty() {
+        return a.clone();
+    }
+    if a.by_span.is_empty() && a.by_var.is_empty() {
+        return b.clone();
+    }
+    let mut merged = (**a).clone();
+    for (offset, closure) in &b.by_span {
+        merged
+            .by_span
+            .entry(*offset)
+            .or_insert_with(|| closure.clone());
+    }
+    for (name, closure) in &b.by_var {
+        merged
+            .by_var
+            .entry(*name)
+            .or_insert_with(|| closure.clone());
+    }
+    Arc::new(merged)
 }
 
 /// Taint of each literal key of an array, and of every other key.
