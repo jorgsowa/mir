@@ -462,7 +462,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             ctor_params,
                             &n.args,
                             ctor_taint_sink_params,
-                            |db, _| crate::db::method_taint_summary(db, ctor_owner, "__construct"),
+                            |db, file| {
+                                crate::db::method_taint_summary(db, file, ctor_owner, "__construct")
+                            },
                             call_span,
                         );
                         // Purity check: `new X(...)` inside a @pure function

@@ -347,7 +347,7 @@ fn callee_reads_source(db: &dyn MirDatabase, from: &str, callee: &Callee) -> boo
                 .iter()
                 .any(|candidate| function_reads_source(db, from, candidate))
         }
-        Callee::Method(class, method) => method_reads_source(db, class, method),
+        Callee::Method(class, method) => method_reads_source(db, from, class, method),
     }
 }
 
@@ -363,12 +363,17 @@ pub(crate) fn function_reads_source(db: &dyn MirDatabase, from: &str, fqn: &str)
     let Some(sf) = crate::db::function_loc_from(db, from, here).map(|loc| loc.file()) else {
         return false;
     };
-    !crate::stubs::is_stub_path(sf.path(db).as_ref())
+    super::inferred_types::summarizable(db, sf, from)
         && *decl_reads_source(db, sf, Arc::from(def.fqn.as_ref()))
 }
 
-/// Whether `method_lower` called on `class` may return source data.
-pub(crate) fn method_reads_source(db: &dyn MirDatabase, class: &str, method_lower: &str) -> bool {
+/// Whether `method_lower` called on `class` from `from` may return source data.
+pub(crate) fn method_reads_source(
+    db: &dyn MirDatabase,
+    from: &str,
+    class: &str,
+    method_lower: &str,
+) -> bool {
     let Some((owner, def)) = crate::db::find_method_respecting_precedence(
         db,
         crate::db::Fqcn::from_str(db, class),
@@ -384,6 +389,6 @@ pub(crate) fn method_reads_source(db: &dyn MirDatabase, class: &str, method_lowe
     else {
         return false;
     };
-    !crate::stubs::is_stub_path(sf.path(db).as_ref())
+    super::inferred_types::summarizable(db, sf, from)
         && *decl_reads_source(db, sf, method_key(&owner, method_lower))
 }

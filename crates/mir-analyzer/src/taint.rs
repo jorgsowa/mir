@@ -276,6 +276,25 @@ fn return_drops_taint(ty: &mir_types::Type) -> bool {
         })
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CalleeBody {
+    /// Abstract, interface or stub: only annotations describe it.
+    None,
+    Dependency,
+    Summarized,
+}
+
+impl CalleeBody {
+    fn of(location: Option<&mir_types::Location>, from: &str) -> CalleeBody {
+        match location {
+            Some(loc) if crate::stubs::is_stub_path(loc.file.as_ref()) => CalleeBody::None,
+            Some(loc) if is_dependency_of(loc.file.as_ref(), from) => CalleeBody::Dependency,
+            Some(_) => CalleeBody::Summarized,
+            None => CalleeBody::None,
+        }
+    }
+}
+
 /// Taint of a call to user code, from the callee's annotations and inferred summary.
 #[allow(clippy::too_many_arguments)]
 fn user_call_taint(
@@ -283,7 +302,7 @@ fn user_call_taint(
     args: &[php_ast::owned::Arg],
     return_type: Option<&mir_types::Type>,
     annotations: Option<&mir_codebase::TaintAnnotations>,
-    has_body: bool,
+    body: CalleeBody,
     reads_source: impl FnOnce() -> bool,
     summary: impl FnOnce() -> Option<TaintSummary>,
     ctx: &FlowState,
@@ -296,10 +315,12 @@ fn user_call_taint(
     let arg_taint = |index| param_arg_taint(params, args, index, ctx, db, file);
     // Inferring a summary only pays off when it can return source data or tainted arguments.
     let worth_summary = || !args_taint(args, ctx, db, file).is_empty() || reads_source();
-    let mut taint = if has_body && worth_summary() {
-        summary().map_or(Taint::NONE, |s| s.call_result(arg_taint))
-    } else {
-        Taint::NONE
+    let mut taint = match body {
+        CalleeBody::Summarized if worth_summary() => {
+            summary().map_or(Taint::NONE, |s| s.call_result(arg_taint))
+        }
+        CalleeBody::Dependency => args_taint(args, ctx, db, file),
+        _ => Taint::NONE,
     };
     let Some(annotations) = annotations else {
         return taint;
@@ -312,7 +333,7 @@ fn user_call_taint(
     let escaped = named_kinds(&annotations.escape);
     let unescaped = named_kinds(&annotations.unescape);
     // An annotated escaper or decoder without a body to summarize passes its arguments through.
-    if !has_body && annotations.flow_params.is_empty() {
+    if body == CalleeBody::None && annotations.flow_params.is_empty() {
         taint = args_taint(args, ctx, db, file);
     }
     taint.without(escaped).restore(unescaped)
@@ -906,7 +927,8 @@ pub fn expr_taint(
 
         ExprKind::FunctionCall(fc) => {
             if let ExprKind::Identifier(name) = &fc.name.kind {
-                let lower_name = crate::util::php_ident_lowercase(name.as_ref());
+                let lower_name =
+                    crate::util::php_ident_lowercase(name.as_ref().trim_start_matches('\\'));
                 if matches!(
                     lower_name.as_str(),
                     "getallheaders" | "apache_request_headers"
@@ -937,9 +959,21 @@ pub fn expr_taint(
                         },
                     );
                 }
-                let resolved = crate::db::resolve_name(db, file, name.as_ref());
-                let here = crate::db::Fqcn::from_str(db, resolved.as_str());
-                let func = crate::db::find_function_from(db, file, here);
+                let mut resolved = crate::db::resolve_name(db, file, name.as_ref());
+                let mut func = crate::db::find_function_from(
+                    db,
+                    file,
+                    crate::db::Fqcn::from_str(db, &resolved),
+                );
+                // An unqualified call falls back to the global function.
+                if func.is_none() && !name.contains('\\') && resolved.contains('\\') {
+                    resolved = name.to_string();
+                    func = crate::db::find_function_from(
+                        db,
+                        file,
+                        crate::db::Fqcn::from_str(db, &resolved),
+                    );
+                }
                 if func.as_ref().is_some_and(|f| f.is_taint_source) {
                     return Taint::ALL;
                 }
@@ -949,7 +983,7 @@ pub fn expr_taint(
                         &fc.args,
                         f.return_type.as_deref(),
                         f.taint.as_deref(),
-                        true,
+                        CalleeBody::of(f.location.as_ref(), file),
                         || {
                             crate::db::taint_sources::function_reads_source(
                                 db,
@@ -1071,6 +1105,28 @@ fn is_user_code(location: Option<&mir_types::Location>) -> bool {
     location.is_some_and(|loc| !crate::stubs::is_stub_path(loc.file.as_ref()))
 }
 
+/// `…/vendor/<vendor>/<package>` prefix of a Composer dependency's path.
+fn vendor_package(path: &str) -> Option<&str> {
+    let start = path
+        .match_indices("vendor")
+        .filter(|(i, _)| *i == 0 || path[..*i].ends_with(['/', '\\']))
+        .map(|(i, _)| i + "vendor".len())
+        .filter(|end| path[*end..].starts_with(['/', '\\']))
+        .last()?;
+    let mut separators = path[start..]
+        .match_indices(['/', '\\'])
+        .map(|(i, _)| start + i);
+    separators.next()?;
+    separators.next()?;
+    Some(separators.next().map_or(path, |end| &path[..end]))
+}
+
+/// A callee in another Composer package than `from` is treated like a builtin:
+/// its arguments pass through, and its body isn't summarized.
+pub fn is_dependency_of(callee_path: &str, from: &str) -> bool {
+    vendor_package(callee_path).is_some_and(|package| vendor_package(from) != Some(package))
+}
+
 /// Taint of a call to `method_lower` on `class`, or `None` when the method is unknown.
 fn method_call_taint(
     class: crate::db::Fqcn<'_>,
@@ -1087,17 +1143,19 @@ fn method_call_taint(
     if !is_user_code(m.location.as_ref()) && m.taint.is_none() {
         return None;
     }
-    let has_body = is_user_code(m.location.as_ref())
-        && !m.is_abstract
-        && !crate::db::is_interface(db, owner.as_ref());
+    let body = if m.is_abstract || crate::db::is_interface(db, owner.as_ref()) {
+        CalleeBody::None
+    } else {
+        CalleeBody::of(m.location.as_ref(), file)
+    };
     let taint = user_call_taint(
         &m.params,
         args,
         m.return_type.as_deref(),
         m.taint.as_deref(),
-        has_body,
-        || crate::db::taint_sources::method_reads_source(db, owner.as_ref(), method_lower),
-        || crate::db::method_taint_summary(db, owner.as_ref(), method_lower),
+        body,
+        || crate::db::taint_sources::method_reads_source(db, file, owner.as_ref(), method_lower),
+        || crate::db::method_taint_summary(db, file, owner.as_ref(), method_lower),
         ctx,
         db,
         file,
@@ -1169,7 +1227,7 @@ fn filter_call_taint(
 /// Taint kinds a sanitizing builtin removes from its arguments' taint.
 fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
     Some(match fn_name_lower {
-        "htmlspecialchars" | "htmlentities" | "strip_tags" => Taint::HTML,
+        "htmlspecialchars" | "htmlentities" | "strip_tags" | "e" => Taint::HTML,
         "addslashes"
         | "mysqli_real_escape_string"
         | "mysqli_escape_string"

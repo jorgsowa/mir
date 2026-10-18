@@ -915,8 +915,13 @@ impl CallAnalyzer {
                 &resolved.params,
                 &call.args,
                 &resolved.taint_sink_params,
-                |db, _| {
-                    crate::db::method_taint_summary(db, &resolved.owner_fqcn, &method_name_lower)
+                |db, file| {
+                    crate::db::method_taint_summary(
+                        db,
+                        file,
+                        &resolved.owner_fqcn,
+                        &method_name_lower,
+                    )
                 },
                 span,
             );
