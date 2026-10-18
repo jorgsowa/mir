@@ -258,6 +258,7 @@ pub(crate) fn infer_member(
         let mut driver = BodyAnalyzer::new_inference_only(db, prepared.php_version);
         driver.collect_symbols = false;
         driver.only_method = method;
+        driver.collect_global_taint = matches!(scope, ScopeKey::FileExec);
 
         let mut issues: Vec<Issue> = Vec::new();
         db.push_ref_loc_frame();

@@ -79,6 +79,7 @@ impl<'a> BodyAnalyzer<'a> {
             && !self.collect_symbols
             && !self.collect_navigation_facts
             && !self.collect_resolved_navigation_facts
+            && !self.collect_global_taint
         {
             return;
         }
@@ -140,6 +141,9 @@ impl<'a> BodyAnalyzer<'a> {
         }
         exec_stmts(&mut sa, &mut ctx, &program.stmts, file);
         drop(sa);
+        if self.collect_global_taint {
+            self.record_global_taint(&ctx);
+        }
         if self.mode == AnalysisMode::Full {
             crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_all_issues());

@@ -505,6 +505,14 @@ pub fn is_trusted_superglobal_field(aa: &php_ast::owned::ArrayAccessExpr) -> boo
         && is_superglobal_var(&file_entry.array, "_FILES")
 }
 
+/// The global variable `$GLOBALS['name']` reads.
+fn globals_entry(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&str> {
+    let Some(ExprKind::String(key)) = aa.index.as_deref().map(|i| &i.kind) else {
+        return None;
+    };
+    is_superglobal_var(&aa.array, "GLOBALS").then_some(key.as_ref())
+}
+
 /// `$GLOBALS['_GET']` reads the superglobal itself.
 pub fn is_globals_superglobal_alias(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
     matches!(aa.index.as_deref().map(|i| &i.kind), Some(ExprKind::String(key)) if is_superglobal(key))
@@ -1059,6 +1067,8 @@ pub fn expr_taint(
                 Taint::NONE
             } else if is_globals_superglobal_alias(aa) {
                 Taint::ALL
+            } else if let Some(var) = globals_entry(aa) {
+                crate::db::global_var_taint(db, file, var)
             } else {
                 expr_taint(&aa.array, ctx, db, file)
             }

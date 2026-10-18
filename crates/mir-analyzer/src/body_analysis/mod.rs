@@ -130,6 +130,8 @@ pub(crate) struct InferredTypes {
     /// Non-empty taint summaries, keyed like `functions` / `methods`.
     pub(crate) function_taint: Vec<(Arc<str>, crate::taint::TaintSummary)>,
     pub(crate) method_taint: Vec<(Arc<str>, Arc<str>, crate::taint::TaintSummary)>,
+    /// Source taint of each global variable after a file's top-level code.
+    pub(crate) global_taint: Vec<(mir_types::Name, crate::taint::Taint)>,
 }
 
 /// Nearest ancestor `@param` docblock type for parameter `index` that refines
@@ -635,6 +637,8 @@ pub(crate) struct BodyAnalyzer<'a> {
     /// When set, class-like scopes analyze only the method with this
     /// ASCII-lowercased name and skip every other method body.
     pub(crate) only_method: Option<Arc<str>>,
+    /// Analyze top-level code for the taint its global variables end up with.
+    pub(crate) collect_global_taint: bool,
     inferred_types: Arc<Mutex<InferredTypes>>,
     reference_key_cache: Arc<Mutex<ReferenceKeyCache>>,
     navigation_facts: RefCell<Vec<NavigationFact>>,
@@ -655,6 +659,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_resolved_navigation_facts: false,
             collect_inferred_types: false,
             only_method: None,
+            collect_global_taint: false,
             inferred_types: Arc::new(Mutex::new(InferredTypes::default())),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
             navigation_facts: RefCell::new(Vec::new()),
@@ -675,6 +680,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_resolved_navigation_facts: false,
             collect_inferred_types: true,
             only_method: None,
+            collect_global_taint: false,
             inferred_types: Arc::new(Mutex::new(InferredTypes::default())),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
             navigation_facts: RefCell::new(Vec::new()),
@@ -742,6 +748,15 @@ impl<'a> BodyAnalyzer<'a> {
                 .function_taint
                 .push((fqn.clone(), summary));
         }
+    }
+
+    fn record_global_taint(&self, ctx: &crate::flow_state::FlowState) {
+        self.inferred_types.lock().global_taint = ctx
+            .tainted_vars
+            .iter()
+            .map(|(name, taint)| (*name, taint.concrete()))
+            .filter(|(_, taint)| !taint.is_empty())
+            .collect();
     }
 
     fn record_method_taint(&self, fqcn: &str, name: &str, summary: crate::taint::TaintSummary) {

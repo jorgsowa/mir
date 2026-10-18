@@ -256,3 +256,19 @@ pub fn method_param_sinks(
         .then(|| method_taint_summary(db, file, owner_fqcn, method_name_lower))
         .flatten()
 }
+
+/// Source taint the global `var` holds after the top-level code of `file`.
+pub fn global_var_taint(db: &dyn MirDatabase, file: &str, var: &str) -> crate::taint::Taint {
+    let var = mir_types::Name::new(var);
+    let Some(sf) = db.lookup_source_file(file) else {
+        return crate::taint::Taint::NONE;
+    };
+    if !super::taint_sources::global_may_read_source(db, sf, var) {
+        return crate::taint::Taint::NONE;
+    }
+    crate::db::infer_member(db, sf, ScopeKey::FileExec, None)
+        .global_taint
+        .iter()
+        .filter(|(name, _)| *name == var)
+        .fold(crate::taint::Taint::NONE, |acc, (_, taint)| acc | *taint)
+}

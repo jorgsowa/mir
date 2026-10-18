@@ -865,6 +865,10 @@ impl<'a> StatementsAnalyzer<'a> {
                     .unwrap_or_else(Type::mixed);
                 self.record_symbol_for_var(var.span, var_name, ty.clone());
                 ctx.set_var(var_name, ty);
+                ctx.set_var_taint(
+                    var_name,
+                    crate::db::global_var_taint(self.db, &self.file, var_name),
+                );
                 std::sync::Arc::make_mut(&mut ctx.byref_param_names)
                     .insert(mir_types::Name::from(var_name));
                 let (line, col_start) = self.offset_to_line_col(var.span.start);

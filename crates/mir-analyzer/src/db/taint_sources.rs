@@ -87,6 +87,8 @@ type DeclKey = (Name, Option<Name>);
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct FileSourceFacts {
     decls: FxHashMap<DeclKey, DeclFacts>,
+    /// Values top-level code assigns to global variables.
+    globals: Vec<(Name, ValueFacts)>,
 }
 
 #[salsa::tracked]
@@ -142,7 +144,46 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
             _ => {}
         }
     });
+    let mut top_level = Scan::new(db, &path, None, None);
+    scan_top_level(&mut top_level, &parsed.program.stmts);
+    facts.globals = top_level
+        .local_values
+        .into_iter()
+        .filter(|(_, value)| value.reads_source || !value.callees.is_empty())
+        .map(|(name, value)| (Name::new(&name), value))
+        .collect();
     Arc::new(facts)
+}
+
+fn scan_top_level(scan: &mut Scan<'_>, stmts: &[php_ast::owned::Stmt]) {
+    for stmt in stmts {
+        let _scope = crate::db::ns_scope::enter(scan.db, scan.path, stmt.span.start);
+        match &stmt.kind {
+            StmtKind::Function(_)
+            | StmtKind::Class(_)
+            | StmtKind::Enum(_)
+            | StmtKind::Interface(_)
+            | StmtKind::Trait(_)
+            | StmtKind::Use(_) => {}
+            StmtKind::Namespace(ns) => {
+                if let php_ast::owned::NamespaceBody::Braced(body) = &ns.body {
+                    scan_top_level(scan, &body.stmts);
+                }
+            }
+            _ => {
+                let _ = scan.visit_stmt(stmt);
+            }
+        }
+    }
+}
+
+/// Whether top-level code of `file` may store source data in the global `var`.
+pub(crate) fn global_may_read_source(db: &dyn MirDatabase, file: SourceFile, var: Name) -> bool {
+    let facts = file_source_facts(db, file);
+    facts
+        .globals
+        .iter()
+        .any(|(name, value)| *name == var && value_reads_source(db, file.path(db), value))
 }
 
 fn scan_method(
