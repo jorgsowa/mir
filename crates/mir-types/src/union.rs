@@ -1535,9 +1535,10 @@ impl Type {
         if self.is_never() {
             return true; // never <: everything
         }
-        self.types
-            .iter()
-            .all(|a| other.types.iter().any(|b| atomic_subtype(a, b)))
+        self.types.iter().all(|a| {
+            let fits = |a: &Atomic| other.types.iter().any(|b| atomic_subtype(a, b));
+            fits(a) || composite_parts(a).is_some_and(|parts| parts.iter().all(fits))
+        })
     }
 
     /// Like `is_subtype_structural`, but a template atom is judged by its bound
@@ -1949,6 +1950,16 @@ fn substitute_in_fn_param(
 // ---------------------------------------------------------------------------
 // Atomic subtype (no codebase — structural check only)
 // ---------------------------------------------------------------------------
+
+/// Atomics that are exactly a union of other atomics, so a union spelling out
+/// every part (e.g. `string|int|float|bool`) accepts them.
+fn composite_parts(atomic: &Atomic) -> Option<&'static [Atomic]> {
+    match atomic {
+        Atomic::TScalar => Some(&[Atomic::TInt, Atomic::TFloat, Atomic::TString, Atomic::TBool]),
+        Atomic::TNumeric => Some(&[Atomic::TInt, Atomic::TFloat, Atomic::TNumericString]),
+        _ => None,
+    }
+}
 
 /// Structural `sub <: sup` for a single atomic pair, without hierarchy resolution.
 pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
