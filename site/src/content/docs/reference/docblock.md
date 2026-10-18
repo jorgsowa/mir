@@ -41,6 +41,8 @@ Each tag also accepts the `@psalm-` prefix.
 | `@taint-unescape <kind>` | The return value is dangerous again for `<kind>` sinks when its input was tainted |
 | `@psalm-flow ($a, $b) -> return` | The listed parameters' taint flows into the return value of a method without a body |
 
+Without annotations, request data is tainted wherever it is read: `$_GET`, `$_POST`, `$_COOKIE`, `$_FILES`, `$_REQUEST`, client-controlled `$_SERVER` entries, `php://input`, and the request objects of Symfony, Laravel and PSR-7.
+
 Function and method bodies are summarized automatically: a call's result carries the taint of the arguments its body returns, and an argument that reaches a sink inside the callee is reported at the call.
 
 ## Metadata

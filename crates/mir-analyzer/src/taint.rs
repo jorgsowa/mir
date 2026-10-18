@@ -650,6 +650,146 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     }
 }
 
+const SYMFONY_REQUEST: &str = "Symfony\\Component\\HttpFoundation\\Request";
+
+/// `Request` properties holding client data (`$request->query->get('q')`).
+const REQUEST_BAG_PROPERTIES: &[&str] = &[
+    "query",
+    "request",
+    "cookies",
+    "headers",
+    "files",
+    "server",
+    "attributes",
+];
+
+/// Request accessors returning client data: Symfony's `Request`, Laravel's
+/// subclass, and PSR-7 requests.
+pub fn is_framework_request_source(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_lower: &str,
+) -> bool {
+    let is_a = |base: &str| {
+        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+    };
+    if is_a(SYMFONY_REQUEST) {
+        return matches!(
+            method_lower,
+            "get"
+                | "getcontent"
+                | "getpayload"
+                | "toarray"
+                | "geturi"
+                | "getrequesturi"
+                | "getpathinfo"
+                | "getquerystring"
+                | "gethost"
+                | "gethttphost"
+                | "getschemeandhttphost"
+                | "getbaseurl"
+                | "getbasepath"
+                | "getuserinfo"
+                | "getuser"
+                | "getpassword"
+                | "getclientip"
+                | "getclientips"
+                | "getpreferredlanguage"
+                | "getlanguages"
+                | "getcharsets"
+                | "getencodings"
+                | "getacceptablecontenttypes"
+                | "getetags"
+                | "getrequestformat"
+        ) || is_laravel_request_accessor(method_lower);
+    }
+    if is_a("Psr\\Http\\Message\\ServerRequestInterface")
+        && matches!(
+            method_lower,
+            "getqueryparams"
+                | "getparsedbody"
+                | "getcookieparams"
+                | "getuploadedfiles"
+                | "getserverparams"
+                | "getattribute"
+                | "getattributes"
+        )
+    {
+        return true;
+    }
+    is_a("Psr\\Http\\Message\\RequestInterface")
+        && matches!(
+            method_lower,
+            "getheader"
+                | "getheaderline"
+                | "getheaders"
+                | "getbody"
+                | "geturi"
+                | "getrequesttarget"
+        )
+}
+
+fn is_laravel_request_accessor(method_lower: &str) -> bool {
+    matches!(
+        method_lower,
+        "input"
+            | "query"
+            | "post"
+            | "cookie"
+            | "header"
+            | "server"
+            | "all"
+            | "only"
+            | "except"
+            | "json"
+            | "string"
+            | "str"
+            | "keys"
+            | "collect"
+            | "route"
+            | "fullurl"
+            | "fullurlwithquery"
+            | "fullurlwithoutquery"
+            | "url"
+            | "path"
+            | "decodedpath"
+            | "segment"
+            | "segments"
+            | "ip"
+            | "ips"
+            | "useragent"
+            | "bearertoken"
+            | "validated"
+            | "safe"
+            | "old"
+            | "file"
+            | "allfiles"
+    )
+}
+
+/// `Request::input('q')` through Laravel's facades.
+pub fn is_laravel_request_facade_source(class: &str, method_lower: &str) -> bool {
+    matches!(
+        class.trim_start_matches('\\'),
+        "Request"
+            | "Input"
+            | "Illuminate\\Support\\Facades\\Request"
+            | "Illuminate\\Support\\Facades\\Input"
+    ) && (method_lower == "get" || is_laravel_request_accessor(method_lower))
+}
+
+/// `$request->query` and the other client-data bags of a Symfony request.
+pub fn is_request_bag_property(db: &dyn crate::db::MirDatabase, fqcn: &str, prop: &str) -> bool {
+    REQUEST_BAG_PROPERTIES.contains(&prop)
+        && (fqcn.eq_ignore_ascii_case(SYMFONY_REQUEST)
+            || crate::db::extends_or_implements(db, fqcn, SYMFONY_REQUEST))
+}
+
+/// Laravel's `request('q')` helper reads input; `request()` returns the request object.
+pub fn is_request_helper_source(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
+    fn_name_lower.trim_start_matches('\\') == "request" && !args.is_empty()
+}
+
 /// Return the sink kind for a *method* call on a known OOP database wrapper —
 /// `$pdo->query($sql)`, `$mysqli->prepare($sql)` — the dominant modern PHP
 /// idiom over the procedural `mysqli_query()` style `classify_sink` covers.
@@ -866,14 +1006,29 @@ pub fn expr_taint(
         // Only a simple-variable receiver is tracked, matching prop_refined's
         // narrowing scope.
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
-            if let ExprKind::Variable(obj_var) = &pa.object.kind {
-                if let Some(prop_name) =
-                    crate::expr::helpers::extract_string_from_expr(&pa.property)
-                {
-                    return ctx.prop_taint(obj_var.trim_start_matches('$'), &prop_name);
+            let Some(prop_name) = crate::expr::helpers::extract_string_from_expr(&pa.property)
+            else {
+                return expr_taint(&pa.object, ctx, db, file);
+            };
+            if let Some(recv_ty) =
+                crate::expr::assignment::resolve_chained_receiver_type(&pa.object, ctx, db, file)
+            {
+                let is_bag = recv_ty.types.iter().any(|atom| {
+                    matches!(atom, mir_types::Atomic::TNamedObject { fqcn, .. }
+                        if is_request_bag_property(db, fqcn.as_ref(), &prop_name))
+                });
+                if is_bag {
+                    return Taint::ALL;
                 }
             }
-            Taint::NONE
+            // A property of a tainted object (`json_decode($_GET['j'])->name`) is tainted too.
+            let own = match &pa.object.kind {
+                ExprKind::Variable(obj_var) => {
+                    ctx.prop_taint(obj_var.trim_start_matches('$'), &prop_name)
+                }
+                _ => Taint::NONE,
+            };
+            own | expr_taint(&pa.object, ctx, db, file)
         }
 
         ExprKind::Assign(a) => expr_taint(&a.value, ctx, db, file),
@@ -935,7 +1090,9 @@ pub fn expr_taint(
                 ) {
                     return Taint::ALL;
                 }
-                if reads_raw_request_body(&lower_name, &fc.args) {
+                if reads_raw_request_body(&lower_name, &fc.args)
+                    || is_request_helper_source(&lower_name, &fc.args)
+                {
                     return Taint::ALL;
                 }
                 if let Some(taint) = filter_call_taint(&lower_name, &fc.args, ctx, db, file) {
@@ -1033,29 +1190,46 @@ pub fn expr_taint(
         }
 
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
-            if let ExprKind::Identifier(method_name) = &mc.method.kind {
-                if let Some(recv_ty) = crate::expr::assignment::resolve_chained_receiver_type(
-                    &mc.object, ctx, db, file,
-                ) {
-                    let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
-                    for atom in &recv_ty.types {
-                        if let mir_types::Atomic::TNamedObject { fqcn, .. } = atom {
-                            if let Some(removed) =
-                                sanitized_method_kinds(db, fqcn.as_ref(), &method_lower)
-                            {
-                                return args_taint(&mc.args, ctx, db, file).without(removed);
-                            }
-                            let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                            if let Some(taint) =
-                                method_call_taint(here, &method_lower, &mc.args, ctx, db, file)
-                            {
-                                return taint;
-                            }
-                        }
-                    }
+            // A tainted object's methods return its data (`$request->query->get('q')`).
+            let receiver = expr_taint(&mc.object, ctx, db, file);
+            let ExprKind::Identifier(method_name) = &mc.method.kind else {
+                return receiver;
+            };
+            let Some(recv_ty) =
+                crate::expr::assignment::resolve_chained_receiver_type(&mc.object, ctx, db, file)
+            else {
+                return receiver;
+            };
+            let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+            let mut taint = Taint::NONE;
+            let mut receiver_flows = true;
+            for atom in &recv_ty.types {
+                let mir_types::Atomic::TNamedObject { fqcn, .. } = atom else {
+                    continue;
+                };
+                if is_framework_request_source(db, fqcn.as_ref(), &method_lower) {
+                    return Taint::ALL;
+                }
+                if let Some(removed) = sanitized_method_kinds(db, fqcn.as_ref(), &method_lower) {
+                    return args_taint(&mc.args, ctx, db, file).without(removed);
+                }
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                if let Some((_, m)) =
+                    crate::db::find_method_respecting_precedence(db, here, &method_lower)
+                {
+                    receiver_flows &= !m
+                        .return_type
+                        .as_deref()
+                        .is_some_and(|ty| ty.is_void() || is_injection_safe_type(ty));
+                }
+                if let Some(t) = method_call_taint(here, &method_lower, &mc.args, ctx, db, file) {
+                    taint |= t;
                 }
             }
-            Taint::NONE
+            if receiver_flows {
+                taint |= receiver;
+            }
+            taint
         }
 
         ExprKind::StaticMethodCall(smc) => {
@@ -1086,6 +1260,9 @@ pub fn expr_taint(
             };
             if let (Some(fqcn), ExprKind::Identifier(method_name)) = (fqcn_opt, &smc.method.kind) {
                 let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                if is_laravel_request_facade_source(fqcn.as_ref(), &method_lower) {
+                    return Taint::ALL;
+                }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 if let Some(taint) =
                     method_call_taint(here, &method_lower, &smc.args, ctx, db, file)

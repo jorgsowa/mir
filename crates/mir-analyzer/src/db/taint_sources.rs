@@ -270,10 +270,20 @@ impl OwnedVisitor for Scan<'_> {
                     }
                 }
             }
+            ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+                let prop = crate::expr::helpers::extract_string_from_expr(&pa.property);
+                if let (Some(class), Some(prop)) = (self.class_of(&pa.object), prop) {
+                    if crate::taint::is_request_bag_property(self.db, &class, &prop) {
+                        self.facts.reads_source = true;
+                    }
+                }
+            }
             ExprKind::FunctionCall(fc) => {
                 if let ExprKind::Identifier(name) = &fc.name.kind {
                     let lower = crate::util::php_ident_lowercase(name.as_ref());
-                    if crate::taint::is_source_function(&lower) {
+                    if crate::taint::is_source_function(&lower)
+                        || crate::taint::is_request_helper_source(&lower, &fc.args)
+                    {
                         self.facts.reads_source = true;
                     } else if !crate::stubs::is_builtin_function(&lower) {
                         let resolved = crate::db::resolve_name(self.db, self.path, name.as_ref());
@@ -294,7 +304,11 @@ impl OwnedVisitor for Scan<'_> {
                     (self.class_name(&smc.class), &smc.method.kind)
                 {
                     let lower = crate::util::php_ident_lowercase(name.as_ref());
-                    self.push(Callee::Method(class, Arc::from(lower.as_str())));
+                    if crate::taint::is_laravel_request_facade_source(&class, &lower) {
+                        self.facts.reads_source = true;
+                    } else {
+                        self.push(Callee::Method(class, Arc::from(lower.as_str())));
+                    }
                 }
             }
             _ => {}
@@ -341,6 +355,11 @@ fn reads_source_cycle(
 
 fn callee_reads_source(db: &dyn MirDatabase, from: &str, callee: &Callee) -> bool {
     match callee {
+        Callee::Method(class, method)
+            if crate::taint::is_framework_request_source(db, class, method) =>
+        {
+            true
+        }
         Callee::Function(name) => {
             let candidates = [name.as_ref(), name.rsplit('\\').next().unwrap_or(name)];
             candidates
