@@ -2557,6 +2557,7 @@ pub fn expr_taint(
                     &method_lower,
                     &mc.args,
                     Some(&mc.object),
+                    false,
                     ctx,
                     db,
                     file,
@@ -2603,7 +2604,7 @@ pub fn expr_taint(
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 if let Some(taint) =
-                    method_call_taint(here, &method_lower, &smc.args, None, ctx, db, file)
+                    method_call_taint(here, &method_lower, &smc.args, None, false, ctx, db, file)
                 {
                     return taint;
                 }
@@ -3165,12 +3166,15 @@ pub fn is_dependency_of(callee_path: &str, from: &str) -> bool {
     vendor_package(callee_path).is_some_and(|package| vendor_package(from) != Some(package))
 }
 
-/// Taint of a call to `method_lower` on `class`, or `None` when the method is unknown.
+/// Taint of a call to `method_lower` on `class`, or `None` when the method is
+/// unknown; `dispatched` when the call names an abstract method `class` implements.
+#[allow(clippy::too_many_arguments)]
 fn method_call_taint(
     class: crate::db::Fqcn<'_>,
     method_lower: &str,
     args: &[php_ast::owned::Arg],
     receiver: Option<&Expr>,
+    dispatched: bool,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
@@ -3193,16 +3197,18 @@ fn method_call_taint(
                 .iter()
                 .fold(Taint::NONE, |acc, implementor| {
                     let here = crate::db::Fqcn::from_str(db, implementor.as_str());
-                    acc | method_call_taint(here, method_lower, args, receiver, ctx, db, file)
+                    acc | method_call_taint(here, method_lower, args, receiver, true, ctx, db, file)
                         .unwrap_or_default()
                 });
             return (!taint.is_empty()).then_some(taint);
         }
     }
-    let body = if m.is_abstract || crate::db::is_interface(db, owner.as_ref()) {
-        CalleeBody::None
-    } else {
-        CalleeBody::of(m.location.as_ref(), file)
+    let body = match CalleeBody::of(m.location.as_ref(), file) {
+        _ if m.is_abstract || crate::db::is_interface(db, owner.as_ref()) => CalleeBody::None,
+        // Like the abstract declaration, an implementation in another package
+        // is described by its annotations alone.
+        CalleeBody::Dependency if dispatched => CalleeBody::None,
+        body => body,
     };
     let taint = user_call_taint(
         &m.params,
