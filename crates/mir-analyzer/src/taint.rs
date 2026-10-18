@@ -127,11 +127,32 @@ pub struct TaintSummary {
     /// itself, each parameter slot the kinds of that argument that flow out.
     pub returns: Taint,
     pub param_sinks: Vec<ParamSink>,
+    /// Source taint written to the class's own properties, keyed like
+    /// [`crate::db::taint_sources::prop_key`].
+    pub prop_writes: Vec<(mir_types::Name, Taint)>,
 }
 
 impl TaintSummary {
     pub fn is_empty(&self) -> bool {
-        self.returns.is_empty() && self.param_sinks.is_empty()
+        self.returns.is_empty() && self.param_sinks.is_empty() && self.prop_writes.is_empty()
+    }
+
+    pub fn record_prop_write(&mut self, key: mir_types::Name, taint: Taint) {
+        let taint = taint.concrete();
+        if taint.is_empty() {
+            return;
+        }
+        match self.prop_writes.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, existing)) => *existing |= taint,
+            None => self.prop_writes.push((key, taint)),
+        }
+    }
+
+    pub fn prop_write(&self, key: mir_types::Name) -> Taint {
+        self.prop_writes
+            .iter()
+            .filter(|(k, _)| *k == key)
+            .fold(Taint::NONE, |acc, (_, t)| acc | *t)
     }
 
     /// Record that `taint`, reaching a sink of `kinds`, carries parameter labels.
@@ -196,6 +217,50 @@ pub fn seed_param_labels(
     for (index, param) in params.iter().take(MAX_TRACKED_PARAMS).enumerate() {
         ctx.set_var_taint(param.name.as_ref(), Taint::param(index));
     }
+}
+
+/// The analyzed class's own property a write lands in: `$this->p`, `$this->p['k']`,
+/// `$this->p->q`, `self::$p`.
+pub fn own_property_written(
+    target: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<mir_types::Name> {
+    match &target.kind {
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            match &pa.object.kind {
+                ExprKind::Variable(v) if v.trim_start_matches('$') == "this" => {
+                    let prop = crate::expr::helpers::extract_string_from_expr(&pa.property)?;
+                    Some(crate::db::taint_sources::prop_key(&prop, false))
+                }
+                _ => own_property_written(&pa.object, ctx, db, file),
+            }
+        }
+        ExprKind::ArrayAccess(aa) => own_property_written(&aa.array, ctx, db, file),
+        ExprKind::StaticPropertyAccess(spa) => {
+            let (fqcn, prop) =
+                crate::expr::assignment::resolve_static_prop_target(spa, ctx, db, file)?;
+            (ctx.self_fqcn.as_deref() == Some(fqcn.as_ref()))
+                .then(|| crate::db::taint_sources::prop_key(&prop, true))
+        }
+        _ => None,
+    }
+}
+
+/// Source taint any method of `class` or its ancestors may store in property `key`.
+pub fn class_property_taint(
+    db: &dyn crate::db::MirDatabase,
+    from: &str,
+    class: &str,
+    key: mir_types::Name,
+) -> Taint {
+    crate::db::taint_sources::class_property_writers(db, from, class, key)
+        .iter()
+        .fold(Taint::NONE, |acc, (owner, method)| {
+            acc | crate::db::method_taint_summary(db, from, owner.as_str(), method.as_str())
+                .map_or(Taint::NONE, |s| s.prop_write(key))
+        })
 }
 
 /// Expressions passed for declared parameter `index`, including a spread that may cover it.
@@ -303,6 +368,7 @@ fn user_call_taint(
     return_type: Option<&mir_types::Type>,
     annotations: Option<&mir_codebase::TaintAnnotations>,
     body: CalleeBody,
+    returns_param: impl FnOnce() -> bool,
     reads_source: impl FnOnce() -> bool,
     summary: impl FnOnce() -> Option<TaintSummary>,
     ctx: &FlowState,
@@ -314,7 +380,8 @@ fn user_call_taint(
     }
     let arg_taint = |index| param_arg_taint(params, args, index, ctx, db, file);
     // Inferring a summary only pays off when it can return source data or tainted arguments.
-    let worth_summary = || !args_taint(args, ctx, db, file).is_empty() || reads_source();
+    let worth_summary =
+        || (returns_param() && !args_taint(args, ctx, db, file).is_empty()) || reads_source();
     let mut taint = match body {
         CalleeBody::Summarized if worth_summary() => {
             summary().map_or(Taint::NONE, |s| s.call_result(arg_taint))
@@ -1028,7 +1095,13 @@ pub fn expr_taint(
                 }
                 _ => Taint::NONE,
             };
-            own | expr_taint(&pa.object, ctx, db, file)
+            let key = crate::db::taint_sources::prop_key(&prop_name, false);
+            let stored = receiver_classes(&pa.object, ctx, db, file)
+                .iter()
+                .fold(Taint::NONE, |acc, class| {
+                    acc | class_property_taint(db, file, class, key)
+                });
+            own | stored | expr_taint(&pa.object, ctx, db, file)
         }
 
         ExprKind::Assign(a) => expr_taint(&a.value, ctx, db, file),
@@ -1142,6 +1215,13 @@ pub fn expr_taint(
                         f.taint.as_deref(),
                         CalleeBody::of(f.location.as_ref(), file),
                         || {
+                            crate::db::taint_sources::function_returns_param(
+                                db,
+                                file,
+                                f.fqn.as_ref(),
+                            )
+                        },
+                        || {
                             crate::db::taint_sources::function_reads_source(
                                 db,
                                 file,
@@ -1182,12 +1262,13 @@ pub fn expr_taint(
             Taint::NONE
         }
 
-        ExprKind::StaticPropertyAccess(spa) => {
-            crate::expr::assignment::resolve_static_prop_target(spa, ctx, db, file)
-                .map_or(Taint::NONE, |(fqcn, prop_name)| {
-                    ctx.static_prop_taint(&fqcn, &prop_name)
-                })
-        }
+        ExprKind::StaticPropertyAccess(spa) => crate::expr::assignment::resolve_static_prop_target(
+            spa, ctx, db, file,
+        )
+        .map_or(Taint::NONE, |(fqcn, prop_name)| {
+            let key = crate::db::taint_sources::prop_key(&prop_name, true);
+            ctx.static_prop_taint(&fqcn, &prop_name) | class_property_taint(db, file, &fqcn, key)
+        }),
 
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             // A tainted object's methods return its data (`$request->query->get('q')`).
@@ -1277,6 +1358,31 @@ pub fn expr_taint(
     }
 }
 
+/// Classes an object expression may be an instance of.
+fn receiver_classes(
+    object: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<std::sync::Arc<str>> {
+    if matches!(&object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this") {
+        return ctx.self_fqcn.iter().cloned().collect();
+    }
+    crate::expr::assignment::resolve_chained_receiver_type(object, ctx, db, file)
+        .map(|ty| {
+            ty.types
+                .iter()
+                .filter_map(|atom| match atom {
+                    mir_types::Atomic::TNamedObject { fqcn, .. } => {
+                        Some(std::sync::Arc::from(fqcn.as_ref()))
+                    }
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Whether a declaration at `location` has a body worth summarizing.
 fn is_user_code(location: Option<&mir_types::Location>) -> bool {
     location.is_some_and(|loc| !crate::stubs::is_stub_path(loc.file.as_ref()))
@@ -1331,6 +1437,7 @@ fn method_call_taint(
         m.return_type.as_deref(),
         m.taint.as_deref(),
         body,
+        || crate::db::taint_sources::method_returns_param(db, file, owner.as_ref(), method_lower),
         || crate::db::taint_sources::method_reads_source(db, file, owner.as_ref(), method_lower),
         || crate::db::method_taint_summary(db, file, owner.as_ref(), method_lower),
         ctx,

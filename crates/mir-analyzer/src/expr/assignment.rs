@@ -116,13 +116,15 @@ fn taint_array_write_base(
     }
     match &base.kind {
         ExprKind::Variable(name) => ctx.taint_var(name.trim_start_matches('$'), taint),
-        ExprKind::PropertyAccess(pa) => {
-            if let ExprKind::Variable(obj_var) = &pa.object.kind {
+        ExprKind::PropertyAccess(pa) => match &pa.object.kind {
+            ExprKind::Variable(obj_var) => {
                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                     ctx.taint_prop(obj_var.trim_start_matches('$'), &prop_name, taint);
                 }
             }
-        }
+            _ => taint_array_write_base(&pa.object, ctx, db, file, taint),
+        },
+        ExprKind::ArrayAccess(aa) => taint_array_write_base(&aa.array, ctx, db, file, taint),
         ExprKind::StaticPropertyAccess(spa) => {
             if let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, db, file) {
                 ctx.taint_static_prop(&fqcn, &prop_name, taint);
@@ -371,6 +373,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         if rhs_ty.is_never() {
             return rhs_ty;
         }
+        if let Some(key) = crate::taint::own_property_written(&a.target, ctx, self.db, &self.file) {
+            self.taint_summary.record_prop_write(key, rhs_taint);
+        }
         match a.op {
             AssignOp::Assign => {
                 // `$x =& $this->prop;` — record the alias so a later PLAIN
@@ -458,6 +463,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 let obj_var = obj_var.trim_start_matches('$');
                                 ctx.set_prop_taint(obj_var, &prop_name, rhs_taint);
                             }
+                        } else {
+                            // `$o->a->b = $tainted` taints `$o->a` as a whole.
+                            taint_array_write_base(&pa.object, ctx, self.db, &self.file, rhs_taint);
                         }
                     }
                     // List/array destructuring (`[$a, $b] = $arr;`,

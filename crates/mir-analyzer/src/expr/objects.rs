@@ -463,7 +463,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             &n.args,
                             ctor_taint_sink_params,
                             |db, file| {
-                                crate::db::method_taint_summary(db, file, ctor_owner, "__construct")
+                                crate::db::method_param_sinks(db, file, ctor_owner, "__construct")
                             },
                             call_span,
                         );

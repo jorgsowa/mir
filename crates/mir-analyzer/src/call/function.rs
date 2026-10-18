@@ -808,7 +808,7 @@ impl CallAnalyzer {
                 &params,
                 &call.args,
                 &taint_sink_params,
-                |db, file| crate::db::function_taint_summary(db, file, &resolved.fqn),
+                |db, file| crate::db::function_param_sinks(db, file, &resolved.fqn),
                 span,
             );
 

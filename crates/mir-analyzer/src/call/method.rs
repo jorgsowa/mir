@@ -1597,7 +1597,7 @@ fn resolve_method_return<'a>(
             &call.args,
             &resolved.taint_sink_params,
             |db, file| {
-                crate::db::method_taint_summary(db, file, &resolved.owner_fqcn, &method_name_lower)
+                crate::db::method_param_sinks(db, file, &resolved.owner_fqcn, &method_name_lower)
             },
             span,
         );

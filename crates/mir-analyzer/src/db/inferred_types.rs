@@ -232,3 +232,27 @@ pub fn method_taint_summary(
     })
     .map(|(_, _, summary)| summary.clone())
 }
+
+/// [`function_taint_summary`] for reporting arguments at a call; `None` unless
+/// the body may pass a parameter to a sink.
+pub fn function_param_sinks(
+    db: &dyn MirDatabase,
+    file: &str,
+    fqn: &str,
+) -> Option<crate::taint::TaintSummary> {
+    super::taint_sources::function_may_reach_sink(db, file, fqn)
+        .then(|| function_taint_summary(db, file, fqn))
+        .flatten()
+}
+
+/// [`method_taint_summary`] for reporting arguments at a call.
+pub fn method_param_sinks(
+    db: &dyn MirDatabase,
+    file: &str,
+    owner_fqcn: &str,
+    method_name_lower: &str,
+) -> Option<crate::taint::TaintSummary> {
+    super::taint_sources::method_may_reach_sink(db, file, owner_fqcn, method_name_lower)
+        .then(|| method_taint_summary(db, file, owner_fqcn, method_name_lower))
+        .flatten()
+}
