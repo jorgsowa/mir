@@ -90,7 +90,8 @@ foreach (require $here . '/packages.php' as $package) {
     if (count($issues) > 0) {
         echo '  ' . count($issues) . " NEW issue(s) not in baseline:\n";
         foreach ($issues as $issue) {
-            $kind = array_key_first($issue['kind']);
+            // A kind without fields serializes as a bare string.
+            $kind = is_array($issue['kind']) ? array_key_first($issue['kind']) : $issue['kind'];
             $file = $issue['location']['file'];
             $snippet = $issue['snippet'] ?? '';
             $suffix = $snippet !== '' ? " ($snippet)" : '';
