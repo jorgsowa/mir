@@ -376,6 +376,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // `expr_taint` only needs the iterable expression + current
         // taint state, same timing as an assignment's RHS taint check.
         let iterable_taint = crate::taint::expr_taint(&fe.expr, ctx, self.db, &self.file);
+        let iterable_parts = crate::taint::param_parts(&fe.expr, ctx, self.db, &self.file);
         let iterable_trail = (!iterable_taint.concrete().is_empty()).then(|| {
             crate::taint::taint_trail(
                 &fe.expr,
@@ -429,6 +430,12 @@ impl<'a> StatementsAnalyzer<'a> {
             let pre = &self.source[..start.min(self.source.len())];
             pre.chars().rev().find(|c| !c.is_whitespace()) == Some('&')
         };
+        // Writes through a by-reference value change the iterated array too.
+        let value_parts = if value_is_by_ref {
+            crate::taint::Taint::NONE
+        } else {
+            iterable_parts
+        };
         if value_is_by_ref {
             // `foreach ($this->items as &$v)` mutates that property's
             // contents in place, exactly as much as a by-ref call argument
@@ -441,7 +448,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(ref vname) = value_var {
             let intentionally_unused = is_intentionally_unused_foreach_value(vname, &fe.body);
             entry.set_var(vname.as_str(), value_ty.clone());
-            entry.taint_var(vname.as_str(), iterable_taint);
+            entry.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
             if let Some(trail) = &iterable_trail {
                 entry.taint_trails.insert(
                     Name::from(vname.as_str()),
@@ -503,6 +510,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 &fe.value,
                 &mut entry,
                 iterable_taint,
+                value_parts,
             );
         }
 
@@ -519,7 +527,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
                 if let Some(ref vname) = value_var {
                     iter.set_var(vname.as_str(), value_ty.clone());
-                    iter.taint_var(vname.as_str(), iterable_taint);
+                    iter.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
                 } else {
                     sa.expr_analyzer(iter).assign_to_target(
                         &fe.value,
@@ -531,6 +539,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         &fe.value,
                         iter,
                         iterable_taint,
+                        value_parts,
                     );
                 }
                 sa.analyze_stmt(&fe.body, iter);

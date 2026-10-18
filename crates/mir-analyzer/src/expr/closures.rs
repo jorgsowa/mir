@@ -724,10 +724,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .iter()
                     .map(|p| (Name::from(p.name.as_ref()), p.is_variadic))
                     .collect(),
-                summary: crate::taint::finish_summary(
-                    &mut sa.taint_summary,
-                    closure_ctx.is_generator,
-                ),
+                summary: crate::taint::finish_summary(&mut sa.taint_summary, &closure_ctx),
                 captures: taint_captures,
             },
         );

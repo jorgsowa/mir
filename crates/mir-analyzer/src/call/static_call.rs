@@ -920,6 +920,7 @@ impl CallAnalyzer {
                 ctx,
                 &resolved.params,
                 &call.args,
+                &arg_types,
                 None,
                 &resolved.taint_sink_params,
                 |db, file| {

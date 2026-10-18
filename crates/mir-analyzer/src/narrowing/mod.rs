@@ -132,6 +132,9 @@ pub fn narrow_from_condition(
             ctx.set_var_taint(var, taint);
         }
     }
+    if let Some(var) = crate::taint::proven_object(expr, is_true) {
+        crate::taint::guard_object(ctx, var);
+    }
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {

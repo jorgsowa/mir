@@ -21,7 +21,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 /// `ArrayAccess` element (`[$obj->prop] = $tainted;`) is conservatively
 /// skipped, matching how the plain-assignment case only taints a bare
 /// variable or property, never an arbitrary nested write target.
-pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState, taint: Taint) {
+pub(crate) fn taint_destructured_targets(
+    target: &Expr,
+    ctx: &mut FlowState,
+    taint: Taint,
+    parts: Taint,
+) {
     let ExprKind::Array(elements) = &target.kind else {
         return;
     };
@@ -30,8 +35,8 @@ pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState, tai
     }
     for elem in elements.iter() {
         match &elem.value.kind {
-            ExprKind::Variable(name) => ctx.taint_var(name.as_ref(), taint),
-            ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx, taint),
+            ExprKind::Variable(name) => ctx.taint_var_with_parts(name.as_ref(), taint, parts),
+            ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx, taint, parts),
             _ => {}
         }
     }
@@ -408,6 +413,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let rhs_taint = crate::taint::expr_taint(&a.value, ctx, self.db, &self.file);
+        let rhs_parts = if a.by_ref {
+            Taint::NONE
+        } else {
+            crate::taint::param_parts(&a.value, ctx, self.db, &self.file)
+        };
         // Snapshot which variables were already in consumed_write_locs before
         // analyzing the RHS. When the LHS target variable is consumed DURING RHS
         // analysis (e.g. `$x = f($x)`) the new write to `$x` must be re-armed so it
@@ -548,6 +558,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Some(keys) if !a.by_ref => ctx.set_key_taints(name.as_ref(), keys),
                             _ => ctx.set_var_taint(name.as_ref(), rhs_taint),
                         }
+                        ctx.set_param_parts(name.as_ref(), rhs_parts);
                         let mut value = a.value.as_ref();
                         while let ExprKind::Parenthesized(inner) = &value.kind {
                             value = inner;
@@ -599,7 +610,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // shape with no taint propagation at all, unlike plain
                     // variable/property assignment just above.
                     ExprKind::Array(_) => {
-                        taint_destructured_targets(&a.target, ctx, rhs_taint);
+                        taint_destructured_targets(&a.target, ctx, rhs_taint, rhs_parts);
                     }
                     // `$arr['k'] = $tainted;` — taint the whole array (same
                     // coarse, whole-container granularity the Array-literal

@@ -202,6 +202,7 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.mode);
+        crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts);
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
@@ -254,7 +255,7 @@ impl<'a> BodyAnalyzer<'a> {
             build_generator_return_type(&sa.yielded_types, inferred)
         };
         let body_diverges = ctx.diverges;
-        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
+        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, &ctx);
         drop(sa);
 
         if self.mode == AnalysisMode::Full {
@@ -980,6 +981,7 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.mode);
+        crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts);
         record_param_symbols(
             Some(all_symbols),
             file,
@@ -1017,7 +1019,7 @@ impl<'a> BodyAnalyzer<'a> {
         } else {
             build_generator_return_type(&sa.yielded_types, inferred)
         };
-        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
+        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, &ctx);
         drop(sa);
 
         let scope_name = fqn.clone().unwrap_or_else(|| Arc::from(fn_name));

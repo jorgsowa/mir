@@ -1596,6 +1596,7 @@ fn resolve_method_return<'a>(
             ctx,
             &resolved.params,
             &call.args,
+            arg_types,
             Some(&call.object),
             &resolved.taint_sink_params,
             |db, file| {

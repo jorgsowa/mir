@@ -173,7 +173,10 @@ impl<'a> StatementsAnalyzer<'a> {
         let stmt_span = stmt.span;
         if let Some(expr) = opt_expr {
             let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
-            self.taint_summary.returns |= crate::taint::expr_taint(expr, ctx, self.db, &self.file);
+            self.taint_summary.record_return(
+                crate::taint::expr_taint(expr, ctx, self.db, &self.file),
+                crate::taint::param_parts(expr, ctx, self.db, &self.file),
+            );
 
             // If there's a bare `@var Type` (no variable name) on the return statement,
             // use the annotated type for the return-type compatibility check.

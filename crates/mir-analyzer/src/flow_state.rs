@@ -126,6 +126,15 @@ impl Guard {
     }
 }
 
+/// Label slots of one body's summary for parameters proven objects.
+#[derive(Debug, Default)]
+pub struct ObjectGuardSlots {
+    /// Slots no label uses yet.
+    pub free: Vec<usize>,
+    /// `(param, slot)`, in the order the body proved them objects.
+    pub assigned: Vec<(usize, usize)>,
+}
+
 /// Pending write locations of one variable. Almost always exactly one, so
 /// it is kept inline: cloning a [`FlowState`] for each branch then does not
 /// allocate once per pending variable.
@@ -239,6 +248,14 @@ pub struct FlowState {
     /// Whether this body is being analyzed for its taint summary, so
     /// arguments carrying only parameter labels still need callee summaries.
     pub summarizing_taint: bool,
+
+    /// Label slots each variable carries as (part of) that argument's own
+    /// value rather than something computed from it; see `taint::param_parts`.
+    pub param_parts: FxHashMap<Name, Taint>,
+
+    /// Label slots standing for parameters the body proves objects, shared by
+    /// every branch of the body; see `taint::seed_object_guards`.
+    pub object_guard_slots: Option<Arc<std::sync::Mutex<ObjectGuardSlots>>>,
 
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
@@ -654,6 +671,8 @@ impl FlowState {
             closures: Arc::default(),
             taint_trails: FxHashMap::default(),
             summarizing_taint: false,
+            param_parts: FxHashMap::default(),
+            object_guard_slots: None,
             tainted_props: FxHashMap::default(),
             tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),
@@ -1238,11 +1257,89 @@ impl FlowState {
             keys.rest |= taint;
         }
         add_taint(&mut self.tainted_vars, sym, taint);
+        self.drop_param_parts(sym, taint);
+    }
+
+    /// [`Self::taint_var`], where `parts` of `taint`'s label slots arrive as
+    /// (part of) an argument itself.
+    pub fn taint_var_with_parts(&mut self, name: &str, taint: Taint, parts: Taint) {
+        let computed = self
+            .var_taint(name)
+            .label_slots()
+            .difference(self.param_parts(name));
+        self.taint_var(name, taint);
+        let parts = parts.intersection(taint.label_slots()).difference(computed);
+        self.set_param_parts(name, self.param_parts(name) | parts);
+    }
+
+    /// The label slot standing for parameter `param` once proven an object,
+    /// claimed the first time; `None` when no slot is left.
+    pub fn object_guard_slot(&self, param: usize) -> Option<usize> {
+        let mut slots = self.object_guard_slots.as_ref()?.lock().ok()?;
+        if let Some((_, slot)) = slots.assigned.iter().find(|(p, _)| *p == param) {
+            return Some(*slot);
+        }
+        if slots.free.is_empty() {
+            return None;
+        }
+        let slot = slots.free.remove(0);
+        slots.assigned.push((param, slot));
+        Some(slot)
+    }
+
+    /// `(param, slot)` for every object guard slot claimed so far.
+    pub fn object_guards(&self) -> Vec<(usize, usize)> {
+        self.object_guard_slots
+            .as_ref()
+            .and_then(|slots| slots.lock().ok().map(|slots| slots.assigned.clone()))
+            .unwrap_or_default()
+    }
+
+    /// Label slots the variable carries as (part of) an argument itself.
+    pub fn param_parts(&self, name: &str) -> Taint {
+        self.param_parts
+            .get(&Name::from(name.trim_start_matches('$')))
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Record which of the variable's label slots hold (part of) an argument itself.
+    pub fn set_param_parts(&mut self, name: &str, parts: Taint) {
+        let parts = parts.intersection(self.var_taint(name).label_slots());
+        set_taint(
+            &mut self.param_parts,
+            Name::from(name.trim_start_matches('$')),
+            parts,
+        );
+    }
+
+    fn drop_param_parts(&mut self, sym: Name, taint: Taint) {
+        if let Some(parts) = self.param_parts.get_mut(&sym) {
+            *parts = parts.difference(taint.label_slots());
+            if parts.is_empty() {
+                self.param_parts.remove(&sym);
+            }
+        }
+    }
+
+    /// Rewrite the variable's taint and that of each of its keys, keeping what
+    /// else is known about it.
+    pub fn map_var_taint(&mut self, name: &str, mut f: impl FnMut(Taint) -> Taint) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        if let Some(keys) = self.tainted_keys.get_mut(&sym) {
+            keys.rest = f(keys.rest);
+            for (_, taint) in &mut keys.keys {
+                *taint = f(*taint);
+            }
+        }
+        let taint = f(self.var_taint(name));
+        set_taint(&mut self.tainted_vars, sym, taint);
     }
 
     /// Replace the variable's taint; `Taint::NONE` clears it.
     pub fn set_var_taint(&mut self, name: &str, taint: Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
+        self.param_parts.remove(&sym);
         self.tainted_keys.remove(&sym);
         self.taint_trails.remove(&sym);
         if self.closures.by_var.contains_key(&sym) {
@@ -1268,6 +1365,7 @@ impl FlowState {
     /// Replace an array variable's taint with known per-key taint.
     pub fn set_key_taints(&mut self, name: &str, keys: KeyTaint) {
         let sym = Name::from(name.trim_start_matches('$'));
+        self.param_parts.remove(&sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
         if keys.whole().is_empty() {
             self.tainted_keys.remove(&sym);
@@ -1297,6 +1395,7 @@ impl FlowState {
             rest: whole,
             keys: Vec::new(),
         });
+        let added = taint;
         let taint = if replace {
             taint
         } else {
@@ -1305,6 +1404,7 @@ impl FlowState {
         keys.set(key, taint);
         let whole = keys.whole();
         set_taint(&mut self.tainted_vars, sym, whole);
+        self.drop_param_parts(sym, added);
     }
 
     /// Taint of `$name[key]`.
@@ -1886,6 +1986,7 @@ impl FlowState {
         {
             add_taint(&mut result.tainted_vars, *name, *taint);
         }
+        result.param_parts = merge_param_parts(&if_ctx, &else_ctx);
         for (key, taint) in if_ctx
             .tainted_props
             .iter()
@@ -2121,6 +2222,21 @@ impl KeyTaint {
         }
         merged
     }
+}
+
+/// A label slot stays (part of) an argument where no branch carries it otherwise.
+fn merge_param_parts(a: &FlowState, b: &FlowState) -> FxHashMap<Name, Taint> {
+    let computed = |ctx: &FlowState, name: &Name| {
+        ctx.var_taint(name.as_str())
+            .label_slots()
+            .difference(ctx.param_parts(name.as_str()))
+    };
+    let mut merged = FxHashMap::default();
+    for (name, parts) in a.param_parts.iter().chain(b.param_parts.iter()) {
+        let parts = parts.difference(computed(a, name) | computed(b, name));
+        add_taint(&mut merged, *name, parts);
+    }
+    merged
 }
 
 /// Per-key taint after two branches meet: kept where both sides know it, or

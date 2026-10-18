@@ -494,6 +494,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             ctx,
                             ctor_params,
                             &n.args,
+                            &arg_types,
                             None,
                             ctor_taint_sink_params,
                             |db, file| {

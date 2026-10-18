@@ -805,6 +805,7 @@ impl CallAnalyzer {
                 ctx,
                 &params,
                 &call.args,
+                &arg_types,
                 None,
                 &taint_sink_params,
                 |db, file| crate::db::function_param_sinks(db, file, &resolved.fqn),

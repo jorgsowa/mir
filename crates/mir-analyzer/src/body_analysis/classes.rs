@@ -1256,8 +1256,10 @@ impl<'a> BodyAnalyzer<'a> {
         let prop_labels = if method.is_static {
             Vec::new()
         } else {
-            crate::taint::seed_prop_labels(&mut ctx, params.len(), &body.stmts)
+            let named = crate::taint::named_params(&params).len();
+            crate::taint::seed_prop_labels(&mut ctx, named, &body.stmts)
         };
+        crate::taint::seed_object_guards(&mut ctx, &params, &prop_labels, &body.stmts);
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
@@ -1411,8 +1413,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
-        let mut taint_summary =
-            crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
+        let mut taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, &ctx);
         taint_summary.prop_labels = prop_labels;
         drop(sa);
 
