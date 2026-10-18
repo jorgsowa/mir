@@ -1,6 +1,6 @@
 ===description===
 @taint-sink with a kind string that isn't one of the recognized ones
-(llm_prompt/html/sql/shell) falls back to the generic TaintedInput issue,
+(html, sql, shell, ldap, ...) falls back to the generic TaintedInput issue,
 naming the kind, instead of silently doing nothing.
 ===config===
 <mir>
@@ -11,9 +11,9 @@ naming the kind, instead of silently doing nothing.
 </mir>
 ===file===
 <?php
-/** @taint-sink ldap $filter */
-function runLdapSearch(string $filter): void {
+/** @taint-sink graphql $filter */
+function runGraphqlQuery(string $filter): void {
 }
 
-runLdapSearch((string) $_GET["q"]);
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
+runGraphqlQuery((string) $_GET["q"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'graphql'

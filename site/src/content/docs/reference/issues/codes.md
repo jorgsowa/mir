@@ -148,6 +148,10 @@ issues keep their code.
 | MIR0804  | TaintedLlmPrompt              | [security/tainted-llm-prompt](../security/tainted-llm-prompt/) |
 | MIR0805  | TaintedHeader                 | [security/tainted-header](../security/tainted-header/) |
 | MIR0806  | TaintedCookie                 | [security/tainted-cookie](../security/tainted-cookie/) |
+| MIR0807  | TaintedSsrf                   | [security/tainted-ssrf](../security/tainted-ssrf/) |
+| MIR0808  | TaintedLdap                   | [security/tainted-ldap](../security/tainted-ldap/) |
+| MIR0809  | TaintedXpath                  | [security/tainted-xpath](../security/tainted-xpath/) |
+| MIR0810  | TaintedCallable               | [security/tainted-callable](../security/tainted-callable/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

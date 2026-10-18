@@ -695,6 +695,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             ExprKind::StaticDynMethodCall(smc) => {
+                crate::taint::check_callable_target(self, &smc.method, ctx, expr.span);
+                if !matches!(smc.class.kind, ExprKind::Identifier(_)) {
+                    crate::taint::check_callable_target(self, &smc.class, ctx, expr.span);
+                }
                 crate::call::CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx)
             }
 

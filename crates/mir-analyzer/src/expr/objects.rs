@@ -278,6 +278,38 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// `new $class` with a tainted class name, and constructors whose first
+    /// argument is a sink (`new SplFileObject($path)`).
+    fn check_new_taint(&mut self, n: &NewExpr, span: php_ast::Span, ctx: &FlowState) {
+        use crate::taint::SinkKind;
+        let (value, kind) = match &n.class.kind {
+            ExprKind::Identifier(name) => {
+                let fqcn = crate::db::resolve_name(self.db, &self.file, name.as_ref());
+                let Some(kind) = crate::taint::classify_constructor_sink(self.db, &fqcn) else {
+                    return;
+                };
+                let Some(value) = n.args.first().and_then(|a| a.value.as_ref()) else {
+                    return;
+                };
+                (value, kind)
+            }
+            ExprKind::AnonymousClass(_) => return,
+            _ => (n.class.as_ref(), SinkKind::Callable),
+        };
+        let issue = kind.issue();
+        if crate::taint::reaches_sink(
+            value,
+            kind.taint(),
+            &issue,
+            ctx,
+            self.db,
+            &self.file,
+            self.taint_summary,
+        ) {
+            self.emit(issue, Severity::Error, span);
+        }
+    }
+
     pub(super) fn analyze_new(
         &mut self,
         n: &NewExpr,
@@ -305,6 +337,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 arg_types.push(ty);
             }
         }
+        self.check_new_taint(n, call_span, ctx);
         let mut arg_spans: Vec<php_ast::Span> = n.args.iter().map(|a| a.span).collect();
         let mut arg_names: Vec<Option<String>> = n
             .args

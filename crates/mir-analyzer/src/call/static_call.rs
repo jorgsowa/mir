@@ -284,9 +284,15 @@ impl CallAnalyzer {
         ctx: &mut FlowState,
         span: Span,
     ) -> Type {
+        if !matches!(call.class.kind, ExprKind::Identifier(_)) {
+            crate::taint::check_callable_target(ea, &call.class, ctx, span);
+        }
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),
-            _ => return analyze_args_unresolved(ea, call, ctx),
+            _ => {
+                crate::taint::check_callable_target(ea, &call.method, ctx, span);
+                return analyze_args_unresolved(ea, call, ctx);
+            }
         };
 
         let mut receiver_type_params: Vec<Type> = Vec::new();

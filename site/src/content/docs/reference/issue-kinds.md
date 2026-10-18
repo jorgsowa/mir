@@ -141,6 +141,10 @@ All issue types mir can emit, grouped by category.
 | `TaintedLlmPrompt` | Tainted input reaches a `@taint-sink llm_prompt` parameter without sanitization. |
 | `TaintedHeader` | User-controlled input reaches `header()` without validation. |
 | `TaintedCookie` | User-controlled input reaches `setcookie()` / `setrawcookie()` without validation. |
+| `TaintedSsrf` | User-controlled input picks the URL or host the server connects to. |
+| `TaintedLdap` | User-controlled input reaches an LDAP search filter or base DN. |
+| `TaintedXpath` | User-controlled input reaches an XPath expression. |
+| `TaintedCallable` | User-controlled input chooses which function, method or class runs. |
 
 ## Generics
 

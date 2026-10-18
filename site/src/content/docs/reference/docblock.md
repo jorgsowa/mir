@@ -36,7 +36,7 @@ Each tag also accepts the `@psalm-` prefix.
 | Annotation | Effect |
 |-----------|--------|
 | `@taint-source` | The return value is user-controlled input |
-| `@taint-sink <kind> $param` | Tainted data passed to `$param` is reported (`html`, `sql`, `shell`, `header`, `cookie`, `file`, `unserialize`, `eval`, `llm_prompt`, ...) |
+| `@taint-sink <kind> $param` | Tainted data passed to `$param` is reported (`html`, `sql`, `shell`, `header`, `cookie`, `file`, `ssrf`, `ldap`, `xpath`, `callable`, `unserialize`, `eval`, `llm_prompt`, ...) |
 | `@taint-escape <kind>` | The return value is safe for sinks of `<kind>` |
 | `@taint-unescape <kind>` | The return value is dangerous again for `<kind>` sinks when its input was tainted |
 | `@psalm-flow ($a, $b) -> return` | The listed parameters' taint flows into the return value of a method without a body |

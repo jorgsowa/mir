@@ -21,9 +21,9 @@ use crate::flow_state::FlowState;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct Taint(u128);
 
-const KIND_BITS: u32 = 12;
+const KIND_BITS: u32 = 14;
 const KIND_MASK: u128 = (1 << KIND_BITS) - 1;
-pub const MAX_TRACKED_PARAMS: usize = 9;
+pub const MAX_TRACKED_PARAMS: usize = 8;
 
 /// `kinds` copied into the source slot and every parameter slot.
 const fn replicate(kinds: u128) -> u128 {
@@ -52,6 +52,8 @@ impl Taint {
     pub const XPATH: Taint = Taint(1 << 10);
     /// Any `@taint-sink` kind without a dedicated bit.
     pub const OTHER: Taint = Taint(1 << 11);
+    pub const SSRF: Taint = Taint(1 << 12);
+    pub const CALLABLE: Taint = Taint(1 << 13);
     pub const ALL: Taint = Taint(KIND_MASK);
 
     pub const fn is_empty(self) -> bool {
@@ -406,6 +408,27 @@ fn user_call_taint(
     taint.without(escaped).restore(unescaped)
 }
 
+/// Report a call target or class name chosen by user input (`$_GET['f']()`).
+pub fn check_callable_target(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    target: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let issue = mir_issues::IssueKind::TaintedCallable;
+    if reaches_sink(
+        target,
+        Taint::CALLABLE,
+        &issue,
+        ctx,
+        ea.db,
+        &ea.file,
+        ea.taint_summary,
+    ) {
+        ea.emit(issue, mir_issues::Severity::Error, span);
+    }
+}
+
 /// Report arguments reaching a sink inside the callee: its `@taint-sink`
 /// parameters and the sinks its inferred summary records.
 #[allow(clippy::too_many_arguments)]
@@ -528,10 +551,14 @@ pub enum SinkKind {
     Html,        // echo / print → XSS
     Sql,         // DB query functions → SQL injection
     Shell,       // system / exec / shell_exec → command injection
-    File,        // filesystem path args → path traversal / LFI / SSRF
+    File,        // filesystem path args → path traversal / local file inclusion
     Unserialize, // unserialize → PHP object injection
     Header,      // header → response splitting / open redirect
     Cookie,      // setcookie / setrawcookie → cookie injection
+    Ssrf,        // connection targets → server-side request forgery
+    Ldap,        // LDAP filters and DNs → LDAP injection
+    Xpath,       // XPath expressions → XPath injection
+    Callable,    // callbacks and dynamic calls → arbitrary code paths
 }
 
 impl SinkKind {
@@ -549,6 +576,10 @@ impl SinkKind {
             SinkKind::Unserialize => IssueKind::TaintedInput {
                 sink: "unserialize".to_string(),
             },
+            SinkKind::Ssrf => IssueKind::TaintedSsrf,
+            SinkKind::Ldap => IssueKind::TaintedLdap,
+            SinkKind::Xpath => IssueKind::TaintedXpath,
+            SinkKind::Callable => IssueKind::TaintedCallable,
         }
     }
 
@@ -561,96 +592,58 @@ impl SinkKind {
             SinkKind::Unserialize => Taint::UNSERIALIZE,
             SinkKind::Header => Taint::HEADER,
             SinkKind::Cookie => Taint::COOKIE,
-        }
-    }
-
-    /// The argument indices whose taint should be reported for this sink.
-    ///
-    /// `None` means "any argument" — used for output/query/command sinks where
-    /// the dangerous payload may be in any position (e.g. `mysqli_query($db,
-    /// $sql)` carries the query in arg 1). The path/payload sinks below name
-    /// the single relevant argument so that, e.g., writing tainted *data* to a
-    /// constant path is not flagged — only a tainted *path* is.
-    pub fn tainted_arg_indices(self) -> Option<&'static [usize]> {
-        match self {
-            SinkKind::Html
-            | SinkKind::Sql
-            | SinkKind::Shell
-            | SinkKind::Header
-            | SinkKind::Cookie => None,
-            // Path is the first argument for every File sink listed below.
-            SinkKind::File => Some(&[0]),
-            // unserialize($data) — the payload is the first argument.
-            SinkKind::Unserialize => Some(&[0]),
+            SinkKind::Ssrf => Taint::SSRF,
+            SinkKind::Ldap => Taint::LDAP,
+            SinkKind::Xpath => Taint::XPATH,
+            SinkKind::Callable => Taint::CALLABLE,
         }
     }
 }
 
-/// The declared parameter NAME at a File/Unserialize sink's single relevant
-/// index (see `SinkKind::tainted_arg_indices`) — lets the caller resolve a
-/// PHP 8 named argument to the same slot a positional call would use, so
-/// `file_put_contents(data: 'safe', filename: $_GET['path'])` still flags
-/// the actually-tainted `filename` even though it's not in position 0.
-/// `None` for Html/Sql/Shell, which check "any argument" and don't need
-/// per-parameter name resolution.
-pub fn sink_param_name(fn_name_lower: &str) -> Option<&'static str> {
-    match fn_name_lower {
-        "fopen"
-        | "file_get_contents"
-        | "file_put_contents"
-        | "readfile"
-        | "file"
-        | "unlink"
-        | "touch"
-        | "chmod"
-        | "chown"
-        | "parse_ini_file"
-        | "simplexml_load_file"
-        | "highlight_file"
-        | "show_source"
-        | "php_strip_whitespace"
-        | "getimagesize"
-        | "gzopen"
-        | "gzfile"
-        | "readgzfile" => Some("filename"),
-        "mkdir" | "rmdir" | "scandir" | "opendir" | "chdir" => Some("directory"),
-        "copy" | "rename" => Some("from"),
-        "symlink" | "link" => Some("target"),
-        "readlink" => Some("path"),
-        "glob" => Some("pattern"),
-        "fsockopen" => Some("hostname"),
-        "get_headers" | "curl_init" => Some("url"),
-        "stream_socket_client" => Some("address"),
-        "dl" => Some("extension_filename"),
-        "move_uploaded_file" => Some("to"),
-        "unserialize" => Some("data"),
-        _ => None,
+/// One dangerous parameter of a builtin sink. `index: None` means every argument.
+#[derive(Debug, Clone, Copy)]
+pub struct SinkParam {
+    pub index: Option<usize>,
+    pub name: &'static str,
+    pub kind: SinkKind,
+}
+
+const fn any(kind: SinkKind) -> SinkParam {
+    SinkParam {
+        index: None,
+        name: "",
+        kind,
     }
 }
 
-/// Positional-call override for a File sink whose dangerous argument isn't at
-/// `SinkKind::tainted_arg_indices`'s shared index 0 — `move_uploaded_file($from,
-/// $to)` writes to `$to` (index 1), unlike every other File sink listed there,
-/// whose sole argument (or first argument) IS the path. `None` means "use the
-/// shared index," which is every other File/Unserialize sink today.
-pub fn sink_positional_index_override(fn_name_lower: &str) -> Option<usize> {
-    match fn_name_lower {
-        "move_uploaded_file" => Some(1),
-        _ => None,
+const fn at(index: usize, name: &'static str, kind: SinkKind) -> SinkParam {
+    SinkParam {
+        index: Some(index),
+        name,
+        kind,
     }
 }
 
-/// Return the sink kind for a built-in function name, if it is a taint sink.
-pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
-    match crate::util::php_ident_lowercase(fn_name).as_str() {
-        // HTML output
-        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "vfprintf" => Some(SinkKind::Html),
+macro_rules! sinks {
+    ($($param:expr),* $(,)?) => {{
+        const PARAMS: &[SinkParam] = &[$($param),*];
+        PARAMS
+    }};
+}
 
-        // HTTP response header / cookie
-        "header" => Some(SinkKind::Header),
-        "setcookie" | "setrawcookie" => Some(SinkKind::Cookie),
+/// The parameters of builtin `fn_name` that are taint sinks.
+pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
+    use SinkKind::*;
+    match crate::util::php_ident_lowercase(fn_name.trim_start_matches('\\')).as_str() {
+        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "vfprintf" => sinks![any(Html)],
 
-        // SQL
+        "header" => sinks![at(0, "header", Header)],
+        "setcookie" | "setrawcookie" => sinks![any(Cookie)],
+        "mail" => sinks![
+            at(3, "additional_headers", Header),
+            at(4, "additional_params", Shell),
+        ],
+
         "mysql_query"
         | "mysqli_query"
         | "mysqli_real_query"
@@ -673,15 +666,14 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
         | "odbc_prepare"
         | "oci_parse"
         | "db2_exec"
-        | "db2_prepare" => Some(SinkKind::Sql),
+        | "db2_prepare" => sinks![any(Sql)],
 
-        // Shell
-        "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "pcntl_exec"
-        | "ssh2_exec" | "expect_popen" => Some(SinkKind::Shell),
+        "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "expect_popen" => {
+            sinks![at(0, "command", Shell)]
+        }
+        "pcntl_exec" => sinks![at(0, "path", Shell), at(1, "args", Shell)],
+        "ssh2_exec" => sinks![at(1, "command", Shell)],
 
-        // Filesystem path (path traversal / local-file-inclusion / SSRF). Each
-        // of these takes the path/URL as its first argument, except
-        // `move_uploaded_file` (see `sink_positional_index_override`).
         "fopen"
         | "file_get_contents"
         | "file_put_contents"
@@ -699,30 +691,98 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
         | "getimagesize"
         | "gzopen"
         | "gzfile"
-        | "readgzfile"
-        | "mkdir"
-        | "rmdir"
-        | "scandir"
-        | "opendir"
-        | "chdir"
-        | "copy"
-        | "rename"
-        | "symlink"
-        | "link"
-        | "readlink"
-        | "glob"
-        | "fsockopen"
-        | "get_headers"
-        | "curl_init"
-        | "stream_socket_client"
-        | "dl"
-        | "move_uploaded_file" => Some(SinkKind::File),
+        | "readgzfile" => sinks![at(0, "filename", File)],
+        "mkdir" | "rmdir" | "scandir" | "opendir" | "chdir" => sinks![at(0, "directory", File)],
+        "copy" | "rename" => sinks![at(0, "from", File), at(1, "to", File)],
+        "symlink" | "link" => sinks![at(0, "target", File), at(1, "link", File)],
+        "readlink" => sinks![at(0, "path", File)],
+        "glob" => sinks![at(0, "pattern", File)],
+        "dl" => sinks![at(0, "extension_filename", File)],
+        "move_uploaded_file" => sinks![at(1, "to", File)],
 
-        // Object injection.
-        "unserialize" => Some(SinkKind::Unserialize),
+        "fsockopen" | "pfsockopen" => sinks![at(0, "hostname", Ssrf)],
+        "get_headers" | "curl_init" => sinks![at(0, "url", Ssrf)],
+        "stream_socket_client" => sinks![at(0, "address", Ssrf)],
 
-        _ => None,
+        "ldap_search" | "ldap_list" | "ldap_read" => {
+            sinks![at(1, "base", Ldap), at(2, "filter", Ldap)]
+        }
+        "ldap_delete" | "ldap_compare" => sinks![at(1, "dn", Ldap)],
+
+        "unserialize" => sinks![at(0, "data", Unserialize)],
+
+        "call_user_func"
+        | "call_user_func_array"
+        | "forward_static_call"
+        | "forward_static_call_array"
+        | "register_shutdown_function"
+        | "register_tick_function"
+        | "spl_autoload_register"
+        | "set_error_handler"
+        | "set_exception_handler"
+        | "array_map"
+        | "ob_start" => sinks![at(0, "callback", Callable)],
+        "usort"
+        | "uasort"
+        | "uksort"
+        | "array_filter"
+        | "array_walk"
+        | "array_walk_recursive"
+        | "array_reduce"
+        | "iterator_apply"
+        | "preg_replace_callback" => {
+            sinks![at(1, "callback", Callable)]
+        }
+
+        _ => sinks![],
     }
+}
+
+/// The first sink kind of builtin `fn_name`, if it is a sink.
+pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
+    builtin_sinks(fn_name).first().map(|p| p.kind)
+}
+
+/// Values reaching sinks that depend on another argument: `curl_setopt($ch,
+/// CURLOPT_URL, $url)`, `curl_setopt_array($ch, [CURLOPT_URL => $url])`.
+pub fn option_sink_values<'e>(
+    fn_name_lower: &str,
+    args: &'e [php_ast::owned::Arg],
+) -> Vec<(&'e Expr, SinkKind)> {
+    let is_target_option = |e: &Expr| {
+        matches!(&e.kind, ExprKind::Identifier(name)
+            if matches!(name.trim_start_matches('\\'), "CURLOPT_URL" | "CURLOPT_PROXY"))
+    };
+    match fn_name_lower.trim_start_matches('\\') {
+        "curl_setopt" => match (args.get(1).and_then(|a| a.value.as_ref()), args.get(2)) {
+            (Some(option), Some(value)) if is_target_option(option) => {
+                value.value.iter().map(|v| (v, SinkKind::Ssrf)).collect()
+            }
+            _ => Vec::new(),
+        },
+        "curl_setopt_array" => match args.get(1).and_then(|a| a.value.as_ref()).map(|v| &v.kind) {
+            Some(ExprKind::Array(elements)) => elements
+                .iter()
+                .filter(|el| el.key.as_ref().is_some_and(is_target_option))
+                .map(|el| (&el.value, SinkKind::Ssrf))
+                .collect(),
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
+}
+
+/// `unserialize($data, ['allowed_classes' => false])` can't instantiate objects.
+pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg]) -> bool {
+    let Some(ExprKind::Array(options)) =
+        args.get(1).and_then(|a| a.value.as_ref()).map(|v| &v.kind)
+    else {
+        return false;
+    };
+    options.iter().any(|el| {
+        matches!(el.key.as_ref().map(|k| &k.kind), Some(ExprKind::String(k)) if &**k == "allowed_classes")
+            && matches!(&el.value.kind, ExprKind::Bool(false))
+    })
 }
 
 const SYMFONY_REQUEST: &str = "Symfony\\Component\\HttpFoundation\\Request";
@@ -894,7 +954,27 @@ pub fn classify_method_sink(
     if is_a("SQLite3") && matches!(method.as_str(), "query" | "exec" | "prepare") {
         return Some(SinkKind::Sql);
     }
+    if is_a("DOMXPath") && matches!(method.as_str(), "query" | "evaluate") {
+        return Some(SinkKind::Xpath);
+    }
+    if is_a("SimpleXMLElement") && method == "xpath" {
+        return Some(SinkKind::Xpath);
+    }
     None
+}
+
+/// Constructors whose first argument is a sink: `new SplFileObject($path)`.
+pub fn classify_constructor_sink(db: &dyn crate::db::MirDatabase, fqcn: &str) -> Option<SinkKind> {
+    let is_a = |base: &str| {
+        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+    };
+    if ["SplFileObject", "DirectoryIterator", "GlobIterator"]
+        .iter()
+        .any(|base| is_a(base))
+    {
+        return Some(SinkKind::File);
+    }
+    is_a("SoapClient").then_some(SinkKind::Ssrf)
 }
 
 /// Map a `@taint-sink <kind> $param` docblock tag's free-text kind to the
@@ -906,6 +986,10 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
     match kind {
         "llm_prompt" => mir_issues::IssueKind::TaintedLlmPrompt,
         "html" => mir_issues::IssueKind::TaintedHtml,
+        "ssrf" => mir_issues::IssueKind::TaintedSsrf,
+        "ldap" => mir_issues::IssueKind::TaintedLdap,
+        "xpath" => mir_issues::IssueKind::TaintedXpath,
+        "callable" => mir_issues::IssueKind::TaintedCallable,
         "header" => mir_issues::IssueKind::TaintedHeader,
         "cookie" => mir_issues::IssueKind::TaintedCookie,
         "sql" => mir_issues::IssueKind::TaintedSql,
@@ -927,7 +1011,9 @@ pub fn taint_sink_kind(kind: &str) -> Taint {
         "shell" => Taint::SHELL,
         "file" | "include" => Taint::FILE,
         "unserialize" => Taint::UNSERIALIZE,
-        "eval" | "callable" => Taint::EVAL,
+        "eval" => Taint::EVAL,
+        "callable" => Taint::CALLABLE,
+        "ssrf" => Taint::SSRF,
         "ldap" => Taint::LDAP,
         "xpath" => Taint::XPATH,
         _ => Taint::OTHER,

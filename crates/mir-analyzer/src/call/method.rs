@@ -516,6 +516,7 @@ impl CallAnalyzer {
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),
             _ => {
+                crate::taint::check_callable_target(ea, &call.method, ctx, span);
                 ea.analyze(&call.method, ctx);
                 ea.record_dynamic_member_access(&obj_ty, call.method.span);
                 // Analyze arguments so variables used in them are marked as consumed.

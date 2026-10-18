@@ -18,7 +18,7 @@ function runLdapSearchFn(string ...$parts): void {
 }
 
 runLdapSearchFn("a", "b", (string) $_GET["q"]);
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedLdap: Tainted LDAP query — possible LDAP injection
 
 class Searcher {
     /** @taint-sink ldap $parts */
@@ -27,4 +27,4 @@ class Searcher {
 }
 
 (new Searcher())->runLdapSearchMethod("a", "b", (string) $_GET["q"]);
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedLdap: Tainted LDAP query — possible LDAP injection

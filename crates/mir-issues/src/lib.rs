@@ -577,6 +577,18 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/tainted_cookie/`.
     TaintedCookie,
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_ssrf/`.
+    TaintedSsrf,
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_ldap/`.
+    TaintedLdap,
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_xpath/`.
+    TaintedXpath,
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_callable/`.
+    TaintedCallable,
 
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
@@ -896,6 +908,10 @@ impl IssueKind {
             | IssueKind::TaintedLlmPrompt
             | IssueKind::TaintedHeader
             | IssueKind::TaintedCookie
+            | IssueKind::TaintedSsrf
+            | IssueKind::TaintedLdap
+            | IssueKind::TaintedXpath
+            | IssueKind::TaintedCallable
             | IssueKind::CircularInheritance { .. }
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
@@ -1213,6 +1229,10 @@ impl IssueKind {
             IssueKind::TaintedLlmPrompt => "MIR0804",
             IssueKind::TaintedHeader => "MIR0805",
             IssueKind::TaintedCookie => "MIR0806",
+            IssueKind::TaintedSsrf => "MIR0807",
+            IssueKind::TaintedLdap => "MIR0808",
+            IssueKind::TaintedXpath => "MIR0809",
+            IssueKind::TaintedCallable => "MIR0810",
 
             // Generics (0900-0999)
             IssueKind::InvalidTemplateParam { .. } => "MIR0900",
@@ -1297,10 +1317,9 @@ impl IssueKind {
             | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711"
             | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228"
             | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805"
-            | "MIR0806" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500"
-            | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
-                Some(Severity::Error)
-            }
+            | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205"
+            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
+            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1465,6 +1484,10 @@ impl IssueKind {
             IssueKind::TaintedLlmPrompt => "TaintedLlmPrompt",
             IssueKind::TaintedHeader => "TaintedHeader",
             IssueKind::TaintedCookie => "TaintedCookie",
+            IssueKind::TaintedSsrf => "TaintedSsrf",
+            IssueKind::TaintedLdap => "TaintedLdap",
+            IssueKind::TaintedXpath => "TaintedXpath",
+            IssueKind::TaintedCallable => "TaintedCallable",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
             IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
             IssueKind::DeprecatedConstant { .. } => "DeprecatedConstant",
@@ -2035,6 +2058,14 @@ impl IssueKind {
                 "Tainted HTTP header — possible header injection or open redirect".to_string()
             }
             IssueKind::TaintedCookie => "Tainted cookie — possible cookie injection".to_string(),
+            IssueKind::TaintedSsrf => {
+                "Tainted URL — possible server-side request forgery".to_string()
+            }
+            IssueKind::TaintedLdap => "Tainted LDAP query — possible LDAP injection".to_string(),
+            IssueKind::TaintedXpath => "Tainted XPath query — possible XPath injection".to_string(),
+            IssueKind::TaintedCallable => {
+                "Tainted callable — user input chooses the code that runs".to_string()
+            }
 
             IssueKind::DeprecatedCall { name, message } => {
                 let base = format!("Call to deprecated function {name}");
@@ -2756,6 +2787,10 @@ mod code_tests {
             IssueKind::TaintedLlmPrompt,
             IssueKind::TaintedHeader,
             IssueKind::TaintedCookie,
+            IssueKind::TaintedSsrf,
+            IssueKind::TaintedLdap,
+            IssueKind::TaintedXpath,
+            IssueKind::TaintedCallable,
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -2931,6 +2966,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 164);
+        assert_eq!(one_of_each().len(), 168);
     }
 }
