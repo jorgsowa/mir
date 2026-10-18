@@ -22,7 +22,7 @@ use mir_codebase::definitions::{
     StubSlice, TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
-use mir_types::{Atomic, Location, Name, Type};
+use mir_types::{union::atomic_subtype, Atomic, Location, Name, Type};
 
 mod annotation;
 mod class;
@@ -231,6 +231,38 @@ pub(crate) fn preserve_native_nullability(native: &Type, mut doc: Type) -> Type 
         doc.add_type(Atomic::TNull);
     }
     doc
+}
+
+/// The stub docblock type when it refines the `#[LanguageLevelTypeAware]` type, else the attribute's.
+pub(crate) fn refine_version_attr_type(
+    attr: Type,
+    doc: Option<Type>,
+    template_params: &[TemplateParam],
+) -> Type {
+    let Some(doc) = doc else { return attr };
+    if doc.is_empty() || doc.types.iter().any(|a| matches!(a, Atomic::TMixed)) {
+        return attr;
+    }
+    let bounds: FxHashMap<Name, Type> = template_params
+        .iter()
+        .map(|tp| {
+            let bound = tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed);
+            (tp.name, bound)
+        })
+        .collect();
+    let erased = doc.substitute_templates(&bounds);
+    // A docblock missing one of the attribute's atoms predates that version's widening.
+    let covers_attr = attr
+        .types
+        .iter()
+        .all(|a| matches!(a, Atomic::TNull) || erased.types.iter().any(|d| atomic_subtype(d, a)));
+    // A docblock that only restates the attribute type stays native, like a hint.
+    let restates_attr = erased == doc && attr.is_subtype_structural(&doc);
+    if covers_attr && !restates_attr && erased.is_subtype_structural(&attr) {
+        preserve_native_nullability(&attr, doc)
+    } else {
+        attr
+    }
 }
 
 /// In a bundled stub, a by-ref param with a default or without a native type,
@@ -2323,61 +2355,65 @@ impl<'a> DefinitionCollector<'a> {
             let doc_type_raw = doc
                 .get_param_type_string(param_name)
                 .map(|s| Arc::<str>::from(s.trim()));
-            let ty = self
-                // phpstorm-stubs `#[LanguageLevelTypeAware]` type override wins.
+            let doc_ty = doc.get_param_type(param_name).cloned().map(|u| {
+                // Expand type aliases first (no FQN change), then run
+                // template-aware resolution — same order as @return
+                // below, so a bare name matching a class/method
+                // template param (e.g. `TRelatedModel`) becomes a
+                // TTemplateParam, and any other bare class name (e.g.
+                // a same-namespace sibling class) is FQN-qualified
+                // instead of left relative. Real global builtins like
+                // `Closure` are exempted in `resolve_type_name`.
+                let expanded =
+                    effective_aliases.map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
+                let doc_ty = self.resolve_union_doc_with_templates(
+                    expanded,
+                    &template_names,
+                    class_fqcn,
+                    template_params_for_resolve,
+                );
+                // When the native hint is a concrete scalar and the docblock has only
+                // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
+                // the PHP type hint is the runtime truth — prefer it over the docblock.
+                if native_ty
+                    .as_ref()
+                    .is_some_and(|n| native_hint_wins_over_docblock_scalar(n, &doc_ty))
+                {
+                    return native_ty.clone().unwrap();
+                }
+                // Partial conflict (e.g. `@param int|string` on a native `int`
+                // hint): strip the atoms foreign to the hint's family instead
+                // of storing the raw union.
+                let mut doc_ty = match native_ty.as_ref() {
+                    Some(n) => {
+                        preserve_native_nullability(n, resolve_docblock_scalar_conflict(n, doc_ty))
+                    }
+                    None => doc_ty,
+                };
+                // Mark the type as docblock-sourced so signature checks (e.g.
+                // param contravariance) can tell a `@param` refinement apart
+                // from a native type hint.
+                doc_ty = per_argument_variadic_doc_type(
+                    p.variadic,
+                    native_ty.as_ref(),
+                    doc_type_raw.as_deref(),
+                    doc_ty,
+                );
+                doc_ty.from_docblock = true;
+                Self::fill_self_static_parent(doc_ty, class_fqcn)
+            });
+            // phpstorm-stubs `#[LanguageLevelTypeAware]` type override wins unless the docblock refines it.
+            let ty = match self
                 .version_attr_type_string(&p.attributes)
                 .map(|s| crate::parser::docblock::parse_type_string(&s))
-                .or_else(|| {
-                    doc.get_param_type(param_name).cloned().map(|u| {
-                        // Expand type aliases first (no FQN change), then run
-                        // template-aware resolution — same order as @return
-                        // below, so a bare name matching a class/method
-                        // template param (e.g. `TRelatedModel`) becomes a
-                        // TTemplateParam, and any other bare class name (e.g.
-                        // a same-namespace sibling class) is FQN-qualified
-                        // instead of left relative. Real global builtins like
-                        // `Closure` are exempted in `resolve_type_name`.
-                        let expanded = effective_aliases
-                            .map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
-                        let doc_ty = self.resolve_union_doc_with_templates(
-                            expanded,
-                            &template_names,
-                            class_fqcn,
-                            template_params_for_resolve,
-                        );
-                        // When the native hint is a concrete scalar and the docblock has only
-                        // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
-                        // the PHP type hint is the runtime truth — prefer it over the docblock.
-                        if native_ty
-                            .as_ref()
-                            .is_some_and(|n| native_hint_wins_over_docblock_scalar(n, &doc_ty))
-                        {
-                            return native_ty.clone().unwrap();
-                        }
-                        // Partial conflict (e.g. `@param int|string` on a native `int`
-                        // hint): strip the atoms foreign to the hint's family instead
-                        // of storing the raw union.
-                        let mut doc_ty = match native_ty.as_ref() {
-                            Some(n) => preserve_native_nullability(
-                                n,
-                                resolve_docblock_scalar_conflict(n, doc_ty),
-                            ),
-                            None => doc_ty,
-                        };
-                        // Mark the type as docblock-sourced so signature checks (e.g.
-                        // param contravariance) can tell a `@param` refinement apart
-                        // from a native type hint.
-                        doc_ty = per_argument_variadic_doc_type(
-                            p.variadic,
-                            native_ty.as_ref(),
-                            doc_type_raw.as_deref(),
-                            doc_ty,
-                        );
-                        doc_ty.from_docblock = true;
-                        Self::fill_self_static_parent(doc_ty, class_fqcn)
-                    })
-                })
-                .or(native_ty);
+            {
+                Some(attr_ty) => Some(refine_version_attr_type(
+                    attr_ty,
+                    doc_ty,
+                    template_params_for_resolve,
+                )),
+                None => doc_ty.or(native_ty),
+            };
             if let Some(ty_ref) = &ty {
                 if is_simple_scalar(ty_ref) {
                     local_scalar += 1;

@@ -535,8 +535,15 @@ fn compute_template_residual(
     let mut class_string_consumed = false;
     let mut container_consumed = false;
     for a in &arg_ty.types {
+        // A plain `string` may name a class, so it fills the class-string alternative, not `T`.
         let consumed_by_class_string = has_template_class_string
-            && matches!(a, Atomic::TClassString(_) | Atomic::TInterfaceString(_))
+            && matches!(
+                a,
+                Atomic::TClassString(_)
+                    | Atomic::TInterfaceString(_)
+                    | Atomic::TString
+                    | Atomic::TNonEmptyString
+            )
             || matches!(a, Atomic::TLiteralString(s) if has_template_class_string && literal_is_class_like(s));
         if consumed_by_class_string {
             class_string_consumed = true;
@@ -579,7 +586,7 @@ fn compute_template_residual(
 
 /// Whether a string literal is shaped like a class reference: backslash-
 /// separated identifier segments, with at least one backslash or an
-/// uppercase first letter. Filters out Mockery's `'alias:Foo'` /
+/// uppercase letter (`stdClass`). Filters out Mockery's `'alias:Foo'` /
 /// `'overload:Foo'` prefixes and plain lowercase words.
 fn literal_is_class_like(s: &str) -> bool {
     let t = s.trim_start_matches('\\');
@@ -593,7 +600,7 @@ fn literal_is_class_like(s: &str) -> bool {
                 .all(|c| c.is_ascii_alphanumeric() || c == '_' || !c.is_ascii())
             && !seg.chars().next().is_some_and(|c| c.is_ascii_digit())
     });
-    shape_ok && (s.contains('\\') || t.chars().next().is_some_and(|c| c.is_ascii_uppercase()))
+    shape_ok && (s.contains('\\') || t.chars().any(|c| c.is_ascii_uppercase()))
 }
 
 fn is_template_atomic(a: &Atomic, template_names: &FxHashSet<Name>) -> bool {

@@ -135,8 +135,9 @@ pub(crate) struct InferredTypes {
 }
 
 /// Nearest ancestor `@param` docblock type for parameter `index` that refines
-/// `own`'s native-only hint. Skipped for generic ancestors (unbound templates)
-/// and for types naming unresolvable classes (e.g. unexpanded `@psalm-type` aliases).
+/// `own`'s native-only hint. Skipped for generic ancestors (unbound templates),
+/// for types naming unresolvable classes (e.g. unexpanded `@psalm-type` aliases),
+/// and for constructors, whose signature is unrelated to the parent's.
 fn ancestor_param_refinement(
     db: &dyn MirDatabase,
     fqcn: &str,
@@ -144,6 +145,9 @@ fn ancestor_param_refinement(
     index: usize,
     own: &mir_codebase::definitions::DeclaredParam,
 ) -> Option<Arc<Type>> {
+    if method_name_lower == "__construct" {
+        return None;
+    }
     let own_ty = own
         .ty
         .as_deref()

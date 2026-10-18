@@ -1038,25 +1038,20 @@ fn static_arg_fits_param(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) 
 }
 
 /// Binds each of `tps` to the corresponding entry in `args` by position,
-/// falling back to the template's own declared `@template T = Default`,
-/// then its bound, then `mixed` for any param `args` doesn't supply (e.g. a
-/// bare, unparameterized `Generator` return with no `@return Generator<...>`
-/// annotation, or an intermediate class in an inheritance chain that
-/// bare-re-extends its parent without redeclaring its own `<T>` args). This
-/// is the same fallback `infer_template_bindings` uses, so a bare ancestor
-/// placeholder doesn't leak through unresolved and then read as a concrete
-/// mismatch against the expected type.
+/// falling back to the template's own declared `@template T = Default`, then
+/// `mixed` for any param `args` doesn't supply (e.g. a bare, unparameterized
+/// `Generator` return with no `@return Generator<...>` annotation), so a bare
+/// ancestor placeholder doesn't leak through unresolved and then read as a
+/// concrete mismatch against the expected type. Not the bound: a raw instance
+/// says nothing about its type args.
 fn template_bindings_with_fallback(tps: &[TemplateParam], args: &[Type]) -> FxHashMap<Name, Type> {
     tps.iter()
         .enumerate()
         .map(|(i, tp)| {
-            let ty = args.get(i).cloned().unwrap_or_else(|| {
-                tp.default
-                    .as_deref()
-                    .or(tp.bound.as_deref())
-                    .cloned()
-                    .unwrap_or_else(Type::mixed)
-            });
+            let ty = args
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| tp.default.as_deref().cloned().unwrap_or_else(Type::mixed));
             (Name::from(tp.name.as_ref()), ty)
         })
         .collect()
@@ -1654,7 +1649,8 @@ fn validate_callable_argument(
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
         // Check for "ClassName::methodName" format
         if let Some((class_name, method_name)) = s.split_once("::") {
-            let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
+            // A runtime class-name string is always fully qualified.
+            let resolved_class = class_name.trim_start_matches('\\').to_string();
             if !crate::db::class_exists(ea.db, &resolved_class) {
                 ea.emit(
                     IssueKind::UndefinedClass {
@@ -1748,7 +1744,7 @@ fn validate_class_string_argument(
         if !is_possible_class_name(s) {
             continue;
         }
-        let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
+        let resolved = s.trim_start_matches('\\').to_string();
         if !crate::db::class_exists(ea.db, &resolved) {
             ea.emit(
                 IssueKind::UndefinedClass { name: resolved },
@@ -1798,7 +1794,7 @@ fn validate_interface_string_argument(
         if !is_possible_class_name(s) {
             continue;
         }
-        let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
+        let resolved = s.trim_start_matches('\\').to_string();
         if !crate::db::class_exists(ea.db, &resolved) {
             ea.emit(
                 IssueKind::UndefinedClass { name: resolved },
@@ -1817,6 +1813,9 @@ fn validate_interface_string_argument(
 
 fn is_possible_class_name(s: &str) -> bool {
     !s.is_empty()
+        && s.trim_start_matches('\\')
+            .split('\\')
+            .all(|seg| seg.chars().next().is_some_and(|c| !c.is_ascii_digit()))
         && s.chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '\\' || !c.is_ascii())
 }

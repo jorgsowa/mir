@@ -26,9 +26,12 @@ pub(crate) fn check_one(
         return;
     }
 
+    let template_exempt =
+        super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
+            && !stub_template_bounds_exclude_null(ea, param_ty);
     if !param_ty.is_nullable()
         && !param_ty.is_mixed()
-        && !super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
+        && !template_exempt
         && arg_ty.is_single()
         && arg_ty.contains(|t| matches!(t, Atomic::TNull))
     {
@@ -42,7 +45,7 @@ pub(crate) fn check_one(
         );
     } else if !param_ty.is_nullable()
         && !param_ty.is_mixed()
-        && !super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
+        && !template_exempt
         && arg_ty.is_nullable()
     {
         ea.emit(
@@ -54,4 +57,35 @@ pub(crate) fn check_one(
             arg_span,
         );
     }
+}
+
+/// A stub class template bounded by a non-null type, whose violations `new` doesn't report.
+fn stub_template_bounds_exclude_null(ea: &ExpressionAnalyzer<'_>, param_ty: &Type) -> bool {
+    let mut any_template = false;
+    for a in &param_ty.types {
+        let Atomic::TTemplateParam {
+            name,
+            as_type,
+            defining_entity,
+        } = a
+        else {
+            continue;
+        };
+        if as_type.is_mixed() || as_type.is_nullable() {
+            return false;
+        }
+        let is_class_template = crate::db::class_template_params(ea.db, defining_entity.as_ref())
+            .is_some_and(|tps| tps.iter().any(|tp| tp.name == *name));
+        let declared_in_stub = is_class_template
+            && crate::db::class_like_decl_file(
+                ea.db,
+                crate::db::Fqcn::from_str(ea.db, defining_entity.as_ref()),
+            )
+            .is_some_and(|f| crate::stubs::StubVfs::new().is_stub_file(f.as_ref()));
+        if !declared_in_stub {
+            return false;
+        }
+        any_template = true;
+    }
+    any_template
 }

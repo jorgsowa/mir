@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `new ArrayIterator([...])`, `new ArrayObject(...)` and other generic stub classes bind their templates from constructor arguments like user classes do. A stub `@param` that refines its `#[LanguageLevelTypeAware]` type (`array<TKey, TValue>|object` for `object|array`) is kept; a stale or merely restating one still yields to the attribute. This removes false `InvalidArgument` such as `expects 'Traversable<string, object>', got 'Traversable<int|string, mixed>'`.
+- A raw generic instance (`ArrayIterator`, `class Inner extends ArrayIterator {}`) passed to a parameterized ancestor no longer has its unknown type arguments filled with the template bounds, which rejected string-keyed expectations.
+- A plain `string` passed to a `class-string<T>|T` parameter (`new ReflectionClass($class)`) no longer binds `T` to `string`, and a class-name literal such as `'stdClass'` binds `T` to that class. A stub class leaves a template that violates its bound unbound, while a non-null bound still reports a possibly-null argument.
+- A constructor no longer inherits its parent constructor's `@param` types by position, which turned a child's `Throwable|string` parameter into the parent's `string` and reported `InvalidMethodCall`/`RedundantCondition` in its body.
+- Class names in strings (`class-string`, `interface-string` and `'Class::method'` arguments) are resolved as fully qualified, without the current namespace or `use` imports, and `'0'` is no longer looked up as a class.
 - The pipe operator (`$x |> f(...)`) is analyzed as the call `f($x)`: its result has the callable's return type instead of the callable's own type (`Closure`, or the function-name string), removing false `InvalidArgument`/`InvalidOperand` on its result. Argument checks, template inference, arity, undefined-callable reports, references and taint now apply to it as to the equivalent call.
 
 ## [0.88.0] - 2026-10-17

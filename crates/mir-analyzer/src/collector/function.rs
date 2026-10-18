@@ -245,53 +245,58 @@ impl DefinitionCollector<'_> {
             let doc_type_raw = doc
                 .get_param_type_string(param_name)
                 .map(|s| Arc::<str>::from(s.trim()));
-            let ty = self
-                // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
-                // type override wins over the (usually absent) hint/docblock type.
+            let doc_ty = doc.get_param_type(param_name).cloned().map(|u| {
+                let expanded = expand_aliases_only(u, &type_aliases);
+                let doc_ty = self.resolve_union_doc_with_templates(
+                    expanded,
+                    &template_names,
+                    &fqn,
+                    &template_params,
+                );
+                // When the native hint is a concrete scalar and the docblock has only
+                // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
+                // the PHP type hint is the runtime truth — prefer it over the docblock.
+                if native_ty
+                    .as_ref()
+                    .is_some_and(|n| super::native_hint_wins_over_docblock_scalar(n, &doc_ty))
+                {
+                    return native_ty.clone().unwrap();
+                }
+                // Partial conflict (e.g. `@param int|string` on a native `int`
+                // hint): strip the atoms foreign to the hint's family instead
+                // of storing the raw union, which would let body analysis
+                // believe $x could hold a value the native hint rules out.
+                let mut doc_ty = match native_ty.as_ref() {
+                    Some(n) => super::preserve_native_nullability(
+                        n,
+                        super::resolve_docblock_scalar_conflict(n, doc_ty),
+                    ),
+                    None => doc_ty,
+                };
+                // Mark the type as docblock-sourced so signature checks (e.g.
+                // param contravariance) can tell a `@param` refinement apart
+                // from a native type hint.
+                doc_ty = super::per_argument_variadic_doc_type(
+                    p.variadic,
+                    native_ty.as_ref(),
+                    doc_type_raw.as_deref(),
+                    doc_ty,
+                );
+                doc_ty.from_docblock = true;
+                doc_ty
+            });
+            // phpstorm-stubs `#[LanguageLevelTypeAware]` type override wins unless the docblock refines it.
+            let ty = match self
                 .version_attr_type_string(&p.attributes)
                 .map(|s| crate::parser::docblock::parse_type_string(&s))
-                .or_else(|| {
-                    doc.get_param_type(param_name).cloned().map(|u| {
-                        let expanded = expand_aliases_only(u, &type_aliases);
-                        let doc_ty = self.resolve_union_doc_with_templates(
-                            expanded,
-                            &template_names,
-                            &fqn,
-                            &template_params,
-                        );
-                        // When the native hint is a concrete scalar and the docblock has only
-                        // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
-                        // the PHP type hint is the runtime truth — prefer it over the docblock.
-                        if native_ty.as_ref().is_some_and(|n| {
-                            super::native_hint_wins_over_docblock_scalar(n, &doc_ty)
-                        }) {
-                            return native_ty.clone().unwrap();
-                        }
-                        // Partial conflict (e.g. `@param int|string` on a native `int`
-                        // hint): strip the atoms foreign to the hint's family instead
-                        // of storing the raw union, which would let body analysis
-                        // believe $x could hold a value the native hint rules out.
-                        let mut doc_ty = match native_ty.as_ref() {
-                            Some(n) => super::preserve_native_nullability(
-                                n,
-                                super::resolve_docblock_scalar_conflict(n, doc_ty),
-                            ),
-                            None => doc_ty,
-                        };
-                        // Mark the type as docblock-sourced so signature checks (e.g.
-                        // param contravariance) can tell a `@param` refinement apart
-                        // from a native type hint.
-                        doc_ty = super::per_argument_variadic_doc_type(
-                            p.variadic,
-                            native_ty.as_ref(),
-                            doc_type_raw.as_deref(),
-                            doc_ty,
-                        );
-                        doc_ty.from_docblock = true;
-                        doc_ty
-                    })
-                })
-                .or(native_ty);
+            {
+                Some(attr_ty) => Some(super::refine_version_attr_type(
+                    attr_ty,
+                    doc_ty,
+                    &template_params,
+                )),
+                None => doc_ty.or(native_ty),
+            };
             if let Some(ty_ref) = &ty {
                 if super::is_simple_scalar(ty_ref) {
                     local_scalar += 1;

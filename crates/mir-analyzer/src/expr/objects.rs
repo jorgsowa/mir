@@ -231,19 +231,25 @@ impl<'a> ExpressionAnalyzer<'a> {
         let is_stub_class = !violations.is_empty()
             && crate::db::class_like_decl_file(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
                 .is_some_and(|f| crate::stubs::StubVfs::new().is_stub_file(f.as_ref()));
-        for (name, inferred, bound) in violations {
-            if is_stub_class {
-                continue;
+        if is_stub_class {
+            // Left unbound, or every later call on the receiver reports the same violation.
+            let violated: Vec<mir_types::Name> =
+                violations.into_iter().map(|(name, ..)| *name).collect();
+            for name in violated {
+                bindings.remove(&name);
             }
-            self.emit(
-                IssueKind::InvalidTemplateParam {
-                    name: name.to_string(),
-                    expected_bound: format!("{bound}"),
-                    actual: format!("{inferred}"),
-                },
-                Severity::Error,
-                call_span,
-            );
+        } else {
+            for (name, inferred, bound) in violations {
+                self.emit(
+                    IssueKind::InvalidTemplateParam {
+                        name: name.to_string(),
+                        expected_bound: format!("{bound}"),
+                        actual: format!("{inferred}"),
+                    },
+                    Severity::Error,
+                    call_span,
+                );
+            }
         }
 
         // Emit the inferred bindings in the class's declared template-param order
