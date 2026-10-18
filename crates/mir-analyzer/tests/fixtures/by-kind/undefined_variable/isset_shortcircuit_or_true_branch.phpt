@@ -1,8 +1,8 @@
 ===description===
-isset short-circuit with || — no narrowing in true branch for unset variable
+isset short-circuit with || — in the true branch $x is set only when the left disjunct held
 ===file===
 <?php
 if (isset($x) || isset($y)) {
     echo $x;
-//       ^^ UndefinedVariable: Variable $x is not defined
+//       ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }

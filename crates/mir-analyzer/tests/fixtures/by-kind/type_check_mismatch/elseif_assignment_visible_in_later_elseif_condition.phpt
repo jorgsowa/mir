@@ -30,6 +30,7 @@ function f(): void {
     } elseif ($b = tryB()) {
         use1($b);
     } elseif ($a || $b) {
+//            ^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         // Reaching here means both prior conditions were falsy — $a and $b
         // were still both assigned (to null) by their own condition.
         use1((string) ($a ?? $b));

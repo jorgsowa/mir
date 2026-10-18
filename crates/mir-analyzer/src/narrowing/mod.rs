@@ -77,13 +77,13 @@ use instanceof_core::{
     narrow_prop_is_subclass_of, narrow_static_prop_instanceof, narrow_static_prop_is_a,
     narrow_static_prop_is_subclass_of, narrow_strict_subclass_of, partition_is_a_string_like,
 };
+use instanceof_disjuncts::narrow_or_instanceof_true;
 pub(crate) use instanceof_disjuncts::{
     narrow_instanceof_disjuncts, narrow_mixed_disjuncts, narrow_mixed_prop_disjuncts,
     narrow_mixed_static_prop_disjuncts, narrow_prop_instanceof_disjuncts,
     narrow_prop_type_fn_disjuncts, narrow_static_prop_instanceof_disjuncts,
     narrow_static_prop_type_fn_disjuncts, narrow_type_fn_disjuncts,
 };
-use instanceof_disjuncts::{narrow_or_instanceof_true, narrow_or_isset_true};
 use literals::{
     atom_safe_for_loose_int_narrowing, bool_narrow_type, expr_is_nonempty_string_literal,
     extract_int_bound, extract_int_literal, flip_comparison_op, is_truthy_bool_literal,
@@ -169,7 +169,10 @@ pub fn narrow_from_condition(
             }
         }
 
-        // $a || $b  →  if false: narrow both; if true: try to narrow same-var instanceof union
+        // $a || $b  →  if false: narrow both.
+        // If true: same-subject instanceof/type-check disjuncts get a dedicated
+        // union narrowing; anything else is the disjoint union of ($a is true)
+        // and ($a is false AND $b is true), mirroring the false branch of `&&`.
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
             if !is_true {
                 narrow_from_condition(&b.left, ctx, false, db, file);
@@ -178,12 +181,21 @@ pub fn narrow_from_condition(
                 // Promote variables from possibly_assigned to assigned for side effects in each.
                 promote_assignment_effects(&b.left, ctx, db, file);
                 promote_assignment_effects(&b.right, ctx, db, file);
-            } else {
-                // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
-                narrow_or_instanceof_true(&b.left, &b.right, ctx, db, file);
+            } else if !narrow_or_instanceof_true(&b.left, &b.right, ctx, db, file) {
+                let pre = ctx.branch();
 
-                // For `!isset($x) || RHS` in true-branch: narrow RHS as if isset($x) is true
-                narrow_or_isset_true(&b.left, &b.right, ctx, db, file);
+                let mut a_true = ctx.branch();
+                narrow_from_condition(&b.left, &mut a_true, true, db, file);
+                promote_assignment_effects(&b.left, &mut a_true, db, file);
+
+                let mut a_false_b_true = ctx.branch();
+                narrow_from_condition(&b.left, &mut a_false_b_true, false, db, file);
+                narrow_from_condition(&b.right, &mut a_false_b_true, true, db, file);
+                promote_assignment_effects(&b.left, &mut a_false_b_true, db, file);
+                promote_assignment_effects(&b.right, &mut a_false_b_true, db, file);
+
+                *ctx = FlowState::merge_branches(&pre, a_true, Some(a_false_b_true));
+                keep_equivalent_pre_types(&pre, ctx, db);
             }
         }
 
@@ -2224,6 +2236,28 @@ pub fn narrow_from_condition(
                 narrow_static_prop_loose_bool(ctx, &fqcn, &prop, db, is_true);
             }
         }
+    }
+}
+
+/// Keeps a variable's pre-condition type where the merged branches widened back
+/// to an equivalent but differently spelled type (e.g. `A|Shape` for `Shape`).
+fn keep_equivalent_pre_types(pre: &FlowState, ctx: &mut FlowState, db: &dyn MirDatabase) {
+    let restored: Vec<_> = ctx
+        .vars
+        .iter()
+        .filter_map(|(name, ty)| {
+            let pre_ty = pre.vars.get(name)?;
+            // `is_subtype` accepts `mixed` against anything, which isn't equivalence.
+            (!std::sync::Arc::ptr_eq(ty, pre_ty)
+                && !pre_ty.is_mixed()
+                && !ty.is_mixed()
+                && crate::subtype::is_subtype(db, ty, pre_ty)
+                && crate::subtype::is_subtype(db, pre_ty, ty))
+            .then(|| (*name, std::sync::Arc::clone(pre_ty)))
+        })
+        .collect();
+    if !restored.is_empty() {
+        std::sync::Arc::make_mut(&mut ctx.vars).extend(restored);
     }
 }
 

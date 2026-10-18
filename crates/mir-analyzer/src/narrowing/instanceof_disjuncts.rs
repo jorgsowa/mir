@@ -3,7 +3,7 @@
 //! `is_subclass_of()` leaves across a condition list (or an OR-chain) that
 //! all target the same variable/property/static-property receiver, and
 //! narrows it to the union of every leaf's narrowing.
-use php_ast::ast::{BinaryOp, UnaryPrefixOp};
+use php_ast::ast::BinaryOp;
 use php_ast::owned::ExprKind;
 
 use mir_types::Type;
@@ -939,64 +939,21 @@ pub(crate) fn narrow_mixed_static_prop_disjuncts(
 /// Also handles the scalar-type-check counterpart (`is_int($x) || is_string($x)`)
 /// via [`narrow_type_fn_disjuncts`], and a mix of the two (`$x instanceof A ||
 /// is_string($x)`) via [`narrow_mixed_disjuncts`], when the pure-instanceof
-/// shape doesn't apply.
+/// shape doesn't apply. Returns whether any of these shapes matched.
 pub(super) fn narrow_or_instanceof_true(
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
-) {
-    if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_type_fn_disjuncts(&[left, right], ctx, db).is_none()
-        && narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_static_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_static_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_mixed_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_mixed_prop_disjuncts(&[left, right], ctx, db, file).is_none()
-    {
-        narrow_mixed_static_prop_disjuncts(&[left, right], ctx, db, file);
-    }
-}
-
-/// Apply short-circuit narrowing for isset() in || expressions (true branch).
-///
-/// Handles the PHP idiom: `!isset($x) || use($x)`
-///
-/// `!isset($x) || RHS` being true means either `$x` isn't set (RHS never
-/// runs) or `$x` is set AND RHS is true — the merged true-branch state is
-/// the union of those two paths, not "nothing narrowed" (a plain union
-/// with an unnarrowed path does NOT generally collapse back to the
-/// pre-condition state, e.g. `$x` itself is null on one path and
-/// non-null-and-`instanceof`-narrowed on the other, which merges to a
-/// strictly narrower type than the original).
-pub(super) fn narrow_or_isset_true(
-    left: &php_ast::owned::Expr,
-    right: &php_ast::owned::Expr,
-    ctx: &mut FlowState,
-    db: &dyn MirDatabase,
-    file: &str,
-) {
-    // Pattern: !isset($x) || RHS
-    if let ExprKind::UnaryPrefix(u) = &left.kind {
-        if u.op == UnaryPrefixOp::BooleanNot {
-            if let ExprKind::Isset(_) = &u.operand.kind {
-                let pre = ctx.branch();
-
-                // Path A: $x (or whichever operands) is/are not set; RHS never runs.
-                let mut not_set_branch = ctx.branch();
-                narrow_from_condition(left, &mut not_set_branch, true, db, file);
-
-                // Path B: $x is set, and RHS was true.
-                let mut set_branch = ctx.branch();
-                narrow_from_condition(left, &mut set_branch, false, db, file);
-                if !set_branch.diverges {
-                    narrow_from_condition(right, &mut set_branch, true, db, file);
-                }
-
-                *ctx = FlowState::merge_branches(&pre, set_branch, Some(not_set_branch));
-            }
-        }
-    }
+) -> bool {
+    narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_type_fn_disjuncts(&[left, right], ctx, db).is_some()
+        || narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_static_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_static_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_mixed_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_mixed_prop_disjuncts(&[left, right], ctx, db, file).is_some()
+        || narrow_mixed_static_prop_disjuncts(&[left, right], ctx, db, file).is_some()
 }
