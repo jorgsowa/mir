@@ -639,6 +639,8 @@ pub(crate) struct BodyAnalyzer<'a> {
     pub(crate) only_method: Option<Arc<str>>,
     /// Analyze top-level code for the taint its global variables end up with.
     pub(crate) collect_global_taint: bool,
+    /// Label parameters so the walk records the taint summaries callers' taint checks read.
+    pub(crate) summarize_taint: bool,
     inferred_types: Arc<Mutex<InferredTypes>>,
     reference_key_cache: Arc<Mutex<ReferenceKeyCache>>,
     navigation_facts: RefCell<Vec<NavigationFact>>,
@@ -660,6 +662,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_inferred_types: false,
             only_method: None,
             collect_global_taint: false,
+            summarize_taint: false,
             inferred_types: Arc::new(Mutex::new(InferredTypes::default())),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
             navigation_facts: RefCell::new(Vec::new()),
@@ -681,6 +684,7 @@ impl<'a> BodyAnalyzer<'a> {
             collect_inferred_types: true,
             only_method: None,
             collect_global_taint: false,
+            summarize_taint: false,
             inferred_types: Arc::new(Mutex::new(InferredTypes::default())),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
             navigation_facts: RefCell::new(Vec::new()),

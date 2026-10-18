@@ -262,7 +262,7 @@ mod tests {
         let _ = collect_file_definitions(&db, file);
         let scope = ScopeKey::ClassLike(Arc::from("Pair"), 0);
 
-        let inferred = infer_member(&db, file, scope, Some(Arc::from("second")));
+        let inferred = infer_member(&db, file, scope, Some(Arc::from("second")), false);
         let methods: Vec<(String, String)> = inferred
             .methods
             .iter()

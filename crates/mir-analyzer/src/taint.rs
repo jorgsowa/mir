@@ -559,13 +559,12 @@ pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSumma
 }
 
 /// Label each parameter so the body's summary can tell which arguments flow where.
-/// Only inference builds summaries; a full analysis reports source taint alone.
 pub fn seed_param_labels(
     ctx: &mut FlowState,
     params: &[mir_codebase::DeclaredParam],
-    mode: crate::body_analysis::AnalysisMode,
+    summarize: bool,
 ) {
-    if mode == crate::body_analysis::AnalysisMode::InferenceOnly {
+    if summarize {
         ctx.summarizing_taint = true;
         label_params(ctx, named_params(params).iter().map(|p| p.name.as_ref()));
     }

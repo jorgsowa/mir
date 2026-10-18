@@ -64,6 +64,7 @@ fn function_return_type_in(db: &dyn MirDatabase, sf: SourceFile, fqn: &str) -> O
         sf,
         |key| matches!(key, ScopeKey::Function(name, _) if name.as_ref() == fqn),
         None,
+        false,
     ) else {
         return crate::db::infer_file_return_types(db, sf)
             .functions
@@ -86,12 +87,15 @@ fn infer_scopes_matching(
     sf: SourceFile,
     matches: impl Fn(&ScopeKey) -> bool,
     method: Option<&str>,
+    summarize_taint: bool,
 ) -> Option<Vec<Arc<InferredTypes>>> {
     let method: Option<Arc<str>> = method.map(Arc::from);
     let inferred: Vec<Arc<InferredTypes>> = crate::db::file_scopes(db, sf)
         .iter()
         .filter(|key| matches(key))
-        .map(|key| crate::db::infer_member(db, sf, key.clone(), method.clone()).clone())
+        .map(|key| {
+            crate::db::infer_member(db, sf, key.clone(), method.clone(), summarize_taint).clone()
+        })
         .collect();
     (!inferred.is_empty()).then_some(inferred)
 }
@@ -114,6 +118,7 @@ pub fn inferred_method_return_type_demand(
         sf,
         |key| matches!(key, ScopeKey::ClassLike(name, _) if name.as_ref() == fqcn),
         Some(method_name_lower),
+        false,
     ) else {
         return crate::db::infer_file_return_types(db, sf)
             .methods
@@ -156,6 +161,7 @@ pub fn inferred_property_type_demand(
                 sf,
                 |key| matches!(key, ScopeKey::ClassLike(..)),
                 Some("__construct"),
+                false,
             )
         })
         .flatten();
@@ -201,6 +207,7 @@ pub fn function_taint_summary(
         sf,
         |key| matches!(key, ScopeKey::Function(name, _) if name.as_ref() == fqn),
         None,
+        true,
     )?
     .iter()
     .flat_map(|types| types.function_taint.iter())
@@ -224,6 +231,7 @@ pub fn method_taint_summary(
         sf,
         |key| matches!(key, ScopeKey::ClassLike(name, _) if name.as_ref() == owner_fqcn),
         Some(method_name_lower),
+        true,
     )?
     .iter()
     .flat_map(|types| types.method_taint.iter())
@@ -289,7 +297,7 @@ pub fn global_var_taint(db: &dyn MirDatabase, file: &str, var: &str) -> crate::t
             continue;
         }
         for (name, member_taint) in
-            &crate::db::infer_member(db, *member, ScopeKey::FileExec, None).global_taint
+            &crate::db::infer_member(db, *member, ScopeKey::FileExec, None, false).global_taint
         {
             if *name == var {
                 taint |= *member_taint;

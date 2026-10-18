@@ -1252,7 +1252,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
-        crate::taint::seed_param_labels(&mut ctx, &params, self.mode);
+        crate::taint::seed_param_labels(&mut ctx, &params, self.summarize_taint);
         let prop_labels = if method.is_static {
             Vec::new()
         } else {

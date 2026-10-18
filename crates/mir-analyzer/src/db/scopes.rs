@@ -242,13 +242,16 @@ fn infer_scope_body(
 /// `None` analyzes the whole scope. A caller needing one method's return
 /// type therefore analyzes that method alone, not every method of its class
 /// as [`infer_scope`] would, and the analysis records neither issues nor
-/// references. Cycles fixpoint-iterate and widen like [`infer_scope`].
+/// references. Only `summarize_taint` runs build taint summaries, which demand
+/// their callees' summaries in turn. Cycles fixpoint-iterate and widen like
+/// [`infer_scope`].
 #[salsa::tracked(cycle_fn = infer_member_cycle, cycle_initial = infer_member_initial)]
 pub(crate) fn infer_member(
     db: &dyn MirDatabase,
     file: SourceFile,
     scope: ScopeKey,
     method: Option<Arc<str>>,
+    summarize_taint: bool,
 ) -> Arc<InferredTypes> {
     crate::recursion::ensure_phase_stack(|| {
         let prepared = super::queries::prepare_analysis_file(db, file);
@@ -259,6 +262,7 @@ pub(crate) fn infer_member(
         driver.collect_symbols = false;
         driver.only_method = method;
         driver.collect_global_taint = matches!(scope, ScopeKey::FileExec);
+        driver.summarize_taint = summarize_taint;
 
         let mut issues: Vec<Issue> = Vec::new();
         db.push_ref_loc_frame();
@@ -276,10 +280,12 @@ fn infer_member_initial(
     _file: SourceFile,
     _scope: ScopeKey,
     _method: Option<Arc<str>>,
+    _summarize_taint: bool,
 ) -> Arc<InferredTypes> {
     Arc::new(InferredTypes::default())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn infer_member_cycle(
     _db: &dyn MirDatabase,
     cycle: &salsa::Cycle,
@@ -288,6 +294,7 @@ fn infer_member_cycle(
     _file: SourceFile,
     _scope: ScopeKey,
     _method: Option<Arc<str>>,
+    _summarize_taint: bool,
 ) -> Arc<InferredTypes> {
     if !super::inferred_types::should_widen(cycle) {
         return value;
