@@ -455,7 +455,8 @@ pub fn constructed_prop_taints(
     }) else {
         return Vec::new();
     };
-    if demanding_taint(args_taint(&new.args, ctx, db, file), ctx).is_empty()
+    // Like a receiver's, an object's properties only demand summaries for source data.
+    if args_taint(&new.args, ctx, db, file).concrete().is_empty()
         || !crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), "__construct")
     {
         return Vec::new();
@@ -466,7 +467,7 @@ pub fn constructed_prop_taints(
     };
     let arg_taint = |slot: usize| match summary.prop_label(slot) {
         Some(_) => Taint::NONE,
-        None => param_arg_taint(&ctor.params, &new.args, slot, ctx, db, file),
+        None => param_arg_taint(&ctor.params, &new.args, slot, ctx, db, file).concrete(),
     };
     summary
         .prop_writes
@@ -534,7 +535,8 @@ fn receiver_prop_taint(receiver: Option<&Expr>, prop: mir_types::Name, ctx: &Flo
     }
 }
 
-/// Whether the object `receiver` evaluates to holds data worth a callee summary.
+/// Whether the object `receiver` evaluates to holds source data worth a callee
+/// summary; `$this`'s property labels alone would demand one for every call on it.
 fn receiver_demands_summary(receiver: Option<&Expr>, ctx: &FlowState) -> bool {
     let Some(ExprKind::Variable(var)) = receiver.map(|r| &unwrap_parens(r).kind) else {
         return false;
@@ -542,7 +544,7 @@ fn receiver_demands_summary(receiver: Option<&Expr>, ctx: &FlowState) -> bool {
     let var = mir_types::Name::from(var.trim_start_matches('$'));
     ctx.tainted_props
         .iter()
-        .any(|((object, _), taint)| *object == var && !demanding_taint(*taint, ctx).is_empty())
+        .any(|((object, _), taint)| *object == var && !taint.concrete().is_empty())
 }
 
 /// The part of an argument's taint worth inferring a callee summary for:
@@ -565,6 +567,7 @@ fn user_call_taint(
     body: CalleeBody,
     receiver: Option<&Expr>,
     returns_param: impl FnOnce() -> bool,
+    returns_prop: impl FnOnce() -> bool,
     reads_source: impl FnOnce() -> bool,
     summary: impl FnOnce() -> Option<TaintSummary>,
     ctx: &FlowState,
@@ -575,11 +578,11 @@ fn user_call_taint(
         return Taint::NONE;
     }
     let arg_taint = |index| param_arg_taint(params, args, index, ctx, db, file);
-    // Inferring a summary only pays off when it can return source data or tainted arguments.
+    // Inferring a summary only pays off when it can return source data, tainted
+    // arguments or the receiver's tainted properties.
     let worth_summary = || {
-        (returns_param()
-            && (!demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty()
-                || receiver_demands_summary(receiver, ctx)))
+        (returns_param() && !demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty())
+            || (receiver_demands_summary(receiver, ctx) && returns_prop())
             || reads_source()
     };
     let mut taint = match body {
@@ -1598,6 +1601,7 @@ pub fn expr_taint(
                                 f.fqn.as_ref(),
                             )
                         },
+                        || false,
                         || {
                             crate::db::taint_sources::function_reads_source(
                                 db,
@@ -2320,6 +2324,7 @@ fn method_call_taint(
         body,
         receiver,
         || crate::db::taint_sources::method_returns_param(db, file, owner.as_ref(), method_lower),
+        || crate::db::taint_sources::method_returns_prop(db, file, owner.as_ref(), method_lower),
         || crate::db::taint_sources::method_reads_source(db, file, owner.as_ref(), method_lower),
         || crate::db::method_taint_summary(db, file, owner.as_ref(), method_lower),
         ctx,

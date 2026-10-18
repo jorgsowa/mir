@@ -27,17 +27,20 @@ struct ValueFacts {
     reads_source: bool,
     /// Derived from a parameter.
     reads_param: bool,
+    /// Derived from a property of `$this`, which is followed per object.
+    reads_prop: bool,
     callees: Vec<Callee>,
 }
 
 impl ValueFacts {
     fn is_empty(&self) -> bool {
-        !self.reads_source && !self.reads_param && self.callees.is_empty()
+        !self.reads_source && !self.reads_param && !self.reads_prop && self.callees.is_empty()
     }
 
     fn merge(&mut self, other: &ValueFacts) {
         self.reads_source |= other.reads_source;
         self.reads_param |= other.reads_param;
+        self.reads_prop |= other.reads_prop;
         for callee in &other.callees {
             self.push(callee.clone());
         }
@@ -58,6 +61,8 @@ struct DeclFacts {
     prop_writes: Vec<(Name, ValueFacts)>,
     /// Some `return` may carry a parameter's data.
     returns_param: bool,
+    /// Some `return` may carry a property of `$this`.
+    returns_prop: bool,
     /// The body has a sink, or a call this scan can't resolve.
     may_reach_sink: bool,
 }
@@ -67,6 +72,7 @@ impl DeclFacts {
         self.body.is_empty()
             && self.prop_writes.is_empty()
             && !self.returns_param
+            && !self.returns_prop
             && !self.may_reach_sink
     }
 }
@@ -519,11 +525,10 @@ impl OwnedVisitor for ValueScan<'_, '_> {
                 self.facts.merge(local);
             }
         }
-        // `$this`'s properties are followed per object, like parameters.
         if let ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) = &expr.kind {
             if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
             {
-                self.facts.reads_param = true;
+                self.facts.reads_prop = true;
             }
         }
         match self.scan.inspect(expr) {
@@ -547,7 +552,9 @@ impl OwnedVisitor for Scan<'_> {
                 self.record_assign(&f.value, value);
             }
             StmtKind::Return(Some(value)) => {
-                self.facts.returns_param |= self.value_facts(value).reads_param;
+                let value = self.value_facts(value);
+                self.facts.returns_param |= value.reads_param;
+                self.facts.returns_prop |= value.reads_prop;
             }
             StmtKind::Echo(_) => self.facts.may_reach_sink = true,
             _ => {}
@@ -916,18 +923,19 @@ fn method_decl(
         .then(|| (sf, (Name::new(owner), Some(Name::new(method_lower)))))
 }
 
-fn returns_param(db: &dyn MirDatabase, decl: Option<(SourceFile, DeclKey)>) -> bool {
-    decl.is_some_and(|(sf, key)| {
-        file_source_facts(db, sf)
-            .decls
-            .get(&key)
-            .is_some_and(|facts| facts.returns_param)
-    })
+fn decl_fact(
+    db: &dyn MirDatabase,
+    decl: Option<(SourceFile, DeclKey)>,
+    fact: impl Fn(&DeclFacts) -> bool,
+) -> bool {
+    decl.is_some_and(|(sf, key)| file_source_facts(db, sf).decls.get(&key).is_some_and(fact))
 }
 
 /// Whether some `return` of the user function `fqn` may carry a parameter's data.
 pub(crate) fn function_returns_param(db: &dyn MirDatabase, from: &str, fqn: &str) -> bool {
-    returns_param(db, function_decl(db, from, fqn))
+    decl_fact(db, function_decl(db, from, fqn), |facts| {
+        facts.returns_param
+    })
 }
 
 /// Whether some `return` of `owner::method_lower` may carry a parameter's data.
@@ -937,7 +945,21 @@ pub(crate) fn method_returns_param(
     owner: &str,
     method_lower: &str,
 ) -> bool {
-    returns_param(db, method_decl(db, from, owner, method_lower))
+    decl_fact(db, method_decl(db, from, owner, method_lower), |facts| {
+        facts.returns_param
+    })
+}
+
+/// Whether some `return` of `owner::method_lower` may carry a property of `$this`.
+pub(crate) fn method_returns_prop(
+    db: &dyn MirDatabase,
+    from: &str,
+    owner: &str,
+    method_lower: &str,
+) -> bool {
+    decl_fact(db, method_decl(db, from, owner, method_lower), |facts| {
+        facts.returns_prop
+    })
 }
 
 /// Whether `owner::method_lower` may store a parameter's data in a property.
@@ -947,11 +969,8 @@ pub(crate) fn method_stores_param(
     owner: &str,
     method_lower: &str,
 ) -> bool {
-    method_decl(db, from, owner, method_lower).is_some_and(|(sf, key)| {
-        file_source_facts(db, sf)
-            .decls
-            .get(&key)
-            .is_some_and(|facts| facts.prop_writes.iter().any(|(_, value)| value.reads_param))
+    decl_fact(db, method_decl(db, from, owner, method_lower), |facts| {
+        facts.prop_writes.iter().any(|(_, value)| value.reads_param)
     })
 }
 
