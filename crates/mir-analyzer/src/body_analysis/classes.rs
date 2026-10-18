@@ -1252,7 +1252,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
-        crate::taint::seed_param_labels(&mut ctx, &params);
+        crate::taint::seed_param_labels(&mut ctx, &params, self.mode);
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,

@@ -4,7 +4,7 @@ use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use crate::narrowing::{extract_any_prop_access, extract_expr_guard_key};
-use crate::taint::{classify_method_sink, reaches_sink, taint_sink_issue, taint_sink_kind};
+use crate::taint::{classify_method_sink, reaches_sink};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
 };
@@ -1590,56 +1590,15 @@ fn resolve_method_return<'a>(
             }
         }
 
-        // Taint sink check: emit the matching Tainted* issue when a tainted
-        // value reaches a @taint-sink annotated parameter.
-        if !resolved.taint_sink_params.is_empty() {
-            for (param_name, sink_kind) in &resolved.taint_sink_params {
-                // Find positional index of this param in the method's param list.
-                let param_idx = resolved
-                    .params
-                    .iter()
-                    .position(|p| p.name.as_ref() == param_name.as_ref());
-                // A variadic sink parameter (`...$args`) swallows every
-                // trailing positional argument from its index onward, not
-                // just the first — check them all.
-                let is_variadic = param_idx
-                    .and_then(|idx| resolved.params.get(idx))
-                    .is_some_and(|p| p.is_variadic);
-                let args: Vec<&php_ast::owned::Arg> = if is_variadic {
-                    let idx = param_idx.unwrap();
-                    call.args
-                        .iter()
-                        .filter(|a| a.name.is_none())
-                        .skip(idx)
-                        .collect()
-                } else {
-                    let positional = param_idx.and_then(|idx| call.args.get(idx));
-                    // Also check named args.
-                    let named_arg = call.args.iter().find(|a| {
-                        a.name
-                            .as_ref()
-                            .map(|n| crate::parser::name_to_string_owned(n) == param_name.as_ref())
-                            .unwrap_or(false)
-                    });
-                    positional.or(named_arg).into_iter().collect()
-                };
-                for arg in args {
-                    let Some(value) = &arg.value else { continue };
-                    let issue = taint_sink_issue(sink_kind);
-                    if reaches_sink(
-                        value,
-                        taint_sink_kind(sink_kind),
-                        &issue,
-                        ctx,
-                        ea.db,
-                        &ea.file,
-                        ea.taint_summary,
-                    ) {
-                        ea.emit(issue, Severity::Error, span);
-                    }
-                }
-            }
-        }
+        crate::taint::check_call_sinks(
+            ea,
+            ctx,
+            &resolved.params,
+            &call.args,
+            &resolved.taint_sink_params,
+            |db, _| crate::db::method_taint_summary(db, &resolved.owner_fqcn, &method_name_lower),
+            span,
+        );
 
         // OOP database sink check (M19 parity with call/function.rs's
         // procedural classify_sink): $pdo->query($sql) etc.

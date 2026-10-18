@@ -456,56 +456,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ctor_owner,
                     )) = &ctor_params_and_templates
                     {
-                        // Taint sink check: `new Sink($tainted)` reaching a
-                        // @taint-sink annotated constructor parameter never
-                        // ran this at all — call/function.rs and
-                        // call/method.rs both check it for their own call
-                        // shapes, but analyze_new had no equivalent.
-                        if !ctor_taint_sink_params.is_empty() {
-                            for (param_name, sink_kind) in ctor_taint_sink_params {
-                                let param_idx = ctor_params
-                                    .iter()
-                                    .position(|p| p.name.as_ref() == param_name.as_ref());
-                                let is_variadic = param_idx
-                                    .and_then(|idx| ctor_params.get(idx))
-                                    .is_some_and(|p| p.is_variadic);
-                                let args: Vec<&php_ast::owned::Arg> = if is_variadic {
-                                    let idx = param_idx.unwrap();
-                                    n.args
-                                        .iter()
-                                        .filter(|a| a.name.is_none())
-                                        .skip(idx)
-                                        .collect()
-                                } else {
-                                    let positional = param_idx.and_then(|idx| n.args.get(idx));
-                                    let named = n.args.iter().find(|a| {
-                                        a.name
-                                            .as_ref()
-                                            .map(|nm| {
-                                                crate::parser::name_to_string_owned(nm)
-                                                    == param_name.as_ref()
-                                            })
-                                            .unwrap_or(false)
-                                    });
-                                    positional.or(named).into_iter().collect()
-                                };
-                                for arg in args {
-                                    let Some(value) = &arg.value else { continue };
-                                    let issue = crate::taint::taint_sink_issue(sink_kind);
-                                    if crate::taint::reaches_sink(
-                                        value,
-                                        crate::taint::taint_sink_kind(sink_kind),
-                                        &issue,
-                                        ctx,
-                                        self.db,
-                                        &self.file,
-                                        self.taint_summary,
-                                    ) {
-                                        self.emit(issue, Severity::Error, call_span);
-                                    }
-                                }
-                            }
-                        }
+                        crate::taint::check_call_sinks(
+                            self,
+                            ctx,
+                            ctor_params,
+                            &n.args,
+                            ctor_taint_sink_params,
+                            |db, _| crate::db::method_taint_summary(db, ctor_owner, "__construct"),
+                            call_span,
+                        );
                         // Purity check: `new X(...)` inside a @pure function
                         // runs X's constructor exactly like any other call —
                         // call/function.rs and call/method.rs both check the

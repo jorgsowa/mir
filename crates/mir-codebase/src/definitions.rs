@@ -443,6 +443,17 @@ pub struct TagDescriptions {
     pub throws: Vec<(Arc<str>, Arc<str>)>,
 }
 
+/// `@taint-escape`, `@taint-unescape` and `@psalm-flow` on a function or method.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaintAnnotations {
+    /// Sink kinds the return value no longer carries.
+    pub escape: Vec<Arc<str>>,
+    /// Sink kinds the return value regains from tainted arguments.
+    pub unescape: Vec<Arc<str>>,
+    /// Parameters whose taint flows into the return value.
+    pub flow_params: Vec<Arc<str>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MethodDef {
     pub name: Arc<str>,
@@ -514,6 +525,8 @@ pub struct MethodDef {
     /// mechanism but marking the source side instead.
     #[serde(default)]
     pub is_taint_source: bool,
+    #[serde(default)]
+    pub taint: Option<Arc<TaintAnnotations>>,
     /// `@if-this-is Type` — the resolved constraint a receiver's type must
     /// satisfy for this method to be callable. `None` when absent.
     #[serde(default)]
@@ -932,6 +945,8 @@ pub struct FunctionDef {
     /// mechanism but marking the source side instead.
     #[serde(default)]
     pub is_taint_source: bool,
+    #[serde(default)]
+    pub taint: Option<Arc<TaintAnnotations>>,
     /// Type aliases declared on this function via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
     pub type_aliases: FxHashMap<Arc<str>, Type>,

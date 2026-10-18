@@ -184,9 +184,180 @@ pub fn finish_summary(summary: &mut TaintSummary, is_generator: bool) -> TaintSu
 }
 
 /// Label each parameter so the body's summary can tell which arguments flow where.
-pub fn seed_param_labels(ctx: &mut FlowState, params: &[mir_codebase::DeclaredParam]) {
+/// Only inference builds summaries; a full analysis reports source taint alone.
+pub fn seed_param_labels(
+    ctx: &mut FlowState,
+    params: &[mir_codebase::DeclaredParam],
+    mode: crate::body_analysis::AnalysisMode,
+) {
+    if mode != crate::body_analysis::AnalysisMode::InferenceOnly {
+        return;
+    }
     for (index, param) in params.iter().take(MAX_TRACKED_PARAMS).enumerate() {
         ctx.set_var_taint(param.name.as_ref(), Taint::param(index));
+    }
+}
+
+/// Expressions passed for declared parameter `index`, including a spread that may cover it.
+pub fn param_arg_exprs<'e>(
+    params: &[mir_codebase::DeclaredParam],
+    args: &'e [php_ast::owned::Arg],
+    index: usize,
+) -> Vec<&'e Expr> {
+    let Some(param) = params.get(index) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut position = 0;
+    for arg in args {
+        let Some(value) = &arg.value else {
+            position += 1;
+            continue;
+        };
+        if let Some(name) = &arg.name {
+            let name = crate::parser::name_to_string_owned(name);
+            let unknown_name = || !params.iter().any(|p| p.name.as_ref() == name);
+            if name == param.name.as_ref() || (param.is_variadic && unknown_name()) {
+                out.push(value);
+            }
+        } else if arg.unpack {
+            if position <= index || param.is_variadic {
+                out.push(value);
+            }
+        } else if position == index || (param.is_variadic && position >= index) {
+            out.push(value);
+        }
+        position += 1;
+    }
+    out
+}
+
+/// Taint of the arguments bound to parameter `index`.
+pub fn param_arg_taint(
+    params: &[mir_codebase::DeclaredParam],
+    args: &[php_ast::owned::Arg],
+    index: usize,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    param_arg_exprs(params, args, index)
+        .into_iter()
+        .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file))
+}
+
+/// Union of the kinds named by taint annotations (`html`, `sql`, `input`, ...).
+fn named_kinds(names: &[std::sync::Arc<str>]) -> Taint {
+    names.iter().fold(Taint::NONE, |acc, name| {
+        acc | match name.as_ref() {
+            "input" | "text" => Taint::ALL,
+            "has_quotes" => Taint::HTML | Taint::SQL,
+            other => taint_sink_kind(other),
+        }
+    })
+}
+
+/// A return type whose values can't carry a payload into a sink.
+fn return_drops_taint(ty: &mir_types::Type) -> bool {
+    use mir_types::Atomic;
+    ty.is_void()
+        || ty.is_never()
+        || is_injection_safe_type(ty)
+        || ty.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TNamedObject { .. }
+                    | Atomic::TStaticObject { .. }
+                    | Atomic::TSelf { .. }
+                    | Atomic::TParent { .. }
+                    | Atomic::TClosure { .. }
+                    | Atomic::TObject
+            )
+        })
+}
+
+/// Taint of a call to user code, from the callee's annotations and inferred summary.
+#[allow(clippy::too_many_arguments)]
+fn user_call_taint(
+    params: &[mir_codebase::DeclaredParam],
+    args: &[php_ast::owned::Arg],
+    return_type: Option<&mir_types::Type>,
+    annotations: Option<&mir_codebase::TaintAnnotations>,
+    has_body: bool,
+    reads_source: impl FnOnce() -> bool,
+    summary: impl FnOnce() -> Option<TaintSummary>,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    if return_type.is_some_and(return_drops_taint) {
+        return Taint::NONE;
+    }
+    let arg_taint = |index| param_arg_taint(params, args, index, ctx, db, file);
+    // Inferring a summary only pays off when it can return source data or tainted arguments.
+    let worth_summary = || !args_taint(args, ctx, db, file).is_empty() || reads_source();
+    let mut taint = if has_body && worth_summary() {
+        summary().map_or(Taint::NONE, |s| s.call_result(arg_taint))
+    } else {
+        Taint::NONE
+    };
+    let Some(annotations) = annotations else {
+        return taint;
+    };
+    for name in &annotations.flow_params {
+        if let Some(index) = params.iter().position(|p| p.name.as_ref() == name.as_ref()) {
+            taint |= arg_taint(index);
+        }
+    }
+    let escaped = named_kinds(&annotations.escape);
+    let unescaped = named_kinds(&annotations.unescape);
+    // An annotated escaper or decoder without a body to summarize passes its arguments through.
+    if !has_body && annotations.flow_params.is_empty() {
+        taint = args_taint(args, ctx, db, file);
+    }
+    taint.without(escaped).restore(unescaped)
+}
+
+/// Report arguments reaching a sink inside the callee: its `@taint-sink`
+/// parameters and the sinks its inferred summary records.
+#[allow(clippy::too_many_arguments)]
+pub fn check_call_sinks(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    params: &[mir_codebase::DeclaredParam],
+    args: &[php_ast::owned::Arg],
+    sink_params: &[(std::sync::Arc<str>, std::sync::Arc<str>)],
+    summary: impl FnOnce(&dyn crate::db::MirDatabase, &str) -> Option<TaintSummary>,
+    span: php_ast::Span,
+) {
+    let mut sinks: Vec<ParamSink> = sink_params
+        .iter()
+        .filter_map(|(name, kind)| {
+            Some(ParamSink {
+                param: params
+                    .iter()
+                    .position(|p| p.name.as_ref() == name.as_ref())?,
+                kinds: taint_sink_kind(kind),
+                issue: taint_sink_issue(kind),
+            })
+        })
+        .collect();
+    if !args_taint(args, ctx, ea.db, &ea.file).is_empty() {
+        if let Some(summary) = summary(ea.db, &ea.file) {
+            sinks.extend(summary.param_sinks);
+        }
+    }
+    let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
+    for sink in &sinks {
+        for value in param_arg_exprs(params, args, sink.param) {
+            let taint = expr_taint(value, ctx, ea.db, &ea.file);
+            ea.taint_summary
+                .record_param_sinks(taint, sink.kinds, &sink.issue);
+            if taint.concrete().intersects(sink.kinds) && !emitted.contains(&sink.issue) {
+                emitted.push(sink.issue.clone());
+                ea.emit(sink.issue.clone(), mir_issues::Severity::Error, span);
+            }
+        }
     }
 }
 
@@ -713,12 +884,7 @@ pub fn expr_taint(
                     return args_taint(&fc.args, ctx, db, file).without(removed);
                 }
                 if let Some(restored) = unescaped_kinds(&lower_name) {
-                    let taint = args_taint(&fc.args, ctx, db, file);
-                    return if taint.is_empty() {
-                        taint
-                    } else {
-                        taint | restored
-                    };
+                    return args_taint(&fc.args, ctx, db, file).restore(restored);
                 }
                 // `compact('id')` copies `$id`'s current value into the
                 // returned array; only literal names are resolved, matching
@@ -734,9 +900,29 @@ pub fn expr_taint(
                 }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
-                let func = crate::db::find_function(db, here);
+                let func = crate::db::find_function_from(db, file, here);
                 if func.as_ref().is_some_and(|f| f.is_taint_source) {
                     return Taint::ALL;
+                }
+                if let Some(f) = func.as_ref().filter(|f| is_user_code(f.location.as_ref())) {
+                    return user_call_taint(
+                        &f.params,
+                        &fc.args,
+                        f.return_type.as_deref(),
+                        f.taint.as_deref(),
+                        true,
+                        || {
+                            crate::db::taint_sources::function_reads_source(
+                                db,
+                                file,
+                                f.fqn.as_ref(),
+                            )
+                        },
+                        || crate::db::function_taint_summary(db, file, f.fqn.as_ref()),
+                        ctx,
+                        db,
+                        file,
+                    );
                 }
                 // A builtin's result is derived from its arguments unless it can
                 // only return values that carry no payload (`strlen`, `is_numeric`).
@@ -787,10 +973,10 @@ pub fn expr_taint(
                                 return args_taint(&mc.args, ctx, db, file).without(removed);
                             }
                             let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                            if crate::db::find_method_respecting_precedence(db, here, &method_lower)
-                                .is_some_and(|(_, m)| m.is_taint_source)
+                            if let Some(taint) =
+                                method_call_taint(here, &method_lower, &mc.args, ctx, db, file)
                             {
-                                return Taint::ALL;
+                                return taint;
                             }
                         }
                     }
@@ -828,10 +1014,10 @@ pub fn expr_taint(
             if let (Some(fqcn), ExprKind::Identifier(method_name)) = (fqcn_opt, &smc.method.kind) {
                 let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                if crate::db::find_method_respecting_precedence(db, here, &method_lower)
-                    .is_some_and(|(_, m)| m.is_taint_source)
+                if let Some(taint) =
+                    method_call_taint(here, &method_lower, &smc.args, ctx, db, file)
                 {
-                    return Taint::ALL;
+                    return taint;
                 }
             }
             Taint::NONE
@@ -839,6 +1025,53 @@ pub fn expr_taint(
 
         _ => Taint::NONE,
     }
+}
+
+/// Whether a declaration at `location` has a body worth summarizing.
+fn is_user_code(location: Option<&mir_types::Location>) -> bool {
+    location.is_some_and(|loc| !crate::stubs::is_stub_path(loc.file.as_ref()))
+}
+
+/// Taint of a call to `method_lower` on `class`, or `None` when the method is unknown.
+fn method_call_taint(
+    class: crate::db::Fqcn<'_>,
+    method_lower: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    let (owner, m) = crate::db::find_method_respecting_precedence(db, class, method_lower)?;
+    if m.is_taint_source {
+        return Some(Taint::ALL);
+    }
+    if !is_user_code(m.location.as_ref()) && m.taint.is_none() {
+        return None;
+    }
+    let has_body = is_user_code(m.location.as_ref())
+        && !m.is_abstract
+        && !crate::db::is_interface(db, owner.as_ref());
+    let taint = user_call_taint(
+        &m.params,
+        args,
+        m.return_type.as_deref(),
+        m.taint.as_deref(),
+        has_body,
+        || crate::db::taint_sources::method_reads_source(db, owner.as_ref(), method_lower),
+        || crate::db::method_taint_summary(db, owner.as_ref(), method_lower),
+        ctx,
+        db,
+        file,
+    );
+    (!taint.is_empty()).then_some(taint)
+}
+
+/// Builtins whose result is request data.
+pub fn is_source_function(fn_name_lower: &str) -> bool {
+    matches!(
+        fn_name_lower,
+        "getallheaders" | "apache_request_headers" | "filter_input" | "filter_input_array"
+    )
 }
 
 /// `file_get_contents('php://input')` and friends read the raw request body.

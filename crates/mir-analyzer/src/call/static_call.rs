@@ -14,7 +14,6 @@ use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::{self_is_trait, FlowState};
 use crate::narrowing::extract_expr_guard_key;
 use crate::symbol::ReferenceKind;
-use crate::taint::{reaches_sink, taint_sink_issue, taint_sink_kind};
 
 use super::args::{
     check_args, check_method_visibility_with_magic, distinct_spans_for_expansion,
@@ -910,55 +909,17 @@ impl CallAnalyzer {
                 }
             }
 
-            // Taint sink check: emit the matching Tainted* issue when a tainted
-            // value reaches a @taint-sink annotated parameter. Mirrors the
-            // instance-call check in call/method.rs, which this static-call
-            // path never had at all.
-            if !resolved.taint_sink_params.is_empty() {
-                for (param_name, sink_kind) in &resolved.taint_sink_params {
-                    let param_idx = resolved
-                        .params
-                        .iter()
-                        .position(|p| p.name.as_ref() == param_name.as_ref());
-                    let is_variadic = param_idx
-                        .and_then(|idx| resolved.params.get(idx))
-                        .is_some_and(|p| p.is_variadic);
-                    let args: Vec<&php_ast::owned::Arg> = if is_variadic {
-                        let idx = param_idx.unwrap();
-                        call.args
-                            .iter()
-                            .filter(|a| a.name.is_none())
-                            .skip(idx)
-                            .collect()
-                    } else {
-                        let positional = param_idx.and_then(|idx| call.args.get(idx));
-                        let named_arg = call.args.iter().find(|a| {
-                            a.name
-                                .as_ref()
-                                .map(|n| {
-                                    crate::parser::name_to_string_owned(n) == param_name.as_ref()
-                                })
-                                .unwrap_or(false)
-                        });
-                        positional.or(named_arg).into_iter().collect()
-                    };
-                    for arg in args {
-                        let Some(value) = &arg.value else { continue };
-                        let issue = taint_sink_issue(sink_kind);
-                        if reaches_sink(
-                            value,
-                            taint_sink_kind(sink_kind),
-                            &issue,
-                            ctx,
-                            ea.db,
-                            &ea.file,
-                            ea.taint_summary,
-                        ) {
-                            ea.emit(issue, Severity::Error, span);
-                        }
-                    }
-                }
-            }
+            crate::taint::check_call_sinks(
+                ea,
+                ctx,
+                &resolved.params,
+                &call.args,
+                &resolved.taint_sink_params,
+                |db, _| {
+                    crate::db::method_taint_summary(db, &resolved.owner_fqcn, &method_name_lower)
+                },
+                span,
+            );
 
             let owner_fqcn = resolved.owner_fqcn.clone();
             let ret_raw = resolved.return_ty_raw;

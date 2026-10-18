@@ -685,6 +685,29 @@ impl DocblockParser {
                     }
                 }
                 "taint-source" | "psalm-taint-source" => result.is_taint_source = true,
+                "taint-escape"
+                | "psalm-taint-escape"
+                | "taint-unescape"
+                | "psalm-taint-unescape" => {
+                    // A conditional `(... ? 'html' : null)` form isn't evaluated.
+                    if let Some(kind) = body_text(&tag.body)
+                        .and_then(|b| b.split_whitespace().next().map(str::to_string))
+                        .filter(|k| !k.starts_with('('))
+                    {
+                        if tag.name.ends_with("unescape") {
+                            result.taint_unescape.push(kind);
+                        } else {
+                            result.taint_escape.push(kind);
+                        }
+                    }
+                }
+                "psalm-flow" | "taint-flow" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some(params) = parse_flow_to_return(&body_str) {
+                            result.taint_flow_params.extend(params);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -696,6 +719,23 @@ impl DocblockParser {
 
         result
     }
+}
+
+/// Parameter names in `($a, $b) -> return`; other flow targets aren't modeled.
+fn parse_flow_to_return(body: &str) -> Option<Vec<String>> {
+    let rest = body.trim().strip_prefix('(')?;
+    let (params, target) = rest.split_once(')')?;
+    let target = target.trim().strip_prefix("->")?.trim();
+    if !target.eq_ignore_ascii_case("return") {
+        return None;
+    }
+    Some(
+        params
+            .split(',')
+            .map(|p| p.trim().trim_start_matches('$').to_string())
+            .filter(|p| !p.is_empty())
+            .collect(),
+    )
 }
 
 /// Record the backslash-qualified non-class (`\int`) members of a docblock
@@ -982,6 +1022,12 @@ pub struct ParsedDocblock {
     pub taint_sinks: Vec<(String, String)>,
     /// `@taint-source` — this function/method's return value is tainted.
     pub is_taint_source: bool,
+    /// `@taint-escape <kind>` — kinds the return value no longer carries.
+    pub taint_escape: Vec<String>,
+    /// `@taint-unescape <kind>` — kinds the return value regains.
+    pub taint_unescape: Vec<String>,
+    /// `@psalm-flow ($a, $b) -> return` — parameters flowing into the return value.
+    pub taint_flow_params: Vec<String>,
     /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
     pub seal_properties: bool,
     /// `@if-this-is Type` / `@psalm-if-this-is Type` — the method may only be
@@ -998,6 +1044,21 @@ pub struct ParsedDocblock {
 }
 
 impl ParsedDocblock {
+    pub fn taint_annotations(&self) -> Option<std::sync::Arc<mir_codebase::TaintAnnotations>> {
+        if self.taint_escape.is_empty()
+            && self.taint_unescape.is_empty()
+            && self.taint_flow_params.is_empty()
+        {
+            return None;
+        }
+        let arcs = |v: &[String]| v.iter().map(|s| std::sync::Arc::from(s.as_str())).collect();
+        Some(std::sync::Arc::new(mir_codebase::TaintAnnotations {
+            escape: arcs(&self.taint_escape),
+            unescape: arcs(&self.taint_unescape),
+            flow_params: arcs(&self.taint_flow_params),
+        }))
+    }
+
     fn fill_invalid_annotation_spans(&mut self, span: (u32, u32)) {
         self.invalid_annotation_spans
             .resize(self.invalid_annotations.len(), span);

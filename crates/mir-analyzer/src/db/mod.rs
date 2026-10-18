@@ -261,8 +261,9 @@ pub(crate) use self::find_queries::{
     class_like_loc, function_loc, function_loc_from, indexed_symbol_loc, symbol_loc,
 };
 pub use self::inferred_types::{
-    inferred_function_return_type_demand, inferred_function_return_type_from,
-    inferred_method_return_type_demand, inferred_property_type_demand,
+    function_taint_summary, inferred_function_return_type_demand,
+    inferred_function_return_type_from, inferred_method_return_type_demand,
+    inferred_property_type_demand, method_taint_summary,
 };
 #[allow(unused_imports)]
 pub use self::mirdb::MirDbStorage;
@@ -314,6 +315,7 @@ mod reference_locations;
 mod resolver;
 mod scopes;
 pub(crate) mod subtype_index;
+pub(crate) mod taint_sources;
 mod work_counts;
 mod workspace;
 

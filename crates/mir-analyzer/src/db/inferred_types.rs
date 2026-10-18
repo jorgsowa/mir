@@ -178,3 +178,50 @@ pub fn inferred_property_type_demand(
     }
     merged.map(mir_codebase::definitions::wrap_var_type)
 }
+
+/// Taint summary of the user function `fqn` as seen from `file`; `None` for
+/// stubs, unknown functions, and bodies that move no taint.
+pub fn function_taint_summary(
+    db: &dyn MirDatabase,
+    file: &str,
+    fqn: &str,
+) -> Option<crate::taint::TaintSummary> {
+    let sf = crate::db::function_loc_from(db, file, Fqcn::from_str(db, fqn))?.file();
+    if crate::stubs::is_stub_path(sf.path(db).as_ref()) {
+        return None;
+    }
+    infer_scopes_matching(
+        db,
+        sf,
+        |key| matches!(key, ScopeKey::Function(name, _) if name.as_ref() == fqn),
+        None,
+    )?
+    .iter()
+    .flat_map(|types| types.function_taint.iter())
+    .rfind(|(name, _)| name.as_ref() == fqn)
+    .map(|(_, summary)| summary.clone())
+}
+
+/// Taint summary of method `method_name_lower` declared on `owner_fqcn`.
+pub fn method_taint_summary(
+    db: &dyn MirDatabase,
+    owner_fqcn: &str,
+    method_name_lower: &str,
+) -> Option<crate::taint::TaintSummary> {
+    let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, owner_fqcn))?.file();
+    if crate::stubs::is_stub_path(sf.path(db).as_ref()) {
+        return None;
+    }
+    infer_scopes_matching(
+        db,
+        sf,
+        |key| matches!(key, ScopeKey::ClassLike(name, _) if name.as_ref() == owner_fqcn),
+        Some(method_name_lower),
+    )?
+    .iter()
+    .flat_map(|types| types.method_taint.iter())
+    .rfind(|(class, name, _)| {
+        class.as_ref() == owner_fqcn && name.eq_ignore_ascii_case(method_name_lower)
+    })
+    .map(|(_, _, summary)| summary.clone())
+}

@@ -12,7 +12,7 @@ use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::generic::{check_template_bounds_with_inheritance, infer_template_bindings};
 use crate::symbol::ReferenceKind;
-use crate::taint::{classify_sink, reaches_sink, taint_sink_issue, taint_sink_kind};
+use crate::taint::{classify_sink, reaches_sink};
 
 use super::args::{
     check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
@@ -802,59 +802,15 @@ impl CallAnalyzer {
             let is_mutation_free = resolved.is_mutation_free;
             let taint_sink_params = resolved.taint_sink_params;
 
-            // Taint sink check: emit the matching Tainted* issue when a
-            // tainted value reaches a @taint-sink annotated parameter.
-            // Mirrors call/method.rs's identical check for method/
-            // static-method calls.
-            if !taint_sink_params.is_empty() {
-                for (param_name, sink_kind) in &taint_sink_params {
-                    let param_idx = params
-                        .iter()
-                        .position(|p| p.name.as_ref() == param_name.as_ref());
-                    // A variadic sink parameter (`...$args`) swallows every
-                    // trailing positional argument from its index onward, not
-                    // just the first — check them all, mirroring how
-                    // narrowing/assertions.rs's variadic assertion handling
-                    // does the same for `@psalm-assert-if-true`.
-                    let is_variadic = param_idx
-                        .and_then(|idx| params.get(idx))
-                        .is_some_and(|p| p.is_variadic);
-                    let args: Vec<&php_ast::owned::Arg> = if is_variadic {
-                        let idx = param_idx.unwrap();
-                        call.args
-                            .iter()
-                            .filter(|a| a.name.is_none())
-                            .skip(idx)
-                            .collect()
-                    } else {
-                        let positional = param_idx.and_then(|idx| call.args.get(idx));
-                        let named = call.args.iter().find(|a| {
-                            a.name
-                                .as_ref()
-                                .map(|n| {
-                                    crate::parser::name_to_string_owned(n) == param_name.as_ref()
-                                })
-                                .unwrap_or(false)
-                        });
-                        positional.or(named).into_iter().collect()
-                    };
-                    for arg in args {
-                        let Some(value) = &arg.value else { continue };
-                        let issue = taint_sink_issue(sink_kind);
-                        if reaches_sink(
-                            value,
-                            taint_sink_kind(sink_kind),
-                            &issue,
-                            ctx,
-                            ea.db,
-                            &ea.file,
-                            ea.taint_summary,
-                        ) {
-                            ea.emit(issue, Severity::Error, span);
-                        }
-                    }
-                }
-            }
+            crate::taint::check_call_sinks(
+                ea,
+                ctx,
+                &params,
+                &call.args,
+                &taint_sink_params,
+                |db, file| crate::db::function_taint_summary(db, file, &resolved.fqn),
+                span,
+            );
 
             if ctx.is_in_pure_fn
                 && !is_pure

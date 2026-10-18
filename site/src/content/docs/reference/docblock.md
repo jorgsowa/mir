@@ -29,6 +29,20 @@ mir understands the following docblock annotations.
 | `@psalm-pure` | Marks function as side-effect-free |
 | `@psalm-immutable` | Marks class as immutable |
 
+## Taint analysis
+
+Each tag also accepts the `@psalm-` prefix.
+
+| Annotation | Effect |
+|-----------|--------|
+| `@taint-source` | The return value is user-controlled input |
+| `@taint-sink <kind> $param` | Tainted data passed to `$param` is reported (`html`, `sql`, `shell`, `header`, `cookie`, `file`, `unserialize`, `eval`, `llm_prompt`, ...) |
+| `@taint-escape <kind>` | The return value is safe for sinks of `<kind>` |
+| `@taint-unescape <kind>` | The return value is dangerous again for `<kind>` sinks when its input was tainted |
+| `@psalm-flow ($a, $b) -> return` | The listed parameters' taint flows into the return value of a method without a body |
+
+Function and method bodies are summarized automatically: a call's result carries the taint of the arguments its body returns, and an argument that reaches a sink inside the callee is reported at the call.
+
 ## Metadata
 
 | Annotation | Effect |

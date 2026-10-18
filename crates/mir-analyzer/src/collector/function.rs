@@ -469,6 +469,7 @@ impl DefinitionCollector<'_> {
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
             is_taint_source: doc.is_taint_source,
+            taint: doc.taint_annotations(),
             type_aliases: Self::stored_type_aliases(&type_aliases),
         };
 
