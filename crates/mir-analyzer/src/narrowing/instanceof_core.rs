@@ -616,7 +616,7 @@ pub(super) fn named_object_matches_instanceof(
 /// kept as-is (it might name `class_name` at runtime; there's nothing more
 /// precise to narrow it to). The second element of the tuple is every
 /// non-string atom, handed back separately so the caller can narrow it via
-/// `instanceof` semantics.
+/// `instanceof` semantics; a `mixed` atom also yields `class-string<class_name>`.
 pub(super) fn partition_is_a_string_like(
     current: &Type,
     class_name: &str,
@@ -634,6 +634,9 @@ pub(super) fn partition_is_a_string_like(
         } else if atom.is_string() {
             string_part.add_type(atom.clone());
         } else {
+            if matches!(atom, Atomic::TMixed) {
+                string_part.add_type(Atomic::TClassString(Some(class_name.into())));
+            }
             obj_part.add_type(atom.clone());
         }
     }
