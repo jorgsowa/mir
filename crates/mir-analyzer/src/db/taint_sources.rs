@@ -380,9 +380,7 @@ impl<'a> Scan<'a> {
             {
                 Inspect::Source
             }
-            ExprKind::String(s) if s.contains("php://input") || s.contains("php://stdin") => {
-                Inspect::Source
-            }
+            ExprKind::String(s) if s.contains("php://input") => Inspect::Source,
             ExprKind::ArrayAccess(aa) if crate::taint::is_globals_superglobal_alias(aa) => {
                 Inspect::Source
             }

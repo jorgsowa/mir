@@ -788,15 +788,9 @@ pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg]) -> bool {
 const SYMFONY_REQUEST: &str = "Symfony\\Component\\HttpFoundation\\Request";
 
 /// `Request` properties holding client data (`$request->query->get('q')`).
-const REQUEST_BAG_PROPERTIES: &[&str] = &[
-    "query",
-    "request",
-    "cookies",
-    "headers",
-    "files",
-    "server",
-    "attributes",
-];
+/// `attributes` is left out: the router fills it (`_controller`, `_route`).
+const REQUEST_BAG_PROPERTIES: &[&str] =
+    &["query", "request", "cookies", "headers", "files", "server"];
 
 /// Request accessors returning client data: Symfony's `Request`, Laravel's
 /// subclass, and PSR-7 requests.
@@ -846,8 +840,6 @@ pub fn is_framework_request_source(
                 | "getcookieparams"
                 | "getuploadedfiles"
                 | "getserverparams"
-                | "getattribute"
-                | "getattributes"
         )
     {
         return true;
@@ -1384,7 +1376,9 @@ pub fn expr_taint(
                 let mir_types::Atomic::TNamedObject { fqcn, .. } = atom else {
                     continue;
                 };
-                if is_framework_request_source(db, fqcn.as_ref(), &method_lower) {
+                // Laravel's `route()` without a key returns the `Route` object.
+                let route_object = method_lower == "route" && mc.args.is_empty();
+                if !route_object && is_framework_request_source(db, fqcn.as_ref(), &method_lower) {
                     return Taint::ALL;
                 }
                 if let Some(removed) = sanitized_method_kinds(db, fqcn.as_ref(), &method_lower) {
@@ -1559,7 +1553,7 @@ fn reads_raw_request_body(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> 
     ) && matches!(
         args.first().and_then(|a| a.value.as_ref()).map(|v| &v.kind),
         Some(ExprKind::String(path))
-            if path.eq_ignore_ascii_case("php://input") || path.eq_ignore_ascii_case("php://stdin")
+            if path.eq_ignore_ascii_case("php://input")
     )
 }
 

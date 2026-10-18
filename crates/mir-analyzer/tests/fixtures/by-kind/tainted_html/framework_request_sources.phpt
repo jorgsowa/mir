@@ -1,7 +1,8 @@
 ===description===
 Symfony, Laravel and PSR-7 request accessors return client data, and so do
-the parameter bags of a Symfony request. A tainted object's methods and
-properties carry its taint.
+the parameter bags of a Symfony request. Router-set request attributes and
+Laravel's `Route` object don't. A tainted object's methods and properties
+carry its taint.
 ===config===
 <mir>
   <issueHandlers>
@@ -39,10 +40,18 @@ namespace Symfony\Component\HttpFoundation {
     }
 }
 
+namespace Illuminate\Routing {
+    class Route {
+        public function uri(): string { return ''; }
+    }
+}
+
 namespace Illuminate\Http {
     class Request extends \Symfony\Component\HttpFoundation\Request {
         public function input(?string $key = null): mixed { return null; }
         public function boolean(string $key): bool { return false; }
+        /** @return ($param is null ? \Illuminate\Routing\Route : string) */
+        public function route(?string $param = null): mixed { return null; }
     }
 }
 
@@ -83,6 +92,7 @@ namespace App {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->query->getInt('page');
         echo $request->getMethod();
+        echo $request->attributes->get('_route');
     }
 
     function laravel(\Illuminate\Http\Request $request): void {
@@ -95,6 +105,9 @@ namespace App {
         echo \Request::input('name');
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->boolean('flag') ? 'yes' : 'no';
+        echo $request->route('slug');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
+        echo $request->route()->uri();
     }
 
     function psr(ServerRequestInterface $request): void {

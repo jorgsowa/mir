@@ -1,7 +1,7 @@
 ===description===
 Only the `$_SERVER` entries a client controls are tainted: request headers,
 the URI and query string, the method and auth credentials. Entries the server
-or environment sets, `$_ENV` and CLI arguments are not. `$GLOBALS['_GET']`
+or environment sets, `$_ENV`, CLI arguments and standard input are not. `$GLOBALS['_GET']`
 reads the superglobal itself.
 ===config===
 <mir>
@@ -43,6 +43,7 @@ function serverControlled(): void {
     echo $GLOBALS['config'];
     system('ls ' . $_SERVER['argv'][1]);
     include $_SERVER['DOCUMENT_ROOT'] . '/header.php';
+    echo file_get_contents('php://stdin');
 }
 
 function readsHeader(): string {
