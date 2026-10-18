@@ -1241,6 +1241,10 @@ pub fn expr_taint(
 
         ExprKind::Assign(a) => expr_taint(&a.value, ctx, db, file),
 
+        ExprKind::Binary(op) if op.op == php_ast::ast::BinaryOp::Pipe => {
+            expr_taint(&crate::expr::pipe_as_call(op, expr.span), ctx, db, file)
+        }
+
         ExprKind::Binary(op) => {
             expr_taint(&op.left, ctx, db, file) | expr_taint(&op.right, ctx, db, file)
         }

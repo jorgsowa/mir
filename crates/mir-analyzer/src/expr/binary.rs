@@ -7,9 +7,64 @@ use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::BinaryOp;
-use php_ast::owned::{BinaryExpr, ExprKind};
+use php_ast::owned::{
+    Arg, BinaryExpr, CallableCreateKind, Expr, ExprKind, FunctionCallExpr, MethodCallExpr,
+    StaticDynMethodCallExpr, StaticMethodCallExpr,
+};
 use php_ast::Span;
 use std::sync::Arc;
+
+/// `$x |> f(...)` as the call `f($x)` it evaluates to; any other callable `$c` as `$c($x)`.
+pub(crate) fn pipe_as_call(b: &BinaryExpr, span: Span) -> Expr {
+    let args: Box<[Arg]> = Box::new([Arg {
+        name: None,
+        value: Some((*b.left).clone()),
+        unpack: false,
+        by_ref: false,
+        span: b.left.span,
+    }]);
+    let kind = match &b.right.kind {
+        ExprKind::CallableCreate(cc) => match &cc.kind {
+            CallableCreateKind::Function(name) => ExprKind::FunctionCall(FunctionCallExpr {
+                name: name.clone(),
+                args,
+            }),
+            CallableCreateKind::Method { object, method } => {
+                ExprKind::MethodCall(Box::new(MethodCallExpr {
+                    object: object.clone(),
+                    method: method.clone(),
+                    args,
+                }))
+            }
+            CallableCreateKind::NullsafeMethod { object, method } => {
+                ExprKind::NullsafeMethodCall(Box::new(MethodCallExpr {
+                    object: object.clone(),
+                    method: method.clone(),
+                    args,
+                }))
+            }
+            CallableCreateKind::StaticMethod { class, method } => match method.kind {
+                ExprKind::Identifier(_) => {
+                    ExprKind::StaticMethodCall(Box::new(StaticMethodCallExpr {
+                        class: class.clone(),
+                        method: method.clone(),
+                        args,
+                    }))
+                }
+                _ => ExprKind::StaticDynMethodCall(Box::new(StaticDynMethodCallExpr {
+                    class: class.clone(),
+                    method: method.clone(),
+                    args,
+                })),
+            },
+        },
+        _ => ExprKind::FunctionCall(FunctionCallExpr {
+            name: b.right.clone(),
+            args,
+        }),
+    };
+    Expr { kind, span }
+}
 
 /// Whether every member of `ty` is definitely a string — `&`/`|`/`^` (and
 /// unary `~`) return `string` instead of `int` when all operands are string.
@@ -73,6 +128,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             // The RHS runs on some paths only: join its writes with the skipped state.
             *ctx = FlowState::merge_branches(ctx, ctx.clone(), Some(right_ctx));
             return Type::single(Atomic::TBool);
+        }
+
+        if b.op == B::Pipe {
+            return self.analyze(&pipe_as_call(b, span), ctx);
         }
 
         if b.op == B::Instanceof {
@@ -361,7 +420,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
 
-            BinaryOp::Pipe => right_ty,
+            BinaryOp::Pipe => unreachable!("pipe is analyzed as a call"),
             BinaryOp::Instanceof => Type::single(Atomic::TBool),
         }
     }

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The pipe operator (`$x |> f(...)`) is analyzed as the call `f($x)`: its result has the callable's return type instead of the callable's own type (`Closure`, or the function-name string), removing false `InvalidArgument`/`InvalidOperand` on its result. Argument checks, template inference, arity, undefined-callable reports, references and taint now apply to it as to the equivalent call.
+
 ## [0.88.0] - 2026-10-17
 
 ### Changed
