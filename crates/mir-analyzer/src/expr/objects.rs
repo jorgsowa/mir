@@ -494,6 +494,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             ctx,
                             ctor_params,
                             &n.args,
+                            None,
                             ctor_taint_sink_params,
                             |db, file| {
                                 crate::db::method_param_sinks(db, file, ctor_owner, "__construct")

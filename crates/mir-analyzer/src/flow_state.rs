@@ -1336,6 +1336,12 @@ impl FlowState {
         set_taint(&mut self.tainted_props, key, taint);
     }
 
+    /// Forget the property taint of the object `obj_var` held.
+    pub fn clear_prop_taints(&mut self, obj_var: &str) {
+        let obj = Name::from(obj_var.trim_start_matches('$'));
+        self.tainted_props.retain(|(o, _), _| *o != obj);
+    }
+
     pub fn prop_taint(&self, obj_var: &str, prop: &str) -> Taint {
         let key = (
             Name::from(obj_var.trim_start_matches('$')),

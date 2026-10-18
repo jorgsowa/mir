@@ -197,6 +197,20 @@ fn scan_method(
     let Some(body) = &method.body else { return };
     let mut scan = Scan::new(db, path, Some(fqcn), parent);
     scan.seed_params(&method.params);
+    if method
+        .name
+        .as_deref()
+        .is_some_and(|name| name.eq_ignore_ascii_case("__construct"))
+    {
+        for param in method.params.iter().filter(|p| p.visibility.is_some()) {
+            let key = prop_key(param.name.as_deref().unwrap_or(""), false);
+            let value = ValueFacts {
+                reads_param: true,
+                ..ValueFacts::default()
+            };
+            scan.facts.prop_writes.push((key, value));
+        }
+    }
     let _ = crate::recursion::walk_block(&mut scan, body);
     if !scan.facts.is_empty() {
         let name = crate::util::php_ident_lowercase(method.name.as_deref().unwrap_or(""));
@@ -503,6 +517,13 @@ impl OwnedVisitor for ValueScan<'_, '_> {
         if let ExprKind::Variable(name) = &expr.kind {
             if let Some(local) = self.scan.local_values.get(name.trim_start_matches('$')) {
                 self.facts.merge(local);
+            }
+        }
+        // `$this`'s properties are followed per object, like parameters.
+        if let ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) = &expr.kind {
+            if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
+            {
+                self.facts.reads_param = true;
             }
         }
         match self.scan.inspect(expr) {
@@ -904,6 +925,21 @@ pub(crate) fn method_returns_param(
     method_lower: &str,
 ) -> bool {
     returns_param(db, method_decl(db, from, owner, method_lower))
+}
+
+/// Whether `owner::method_lower` may store a parameter's data in a property.
+pub(crate) fn method_stores_param(
+    db: &dyn MirDatabase,
+    from: &str,
+    owner: &str,
+    method_lower: &str,
+) -> bool {
+    method_decl(db, from, owner, method_lower).is_some_and(|(sf, key)| {
+        file_source_facts(db, sf)
+            .decls
+            .get(&key)
+            .is_some_and(|facts| facts.prop_writes.iter().any(|(_, value)| value.reads_param))
+    })
 }
 
 /// Whether the user function `fqn` may pass a parameter's data to a sink.

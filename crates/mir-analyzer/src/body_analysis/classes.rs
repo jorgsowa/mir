@@ -1253,6 +1253,11 @@ impl<'a> BodyAnalyzer<'a> {
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.mode);
+        let prop_labels = if method.is_static {
+            Vec::new()
+        } else {
+            crate::taint::seed_prop_labels(&mut ctx, params.len(), &body.stmts)
+        };
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
@@ -1295,6 +1300,15 @@ impl<'a> BodyAnalyzer<'a> {
         sa.codebase_symbols_only = self.codebase_symbols_only;
         sa.collect_navigation_facts = self.collect_navigation_facts;
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
+        if is_ctor {
+            for param in method.params.iter().filter(|p| p.visibility.is_some()) {
+                let name = param.name.as_deref().unwrap_or("");
+                sa.taint_summary.record_prop_write(
+                    crate::db::taint_sources::prop_key(name, false),
+                    ctx.var_taint(name),
+                );
+            }
+        }
         ctx.is_generator = body_has_yield(&body.stmts);
         sa.analyze_stmts(&body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types, ctx.diverges);
@@ -1397,7 +1411,9 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
-        let taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
+        let mut taint_summary =
+            crate::taint::finish_summary(&mut sa.taint_summary, ctx.is_generator);
+        taint_summary.prop_labels = prop_labels;
         drop(sa);
 
         if let Some(type_envs) = type_envs {

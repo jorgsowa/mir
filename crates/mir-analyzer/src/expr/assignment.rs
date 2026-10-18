@@ -566,6 +566,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some(closure) = closure.filter(|_| !a.by_ref) {
                             ctx.bind_closure(name.as_ref(), closure);
                         }
+                        if let ExprKind::New(new) = &value.kind {
+                            let props = crate::taint::constructed_prop_taints(
+                                new, ctx, self.db, &self.file,
+                            );
+                            ctx.clear_prop_taints(name);
+                            for (prop, taint) in props {
+                                ctx.set_prop_taint(name, prop.as_str(), taint);
+                            }
+                        }
                         if let Some(trail) = trail {
                             ctx.taint_trails.insert(
                                 mir_types::Name::from(name.trim_start_matches('$')),

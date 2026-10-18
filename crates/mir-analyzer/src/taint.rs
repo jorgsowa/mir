@@ -95,6 +95,11 @@ impl Taint {
         Taint(KIND_MASK << ((index as u32 + 1) * KIND_BITS))
     }
 
+    /// This value without parameter `index`'s label.
+    pub const fn without_label(self, index: usize) -> Taint {
+        Taint(self.0 & !Taint::param(index).0)
+    }
+
     /// Kinds of parameter `index`'s label this value still carries.
     pub const fn param_kinds(self, index: usize) -> Taint {
         Taint((self.0 >> ((index as u32 + 1) * KIND_BITS)) & KIND_MASK)
@@ -129,9 +134,11 @@ pub struct TaintSummary {
     /// itself, each parameter slot the kinds of that argument that flow out.
     pub returns: Taint,
     pub param_sinks: Vec<ParamSink>,
-    /// Source taint written to the class's own properties, keyed like
+    /// Taint written to the class's own properties, keyed like
     /// [`crate::db::taint_sources::prop_key`].
     pub prop_writes: Vec<(mir_types::Name, Taint)>,
+    /// Label slots past the parameters that stand for `$this`'s properties.
+    pub prop_labels: Vec<(usize, mir_types::Name)>,
 }
 
 impl TaintSummary {
@@ -140,7 +147,6 @@ impl TaintSummary {
     }
 
     pub fn record_prop_write(&mut self, key: mir_types::Name, taint: Taint) {
-        let taint = taint.concrete();
         if taint.is_empty() {
             return;
         }
@@ -151,7 +157,14 @@ impl TaintSummary {
     }
 
     /// Combine with another body's summary, for a call that may run either.
-    pub fn merge(&mut self, other: TaintSummary) {
+    pub fn merge(&mut self, mut other: TaintSummary) {
+        for (slot, prop) in std::mem::take(&mut other.prop_labels) {
+            match self.prop_label(slot) {
+                Some(own) if own != prop => other.drop_label(slot),
+                Some(_) => {}
+                None => self.prop_labels.push((slot, prop)),
+            }
+        }
         self.returns |= other.returns;
         for sink in other.param_sinks {
             match self
@@ -168,11 +181,44 @@ impl TaintSummary {
         }
     }
 
+    /// Source taint written to property `key` whatever the arguments.
     pub fn prop_write(&self, key: mir_types::Name) -> Taint {
         self.prop_writes
             .iter()
             .filter(|(k, _)| *k == key)
-            .fold(Taint::NONE, |acc, (_, t)| acc | *t)
+            .fold(Taint::NONE, |acc, (_, t)| acc | t.concrete())
+    }
+
+    /// Forget what flows from label slot `slot`.
+    fn drop_label(&mut self, slot: usize) {
+        self.returns = self.returns.without_label(slot);
+        self.param_sinks.retain(|sink| sink.param != slot);
+        for (_, taint) in &mut self.prop_writes {
+            *taint = taint.without_label(slot);
+        }
+    }
+
+    /// Taint flowing into label slot `slot` at a call: a property of the
+    /// receiver, or the arguments bound to that parameter.
+    fn slot_taint(
+        &self,
+        slot: usize,
+        receiver: Option<&Expr>,
+        arg_taint: impl Fn(usize) -> Taint,
+        ctx: &FlowState,
+    ) -> Taint {
+        match self.prop_label(slot) {
+            Some(prop) => receiver_prop_taint(receiver, prop, ctx),
+            None => arg_taint(slot),
+        }
+    }
+
+    /// The property of `$this` label slot `slot` stands for.
+    pub fn prop_label(&self, slot: usize) -> Option<mir_types::Name> {
+        self.prop_labels
+            .iter()
+            .find(|(s, _)| *s == slot)
+            .map(|(_, prop)| *prop)
     }
 
     /// Record that `taint`, reaching a sink of `kinds`, carries parameter labels.
@@ -204,15 +250,20 @@ impl TaintSummary {
 
     /// Taint of a call's result, given the taint of the argument bound to each parameter.
     pub fn call_result(&self, arg_taint: impl Fn(usize) -> Taint) -> Taint {
-        let mut out = self.returns.concrete();
-        for param in 0..MAX_TRACKED_PARAMS {
-            let kinds = self.returns.param_kinds(param);
-            if !kinds.is_empty() {
-                out |= arg_taint(param).restrict_to(kinds);
-            }
-        }
-        out
+        resolve_labels(self.returns, arg_taint)
     }
+}
+
+/// `taint` with each label slot replaced by what flows into it at a call.
+pub fn resolve_labels(taint: Taint, slot_taint: impl Fn(usize) -> Taint) -> Taint {
+    let mut out = taint.concrete();
+    for slot in 0..MAX_TRACKED_PARAMS {
+        let kinds = taint.param_kinds(slot);
+        if !kinds.is_empty() {
+            out |= slot_taint(slot).restrict_to(kinds);
+        }
+    }
+    out
 }
 
 /// Take the body's summary; a generator's `return` value isn't the call result.
@@ -234,6 +285,48 @@ pub fn seed_param_labels(
     if mode == crate::body_analysis::AnalysisMode::InferenceOnly {
         ctx.summarizing_taint = true;
         label_params(ctx, params.iter().map(|p| p.name.as_ref()));
+    }
+}
+
+/// Label the properties of `$this` a method body reads with the slots its
+/// parameters leave free, so its summary can tell which of them flow where.
+pub fn seed_prop_labels(
+    ctx: &mut FlowState,
+    param_count: usize,
+    body: &[php_ast::owned::Stmt],
+) -> Vec<(usize, mir_types::Name)> {
+    if !ctx.summarizing_taint || param_count >= MAX_TRACKED_PARAMS {
+        return Vec::new();
+    }
+    let mut reads = ThisPropReads(Vec::new());
+    for stmt in body {
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut reads, stmt);
+    }
+    let labels: Vec<(usize, mir_types::Name)> =
+        (param_count..MAX_TRACKED_PARAMS).zip(reads.0).collect();
+    for (slot, prop) in &labels {
+        ctx.set_prop_taint("this", prop.as_str(), Taint::param(*slot));
+    }
+    labels
+}
+
+/// Properties read through `$this->name`, in source order.
+struct ThisPropReads(Vec<mir_types::Name>);
+
+impl php_ast::owned::visitor::OwnedVisitor for ThisPropReads {
+    fn visit_expr(&mut self, expr: &Expr) -> std::ops::ControlFlow<()> {
+        if let ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) = &expr.kind {
+            if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
+            {
+                if let Some(prop) = crate::expr::helpers::extract_string_from_expr(&pa.property) {
+                    let prop = mir_types::Name::new(&prop);
+                    if !self.0.contains(&prop) {
+                        self.0.push(prop);
+                    }
+                }
+            }
+        }
+        crate::recursion::walk_expr(self, expr)
     }
 }
 
@@ -336,6 +429,49 @@ pub fn param_arg_taint(
         .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file))
 }
 
+/// Taint `new` leaves in each instance property of the object it creates,
+/// from what the constructor stores there.
+pub fn constructed_prop_taints(
+    new: &php_ast::owned::NewExpr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<(mir_types::Name, Taint)> {
+    let ExprKind::Identifier(name) = &new.class.kind else {
+        return Vec::new();
+    };
+    let class = match crate::db::resolve_name(db, file, name.as_ref()).as_str() {
+        "self" | "static" => ctx.self_fqcn.clone(),
+        "parent" => ctx.parent_fqcn.clone(),
+        resolved => Some(std::sync::Arc::from(resolved)),
+    };
+    let Some((owner, ctor)) = class.and_then(|class| {
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, &class), "__construct")
+    }) else {
+        return Vec::new();
+    };
+    if demanding_taint(args_taint(&new.args, ctx, db, file), ctx).is_empty()
+        || !crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), "__construct")
+    {
+        return Vec::new();
+    }
+    let Some(summary) = crate::db::method_taint_summary(db, file, owner.as_ref(), "__construct")
+    else {
+        return Vec::new();
+    };
+    let arg_taint = |slot: usize| match summary.prop_label(slot) {
+        Some(_) => Taint::NONE,
+        None => param_arg_taint(&ctor.params, &new.args, slot, ctx, db, file),
+    };
+    summary
+        .prop_writes
+        .iter()
+        .filter(|(key, _)| !key.as_str().starts_with('$'))
+        .map(|(key, taint)| (*key, resolve_labels(*taint, arg_taint)))
+        .filter(|(_, taint)| !taint.is_empty())
+        .collect()
+}
+
 /// Union of the kinds named by taint annotations (`html`, `sql`, `input`, ...).
 fn named_kinds(names: &[std::sync::Arc<str>]) -> Taint {
     names.iter().fold(Taint::NONE, |acc, name| {
@@ -385,6 +521,25 @@ impl CalleeBody {
     }
 }
 
+/// Taint the object `receiver` evaluates to holds in property `prop`.
+fn receiver_prop_taint(receiver: Option<&Expr>, prop: mir_types::Name, ctx: &FlowState) -> Taint {
+    match receiver.map(|r| &unwrap_parens(r).kind) {
+        Some(ExprKind::Variable(var)) => ctx.prop_taint(var.trim_start_matches('$'), prop.as_str()),
+        _ => Taint::NONE,
+    }
+}
+
+/// Whether the object `receiver` evaluates to holds data worth a callee summary.
+fn receiver_demands_summary(receiver: Option<&Expr>, ctx: &FlowState) -> bool {
+    let Some(ExprKind::Variable(var)) = receiver.map(|r| &unwrap_parens(r).kind) else {
+        return false;
+    };
+    let var = mir_types::Name::from(var.trim_start_matches('$'));
+    ctx.tainted_props
+        .iter()
+        .any(|((object, _), taint)| *object == var && !demanding_taint(*taint, ctx).is_empty())
+}
+
 /// The part of an argument's taint worth inferring a callee summary for:
 /// parameter labels only matter while a summary is being built.
 fn demanding_taint(taint: Taint, ctx: &FlowState) -> Taint {
@@ -403,6 +558,7 @@ fn user_call_taint(
     return_type: Option<&mir_types::Type>,
     annotations: Option<&mir_codebase::TaintAnnotations>,
     body: CalleeBody,
+    receiver: Option<&Expr>,
     returns_param: impl FnOnce() -> bool,
     reads_source: impl FnOnce() -> bool,
     summary: impl FnOnce() -> Option<TaintSummary>,
@@ -416,13 +572,15 @@ fn user_call_taint(
     let arg_taint = |index| param_arg_taint(params, args, index, ctx, db, file);
     // Inferring a summary only pays off when it can return source data or tainted arguments.
     let worth_summary = || {
-        (returns_param() && !demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty())
+        (returns_param()
+            && (!demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty()
+                || receiver_demands_summary(receiver, ctx)))
             || reads_source()
     };
     let mut taint = match body {
-        CalleeBody::Summarized if worth_summary() => {
-            summary().map_or(Taint::NONE, |s| s.call_result(arg_taint))
-        }
+        CalleeBody::Summarized if worth_summary() => summary().map_or(Taint::NONE, |s| {
+            s.call_result(|slot| s.slot_taint(slot, receiver, arg_taint, ctx))
+        }),
         CalleeBody::Dependency => args_taint(args, ctx, db, file),
         _ => Taint::NONE,
     };
@@ -472,6 +630,7 @@ pub fn check_call_sinks(
     ctx: &FlowState,
     params: &[mir_codebase::DeclaredParam],
     args: &[php_ast::owned::Arg],
+    receiver: Option<&Expr>,
     sink_params: &[(std::sync::Arc<str>, std::sync::Arc<str>)],
     summary: impl FnOnce(&dyn crate::db::MirDatabase, &str) -> Option<TaintSummary>,
     span: php_ast::Span,
@@ -488,13 +647,30 @@ pub fn check_call_sinks(
             })
         })
         .collect();
-    if !demanding_taint(args_taint(args, ctx, ea.db, &ea.file), ctx).is_empty() {
+    let mut prop_labels = Vec::new();
+    if !demanding_taint(args_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
+        || receiver_demands_summary(receiver, ctx)
+    {
         if let Some(summary) = summary(ea.db, &ea.file) {
             sinks.extend(summary.param_sinks);
+            prop_labels = summary.prop_labels;
         }
     }
     let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
     for sink in &sinks {
+        if let Some((_, prop)) = prop_labels.iter().find(|(slot, _)| *slot == sink.param) {
+            let (Some(receiver), taint) = (receiver, receiver_prop_taint(receiver, *prop, ctx))
+            else {
+                continue;
+            };
+            ea.taint_summary
+                .record_param_sinks(taint, sink.kinds, &sink.issue);
+            if taint.concrete().intersects(sink.kinds) && !emitted.contains(&sink.issue) {
+                emitted.push(sink.issue.clone());
+                ea.emit_taint(sink.issue.clone(), span, receiver, sink.kinds, ctx);
+            }
+            continue;
+        }
         for value in param_arg_exprs(params, args, sink.param) {
             let taint = expr_taint(value, ctx, ea.db, &ea.file);
             ea.taint_summary
@@ -1409,6 +1585,7 @@ pub fn expr_taint(
                         f.return_type.as_deref(),
                         f.taint.as_deref(),
                         CalleeBody::of(f.location.as_ref(), file),
+                        None,
                         || {
                             crate::db::taint_sources::function_returns_param(
                                 db,
@@ -1493,7 +1670,15 @@ pub fn expr_taint(
                         .as_deref()
                         .is_some_and(|ty| ty.is_void() || is_injection_safe_type(ty));
                 }
-                if let Some(t) = method_call_taint(here, &method_lower, &mc.args, ctx, db, file) {
+                if let Some(t) = method_call_taint(
+                    here,
+                    &method_lower,
+                    &mc.args,
+                    Some(&mc.object),
+                    ctx,
+                    db,
+                    file,
+                ) {
                     taint |= t;
                 }
             }
@@ -1536,7 +1721,7 @@ pub fn expr_taint(
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 if let Some(taint) =
-                    method_call_taint(here, &method_lower, &smc.args, ctx, db, file)
+                    method_call_taint(here, &method_lower, &smc.args, None, ctx, db, file)
                 {
                     return taint;
                 }
@@ -2036,6 +2221,7 @@ fn method_call_taint(
     class: crate::db::Fqcn<'_>,
     method_lower: &str,
     args: &[php_ast::owned::Arg],
+    receiver: Option<&Expr>,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
@@ -2055,7 +2241,7 @@ fn method_call_taint(
                 .iter()
                 .fold(Taint::NONE, |acc, implementor| {
                     let here = crate::db::Fqcn::from_str(db, implementor.as_str());
-                    acc | method_call_taint(here, method_lower, args, ctx, db, file)
+                    acc | method_call_taint(here, method_lower, args, receiver, ctx, db, file)
                         .unwrap_or_default()
                 });
             return (!taint.is_empty()).then_some(taint);
@@ -2072,6 +2258,7 @@ fn method_call_taint(
         m.return_type.as_deref(),
         m.taint.as_deref(),
         body,
+        receiver,
         || crate::db::taint_sources::method_returns_param(db, file, owner.as_ref(), method_lower),
         || crate::db::taint_sources::method_reads_source(db, file, owner.as_ref(), method_lower),
         || crate::db::method_taint_summary(db, file, owner.as_ref(), method_lower),

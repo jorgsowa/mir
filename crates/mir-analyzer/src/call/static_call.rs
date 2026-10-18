@@ -920,6 +920,7 @@ impl CallAnalyzer {
                 ctx,
                 &resolved.params,
                 &call.args,
+                None,
                 &resolved.taint_sink_params,
                 |db, file| {
                     crate::db::method_param_sinks(
