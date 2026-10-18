@@ -2043,6 +2043,16 @@ pub struct ClosureSummary {
     /// Parameter names, and whether each is variadic.
     pub params: Vec<(Name, bool)>,
     pub summary: crate::taint::TaintSummary,
+    /// The enclosing body's labels captured into each slot past the parameters.
+    pub captures: Vec<Taint>,
+}
+
+impl ClosureSummary {
+    /// What label slot `slot` captured, unless it is a parameter's.
+    pub fn capture(&self, slot: usize) -> Option<Taint> {
+        slot.checked_sub(self.params.len())
+            .and_then(|index| self.captures.get(index).copied())
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

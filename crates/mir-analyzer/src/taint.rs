@@ -85,6 +85,11 @@ impl Taint {
         Taint(out)
     }
 
+    /// Parameter labels only.
+    pub const fn labels(self) -> Taint {
+        Taint(self.0 & !KIND_MASK)
+    }
+
     /// Taint from real sources only.
     pub const fn concrete(self) -> Taint {
         Taint(self.0 & KIND_MASK)
@@ -1928,6 +1933,33 @@ fn callee_closure(
     }
 }
 
+/// The taint a captured variable carries inside a closure: its source taint,
+/// and a slot past the closure's parameters standing for the enclosing body's
+/// labels, which `captures` records.
+pub fn captured_taint(outer: Taint, param_count: usize, captures: &mut Vec<Taint>) -> Taint {
+    let slot = param_count + captures.len();
+    if outer.labels().is_empty() || slot >= MAX_TRACKED_PARAMS {
+        return outer.concrete();
+    }
+    captures.push(outer.labels());
+    outer.concrete() | Taint::param(slot)
+}
+
+/// Variables an expression reads, in source order.
+struct VariableReads(Vec<mir_types::Name>);
+
+impl php_ast::owned::visitor::OwnedVisitor for VariableReads {
+    fn visit_expr(&mut self, expr: &Expr) -> std::ops::ControlFlow<()> {
+        if let ExprKind::Variable(name) = &expr.kind {
+            let name = mir_types::Name::from(name.trim_start_matches('$'));
+            if !self.0.contains(&name) {
+                self.0.push(name);
+            }
+        }
+        crate::recursion::walk_expr(self, expr)
+    }
+}
+
 /// An arrow function's summary, from its body evaluated with labelled parameters.
 pub fn arrow_summary(
     af: &php_ast::owned::ArrowFunctionExpr,
@@ -1950,10 +1982,21 @@ pub fn arrow_summary(
         body_ctx.set_var(name.as_str(), mir_types::Type::mixed());
     }
     label_params(&mut body_ctx, params.iter().map(|(n, _)| n.as_str()));
-    // Outer labels can't be told apart from the arrow function's own.
     for (name, taint) in body_ctx.tainted_vars.iter_mut() {
         if !params.iter().any(|(p, _)| p == name) {
             *taint = taint.concrete();
+        }
+    }
+    let mut reads = VariableReads(Vec::new());
+    let _ = php_ast::owned::visitor::OwnedVisitor::visit_expr(&mut reads, &af.body);
+    let mut captures = Vec::new();
+    for name in reads.0 {
+        if params.iter().any(|(p, _)| *p == name) {
+            continue;
+        }
+        let taint = captured_taint(ctx.var_taint(name.as_str()), params.len(), &mut captures);
+        if !taint.is_empty() {
+            body_ctx.tainted_vars.insert(name, taint);
         }
     }
     crate::flow_state::ClosureSummary {
@@ -1962,6 +2005,7 @@ pub fn arrow_summary(
             returns: expr_taint(&af.body, &body_ctx, db, file),
             ..TaintSummary::default()
         },
+        captures,
     }
 }
 
@@ -2005,10 +2049,12 @@ fn closure_call_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    closure.summary.call_result(|index| {
-        closure_param_args(&closure.params, args, index)
-            .into_iter()
-            .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file))
+    closure.summary.call_result(|slot| {
+        closure.capture(slot).unwrap_or_else(|| {
+            closure_param_args(&closure.params, args, slot)
+                .into_iter()
+                .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file))
+        })
     })
 }
 
@@ -2038,7 +2084,9 @@ fn callback_result(
     let all = inputs.iter().fold(Taint::NONE, |acc, t| acc | *t);
     let input = |index: usize| inputs.get(index).copied().unwrap_or_default();
     if let Some(closure) = callee_closure(callback, ctx, db, file) {
-        return closure.summary.call_result(input);
+        return closure
+            .summary
+            .call_result(|slot| closure.capture(slot).unwrap_or_else(|| input(slot)));
     }
     let Some(name) = callback_function_name(callback) else {
         return all;
@@ -2133,7 +2181,8 @@ pub fn check_callback_sinks(
     let Some(callback) = args.get(callback_index).and_then(|a| a.value.as_ref()) else {
         return;
     };
-    let param_sinks = match callee_closure(callback, ctx, ea.db, &ea.file) {
+    let closure = callee_closure(callback, ctx, ea.db, &ea.file);
+    let param_sinks = match &closure {
         Some(closure) => closure.summary.param_sinks.clone(),
         None => {
             let Some(name) = callback_function_name(callback) else {
@@ -2147,6 +2196,11 @@ pub fn check_callback_sinks(
     };
     let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
     for sink in &param_sinks {
+        if let Some(captured) = closure.as_ref().and_then(|c| c.capture(sink.param)) {
+            ea.taint_summary
+                .record_param_sinks(captured, sink.kinds, &sink.issue);
+            continue;
+        }
         let Some(value) = input_args
             .get(sink.param)
             .and_then(|i| args.get(*i))
@@ -2177,6 +2231,12 @@ pub fn check_closure_call_sinks(
     };
     let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
     for sink in &closure.summary.param_sinks {
+        // Source data a capture holds was reported inside the closure's body.
+        if let Some(captured) = closure.capture(sink.param) {
+            ea.taint_summary
+                .record_param_sinks(captured, sink.kinds, &sink.issue);
+            continue;
+        }
         for value in closure_param_args(&closure.params, args, sink.param) {
             let taint = expr_taint(value, ctx, ea.db, &ea.file);
             ea.taint_summary

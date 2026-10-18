@@ -569,6 +569,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         let mut byref_captures: Vec<(&str, Type)> = Vec::new();
+        let mut taint_captures = Vec::new();
         for use_var in c.use_vars.iter() {
             let name = use_var.name.trim_start_matches('$');
             // A by-ref capture (`use (&$f)`) binds by reference and auto-creates
@@ -637,8 +638,14 @@ impl<'a> ExpressionAnalyzer<'a> {
             if use_var.by_ref {
                 byref_captures.push((name, captured_ty));
             }
-            // Outer parameter labels can't be told apart from the closure's own.
-            closure_ctx.taint_var(name, ctx.var_taint(name).concrete());
+            closure_ctx.taint_var(
+                name,
+                crate::taint::captured_taint(
+                    ctx.var_taint(name),
+                    params.len(),
+                    &mut taint_captures,
+                ),
+            );
             if let Some(closure) = ctx.closures.by_var.get(&Name::from(name)) {
                 closure_ctx.bind_closure(name, closure.clone());
             }
@@ -721,6 +728,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &mut sa.taint_summary,
                     closure_ctx.is_generator,
                 ),
+                captures: taint_captures,
             },
         );
         let inferred_return =
