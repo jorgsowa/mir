@@ -245,13 +245,27 @@ pub fn function_param_sinks(
         .flatten()
 }
 
-/// [`method_taint_summary`] for reporting arguments at a call.
+/// [`method_taint_summary`] for reporting arguments at a call; an abstract
+/// method's merges those of its implementations.
 pub fn method_param_sinks(
     db: &dyn MirDatabase,
     file: &str,
     owner_fqcn: &str,
     method_name_lower: &str,
 ) -> Option<crate::taint::TaintSummary> {
+    let implementations =
+        super::taint_sources::method_implementations(db, owner_fqcn, method_name_lower);
+    if !implementations.is_empty() {
+        return implementations
+            .iter()
+            .filter_map(|implementor| {
+                method_param_sinks(db, file, implementor.as_str(), method_name_lower)
+            })
+            .reduce(|mut merged, summary| {
+                merged.merge(summary);
+                merged
+            });
+    }
     super::taint_sources::method_may_reach_sink(db, file, owner_fqcn, method_name_lower)
         .then(|| method_taint_summary(db, file, owner_fqcn, method_name_lower))
         .flatten()

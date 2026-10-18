@@ -1,7 +1,7 @@
 ===description===
 Instance, static, inherited, trait and constructor calls carry taint through
-their bodies like functions do. A method without a body (interface or
-abstract) has nothing to summarize.
+their bodies like functions do. A call through an interface uses its
+implementations' bodies.
 ===config===
 <mir>
   <issueHandlers>
@@ -61,4 +61,5 @@ function useThem(Page $page, Formatter $formatter): void {
 //  ^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $page->safe($_GET['x']);
     echo $formatter->format($_GET['x']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }

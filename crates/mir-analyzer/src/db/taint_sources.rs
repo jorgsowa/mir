@@ -785,6 +785,12 @@ fn callee_may_reach_sink(db: &dyn MirDatabase, from: &str, callee: &Callee) -> b
             ) else {
                 return false;
             };
+            let implementations = method_implementations(db, owner.as_ref(), method.as_str());
+            if !implementations.is_empty() && def.taint_sink_params.is_empty() {
+                return implementations.iter().any(|implementor| {
+                    callee_may_reach_sink(db, from, &Callee::Method(*implementor, *method))
+                });
+            }
             !def.taint_sink_params.is_empty()
                 || crate::db::class_like_loc(db, crate::db::Fqcn::from_str(db, owner.as_ref()))
                     .is_some_and(|loc| {
@@ -799,6 +805,60 @@ fn callee_may_reach_sink(db: &dyn MirDatabase, from: &str, callee: &Callee) -> b
         }
         Callee::Property(..) => false,
     }
+}
+
+/// An interface with more implementations than this is too generic for their
+/// summaries to say anything about one call.
+const MAX_IMPLEMENTATIONS: usize = 8;
+
+/// Declaring classes of the bodies implementing `owner::method_lower`; empty
+/// unless that method is abstract or declared on an interface.
+pub(crate) fn method_implementations(
+    db: &dyn MirDatabase,
+    owner: &str,
+    method_lower: &str,
+) -> Arc<[Name]> {
+    let Some((owner, def)) = crate::db::find_method_respecting_precedence(
+        db,
+        crate::db::Fqcn::from_str(db, owner),
+        method_lower,
+    ) else {
+        return Arc::from([]);
+    };
+    if !def.is_abstract && !crate::db::is_interface(db, owner.as_ref()) {
+        return Arc::from([]);
+    }
+    implementations(db, Name::new(owner.as_ref()), Name::new(method_lower)).clone()
+}
+
+#[salsa::tracked]
+fn implementations(db: &dyn MirDatabase, owner: Name, method: Name) -> Arc<[Name]> {
+    let mut out: Vec<Name> = Vec::new();
+    for class in crate::db::workspace_classes(db).iter() {
+        if class.as_str().eq_ignore_ascii_case(owner.as_str())
+            || !crate::db::extends_or_implements(db, class.as_str(), owner.as_str())
+        {
+            continue;
+        }
+        let Some((declarer, def)) = crate::db::find_method_respecting_precedence(
+            db,
+            crate::db::Fqcn::from_str(db, class.as_str()),
+            method.as_str(),
+        ) else {
+            continue;
+        };
+        if def.is_abstract || crate::db::is_interface(db, declarer.as_ref()) {
+            continue;
+        }
+        let declarer = Name::new(declarer.as_ref());
+        if !out.contains(&declarer) {
+            if out.len() == MAX_IMPLEMENTATIONS {
+                return Arc::from([]);
+            }
+            out.push(declarer);
+        }
+    }
+    Arc::from(out)
 }
 
 /// The file and facts key of the user function `fqn` seen from `from`.
@@ -895,6 +955,12 @@ pub(crate) fn method_reads_source(
     };
     if def.is_taint_source {
         return true;
+    }
+    let implementations = method_implementations(db, owner.as_ref(), method_lower);
+    if !implementations.is_empty() {
+        return implementations
+            .iter()
+            .any(|implementor| method_reads_source(db, from, implementor.as_str(), method_lower));
     }
     let Some(sf) = crate::db::class_like_loc(db, crate::db::Fqcn::from_str(db, owner.as_ref()))
         .map(|loc| loc.file())

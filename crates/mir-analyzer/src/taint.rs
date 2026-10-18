@@ -150,6 +150,24 @@ impl TaintSummary {
         }
     }
 
+    /// Combine with another body's summary, for a call that may run either.
+    pub fn merge(&mut self, other: TaintSummary) {
+        self.returns |= other.returns;
+        for sink in other.param_sinks {
+            match self
+                .param_sinks
+                .iter_mut()
+                .find(|s| s.param == sink.param && s.issue == sink.issue)
+            {
+                Some(existing) => existing.kinds |= sink.kinds,
+                None => self.param_sinks.push(sink),
+            }
+        }
+        for (key, taint) in other.prop_writes {
+            self.record_prop_write(key, taint);
+        }
+    }
+
     pub fn prop_write(&self, key: mir_types::Name) -> Taint {
         self.prop_writes
             .iter()
@@ -2028,6 +2046,20 @@ fn method_call_taint(
     }
     if !is_user_code(m.location.as_ref()) && m.taint.is_none() {
         return None;
+    }
+    if m.taint.is_none() {
+        let implementations =
+            crate::db::taint_sources::method_implementations(db, owner.as_ref(), method_lower);
+        if !implementations.is_empty() {
+            let taint = implementations
+                .iter()
+                .fold(Taint::NONE, |acc, implementor| {
+                    let here = crate::db::Fqcn::from_str(db, implementor.as_str());
+                    acc | method_call_taint(here, method_lower, args, ctx, db, file)
+                        .unwrap_or_default()
+                });
+            return (!taint.is_empty()).then_some(taint);
+        }
     }
     let body = if m.is_abstract || crate::db::is_interface(db, owner.as_ref()) {
         CalleeBody::None
