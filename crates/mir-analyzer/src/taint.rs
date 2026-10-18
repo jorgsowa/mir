@@ -1062,6 +1062,22 @@ pub fn is_injection_safe_type(ty: &mir_types::Type) -> bool {
         })
 }
 
+/// Whether every array shape `ty` can be holds an injection-safe value at `key`.
+fn shape_entry_is_safe(ty: &mir_types::Type, key: mir_types::Name) -> bool {
+    use mir_types::atomic::ArrayKey;
+    !ty.types.is_empty()
+        && ty.types.iter().all(|atom| match atom {
+            mir_types::Atomic::TKeyedArray { properties, .. } => properties
+                .iter()
+                .find(|(k, _)| match k {
+                    ArrayKey::String(s) => s.as_ref() == key.as_str(),
+                    ArrayKey::Int(i) => i.to_string() == key.as_str(),
+                })
+                .is_some_and(|(_, prop)| is_injection_safe_type(&prop.ty)),
+            _ => false,
+        })
+}
+
 /// Strip any number of redundant parens (`((expr))` -> `expr`) — a call
 /// target keeps its parens in the AST (`(fn() => ...)()`), unlike most
 /// other expression positions.
@@ -1147,6 +1163,22 @@ pub fn expr_taint(
                 Taint::ALL
             } else if let Some(var) = globals_entry(aa) {
                 crate::db::global_var_taint(db, file, var)
+            } else if let (ExprKind::Variable(name), Some(key)) = (
+                &aa.array.kind,
+                crate::expr::assignment::literal_key_name(aa.index.as_deref()),
+            ) {
+                let n = name.trim_start_matches('$');
+                if is_superglobal(n) {
+                    Taint::ALL
+                } else if ctx
+                    .vars
+                    .get(&mir_types::Name::from(n))
+                    .is_some_and(|ty| shape_entry_is_safe(ty, key))
+                {
+                    Taint::NONE
+                } else {
+                    ctx.key_taint(n, key)
+                }
             } else {
                 expr_taint(&aa.array, ctx, db, file)
             }
@@ -1183,12 +1215,23 @@ pub fn expr_taint(
                 }
                 _ => Taint::NONE,
             };
-            let key = crate::db::taint_sources::prop_key(&prop_name, false);
-            let stored = receiver_classes(&pa.object, ctx, db, file)
-                .iter()
-                .fold(Taint::NONE, |acc, class| {
-                    acc | class_property_taint(db, file, class, key)
+            let classes = receiver_classes(&pa.object, ctx, db, file);
+            let declared_safe = !classes.is_empty()
+                && classes.iter().all(|class| {
+                    crate::db::find_property_in_chain(
+                        db,
+                        crate::db::Fqcn::from_str(db, class.as_ref()),
+                        &prop_name,
+                    )
+                    .is_some_and(|(_, def)| def.ty.as_deref().is_some_and(is_injection_safe_type))
                 });
+            if declared_safe {
+                return Taint::NONE;
+            }
+            let key = crate::db::taint_sources::prop_key(&prop_name, false);
+            let stored = classes.iter().fold(Taint::NONE, |acc, class| {
+                acc | class_property_taint(db, file, class, key)
+            });
             own | stored | expr_taint(&pa.object, ctx, db, file)
         }
 

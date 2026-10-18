@@ -134,6 +134,72 @@ fn taint_array_write_base(
     }
 }
 
+/// A literal array key as a [`Name`]: `'id'`, `3`.
+pub(crate) fn literal_key_name(index: Option<&Expr>) -> Option<mir_types::Name> {
+    match &index?.kind {
+        ExprKind::String(s) => Some(mir_types::Name::new(s)),
+        ExprKind::Int(i) => Some(mir_types::Name::new(&i.to_string())),
+        _ => None,
+    }
+}
+
+/// Record a write of `taint` to an array element, per key where the base is
+/// a variable (`$a['k']`, `$a['k']['x']`) and for the whole base otherwise.
+fn taint_array_element_write(
+    aa: &php_ast::owned::ArrayAccessExpr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    taint: Taint,
+    replace: bool,
+) {
+    match &aa.array.kind {
+        ExprKind::Variable(name) => {
+            let key = literal_key_name(aa.index.as_deref());
+            ctx.write_key_taint(name, key, taint, replace && key.is_some());
+        }
+        ExprKind::ArrayAccess(inner) => match &inner.array.kind {
+            ExprKind::Variable(name) => {
+                let key = literal_key_name(inner.index.as_deref());
+                ctx.write_key_taint(name, key, taint, false);
+            }
+            _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
+        },
+        _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
+    }
+}
+
+/// Per-key taint of an array literal whose keys are all literal.
+fn array_literal_key_taints(
+    elements: &[php_ast::owned::ArrayElement],
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<crate::flow_state::KeyTaint> {
+    let mut keys = crate::flow_state::KeyTaint::default();
+    let mut next_index: i64 = 0;
+    for el in elements {
+        if el.unpack || el.by_ref {
+            return None;
+        }
+        let key = match el.key.as_ref() {
+            None => {
+                let key = mir_types::Name::new(&next_index.to_string());
+                next_index += 1;
+                key
+            }
+            Some(key) => {
+                if let ExprKind::Int(i) = key.kind {
+                    next_index = next_index.max(i + 1);
+                }
+                literal_key_name(Some(key))?
+            }
+        };
+        keys.set(key, crate::taint::expr_taint(&el.value, ctx, db, file));
+    }
+    Some(keys)
+}
+
 /// Apply a compound-assignment's taint outcome to its target — shared by
 /// the arithmetic (`+=` family) and `??=` arms, both of which need the same
 /// four-way target-shape taint set/clear that `.=`'s own arm already
@@ -160,7 +226,7 @@ fn apply_compound_assign_taint(
         // cleared, since a single tainted element must not clean the whole
         // container just because THIS write happened to be untainted.
         ExprKind::ArrayAccess(aa) => {
-            taint_array_write_base(&aa.array, ctx, db, file, taint);
+            taint_array_element_write(aa, ctx, db, file, taint, false);
         }
         ExprKind::StaticPropertyAccess(spa) => {
             if let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, db, file) {
@@ -455,7 +521,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match &a.target.kind {
                     ExprKind::Variable(name) => {
                         ctx.invalidate_prop_refined_receiver(name);
-                        ctx.set_var_taint(name.as_ref(), rhs_taint);
+                        let keys = match &a.value.kind {
+                            ExprKind::Array(elements) => {
+                                array_literal_key_taints(elements, ctx, self.db, &self.file)
+                            }
+                            ExprKind::Variable(source) => ctx.key_taints(source).cloned(),
+                            _ => None,
+                        };
+                        match keys {
+                            Some(keys) if !a.by_ref => ctx.set_key_taints(name.as_ref(), keys),
+                            _ => ctx.set_var_taint(name.as_ref(), rhs_taint),
+                        }
                     }
                     ExprKind::PropertyAccess(pa) => {
                         if let ExprKind::Variable(obj_var) = &pa.object.kind {
@@ -483,7 +559,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // simple-variable base is tracked, matching every other
                     // taint-propagating target arm above.
                     ExprKind::ArrayAccess(aa) => {
-                        taint_array_write_base(&aa.array, ctx, self.db, &self.file, rhs_taint);
+                        taint_array_element_write(aa, ctx, self.db, &self.file, rhs_taint, true);
                     }
                     // `self::$prop = $tainted;` / `Foo::$prop = $tainted;` —
                     // static properties were entirely untracked for taint,
@@ -571,7 +647,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                         ExprKind::ArrayAccess(aa) => {
-                            taint_array_write_base(&aa.array, ctx, self.db, &self.file, rhs_taint);
+                            taint_array_element_write(
+                                aa, ctx, self.db, &self.file, rhs_taint, false,
+                            );
                         }
                         ExprKind::StaticPropertyAccess(spa) => {
                             if let Some((fqcn, prop_name)) =

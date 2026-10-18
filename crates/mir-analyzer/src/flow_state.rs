@@ -226,6 +226,10 @@ pub struct FlowState {
     /// Used by taint analysis.
     pub tainted_vars: FxHashMap<Name, Taint>,
 
+    /// Per-key taint of array variables whose literal-key writes are known;
+    /// a variable's `tainted_vars` entry stays the union of its keys.
+    pub tainted_keys: FxHashMap<Name, KeyTaint>,
+
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
@@ -636,6 +640,7 @@ impl FlowState {
             inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashMap::default(),
+            tainted_keys: FxHashMap::default(),
             tainted_props: FxHashMap::default(),
             tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),
@@ -1215,20 +1220,68 @@ impl FlowState {
 
     /// Add `taint` to whatever the variable already carries.
     pub fn taint_var(&mut self, name: &str, taint: Taint) {
-        add_taint(
-            &mut self.tainted_vars,
-            Name::from(name.trim_start_matches('$')),
-            taint,
-        );
+        let sym = Name::from(name.trim_start_matches('$'));
+        if let Some(keys) = self.tainted_keys.get_mut(&sym) {
+            keys.rest |= taint;
+        }
+        add_taint(&mut self.tainted_vars, sym, taint);
     }
 
     /// Replace the variable's taint; `Taint::NONE` clears it.
     pub fn set_var_taint(&mut self, name: &str, taint: Taint) {
-        set_taint(
-            &mut self.tainted_vars,
-            Name::from(name.trim_start_matches('$')),
-            taint,
-        );
+        let sym = Name::from(name.trim_start_matches('$'));
+        self.tainted_keys.remove(&sym);
+        set_taint(&mut self.tainted_vars, sym, taint);
+    }
+
+    /// Replace an array variable's taint with known per-key taint.
+    pub fn set_key_taints(&mut self, name: &str, keys: KeyTaint) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        set_taint(&mut self.tainted_vars, sym, keys.whole());
+        if keys.whole().is_empty() {
+            self.tainted_keys.remove(&sym);
+        } else {
+            self.tainted_keys.insert(sym, keys);
+        }
+    }
+
+    pub fn key_taints(&self, name: &str) -> Option<&KeyTaint> {
+        self.tainted_keys
+            .get(&Name::from(name.trim_start_matches('$')))
+    }
+
+    /// Record a write of `taint` to `$name[key]`; `None` is an append or a
+    /// dynamic key. `replace` overwrites the key's old taint.
+    pub fn write_key_taint(&mut self, name: &str, key: Option<Name>, taint: Taint, replace: bool) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        let whole = self.tainted_vars.get(&sym).copied().unwrap_or_default();
+        let Some(key) = key else {
+            self.taint_var(name, taint);
+            return;
+        };
+        if !self.tainted_keys.contains_key(&sym) && whole.is_empty() && taint.is_empty() {
+            return;
+        }
+        let keys = self.tainted_keys.entry(sym).or_insert_with(|| KeyTaint {
+            rest: whole,
+            keys: Vec::new(),
+        });
+        let taint = if replace {
+            taint
+        } else {
+            keys.get(key) | taint
+        };
+        keys.set(key, taint);
+        let whole = keys.whole();
+        set_taint(&mut self.tainted_vars, sym, whole);
+    }
+
+    /// Taint of `$name[key]`.
+    pub fn key_taint(&self, name: &str, key: Name) -> Taint {
+        match self.key_taints(name) {
+            Some(keys) => keys.get(key),
+            None => self.var_taint(name),
+        }
     }
 
     pub fn var_taint(&self, name: &str) -> Taint {
@@ -1779,6 +1832,7 @@ impl FlowState {
             result.prop_refined = Arc::new(merged_props);
         }
 
+        result.tainted_keys = merge_key_taints(&if_ctx, &else_ctx);
         // Taint: conservative union — if either branch taints a var, it stays tainted
         for (name, taint) in if_ctx
             .tainted_vars
@@ -1929,6 +1983,64 @@ pub(crate) fn self_is_trait(db: &dyn crate::db::MirDatabase, ctx: &FlowState) ->
     ctx.self_fqcn
         .as_deref()
         .is_some_and(|f| crate::db::class_kind(db, f).is_some_and(|k| k.is_trait))
+}
+
+/// Taint of each literal key of an array, and of every other key.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct KeyTaint {
+    pub rest: Taint,
+    pub keys: Vec<(Name, Taint)>,
+}
+
+impl KeyTaint {
+    pub fn get(&self, key: Name) -> Taint {
+        self.keys
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map_or(self.rest, |(_, t)| *t)
+    }
+
+    pub fn set(&mut self, key: Name, taint: Taint) {
+        match self.keys.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, t)) => *t = taint,
+            None => self.keys.push((key, taint)),
+        }
+    }
+
+    pub fn whole(&self) -> Taint {
+        self.keys.iter().fold(self.rest, |acc, (_, t)| acc | *t)
+    }
+
+    fn union(&self, other: &KeyTaint) -> KeyTaint {
+        let mut merged = KeyTaint {
+            rest: self.rest | other.rest,
+            keys: Vec::new(),
+        };
+        for (key, _) in self.keys.iter().chain(other.keys.iter()) {
+            merged.set(*key, self.get(*key) | other.get(*key));
+        }
+        merged
+    }
+}
+
+/// Per-key taint after two branches meet: kept where both sides know it, or
+/// where the side that doesn't holds no taint for the variable at all.
+fn merge_key_taints(a: &FlowState, b: &FlowState) -> FxHashMap<Name, KeyTaint> {
+    let mut merged = FxHashMap::default();
+    for name in a.tainted_keys.keys().chain(b.tainted_keys.keys()) {
+        if merged.contains_key(name) {
+            continue;
+        }
+        let side = |ctx: &FlowState| match ctx.tainted_keys.get(name) {
+            Some(keys) => Some(keys.clone()),
+            None if !ctx.tainted_vars.contains_key(name) => Some(KeyTaint::default()),
+            None => None,
+        };
+        if let (Some(left), Some(right)) = (side(a), side(b)) {
+            merged.insert(*name, left.union(&right));
+        }
+    }
+    merged
 }
 
 fn add_taint<K: std::hash::Hash + Eq>(map: &mut FxHashMap<K, Taint>, key: K, taint: Taint) {
