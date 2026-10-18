@@ -4,7 +4,7 @@ use std::process;
 use mir_issues::{Issue, Severity};
 
 use crate::config::{Baseline, Config, ErrorLevel};
-use crate::format::{format_issue, format_junit, format_sarif};
+use crate::format::{format_issue, format_junit, format_sarif, format_taint_trace};
 use crate::path_util::normalize_for_compare;
 use crate::{color, Cli, OutputFormat};
 
@@ -186,11 +186,19 @@ pub fn run_output(
                 let mut out = std::io::BufWriter::new(std::io::stdout().lock());
                 for issue in &display_issues {
                     let _ = writeln!(out, "{}", format_issue(issue));
+                    if let Some(trace) = format_taint_trace(issue) {
+                        let _ = writeln!(out, "{trace}");
+                    }
                 }
             }
         }
 
-        OutputFormat::Json => match serde_json::to_string_pretty(&display_issues) {
+        OutputFormat::Json => match serde_json::to_string_pretty(
+            &display_issues
+                .iter()
+                .map(|issue| JsonIssue::from(*issue))
+                .collect::<Vec<_>>(),
+        ) {
             Ok(json) => println!("{json}"),
             Err(e) => eprintln!("JSON serialization error: {e}"),
         },
@@ -366,4 +374,29 @@ fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
         }
     }
     file.to_string()
+}
+
+/// An issue as `--format json` prints it: `taint_trace` only on taint issues.
+#[derive(serde::Serialize)]
+struct JsonIssue<'a> {
+    kind: &'a mir_issues::IssueKind,
+    severity: Severity,
+    location: &'a mir_issues::Location,
+    snippet: &'a Option<String>,
+    suppressed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    taint_trace: Option<&'a [mir_issues::TaintStep]>,
+}
+
+impl<'a> From<&'a Issue> for JsonIssue<'a> {
+    fn from(issue: &'a Issue) -> Self {
+        JsonIssue {
+            kind: &issue.kind,
+            severity: issue.severity,
+            location: &issue.location,
+            snippet: &issue.snippet,
+            suppressed: issue.suppressed,
+            taint_trace: issue.taint_trace.as_deref(),
+        }
+    }
 }

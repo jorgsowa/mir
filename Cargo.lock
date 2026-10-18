@@ -915,6 +915,7 @@ dependencies = [
  "owo-colors",
  "quick-xml",
  "rayon",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror",

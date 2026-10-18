@@ -494,7 +494,7 @@ impl CallAnalyzer {
                 ea.taint_summary,
             ) {
                 reported.push(kind);
-                ea.emit(issue, Severity::Error, span);
+                ea.emit_taint(issue, span, value, kind.taint(), ctx);
             }
         }
 

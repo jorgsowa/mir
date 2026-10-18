@@ -54,6 +54,7 @@ mod stub_cache_correctness;
 mod symbol_at;
 mod symfony_full_project;
 mod tag_descriptions;
+mod taint_trace;
 mod type_env;
 mod user_stubs;
 mod var_docblock_split_html_block;

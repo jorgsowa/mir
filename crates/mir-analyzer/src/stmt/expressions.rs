@@ -110,6 +110,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         issue = issue.with_snippet(first_line.trim().to_string());
                     }
                 }
+                issue.taint_trace =
+                    self.expr_analyzer(ctx)
+                        .taint_trace(expr, crate::taint::Taint::HTML, ctx);
                 self.issues.add(issue);
             }
         }

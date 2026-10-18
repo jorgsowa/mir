@@ -376,6 +376,16 @@ impl<'a> StatementsAnalyzer<'a> {
         // `expr_taint` only needs the iterable expression + current
         // taint state, same timing as an assignment's RHS taint check.
         let iterable_taint = crate::taint::expr_taint(&fe.expr, ctx, self.db, &self.file);
+        let iterable_trail = (!iterable_taint.concrete().is_empty()).then(|| {
+            crate::taint::taint_trail(
+                &fe.expr,
+                iterable_taint.concrete(),
+                ctx,
+                self.db,
+                &self.file,
+                self.source,
+            )
+        });
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 
@@ -432,6 +442,12 @@ impl<'a> StatementsAnalyzer<'a> {
             let intentionally_unused = is_intentionally_unused_foreach_value(vname, &fe.body);
             entry.set_var(vname.as_str(), value_ty.clone());
             entry.taint_var(vname.as_str(), iterable_taint);
+            if let Some(trail) = &iterable_trail {
+                entry.taint_trails.insert(
+                    Name::from(vname.as_str()),
+                    crate::taint::extend_trail(trail.clone(), &fe.value, self.source),
+                );
+            }
             if value_is_by_ref {
                 // By-reference iteration: writes to this variable always mutate
                 // the source array through the reference, so they are never dead.

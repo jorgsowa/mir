@@ -306,7 +306,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             &self.file,
             self.taint_summary,
         ) {
-            self.emit(issue, Severity::Error, span);
+            self.emit_taint(issue, span, value, kind.taint(), ctx);
         }
     }
 

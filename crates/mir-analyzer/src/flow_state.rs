@@ -233,6 +233,9 @@ pub struct FlowState {
     /// Taint summaries of closures analyzed in this scope.
     pub closures: Arc<ClosureSummaries>,
 
+    /// How source data reached each tainted variable, source first.
+    pub taint_trails: FxHashMap<Name, Arc<[TrailStep]>>,
+
     /// Instance properties that carry tainted (user-controlled) values at
     /// this point, tracked the same way `prop_refined` tracks narrowed
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
@@ -645,6 +648,7 @@ impl FlowState {
             tainted_vars: FxHashMap::default(),
             tainted_keys: FxHashMap::default(),
             closures: Arc::default(),
+            taint_trails: FxHashMap::default(),
             tainted_props: FxHashMap::default(),
             tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),
@@ -1235,6 +1239,7 @@ impl FlowState {
     pub fn set_var_taint(&mut self, name: &str, taint: Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
         self.tainted_keys.remove(&sym);
+        self.taint_trails.remove(&sym);
         if self.closures.by_var.contains_key(&sym) {
             Arc::make_mut(&mut self.closures).by_var.remove(&sym);
         }
@@ -1855,6 +1860,13 @@ impl FlowState {
 
         result.tainted_keys = merge_key_taints(&if_ctx, &else_ctx);
         result.closures = merge_closures(&if_ctx.closures, &else_ctx.closures);
+        for (name, trail) in else_ctx
+            .taint_trails
+            .iter()
+            .chain(if_ctx.taint_trails.iter())
+        {
+            result.taint_trails.insert(*name, trail.clone());
+        }
         // Taint: conservative union — if either branch taints a var, it stays tainted
         for (name, taint) in if_ctx
             .tainted_vars
@@ -2005,6 +2017,13 @@ pub(crate) fn self_is_trait(db: &dyn crate::db::MirDatabase, ctx: &FlowState) ->
     ctx.self_fqcn
         .as_deref()
         .is_some_and(|f| crate::db::class_kind(db, f).is_some_and(|k| k.is_trait))
+}
+
+/// One hop of a taint trail: the expression's source text and span in this file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrailStep {
+    pub label: Arc<str>,
+    pub span: php_ast::Span,
 }
 
 /// How a closure literal moves taint, with the parameters its summary's labels refer to.

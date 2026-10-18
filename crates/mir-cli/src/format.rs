@@ -20,6 +20,17 @@ pub fn format_issue(issue: &Issue) -> String {
     )
 }
 
+/// The second line of a taint issue: how the data got from its source to the sink.
+pub fn format_taint_trace(issue: &Issue) -> Option<String> {
+    let steps = issue.taint_trace.as_deref()?;
+    let flow = steps
+        .iter()
+        .map(|step| format!("{} (line {})", step.label, step.location.line))
+        .collect::<Vec<_>>()
+        .join(" → ");
+    Some(format!("  {} {flow}", color::dim("= taint flow:")))
+}
+
 pub fn format_junit(issues: &[&Issue]) -> String {
     use std::collections::HashMap;
 
@@ -108,6 +119,39 @@ fn fnv1a(data: &str) -> u64 {
     hash
 }
 
+// SARIF 2.1.0 §3.30.5: columns are 1-based; col_start/col_end are 0-based.
+fn sarif_physical_location(location: &mir_issues::Location) -> serde_json::Value {
+    serde_json::json!({
+        "artifactLocation": {
+            "uri": location.file.as_ref(),
+            "uriBaseId": "%SRCROOT%",
+        },
+        "region": {
+            "startLine": location.line,
+            "endLine": location.line_end,
+            "startColumn": location.col_start + 1,
+            "endColumn": location.col_end + 1,
+        }
+    })
+}
+
+/// A taint issue's trace as a SARIF thread flow, source first.
+fn sarif_code_flows(issue: &Issue) -> Option<serde_json::Value> {
+    let steps = issue.taint_trace.as_deref()?;
+    let locations: Vec<serde_json::Value> = steps
+        .iter()
+        .map(|step| {
+            serde_json::json!({
+                "location": {
+                    "physicalLocation": sarif_physical_location(&step.location),
+                    "message": { "text": step.label },
+                }
+            })
+        })
+        .collect();
+    Some(serde_json::json!([{ "threadFlows": [{ "locations": locations }] }]))
+}
+
 pub fn format_sarif(issues: &[&Issue]) -> String {
     let mut rule_map: std::collections::HashMap<String, Severity> =
         std::collections::HashMap::new();
@@ -168,8 +212,7 @@ pub fn format_sarif(issues: &[&Issue]) -> String {
                 Severity::Info => 99.0,
             };
 
-            // SARIF 2.1.0 §3.30.5: columns are 1-based; col_start/col_end are 0-based.
-            serde_json::json!({
+            let mut result = serde_json::json!({
                 "ruleId": issue.kind.display_name(),
                 "level": level,
                 "rank": rank,
@@ -178,20 +221,13 @@ pub fn format_sarif(issues: &[&Issue]) -> String {
                     "primaryLocationLineHash": fingerprint,
                 },
                 "locations": [{
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": issue.location.file.as_ref(),
-                            "uriBaseId": "%SRCROOT%",
-                        },
-                        "region": {
-                            "startLine": issue.location.line,
-                            "endLine": issue.location.line_end,
-                            "startColumn": issue.location.col_start + 1,
-                            "endColumn": issue.location.col_end + 1,
-                        }
-                    }
-                }]
-            })
+                    "physicalLocation": sarif_physical_location(&issue.location),
+                }],
+            });
+            if let Some(flows) = sarif_code_flows(issue) {
+                result["codeFlows"] = flows;
+            }
+            result
         })
         .collect();
 
@@ -221,6 +257,74 @@ mod tests {
 
     use super::*;
 
+    /// Drops ANSI escapes so assertions don't depend on owo-colors' tty detection.
+    fn strip_ansi(raw: &str) -> String {
+        let mut out = String::new();
+        let mut chars = raw.chars();
+        while let Some(c) = chars.next() {
+            if c == '\u{1b}' {
+                for c2 in chars.by_ref() {
+                    if c2 == 'm' {
+                        break;
+                    }
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out
+    }
+
+    fn traced_issue() -> Issue {
+        let at = |line| Location {
+            file: Arc::from("a.php"),
+            line,
+            line_end: line,
+            col_start: 4,
+            col_end: 10,
+        };
+        let mut issue = Issue::new(IssueKind::TaintedHtml, at(5));
+        issue.taint_trace = Some(Box::new([
+            mir_issues::TaintStep {
+                label: "$_GET['q']".to_string(),
+                location: at(3),
+            },
+            mir_issues::TaintStep {
+                label: "$q".to_string(),
+                location: at(3),
+            },
+        ]));
+        issue
+    }
+
+    #[test]
+    fn taint_trace_lists_each_step_with_its_line() {
+        let trace = format_taint_trace(&traced_issue()).unwrap();
+        let stripped = strip_ansi(&trace);
+        assert_eq!(
+            stripped,
+            "  = taint flow: $_GET['q'] (line 3) → $q (line 3)"
+        );
+        let plain = Issue::new(IssueKind::TaintedHtml, traced_issue().location);
+        assert!(format_taint_trace(&plain).is_none());
+    }
+
+    #[test]
+    fn sarif_carries_the_taint_trace_as_a_code_flow() {
+        let traced = traced_issue();
+        let plain = Issue::new(IssueKind::TaintedSql, traced.location.clone());
+        let sarif: serde_json::Value =
+            serde_json::from_str(&format_sarif(&[&traced, &plain])).unwrap();
+        let results = &sarif["runs"][0]["results"];
+        let flow = &results[0]["codeFlows"][0]["threadFlows"][0]["locations"];
+        assert_eq!(flow[0]["location"]["message"]["text"], "$_GET['q']");
+        assert_eq!(
+            flow[1]["location"]["physicalLocation"]["region"]["startLine"],
+            3
+        );
+        assert!(results[1].get("codeFlows").is_none());
+    }
+
     #[test]
     fn format_issue_includes_code() {
         let issue = Issue::new(
@@ -235,25 +339,7 @@ mod tests {
                 col_end: 3,
             },
         );
-        // Strip ANSI escape sequences so the assertion isn't dependent on
-        // owo-colors' tty detection.
-        let raw = format_issue(&issue);
-        let stripped: String = {
-            let mut out = String::new();
-            let mut chars = raw.chars();
-            while let Some(c) = chars.next() {
-                if c == '\u{1b}' {
-                    for c2 in chars.by_ref() {
-                        if c2 == 'm' {
-                            break;
-                        }
-                    }
-                } else {
-                    out.push(c);
-                }
-            }
-            out
-        };
+        let stripped = strip_ansi(&format_issue(&issue));
         assert!(
             stripped.contains("error[MIR0005] UndefinedClass:"),
             "format_issue output missing code/name segment: {stripped:?}",

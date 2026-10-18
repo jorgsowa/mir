@@ -2250,6 +2250,14 @@ impl IssueKind {
 // Issue
 // ---------------------------------------------------------------------------
 
+/// One hop of user-controlled data on its way to a taint sink.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaintStep {
+    /// Source text of the expression holding the data at this hop.
+    pub label: String,
+    pub location: Location,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Issue {
     pub kind: IssueKind,
@@ -2257,6 +2265,9 @@ pub struct Issue {
     pub location: Location,
     pub snippet: Option<String>,
     pub suppressed: bool,
+    /// Where a taint issue's data came from, source first.
+    #[serde(default)]
+    pub taint_trace: Option<Box<[TaintStep]>>,
 }
 
 impl Issue {
@@ -2268,6 +2279,7 @@ impl Issue {
             location,
             snippet: None,
             suppressed: false,
+            taint_trace: None,
         }
     }
 

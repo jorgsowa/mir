@@ -527,6 +527,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match &a.target.kind {
                     ExprKind::Variable(name) => {
                         ctx.invalidate_prop_refined_receiver(name);
+                        let trail = (!rhs_taint.concrete().is_empty()).then(|| {
+                            crate::taint::taint_trail(
+                                &a.value,
+                                rhs_taint.concrete(),
+                                ctx,
+                                self.db,
+                                &self.file,
+                                self.source,
+                            )
+                        });
                         let keys = match &a.value.kind {
                             ExprKind::Array(elements) => {
                                 array_literal_key_taints(elements, ctx, self.db, &self.file)
@@ -555,6 +565,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         };
                         if let Some(closure) = closure.filter(|_| !a.by_ref) {
                             ctx.bind_closure(name.as_ref(), closure);
+                        }
+                        if let Some(trail) = trail {
+                            ctx.taint_trails.insert(
+                                mir_types::Name::from(name.trim_start_matches('$')),
+                                crate::taint::extend_trail(trail, &a.target, self.source),
+                            );
                         }
                     }
                     ExprKind::PropertyAccess(pa) => {

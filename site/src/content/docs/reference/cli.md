@@ -42,6 +42,13 @@ Paths default to the current directory when omitted.
 | `junit` | JUnit XML — compatible with most CI systems |
 | `sarif` | SARIF 2.1.0 — GitHub Code Scanning / VS Code |
 
+Taint issues also show how the data reached the sink, source first: a `= taint flow:` line in `text`, a `taint_trace` array in `json`, and `codeFlows` in `sarif`.
+
+```
+src/search.php:7:4 error[MIR0801] TaintedHtml: Tainted HTML output — possible XSS
+  = taint flow: $_GET['q'] (line 4) → $q (line 4) → trim($q) (line 5) → $label (line 5)
+```
+
 ## Exit codes
 
 | Code | Meaning |

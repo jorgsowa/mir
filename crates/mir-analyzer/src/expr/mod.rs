@@ -472,7 +472,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &self.file,
                     self.taint_summary,
                 ) {
-                    self.emit(IssueKind::TaintedShell, Severity::Error, expr.span);
+                    self.emit_taint(
+                        IssueKind::TaintedShell,
+                        expr.span,
+                        expr,
+                        crate::taint::Taint::SHELL,
+                        ctx,
+                    );
                 }
                 if self.db.is_forbidden_function("shell_exec") {
                     self.emit(
@@ -549,7 +555,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &self.file,
                     self.taint_summary,
                 ) {
-                    self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
+                    self.emit_taint(
+                        IssueKind::TaintedHtml,
+                        expr.span,
+                        inner,
+                        crate::taint::Taint::HTML,
+                        ctx,
+                    );
                 }
                 // @pure implies no side effects at all — same purity
                 // violation `echo` checks (stmt/expressions.rs), for the
@@ -750,12 +762,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &self.file,
                     self.taint_summary,
                 ) {
-                    self.emit(
+                    self.emit_taint(
                         IssueKind::TaintedInput {
                             sink: "include".to_string(),
                         },
-                        Severity::Error,
                         expr.span,
+                        inner,
+                        crate::taint::Taint::FILE,
+                        ctx,
                     );
                 }
                 // A require/include can read any variable currently in scope, so
@@ -792,12 +806,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &self.file,
                     self.taint_summary,
                 ) {
-                    self.emit(
+                    self.emit_taint(
                         IssueKind::TaintedInput {
                             sink: "eval".to_string(),
                         },
-                        Severity::Error,
                         expr.span,
+                        inner,
+                        crate::taint::Taint::EVAL,
+                        ctx,
                     );
                 }
                 Type::mixed()
@@ -823,7 +839,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self.taint_summary,
                         )
                     {
-                        self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
+                        self.emit_taint(
+                            IssueKind::TaintedHtml,
+                            expr.span,
+                            e,
+                            crate::taint::Taint::HTML,
+                            ctx,
+                        );
                     }
                 }
                 ctx.diverges = true;
@@ -1717,25 +1739,34 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
-        let (line, col_start) = self.offset_to_line_col(span.start);
+        let issue = self.build_issue(kind, severity, span);
+        self.issues.add(issue);
+    }
 
+    /// Location of `span` in the file under analysis.
+    pub(crate) fn span_location(&self, span: php_ast::Span) -> Location {
+        let (line, col_start) = self.offset_to_line_col(span.start);
         let (line_end, col_end) = if span.start < span.end {
-            let (end_line, end_col) = self.offset_to_line_col(span.end);
-            (end_line, end_col)
+            self.offset_to_line_col(span.end)
         } else {
             (line, col_start)
         };
+        Location {
+            file: self.file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        }
+    }
 
-        let mut issue = Issue::new(
-            kind,
-            Location {
-                file: self.file.clone(),
-                line,
-                line_end,
-                col_start,
-                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
-            },
-        );
+    pub(crate) fn build_issue(
+        &self,
+        kind: IssueKind,
+        severity: Severity,
+        span: php_ast::Span,
+    ) -> Issue {
+        let mut issue = Issue::new(kind, self.span_location(span));
         issue.severity = severity;
         // Store the source snippet for baseline matching.
         if span.start < span.end {
@@ -1748,7 +1779,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         }
-        self.issues.add(issue);
+        issue
     }
 
     /// Emit a clone diagnostic when `ty` is (possibly) not an object. `mixed`

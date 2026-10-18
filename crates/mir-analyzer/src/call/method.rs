@@ -1618,7 +1618,7 @@ fn resolve_method_return<'a>(
                     &ea.file,
                     ea.taint_summary,
                 ) {
-                    ea.emit(issue, Severity::Error, span);
+                    ea.emit_taint(issue, span, value, sink_kind.taint(), ctx);
                     break;
                 }
             }
