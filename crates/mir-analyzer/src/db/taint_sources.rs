@@ -256,6 +256,12 @@ impl OwnedVisitor for Scan<'_> {
             ExprKind::String(s) if s.contains("php://input") || s.contains("php://stdin") => {
                 self.facts.reads_source = true;
             }
+            ExprKind::ArrayAccess(aa) if crate::taint::is_globals_superglobal_alias(aa) => {
+                self.facts.reads_source = true;
+            }
+            ExprKind::ArrayAccess(aa) if crate::taint::is_trusted_superglobal_field(aa) => {
+                return ControlFlow::Continue(());
+            }
             ExprKind::Assign(a) => {
                 if let ExprKind::Variable(name) = &a.target.kind {
                     if let Some(class) = self.class_of(&a.value) {

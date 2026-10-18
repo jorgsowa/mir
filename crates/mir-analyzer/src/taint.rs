@@ -365,25 +365,62 @@ pub fn check_call_sinks(
 // Superglobal names (without the $ prefix, as stored in FlowState::vars)
 // ---------------------------------------------------------------------------
 
-pub const SUPERGLOBALS: &[&str] = &[
-    "_GET", "_POST", "_REQUEST", "_COOKIE", "_FILES", "_SERVER", "_ENV",
-];
+/// Superglobals holding request data; `$_ENV` comes from the process environment.
+pub const SUPERGLOBALS: &[&str] = &["_GET", "_POST", "_REQUEST", "_COOKIE", "_FILES", "_SERVER"];
 
 pub fn is_superglobal(name: &str) -> bool {
     SUPERGLOBALS.contains(&name)
 }
 
-/// `$_FILES[x]['tmp_name'|'size'|'error']` are set by PHP, not the client.
-fn is_server_generated_upload_field(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
-    let is_server_field = matches!(
-        aa.index.as_deref().map(|i| &i.kind),
-        Some(ExprKind::String(f)) if matches!(&**f, "tmp_name" | "size" | "error")
-    );
+/// `$_SERVER` keys a client controls; the rest come from the server or environment.
+fn is_request_server_key(key: &str) -> bool {
+    key.starts_with("HTTP_")
+        || matches!(
+            key,
+            "REQUEST_URI"
+                | "QUERY_STRING"
+                | "PHP_SELF"
+                | "PATH_INFO"
+                | "PATH_TRANSLATED"
+                | "ORIG_PATH_INFO"
+                | "REQUEST_METHOD"
+                | "CONTENT_TYPE"
+                | "CONTENT_LENGTH"
+                | "PHP_AUTH_USER"
+                | "PHP_AUTH_PW"
+                | "PHP_AUTH_DIGEST"
+                | "REMOTE_USER"
+                | "REDIRECT_URL"
+                | "REDIRECT_QUERY_STRING"
+                | "UNENCODED_URL"
+                | "SERVER_NAME"
+        )
+}
+
+fn is_superglobal_var(expr: &Expr, name: &str) -> bool {
+    matches!(&expr.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == name)
+}
+
+/// A superglobal entry PHP, the server or the environment sets rather than the
+/// client: `$_SERVER['DOCUMENT_ROOT']`, `$_FILES[x]['tmp_name']`.
+pub fn is_trusted_superglobal_field(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
+    let Some(ExprKind::String(key)) = aa.index.as_deref().map(|i| &i.kind) else {
+        return false;
+    };
+    if is_superglobal_var(&aa.array, "_SERVER") {
+        return !is_request_server_key(key);
+    }
     let ExprKind::ArrayAccess(file_entry) = &aa.array.kind else {
         return false;
     };
-    is_server_field
-        && matches!(&file_entry.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_FILES")
+    matches!(&**key, "tmp_name" | "size" | "error")
+        && is_superglobal_var(&file_entry.array, "_FILES")
+}
+
+/// `$GLOBALS['_GET']` reads the superglobal itself.
+pub fn is_globals_superglobal_alias(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
+    matches!(aa.index.as_deref().map(|i| &i.kind), Some(ExprKind::String(key)) if is_superglobal(key))
+        && is_superglobal_var(&aa.array, "GLOBALS")
 }
 
 // ---------------------------------------------------------------------------
@@ -790,8 +827,10 @@ pub fn expr_taint(
         }
 
         ExprKind::ArrayAccess(aa) => {
-            if is_server_generated_upload_field(aa) {
+            if is_trusted_superglobal_field(aa) {
                 Taint::NONE
+            } else if is_globals_superglobal_alias(aa) {
+                Taint::ALL
             } else {
                 expr_taint(&aa.array, ctx, db, file)
             }
