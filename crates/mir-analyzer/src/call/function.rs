@@ -451,7 +451,12 @@ impl CallAnalyzer {
         // A named argument is matched by parameter name, so reordering can't hide it.
         let fn_name_lower = crate::util::php_ident_lowercase(fn_name.trim_start_matches('\\'));
         let mut sink_values: Vec<(&php_ast::owned::Expr, SinkKind)> = Vec::new();
+        let format_text = crate::taint::format_text_args(&fn_name_lower, &call.args);
         for param in crate::taint::builtin_sinks(&fn_name_lower) {
+            if let (Some(text), SinkKind::Html) = (&format_text, param.kind) {
+                sink_values.extend(text.iter().map(|v| (*v, SinkKind::Html)));
+                continue;
+            }
             if param.kind == SinkKind::Unserialize
                 && crate::taint::unserialize_disallows_classes(&call.args)
             {

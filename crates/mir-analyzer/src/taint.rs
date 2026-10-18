@@ -1308,6 +1308,25 @@ pub fn expr_taint(
                 if let Some(restored) = unescaped_kinds(&lower_name) {
                     return args_taint(&fc.args, ctx, db, file).restore(restored);
                 }
+                if let Some(text) = format_text_args(&lower_name, &fc.args) {
+                    return text
+                        .into_iter()
+                        .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file));
+                }
+                // `JSON_HEX_TAG` encodes `<` and `>`, so the JSON can't open a tag.
+                if lower_name == "json_encode" {
+                    let taint = args_taint(&fc.args[..fc.args.len().min(1)], ctx, db, file);
+                    let hex_tag = fc
+                        .args
+                        .get(1)
+                        .and_then(|a| a.value.as_ref())
+                        .is_some_and(|flags| has_flag(flags, "JSON_HEX_TAG"));
+                    return if hex_tag {
+                        taint.without(Taint::HTML)
+                    } else {
+                        taint
+                    };
+                }
                 // `compact('id')` copies `$id`'s current value into the
                 // returned array; only literal names are resolved, matching
                 // `compact_return_type`.
@@ -1598,6 +1617,110 @@ fn reads_raw_request_body(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> 
         Some(ExprKind::String(path))
             if path.eq_ignore_ascii_case("php://input")
     )
+}
+
+/// Positions (among the values after the format) a printf-style format
+/// interpolates as text; numeric conversions (`%d`, `%.2f`, `%x`) can't carry
+/// a payload. `None` when the format is malformed.
+fn format_text_positions(format: &str) -> Option<Vec<usize>> {
+    let mut positions = Vec::new();
+    let mut next = 0;
+    let mut chars = format.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '%' {
+            continue;
+        }
+        if chars.peek() == Some(&'%') {
+            chars.next();
+            continue;
+        }
+        let mut digits = String::new();
+        while let Some(d) = chars.peek().copied().filter(char::is_ascii_digit) {
+            digits.push(d);
+            chars.next();
+        }
+        let position = if chars.peek() == Some(&'$') && !digits.is_empty() {
+            chars.next();
+            digits.parse::<usize>().ok()?.checked_sub(1)?
+        } else {
+            let position = next;
+            next += 1;
+            position
+        };
+        loop {
+            match chars.next()? {
+                '-' | '+' | ' ' | '0'..='9' | '.' => {}
+                '\'' => {
+                    chars.next()?;
+                }
+                's' | 'c' => {
+                    positions.push(position);
+                    break;
+                }
+                'b' | 'd' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 'h' | 'H' | 'o' | 'u' | 'x'
+                | 'X' => break,
+                _ => return None,
+            }
+        }
+    }
+    Some(positions)
+}
+
+/// The arguments of a printf-family call whose text ends up in the result:
+/// the format itself and the values it interpolates with `%s`. `None` when the
+/// call isn't printf-style.
+pub fn format_text_args<'e>(
+    fn_name_lower: &str,
+    args: &'e [php_ast::owned::Arg],
+) -> Option<Vec<&'e Expr>> {
+    let (format_index, values_as_array) = match fn_name_lower {
+        "sprintf" | "printf" => (0, false),
+        "fprintf" => (1, false),
+        "vsprintf" | "vprintf" => (0, true),
+        "vfprintf" => (1, true),
+        _ => return None,
+    };
+    if args.iter().any(|a| a.name.is_some() || a.unpack) {
+        return None;
+    }
+    let format = args.get(format_index)?.value.as_ref()?;
+    let values = || {
+        args.iter()
+            .skip(format_index + 1)
+            .filter_map(|a| a.value.as_ref())
+    };
+    let ExprKind::String(literal) = &format.kind else {
+        return Some(std::iter::once(format).chain(values()).collect());
+    };
+    let Some(positions) = format_text_positions(literal) else {
+        return Some(std::iter::once(format).chain(values()).collect());
+    };
+    if values_as_array {
+        return Some(if positions.is_empty() {
+            Vec::new()
+        } else {
+            values().collect()
+        });
+    }
+    Some(
+        values()
+            .enumerate()
+            .filter(|(i, _)| positions.contains(i))
+            .map(|(_, v)| v)
+            .collect(),
+    )
+}
+
+/// Whether a flags expression includes the constant `flag` (`A | B`).
+fn has_flag(expr: &Expr, flag: &str) -> bool {
+    match &expr.kind {
+        ExprKind::Identifier(name) => name.trim_start_matches('\\') == flag,
+        ExprKind::Binary(op) if op.op == php_ast::ast::BinaryOp::BitwiseOr => {
+            has_flag(&op.left, flag) || has_flag(&op.right, flag)
+        }
+        ExprKind::Parenthesized(inner) => has_flag(inner, flag),
+        _ => false,
+    }
 }
 
 /// Taint of a `filter_var()`/`filter_input()` result: validating filters
