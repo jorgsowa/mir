@@ -127,6 +127,8 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
                 | Taint::LDAP
                 | Taint::XPATH
         }
+        // Output is limited to `[A-Za-z0-9+/=]`.
+        "base64_encode" => Taint::HTML | Taint::HEADER | Taint::COOKIE,
         "md5" | "sha1" | "crc32" | "hash" | "hash_hmac" | "password_hash" | "bin2hex"
         | "dechex" | "decbin" | "decoct" | "number_format" | "uniqid" => Taint::ALL,
         _ => return None,

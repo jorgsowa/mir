@@ -139,13 +139,6 @@ pub(super) fn server_bag_read_taint(
     entry | args_taint(&args[1..], ctx, db, file)
 }
 
-pub(super) fn is_key_filter(lower_name: &str) -> bool {
-    matches!(
-        lower_name,
-        "array_intersect_key" | "array_diff_key" | "array_intersect_ukey" | "array_diff_ukey"
-    )
-}
-
 pub(super) fn is_superglobal_var(expr: &Expr, name: &str) -> bool {
     matches!(&expr.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == name)
 }

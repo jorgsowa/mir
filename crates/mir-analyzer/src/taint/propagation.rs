@@ -160,6 +160,74 @@ pub fn args_taint(
         .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file))
 }
 
+/// Argument positions whose data a builtin's result is built from; `None` when any argument may contribute.
+fn carrying_positions(lower_name: &str) -> Option<&'static [usize]> {
+    Some(match lower_name {
+        "get_debug_type" | "gettype" | "range" | "random_bytes" => &[],
+        // Only the first array contributes values; the rest are compared by key.
+        "array_intersect_key"
+        | "array_diff_key"
+        | "array_intersect_ukey"
+        | "array_diff_ukey"
+        | "substr"
+        | "mb_substr"
+        | "iconv_substr"
+        | "mb_strcut"
+        | "str_repeat"
+        | "str_split"
+        | "mb_str_split"
+        | "trim"
+        | "ltrim"
+        | "rtrim"
+        | "chop"
+        | "nl2br"
+        | "ucwords"
+        | "mb_convert_case"
+        | "array_slice"
+        | "array_chunk"
+        | "array_unique"
+        | "array_reverse"
+        | "array_column"
+        | "array_keys"
+        | "strstr"
+        | "stristr"
+        | "strrchr"
+        | "preg_quote"
+        | "json_decode"
+        | "hex2bin"
+        | "base_convert"
+        | "iterator_to_array"
+        | "date"
+        | "gmdate"
+        | "strftime"
+        | "gmstrftime" => &[0],
+        "explode" | "array_search" | "preg_split" => &[1],
+        "str_pad" | "wordwrap" | "chunk_split" | "array_pad" => &[0, 2],
+        "substr_replace" => &[0, 1],
+        "mb_strimwidth" => &[0, 3],
+        "array_fill" => &[2],
+        _ => return None,
+    })
+}
+
+/// Taint of a builtin's result: the arguments its value is built from, not the offsets, counts and formats.
+fn builtin_args_taint(
+    lower_name: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    let positional = args.iter().all(|a| !a.unpack && a.name.is_none());
+    match carrying_positions(lower_name) {
+        Some(positions) if positional => positions
+            .iter()
+            .filter_map(|&i| args.get(i)?.value.as_ref())
+            .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file)),
+        _ => args_taint(args, ctx, db, file),
+    }
+}
+
 /// The kinds of attacker-controlled data the expression could carry, given the
 /// current `FlowState` taint state.
 ///
@@ -475,13 +543,7 @@ pub fn expr_taint(
                     // is reported at the call itself.
                     let reads_path = classify_sink(&lower_name) == Some(SinkKind::File);
                     if !safe_return && !reads_path {
-                        // Only the first array contributes values; the rest are compared by key.
-                        let carrying = if is_key_filter(&lower_name) {
-                            &fc.args[..fc.args.len().min(1)]
-                        } else {
-                            &fc.args[..]
-                        };
-                        return args_taint(carrying, ctx, db, file);
+                        return builtin_args_taint(&lower_name, &fc.args, ctx, db, file);
                     }
                 }
             }

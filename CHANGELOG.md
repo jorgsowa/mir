@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A plain PSR-7 `RequestInterface` (an outgoing client request) is no longer a taint source; `getUri()`, `getHeader*()` and `getBody()` are tainted only on a `ServerRequestInterface`. A `Sub|Base` union left by a branch merge no longer counts `Sub` as a separate request source.
 - `$_SERVER[$key]` with a key unknown statically carries the taint of `$key` instead of the whole superglobal, so env-var helpers like `env('HOME')` no longer report tainted sinks; keys that can name a request entry (`HTTP_` prefix, a variable holding a request key) stay tainted. `array_intersect_key`/`array_diff_key` and their `u` variants take taint from the first array only.
 - `$request->server->get($key)` on a Symfony request applies the same key filter as `$_SERVER[$key]`: server-set entries (`DOCUMENT_ROOT`, `SCRIPT_NAME`) are clean, `HTTP_*` and other client-controlled keys stay tainted, and a dynamic key carries the taint of the key. A default argument still flows to the result.
+- A builtin's result carries only the taint of the arguments its value is built from: offsets, counts, formats and delimiters (`substr('abc', 0, $n)`, `date('Y', $ts)`, `str_pad($s, $n)`, `explode($sep, $s)`), the count of `array_fill(0, $n, '?')`, and `range()`/`gettype()`/`get_debug_type()`/`random_bytes()` results no longer taint it, so `implode(',', array_fill(0, $n, '?'))` in an `IN (...)` clause is not `TaintedSql`. Named or spread arguments keep the old all-arguments rule.
+- `base64_encode()` clears HTML, header and cookie taint.
 
 ## [0.88.0] - 2026-10-17
 
