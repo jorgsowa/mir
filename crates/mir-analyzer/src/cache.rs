@@ -68,6 +68,9 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
             }
             crate::recursion::walk_stmt(self, stmt)
         }
+        fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
+            crate::recursion::walk_expr(self, expr)
+        }
         fn visit_class_member(&mut self, member: &ClassMember) -> ControlFlow<()> {
             if let ClassMemberKind::Method(m) = &member.kind {
                 if m.return_type.is_some() {

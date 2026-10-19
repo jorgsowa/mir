@@ -90,3 +90,34 @@ fn nested_cross_file_return_type_inference() {
     ));
     analyze_on_small_stack(files);
 }
+
+#[test]
+fn nested_expression_at_parser_limit() {
+    let depth = 500;
+    let src = format!(
+        "<?php\nfunction f(int $x): int {{ return {}$x{}; }}\n",
+        "(".repeat(depth),
+        ")".repeat(depth)
+    );
+    let issues = analyze_on_small_stack(vec![("<test>", src)]);
+    assert!(issues.is_empty(), "{issues:?}");
+}
+
+#[test]
+fn nested_expression_beyond_parser_limit_on_worker_stack() {
+    let depth = 2000;
+    let src = format!(
+        "<?php\nfunction f(int $x): int {{ return {}$x{}; }}\n",
+        "(".repeat(depth),
+        ")".repeat(depth)
+    );
+    std::thread::Builder::new()
+        .stack_size(mir_analyzer::recursion::STACK_SIZE)
+        .spawn(move || {
+            let mut session = fresh_session(PhpVersion::LATEST);
+            session.ingest_file(Arc::from("<test>"), Arc::from(src.as_str()));
+        })
+        .unwrap()
+        .join()
+        .expect("analysis overflowed or panicked");
+}
