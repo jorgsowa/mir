@@ -398,7 +398,7 @@ pub(super) fn summarized_callee<'e>(
 }
 
 /// The arrays a builtin's result takes its elements from unchanged
-/// (`array_filter($xs, $f)`, `array_merge($a, $b)`).
+/// (`array_filter($xs, $f)`, `array_merge($a, $b)`, `reset($xs)`).
 pub(super) fn element_preserving_args<'e>(
     callee: &Expr,
     args: &'e [php_ast::owned::Arg],
@@ -437,7 +437,15 @@ pub(super) fn element_preserving_args<'e>(
         | "array_diff_assoc"
         | "array_intersect"
         | "array_intersect_key"
-        | "array_intersect_assoc" => Some(values(1)),
+        | "array_intersect_assoc"
+        | "reset"
+        | "end"
+        | "current"
+        | "pos"
+        | "next"
+        | "prev"
+        | "array_shift"
+        | "array_pop" => Some(values(1)),
         "array_merge" => Some(values(args.len())),
         _ => None,
     }
@@ -489,7 +497,7 @@ pub(super) fn type_may_hold_object(ty: &mir_types::Type) -> bool {
 
 /// Whether `expr`'s value may be, or contain, an object, judged from its shape
 /// and declared types; request data never is.
-pub(super) fn value_may_hold_object(
+pub fn value_may_hold_object(
     expr: &Expr,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
@@ -501,6 +509,7 @@ pub(super) fn value_may_hold_object(
         ExprKind::Variable(name) => {
             let name = name.trim_start_matches('$');
             !is_superglobal(name)
+                && !ctx.is_plain(name)
                 && declared(ctx.vars.get(&mir_types::Name::from(name)).map(|t| &**t))
         }
         ExprKind::ArrayAccess(aa) => value_may_hold_object(&aa.array, ctx, db, file),

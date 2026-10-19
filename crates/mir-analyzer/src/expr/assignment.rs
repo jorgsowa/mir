@@ -413,6 +413,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let rhs_taint = crate::taint::expr_taint(&a.value, ctx, self.db, &self.file);
+        let rhs_plain = !a.by_ref
+            && !rhs_taint.concrete().is_empty()
+            && !crate::taint::value_may_hold_object(&a.value, ctx, self.db, &self.file);
         let rhs_parts = if a.by_ref {
             Taint::NONE
         } else {
@@ -566,6 +569,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             _ => ctx.set_var_taint(name.as_ref(), rhs_taint),
                         }
                         ctx.set_param_parts(name.as_ref(), rhs_parts);
+                        if rhs_plain {
+                            ctx.mark_plain(name.as_ref());
+                        }
+                        if let (true, ExprKind::Variable(source)) = (a.by_ref, &a.value.kind) {
+                            ctx.clear_plain(mir_types::Name::from(source.trim_start_matches('$')));
+                        }
                         let mut value = a.value.as_ref();
                         while let ExprKind::Parenthesized(inner) = &value.kind {
                             value = inner;

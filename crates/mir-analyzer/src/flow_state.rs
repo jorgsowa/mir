@@ -253,6 +253,9 @@ pub struct FlowState {
     /// value rather than something computed from it; see `taint::param_parts`.
     pub param_parts: Arc<FxHashMap<Name, Taint>>,
 
+    /// Variables last assigned data no object can be part of; see `taint::value_may_hold_object`.
+    pub plain_vars: Arc<FxHashSet<Name>>,
+
     /// Label slots standing for parameters the body proves objects, shared by
     /// every branch of the body; see `taint::seed_object_guards`.
     pub object_guard_slots: Option<Arc<std::sync::Mutex<ObjectGuardSlots>>>,
@@ -677,6 +680,7 @@ impl FlowState {
             taint_trails: Arc::default(),
             summarizing_taint: false,
             param_parts: Arc::default(),
+            plain_vars: Arc::default(),
             object_guard_slots: None,
             tainted_props: Arc::default(),
             tainted_static_props: Arc::default(),
@@ -1316,6 +1320,7 @@ impl FlowState {
         }
         add_taint(&mut self.tainted_vars, sym, taint);
         self.drop_param_parts(sym, taint);
+        self.clear_plain(sym);
     }
 
     /// [`Self::taint_var`], where `parts` of `taint`'s label slots arrive as
@@ -1408,7 +1413,26 @@ impl FlowState {
         remove_entry(&mut self.tainted_keys, &sym);
         remove_entry(&mut self.taint_trails, &sym);
         self.unbind_closure(sym);
+        self.clear_plain(sym);
         set_taint(&mut self.tainted_vars, sym, taint);
+    }
+
+    /// Record that the variable now holds data no object can be part of.
+    pub fn mark_plain(&mut self, name: &str) {
+        Arc::make_mut(&mut self.plain_vars).insert(Name::from(name.trim_start_matches('$')));
+    }
+
+    pub fn is_plain(&self, name: &str) -> bool {
+        !self.plain_vars.is_empty()
+            && self
+                .plain_vars
+                .contains(&Name::from(name.trim_start_matches('$')))
+    }
+
+    pub fn clear_plain(&mut self, sym: Name) {
+        if self.plain_vars.contains(&sym) {
+            Arc::make_mut(&mut self.plain_vars).remove(&sym);
+        }
     }
 
     fn unbind_closure(&mut self, sym: Name) {
@@ -1435,6 +1459,7 @@ impl FlowState {
     pub fn set_key_taints(&mut self, name: &str, keys: KeyTaint) {
         let sym = Name::from(name.trim_start_matches('$'));
         remove_entry(&mut self.param_parts, &sym);
+        self.clear_plain(sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
         if keys.whole().is_empty() {
             remove_entry(&mut self.tainted_keys, &sym);
@@ -1476,6 +1501,7 @@ impl FlowState {
         let whole = keys.whole();
         set_taint(&mut self.tainted_vars, sym, whole);
         self.drop_param_parts(sym, added);
+        self.clear_plain(sym);
     }
 
     /// Taint of `$name[key]`.
@@ -2062,6 +2088,15 @@ impl FlowState {
             }
         }
         result.param_parts = merge_param_parts(&if_ctx, &else_ctx);
+        if !(if_ctx.plain_vars.is_empty() && else_ctx.plain_vars.is_empty()) {
+            result.plain_vars = Arc::new(
+                if_ctx
+                    .plain_vars
+                    .intersection(&else_ctx.plain_vars)
+                    .copied()
+                    .collect(),
+            );
+        }
         for branch in [&if_ctx, &else_ctx] {
             if !Arc::ptr_eq(&branch.tainted_props, &result.tainted_props) {
                 for (key, taint) in branch.tainted_props.iter() {
