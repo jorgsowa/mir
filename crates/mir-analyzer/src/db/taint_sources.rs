@@ -289,7 +289,7 @@ enum Inspect {
     Source,
     Callee(Callee),
     SkipChildren,
-    /// Only the index of an array read is a possible source.
+    /// Only the key operands of a read are possible sources.
     Index,
     Nothing,
 }
@@ -442,6 +442,22 @@ impl<'a> Scan<'a> {
         }
     }
 
+    fn is_server_bag_read(
+        &self,
+        object: &Expr,
+        method: &Expr,
+        args: &[php_ast::owned::Arg],
+    ) -> bool {
+        let (ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa)) = &object.kind
+        else {
+            return false;
+        };
+        crate::taint::server_bag_read_key(object, method, args).is_some()
+            && self.class_of(&pa.object).is_some_and(|class| {
+                crate::taint::is_request_bag_property(self.db, class.as_str(), "server")
+            })
+    }
+
     fn inspect(&self, expr: &Expr) -> Inspect {
         match &expr.kind {
             ExprKind::Variable(name)
@@ -497,6 +513,14 @@ impl<'a> Scan<'a> {
                 } else {
                     let resolved = crate::db::resolve_name(self.db, self.path, name.as_ref());
                     Inspect::Callee(Callee::Function(Name::new(&resolved)))
+                }
+            }
+            ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc)
+                if self.is_server_bag_read(&mc.object, &mc.method, &mc.args) =>
+            {
+                match crate::taint::server_bag_read_key(&mc.object, &mc.method, &mc.args) {
+                    Some(key) if crate::taint::is_request_server_key_expr(key) => Inspect::Source,
+                    _ => Inspect::Index,
                 }
             }
             ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
@@ -568,6 +592,12 @@ impl<'a> Scan<'a> {
 
 fn visit_index<V: OwnedVisitor>(visitor: &mut V, expr: &Expr) -> ControlFlow<()> {
     match &expr.kind {
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            for value in mc.args.iter().filter_map(|a| a.value.as_ref()) {
+                visitor.visit_expr(value)?;
+            }
+            ControlFlow::Continue(())
+        }
         ExprKind::ArrayAccess(aa) => aa
             .index
             .as_deref()

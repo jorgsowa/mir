@@ -1660,6 +1660,53 @@ fn server_dynamic_read_taint(
     expr_taint(key, ctx, db, file)
 }
 
+/// Key argument of a Symfony `$request->server->get($key)` read, when the receiver is the `server` bag.
+pub fn server_bag_read_key<'a>(
+    object: &Expr,
+    method: &Expr,
+    args: &'a [php_ast::owned::Arg],
+) -> Option<&'a Expr> {
+    let first = args.first().filter(|a| !a.unpack && a.name.is_none())?;
+    let (ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa)) =
+        &unwrap_parens(object).kind
+    else {
+        return None;
+    };
+    let (ExprKind::Identifier(prop) | ExprKind::String(prop)) = &pa.property.kind else {
+        return None;
+    };
+    let ExprKind::Identifier(method) = &method.kind else {
+        return None;
+    };
+    (&**prop == "server"
+        && ["get", "getstring", "filter"]
+            .iter()
+            .any(|name| method.eq_ignore_ascii_case(name)))
+    .then_some(first.value.as_ref()?)
+}
+
+/// Whether a key expression names a client-controlled `$_SERVER` entry.
+pub fn is_request_server_key_expr(key: &Expr) -> bool {
+    starts_with_header_prefix(key)
+        || matches!(&unwrap_parens(key).kind, ExprKind::String(k) if is_request_server_key(k))
+}
+
+/// Taint of a `$request->server->get($key, $default)` read.
+fn server_bag_read_taint(
+    key: &Expr,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    let entry = match &unwrap_parens(key).kind {
+        ExprKind::String(k) if is_request_server_key(k) => Taint::ALL,
+        ExprKind::String(_) => Taint::NONE,
+        _ => server_dynamic_read_taint(key, ctx, db, file),
+    };
+    entry | args_taint(&args[1..], ctx, db, file)
+}
+
 fn is_key_filter(lower_name: &str) -> bool {
     matches!(
         lower_name,
@@ -2614,6 +2661,11 @@ pub fn expr_taint(
         }),
 
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            if let Some(key) = server_bag_read_key(&mc.object, &mc.method, &mc.args) {
+                if is_server_bag_receiver(&mc.object, ctx, db, file) {
+                    return server_bag_read_taint(key, &mc.args, ctx, db, file);
+                }
+            }
             // A tainted object's methods return its data (`$request->query->get('q')`).
             let receiver = expr_taint(&mc.object, ctx, db, file);
             let ExprKind::Identifier(method_name) = &mc.method.kind else {
@@ -2713,6 +2765,27 @@ pub fn expr_taint(
 
         _ => Taint::NONE,
     }
+}
+
+fn is_server_bag_receiver(
+    object: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    let (ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa)) =
+        &unwrap_parens(object).kind
+    else {
+        return false;
+    };
+    crate::expr::assignment::resolve_chained_receiver_type(&pa.object, ctx, db, file).is_some_and(
+        |ty| {
+            ty.types.iter().all(|atom| {
+                matches!(atom, mir_types::Atomic::TNamedObject { fqcn, .. }
+                    if is_request_bag_property(db, fqcn.as_ref(), "server"))
+            })
+        },
+    )
 }
 
 /// Classes an object expression may be an instance of.
