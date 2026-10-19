@@ -114,12 +114,12 @@ fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ct
         php_ast::owned::StmtKind::StaticVar(vars) => {
             if annotation.name.is_some() {
                 for sv in vars.iter() {
-                    if let Some(name) = sv.name.as_deref() {
+                    if let Some(name) = sv.name.as_str() {
                         apply(name.trim_start_matches('$'), ctx);
                     }
                 }
             } else if let [sv] = vars.as_ref() {
-                if let Some(name) = sv.name.as_deref() {
+                if let Some(name) = sv.name.as_str() {
                     apply(name.trim_start_matches('$'), ctx);
                 }
             }
@@ -758,6 +758,7 @@ impl<'a> StatementsAnalyzer<'a> {
             | StmtKind::HaltCompiler(_) => {}
 
             StmtKind::Error => {}
+            _ => {}
         }
 
         // Post-narrow: after `$x = expr()`, override the inferred type if annotated.
@@ -935,7 +936,7 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     fn record_global_const_decl_name(&mut self, item: &php_ast::owned::ConstItem) {
-        let Some(name) = item.name.as_deref().filter(|n| !n.is_empty()) else {
+        let Some(name) = item.name.as_str().filter(|n| !n.is_empty()) else {
             return;
         };
         let span = crate::body_analysis::bare_name_span_in(self.source, &item.span, name);

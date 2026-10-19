@@ -2421,6 +2421,7 @@ pub fn expr_taint(
         | ExprKind::ShellExec(parts) => parts.iter().fold(Taint::NONE, |acc, p| match p {
             StringPart::Expr(e) => acc | expr_taint(e, ctx, db, file),
             StringPart::Literal(_) => acc,
+            _ => acc,
         }),
 
         // Short ternary (`$x ?: $y`): the true branch's value is the condition itself.
@@ -2786,6 +2787,7 @@ pub fn taint_trail(
         | ExprKind::ShellExec(parts) => first(&mut parts.iter().filter_map(|p| match p {
             StringPart::Expr(e) => Some(e),
             StringPart::Literal(_) => None,
+            _ => None,
         })),
         ExprKind::Array(elements) => first(
             &mut elements
@@ -2933,7 +2935,7 @@ pub fn arrow_summary(
         .iter()
         .map(|p| {
             (
-                mir_types::Name::new(p.name.as_deref().unwrap_or("")),
+                mir_types::Name::new(p.name.as_str().unwrap_or("")),
                 p.variadic,
             )
         })

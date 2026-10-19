@@ -359,6 +359,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             CastKind::Object => Type::single(Atomic::TObject),
             CastKind::Unset | CastKind::Void => Type::single(Atomic::TNull),
+            _ => Type::mixed(),
         }
     }
 

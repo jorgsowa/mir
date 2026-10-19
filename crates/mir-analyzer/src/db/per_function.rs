@@ -66,7 +66,7 @@ fn find_function_decl<'a>(
             return;
         }
         if let StmtKind::Function(decl) = &stmt.kind {
-            let name = decl.name.as_deref().unwrap_or("");
+            let name = decl.name.as_str().unwrap_or("");
             let _scope = crate::db::ns_scope::enter(db, file, stmt.span.start);
             if !name.is_empty() && crate::db::resolve_name(db, file, name) == target_fqn {
                 found = Some((decl, stmt.span.start));

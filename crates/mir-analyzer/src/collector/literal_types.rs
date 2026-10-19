@@ -109,13 +109,14 @@ impl OwnedVisitor for WriteScanner {
                     NamespaceBody::Simple => {
                         self.ns = ns;
                     }
+                    _ => {}
                 }
             }
             StmtKind::Class(decl) => {
                 self.enter_static_scope(
                     decl.name
                         .as_ref()
-                        .and_then(|n| n.as_deref())
+                        .and_then(|n| n.as_str())
                         .map(str::to_owned),
                 );
                 let flow = crate::recursion::walk_stmt(self, stmt);
@@ -123,13 +124,13 @@ impl OwnedVisitor for WriteScanner {
                 return flow;
             }
             StmtKind::Trait(decl) => {
-                self.enter_static_scope(decl.name.as_deref().map(str::to_owned));
+                self.enter_static_scope(decl.name.as_str().map(str::to_owned));
                 let flow = crate::recursion::walk_stmt(self, stmt);
                 self.exit_static_scope();
                 return flow;
             }
             StmtKind::Enum(decl) => {
-                self.enter_static_scope(decl.name.as_deref().map(str::to_owned));
+                self.enter_static_scope(decl.name.as_str().map(str::to_owned));
                 let flow = crate::recursion::walk_stmt(self, stmt);
                 self.exit_static_scope();
                 return flow;

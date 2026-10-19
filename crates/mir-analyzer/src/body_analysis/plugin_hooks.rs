@@ -67,7 +67,7 @@ impl<'a> BodyAnalyzer<'a> {
         declared: Option<&[mir_codebase::DeclaredParam]>,
         file: &Arc<str>,
     ) -> FunctionLikeParamInfo {
-        let name = param.name.as_deref().unwrap_or("").to_string();
+        let name = param.name.as_str().unwrap_or("").to_string();
         let declared_type = declared
             .and_then(|d| d.iter().find(|p| p.name.as_ref() == name))
             .and_then(|p| p.ty.as_ref())

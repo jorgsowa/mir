@@ -152,6 +152,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     Type::single(Atomic::TInt)
                 }
             }
+            _ => Type::mixed(),
         }
     }
 
@@ -221,6 +222,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 operand_ty
             }
+            _ => operand_ty,
         }
     }
 }

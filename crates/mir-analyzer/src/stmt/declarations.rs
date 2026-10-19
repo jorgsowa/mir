@@ -20,57 +20,57 @@ impl<'a> StatementsAnalyzer<'a> {
         strict_types: bool,
     ) {
         for hook in hooks {
-            let params: Vec<mir_codebase::DeclaredParam> =
-                if hook.params.is_empty() && matches!(hook.kind, PropertyHookKind::Set) {
-                    vec![mir_codebase::DeclaredParam {
-                        closure_this: None,
-                        name: Name::new("value"),
-                        ty: mir_codebase::wrap_param_type(property_ty.clone()),
-                        out_ty: None,
-                        doc_type_raw: None,
-                        doc_type_file: None,
-                        has_default: false,
-                        default_text: None,
-                        is_variadic: false,
-                        is_byref: hook.by_ref,
-                        is_optional: false,
-                    }]
-                } else {
-                    hook.params
-                        .iter()
-                        .enumerate()
-                        .map(|(i, p)| {
-                            let explicit_ty = p.type_hint.as_ref().map(|hint| {
-                                crate::parser::type_from_hint_owned(hint, Some(fqcn.as_ref()))
-                            });
-                            let ty = explicit_ty.or_else(|| {
-                                if matches!(hook.kind, PropertyHookKind::Set) && i == 0 {
-                                    property_ty.clone()
-                                } else {
-                                    None
-                                }
-                            });
-                            mir_codebase::DeclaredParam {
-                                closure_this: None,
-                                name: Name::new(
-                                    p.name.as_deref().unwrap_or("").trim_start_matches('$'),
-                                ),
-                                ty: mir_codebase::wrap_param_type(ty),
-                                out_ty: None,
-                                doc_type_raw: None,
-                                doc_type_file: None,
-                                has_default: p.default.is_some(),
-                                default_text: None,
-                                is_variadic: p.variadic,
-                                is_byref: p.by_ref,
-                                is_optional: p.default.is_some() || p.variadic,
+            let params: Vec<mir_codebase::DeclaredParam> = if hook.params.is_empty()
+                && matches!(hook.kind, PropertyHookKind::Set)
+            {
+                vec![mir_codebase::DeclaredParam {
+                    closure_this: None,
+                    name: Name::new("value"),
+                    ty: mir_codebase::wrap_param_type(property_ty.clone()),
+                    out_ty: None,
+                    doc_type_raw: None,
+                    doc_type_file: None,
+                    has_default: false,
+                    default_text: None,
+                    is_variadic: false,
+                    is_byref: hook.by_ref,
+                    is_optional: false,
+                }]
+            } else {
+                hook.params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| {
+                        let explicit_ty = p.type_hint.as_ref().map(|hint| {
+                            crate::parser::type_from_hint_owned(hint, Some(fqcn.as_ref()))
+                        });
+                        let ty = explicit_ty.or_else(|| {
+                            if matches!(hook.kind, PropertyHookKind::Set) && i == 0 {
+                                property_ty.clone()
+                            } else {
+                                None
                             }
-                        })
-                        .collect()
-                };
+                        });
+                        mir_codebase::DeclaredParam {
+                            closure_this: None,
+                            name: Name::new(p.name.as_str().unwrap_or("").trim_start_matches('$')),
+                            ty: mir_codebase::wrap_param_type(ty),
+                            out_ty: None,
+                            doc_type_raw: None,
+                            doc_type_file: None,
+                            has_default: p.default.is_some(),
+                            default_text: None,
+                            is_variadic: p.variadic,
+                            is_byref: p.by_ref,
+                            is_optional: p.default.is_some() || p.variadic,
+                        }
+                    })
+                    .collect()
+            };
             let return_ty = match hook.kind {
                 PropertyHookKind::Get => property_ty.clone(),
                 PropertyHookKind::Set => Some(mir_types::Type::void()),
+                _ => None,
             };
             let mut hook_ctx = FlowState::for_method(
                 &params,
@@ -86,6 +86,7 @@ impl<'a> StatementsAnalyzer<'a> {
             hook_ctx.current_method_name = Some(Arc::from(match hook.kind {
                 PropertyHookKind::Get => "__property_get",
                 PropertyHookKind::Set => "__property_set",
+                _ => "__property_hook",
             }));
             for p in hook.params.iter() {
                 if let Some(default) = &p.default {
@@ -95,7 +96,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
             for p in hook.params.iter() {
-                if let Some(raw) = p.name.as_deref() {
+                if let Some(raw) = p.name.as_str() {
                     let trimmed = raw.trim_start_matches('$');
                     let ty = hook_ctx.get_var(trimmed);
                     self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
@@ -129,6 +130,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     let _ = ea.analyze(expr, &mut hook_ctx);
                 }
                 PropertyHookBody::Abstract => {}
+                _ => {}
             }
         }
     }
@@ -142,7 +144,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Look up the function in the database to get resolved parameter types
-        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
+        let fn_name = decl.name.as_str().unwrap_or("").to_string();
         let resolve_fn =
             |fqn: &str| -> Option<(Vec<mir_codebase::DeclaredParam>, Option<mir_types::Type>)> {
                 let db = self.db;
@@ -167,7 +169,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .iter()
                     .map(|p| mir_codebase::DeclaredParam {
                         closure_this: None,
-                        name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Name::new(p.name.as_str().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,
                         doc_type_raw: None,
@@ -189,7 +191,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 .iter()
                 .map(|p| mir_codebase::DeclaredParam {
                     closure_this: None,
-                    name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                    name: Name::new(p.name.as_str().unwrap_or("").trim_start_matches('$')),
                     ty: None,
                     out_ty: None,
                     doc_type_raw: None,
@@ -226,7 +228,7 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
         for p in decl.params.iter() {
-            if let Some(raw) = p.name.as_deref() {
+            if let Some(raw) = p.name.as_str() {
                 let trimmed = raw.trim_start_matches('$');
                 let ty = fn_ctx.get_var(trimmed);
                 self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
@@ -257,7 +259,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let class_name = decl
             .name
             .as_ref()
-            .and_then(|i| i.as_deref())
+            .and_then(|i| i.as_str())
             .unwrap_or("<anonymous>");
         let resolved = crate::db::resolve_name(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
@@ -265,7 +267,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Anonymous classes are not collected into the DB (the collector skips
         // them), so `find_class_like` always returns None for them. Derive the
         // parent FQCN directly from the AST extends clause instead.
-        let parent_fqcn = if decl.name.as_ref().and_then(|i| i.as_deref()).is_some() {
+        let parent_fqcn = if decl.name.as_ref().and_then(|i| i.as_str()).is_some() {
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned())
         } else {
             decl.extends.as_ref().map(|parent_name| {
@@ -325,13 +327,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(default) = &prop.default {
                     let mut ea = self.expr_analyzer(&param_default_ctx);
                     let _ = ea.analyze(default, &mut param_default_ctx);
-                    self.check_property_default_range(&fqcn, prop.name.as_deref(), default);
+                    self.check_property_default_range(&fqcn, prop.name.as_str(), default);
                 }
                 if !prop.hooks.is_empty() {
                     let property_ty = crate::db::find_property_in_class(
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
-                        prop.name.as_deref().unwrap_or(""),
+                        prop.name.as_str().unwrap_or(""),
                     )
                     .and_then(|def| def.ty.as_deref().cloned())
                     .or_else(|| {
@@ -352,7 +354,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-            let method_name = method.name.as_deref().unwrap_or("");
+            let method_name = method.name.as_str().unwrap_or("");
             let declared_params = crate::db::find_method_in_chain(
                 self.db,
                 crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
@@ -376,7 +378,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     if p.visibility.is_none() || p.hooks.is_empty() {
                         continue;
                     }
-                    let property_name = p.name.as_deref().unwrap_or("").trim_start_matches('$');
+                    let property_name = p.name.as_str().unwrap_or("").trim_start_matches('$');
                     let property_ty = crate::db::find_property_in_class(
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
@@ -414,7 +416,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .iter()
                     .map(|p| mir_codebase::DeclaredParam {
                         closure_this: None,
-                        name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Name::new(p.name.as_str().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,
                         doc_type_raw: None,
@@ -450,7 +452,7 @@ impl<'a> StatementsAnalyzer<'a> {
             );
             method_ctx.current_method_name = Some(Arc::from(method_name));
             for p in method.params.iter() {
-                if let Some(raw) = p.name.as_deref() {
+                if let Some(raw) = p.name.as_str() {
                     let trimmed = raw.trim_start_matches('$');
                     let ty = method_ctx.get_var(trimmed);
                     self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
@@ -499,7 +501,7 @@ impl<'a> StatementsAnalyzer<'a> {
         p: &Param,
         declared_params: &[mir_codebase::DeclaredParam],
     ) {
-        let (Some(default), Some(raw)) = (&p.default, p.name.as_deref()) else {
+        let (Some(default), Some(raw)) = (&p.default, p.name.as_str()) else {
             return;
         };
         let name = raw.trim_start_matches('$');

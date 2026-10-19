@@ -40,6 +40,7 @@ pub fn type_from_hint(hint: &TypeHint<'_, '_>, context_fqcn: Option<&str>) -> Ty
             let name_str = name_to_string(name);
             named_type_to_union(&name_str, context_fqcn)
         }
+        _ => Type::mixed(),
     }
 }
 
@@ -97,6 +98,7 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
                 Type::single(Atomic::TObject)
             }
         }
+        _ => Type::mixed(),
     }
 }
 
@@ -177,5 +179,6 @@ pub fn type_from_hint_owned(hint: &php_ast::owned::TypeHint, context_fqcn: Optio
             let name_str = super::name_to_string_owned(name);
             named_type_to_union(&name_str, context_fqcn)
         }
+        _ => Type::mixed(),
     }
 }

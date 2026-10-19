@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Parser crates updated to 0.23: faster parsing (~13% on a 96 MB corpus) and a nesting limit of 512 instead of a lower one.
 - Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
 
 ### Fixed

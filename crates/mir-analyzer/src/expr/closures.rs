@@ -558,7 +558,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         closure_ctx.is_in_immutable_ctor = ctx.is_in_immutable_ctor;
         propagate_readonly_prop_refinements(self.db, ctx, &mut closure_ctx);
         for p in c.params.iter() {
-            if let Some(raw) = p.name.as_deref() {
+            if let Some(raw) = p.name.as_str() {
                 let trimmed = raw.trim_start_matches('$');
                 let ty = closure_ctx.get_var(trimmed);
                 self.record_symbol(
@@ -897,10 +897,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // explicit `use()` list), so taint on any of them must carry over too.
         arrow_ctx.tainted_vars = ctx.tainted_vars.clone();
         for param in af.params.iter() {
-            arrow_ctx.set_var_taint(
-                param.name.as_deref().unwrap_or(""),
-                crate::taint::Taint::NONE,
-            );
+            arrow_ctx.set_var_taint(param.name.as_str().unwrap_or(""), crate::taint::Taint::NONE);
         }
         arrow_ctx.closures = ctx.closures.clone();
         arrow_ctx.summarizing_taint = ctx.summarizing_taint;
@@ -948,7 +945,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         for p in af.params.iter() {
-            if let Some(raw) = p.name.as_deref() {
+            if let Some(raw) = p.name.as_str() {
                 let trimmed = raw.trim_start_matches('$');
                 // Use arrow_ctx.get_var to get the resolved type (params take priority
                 // over outer-scope vars of the same name since they were inserted first).

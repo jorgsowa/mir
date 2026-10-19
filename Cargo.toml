@@ -29,10 +29,10 @@ mir-plugin     = { path = "crates/mir-plugin",     version = "0.88.0" }
 mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.88.0" }
 
 # PHP parsing
-php-rs-parser   = "0.21.0"
-php-ast         = "0.21.0"
-php-lexer       = "0.21.0"
-phpdoc-parser   = "0.21.0"
+php-rs-parser   = "0.23.0"
+php-ast         = "0.23.0"
+php-lexer       = "0.23.0"
+phpdoc-parser   = "0.23.0"
 # Data structures
 indexmap = { version = "2", features = ["serde"] }
 smallvec = { version = "1", features = ["union", "serde"] }

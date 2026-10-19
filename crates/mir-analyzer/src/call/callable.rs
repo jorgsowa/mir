@@ -893,7 +893,7 @@ pub(crate) fn single_param_predicate_body(callback_expr: &Expr) -> Option<(&str,
     let [param] = &**params else {
         return None;
     };
-    let param_name = param.name.as_deref()?.trim_start_matches('$');
+    let param_name = param.name.as_str()?.trim_start_matches('$');
     Some((param_name, unwrap_parens(body)))
 }
 

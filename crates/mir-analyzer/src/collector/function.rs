@@ -61,7 +61,7 @@ pub(crate) fn stmts_use_func_get_args(stmts: &[php_ast::owned::Stmt]) -> bool {
                         .iter()
                         .any(|a| a.value.as_ref().is_some_and(check_expr))
             }
-            StaticDynMethodCall(e) => {
+            StaticMethodCallDynamic(e) => {
                 check_expr(&e.class)
                     || check_expr(&e.method)
                     || e.args
@@ -80,7 +80,7 @@ pub(crate) fn stmts_use_func_get_args(stmts: &[php_ast::owned::Stmt]) -> bool {
             }
             PropertyAccess(e) | NullsafePropertyAccess(e) => check_expr(&e.object),
             Include(_, e) => check_expr(e),
-            ThrowExpr(e) | Print(e) | Clone(e) | Empty(e) | ErrorSuppress(e) | Parenthesized(e)
+            Throw(e) | Print(e) | Clone(e) | Empty(e) | ErrorSuppress(e) | Parenthesized(e)
             | Eval(e) | Exit(Some(e)) => check_expr(e),
             Yield(e) => {
                 e.key.as_ref().is_some_and(|k| check_expr(k))
@@ -161,7 +161,7 @@ impl DefinitionCollector<'_> {
         decl: &php_ast::owned::FunctionDecl,
         stmt_span: php_ast::Span,
     ) {
-        let short_name = decl.name.as_deref().unwrap_or_default().to_string();
+        let short_name = decl.name.as_str().unwrap_or_default().to_string();
         let fqn = if let Some(ns) = &self.namespace {
             format!("{ns}\\{short_name}")
         } else {
@@ -237,7 +237,7 @@ impl DefinitionCollector<'_> {
             if !self.version_attr_available(&p.attributes) {
                 continue;
             }
-            let param_name = p.name.as_deref().unwrap_or_default();
+            let param_name = p.name.as_str().unwrap_or_default();
             let has_native_type =
                 p.type_hint.is_some() || self.version_attr_type_string(&p.attributes).is_some();
             let native_ty =

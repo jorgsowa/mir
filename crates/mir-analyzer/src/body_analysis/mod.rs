@@ -326,7 +326,7 @@ fn lookup_function_node_for_decl(
     let source_file = db.lookup_source_file(file)?;
     let (body_line, body_col) =
         crate::diagnostics::offset_to_line_col(source, decl.body.span.start, source_map);
-    let short_name = decl.name.as_deref().unwrap_or("");
+    let short_name = decl.name.as_str().unwrap_or("");
 
     let definition = crate::db::collect_file_definitions(db, source_file)
         .slice
@@ -413,7 +413,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
         .iter()
         .map(|p| mir_codebase::DeclaredParam {
             closure_this: None,
-            name: Name::new(p.name.as_deref().unwrap_or("")),
+            name: Name::new(p.name.as_str().unwrap_or("")),
             ty: None,
             out_ty: None,
             doc_type_raw: None,
@@ -459,7 +459,7 @@ fn collect_decl_spans(
     for stmt in stmts {
         match &stmt.kind {
             StmtKind::Class(d) => {
-                let name = d.name.as_ref().and_then(|n| n.as_deref()).unwrap_or("");
+                let name = d.name.as_ref().and_then(|n| n.as_str()).unwrap_or("");
                 out.push((
                     format!("{current_prefix}{name}"),
                     stmt.span,
@@ -467,7 +467,7 @@ fn collect_decl_spans(
                 ));
             }
             StmtKind::Interface(d) => {
-                let name = d.name.as_deref().unwrap_or("");
+                let name = d.name.as_str().unwrap_or("");
                 out.push((
                     format!("{current_prefix}{name}"),
                     stmt.span,
@@ -475,7 +475,7 @@ fn collect_decl_spans(
                 ));
             }
             StmtKind::Trait(d) => {
-                let name = d.name.as_deref().unwrap_or("");
+                let name = d.name.as_str().unwrap_or("");
                 out.push((
                     format!("{current_prefix}{name}"),
                     stmt.span,
@@ -483,11 +483,11 @@ fn collect_decl_spans(
                 ));
             }
             StmtKind::Enum(d) => {
-                let name = d.name.as_deref().unwrap_or("");
+                let name = d.name.as_str().unwrap_or("");
                 out.push((format!("{current_prefix}{name}"), stmt.span, DeclKind::Enum));
             }
             StmtKind::Function(d) => {
-                let name = d.name.as_deref().unwrap_or("");
+                let name = d.name.as_str().unwrap_or("");
                 out.push((
                     format!("{current_prefix}{name}"),
                     stmt.span,
@@ -518,6 +518,7 @@ fn collect_decl_spans(
                     // Unbraced: the declarations that follow are flat siblings,
                     // so this prefix applies until the next `namespace` statement.
                     NamespaceBody::Simple => current_prefix = child_prefix,
+                    _ => {}
                 }
             }
             _ => {}
@@ -980,7 +981,7 @@ fn seed_param_locations(
     source_map: &php_rs_parser::source_map::SourceMap,
 ) {
     for p in ast_params.iter() {
-        let name_str = p.name.as_deref().unwrap_or("");
+        let name_str = p.name.as_str().unwrap_or("");
         let name = name_str.trim_start_matches('$');
         let (line, col_start) =
             crate::diagnostics::offset_to_line_col(source, p.span.start, source_map);
@@ -1263,7 +1264,7 @@ fn fn_header_name_span(source: &str, decl: &php_ast::owned::FunctionDecl) -> php
     // `decl.body.span` always covers a real `{ ... }` block, so it's never
     // degenerate — unlike a synthesized single-byte span, it's a safe fallback.
     let fallback = decl.body.span;
-    let Some(name) = decl.name.as_deref() else {
+    let Some(name) = decl.name.as_str() else {
         return fallback;
     };
     if name.is_empty() {
@@ -1301,7 +1302,7 @@ fn method_header_name_span(source: &str, method: &php_ast::owned::MethodDecl) ->
         .map(|p| p.span.start)
         .unwrap_or(fallback.start) as usize;
     let anchor = anchor.min(source.len());
-    let Some(name) = method.name.as_deref() else {
+    let Some(name) = method.name.as_str() else {
         return fallback;
     };
     if name.is_empty() {
@@ -1359,7 +1360,7 @@ pub(super) fn method_decl_name_span(
     member_span: &php_ast::Span,
     method: &php_ast::owned::MethodDecl,
 ) -> php_ast::Span {
-    let Some(name) = method.name.as_deref().filter(|n| !n.is_empty()) else {
+    let Some(name) = method.name.as_str().filter(|n| !n.is_empty()) else {
         return method_header_name_span(source, method);
     };
     let start = member_span.start as usize;
@@ -1476,7 +1477,7 @@ fn record_param_symbols(
         return;
     };
     for p in ast_params {
-        let Some(raw) = p.name.as_deref() else {
+        let Some(raw) = p.name.as_str() else {
             continue;
         };
         let bare = raw.trim_start_matches('$');
@@ -1717,6 +1718,7 @@ pub(crate) fn check_use_decl_casing(
                     push_unresolved_import_fact(navigation_facts.as_deref_mut(), item.span, name);
                 }
             }
+            _ => {}
         }
     }
 }

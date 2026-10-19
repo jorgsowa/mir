@@ -15,7 +15,7 @@ impl DefinitionCollector<'_> {
         decl: &php_ast::owned::EnumDecl,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let enum_name = decl.name.as_deref().unwrap_or_default().to_string();
+        let enum_name = decl.name.as_str().unwrap_or_default().to_string();
         let fqcn = self.declared_fqn(&enum_name);
 
         let enum_doc = decl
@@ -77,7 +77,7 @@ impl DefinitionCollector<'_> {
                 .iter()
                 .filter_map(|m| match &m.kind {
                     EnumMemberKind::ClassConst(c) => {
-                        let name = c.name.as_deref()?;
+                        let name = c.name.as_str()?;
                         match super::infer_const_value(self, &c.value.kind) {
                             Some(t) if t.types.len() == 1 => match &t.types[0] {
                                 a @ (mir_types::Atomic::TLiteralInt(_)
@@ -106,7 +106,7 @@ impl DefinitionCollector<'_> {
         for member in decl.body.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
-                    let case_name = c.name.as_deref().unwrap_or_default();
+                    let case_name = c.name.as_str().unwrap_or_default();
                     let case_doc = c
                         .doc_comment
                         .as_ref()
@@ -189,7 +189,7 @@ impl DefinitionCollector<'_> {
                     }
                 }
                 EnumMemberKind::ClassConst(c) => {
-                    let const_name = c.name.as_deref().unwrap_or_default();
+                    let const_name = c.name.as_str().unwrap_or_default();
                     let const_doc = self.parse_docblock_from_node(c.doc_comment.as_ref());
                     let const_doc_span = c
                         .doc_comment
@@ -260,6 +260,7 @@ impl DefinitionCollector<'_> {
                         traits.push(trait_fqcn);
                     }
                 }
+                _ => {}
             }
         }
 

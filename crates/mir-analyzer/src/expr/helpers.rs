@@ -1285,7 +1285,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
     params
         .iter()
         .map(|p| {
-            let name_str = p.name.as_deref().unwrap_or("").trim_start_matches('$');
+            let name_str = p.name.as_str().unwrap_or("").trim_start_matches('$');
             let ty = p
                 .type_hint
                 .as_ref()
@@ -1337,7 +1337,7 @@ pub(crate) fn apply_doc_param_types(
     for (param, ast_param) in params.iter_mut().zip(ast_params.iter()) {
         let name = ast_param
             .name
-            .as_deref()
+            .as_str()
             .unwrap_or("")
             .trim_start_matches('$');
         let Some((_, doc_ty)) = doc_params.iter().find(|(n, _)| n == name) else {

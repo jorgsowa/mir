@@ -52,11 +52,11 @@ impl<'a> BodyAnalyzer<'a> {
                 StmtKind::Class(d) => d
                     .name
                     .as_ref()
-                    .and_then(|i| i.as_deref())
+                    .and_then(|i| i.as_str())
                     .map(|n| (n, d.body.span.start)),
-                StmtKind::Interface(d) => d.name.as_deref().map(|n| (n, d.body.span.start)),
-                StmtKind::Trait(d) => d.name.as_deref().map(|n| (n, d.body.span.start)),
-                StmtKind::Enum(d) => d.name.as_deref().map(|n| (n, d.body.span.start)),
+                StmtKind::Interface(d) => d.name.as_str().map(|n| (n, d.body.span.start)),
+                StmtKind::Trait(d) => d.name.as_str().map(|n| (n, d.body.span.start)),
+                StmtKind::Enum(d) => d.name.as_str().map(|n| (n, d.body.span.start)),
                 _ => None,
             };
             if let Some((name, body_start)) = named {

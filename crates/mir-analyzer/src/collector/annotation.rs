@@ -136,7 +136,7 @@ pub(super) fn propagate_delegated_assertions(
     for _ in 0..methods.len() {
         let mut changed = false;
         for m in &methods {
-            let key = crate::util::php_ident_lowercase(m.name.as_deref().unwrap_or_default());
+            let key = crate::util::php_ident_lowercase(m.name.as_str().unwrap_or_default());
             let Some(body) = m.body.as_ref() else {
                 continue;
             };

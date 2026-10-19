@@ -54,7 +54,7 @@ pub(super) fn infer_mutation_free(
         .iter()
         .filter_map(|m| match &m.kind {
             ClassMemberKind::Method(m) if has_inferable_signature(m, own_methods) => {
-                Some((crate::util::php_ident_lowercase(m.name.as_deref()?), m))
+                Some((crate::util::php_ident_lowercase(m.name.as_str()?), m))
             }
             _ => None,
         })
@@ -84,7 +84,7 @@ pub(super) fn infer_mutation_free(
 }
 
 fn has_inferable_signature(m: &MethodDecl, own_methods: &MemberMap<Arc<MethodDef>>) -> bool {
-    let Some(name) = m.name.as_deref() else {
+    let Some(name) = m.name.as_str() else {
         return false;
     };
     m.body.is_some()
@@ -208,7 +208,7 @@ impl OwnedVisitor for BodyScan<'_> {
                         if self.safe.contains(crate::util::php_ident_lowercase(n).as_str()))
             }
             ExprKind::NullsafeMethodCall(_)
-            | ExprKind::StaticDynMethodCall(_)
+            | ExprKind::StaticMethodCallDynamic(_)
             | ExprKind::New(_)
             | ExprKind::Clone(_)
             | ExprKind::CloneWith(..)

@@ -14,7 +14,7 @@ impl<'a> DefinitionCollector<'a> {
         decl: &InterfaceDecl,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let interface_name = decl.name.as_deref().unwrap_or_default().to_string();
+        let interface_name = decl.name.as_str().unwrap_or_default().to_string();
         let fqcn = self.declared_fqn(&interface_name);
 
         let iface_doc = decl
@@ -139,7 +139,7 @@ impl<'a> DefinitionCollector<'a> {
                 .iter()
                 .filter_map(|m| match &m.kind {
                     ClassMemberKind::ClassConst(c) => {
-                        let name = c.name.as_deref()?;
+                        let name = c.name.as_str()?;
                         match super::infer_const_value(self, &c.value.kind) {
                             Some(t) if t.types.len() == 1 => match &t.types[0] {
                                 a @ (mir_types::Atomic::TLiteralInt(_)
@@ -185,7 +185,7 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
-                    let const_name = c.name.as_deref().unwrap_or_default();
+                    let const_name = c.name.as_str().unwrap_or_default();
                     // PHP 8.3: typed interface constants (`const int FOO;`).
                     // Prefer @var docblock, then a same-kind literal narrowing
                     // of the native hint, then the bare hint, then mixed —
@@ -255,7 +255,7 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&prop_doc) {
                         continue;
                     }
-                    let prop_name = p.name.as_deref().unwrap_or_default();
+                    let prop_name = p.name.as_str().unwrap_or_default();
                     let hint_ty = self.resolve_union_opt(
                         p.type_hint
                             .as_ref()

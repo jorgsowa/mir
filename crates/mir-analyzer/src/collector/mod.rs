@@ -1589,6 +1589,7 @@ impl<'a> DefinitionCollector<'a> {
             Some(AstVisibility::Public) | None => Visibility::Public,
             Some(AstVisibility::Protected) => Visibility::Protected,
             Some(AstVisibility::Private) => Visibility::Private,
+            _ => Visibility::Public,
         }
     }
 
@@ -2082,12 +2083,11 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                         self.use_aliases = saved_aliases;
                         flow?;
                     }
-                    php_ast::owned::NamespaceBody::Simple => {
-                        // Simple namespace — affects all subsequent declarations
-                        if self.ns_blocks.len() > 1 {
-                            self.use_aliases.clear();
-                        }
+                    // Simple namespace — affects all subsequent declarations
+                    php_ast::owned::NamespaceBody::Simple if self.ns_blocks.len() > 1 => {
+                        self.use_aliases.clear();
                     }
+                    _ => {}
                 }
             }
 
@@ -2171,7 +2171,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
-                    let name_str = item.name.as_deref().unwrap_or_default();
+                    let name_str = item.name.as_str().unwrap_or_default();
                     let fqn: Arc<str> = if let Some(ns) = &self.namespace {
                         format!("{}\\{}", ns, name_str).into()
                     } else {
@@ -2344,7 +2344,7 @@ impl<'a> DefinitionCollector<'a> {
             if !self.version_attr_available(&p.attributes) {
                 continue;
             }
-            let param_name = p.name.as_deref().unwrap_or_default();
+            let param_name = p.name.as_str().unwrap_or_default();
             let has_native_type =
                 p.type_hint.is_some() || self.version_attr_type_string(&p.attributes).is_some();
             let native_ty = self.resolve_union_opt(
@@ -2612,7 +2612,7 @@ impl<'a> DefinitionCollector<'a> {
             }
         };
 
-        let method_name = m.name.as_deref().unwrap_or_default();
+        let method_name = m.name.as_str().unwrap_or_default();
         let is_override = m.attributes.iter().any(|a| {
             a.name
                 .parts

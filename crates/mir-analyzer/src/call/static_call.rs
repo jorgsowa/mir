@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use php_ast::owned::{ExprKind, StaticDynMethodCallExpr, StaticMethodCallExpr};
+use php_ast::owned::{ExprKind, StaticMethodCallDynamicExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -1449,7 +1449,7 @@ impl CallAnalyzer {
 
     pub fn analyze_static_dyn_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
-        call: &StaticDynMethodCallExpr,
+        call: &StaticMethodCallDynamicExpr,
         ctx: &mut FlowState,
     ) -> Type {
         // The called method's name isn't statically known — mark the target

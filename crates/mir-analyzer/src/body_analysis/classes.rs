@@ -205,7 +205,7 @@ impl<'a> BodyAnalyzer<'a> {
                         mir_codebase::DeclaredParam {
                             closure_this: None,
                             name: mir_types::Name::new(
-                                p.name.as_deref().unwrap_or("").trim_start_matches('$'),
+                                p.name.as_str().unwrap_or("").trim_start_matches('$'),
                             ),
                             ty: mir_codebase::wrap_param_type(ty),
                             out_ty: None,
@@ -224,6 +224,7 @@ impl<'a> BodyAnalyzer<'a> {
             let return_ty = match hook.kind {
                 php_ast::ast::PropertyHookKind::Get => property_ty.clone(),
                 php_ast::ast::PropertyHookKind::Set => Some(mir_types::Type::void()),
+                _ => None,
             };
 
             let mut ctx = FlowState::for_method(
@@ -240,6 +241,7 @@ impl<'a> BodyAnalyzer<'a> {
             ctx.current_method_name = Some(Arc::from(match hook.kind {
                 php_ast::ast::PropertyHookKind::Get => "__property_get",
                 php_ast::ast::PropertyHookKind::Set => "__property_set",
+                _ => "__property_hook",
             }));
 
             seed_param_locations(&mut ctx, &hook.params, source, source_map);
@@ -283,6 +285,7 @@ impl<'a> BodyAnalyzer<'a> {
                     let _ = ea.analyze(expr, &mut ctx);
                 }
                 php_ast::owned::PropertyHookBody::Abstract => {}
+                _ => {}
             }
 
             drop(sa);
@@ -308,7 +311,7 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
     ) {
         if self.collect_navigation_facts {
-            if let Some(name) = prop.name.as_deref().filter(|n| !n.is_empty()) {
+            if let Some(name) = prop.name.as_str().filter(|n| !n.is_empty()) {
                 let span = super::property_name_span(source, member_span, name);
                 if span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
@@ -324,7 +327,7 @@ impl<'a> BodyAnalyzer<'a> {
         // with an unresolvable receiver ($x->prop on an untyped $x) can still
         // surface matching declarations, mirroring `methdecl:` for methods.
         if self.mode == AnalysisMode::Full && self.record_reference_locations {
-            if let Some(name) = prop.name.as_deref() {
+            if let Some(name) = prop.name.as_str() {
                 if !name.is_empty() {
                     let span = super::property_name_span(source, member_span, name);
                     if span.end > span.start {
@@ -374,7 +377,7 @@ impl<'a> BodyAnalyzer<'a> {
                 parsed.var_type.is_some() && parsed.invalid_annotations.is_empty()
             });
             if self.mode == AnalysisMode::Full && !has_docblock_type {
-                let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+                let prop_name = prop.name.as_str().unwrap_or("").to_string();
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
                 let (line_end, col_end) =
@@ -411,7 +414,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
     ) {
-        let Some(name) = constant.name.as_deref() else {
+        let Some(name) = constant.name.as_str() else {
             return;
         };
         if name.is_empty() {
@@ -465,7 +468,7 @@ impl<'a> BodyAnalyzer<'a> {
         if self.mode != AnalysisMode::Full {
             return;
         }
-        let prop_name = prop.name.as_deref().unwrap_or("");
+        let prop_name = prop.name.as_str().unwrap_or("");
         if prop_name.is_empty() {
             return;
         }
@@ -543,7 +546,7 @@ impl<'a> BodyAnalyzer<'a> {
         if self.mode != AnalysisMode::Full {
             return;
         }
-        let method_name = method.name.as_deref().unwrap_or("");
+        let method_name = method.name.as_str().unwrap_or("");
         if method_name.is_empty() {
             return;
         }
@@ -921,7 +924,7 @@ impl<'a> BodyAnalyzer<'a> {
         if let Some(only) = &self.only_method {
             if !method
                 .name
-                .as_deref()
+                .as_str()
                 .is_some_and(|name| name.eq_ignore_ascii_case(only))
             {
                 return;
@@ -929,7 +932,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         if self.collect_navigation_facts {
-            if let Some(name) = method.name.as_deref() {
+            if let Some(name) = method.name.as_str() {
                 let span = super::method_decl_name_span(source, member_span, method);
                 if span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
@@ -945,7 +948,7 @@ impl<'a> BodyAnalyzer<'a> {
         // find-references with an unresolvable receiver (`$x->foo()` on an
         // untyped `$x`) can still surface matching declarations.
         if self.mode == AnalysisMode::Full {
-            if let Some(name) = method.name.as_deref() {
+            if let Some(name) = method.name.as_str() {
                 let span = super::method_decl_name_span(source, member_span, method);
                 if span.end > span.start {
                     let (line, col_start) =
@@ -970,14 +973,14 @@ impl<'a> BodyAnalyzer<'a> {
 
         self.run_after_function_like_plugins(
             &super::plugin_hooks::FunctionLikeSite {
-                name: method.name.as_deref().unwrap_or(""),
+                name: method.name.as_str().unwrap_or(""),
                 class: Some(fqcn),
                 params: &method.params,
                 declared: &|| {
                     crate::db::find_method_respecting_precedence(
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn),
-                        method.name.as_deref().unwrap_or(""),
+                        method.name.as_str().unwrap_or(""),
                     )
                     .map(|(_, m)| m.params.clone())
                 },
@@ -990,14 +993,14 @@ impl<'a> BodyAnalyzer<'a> {
         );
         let is_constructor = method
             .name
-            .as_deref()
+            .as_str()
             .is_some_and(|n| n.eq_ignore_ascii_case("__construct"));
         for param in method.params.iter() {
             if self.collect_navigation_facts
                 && is_constructor
                 && (param.visibility.is_some() || param.is_readonly)
             {
-                let name = param.name.as_deref().unwrap_or("");
+                let name = param.name.as_str().unwrap_or("");
                 let span = super::property_name_span(source, &param.span, name);
                 if !name.is_empty() && span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
@@ -1058,7 +1061,7 @@ impl<'a> BodyAnalyzer<'a> {
             default_ctx.self_fqcn = Some(cx.fqcn.clone());
             default_ctx.parent_fqcn = cx.parent_fqcn.clone();
             default_ctx.static_fqcn = Some(cx.fqcn.clone());
-            let method_name = method.name.as_deref().unwrap_or("");
+            let method_name = method.name.as_str().unwrap_or("");
             let declared_params = crate::db::find_method_in_chain(
                 self.db,
                 crate::db::Fqcn::from_str(self.db, fqcn),
@@ -1084,7 +1087,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         let Some(body) = &method.body else { return };
-        let method_name = method.name.as_deref().unwrap_or("");
+        let method_name = method.name.as_str().unwrap_or("");
 
         if method_name == "__construct" && self.mode == AnalysisMode::Full {
             for param in method.params.iter() {
@@ -1094,7 +1097,7 @@ impl<'a> BodyAnalyzer<'a> {
                     // same reasoning as the plain-property check above.
                     let has_docblock_type = param
                         .name
-                        .as_deref()
+                        .as_str()
                         .filter(|n| !n.is_empty())
                         .and_then(|n| {
                             crate::db::find_property_in_class(
@@ -1108,7 +1111,7 @@ impl<'a> BodyAnalyzer<'a> {
                     if has_docblock_type {
                         continue;
                     }
-                    let prop_name = param.name.as_deref().unwrap_or("").to_string();
+                    let prop_name = param.name.as_str().unwrap_or("").to_string();
                     let (line, col_start) = crate::diagnostics::offset_to_line_col(
                         source,
                         param.span.start,
@@ -1140,7 +1143,7 @@ impl<'a> BodyAnalyzer<'a> {
                 if param.visibility.is_none() || param.hooks.is_empty() {
                     continue;
                 }
-                let property_name = param.name.as_deref().unwrap_or("").trim_start_matches('$');
+                let property_name = param.name.as_str().unwrap_or("").trim_start_matches('$');
                 let property_ty = crate::db::find_property_in_class(
                     self.db,
                     crate::db::Fqcn::from_str(self.db, fqcn),
@@ -1277,7 +1280,7 @@ impl<'a> BodyAnalyzer<'a> {
         if is_ctor {
             for param in method.params.iter() {
                 if param.visibility.is_some() {
-                    if let Some(name) = param.name.as_deref() {
+                    if let Some(name) = param.name.as_str() {
                         ctx.mark_this_prop_assigned(name);
                     }
                 }
@@ -1304,7 +1307,7 @@ impl<'a> BodyAnalyzer<'a> {
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         if is_ctor {
             for param in method.params.iter().filter(|p| p.visibility.is_some()) {
-                let name = param.name.as_deref().unwrap_or("");
+                let name = param.name.as_str().unwrap_or("");
                 sa.taint_summary.record_prop_write(
                     crate::db::taint_sources::prop_key(name, false),
                     ctx.var_taint(name),
@@ -1530,7 +1533,7 @@ impl<'a> BodyAnalyzer<'a> {
         let class_name_owned = decl
             .name
             .as_ref()
-            .and_then(|i| i.as_deref())
+            .and_then(|i| i.as_str())
             .unwrap_or("<anonymous>")
             .to_string();
         let class_name = class_name_owned.as_str();
@@ -1543,7 +1546,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
-        if let Some(name) = decl.name.as_ref().and_then(|i| i.as_deref()) {
+        if let Some(name) = decl.name.as_ref().and_then(|i| i.as_str()) {
             self.push_decl_name_fact(
                 source,
                 0..decl.body.span.start,
@@ -1676,7 +1679,7 @@ impl<'a> BodyAnalyzer<'a> {
                     sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                     let mut ea = sa.expr_analyzer(&default_ctx);
                     let _ = ea.analyze(default, &mut default_ctx);
-                    sa.check_property_default_range(fqcn, prop.name.as_deref(), default);
+                    sa.check_property_default_range(fqcn, prop.name.as_str(), default);
                     drop(sa);
                     if self.mode == AnalysisMode::Full {
                         all_issues.extend(buf.into_all_issues());
@@ -1686,7 +1689,7 @@ impl<'a> BodyAnalyzer<'a> {
                     let property_ty = crate::db::find_property_in_class(
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn),
-                        prop.name.as_deref().unwrap_or(""),
+                        prop.name.as_str().unwrap_or(""),
                     )
                     .and_then(|def| def.ty.as_deref().cloned())
                     .or_else(|| {
@@ -1812,7 +1815,7 @@ impl<'a> BodyAnalyzer<'a> {
         let class_name_owned = decl
             .name
             .as_ref()
-            .and_then(|i| i.as_deref())
+            .and_then(|i| i.as_str())
             .unwrap_or("<anonymous>")
             .to_string();
         let class_name = class_name_owned.as_str();
@@ -1916,7 +1919,7 @@ impl<'a> BodyAnalyzer<'a> {
                     let property_ty = crate::db::find_property_in_class(
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn),
-                        prop.name.as_deref().unwrap_or(""),
+                        prop.name.as_str().unwrap_or(""),
                     )
                     .and_then(|def| def.ty.as_deref().cloned())
                     .or_else(|| {

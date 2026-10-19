@@ -632,7 +632,7 @@ enum VariableScopeKind {
 fn param_names(params: &[php_ast::owned::Param]) -> Vec<String> {
     params
         .iter()
-        .filter_map(|p| p.name.as_deref())
+        .filter_map(|p| p.name.as_str())
         .map(|n| n.trim_start_matches('$').to_string())
         .collect()
 }

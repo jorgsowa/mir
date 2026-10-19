@@ -16,7 +16,7 @@ impl<'a> DefinitionCollector<'a> {
         decl: &ClassDecl,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let name = match decl.name.as_ref().and_then(|n| n.as_deref()) {
+        let name = match decl.name.as_ref().and_then(|n| n.as_str()) {
             Some(n) => n.to_string(),
             None => return ControlFlow::Continue(()), // anonymous class — handled at expression level
         };
@@ -127,7 +127,7 @@ impl<'a> DefinitionCollector<'a> {
                 .iter()
                 .filter_map(|m| match &m.kind {
                     ClassMemberKind::ClassConst(c) => {
-                        let name = c.name.as_deref()?;
+                        let name = c.name.as_str()?;
                         match super::infer_const_value(self, &c.value.kind) {
                             Some(t) if t.types.len() == 1 => match &t.types[0] {
                                 a @ (mir_types::Atomic::TLiteralInt(_)
@@ -149,7 +149,7 @@ impl<'a> DefinitionCollector<'a> {
         for member in decl.body.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
-                    if m.name.as_deref() == Some("__construct") {
+                    if m.name.as_str() == Some("__construct") {
                         // Promoted-constructor properties take their type from the
                         // native type hint, falling back to the constructor's
                         // `@param` docblock — so `@param T $value` (with `@template T`
@@ -164,7 +164,7 @@ impl<'a> DefinitionCollector<'a> {
                             .collect();
                         for p in m.params.iter() {
                             if p.visibility.is_some() {
-                                let param_name = p.name.as_deref().unwrap_or_default();
+                                let param_name = p.name.as_str().unwrap_or_default();
                                 let native_ty = self.resolve_union_opt(
                                     p.type_hint
                                         .as_ref()
@@ -278,7 +278,7 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&prop_doc) {
                         continue;
                     }
-                    let prop_name = p.name.as_deref().unwrap_or_default();
+                    let prop_name = p.name.as_str().unwrap_or_default();
                     let hint_ty = self.resolve_union_opt(
                         p.type_hint
                             .as_ref()
@@ -404,7 +404,7 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
-                    let const_name = c.name.as_deref().unwrap_or_default();
+                    let const_name = c.name.as_str().unwrap_or_default();
                     // PHP 8.3: typed class constants (`const int FOO = 1`).
                     // Prefer @var docblock, then a same-kind literal narrowing
                     // of the native hint, then the bare hint, then mixed.
@@ -520,9 +520,11 @@ impl<'a> DefinitionCollector<'a> {
                                     );
                                 }
                             }
+                            _ => {}
                         }
                     }
                 }
+                _ => {}
             }
         }
 

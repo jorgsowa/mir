@@ -108,7 +108,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
         let resolve = |name: &str| Name::new(&crate::db::resolve_name(db, &path, name));
         match &stmt.kind {
             StmtKind::Function(decl) => {
-                let fqn = resolve(decl.name.as_deref().unwrap_or(""));
+                let fqn = resolve(decl.name.as_str().unwrap_or(""));
                 let mut scan = Scan::new(db, &path, None, None);
                 scan.seed_params(&decl.params);
                 let _ = crate::recursion::walk_block(&mut scan, &decl.body);
@@ -117,7 +117,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
                 }
             }
             StmtKind::Class(decl) => {
-                let Some(name) = decl.name.as_ref().and_then(|n| n.as_deref()) else {
+                let Some(name) = decl.name.as_ref().and_then(|n| n.as_str()) else {
                     return;
                 };
                 let fqcn = resolve(name);
@@ -132,7 +132,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
                 }
             }
             StmtKind::Trait(decl) => {
-                let fqcn = resolve(decl.name.as_deref().unwrap_or(""));
+                let fqcn = resolve(decl.name.as_str().unwrap_or(""));
                 for member in decl.body.members.iter() {
                     if let ClassMemberKind::Method(m) = &member.kind {
                         scan_method(db, &path, fqcn, None, m, &mut facts);
@@ -140,7 +140,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
                 }
             }
             StmtKind::Enum(decl) => {
-                let fqcn = resolve(decl.name.as_deref().unwrap_or(""));
+                let fqcn = resolve(decl.name.as_str().unwrap_or(""));
                 for member in decl.body.members.iter() {
                     if let EnumMemberKind::Method(m) = &member.kind {
                         scan_method(db, &path, fqcn, None, m, &mut facts);
@@ -252,11 +252,11 @@ fn scan_method(
     scan.seed_params(&method.params);
     if method
         .name
-        .as_deref()
+        .as_str()
         .is_some_and(|name| name.eq_ignore_ascii_case("__construct"))
     {
         for param in method.params.iter().filter(|p| p.visibility.is_some()) {
-            let key = prop_key(param.name.as_deref().unwrap_or(""), false);
+            let key = prop_key(param.name.as_str().unwrap_or(""), false);
             let value = ValueFacts {
                 reads_param: true,
                 ..ValueFacts::default()
@@ -266,7 +266,7 @@ fn scan_method(
     }
     let _ = crate::recursion::walk_block(&mut scan, body);
     if !scan.facts.is_empty() {
-        let name = crate::util::php_ident_lowercase(method.name.as_deref().unwrap_or(""));
+        let name = crate::util::php_ident_lowercase(method.name.as_str().unwrap_or(""));
         facts
             .decls
             .insert((fqcn, Some(Name::new(&name))), scan.facts);
@@ -320,11 +320,11 @@ impl<'a> Scan<'a> {
             let ty = crate::parser::type_from_hint_owned(hint, self.self_fqcn.as_deref());
             if let Some(class) = self.class_in(&ty) {
                 self.locals
-                    .insert(param.name.as_deref().unwrap_or("").to_string(), class);
+                    .insert(param.name.as_str().unwrap_or("").to_string(), class);
             }
         }
         for param in params {
-            let name = param.name.as_deref().unwrap_or("").to_string();
+            let name = param.name.as_str().unwrap_or("").to_string();
             self.local_values.entry(name).or_default().reads_param = true;
         }
     }

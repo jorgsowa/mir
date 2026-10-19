@@ -32,7 +32,7 @@ impl<'a> BodyAnalyzer<'a> {
         let resolved = super::declared_class_like_fqcn(
             self.db,
             file.as_ref(),
-            decl.name.as_deref().unwrap_or(""),
+            decl.name.as_str().unwrap_or(""),
             decl.body.span.start,
             source,
             source_map,
@@ -42,7 +42,7 @@ impl<'a> BodyAnalyzer<'a> {
             source,
             0..decl.body.span.start,
             "trait",
-            decl.name.as_deref().unwrap_or(""),
+            decl.name.as_str().unwrap_or(""),
             crate::Name::class(fqcn),
         );
         self.check_class_generic_type_args(
@@ -163,7 +163,7 @@ impl<'a> BodyAnalyzer<'a> {
         let resolved = super::declared_class_like_fqcn(
             self.db,
             file.as_ref(),
-            decl.name.as_deref().unwrap_or(""),
+            decl.name.as_str().unwrap_or(""),
             decl.body.span.start,
             source,
             source_map,
@@ -333,7 +333,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let enum_name = decl.name.as_str().unwrap_or("<anonymous>");
         let resolved = super::declared_class_like_fqcn(
             self.db,
             file.as_ref(),
@@ -377,8 +377,8 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         member.span.start..member.span.end,
                         "case",
-                        case.name.as_deref().unwrap_or(""),
-                        crate::Name::class_constant(fqcn, case.name.as_deref().unwrap_or("")),
+                        case.name.as_str().unwrap_or(""),
+                        crate::Name::class_constant(fqcn, case.name.as_str().unwrap_or("")),
                     ),
                     _ => {}
                 }
@@ -459,7 +459,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let enum_name = decl.name.as_str().unwrap_or("<anonymous>");
         let resolved = super::declared_class_like_fqcn(
             self.db,
             file.as_ref(),
@@ -539,7 +539,7 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
-        let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let iface_name = decl.name.as_str().unwrap_or("<anonymous>");
         let iface_fqcn = super::declared_class_like_fqcn(
             self.db,
             file.as_ref(),
@@ -612,7 +612,7 @@ impl<'a> BodyAnalyzer<'a> {
             // `methdecl:` fallback here so an unknown-owner query still
             // surfaces an interface's own method declarations.
             if self.collect_navigation_facts {
-                if let Some(name) = method.name.as_deref() {
+                if let Some(name) = method.name.as_str() {
                     let span = super::method_decl_name_span(source, &member.span, method);
                     if span.end > span.start {
                         self.navigation_facts
@@ -629,7 +629,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
             if self.mode == AnalysisMode::Full && self.record_reference_locations {
-                if let Some(name) = method.name.as_deref() {
+                if let Some(name) = method.name.as_str() {
                     let span = super::method_decl_name_span(source, &member.span, method);
                     if span.end > span.start {
                         let (line, col_start) =
@@ -662,7 +662,7 @@ impl<'a> BodyAnalyzer<'a> {
                 );
             }
 
-            let method_name = method.name.as_deref().unwrap_or("");
+            let method_name = method.name.as_str().unwrap_or("");
             let stored = crate::db::find_method_in_class(self.db, iface_fqcn_ref, method_name);
 
             if self.mode == AnalysisMode::Full {
@@ -698,7 +698,7 @@ impl<'a> BodyAnalyzer<'a> {
                         if ast_param.type_hint.is_none() && stored_param.ty.is_none() {
                             let param_name = ast_param
                                 .name
-                                .as_deref()
+                                .as_str()
                                 .unwrap_or("")
                                 .trim_start_matches('$')
                                 .to_string();

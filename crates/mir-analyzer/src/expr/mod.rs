@@ -437,6 +437,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let expr_ty = self.analyze(e, ctx);
                             self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                         }
+                        _ => {}
                     }
                 }
                 if all_literal {
@@ -723,7 +724,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ty
             }
 
-            ExprKind::StaticDynMethodCall(smc) => {
+            ExprKind::StaticMethodCallDynamic(smc) => {
                 crate::taint::check_callable_target(self, &smc.method, ctx, expr.span);
                 if !matches!(smc.class.kind, ExprKind::Identifier(_)) {
                     crate::taint::check_callable_target(self, &smc.class, ctx, expr.span);
@@ -754,7 +755,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Match(m) => self.analyze_match(m, expr.span, ctx),
 
             // --- Throw as expression (PHP 8) --------------------------------
-            ExprKind::ThrowExpr(e) => {
+            ExprKind::Throw(e) => {
                 self.analyze(e, ctx);
                 Type::single(Atomic::TNever)
             }
@@ -878,6 +879,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Omitted array slot (e.g. [, $b] destructuring) ------------
             ExprKind::Omit => Type::single(Atomic::TNull),
+            _ => Type::mixed(),
         }
     }
 
@@ -1239,6 +1241,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
                 Type::single(bare_closure())
             }
+            _ => Type::single(bare_closure()),
         }
     }
 
@@ -1550,6 +1553,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             TypeHintKind::Keyword(_, _) => {}
+            _ => {}
         }
     }
 

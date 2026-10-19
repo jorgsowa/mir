@@ -110,6 +110,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             | MagicConstKind::Namespace
             | MagicConstKind::Trait
             | MagicConstKind::Property => Type::single(Atomic::TString),
+            _ => Type::mixed(),
         }
     }
 }

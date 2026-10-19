@@ -35,7 +35,7 @@ impl DocblockParser {
             prev_tag_span = tag_head_span(text, tag.span.start, tag.span.end);
             match tag.name.as_str() {
                 "param-out" | "psalm-param-out" | "phpstan-param-out" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -58,7 +58,7 @@ impl DocblockParser {
                 "param-closure-this"
                 | "psalm-param-closure-this"
                 | "phpstan-param-closure-this" => {
-                    if let Some((ty_s, name)) = body_text(&tag.body)
+                    if let Some((ty_s, name)) = body_text(tag.body.as_ref())
                         .as_deref()
                         .and_then(parse_param_line)
                         .filter(|(ty_s, _)| validate_type_str(ty_s, "param-closure-this").is_none())
@@ -70,7 +70,7 @@ impl DocblockParser {
                     }
                 }
                 "param" | "psalm-param" | "phpstan-param" | "phan-param" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -115,7 +115,7 @@ impl DocblockParser {
                     }
                 }
                 "return" | "psalm-return" | "phpstan-return" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let ty_s = extract_return_type(&body_str);
                         record_backslash_keyword_types(
                             &mut result,
@@ -137,7 +137,7 @@ impl DocblockParser {
                     }
                 }
                 "var" | "psalm-var" | "phpstan-var" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_s, name)) = parse_var_line(&body_str) {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -176,7 +176,7 @@ impl DocblockParser {
                     }
                 }
                 "throws" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let first_word = body_str.split_whitespace().next().unwrap_or("");
                         let desc = if capture_descriptions {
                             description_after(&body_str, first_word)
@@ -204,11 +204,12 @@ impl DocblockParser {
                 }
                 "deprecated" => {
                     result.is_deprecated = true;
-                    result.deprecated = Some(body_text(&tag.body).unwrap_or_default().to_string());
+                    result.deprecated =
+                        Some(body_text(tag.body.as_ref()).unwrap_or_default().to_string());
                 }
                 "template" | "psalm-template" | "phpstan-template" => {
                     if let Some((name, bound, default)) =
-                        parse_template_line(tag.name.as_str(), body_text(&tag.body))
+                        parse_template_line(tag.name.as_str(), body_text(tag.body.as_ref()))
                     {
                         if let Some(msg) = validate_type_str(&name, "template") {
                             result.invalid_annotations.push(msg);
@@ -242,7 +243,7 @@ impl DocblockParser {
                 | "psalm-template-covariant"
                 | "phpstan-template-covariant" => {
                     if let Some((name, bound, default)) =
-                        parse_template_line(tag.name.as_str(), body_text(&tag.body))
+                        parse_template_line(tag.name.as_str(), body_text(tag.body.as_ref()))
                     {
                         if let Some(msg) = validate_type_str(&name, "template-covariant") {
                             result.invalid_annotations.push(msg);
@@ -276,7 +277,7 @@ impl DocblockParser {
                 | "psalm-template-contravariant"
                 | "phpstan-template-contravariant" => {
                     if let Some((name, bound, default)) =
-                        parse_template_line(tag.name.as_str(), body_text(&tag.body))
+                        parse_template_line(tag.name.as_str(), body_text(tag.body.as_ref()))
                     {
                         if let Some(msg) = validate_type_str(&name, "template-contravariant") {
                             result.invalid_annotations.push(msg);
@@ -307,7 +308,7 @@ impl DocblockParser {
                     }
                 }
                 "extends" | "template-extends" | "psalm-extends" | "phpstan-extends" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
                         record_backslash_keyword_types(
                             &mut result,
@@ -326,7 +327,7 @@ impl DocblockParser {
                 | "template-implements"
                 | "psalm-implements"
                 | "phpstan-implements" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
                         record_backslash_keyword_types(
                             &mut result,
@@ -342,7 +343,7 @@ impl DocblockParser {
                     }
                 }
                 "use" | "template-use" | "psalm-use" | "phpstan-use" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
                         record_backslash_keyword_types(
                             &mut result,
@@ -358,7 +359,7 @@ impl DocblockParser {
                     }
                 }
                 "assert" | "psalm-assert" | "phpstan-assert" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
                             let (name, key) = split_array_key_suffix(&name);
@@ -367,7 +368,7 @@ impl DocblockParser {
                     }
                 }
                 "if-this-is" | "psalm-if-this-is" | "phpstan-if-this-is" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
                         if !trimmed.is_empty() {
                             result.if_this_is = Some(parse_type_string(trimmed));
@@ -376,7 +377,7 @@ impl DocblockParser {
                 }
                 "self-out" | "psalm-self-out" | "phpstan-self-out" | "this-out"
                 | "psalm-this-out" | "phpstan-this-out" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let trimmed = body_str.trim();
                         if !trimmed.is_empty() {
                             result.self_out = Some(parse_self_out_type(trimmed));
@@ -384,7 +385,7 @@ impl DocblockParser {
                     }
                 }
                 "suppress" | "psalm-suppress" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         for rule in body_str.split([',', ' ']) {
                             let rule = rule.trim().to_string();
                             if !rule.is_empty() {
@@ -394,17 +395,17 @@ impl DocblockParser {
                     }
                 }
                 "see" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         result.see.push(body_str.to_string());
                     }
                 }
                 "link" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         result.see.push(body_str.to_string());
                     }
                 }
                 "mixin" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let base_class =
                             body_str.split('<').next().unwrap_or(&body_str).to_string();
                         result.mixins.push(base_class);
@@ -414,7 +415,7 @@ impl DocblockParser {
                     }
                 }
                 "property" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -434,7 +435,7 @@ impl DocblockParser {
                     }
                 }
                 "property-read" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -454,7 +455,7 @@ impl DocblockParser {
                     }
                 }
                 "property-write" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -474,7 +475,10 @@ impl DocblockParser {
                     }
                 }
                 "method" | "psalm-method" => {
-                    let body_str = body_text(&tag.body).unwrap_or_default().trim().to_string();
+                    let body_str = body_text(tag.body.as_ref())
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string();
                     if let Some(err) = validate_method_body(&body_str) {
                         result.invalid_annotations.push(err);
                     } else if let Some(mut m) = parse_method_line(&body_str) {
@@ -499,7 +503,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-type" | "phpstan-type" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((name, type_expr)) = split_type_alias_decl(&body_str) {
                             result.type_aliases.push(DocTypeAlias {
                                 name: name.to_string(),
@@ -509,14 +513,14 @@ impl DocblockParser {
                     }
                 }
                 "psalm-import-type" | "phpstan-import-type" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some(import) = parse_import_type(&body_str) {
                             result.import_types.push(import);
                         }
                     }
                 }
                 "since" if result.since.is_none() => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let v = body_str.split_whitespace().next().unwrap_or("");
                         if !v.is_empty() {
                             result.since = Some(v.to_string());
@@ -524,7 +528,7 @@ impl DocblockParser {
                     }
                 }
                 "removed" if result.removed.is_none() => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let v = body_str.split_whitespace().next().unwrap_or("");
                         if !v.is_empty() {
                             result.removed = Some(v.to_string());
@@ -548,7 +552,7 @@ impl DocblockParser {
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                 "api" | "psalm-api" => result.is_api = true,
                 "assert-if-true" | "psalm-assert-if-true" | "phpstan-assert-if-true" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
                             let (name, key) = split_array_key_suffix(&name);
@@ -557,7 +561,7 @@ impl DocblockParser {
                     }
                 }
                 "assert-if-false" | "psalm-assert-if-false" | "phpstan-assert-if-false" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
                             let (name, key) = split_array_key_suffix(&name);
@@ -566,7 +570,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-property" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
@@ -579,7 +583,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-property-read" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
@@ -592,7 +596,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-property-write" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
@@ -605,7 +609,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-require-extends" | "phpstan-require-extends" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let cls = body_str
                             .split_whitespace()
                             .next()
@@ -618,7 +622,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-require-implements" | "phpstan-require-implements" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let cls = body_str
                             .split_whitespace()
                             .next()
@@ -631,7 +635,7 @@ impl DocblockParser {
                     }
                 }
                 "mir-check" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((expr_part, type_part)) = body_str.split_once(" is ") {
                             // Kept verbatim (including any leading `$`) — the
                             // consumer parses this as a real PHP expression,
@@ -645,7 +649,7 @@ impl DocblockParser {
                     }
                 }
                 "dataProvider" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let name = body_str
                             .trim()
                             .trim_end_matches("()")
@@ -659,7 +663,7 @@ impl DocblockParser {
                     }
                 }
                 "trace" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         // Support both comma-separated and space-separated variable names
                         for part in body_str.split([',', ' ']) {
                             let var_name = part.trim().trim_start_matches('$').to_string();
@@ -670,7 +674,7 @@ impl DocblockParser {
                     }
                 }
                 "taint-sink" | "psalm-taint-sink" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         // Format: `kind $param` or `kind $param1 $param2`
                         let mut tokens = body_str.split_whitespace();
                         if let Some(kind) = tokens.next() {
@@ -690,7 +694,7 @@ impl DocblockParser {
                 | "taint-unescape"
                 | "psalm-taint-unescape" => {
                     // A conditional `(... ? 'html' : null)` form isn't evaluated.
-                    if let Some(kind) = body_text(&tag.body)
+                    if let Some(kind) = body_text(tag.body.as_ref())
                         .and_then(|b| b.split_whitespace().next().map(str::to_string))
                         .filter(|k| !k.starts_with('('))
                     {
@@ -702,7 +706,7 @@ impl DocblockParser {
                     }
                 }
                 "psalm-flow" | "taint-flow" => {
-                    if let Some(body_str) = body_text(&tag.body) {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some(params) = parse_flow_to_return(&body_str) {
                             result.taint_flow_params.extend(params);
                         }

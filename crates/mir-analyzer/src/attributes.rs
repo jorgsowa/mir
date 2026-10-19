@@ -318,7 +318,7 @@ pub(crate) fn check_class_attributes(
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-            let method_name = method.name.as_deref().unwrap_or("");
+            let method_name = method.name.as_str().unwrap_or("");
             if !method_name.eq_ignore_ascii_case("__construct") {
                 continue;
             }

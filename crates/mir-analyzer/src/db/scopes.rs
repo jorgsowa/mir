@@ -86,17 +86,17 @@ pub fn file_scopes(db: &dyn MirDatabase, file: SourceFile) -> Arc<[ScopeKey]> {
     for_each_top_level_decl(&parsed.program.stmts, &mut |stmt| {
         use php_ast::owned::StmtKind;
         let (is_fn, name) = match &stmt.kind {
-            StmtKind::Function(decl) => (true, decl.name.as_deref().unwrap_or("")),
+            StmtKind::Function(decl) => (true, decl.name.as_str().unwrap_or("")),
             StmtKind::Class(decl) => (
                 false,
                 decl.name
                     .as_ref()
-                    .and_then(|i| i.as_deref())
+                    .and_then(|i| i.as_str())
                     .unwrap_or("<anonymous>"),
             ),
-            StmtKind::Enum(decl) => (false, decl.name.as_deref().unwrap_or("<anonymous>")),
-            StmtKind::Interface(decl) => (false, decl.name.as_deref().unwrap_or("<anonymous>")),
-            StmtKind::Trait(decl) => (false, decl.name.as_deref().unwrap_or("")),
+            StmtKind::Enum(decl) => (false, decl.name.as_str().unwrap_or("<anonymous>")),
+            StmtKind::Interface(decl) => (false, decl.name.as_str().unwrap_or("<anonymous>")),
+            StmtKind::Trait(decl) => (false, decl.name.as_str().unwrap_or("")),
             _ => return,
         };
         let fqn: Arc<str> = Arc::from(resolve_name(db, path.as_ref(), name));
@@ -363,21 +363,21 @@ fn analyze_scope(
                     }
                     let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
                     let (is_fn, name) = match &stmt.kind {
-                        StmtKind::Function(decl) => (true, decl.name.as_deref().unwrap_or("")),
+                        StmtKind::Function(decl) => (true, decl.name.as_str().unwrap_or("")),
                         StmtKind::Class(decl) => (
                             false,
                             decl.name
                                 .as_ref()
-                                .and_then(|i| i.as_deref())
+                                .and_then(|i| i.as_str())
                                 .unwrap_or("<anonymous>"),
                         ),
                         StmtKind::Enum(decl) => {
-                            (false, decl.name.as_deref().unwrap_or("<anonymous>"))
+                            (false, decl.name.as_str().unwrap_or("<anonymous>"))
                         }
                         StmtKind::Interface(decl) => {
-                            (false, decl.name.as_deref().unwrap_or("<anonymous>"))
+                            (false, decl.name.as_str().unwrap_or("<anonymous>"))
                         }
-                        StmtKind::Trait(decl) => (false, decl.name.as_deref().unwrap_or("")),
+                        StmtKind::Trait(decl) => (false, decl.name.as_str().unwrap_or("")),
                         _ => return,
                     };
                     if is_fn != want_fn || resolve_name(db, path.as_ref(), name) != fqn.as_ref() {

@@ -9,7 +9,7 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{
     Arg, BinaryExpr, CallableCreateKind, Expr, ExprKind, FunctionCallExpr, MethodCallExpr,
-    StaticDynMethodCallExpr, StaticMethodCallExpr,
+    StaticMethodCallDynamicExpr, StaticMethodCallExpr,
 };
 use php_ast::Span;
 use std::sync::Arc;
@@ -51,12 +51,16 @@ pub(crate) fn pipe_as_call(b: &BinaryExpr, span: Span) -> Expr {
                         args,
                     }))
                 }
-                _ => ExprKind::StaticDynMethodCall(Box::new(StaticDynMethodCallExpr {
+                _ => ExprKind::StaticMethodCallDynamic(Box::new(StaticMethodCallDynamicExpr {
                     class: class.clone(),
                     method: method.clone(),
                     args,
                 })),
             },
+            _ => ExprKind::FunctionCall(FunctionCallExpr {
+                name: b.right.clone(),
+                args,
+            }),
         },
         _ => ExprKind::FunctionCall(FunctionCallExpr {
             name: b.right.clone(),
@@ -422,6 +426,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             BinaryOp::Pipe => unreachable!("pipe is analyzed as a call"),
             BinaryOp::Instanceof => Type::single(Atomic::TBool),
+            _ => Type::mixed(),
         }
     }
 

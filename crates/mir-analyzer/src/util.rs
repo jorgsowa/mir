@@ -355,7 +355,7 @@ pub(crate) fn is_unresolved_class(
 
 /// Tight span of the `$name` token within a parameter declaration; the full param span when not found.
 pub(crate) fn param_name_span(source: &str, p: &php_ast::owned::Param) -> php_ast::Span {
-    let Some(raw) = p.name.as_deref() else {
+    let Some(raw) = p.name.as_str() else {
         return p.span;
     };
     let needle = format!("${}", raw.trim_start_matches('$'));

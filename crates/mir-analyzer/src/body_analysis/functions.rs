@@ -41,14 +41,14 @@ impl<'a> BodyAnalyzer<'a> {
                     source,
                     0..decl.body.span.start,
                     "function",
-                    decl.name.as_deref().unwrap_or(""),
+                    decl.name.as_str().unwrap_or(""),
                     crate::Name::function(fqn),
                 );
             }
         }
         self.run_after_function_like_plugins(
             &super::plugin_hooks::FunctionLikeSite {
-                name: decl.name.as_deref().unwrap_or(""),
+                name: decl.name.as_str().unwrap_or(""),
                 class: None,
                 params: &decl.params,
                 declared: &|| {
@@ -109,7 +109,7 @@ impl<'a> BodyAnalyzer<'a> {
                         .params
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
+                        .all(|(cp, ap)| ap.name.as_str().unwrap_or("") == cp.name.as_ref())
                 {
                     (
                         Arc::clone(&storage.params),
@@ -296,7 +296,7 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         issues: &mut Vec<Issue>,
     ) {
-        let fn_name = decl.name.as_deref().unwrap_or("");
+        let fn_name = decl.name.as_str().unwrap_or("");
         let stored_params_match = stored.is_some_and(|s| s.params.len() == decl.params.len());
         if decl.return_type.is_none()
             && stored.is_none_or(|s| s.return_type.is_none())
@@ -326,7 +326,7 @@ impl<'a> BodyAnalyzer<'a> {
             if ast_param.type_hint.is_none() && !stored_ty_present {
                 let param_name = ast_param
                     .name
-                    .as_deref()
+                    .as_str()
                     .unwrap_or("")
                     .trim_start_matches('$')
                     .to_string();
@@ -476,7 +476,7 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or_default();
         {
             for ast_param in decl.params.iter() {
-                let raw_name = ast_param.name.as_deref().unwrap_or_default();
+                let raw_name = ast_param.name.as_str().unwrap_or_default();
                 let (Some(hint), Some(doc_raw)) =
                     (&ast_param.type_hint, doc.get_param_type(raw_name))
                 else {
@@ -504,7 +504,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 let param_name = ast_param
                     .name
-                    .as_deref()
+                    .as_str()
                     .unwrap_or("")
                     .trim_start_matches('$')
                     .to_string();
@@ -550,7 +550,7 @@ impl<'a> BodyAnalyzer<'a> {
                 .chain(doc.import_types.iter().map(|i| i.local.as_str()))
                 .collect();
             for ast_param in decl.params.iter() {
-                let raw_name = ast_param.name.as_deref().unwrap_or_default();
+                let raw_name = ast_param.name.as_str().unwrap_or_default();
                 let Some(doc_raw) = doc.get_param_type(raw_name) else {
                     continue;
                 };
@@ -725,7 +725,7 @@ impl<'a> BodyAnalyzer<'a> {
                         .params
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref()) =>
+                        .all(|(cp, ap)| ap.name.as_str().unwrap_or("") == cp.name.as_ref()) =>
             {
                 (
                     Arc::clone(&storage.params),
@@ -842,11 +842,11 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
-        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
+        let fn_name = decl.name.as_str().unwrap_or("").to_string();
 
         self.run_after_function_like_plugins(
             &super::plugin_hooks::FunctionLikeSite {
-                name: decl.name.as_deref().unwrap_or(""),
+                name: decl.name.as_str().unwrap_or(""),
                 class: None,
                 params: &decl.params,
                 declared: &|| {
@@ -920,7 +920,7 @@ impl<'a> BodyAnalyzer<'a> {
                         .params
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
+                        .all(|(cp, ap)| ap.name.as_str().unwrap_or("") == cp.name.as_ref())
                 {
                     (
                         Arc::clone(&storage.params),

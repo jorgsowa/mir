@@ -789,7 +789,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 Some(default) => self.expr_analyzer(ctx).analyze(default, ctx),
                 None => Type::mixed(), // static vars are indeterminate on entry
             };
-            let name_str = sv.name.as_deref().unwrap_or("").to_string();
+            let name_str = sv.name.as_str().unwrap_or("").to_string();
             let name = name_str.trim_start_matches('$');
             // Purity check: using a static variable in a @pure function.
             if ctx.is_in_pure_fn {

@@ -191,6 +191,7 @@ pub(crate) fn check_type_hint_classes(
             }
         }
         TypeHintKind::Keyword(_, _) => {}
+        _ => {}
     }
 }
 
@@ -232,6 +233,7 @@ fn collect_type_hint_class_refs_inner(
             }
         }
         TypeHintKind::Keyword(_, _) => {}
+        _ => {}
     }
 }
 

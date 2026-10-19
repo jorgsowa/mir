@@ -79,19 +79,15 @@ pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) 
         && !is_spurious_reserved_class_error(err)
 }
 
-/// Message of the one `Forbidden` diagnostic that discards part of the AST:
-/// past the parser's nesting limit the subtree becomes `ExprKind::Error`.
-const EXPR_DEPTH_EXCEEDED: &str = "maximum expression nesting depth exceeded";
-
 /// Returns `true` for parser diagnostics that leave the AST incomplete.
 /// Narrower than [`is_hard_parse_error`]: `Forbidden` diagnostics (redeclared
 /// method, reserved function name, valued case on a pure enum, ...) are
 /// emitted after the node is fully built.
 fn leaves_ast_incomplete(err: &php_rs_parser::diagnostics::ParseError) -> bool {
     match err {
-        php_rs_parser::diagnostics::ParseError::Forbidden { message, .. } => {
-            message == EXPR_DEPTH_EXCEEDED
-        }
+        // Past the nesting limit the subtree becomes `ExprKind::Error`.
+        php_rs_parser::diagnostics::ParseError::NestingTooDeep { .. } => true,
+        php_rs_parser::diagnostics::ParseError::Forbidden { .. } => false,
         _ => is_hard_parse_error(err),
     }
 }
@@ -278,23 +274,22 @@ mod ast_incomplete_tests {
         ));
     }
 
-    /// Pins the parser's depth-limit message: if it is reworded, this fails
-    /// instead of silently caching a slice built from a truncated AST. (The
-    /// limit currently also triggers follow-on syntax errors, but the depth
-    /// diagnostic must block caching on its own.)
+    /// The depth diagnostic must block caching on its own, so a slice built
+    /// from a truncated AST is never cached.
     #[test]
     fn expression_depth_limit_leaves_ast_incomplete() {
-        let src = format!("<?php\n$x = {}1{};\n", "(".repeat(200), ")".repeat(200));
+        let src = format!("<?php\n$x = {}1{};\n", "(".repeat(1000), ")".repeat(1000));
         let parsed = php_rs_parser::parse(&src);
         let depth_err = parsed
             .errors
             .iter()
-            .find(|e| e.to_string() == super::EXPR_DEPTH_EXCEEDED)
-            .expect("parser no longer emits the depth-limit message");
-        assert!(matches!(
-            depth_err,
-            php_rs_parser::diagnostics::ParseError::Forbidden { .. }
-        ));
+            .find(|e| {
+                matches!(
+                    e,
+                    php_rs_parser::diagnostics::ParseError::NestingTooDeep { .. }
+                )
+            })
+            .expect("parser no longer emits the depth-limit diagnostic");
         assert!(leaves_ast_incomplete(depth_err));
     }
 }

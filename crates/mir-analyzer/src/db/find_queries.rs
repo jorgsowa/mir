@@ -1321,7 +1321,7 @@ pub fn class_array_property_defaults<'db>(
         let StmtKind::Class(decl) = &stmt.kind else {
             return;
         };
-        let Some(name) = decl.name.as_ref().and_then(|n| n.as_deref()) else {
+        let Some(name) = decl.name.as_ref().and_then(|n| n.as_str()) else {
             return;
         };
         if !crate::db::resolve_name(db, path.as_ref(), name).eq_ignore_ascii_case(target.as_str()) {
@@ -1331,7 +1331,7 @@ pub fn class_array_property_defaults<'db>(
             let ClassMemberKind::Property(p) = &member.kind else {
                 continue;
             };
-            let (Some(prop_name), Some(default)) = (p.name.as_deref(), p.default.as_ref()) else {
+            let (Some(prop_name), Some(default)) = (p.name.as_str(), p.default.as_ref()) else {
                 continue;
             };
             let ExprKind::Array(elements) = &default.kind else {
