@@ -646,7 +646,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &mut taint_captures,
                 ),
             );
-            if let Some(closure) = ctx.closures.by_var.get(&Name::from(name)) {
+            // The enclosing scope can rebind a by-reference capture after this point.
+            if let Some(closure) = ctx
+                .closures
+                .by_var
+                .get(&Name::from(name))
+                .filter(|_| !use_var.by_ref)
+            {
                 closure_ctx.bind_closure(name, closure.clone());
             }
             // Mark the captured variable as read in the parent context, and

@@ -986,7 +986,9 @@ impl FlowState {
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: &str, ty: Type) {
         self.narrow_var(name, ty);
-        self.drop_guards_on(Name::from(name.trim_start_matches('$')));
+        let sym = Name::from(name.trim_start_matches('$'));
+        self.unbind_closure(sym);
+        self.drop_guards_on(sym);
     }
 
     /// [`Self::set_var`] for a type refinement: the value is unchanged, so
@@ -1405,10 +1407,14 @@ impl FlowState {
         remove_entry(&mut self.param_parts, &sym);
         remove_entry(&mut self.tainted_keys, &sym);
         remove_entry(&mut self.taint_trails, &sym);
+        self.unbind_closure(sym);
+        set_taint(&mut self.tainted_vars, sym, taint);
+    }
+
+    fn unbind_closure(&mut self, sym: Name) {
         if self.closures.by_var.contains_key(&sym) {
             Arc::make_mut(&mut self.closures).by_var.remove(&sym);
         }
-        set_taint(&mut self.tainted_vars, sym, taint);
     }
 
     /// Remember the summary of the closure literal starting at `offset`.
