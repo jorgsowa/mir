@@ -284,6 +284,11 @@ pub struct FlowState {
     /// property too.
     pub ref_aliases: FxHashMap<Name, (Name, Name)>,
 
+    /// Variables a call can rewrite behind the analyzer's back: by-ref closure
+    /// captures (value: the widest type the closure can leave) and `global`
+    /// imports (value: `None`). Consulted by [`Self::invalidate_escaped_vars`].
+    pub escaped_vars: FxHashMap<Name, Option<Type>>,
+
     /// Local variables directly assigned from a bare `clone $expr` expression
     /// (`$clone = clone $this;`), keyed by the variable's own name. A write
     /// through such a variable (`$clone->x = $value;`, the standard immutable
@@ -676,6 +681,7 @@ impl FlowState {
             tainted_props: FxHashMap::default(),
             tainted_static_props: FxHashMap::default(),
             ref_aliases: FxHashMap::default(),
+            escaped_vars: FxHashMap::default(),
             cloned_local_vars: FxHashSet::default(),
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
@@ -989,6 +995,50 @@ impl FlowState {
         let name = Name::from(name.trim_start_matches('$'));
         Arc::make_mut(&mut self.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
         Arc::make_mut(&mut self.assigned_vars).insert(name);
+    }
+
+    /// Marks `name` as rewritable by any later call; see [`Self::escaped_vars`].
+    pub fn mark_escaped(&mut self, name: &str, widest: Option<Type>) {
+        let name = Name::from(name.trim_start_matches('$'));
+        match (self.escaped_vars.get_mut(&name), widest) {
+            (Some(Some(existing)), Some(ty)) => existing.merge_with(&ty),
+            (Some(existing), Some(ty)) => *existing = Some(ty),
+            (Some(_), None) => {}
+            (None, widest) => {
+                self.escaped_vars.insert(name, widest);
+            }
+        }
+    }
+
+    /// Drops narrowing of escaped variables: a call may have rewritten them.
+    pub fn invalidate_escaped_vars(&mut self) {
+        if self.escaped_vars.is_empty() {
+            return;
+        }
+        let mut updates: Vec<(Name, Type)> = Vec::new();
+        for (name, widest) in self.escaped_vars.iter() {
+            let Some(current) = self.vars.get(name) else {
+                continue;
+            };
+            let widened = match widest {
+                Some(widest) => {
+                    let mut ty = (**current).clone();
+                    ty.merge_with(widest);
+                    ty
+                }
+                None if current.types.iter().any(is_literal_scalar) => {
+                    crate::stmt::widen_for_check((**current).clone())
+                }
+                None => continue,
+            };
+            if widened != **current {
+                updates.push((*name, widened));
+            }
+        }
+        for (name, ty) in updates {
+            Arc::make_mut(&mut self.vars)
+                .insert(name, mir_codebase::definitions::wrap_var_type(ty));
+        }
     }
 
     /// Drops guarded defs whose guard condition involves `name`.
@@ -2009,6 +2059,21 @@ impl FlowState {
             result.ref_aliases.insert(*var, *alias);
         }
 
+        for (var, ty) in if_ctx
+            .escaped_vars
+            .iter()
+            .chain(else_ctx.escaped_vars.iter())
+        {
+            match (result.escaped_vars.get_mut(var), ty) {
+                (Some(Some(existing)), Some(ty)) => existing.merge_with(ty),
+                (Some(existing), Some(ty)) => *existing = Some(ty.clone()),
+                (Some(_), None) => {}
+                (None, ty) => {
+                    result.escaped_vars.insert(*var, ty.clone());
+                }
+            }
+        }
+
         // Read vars: union — if either branch reads a var, it counts as read
         for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
             result.read_vars.insert(*name);
@@ -2271,4 +2336,14 @@ fn set_taint<K: std::hash::Hash + Eq>(map: &mut FxHashMap<K, Taint>, key: K, tai
     } else {
         map.insert(key, taint);
     }
+}
+
+fn is_literal_scalar(atomic: &Atomic) -> bool {
+    matches!(
+        atomic,
+        Atomic::TLiteralInt(_)
+            | Atomic::TIntRange { .. }
+            | Atomic::TLiteralString(_)
+            | Atomic::TLiteralFloat(_, _)
+    )
 }

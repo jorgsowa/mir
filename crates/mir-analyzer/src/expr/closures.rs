@@ -752,7 +752,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             } else if written_ty != captured_ty {
                 let merged = merge_byref_write(pre_ty, &written_ty);
                 ctx.set_var(name, merged);
+            } else {
+                ctx.mark_escaped(name, Some(captured_ty));
+                continue;
             }
+            ctx.mark_escaped(name, Some(ctx.get_var(name)));
         }
 
         // If the closure reads an outer-scope variable without capturing it via `use`,

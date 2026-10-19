@@ -597,7 +597,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             // --- new ClassName(...) ----------------------------------------
-            ExprKind::New(n) => self.analyze_new(n, expr.span, ctx),
+            ExprKind::New(n) => {
+                let ty = self.analyze_new(n, expr.span, ctx);
+                ctx.invalidate_escaped_vars();
+                ty
+            }
 
             // --- Anonymous class -------------------------------------------
             ExprKind::AnonymousClass(anon) => {
@@ -698,15 +702,25 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Method calls ----------------------------------------------
             ExprKind::MethodCall(mc) => {
-                crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false)
+                let ty =
+                    crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false);
+                ctx.invalidate_escaped_vars();
+                ty
             }
 
             ExprKind::NullsafeMethodCall(mc) => {
-                crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true)
+                let ty =
+                    crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true);
+                ctx.invalidate_escaped_vars();
+                ty
             }
 
             ExprKind::StaticMethodCall(smc) => {
-                crate::call::CallAnalyzer::analyze_static_method_call(self, smc, ctx, expr.span)
+                let ty = crate::call::CallAnalyzer::analyze_static_method_call(
+                    self, smc, ctx, expr.span,
+                );
+                ctx.invalidate_escaped_vars();
+                ty
             }
 
             ExprKind::StaticDynMethodCall(smc) => {
@@ -714,7 +728,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if !matches!(smc.class.kind, ExprKind::Identifier(_)) {
                     crate::taint::check_callable_target(self, &smc.class, ctx, expr.span);
                 }
-                crate::call::CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx)
+                let ty = crate::call::CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx);
+                ctx.invalidate_escaped_vars();
+                ty
             }
 
             // --- Function calls --------------------------------------------
@@ -722,7 +738,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if self.collect_navigation_facts {
                     self.record_define_name_fact(fc);
                 }
-                crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span)
+                let ty = crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span);
+                ctx.invalidate_escaped_vars();
+                ty
             }
 
             // --- Closures / arrow functions --------------------------------
