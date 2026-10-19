@@ -444,7 +444,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         if a.op == AssignOp::Assign && !a.by_ref {
             ctx.self_ref_closure_hint = target_var_name.as_deref().map(mir_types::Name::from);
         }
+        self.vivifying_reference = a.by_ref && matches!(a.value.kind, ExprKind::ArrayAccess(_));
+        if self.vivifying_reference {
+            super::helpers::vivify_reference_base(&a.value, ctx);
+        }
         let rhs_ty = self.analyze(&a.value, ctx);
+        self.vivifying_reference = false;
         ctx.self_ref_closure_hint = prev_self_ref_hint;
         if rhs_ty.is_never() {
             return rhs_ty;

@@ -1639,6 +1639,32 @@ pub(crate) fn is_property_type_coercion(
     }
 }
 
+/// Binding a reference to `$a[..]` creates the array, so `$a` is no longer null.
+pub(crate) fn vivify_reference_base(value: &Expr, ctx: &mut crate::flow_state::FlowState) {
+    let mut base = value;
+    while let ExprKind::ArrayAccess(aa) = &base.kind {
+        base = &aa.array;
+    }
+    let ExprKind::Variable(name) = &base.kind else {
+        return;
+    };
+    if std::ptr::eq(base, value) {
+        return;
+    }
+    let ty = ctx.get_var(name);
+    if !ty.is_nullable() {
+        return;
+    }
+    let mut vivified = ty.remove_null();
+    if vivified.types.is_empty() {
+        vivified = Type::single(Atomic::TArray {
+            key: Box::new(Type::array_key()),
+            value: Box::new(Type::mixed()),
+        });
+    }
+    ctx.narrow_var(name, vivified);
+}
+
 #[cfg(test)]
 mod range_arithmetic_tests {
     use super::*;

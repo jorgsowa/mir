@@ -247,6 +247,9 @@ pub(crate) fn premark_byref_arg_vars(
             return;
         }
         let Some(value) = &arg.value else { return };
+        if matches!(value.kind, ExprKind::ArrayAccess(_)) {
+            crate::expr::helpers::vivify_reference_base(value, ctx);
+        }
         if let ExprKind::Variable(name) = &value.kind {
             let var_name = name.trim_start_matches('$');
             if !ctx.var_is_defined(var_name) {

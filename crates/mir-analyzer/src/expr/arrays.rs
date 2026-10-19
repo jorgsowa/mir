@@ -612,9 +612,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         }
+        let vivifies = std::mem::take(&mut self.vivifying_reference);
         let prev_in_array_access_base = self.in_array_access_base;
         self.in_array_access_base = true;
+        self.vivifying_reference = vivifies && matches!(aa.array.kind, ExprKind::ArrayAccess(_));
         let arr_ty = self.analyze(&aa.array, ctx);
+        self.vivifying_reference = false;
         self.in_array_access_base = prev_in_array_access_base;
         // `ArrayAccess` receivers (WeakMap, SplObjectStorage, user collections)
         // define their own offset type via offsetGet/offsetSet/offsetExists —
@@ -773,7 +776,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.emit(IssueKind::NullArrayAccess, Severity::Error, expr.span);
             return Type::mixed();
         }
-        if arr_ty.is_nullable() && !self.in_existence_check {
+        if arr_ty.is_nullable() && !self.in_existence_check && !vivifies {
             self.emit(
                 IssueKind::PossiblyNullArrayAccess,
                 Severity::Info,

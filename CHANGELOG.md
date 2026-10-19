@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new mysqli_stmt($mysqli)` no longer reports `TooFewArguments`: the constructor's `?string $query` is optional again.
 - `TooFewArguments` on a call with named arguments counts the required parameters that received a value, so `f(b: 1)` missing `$a` reports `got 0` instead of the number of arguments passed.
 - `@psalm-assert array<string> $v` on an `array<string, mixed>` argument now replaces its `mixed` values instead of keeping the less precise type, removing false `MixedAssignment`/`MixedArgument` after webmozart `Assert::all*()` calls.
+- Binding a reference to an array element (`$r = &$a[$k]`) or passing one to a by-reference parameter auto-vivifies a null base: no false `PossiblyNullArrayAccess`/`NullArrayAccess`, and the base is non-null afterwards. Reads in the index expression and plain reads are still reported.
 
 ## [0.88.0] - 2026-10-17
 
