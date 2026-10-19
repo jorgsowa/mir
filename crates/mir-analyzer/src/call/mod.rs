@@ -263,21 +263,30 @@ pub(crate) fn premark_byref_arg_vars(
         }
     }
 
+    for_each_bound_arg(params, args, |param, arg| premark_one(param, arg, ctx));
+}
+
+/// Calls `f` with each argument and the param it feeds, honoring named
+/// arguments and variadics; stops at a spread, which can't be bound statically.
+pub(crate) fn for_each_bound_arg<'a>(
+    params: &'a [mir_codebase::definitions::DeclaredParam],
+    args: &'a [php_ast::owned::Arg],
+    mut f: impl FnMut(&'a mir_codebase::definitions::DeclaredParam, &'a php_ast::owned::Arg),
+) {
     let variadic_index = params.iter().position(|p| p.is_variadic);
     let max_positional = variadic_index.unwrap_or(params.len());
     let mut positional = 0usize;
 
     for arg in args {
-        // A spread (`...$rest`) can't be statically bound to a single param.
         if arg.unpack {
             break;
         }
         if let Some(name) = &arg.name {
             let name = crate::parser::name_to_string_owned(name);
             if let Some(param) = params.iter().find(|p| p.name.as_ref() == name.as_str()) {
-                premark_one(param, arg, ctx);
+                f(param, arg);
             } else if let Some(vi) = variadic_index {
-                premark_one(&params[vi], arg, ctx);
+                f(&params[vi], arg);
             }
             continue;
         }
@@ -287,7 +296,7 @@ pub(crate) fn premark_byref_arg_vars(
             variadic_index.map(|vi| &params[vi])
         };
         if let Some(param) = param {
-            premark_one(param, arg, ctx);
+            f(param, arg);
         }
         positional += 1;
     }

@@ -775,38 +775,20 @@ pub(crate) fn promote_assignment_effects(
             promote_assignment_effects(&u.operand, ctx, db, file);
         }
         ExprKind::FunctionCall(call) => {
-            // Promote variables that were assigned via by-ref parameters
             if let ExprKind::Identifier(fn_name) = &call.name.kind {
-                let resolved = crate::db::resolve_name(db, file, fn_name.as_ref());
-                let find =
-                    |name: &str| crate::db::find_function(db, crate::db::Fqcn::from_str(db, name));
-                // Unqualified calls fall back to the global function.
-                let func = find(&resolved).or_else(|| {
-                    (!fn_name.starts_with('\\') && !fn_name.contains('\\'))
-                        .then(|| find(fn_name.as_ref()))
-                        .flatten()
-                });
-                if let Some(func) = func {
-                    for (i, param) in func.params.iter().enumerate() {
-                        if param.is_byref {
-                            let arg = call.args.get(i);
-                            if let Some(arg) = arg {
-                                if let Some(value) = &arg.value {
-                                    if let ExprKind::Variable(name) = &value.kind {
-                                        let var_name = name.as_ref().trim_start_matches('$');
-                                        let sym = mir_types::Name::from(var_name);
-                                        if ctx.possibly_assigned_vars.contains(&sym) {
-                                            let ty = ctx.get_var(var_name);
-                                            ctx.narrow_var(var_name, ty);
-                                            std::sync::Arc::make_mut(
-                                                &mut ctx.possibly_assigned_vars,
-                                            )
-                                            .remove(&sym);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                if has_possibly_assigned_arg(&call.args, ctx) {
+                    let resolved = crate::db::resolve_name(db, file, fn_name.as_ref());
+                    let find = |name: &str| {
+                        crate::db::find_function(db, crate::db::Fqcn::from_str(db, name))
+                    };
+                    // Unqualified calls fall back to the global function.
+                    let func = find(&resolved).or_else(|| {
+                        (!fn_name.starts_with('\\') && !fn_name.contains('\\'))
+                            .then(|| find(fn_name.as_ref()))
+                            .flatten()
+                    });
+                    if let Some(func) = func {
+                        promote_byref_args(&func.params, &call.args, ctx);
                     }
                 }
             }
@@ -818,6 +800,24 @@ pub(crate) fn promote_assignment_effects(
         }
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             promote_assignment_effects(&mc.object, ctx, db, file);
+            // A nullsafe call on null skips its arguments, so its out-params stay unset.
+            if matches!(expr.kind, ExprKind::MethodCall(_)) {
+                if let ExprKind::Identifier(method_name) = &mc.method.kind {
+                    if has_possibly_assigned_arg(&mc.args, ctx) {
+                        let method = super::assertions::method_call_receiver_fqcn(
+                            &mc.object,
+                            ctx,
+                            db,
+                            file,
+                            method_name.as_ref(),
+                        )
+                        .and_then(|fqcn| find_method(db, &fqcn, method_name.as_ref()));
+                        if let Some(method) = method {
+                            promote_byref_args(&method.params, &mc.args, ctx);
+                        }
+                    }
+                }
+            }
             for arg in mc.args.iter() {
                 if let Some(value) = &arg.value {
                     promote_assignment_effects(value, ctx, db, file);
@@ -825,7 +825,30 @@ pub(crate) fn promote_assignment_effects(
             }
         }
         ExprKind::StaticMethodCall(smc) => {
+            if let ExprKind::Identifier(method_name) = &smc.method.kind {
+                if has_possibly_assigned_arg(&smc.args, ctx) {
+                    let method = static_target_fqcn(&smc.class, ctx, db, file)
+                        .and_then(|fqcn| find_method(db, &fqcn, method_name.as_ref()));
+                    if let Some(method) = method {
+                        promote_byref_args(&method.params, &smc.args, ctx);
+                    }
+                }
+            }
             for arg in smc.args.iter() {
+                if let Some(value) = &arg.value {
+                    promote_assignment_effects(value, ctx, db, file);
+                }
+            }
+        }
+        ExprKind::New(new) => {
+            if has_possibly_assigned_arg(&new.args, ctx) {
+                let ctor = static_target_fqcn(&new.class, ctx, db, file)
+                    .and_then(|fqcn| find_method(db, &fqcn, "__construct"));
+                if let Some(ctor) = ctor {
+                    promote_byref_args(&ctor.params, &new.args, ctx);
+                }
+            }
+            for arg in new.args.iter() {
                 if let Some(value) = &arg.value {
                     promote_assignment_effects(value, ctx, db, file);
                 }
@@ -880,6 +903,73 @@ pub(crate) fn promote_assignment_effects(
             }
         }
         _ => {}
+    }
+}
+
+fn promote_var(var_name: &str, ctx: &mut FlowState) {
+    let sym = mir_types::Name::from(var_name);
+    if ctx.possibly_assigned_vars.contains(&sym) {
+        let ty = ctx.get_var(var_name);
+        ctx.narrow_var(var_name, ty);
+        std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&sym);
+    }
+}
+
+/// Cheap pre-check so callee lookup runs only when an argument could be promoted.
+fn has_possibly_assigned_arg(args: &[php_ast::owned::Arg], ctx: &FlowState) -> bool {
+    args.iter().any(|arg| {
+        matches!(&arg.value, Some(v) if matches!(&v.kind, ExprKind::Variable(name)
+            if ctx.possibly_assigned_vars.contains(&mir_types::Name::from(name.trim_start_matches('$')))))
+    })
+}
+
+fn promote_byref_args(
+    params: &[mir_codebase::definitions::DeclaredParam],
+    args: &[php_ast::owned::Arg],
+    ctx: &mut FlowState,
+) {
+    crate::call::for_each_bound_arg(params, args, |param, arg| {
+        if !param.is_byref {
+            return;
+        }
+        if let Some(value) = &arg.value {
+            if let ExprKind::Variable(name) = &value.kind {
+                promote_var(name.trim_start_matches('$'), ctx);
+            }
+        }
+    });
+}
+
+fn find_method(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    method_name: &str,
+) -> Option<std::sync::Arc<mir_codebase::definitions::MethodDef>> {
+    crate::db::find_method_respecting_precedence(
+        db,
+        crate::db::Fqcn::from_str(db, fqcn),
+        method_name,
+    )
+    .map(|(_, method)| method)
+}
+
+/// The class named by a static call or `new` target, resolving `self`/`static`/`parent`.
+fn static_target_fqcn(
+    class: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<str>> {
+    let ExprKind::Identifier(name) = &class.kind else {
+        return None;
+    };
+    match name.to_ascii_lowercase().as_str() {
+        "self" => ctx.self_fqcn.clone(),
+        "static" => ctx.static_fqcn.clone().or_else(|| ctx.self_fqcn.clone()),
+        "parent" => ctx.parent_fqcn.clone(),
+        _ => Some(std::sync::Arc::from(
+            crate::db::resolve_name(db, file, name.as_ref()).as_str(),
+        )),
     }
 }
 

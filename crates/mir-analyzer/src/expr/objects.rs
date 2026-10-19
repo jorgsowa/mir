@@ -316,6 +316,58 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// The constructor of a `new` target named by identifier, resolving `self`/`static`/`parent`.
+    fn named_ctor(
+        &self,
+        class: &php_ast::owned::Expr,
+        ctx: &FlowState,
+    ) -> Option<Arc<mir_codebase::definitions::MethodDef>> {
+        let ExprKind::Identifier(name) = &class.kind else {
+            return None;
+        };
+        let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
+        let fqcn: Arc<str> = match resolved.as_str() {
+            "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
+            "parent" => ctx.parent_fqcn.clone()?,
+            _ => Arc::from(resolved.as_str()),
+        };
+        crate::db::find_method_in_chain(
+            self.db,
+            crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+            "__construct",
+        )
+        .map(|(_, ctor)| ctor)
+    }
+
+    /// Writes each by-ref constructor param's out type back to its argument variable.
+    fn write_back_byref_args(
+        &mut self,
+        params: &[mir_codebase::definitions::DeclaredParam],
+        args: &[php_ast::owned::Arg],
+        ctx: &mut FlowState,
+    ) {
+        if !params
+            .iter()
+            .any(|p| crate::call::byref_written_type(p).is_some())
+        {
+            return;
+        }
+        let args_taint = crate::taint::args_taint(args, ctx, self.db, &self.file);
+        crate::call::for_each_bound_arg(params, args, |param, arg| {
+            let Some(out_ty) = crate::call::byref_written_type(param) else {
+                return;
+            };
+            if crate::call::has_unbound_template(out_ty) {
+                return;
+            }
+            if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
+                let var_name = name.as_ref().trim_start_matches('$');
+                ctx.set_var(var_name, (**out_ty).clone());
+                ctx.set_var_taint(var_name, args_taint);
+            }
+        });
+    }
+
     pub(super) fn analyze_new(
         &mut self,
         n: &NewExpr,
@@ -327,6 +379,14 @@ impl<'a> ExpressionAnalyzer<'a> {
             .unwrap_or_default();
         arg_types.clear();
         let mut sole_spread_ty: Option<Type> = None;
+        let passes_undefined_var = n.args.iter().any(|a| {
+            matches!(&a.value, Some(v) if matches!(&v.kind, ExprKind::Variable(name) if !ctx.var_is_defined(name)))
+        });
+        if passes_undefined_var {
+            if let Some(ctor) = self.named_ctor(&n.class, ctx) {
+                crate::call::premark_byref_arg_vars(&ctor.params, &n.args, ctx);
+            }
+        }
         for a in n.args.iter() {
             let Some(value) = &a.value else {
                 arg_types.push(Type::mixed());
@@ -700,6 +760,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             mir_issues::Severity::Error,
                             call_span,
                         );
+                    }
+                    if let Some((ctor_params, ..)) = &ctor_params_and_templates {
+                        if !trait_relative_new {
+                            self.write_back_byref_args(ctor_params, &n.args, ctx);
+                        }
                     }
                     // Infer class-level generic type params from the constructor
                     // arguments (e.g. `new Box(5)` → `Box<int>` for `@template T`

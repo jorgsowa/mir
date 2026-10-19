@@ -23,11 +23,12 @@ const APC_ITER_ALL = -1;
 /**
  * Cache a variable in the data store.
  *
- * @param string $key
- * @param mixed  $var
- * @param int    $ttl Time-to-live in seconds (0 = never expire).
+ * @param string|array<string, mixed> $key A key, or an array of key => value pairs.
+ * @param mixed                       $var Ignored when $key is an array.
+ * @param int                         $ttl Time-to-live in seconds (0 = never expire).
+ * @return ($key is array ? array<string, int>|false : bool) An array of the keys that failed when $key is an array.
  */
-function apcu_store(string $key, mixed $var, int $ttl = 0): bool {}
+function apcu_store(string|array $key, mixed $var = null, int $ttl = 0): bool|array {}
 
 /**
  * Fetch a stored variable from the cache.
@@ -41,18 +42,16 @@ function apcu_fetch(string|array $key, bool &$success = null): mixed {}
 /**
  * Removes a stored variable from the cache.
  *
- * @param string|string[] $key
- * @return bool|string[] Returns true on success, false on failure. If an array
- *                       of keys is passed, returns an array of failed keys.
+ * @param string|string[]|APCUIterator $key
+ * @return ($key is array ? list<string> : bool) The keys that failed when $key is an array.
  */
-function apcu_delete(string|array $key): bool|array {}
+function apcu_delete(string|array|APCUIterator $key): bool|array {}
 
 /**
  * Checks if one or more APCu keys exist.
  *
  * @param string|string[] $keys
- * @return bool|string[] Returns true/false for a single key, or an array of
- *                       existing keys when an array is passed.
+ * @return ($keys is array ? array<string, true> : bool) The existing keys when $keys is an array.
  */
 function apcu_exists(string|array $keys): bool|array {}
 
@@ -86,11 +85,12 @@ function apcu_dec(string $key, int $step = 1, bool &$success = null, int $ttl = 
 /**
  * Cache a new variable in the data store (fails silently if key exists).
  *
- * @param string $key
- * @param mixed  $var
- * @param int    $ttl Time-to-live in seconds (0 = never expire).
+ * @param string|array<string, mixed> $key A key, or an array of key => value pairs.
+ * @param mixed                       $var Ignored when $key is an array.
+ * @param int                         $ttl Time-to-live in seconds (0 = never expire).
+ * @return ($key is array ? array<string, int>|false : bool) An array of the keys that failed when $key is an array.
  */
-function apcu_add(string $key, mixed $var, int $ttl = 0): bool {}
+function apcu_add(string|array $key, mixed $var = null, int $ttl = 0): bool|array {}
 
 /**
  * Retrieves cached information from APCu's data store.
