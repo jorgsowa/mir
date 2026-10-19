@@ -2671,18 +2671,28 @@ pub fn expr_taint(
             let ExprKind::Identifier(method_name) = &mc.method.kind else {
                 return receiver;
             };
+            let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
             let Some(recv_ty) =
                 crate::expr::assignment::resolve_chained_receiver_type(&mc.object, ctx, db, file)
             else {
+                let produced = produced_object_classes(&mc.object, db, file);
+                if !produced.is_empty()
+                    && produced
+                        .iter()
+                        .all(|class| result_ignores_receiver(db, class, &method_lower))
+                {
+                    return args_taint(&mc.args, ctx, db, file);
+                }
                 return receiver;
             };
-            let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
             let mut taint = Taint::NONE;
             let mut receiver_flows = true;
+            let (mut ignoring_receiver, mut objects) = (0, 0);
             for atom in &recv_ty.types {
                 let mir_types::Atomic::TNamedObject { fqcn, .. } = atom else {
                     continue;
                 };
+                objects += 1;
                 // Laravel's `route()` without a key returns the `Route` object.
                 let route_object = method_lower == "route" && mc.args.is_empty();
                 if !route_object
@@ -2693,6 +2703,11 @@ pub fn expr_taint(
                 }
                 if let Some(removed) = sanitized_method_kinds(db, fqcn.as_ref(), &method_lower) {
                     return args_taint(&mc.args, ctx, db, file).without(removed);
+                }
+                if result_ignores_receiver(db, fqcn.as_ref(), &method_lower) {
+                    ignoring_receiver += 1;
+                    taint |= args_taint(&mc.args, ctx, db, file);
+                    continue;
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 if let Some((_, m)) =
@@ -2716,7 +2731,7 @@ pub fn expr_taint(
                     taint |= t;
                 }
             }
-            if receiver_flows {
+            if receiver_flows && ignoring_receiver < objects {
                 taint |= receiver;
             }
             taint
@@ -3607,6 +3622,91 @@ fn unescaped_kinds(fn_name_lower: &str) -> Option<Taint> {
         "urldecode" | "rawurldecode" => sanitized_kinds("urlencode")?,
         _ => return None,
     })
+}
+
+/// Classes of the object a `new` or function call yields, when that is declared.
+fn produced_object_classes(
+    expr: &Expr,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<String> {
+    match &unwrap_parens(expr).kind {
+        ExprKind::New(n) => match &n.class.kind {
+            ExprKind::Identifier(name) => {
+                let resolved = crate::db::resolve_name(db, file, name.as_ref());
+                if matches!(resolved.as_str(), "self" | "static" | "parent") {
+                    Vec::new()
+                } else {
+                    vec![resolved]
+                }
+            }
+            _ => Vec::new(),
+        },
+        ExprKind::FunctionCall(fc) => {
+            let ExprKind::Identifier(name) = &fc.name.kind else {
+                return Vec::new();
+            };
+            let mut resolved = crate::db::resolve_name(db, file, name.as_ref());
+            let mut func =
+                crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved));
+            if func.is_none() && !name.contains('\\') && resolved.contains('\\') {
+                resolved = name.to_string();
+                func = crate::db::find_function_from(
+                    db,
+                    file,
+                    crate::db::Fqcn::from_str(db, &resolved),
+                );
+            }
+            let Some(ty) = func
+                .filter(|f| !f.is_taint_source)
+                .and_then(|f| f.return_type.as_deref().cloned())
+            else {
+                return Vec::new();
+            };
+            ty.types
+                .iter()
+                .filter_map(|atom| match atom {
+                    mir_types::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.to_string()),
+                    mir_types::Atomic::TFalse | mir_types::Atomic::TNull => None,
+                    _ => Some(String::new()),
+                })
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Methods whose result comes from server-side state or the arguments, never from the receiver's tainted data.
+fn result_ignores_receiver(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_lower: &str,
+) -> bool {
+    let is_a = |base: &str| {
+        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+    };
+    // A date renders through the format argument; the parsed input is never echoed.
+    if matches!(
+        method_lower,
+        "format" | "gettimezone" | "getname" | "getoffset" | "gettimestamp"
+    ) && ["DateTimeInterface", "DateInterval", "DateTimeZone"]
+        .iter()
+        .any(|base| is_a(base))
+    {
+        return true;
+    }
+    matches!(
+        method_lower,
+        "hashname"
+            | "store"
+            | "storeas"
+            | "storepublicly"
+            | "storepubliclyas"
+            | "getrealpath"
+            | "getpathname"
+            | "getpath"
+            | "path"
+    ) && is_a("Symfony\\Component\\HttpFoundation\\File\\UploadedFile")
 }
 
 /// Taint kinds an escaping method of a builtin database class removes.
