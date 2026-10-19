@@ -623,7 +623,9 @@ impl php_ast::owned::visitor::OwnedVisitor for ThisPropReads {
 
 /// Give each parameter its label, replacing whatever taint the name had.
 pub fn label_params<'p>(ctx: &mut FlowState, names: impl Iterator<Item = &'p str>) {
-    ctx.param_parts.clear();
+    if !ctx.param_parts.is_empty() {
+        ctx.param_parts = Default::default();
+    }
     ctx.object_guard_slots = None;
     for (index, name) in names.take(MAX_TRACKED_PARAMS).enumerate() {
         ctx.set_var_taint(name, Taint::param(index));
@@ -1232,6 +1234,9 @@ pub fn class_property_taint(
     class: &str,
     key: mir_types::Name,
 ) -> Taint {
+    if !db.taint_analysis() {
+        return Taint::NONE;
+    }
     crate::db::taint_sources::class_property_writers(db, from, class, key)
         .iter()
         .fold(Taint::NONE, |acc, (owner, method)| {
@@ -1956,58 +1961,57 @@ pub fn is_framework_request_source(
     let is_a = |base: &str| {
         fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
     };
-    if is_a(SYMFONY_REQUEST) {
-        return matches!(
-            method_lower,
-            "get"
-                | "getcontent"
-                | "getpayload"
-                | "toarray"
-                | "geturi"
-                | "getrequesturi"
-                | "getpathinfo"
-                | "getquerystring"
-                | "gethost"
-                | "gethttphost"
-                | "getschemeandhttphost"
-                | "getbaseurl"
-                | "getbasepath"
-                | "getuserinfo"
-                | "getuser"
-                | "getpassword"
-                | "getclientip"
-                | "getclientips"
-                | "getpreferredlanguage"
-                | "getlanguages"
-                | "getcharsets"
-                | "getencodings"
-                | "getacceptablecontenttypes"
-                | "getetags"
-                | "getrequestformat"
-        ) || is_laravel_request_accessor(method_lower);
+    let symfony_accessor = matches!(
+        method_lower,
+        "get"
+            | "getcontent"
+            | "getpayload"
+            | "toarray"
+            | "geturi"
+            | "getrequesturi"
+            | "getpathinfo"
+            | "getquerystring"
+            | "gethost"
+            | "gethttphost"
+            | "getschemeandhttphost"
+            | "getbaseurl"
+            | "getbasepath"
+            | "getuserinfo"
+            | "getuser"
+            | "getpassword"
+            | "getclientip"
+            | "getclientips"
+            | "getpreferredlanguage"
+            | "getlanguages"
+            | "getcharsets"
+            | "getencodings"
+            | "getacceptablecontenttypes"
+            | "getetags"
+            | "getrequestformat"
+    ) || is_laravel_request_accessor(method_lower);
+    let server_request_accessor = matches!(
+        method_lower,
+        "getqueryparams"
+            | "getparsedbody"
+            | "getcookieparams"
+            | "getuploadedfiles"
+            | "getserverparams"
+    );
+    let request_accessor = matches!(
+        method_lower,
+        "getheader" | "getheaderline" | "getheaders" | "getbody" | "geturi" | "getrequesttarget"
+    );
+    // Most method names are no accessor of any request type: skip the hierarchy walks.
+    if !(symfony_accessor || server_request_accessor || request_accessor) {
+        return false;
     }
-    if is_a("Psr\\Http\\Message\\ServerRequestInterface")
-        && matches!(
-            method_lower,
-            "getqueryparams"
-                | "getparsedbody"
-                | "getcookieparams"
-                | "getuploadedfiles"
-                | "getserverparams"
-        )
-    {
+    if is_a(SYMFONY_REQUEST) {
+        return symfony_accessor;
+    }
+    if server_request_accessor && is_a("Psr\\Http\\Message\\ServerRequestInterface") {
         return true;
     }
-    is_a("Psr\\Http\\Message\\RequestInterface")
-        && matches!(
-            method_lower,
-            "getheader"
-                | "getheaderline"
-                | "getheaders"
-                | "getbody"
-                | "geturi"
-                | "getrequesttarget"
-        )
+    request_accessor && is_a("Psr\\Http\\Message\\RequestInterface")
 }
 
 fn is_laravel_request_accessor(method_lower: &str) -> bool {
@@ -2082,6 +2086,12 @@ pub fn classify_method_sink(
     method_name: &str,
 ) -> Option<SinkKind> {
     let method = crate::util::php_ident_lowercase(method_name);
+    if !matches!(
+        method.as_str(),
+        "query" | "exec" | "prepare" | "real_query" | "multi_query" | "evaluate" | "xpath"
+    ) {
+        return None;
+    }
     let is_a = |base: &str| {
         fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
     };
@@ -2271,6 +2281,9 @@ pub fn expr_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
+    if !db.taint_analysis() {
+        return Taint::NONE;
+    }
     match &expr.kind {
         ExprKind::Variable(name) => {
             let n = name.trim_start_matches('$');
@@ -2930,7 +2943,7 @@ pub fn arrow_summary(
         body_ctx.set_var(name.as_str(), mir_types::Type::mixed());
     }
     label_params(&mut body_ctx, params.iter().map(|(n, _)| n.as_str()));
-    for (name, taint) in body_ctx.tainted_vars.iter_mut() {
+    for (name, taint) in std::sync::Arc::make_mut(&mut body_ctx.tainted_vars).iter_mut() {
         if !params.iter().any(|(p, _)| p == name) {
             *taint = taint.concrete();
         }
@@ -2944,7 +2957,7 @@ pub fn arrow_summary(
         }
         let taint = captured_taint(ctx.var_taint(name.as_str()), params.len(), &mut captures);
         if !taint.is_empty() {
-            body_ctx.tainted_vars.insert(name, taint);
+            std::sync::Arc::make_mut(&mut body_ctx.tainted_vars).insert(name, taint);
         }
     }
     crate::flow_state::ClosureSummary {

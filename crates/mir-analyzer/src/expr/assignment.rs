@@ -592,7 +592,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                         if let Some(trail) = trail {
-                            ctx.taint_trails.insert(
+                            std::sync::Arc::make_mut(&mut ctx.taint_trails).insert(
                                 mir_types::Name::from(name.trim_start_matches('$')),
                                 crate::taint::extend_trail(trail, &a.target, self.source),
                             );

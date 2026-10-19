@@ -233,17 +233,17 @@ pub struct FlowState {
 
     /// Variables that carry tainted (user-controlled) values at this point.
     /// Used by taint analysis.
-    pub tainted_vars: FxHashMap<Name, Taint>,
+    pub tainted_vars: Arc<FxHashMap<Name, Taint>>,
 
     /// Per-key taint of array variables whose literal-key writes are known;
     /// a variable's `tainted_vars` entry stays the union of its keys.
-    pub tainted_keys: FxHashMap<Name, KeyTaint>,
+    pub tainted_keys: Arc<FxHashMap<Name, KeyTaint>>,
 
     /// Taint summaries of closures analyzed in this scope.
     pub closures: Arc<ClosureSummaries>,
 
     /// How source data reached each tainted variable, source first.
-    pub taint_trails: FxHashMap<Name, Arc<[TrailStep]>>,
+    pub taint_trails: Arc<FxHashMap<Name, Arc<[TrailStep]>>>,
 
     /// Whether this body is being analyzed for its taint summary, so
     /// arguments carrying only parameter labels still need callee summaries.
@@ -251,7 +251,7 @@ pub struct FlowState {
 
     /// Label slots each variable carries as (part of) that argument's own
     /// value rather than something computed from it; see `taint::param_parts`.
-    pub param_parts: FxHashMap<Name, Taint>,
+    pub param_parts: Arc<FxHashMap<Name, Taint>>,
 
     /// Label slots standing for parameters the body proves objects, shared by
     /// every branch of the body; see `taint::seed_object_guards`.
@@ -262,13 +262,13 @@ pub struct FlowState {
     /// types. Key: `(object_var, prop_name)`. Set by a tainted property
     /// assignment (`$obj->prop = $_GET['x']`); read by `taint::expr_taint`
     /// so a later `$obj->prop` access is recognized as tainted.
-    pub tainted_props: FxHashMap<(Name, Name), Taint>,
+    pub tainted_props: Arc<FxHashMap<(Name, Name), Taint>>,
 
     /// Static properties that carry tainted (user-controlled) values at this
     /// point. Key: `(fqcn, prop_name)`, mirroring how `prop_refined`'s static
     /// counterpart is keyed by FQCN instead of a receiver variable name (a
     /// FQCN can never collide with a real PHP variable name).
-    pub tainted_static_props: FxHashMap<(Name, Name), Taint>,
+    pub tainted_static_props: Arc<FxHashMap<(Name, Name), Taint>>,
 
     /// Local variables ref-aliased directly to a var-receiver property
     /// (`$x =& $this->prop;`), keyed by the alias variable name, value is
@@ -287,7 +287,7 @@ pub struct FlowState {
     /// Variables a call can rewrite behind the analyzer's back: by-ref closure
     /// captures (value: the widest type the closure can leave) and `global`
     /// imports (value: `None`). Consulted by [`Self::invalidate_escaped_vars`].
-    pub escaped_vars: FxHashMap<Name, Option<Type>>,
+    pub escaped_vars: Arc<FxHashMap<Name, Option<Type>>>,
 
     /// Local variables directly assigned from a bare `clone $expr` expression
     /// (`$clone = clone $this;`), keyed by the variable's own name. A write
@@ -671,17 +671,17 @@ impl FlowState {
             is_in_immutable_ctor: false,
             inside_static_method: false,
             strict_types: false,
-            tainted_vars: FxHashMap::default(),
-            tainted_keys: FxHashMap::default(),
+            tainted_vars: Arc::default(),
+            tainted_keys: Arc::default(),
             closures: Arc::default(),
-            taint_trails: FxHashMap::default(),
+            taint_trails: Arc::default(),
             summarizing_taint: false,
-            param_parts: FxHashMap::default(),
+            param_parts: Arc::default(),
             object_guard_slots: None,
-            tainted_props: FxHashMap::default(),
-            tainted_static_props: FxHashMap::default(),
+            tainted_props: Arc::default(),
+            tainted_static_props: Arc::default(),
             ref_aliases: FxHashMap::default(),
-            escaped_vars: FxHashMap::default(),
+            escaped_vars: Arc::default(),
             cloned_local_vars: FxHashSet::default(),
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
@@ -1000,12 +1000,16 @@ impl FlowState {
     /// Marks `name` as rewritable by any later call; see [`Self::escaped_vars`].
     pub fn mark_escaped(&mut self, name: &str, widest: Option<Type>) {
         let name = Name::from(name.trim_start_matches('$'));
-        match (self.escaped_vars.get_mut(&name), widest) {
+        if widest.is_none() && self.escaped_vars.contains_key(&name) {
+            return;
+        }
+        let escaped = Arc::make_mut(&mut self.escaped_vars);
+        match (escaped.get_mut(&name), widest) {
             (Some(Some(existing)), Some(ty)) => existing.merge_with(&ty),
             (Some(existing), Some(ty)) => *existing = Some(ty),
             (Some(_), None) => {}
             (None, widest) => {
-                self.escaped_vars.insert(name, widest);
+                escaped.insert(name, widest);
             }
         }
     }
@@ -1303,8 +1307,10 @@ impl FlowState {
     /// Add `taint` to whatever the variable already carries.
     pub fn taint_var(&mut self, name: &str, taint: Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
-        if let Some(keys) = self.tainted_keys.get_mut(&sym) {
-            keys.rest |= taint;
+        if !taint.is_empty() {
+            if let Some(keys) = Arc::make_mut(&mut self.tainted_keys).get_mut(&sym) {
+                keys.rest |= taint;
+            }
         }
         add_taint(&mut self.tainted_vars, sym, taint);
         self.drop_param_parts(sym, taint);
@@ -1364,11 +1370,14 @@ impl FlowState {
     }
 
     fn drop_param_parts(&mut self, sym: Name, taint: Taint) {
-        if let Some(parts) = self.param_parts.get_mut(&sym) {
-            *parts = parts.difference(taint.label_slots());
-            if parts.is_empty() {
-                self.param_parts.remove(&sym);
-            }
+        let Some(&parts) = self.param_parts.get(&sym) else {
+            return;
+        };
+        let parts = parts.difference(taint.label_slots());
+        if parts.is_empty() {
+            Arc::make_mut(&mut self.param_parts).remove(&sym);
+        } else {
+            set_taint(&mut self.param_parts, sym, parts);
         }
     }
 
@@ -1376,7 +1385,11 @@ impl FlowState {
     /// else is known about it.
     pub fn map_var_taint(&mut self, name: &str, mut f: impl FnMut(Taint) -> Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
-        if let Some(keys) = self.tainted_keys.get_mut(&sym) {
+        if let Some(keys) = self.tainted_keys.contains_key(&sym).then(|| {
+            Arc::make_mut(&mut self.tainted_keys)
+                .get_mut(&sym)
+                .expect("checked above")
+        }) {
             keys.rest = f(keys.rest);
             for (_, taint) in &mut keys.keys {
                 *taint = f(*taint);
@@ -1389,9 +1402,9 @@ impl FlowState {
     /// Replace the variable's taint; `Taint::NONE` clears it.
     pub fn set_var_taint(&mut self, name: &str, taint: Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
-        self.param_parts.remove(&sym);
-        self.tainted_keys.remove(&sym);
-        self.taint_trails.remove(&sym);
+        remove_entry(&mut self.param_parts, &sym);
+        remove_entry(&mut self.tainted_keys, &sym);
+        remove_entry(&mut self.taint_trails, &sym);
         if self.closures.by_var.contains_key(&sym) {
             Arc::make_mut(&mut self.closures).by_var.remove(&sym);
         }
@@ -1415,12 +1428,12 @@ impl FlowState {
     /// Replace an array variable's taint with known per-key taint.
     pub fn set_key_taints(&mut self, name: &str, keys: KeyTaint) {
         let sym = Name::from(name.trim_start_matches('$'));
-        self.param_parts.remove(&sym);
+        remove_entry(&mut self.param_parts, &sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
         if keys.whole().is_empty() {
-            self.tainted_keys.remove(&sym);
+            remove_entry(&mut self.tainted_keys, &sym);
         } else {
-            self.tainted_keys.insert(sym, keys);
+            Arc::make_mut(&mut self.tainted_keys).insert(sym, keys);
         }
     }
 
@@ -1441,10 +1454,12 @@ impl FlowState {
         if !self.tainted_keys.contains_key(&sym) && whole.is_empty() && taint.is_empty() {
             return;
         }
-        let keys = self.tainted_keys.entry(sym).or_insert_with(|| KeyTaint {
-            rest: whole,
-            keys: Vec::new(),
-        });
+        let keys = Arc::make_mut(&mut self.tainted_keys)
+            .entry(sym)
+            .or_insert_with(|| KeyTaint {
+                rest: whole,
+                keys: Vec::new(),
+            });
         let added = taint;
         let taint = if replace {
             taint
@@ -1489,7 +1504,9 @@ impl FlowState {
     /// Forget the property taint of the object `obj_var` held.
     pub fn clear_prop_taints(&mut self, obj_var: &str) {
         let obj = Name::from(obj_var.trim_start_matches('$'));
-        self.tainted_props.retain(|(o, _), _| *o != obj);
+        if self.tainted_props.keys().any(|(o, _)| *o == obj) {
+            Arc::make_mut(&mut self.tainted_props).retain(|(o, _), _| *o != obj);
+        }
     }
 
     pub fn prop_taint(&self, obj_var: &str, prop: &str) -> Taint {
@@ -2021,35 +2038,35 @@ impl FlowState {
 
         result.tainted_keys = merge_key_taints(&if_ctx, &else_ctx);
         result.closures = merge_closures(&if_ctx.closures, &else_ctx.closures);
-        for (name, trail) in else_ctx
-            .taint_trails
-            .iter()
-            .chain(if_ctx.taint_trails.iter())
-        {
-            result.taint_trails.insert(*name, trail.clone());
+        for branch in [&else_ctx, &if_ctx] {
+            if Arc::ptr_eq(&branch.taint_trails, &result.taint_trails) {
+                continue;
+            }
+            for (name, trail) in branch.taint_trails.iter() {
+                Arc::make_mut(&mut result.taint_trails).insert(*name, trail.clone());
+            }
         }
         // Taint: conservative union — if either branch taints a var, it stays tainted
-        for (name, taint) in if_ctx
-            .tainted_vars
-            .iter()
-            .chain(else_ctx.tainted_vars.iter())
-        {
-            add_taint(&mut result.tainted_vars, *name, *taint);
+        for branch in [&if_ctx, &else_ctx] {
+            if Arc::ptr_eq(&branch.tainted_vars, &result.tainted_vars) {
+                continue;
+            }
+            for (name, taint) in branch.tainted_vars.iter() {
+                add_taint(&mut result.tainted_vars, *name, *taint);
+            }
         }
         result.param_parts = merge_param_parts(&if_ctx, &else_ctx);
-        for (key, taint) in if_ctx
-            .tainted_props
-            .iter()
-            .chain(else_ctx.tainted_props.iter())
-        {
-            add_taint(&mut result.tainted_props, *key, *taint);
-        }
-        for (key, taint) in if_ctx
-            .tainted_static_props
-            .iter()
-            .chain(else_ctx.tainted_static_props.iter())
-        {
-            add_taint(&mut result.tainted_static_props, *key, *taint);
+        for branch in [&if_ctx, &else_ctx] {
+            if !Arc::ptr_eq(&branch.tainted_props, &result.tainted_props) {
+                for (key, taint) in branch.tainted_props.iter() {
+                    add_taint(&mut result.tainted_props, *key, *taint);
+                }
+            }
+            if !Arc::ptr_eq(&branch.tainted_static_props, &result.tainted_static_props) {
+                for (key, taint) in branch.tainted_static_props.iter() {
+                    add_taint(&mut result.tainted_static_props, *key, *taint);
+                }
+            }
         }
 
         // Same conservative union for ref-aliases — once either branch
@@ -2059,17 +2076,19 @@ impl FlowState {
             result.ref_aliases.insert(*var, *alias);
         }
 
-        for (var, ty) in if_ctx
-            .escaped_vars
-            .iter()
-            .chain(else_ctx.escaped_vars.iter())
-        {
-            match (result.escaped_vars.get_mut(var), ty) {
-                (Some(Some(existing)), Some(ty)) => existing.merge_with(ty),
-                (Some(existing), Some(ty)) => *existing = Some(ty.clone()),
-                (Some(_), None) => {}
-                (None, ty) => {
-                    result.escaped_vars.insert(*var, ty.clone());
+        for branch in [&if_ctx, &else_ctx] {
+            if Arc::ptr_eq(&branch.escaped_vars, &result.escaped_vars) {
+                continue;
+            }
+            let escaped = Arc::make_mut(&mut result.escaped_vars);
+            for (var, ty) in branch.escaped_vars.iter() {
+                match (escaped.get_mut(var), ty) {
+                    (Some(Some(existing)), Some(ty)) => existing.merge_with(ty),
+                    (Some(existing), Some(ty)) => *existing = Some(ty.clone()),
+                    (Some(_), None) => {}
+                    (None, ty) => {
+                        escaped.insert(*var, ty.clone());
+                    }
                 }
             }
         }
@@ -2290,7 +2309,10 @@ impl KeyTaint {
 }
 
 /// A label slot stays (part of) an argument where no branch carries it otherwise.
-fn merge_param_parts(a: &FlowState, b: &FlowState) -> FxHashMap<Name, Taint> {
+fn merge_param_parts(a: &FlowState, b: &FlowState) -> Arc<FxHashMap<Name, Taint>> {
+    if a.param_parts.is_empty() && b.param_parts.is_empty() {
+        return a.param_parts.clone();
+    }
     let computed = |ctx: &FlowState, name: &Name| {
         ctx.var_taint(name.as_str())
             .label_slots()
@@ -2299,14 +2321,19 @@ fn merge_param_parts(a: &FlowState, b: &FlowState) -> FxHashMap<Name, Taint> {
     let mut merged = FxHashMap::default();
     for (name, parts) in a.param_parts.iter().chain(b.param_parts.iter()) {
         let parts = parts.difference(computed(a, name) | computed(b, name));
-        add_taint(&mut merged, *name, parts);
+        if !parts.is_empty() {
+            *merged.entry(*name).or_default() |= parts;
+        }
     }
-    merged
+    Arc::new(merged)
 }
 
 /// Per-key taint after two branches meet: kept where both sides know it, or
 /// where the side that doesn't holds no taint for the variable at all.
-fn merge_key_taints(a: &FlowState, b: &FlowState) -> FxHashMap<Name, KeyTaint> {
+fn merge_key_taints(a: &FlowState, b: &FlowState) -> Arc<FxHashMap<Name, KeyTaint>> {
+    if a.tainted_keys.is_empty() && b.tainted_keys.is_empty() {
+        return a.tainted_keys.clone();
+    }
     let mut merged = FxHashMap::default();
     for name in a.tainted_keys.keys().chain(b.tainted_keys.keys()) {
         if merged.contains_key(name) {
@@ -2321,20 +2348,38 @@ fn merge_key_taints(a: &FlowState, b: &FlowState) -> FxHashMap<Name, KeyTaint> {
             merged.insert(*name, left.union(&right));
         }
     }
-    merged
+    Arc::new(merged)
 }
 
-fn add_taint<K: std::hash::Hash + Eq>(map: &mut FxHashMap<K, Taint>, key: K, taint: Taint) {
-    if !taint.is_empty() {
-        *map.entry(key).or_default() |= taint;
+fn add_taint<K: std::hash::Hash + Eq + Clone>(
+    map: &mut Arc<FxHashMap<K, Taint>>,
+    key: K,
+    taint: Taint,
+) {
+    if taint.is_empty() || map.get(&key).is_some_and(|&held| held | taint == held) {
+        return;
+    }
+    *Arc::make_mut(map).entry(key).or_default() |= taint;
+}
+
+fn set_taint<K: std::hash::Hash + Eq + Clone>(
+    map: &mut Arc<FxHashMap<K, Taint>>,
+    key: K,
+    taint: Taint,
+) {
+    if taint.is_empty() {
+        remove_entry(map, &key);
+    } else if map.get(&key) != Some(&taint) {
+        Arc::make_mut(map).insert(key, taint);
     }
 }
 
-fn set_taint<K: std::hash::Hash + Eq>(map: &mut FxHashMap<K, Taint>, key: K, taint: Taint) {
-    if taint.is_empty() {
-        map.remove(&key);
-    } else {
-        map.insert(key, taint);
+fn remove_entry<K: std::hash::Hash + Eq + Clone, V: Clone>(
+    map: &mut Arc<FxHashMap<K, V>>,
+    key: &K,
+) {
+    if map.contains_key(key) {
+        Arc::make_mut(map).remove(key);
     }
 }
 

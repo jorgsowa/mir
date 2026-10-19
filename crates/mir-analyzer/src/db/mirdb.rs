@@ -139,6 +139,8 @@ pub struct MirDbStorage {
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
     /// Seed for [`crate::db::AnalyzeFileInput::memoize_method_call_results`].
     memoize_method_call_results: Arc<std::sync::atomic::AtomicBool>,
+    /// Read untracked: set once while building the session, before any analysis.
+    taint_analysis: Arc<std::sync::atomic::AtomicBool>,
     /// Seed for [`crate::db::AnalyzeFileInput::forbidden_functions`].
     forbidden_functions: Arc<parking_lot::RwLock<Arc<[Arc<str>]>>>,
     /// Lazily-created [`crate::db::AnalyzeFileInput`] singleton input (see
@@ -361,6 +363,7 @@ impl Default for MirDbStorage {
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
             memoize_method_call_results: Arc::default(),
+            taint_analysis: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             forbidden_functions: Arc::new(parking_lot::RwLock::new(Arc::from([]))),
             analyze_config_input: Arc::default(),
             stub_cache: Arc::default(),
@@ -403,6 +406,11 @@ impl MirDatabase for MirDbStorage {
 
     fn memoize_method_call_results(&self) -> bool {
         *self.analyze_config().memoize_method_call_results(self)
+    }
+
+    fn taint_analysis(&self) -> bool {
+        self.taint_analysis
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     fn is_forbidden_function(&self, name: &str) -> bool {
@@ -1472,6 +1480,13 @@ impl MirDbStorage {
             use salsa::Setter as _;
             cfg.set_memoize_method_call_results(self).to(enabled);
         }
+    }
+
+    /// Enable or disable taint tracking; see [`MirDatabase::taint_analysis`].
+    /// Takes effect for analyses started afterwards, not for memoized results.
+    pub fn set_taint_analysis(&mut self, enabled: bool) {
+        self.taint_analysis
+            .store(enabled, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Set the functions whose calls are reported as `ForbiddenCode`.

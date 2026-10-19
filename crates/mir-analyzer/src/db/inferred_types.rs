@@ -198,6 +198,9 @@ pub fn function_taint_summary(
     file: &str,
     fqn: &str,
 ) -> Option<crate::taint::TaintSummary> {
+    if !db.taint_analysis() {
+        return None;
+    }
     let sf = crate::db::function_loc_from(db, file, Fqcn::from_str(db, fqn))?.file();
     if !summarizable(db, sf, file) {
         return None;
@@ -222,6 +225,9 @@ pub fn method_taint_summary(
     owner_fqcn: &str,
     method_name_lower: &str,
 ) -> Option<crate::taint::TaintSummary> {
+    if !db.taint_analysis() {
+        return None;
+    }
     let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, owner_fqcn))?.file();
     if !summarizable(db, sf, file) {
         return None;
@@ -248,6 +254,9 @@ pub fn function_param_sinks(
     file: &str,
     fqn: &str,
 ) -> Option<crate::taint::TaintSummary> {
+    if !db.taint_analysis() {
+        return None;
+    }
     super::taint_sources::function_may_reach_sink(db, file, fqn)
         .then(|| function_taint_summary(db, file, fqn))
         .flatten()
@@ -261,6 +270,9 @@ pub fn method_param_sinks(
     class: &str,
     method_name_lower: &str,
 ) -> Option<crate::taint::TaintSummary> {
+    if !db.taint_analysis() {
+        return None;
+    }
     let implementations =
         super::taint_sources::method_implementations(db, class, method_name_lower);
     if !implementations.is_empty() {
@@ -287,6 +299,9 @@ pub fn method_param_sinks(
 /// Source taint the global `var` holds after the top-level code of `file`
 /// or of the files joined to it by includes.
 pub fn global_var_taint(db: &dyn MirDatabase, file: &str, var: &str) -> crate::taint::Taint {
+    if !db.taint_analysis() {
+        return crate::taint::Taint::NONE;
+    }
     let var = mir_types::Name::new(var);
     let Some(sf) = db.lookup_source_file(file) else {
         return crate::taint::Taint::NONE;

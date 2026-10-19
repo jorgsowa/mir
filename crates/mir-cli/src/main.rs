@@ -110,6 +110,10 @@ struct Cli {
     #[arg(long)]
     find_dead_code: bool,
 
+    /// Skip taint analysis (no `Tainted*` issues); faster on large codebases
+    #[arg(long)]
+    no_taint: bool,
+
     /// Colorize output [default: auto-detect NO_COLOR/CLICOLOR/tty]
     #[arg(long, value_enum, default_value = "auto")]
     color: ColorChoice,

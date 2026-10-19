@@ -29,6 +29,10 @@ pub trait MirDatabase: salsa::Database {
     /// value (Psalm's `memoizeMethodCallResults`).
     fn memoize_method_call_results(&self) -> bool;
 
+    /// Whether taint is tracked and `Tainted*` issues are reported. Fixed for
+    /// the life of a session; reads are not tracked by salsa.
+    fn taint_analysis(&self) -> bool;
+
     /// Whether `name` (case-insensitive, no leading `\`) is in the configured forbidden-functions list.
     fn is_forbidden_function(&self, name: &str) -> bool;
 

@@ -450,7 +450,7 @@ impl<'a> StatementsAnalyzer<'a> {
             entry.set_var(vname.as_str(), value_ty.clone());
             entry.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
             if let Some(trail) = &iterable_trail {
-                entry.taint_trails.insert(
+                std::sync::Arc::make_mut(&mut entry.taint_trails).insert(
                     Name::from(vname.as_str()),
                     crate::taint::extend_trail(trail.clone(), &fe.value, self.source),
                 );

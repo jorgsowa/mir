@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--no-taint` skips taint analysis: no `Tainted*` issues are reported and no taint summaries are built.
+
+### Changed
+
+- Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
+
 ### Fixed
 
 - `new ArrayIterator([...])`, `new ArrayObject(...)` and other generic stub classes bind their templates from constructor arguments like user classes do. A stub `@param` that refines its `#[LanguageLevelTypeAware]` type (`array<TKey, TValue>|object` for `object|array`) is kept; a stale or merely restating one still yields to the attribute. This removes false `InvalidArgument` such as `expects 'Traversable<string, object>', got 'Traversable<int|string, mixed>'`.

@@ -38,6 +38,7 @@ pub struct AnalysisSession {
     resolver: Option<Arc<dyn crate::ClassResolver>>,
     pub(crate) php_version: PhpVersion,
     memoize_method_call_results: bool,
+    taint_analysis: bool,
     forbidden_functions: Vec<String>,
     pub(crate) user_stub_files: Vec<PathBuf>,
     pub(crate) user_stub_dirs: Vec<PathBuf>,
@@ -207,6 +208,7 @@ impl AnalysisSession {
             resolver: None,
             php_version,
             memoize_method_call_results: false,
+            taint_analysis: true,
             forbidden_functions: Vec::new(),
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
@@ -417,6 +419,10 @@ impl AnalysisSession {
         if self.memoize_method_call_results {
             user_stub_fp ^= 0x6d65_6d6f_697a_6531;
         }
+        // Cached diagnostics hold `Tainted*` issues only while taint analysis is on.
+        if !self.taint_analysis {
+            user_stub_fp ^= 0x7461_696e_7469_6e67;
+        }
         for name in &self.forbidden_functions {
             user_stub_fp = user_stub_fp.rotate_left(5)
                 ^ name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
@@ -491,6 +497,14 @@ impl AnalysisSession {
     pub fn with_memoize_method_call_results(mut self, enabled: bool) -> Self {
         self.memoize_method_call_results = enabled;
         self.db.salsa.set_memoize_method_call_results(enabled);
+        self
+    }
+
+    /// Track taint and report `Tainted*` issues (the default). Call before
+    /// [`Self::with_cache_dir`].
+    pub fn with_taint_analysis(mut self, enabled: bool) -> Self {
+        self.taint_analysis = enabled;
+        self.db.salsa.set_taint_analysis(enabled);
         self
     }
 
