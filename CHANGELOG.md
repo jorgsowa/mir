@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `basename()` clears file-path taint again, so `move_uploaded_file($tmp, $dir . basename($_FILES['f']['name']))` and `file_get_contents($dir . basename($q))` are no longer reported; other sink kinds still see the value.
 - A tainted object's date rendering (`date_create($_GET['d'])->format('Y')`, `DateInterval::format`, `DateTimeZone::getName`) and an uploaded file's generated `hashName()`, `store()` and `getRealPath()` no longer carry the receiver's taint; their arguments still do.
 - `new ArrayIterator([...])`, `new ArrayObject(...)` and other generic stub classes bind their templates from constructor arguments like user classes do. A stub `@param` that refines its `#[LanguageLevelTypeAware]` type (`array<TKey, TValue>|object` for `object|array`) is kept; a stale or merely restating one still yields to the attribute. This removes false `InvalidArgument` such as `expects 'Traversable<string, object>', got 'Traversable<int|string, mixed>'`.
 - A raw generic instance (`ArrayIterator`, `class Inner extends ArrayIterator {}`) passed to a parameterized ancestor no longer has its unknown type arguments filled with the template bounds, which rejected string-keyed expectations.

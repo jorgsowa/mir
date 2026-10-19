@@ -115,6 +115,8 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
         | "db2_escape_string" => Taint::SQL,
         "escapeshellarg" | "escapeshellcmd" => Taint::SHELL,
         "ldap_escape" => Taint::LDAP,
+        // Strips directory components, so the value can't traverse out of its directory.
+        "basename" => Taint::FILE,
         // Output is limited to `[A-Za-z0-9%+._~-]`.
         "urlencode" | "rawurlencode" => {
             Taint::HTML
