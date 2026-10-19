@@ -1521,7 +1521,7 @@ class mysqli_stmt
      */
     public function __construct(
         #[LanguageLevelTypeAware(['8.0' => 'mysqli'], default: '')] $mysql,
-        #[LanguageLevelTypeAware(['8.0' => 'string|null'], default: '')] $query
+        #[LanguageLevelTypeAware(['8.0' => 'string|null'], default: '')] $query = null
     ) {}
 
     /**

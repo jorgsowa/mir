@@ -143,7 +143,7 @@ pub(super) fn check_counts(
             IssueKind::TooFewArguments {
                 fn_name: fn_name.to_string(),
                 expected: required_count,
-                actual: arg_types.len(),
+                actual: provided_count,
             },
             Severity::Error,
             call_span,

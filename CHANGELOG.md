@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A constructor no longer inherits its parent constructor's `@param` types by position, which turned a child's `Throwable|string` parameter into the parent's `string` and reported `InvalidMethodCall`/`RedundantCondition` in its body.
 - Class names in strings (`class-string`, `interface-string` and `'Class::method'` arguments) are resolved as fully qualified, without the current namespace or `use` imports, and `'0'` is no longer looked up as a class.
 - The pipe operator (`$x |> f(...)`) is analyzed as the call `f($x)`: its result has the callable's return type instead of the callable's own type (`Closure`, or the function-name string), removing false `InvalidArgument`/`InvalidOperand` on its result. Argument checks, template inference, arity, undefined-callable reports, references and taint now apply to it as to the equivalent call.
+- `new mysqli_stmt($mysqli)` no longer reports `TooFewArguments`: the constructor's `?string $query` is optional again.
+- `TooFewArguments` on a call with named arguments counts the required parameters that received a value, so `f(b: 1)` missing `$a` reports `got 0` instead of the number of arguments passed.
 
 ## [0.88.0] - 2026-10-17
 
