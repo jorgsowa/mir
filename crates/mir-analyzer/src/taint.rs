@@ -1599,6 +1599,69 @@ fn is_request_server_key(key: &str) -> bool {
         )
 }
 
+/// The key of a `$_SERVER[$key]` read whose entry isn't known statically.
+pub fn server_dynamic_key(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&Expr> {
+    let key = aa.index.as_deref()?;
+    (is_superglobal_var(&aa.array, "_SERVER")
+        && !matches!(key.kind, ExprKind::String(_) | ExprKind::Int(_)))
+    .then_some(key)
+}
+
+/// Whether a key expression starts with the `HTTP_` header prefix.
+pub fn starts_with_header_prefix(key: &Expr) -> bool {
+    match &key.kind {
+        ExprKind::String(s) => s.starts_with("HTTP_"),
+        ExprKind::Parenthesized(inner) => starts_with_header_prefix(inner),
+        ExprKind::Binary(b) if matches!(b.op, php_ast::ast::BinaryOp::Concat) => {
+            starts_with_header_prefix(&b.left)
+        }
+        ExprKind::InterpolatedString(parts) => matches!(
+            parts.first(),
+            Some(StringPart::Literal(l)) if l.starts_with("HTTP_")
+        ),
+        _ => false,
+    }
+}
+
+/// Taint of `$_SERVER[$key]`: request entries when the key can name one,
+/// otherwise whatever the key itself carries.
+fn server_dynamic_read_taint(
+    key: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    if starts_with_header_prefix(key) {
+        return Taint::ALL;
+    }
+    if let ExprKind::Variable(name) = &unwrap_parens(key).kind {
+        let ty = ctx.get_var(name);
+        let literals: Option<Vec<&str>> = ty
+            .types
+            .iter()
+            .map(|a| match a {
+                mir_types::Atomic::TLiteralString(s) => Some(s.as_ref()),
+                _ => None,
+            })
+            .collect();
+        if let Some(literals) = literals.filter(|l| !l.is_empty()) {
+            return if literals.iter().any(|l| is_request_server_key(l)) {
+                Taint::ALL
+            } else {
+                Taint::NONE
+            };
+        }
+    }
+    expr_taint(key, ctx, db, file)
+}
+
+fn is_key_filter(lower_name: &str) -> bool {
+    matches!(
+        lower_name,
+        "array_intersect_key" | "array_diff_key" | "array_intersect_ukey" | "array_diff_ukey"
+    )
+}
+
 fn is_superglobal_var(expr: &Expr, name: &str) -> bool {
     matches!(&expr.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == name)
 }
@@ -2250,6 +2313,8 @@ pub fn expr_taint(
         ExprKind::ArrayAccess(aa) => {
             if is_trusted_superglobal_field(aa) {
                 Taint::NONE
+            } else if let Some(key) = server_dynamic_key(aa) {
+                server_dynamic_read_taint(key, ctx, db, file)
             } else if is_globals_superglobal_alias(aa) {
                 Taint::ALL
             } else if let Some(var) = globals_entry(aa) {
@@ -2501,7 +2566,13 @@ pub fn expr_taint(
                     // is reported at the call itself.
                     let reads_path = classify_sink(&lower_name) == Some(SinkKind::File);
                     if !safe_return && !reads_path {
-                        return args_taint(&fc.args, ctx, db, file);
+                        // Only the first array contributes values; the rest are compared by key.
+                        let carrying = if is_key_filter(&lower_name) {
+                            &fc.args[..fc.args.len().min(1)]
+                        } else {
+                            &fc.args[..]
+                        };
+                        return args_taint(carrying, ctx, db, file);
                     }
                 }
             }

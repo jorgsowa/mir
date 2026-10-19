@@ -289,6 +289,8 @@ enum Inspect {
     Source,
     Callee(Callee),
     SkipChildren,
+    /// Only the index of an array read is a possible source.
+    Index,
     Nothing,
 }
 
@@ -454,6 +456,11 @@ impl<'a> Scan<'a> {
             ExprKind::ArrayAccess(aa) if crate::taint::is_trusted_superglobal_field(aa) => {
                 Inspect::SkipChildren
             }
+            ExprKind::ArrayAccess(aa) => match crate::taint::server_dynamic_key(aa) {
+                Some(key) if crate::taint::starts_with_header_prefix(key) => Inspect::Source,
+                Some(_) => Inspect::Index,
+                None => Inspect::Nothing,
+            },
             ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
                 let prop = crate::expr::helpers::extract_string_from_expr(&pa.property);
                 match (self.class_of(&pa.object), prop) {
@@ -559,6 +566,16 @@ impl<'a> Scan<'a> {
     }
 }
 
+fn visit_index<V: OwnedVisitor>(visitor: &mut V, expr: &Expr) -> ControlFlow<()> {
+    match &expr.kind {
+        ExprKind::ArrayAccess(aa) => aa
+            .index
+            .as_deref()
+            .map_or(ControlFlow::Continue(()), |i| visitor.visit_expr(i)),
+        _ => ControlFlow::Continue(()),
+    }
+}
+
 /// Collects what one expression may be derived from.
 struct ValueScan<'s, 'a> {
     scan: &'s Scan<'a>,
@@ -582,6 +599,7 @@ impl OwnedVisitor for ValueScan<'_, '_> {
             Inspect::Source => self.facts.reads_source = true,
             Inspect::Callee(callee) => self.facts.push(callee),
             Inspect::SkipChildren => return ControlFlow::Continue(()),
+            Inspect::Index => return visit_index(self, expr),
             Inspect::Nothing => {}
         }
         crate::recursion::walk_expr(self, expr)
@@ -627,6 +645,7 @@ impl OwnedVisitor for Scan<'_> {
             Inspect::Source => self.facts.body.reads_source = true,
             Inspect::Callee(callee) => self.facts.body.push(callee),
             Inspect::SkipChildren => return ControlFlow::Continue(()),
+            Inspect::Index => return visit_index(self, expr),
             Inspect::Nothing => {}
         }
         crate::recursion::walk_expr(self, expr)

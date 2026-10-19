@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@psalm-assert array<string> $v` on an `array<string, mixed>` argument now replaces its `mixed` values instead of keeping the less precise type, removing false `MixedAssignment`/`MixedArgument` after webmozart `Assert::all*()` calls.
 - Binding a reference to an array element (`$r = &$a[$k]`) or passing one to a by-reference parameter auto-vivifies a null base: no false `PossiblyNullArrayAccess`/`NullArrayAccess`, and the base is non-null afterwards. Reads in the index expression and plain reads are still reported.
 - Narrowing of a by-reference closure capture or a `global` import no longer survives a call that may rewrite it: `if ($x === 'a' || $x === 'b') { $f(); if ($x === 'z') {} }` no longer reports `ImpossibleIdenticalComparison` when `$f` writes `$x`.
+- `$_SERVER[$key]` with a key unknown statically carries the taint of `$key` instead of the whole superglobal, so env-var helpers like `env('HOME')` no longer report tainted sinks; keys that can name a request entry (`HTTP_` prefix, a variable holding a request key) stay tainted. `array_intersect_key`/`array_diff_key` and their `u` variants take taint from the first array only.
 
 ## [0.88.0] - 2026-10-17
 
