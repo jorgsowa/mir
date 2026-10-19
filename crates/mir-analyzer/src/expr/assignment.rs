@@ -461,7 +461,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             rhs_taint
         };
         if let Some(key) = crate::taint::own_property_written(&a.target, ctx, self.db, &self.file) {
-            self.taint_summary.record_prop_write(key, rhs_taint);
+            if !crate::taint::is_injection_safe_type(&rhs_ty) {
+                self.taint_summary.record_prop_write(key, rhs_taint);
+            }
         }
         match a.op {
             AssignOp::Assign => {

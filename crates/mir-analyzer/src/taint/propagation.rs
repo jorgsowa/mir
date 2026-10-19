@@ -390,10 +390,10 @@ pub fn expr_taint(
         // Short ternary (`$x ?: $y`): the true branch's value is the condition itself.
         ExprKind::Ternary(t) => {
             let then_taint = match &t.then_expr {
-                Some(then_e) => expr_taint(then_e, ctx, db, file),
+                Some(then_e) => branch_taint(&t.condition, true, then_e, ctx, db, file),
                 None => expr_taint(&t.condition, ctx, db, file),
             };
-            then_taint | expr_taint(&t.else_expr, ctx, db, file)
+            then_taint | branch_taint(&t.condition, false, &t.else_expr, ctx, db, file)
         }
 
         ExprKind::NullCoalesce(nc) => {
@@ -955,5 +955,33 @@ pub(super) fn produced_object_classes(
                 .collect()
         }
         _ => Vec::new(),
+    }
+}
+
+/// Taint of a ternary branch, seeing the validation guards its condition proves.
+fn branch_taint(
+    condition: &Expr,
+    holds: bool,
+    branch: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    if !has_taint_guard(condition) {
+        return expr_taint(branch, ctx, db, file);
+    }
+    let mut branch_ctx = ctx.clone();
+    crate::narrowing::narrow_from_condition(condition, &mut branch_ctx, holds, db, file);
+    expr_taint(branch, &branch_ctx, db, file)
+}
+
+fn has_taint_guard(condition: &Expr) -> bool {
+    match &condition.kind {
+        ExprKind::Parenthesized(inner) => has_taint_guard(inner),
+        ExprKind::UnaryPrefix(u) if u.op == php_ast::ast::UnaryPrefixOp::BooleanNot => {
+            has_taint_guard(&u.operand)
+        }
+        ExprKind::Binary(b) => has_taint_guard(&b.left) || has_taint_guard(&b.right),
+        _ => crate::taint_guard::guarded_var(condition).is_some(),
     }
 }

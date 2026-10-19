@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A function returning, or a constructor storing, a whitelisted or numeric value (`in_array($s, [...], true) ? $s : 'name'`, `is_numeric($s) ? $s : '0'`, a cast) no longer carries its argument's taint into callers. A ternary whose condition is a validation guard (`ctype_digit($p) ? $p : '1'`, `!ctype_digit($p) ? '1' : $p`) sees the guard in the branch it protects.
 - Laminas `Escaper::escape*()` clears HTML taint and Twig `render()` results are no longer tainted by their arguments, instead of passing vendor-call arguments through.
 - `basename()` clears file-path taint again, so `move_uploaded_file($tmp, $dir . basename($_FILES['f']['name']))` and `file_get_contents($dir . basename($q))` are no longer reported; other sink kinds still see the value.
 - A tainted object's date rendering (`date_create($_GET['d'])->format('Y')`, `DateInterval::format`, `DateTimeZone::getName`) and an uploaded file's generated `hashName()`, `store()` and `getRealPath()` no longer carry the receiver's taint; their arguments still do.
