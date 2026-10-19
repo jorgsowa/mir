@@ -525,17 +525,39 @@ pub(super) fn resolve_static_call_class_fqcn(
 /// narrows, so a `current` type strictly within `asserted` (`array<string>`
 /// asserted `iterable`) keeps its own, more precise type. Both directions
 /// are checked because `mixed` type params match either way: plain `array`
-/// asserted `array<string>` still takes the assertion.
+/// asserted `array<string>` still takes the assertion, as does any `current`
+/// holding more `mixed` components than `asserted`.
 fn positive_assertion_type(current: &Type, asserted: Type, db: &dyn MirDatabase) -> Type {
     if !current.types.is_empty()
         && !current.is_mixed()
         && crate::subtype::is_subtype(db, current, &asserted)
+        && mixed_component_count(current) <= mixed_component_count(&asserted)
         && !crate::subtype::is_subtype(db, &asserted, current)
     {
         current.clone()
     } else {
         asserted
     }
+}
+
+fn mixed_component_count(ty: &Type) -> usize {
+    ty.types
+        .iter()
+        .map(|atomic| match atomic {
+            Atomic::TMixed => 1,
+            Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+                mixed_component_count(key) + mixed_component_count(value)
+            }
+            Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+                mixed_component_count(value)
+            }
+            Atomic::TKeyedArray { properties, .. } => properties
+                .values()
+                .map(|p| mixed_component_count(&p.ty))
+                .sum(),
+            _ => 0,
+        })
+        .sum()
 }
 
 /// Compute the narrowed type for a negated assertion (`@psalm-assert !Type

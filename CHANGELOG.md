@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The pipe operator (`$x |> f(...)`) is analyzed as the call `f($x)`: its result has the callable's return type instead of the callable's own type (`Closure`, or the function-name string), removing false `InvalidArgument`/`InvalidOperand` on its result. Argument checks, template inference, arity, undefined-callable reports, references and taint now apply to it as to the equivalent call.
 - `new mysqli_stmt($mysqli)` no longer reports `TooFewArguments`: the constructor's `?string $query` is optional again.
 - `TooFewArguments` on a call with named arguments counts the required parameters that received a value, so `f(b: 1)` missing `$a` reports `got 0` instead of the number of arguments passed.
+- `@psalm-assert array<string> $v` on an `array<string, mixed>` argument now replaces its `mixed` values instead of keeping the less precise type, removing false `MixedAssignment`/`MixedArgument` after webmozart `Assert::all*()` calls.
 
 ## [0.88.0] - 2026-10-17
 
