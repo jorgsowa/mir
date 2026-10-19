@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `new` of a subclass that overrides `__construct` (`class BillingClient extends SoapClient`) or of `SplTempFileObject` no longer reports its first argument as a file or SSRF sink; only the stub constructor is one.
 - A spread of an array literal (`f(...['title' => $t, 'body' => 'b'])`, `f(...[$t, 'b'])`) and `call_user_func()` / `call_user_func_array()` with a literal callback bind each argument to its own parameter by position or name, so taint reaches only the parameters that use it (and the call's result only when the returned parameter is tainted).
 - A variable that held a closure stops using that closure's taint summary once it is rebound by `foreach`, destructuring or a by-reference argument, and a closure no longer snapshots a by-reference captured closure the enclosing scope can reassign (`$f = fn($x) => $x; foreach (['htmlspecialchars'] as $f) echo $f($_GET['x']);` is no longer reported).
 - Request data held in a variable (`$q = ['k' => $_GET['t']]; $p->find($q)`) no longer reaches a callee that only calls values it proved `instanceof Closure`; the guard also follows `reset()`, `end()`, `current()`, `next()`, `prev()`, `array_shift()` and `array_pop()` results. A variable that later holds a decoded object, an element write or a reference alias is still reported.

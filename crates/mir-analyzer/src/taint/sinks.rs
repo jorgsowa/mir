@@ -381,17 +381,20 @@ pub fn classify_method_sink(
 }
 
 /// Constructors whose first argument is a sink: `new SplFileObject($path)`.
+/// Only the stub constructor counts: a subclass overriding `__construct`, or
+/// `SplTempFileObject` (first argument isn't a path), takes other arguments.
 pub fn classify_constructor_sink(db: &dyn crate::db::MirDatabase, fqcn: &str) -> Option<SinkKind> {
-    let is_a = |base: &str| {
-        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
-    };
-    if ["SplFileObject", "DirectoryIterator", "GlobIterator"]
-        .iter()
-        .any(|base| is_a(base))
-    {
-        return Some(SinkKind::File);
+    let (declarer, _) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), "__construct")?;
+    match crate::util::php_ident_lowercase(declarer.as_ref()).as_str() {
+        "splfileobject"
+        | "directoryiterator"
+        | "filesystemiterator"
+        | "recursivedirectoryiterator"
+        | "globiterator" => Some(SinkKind::File),
+        "soapclient" => Some(SinkKind::Ssrf),
+        _ => None,
     }
-    is_a("SoapClient").then_some(SinkKind::Ssrf)
 }
 
 /// Map a `@taint-sink <kind> $param` docblock tag's free-text kind to the
