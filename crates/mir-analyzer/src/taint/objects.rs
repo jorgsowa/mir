@@ -657,6 +657,26 @@ pub fn param_arg_exprs<'e>(
     let Some(param) = params.get(index) else {
         return Vec::new();
     };
+    bound_arg_exprs(
+        args,
+        index,
+        param.name.as_ref(),
+        param.is_variadic,
+        |name| params.iter().any(|p| p.name.as_ref() == name),
+    )
+}
+
+/// Expressions passed for the parameter `name` at `index`; `is_param` tells declared names
+/// from the extra named arguments a variadic collects. A spread of an array literal binds
+/// element by element, any other spread may cover every parameter from its position on.
+pub(super) fn bound_arg_exprs<'e>(
+    args: &'e [php_ast::owned::Arg],
+    index: usize,
+    name: &str,
+    variadic: bool,
+    is_param: impl Fn(&str) -> bool,
+) -> Vec<&'e Expr> {
+    let named_here = |key: &str| key == name || (variadic && !is_param(key));
     let mut out = Vec::new();
     let mut position = 0;
     for arg in args {
@@ -664,22 +684,70 @@ pub fn param_arg_exprs<'e>(
             position += 1;
             continue;
         };
-        if let Some(name) = &arg.name {
-            let name = crate::parser::name_to_string_owned(name);
-            let unknown_name = || !params.iter().any(|p| p.name.as_ref() == name);
-            if name == param.name.as_ref() || (param.is_variadic && unknown_name()) {
+        if let Some(arg_name) = &arg.name {
+            if named_here(&crate::parser::name_to_string_owned(arg_name)) {
                 out.push(value);
             }
-        } else if arg.unpack {
-            if position <= index || param.is_variadic {
-                out.push(value);
-            }
-        } else if position == index || (param.is_variadic && position >= index) {
-            out.push(value);
+            continue;
         }
-        position += 1;
+        if !arg.unpack {
+            if position == index || (variadic && position >= index) {
+                out.push(value);
+            }
+            position += 1;
+            continue;
+        }
+        let ExprKind::Array(elements) = &unwrap_parens(value).kind else {
+            if position <= index || variadic {
+                out.push(value);
+            }
+            position += 1;
+            continue;
+        };
+        // An element that may expand to any number of arguments leaves later positions unknown.
+        let mut open_ended = false;
+        for el in elements {
+            match literal_element_key(el) {
+                ElementKey::Named(key) => {
+                    if named_here(key) {
+                        out.push(&el.value);
+                    }
+                }
+                ElementKey::Positional => {
+                    if position == index
+                        || (variadic && (open_ended || position >= index))
+                        || (open_ended && position <= index)
+                    {
+                        out.push(&el.value);
+                    }
+                    position += 1;
+                }
+                ElementKey::Unknown => {
+                    open_ended = true;
+                    out.push(&el.value);
+                }
+            }
+        }
     }
     out
+}
+
+/// How an array-literal element binds when the array is spread into a call.
+pub(super) enum ElementKey<'e> {
+    Named(&'e str),
+    Positional,
+    Unknown,
+}
+
+pub(super) fn literal_element_key(el: &php_ast::owned::ArrayElement) -> ElementKey<'_> {
+    if el.unpack {
+        return ElementKey::Unknown;
+    }
+    match el.key.as_ref().map(|k| &k.kind) {
+        None | Some(ExprKind::Int(_)) => ElementKey::Positional,
+        Some(ExprKind::String(key)) => ElementKey::Named(key.as_ref()),
+        Some(_) => ElementKey::Unknown,
+    }
 }
 
 /// Taint of the arguments bound to parameter `index`.

@@ -126,28 +126,9 @@ pub(super) fn closure_param_args<'e>(
     let Some((name, variadic)) = params.get(index) else {
         return Vec::new();
     };
-    let mut out = Vec::new();
-    let mut position = 0;
-    for arg in args {
-        let Some(value) = &arg.value else {
-            position += 1;
-            continue;
-        };
-        match &arg.name {
-            Some(arg_name) => {
-                if crate::parser::name_to_string_owned(arg_name) == name.as_str() {
-                    out.push(value);
-                }
-            }
-            None => {
-                if arg.unpack || position == index || (*variadic && position >= index) {
-                    out.push(value);
-                }
-                position += 1;
-            }
-        }
-    }
-    out
+    bound_arg_exprs(args, index, name.as_str(), *variadic, |key| {
+        params.iter().any(|(p, _)| p.as_str() == key)
+    })
 }
 
 pub(super) fn closure_call_taint(
@@ -190,11 +171,21 @@ pub(super) fn callback_result(
     file: &str,
 ) -> Taint {
     let all = inputs.iter().fold(Taint::NONE, |acc, t| acc | *t);
-    let input = |index: usize| inputs.get(index).copied().unwrap_or_default();
+    let input_for = |index: usize, variadic: bool| {
+        let from = if variadic { index } else { inputs.len() };
+        let first = inputs.get(index).copied().unwrap_or_default();
+        inputs
+            .get(from..)
+            .unwrap_or_default()
+            .iter()
+            .fold(first, |acc, t| acc | *t)
+    };
     if let Some(closure) = callee_closure(callback, ctx, db, file) {
-        return closure
-            .summary
-            .call_result(|slot| closure.capture(slot).unwrap_or_else(|| input(slot)));
+        return closure.summary.call_result(|slot| {
+            closure.capture(slot).unwrap_or_else(|| {
+                input_for(slot, closure.params.get(slot).is_some_and(|(_, v)| *v))
+            })
+        });
     }
     let Some(name) = callback_function_name(callback) else {
         return all;
@@ -221,28 +212,100 @@ pub(super) fn callback_result(
     }
     match CalleeBody::of(func.location.as_ref(), file) {
         CalleeBody::Summarized if !demanding_taint(all, ctx).is_empty() => {
-            crate::db::function_taint_summary(db, file, func.fqn.as_ref())
-                .map_or(Taint::NONE, |s| s.call_result(input))
+            crate::db::function_taint_summary(db, file, func.fqn.as_ref()).map_or(
+                Taint::NONE,
+                |s| {
+                    s.call_result(|slot| {
+                        input_for(slot, func.params.get(slot).is_some_and(|p| p.is_variadic))
+                    })
+                },
+            )
         }
         CalleeBody::Summarized => Taint::NONE,
         _ => all,
     }
 }
 
-/// Builtins that call a callback on an array's elements: the callback's
-/// argument index and, for each of its parameters, the argument it receives.
-pub(super) fn callback_inputs(
+/// Names of the parameters `callback` declares, when it is a closure or a named function.
+fn callback_param_names(
+    callback: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Vec<String>> {
+    if let Some(closure) = callee_closure(callback, ctx, db, file) {
+        return Some(closure.params.iter().map(|(n, _)| n.to_string()).collect());
+    }
+    let resolved = crate::db::resolve_name(db, file, callback_function_name(callback)?);
+    let func = crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))?;
+    Some(func.params.iter().map(|p| p.name.to_string()).collect())
+}
+
+/// The arguments `call_user_func_array` binds to a callback's parameters, from an array literal.
+fn array_literal_inputs<'e>(
+    list: &'e Expr,
+    callback: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Vec<Option<&'e Expr>>> {
+    let ExprKind::Array(elements) = &unwrap_parens(list).kind else {
+        return None;
+    };
+    let keyed = elements
+        .iter()
+        .any(|el| matches!(literal_element_key(el), ElementKey::Named(_)));
+    let names = if keyed {
+        callback_param_names(callback, ctx, db, file)?
+    } else {
+        Vec::new()
+    };
+    let mut inputs: Vec<Option<&Expr>> = vec![None; names.len()];
+    let mut position = 0;
+    for el in elements {
+        let slot = match literal_element_key(el) {
+            ElementKey::Named(key) => names.iter().position(|n| n == key)?,
+            ElementKey::Positional => {
+                position += 1;
+                position - 1
+            }
+            ElementKey::Unknown => return None,
+        };
+        if slot >= inputs.len() {
+            inputs.resize(slot + 1, None);
+        }
+        inputs[slot] = Some(&el.value);
+    }
+    Some(inputs)
+}
+
+/// Builtins that call a callback: the callback's argument index and, for each of its
+/// parameters, the argument it receives.
+pub(super) fn callback_inputs<'e>(
     fn_name_lower: &str,
-    args: &[php_ast::owned::Arg],
-) -> Option<(usize, Vec<usize>)> {
-    Some(match fn_name_lower {
+    args: &'e [php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<(usize, Vec<Option<&'e Expr>>)> {
+    let value = |index: usize| args.get(index).and_then(|a| a.value.as_ref());
+    let (callback_index, input_args): (usize, Vec<usize>) = match fn_name_lower {
         "array_map" => (0, (1..args.len().max(2)).collect()),
         "array_filter" | "array_walk" | "array_walk_recursive" => (1, vec![0]),
         "usort" | "uasort" | "uksort" => (1, vec![0, 0]),
         "array_reduce" => (1, vec![2, 0]),
         "preg_replace_callback" => (1, vec![2]),
+        "call_user_func" if args.iter().all(|a| !a.unpack && a.name.is_none()) => {
+            (0, (1..args.len()).collect())
+        }
+        "call_user_func_array" if args.len() == 2 && args.iter().all(|a| a.name.is_none()) => {
+            let callback = value(0)?;
+            let inputs = array_literal_inputs(value(1)?, callback, ctx, db, file)?;
+            return Some((0, inputs));
+        }
         _ => return None,
-    })
+    };
+    Some((callback_index, input_args.into_iter().map(value).collect()))
 }
 
 /// Result taint of a builtin that calls a callback on its input.
@@ -253,13 +316,16 @@ pub(super) fn callback_builtin_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Option<Taint> {
+    let (callback_index, input_args) = callback_inputs(fn_name_lower, args, ctx, db, file)?;
     let arg_taint = |index: usize| {
         args.get(index)
             .and_then(|a| a.value.as_ref())
             .map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file))
     };
-    let (callback_index, input_args) = callback_inputs(fn_name_lower, args)?;
-    let inputs: Vec<Taint> = input_args.iter().map(|i| arg_taint(*i)).collect();
+    let inputs: Vec<Taint> = input_args
+        .iter()
+        .map(|v| v.map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file)))
+        .collect();
     let callback = args.get(callback_index).and_then(|a| a.value.as_ref());
     let called = || {
         callback.map_or(Taint::NONE, |cb| {
@@ -271,6 +337,13 @@ pub(super) fn callback_builtin_taint(
         "array_filter" => arg_taint(0),
         "array_reduce" => arg_taint(2) | called(),
         "preg_replace_callback" => arg_taint(2) | called(),
+        // A callback that isn't a literal name or closure is data the call result may carry.
+        "call_user_func" | "call_user_func_array" => {
+            let literal = callback.is_some_and(|cb| {
+                callee_closure(cb, ctx, db, file).is_some() || callback_function_name(cb).is_some()
+            });
+            called() | if literal { Taint::NONE } else { arg_taint(0) }
+        }
         _ => return None,
     })
 }
@@ -283,7 +356,9 @@ pub fn check_callback_sinks(
     ctx: &FlowState,
     span: php_ast::Span,
 ) {
-    let Some((callback_index, input_args)) = callback_inputs(fn_name_lower, args) else {
+    let Some((callback_index, input_args)) =
+        callback_inputs(fn_name_lower, args, ctx, ea.db, &ea.file)
+    else {
         return;
     };
     let Some(callback) = args.get(callback_index).and_then(|a| a.value.as_ref()) else {
@@ -321,11 +396,7 @@ pub fn check_callback_sinks(
                 .record_param_sinks(captured, sink.kinds, &sink.issue);
             continue;
         }
-        let Some(value) = input_args
-            .get(sink.param)
-            .and_then(|i| args.get(*i))
-            .and_then(|a| a.value.as_ref())
-        else {
+        let Some(value) = input_args.get(sink.param).copied().flatten() else {
             continue;
         };
         let taint = expr_taint(value, ctx, ea.db, &ea.file);
