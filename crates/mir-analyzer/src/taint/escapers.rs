@@ -178,7 +178,7 @@ pub(super) fn result_ignores_receiver(
     ) && is_a("Symfony\\Component\\HttpFoundation\\File\\UploadedFile")
 }
 
-/// Taint kinds an escaping method of a builtin database class removes.
+/// Taint kinds an escaping or template-rendering method of a known class removes.
 pub(super) fn sanitized_method_kinds(
     db: &dyn crate::db::MirDatabase,
     fqcn: &str,
@@ -187,11 +187,24 @@ pub(super) fn sanitized_method_kinds(
     let is_a = |base: &str| {
         fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
     };
-    let escapes = match method_lower {
+    let escapes_sql = match method_lower {
         "quote" => is_a("PDO"),
         "real_escape_string" | "escape_string" => is_a("mysqli"),
         "escapestring" => is_a("SQLite3"),
         _ => false,
     };
-    escapes.then_some(Taint::SQL)
+    if escapes_sql {
+        return Some(Taint::SQL);
+    }
+    let escapes_html = matches!(
+        method_lower,
+        "escapehtml" | "escapehtmlattr" | "escapejs" | "escapecss" | "escapeurl"
+    ) && (is_a("Laminas\\Escaper\\Escaper") || is_a("Zend\\Escaper\\Escaper"));
+    if escapes_html {
+        return Some(Taint::HTML);
+    }
+    // Twig autoescapes the variables it renders into the template.
+    let renders_template = matches!(method_lower, "render" | "renderblock")
+        && (is_a("Twig\\Environment") || is_a("Twig\\TemplateWrapper") || is_a("Twig\\Template"));
+    renders_template.then_some(Taint::ALL)
 }
