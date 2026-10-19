@@ -423,6 +423,58 @@ fn is_unresolved_shallow(ty: &Type, template_params: &[TemplateParam]) -> bool {
     })
 }
 
+/// `class-string<T>`/`interface-string<T>` naming a class template a bare receiver left unbound
+/// widens to its bound's class-string; left raw, `T` reads as a class name. Templates in the
+/// caller's own scope stay raw.
+pub(crate) fn bound_unbound_class_string_templates(
+    ty: Type,
+    class_template_params: impl FnOnce() -> Option<std::sync::Arc<[TemplateParam]>>,
+    in_scope: &FxHashSet<Name>,
+) -> Type {
+    // A namespaced name is a class, never a template.
+    let may_name_template = |a: &Atomic| {
+        matches!(a, Atomic::TClassString(Some(n)) | Atomic::TInterfaceString(Some(n))
+            if !n.as_ref().contains('\\') && !in_scope.contains(n))
+    };
+    if !ty.types.iter().any(may_name_template) {
+        return ty;
+    }
+    let Some(class_template_params) = class_template_params() else {
+        return ty;
+    };
+    let unbound_template = |name: &Name| {
+        (!in_scope.contains(name))
+            .then(|| class_template_params.iter().find(|tp| tp.name == *name))
+            .flatten()
+    };
+    let needs_rewrite = ty.types.iter().any(|a| {
+        matches!(a, Atomic::TClassString(Some(n)) | Atomic::TInterfaceString(Some(n)) if unbound_template(n).is_some())
+    });
+    if !needs_rewrite {
+        return ty;
+    }
+    let bound_class = |tp: &TemplateParam| match tp.bound.as_deref().map(|b| b.types.as_slice()) {
+        Some([Atomic::TNamedObject { fqcn, .. }]) => Some(*fqcn),
+        _ => None,
+    };
+    let mut out = Type::empty();
+    out.possibly_undefined = ty.possibly_undefined;
+    out.from_docblock = ty.from_docblock;
+    for atomic in &ty.types {
+        let rewritten = match atomic {
+            Atomic::TClassString(Some(n)) => {
+                unbound_template(n).map(|tp| Atomic::TClassString(bound_class(tp)))
+            }
+            Atomic::TInterfaceString(Some(n)) => {
+                unbound_template(n).map(|tp| Atomic::TInterfaceString(bound_class(tp)))
+            }
+            _ => None,
+        };
+        out.add_type(rewritten.unwrap_or_else(|| atomic.clone()));
+    }
+    out
+}
+
 /// Build template bindings from a receiver's concrete type params.
 ///
 /// Zips `class_template_params` (e.g. `[T]` declared on the class) with

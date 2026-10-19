@@ -261,20 +261,27 @@ impl<'a> DefinitionCollector<'a> {
                             .as_ref()
                             .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                     );
-                    let ty = self
+                    let doc_ty = prop_doc.var_type.clone().map(|t| {
+                        self.resolve_union_doc_with_templates(
+                            super::expand_aliases_only(t, &type_aliases),
+                            &iface_template_names,
+                            fqcn.as_str(),
+                            &iface_template_params,
+                        )
+                    });
+                    // phpstorm-stubs `#[LanguageLevelTypeAware]` wins unless the docblock
+                    // refines it, then an `@var` docblock, then the native hint.
+                    let ty = match self
                         .version_attr_type_string(&p.attributes)
                         .map(|s| crate::parser::docblock::parse_type_string(&s))
-                        .or_else(|| {
-                            prop_doc.var_type.clone().map(|t| {
-                                self.resolve_union_doc_with_templates(
-                                    super::expand_aliases_only(t, &type_aliases),
-                                    &iface_template_names,
-                                    fqcn.as_str(),
-                                    &iface_template_params,
-                                )
-                            })
-                        })
-                        .or_else(|| hint_ty.clone());
+                    {
+                        Some(attr_ty) => Some(super::refine_version_attr_type(
+                            attr_ty,
+                            doc_ty,
+                            &iface_template_params,
+                        )),
+                        None => doc_ty.or_else(|| hint_ty.clone()),
+                    };
                     own_properties.insert(
                         Arc::from(prop_name),
                         PropertyDef {

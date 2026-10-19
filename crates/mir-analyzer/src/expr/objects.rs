@@ -2122,6 +2122,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         };
                         let ty = rebind_self_static_parent(ty, owner.as_ref(), &owner_type_params);
                         let ty = ty.substitute_templates(&substitution);
+                        let ty = crate::generic::bound_unbound_class_string_templates(
+                            ty,
+                            || crate::db::class_template_params(self.db, owner.as_ref()),
+                            &ctx.template_param_names,
+                        );
                         self.record_property_ref(&owner, prop_name, span);
                         *declaring_class = Some(owner);
                         return ty;

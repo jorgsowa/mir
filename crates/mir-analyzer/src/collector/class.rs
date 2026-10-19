@@ -289,35 +289,38 @@ impl<'a> DefinitionCollector<'a> {
                     // Resolve with class template awareness so `@var array<TKey, TValue>`
                     // keeps TKey/TValue as template params instead of resolving them to
                     // namespaced classes (App\Support\TKey).
-                    let ty = self
-                        // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
-                        // type override wins, same precedence as params/returns —
-                        // otherwise a stub property like Exception::$file loses its
-                        // PHP-8.1+ refined type entirely.
+                    let doc_ty = prop_doc.var_type.map(|t| {
+                        let resolved = Self::fill_self_static_parent(
+                            self.resolve_union_doc_with_templates(
+                                super::expand_aliases_only(t, &type_aliases),
+                                &class_template_names,
+                                &fqcn,
+                                &class_template_params,
+                            ),
+                            &fqcn,
+                        );
+                        // A `@var` refining a nullable native hint but
+                        // omitting `|null` must not erase that
+                        // nullability — same fix point as the
+                        // promoted-property/param docblock paths.
+                        match hint_ty.as_ref() {
+                            Some(n) => super::preserve_native_nullability(n, resolved),
+                            None => resolved,
+                        }
+                    });
+                    // phpstorm-stubs `#[LanguageLevelTypeAware]` wins unless the docblock
+                    // refines it, same precedence as params/returns.
+                    let ty = match self
                         .version_attr_type_string(&p.attributes)
                         .map(|s| crate::parser::docblock::parse_type_string(&s))
-                        .or_else(|| {
-                            prop_doc.var_type.map(|t| {
-                                let resolved = Self::fill_self_static_parent(
-                                    self.resolve_union_doc_with_templates(
-                                        super::expand_aliases_only(t, &type_aliases),
-                                        &class_template_names,
-                                        &fqcn,
-                                        &class_template_params,
-                                    ),
-                                    &fqcn,
-                                );
-                                // A `@var` refining a nullable native hint but
-                                // omitting `|null` must not erase that
-                                // nullability — same fix point as the
-                                // promoted-property/param docblock paths.
-                                match hint_ty.as_ref() {
-                                    Some(n) => super::preserve_native_nullability(n, resolved),
-                                    None => resolved,
-                                }
-                            })
-                        })
-                        .or_else(|| hint_ty.clone());
+                    {
+                        Some(attr_ty) => Some(super::refine_version_attr_type(
+                            attr_ty,
+                            doc_ty,
+                            &class_template_params,
+                        )),
+                        None => doc_ty.or_else(|| hint_ty.clone()),
+                    };
                     // A bare `array` declaration with a literal initializer
                     // reads back the literal's far narrower shape. Rebuild the
                     // initializer type and refine the declared type into it when the property

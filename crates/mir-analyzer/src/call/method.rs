@@ -1943,6 +1943,11 @@ fn resolve_method_return<'a>(
         if dom_create_element_has_valid_literal_name {
             return_ty = return_ty.remove_false();
         }
+        return_ty = crate::generic::bound_unbound_class_string_templates(
+            return_ty,
+            || crate::db::class_template_params(ea.db, resolved.template_scope.as_ref()),
+            &ctx.template_param_names,
+        );
         if let Some(native) = &resolved.native_return {
             return_ty = bound_unbound_class_templates(
                 return_ty,

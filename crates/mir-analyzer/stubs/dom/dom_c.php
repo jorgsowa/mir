@@ -726,7 +726,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
     public $actualEncoding;
 
     /**
-     * @var DOMConfiguration
+     * @var mixed
      * @link https://php.net/manual/en/class.domdocument.php#domdocument.props.config
      * @see DOMDocument::normalizeDocument()
      */
@@ -1735,7 +1735,7 @@ class DOMAttr extends DOMNode
     public $ownerElement;
 
     /**
-     * @var bool
+     * @var mixed
      * (PHP5)<br/>
      * Not implemented yet, always is NULL
      * @link https://php.net/manual/en/class.domattr.php#domattr.props.schematypeinfo
@@ -1833,11 +1833,11 @@ class DOMElement extends DOMNode implements DOMParentNode, DOMChildNode
      * A <classname>DOMNamedNodeMap</classname> containing the attributes of this node (if it is a <classname>DOMElement</classname>) or NULL otherwise.
      * @link https://php.net/manual/en/class.domnode.php#domnode.props.attributes
      */
-    #[LanguageLevelTypeAware(['8.1' => 'DOMNamedNodeMap|null'], default: '')]
+    #[LanguageLevelTypeAware(['8.1' => 'DOMNamedNodeMap'], default: '')]
     public $attributes;
 
     /**
-     * @var bool
+     * @var mixed
      * Not implemented yet, always return NULL
      * @link https://php.net/manual/en/class.domelement.php#domelement.props.schematypeinfo
      */
