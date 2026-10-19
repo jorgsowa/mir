@@ -1952,7 +1952,7 @@ const REQUEST_BAG_PROPERTIES: &[&str] =
     &["query", "request", "cookies", "headers", "files", "server"];
 
 /// Request accessors returning client data: Symfony's `Request`, Laravel's
-/// subclass, and PSR-7 requests.
+/// subclass, and PSR-7 server requests.
 pub fn is_framework_request_source(
     db: &dyn crate::db::MirDatabase,
     fqcn: &str,
@@ -1996,22 +1996,34 @@ pub fn is_framework_request_source(
             | "getcookieparams"
             | "getuploadedfiles"
             | "getserverparams"
-    );
-    let request_accessor = matches!(
-        method_lower,
-        "getheader" | "getheaderline" | "getheaders" | "getbody" | "geturi" | "getrequesttarget"
+            | "getheader"
+            | "getheaderline"
+            | "getheaders"
+            | "getbody"
+            | "geturi"
+            | "getrequesttarget"
     );
     // Most method names are no accessor of any request type: skip the hierarchy walks.
-    if !(symfony_accessor || server_request_accessor || request_accessor) {
+    if !(symfony_accessor || server_request_accessor) {
         return false;
     }
     if is_a(SYMFONY_REQUEST) {
         return symfony_accessor;
     }
-    if server_request_accessor && is_a("Psr\\Http\\Message\\ServerRequestInterface") {
-        return true;
-    }
-    request_accessor && is_a("Psr\\Http\\Message\\RequestInterface")
+    // A plain `RequestInterface` is an outgoing client request: its data is the caller's own.
+    server_request_accessor && is_a("Psr\\Http\\Message\\ServerRequestInterface")
+}
+
+/// A branch merge can leave `Sub|Base` in a union; `Sub` adds nothing over `Base`.
+fn absorbed_by_supertype(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    ty: &mir_types::Type,
+) -> bool {
+    ty.types.iter().any(|atom| {
+        matches!(atom, mir_types::Atomic::TNamedObject { fqcn: other, .. }
+            if !other.eq_ignore_ascii_case(fqcn) && crate::db::extends_or_implements(db, fqcn, other))
+    })
 }
 
 fn is_laravel_request_accessor(method_lower: &str) -> bool {
@@ -2621,7 +2633,10 @@ pub fn expr_taint(
                 };
                 // Laravel's `route()` without a key returns the `Route` object.
                 let route_object = method_lower == "route" && mc.args.is_empty();
-                if !route_object && is_framework_request_source(db, fqcn.as_ref(), &method_lower) {
+                if !route_object
+                    && is_framework_request_source(db, fqcn.as_ref(), &method_lower)
+                    && !absorbed_by_supertype(db, fqcn.as_ref(), &recv_ty)
+                {
                     return Taint::ALL;
                 }
                 if let Some(removed) = sanitized_method_kinds(db, fqcn.as_ref(), &method_lower) {
