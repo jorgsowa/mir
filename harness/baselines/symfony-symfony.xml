@@ -1,0 +1,3796 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/Symfony/Bridge/Doctrine/Attribute/MapEntity.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$clone->class ??= class_exists($class ?? '') || interface_exists($class ?? '', false) ? $class : null]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/ContainerAwareEventManager.php">
+    <InvalidReturnType>
+      <code><![CDATA[return spl_object_id($listener);]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/DependencyInjection/CompilerPass/RegisterEventListenersAndSubscribersPass.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->connections = $container->getParameter($this->connectionsParameter)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/Form/ChoiceList/IdReader.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->idField = current($ids)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/ManagerRegistry.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->container->get($name);]]></code>
+    </NullableReturnStatement>
+    <UndefinedVariable>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/Messenger/DoctrineCloseConnectionMiddleware.php">
+    <UndefinedVariable>
+      <code><![CDATA[$connection]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/PropertyInfo/DoctrineExtractor.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[Type::collection(Type::object(Collection::class), Type::object($class), null !== $collectionKeyType ? Type::builtin($collectionKeyType) : null)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/Security/RememberMe/DoctrineTokenProvider.php">
+    <InvalidArgument>
+      <code><![CDATA[$token->getTokenValue()]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Bridge/Doctrine/Types/AbstractUidType.php">
+    <AbstractMethodCall>
+      <code><![CDATA[$this->getUidClass()::fromString($value)]]></code>
+      <code><![CDATA[$this->getUidClass()::fromString($value)]]></code>
+    </AbstractMethodCall>
+  </file>
+  <file src="src/Symfony/Bridge/Monolog/Processor/WebProcessor.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->serverData = $event->getRequest()->server->all()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/CoverageListener.php">
+    <UndefinedClass>
+      <code><![CDATA[TestListener]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Registry]]></code>
+    </UndefinedClass>
+    <UndefinedTrait>
+      <code><![CDATA[]]></code>
+    </UndefinedTrait>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/DeprecationErrorHandler.php">
+    <InvalidReturnType>
+      <code><![CDATA[return new $eh(
+                    $frame['object']->getConvertDeprecationsToExceptions(),
+                    $frame['object']->getConvertErrorsToExceptions(),
+                    $frame['object']->getConvertNoticesToExceptions(),
+                    $frame['object']->getConvertWarningsToExceptions()
+                );]]></code>
+    </InvalidReturnType>
+    <UndefinedClass>
+      <code><![CDATA[UtilErrorHandler]]></code>
+      <code><![CDATA[ErrorHandler]]></code>
+      <code><![CDATA[TestResult]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[ErrorHandler]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/DeprecationErrorHandler/Deprecation.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === self::$vendors]]></code>
+    </ImpossibleIdenticalComparison>
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[TestSuite]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/ExpectDeprecationTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[\PHPUnit\Runner\Version]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/ExpectUserDeprecationMessageTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[Version]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Extension/EnableClockMockSubscriber.php">
+    <UndefinedClass>
+      <code><![CDATA[PreparationStartedSubscriber]]></code>
+      <code><![CDATA[PreparationStarted]]></code>
+      <code><![CDATA[TestMethod]]></code>
+      <code><![CDATA[Group]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Extension/RegisterClockMockSubscriber.php">
+    <UndefinedClass>
+      <code><![CDATA[LoadedSubscriber]]></code>
+      <code><![CDATA[Loaded]]></code>
+      <code><![CDATA[TestMethod]]></code>
+      <code><![CDATA[Group]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Extension/RegisterDnsMockSubscriber.php">
+    <UndefinedClass>
+      <code><![CDATA[LoadedSubscriber]]></code>
+      <code><![CDATA[Loaded]]></code>
+      <code><![CDATA[TestMethod]]></code>
+      <code><![CDATA[Group]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Legacy/CommandForV8.php">
+    <UndefinedClass>
+      <code><![CDATA[BaseCommand]]></code>
+      <code><![CDATA[BaseRunner]]></code>
+      <code><![CDATA[Configuration]]></code>
+      <code><![CDATA[Configuration]]></code>
+      <code><![CDATA[parent]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$registeredListener->globalListenerDisabled()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Legacy/CommandForV9.php">
+    <UndefinedClass>
+      <code><![CDATA[BaseCommand]]></code>
+      <code><![CDATA[BaseRunner]]></code>
+      <code><![CDATA[LegacyConfiguration]]></code>
+      <code><![CDATA[Registry]]></code>
+      <code><![CDATA[Loader]]></code>
+      <code><![CDATA[parent]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$registeredListener->globalListenerDisabled()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Legacy/PolyfillAssertTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[TraversableContains]]></code>
+      <code><![CDATA[TraversableContains]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Legacy/SymfonyTestsListenerForV7.php">
+    <UndefinedClass>
+      <code><![CDATA[TestListener]]></code>
+      <code><![CDATA[TestSuite]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+    </UndefinedClass>
+    <UndefinedTrait>
+      <code><![CDATA[]]></code>
+    </UndefinedTrait>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/Legacy/SymfonyTestsListenerTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[Blacklist]]></code>
+      <code><![CDATA[Blacklist]]></code>
+      <code><![CDATA[Blacklist]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[TestSuite]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[TestSuite]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[DataProviderTestSuite]]></code>
+      <code><![CDATA[PhptTestCase]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[AssertionFailedError]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[RiskyTestError]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[RiskyTestError]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[BaseTestRunner]]></code>
+      <code><![CDATA[BaseTestRunner]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[AssertionFailedError]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[BaseTestRunner]]></code>
+      <code><![CDATA[BaseTestRunner]]></code>
+      <code><![CDATA[BaseTestRunner]]></code>
+      <code><![CDATA[BaseTestRunner]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/SymfonyExtension.php">
+    <UndefinedClass>
+      <code><![CDATA[Extension]]></code>
+      <code><![CDATA[Configuration]]></code>
+      <code><![CDATA[Facade]]></code>
+      <code><![CDATA[ParameterCollection]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[Test]]></code>
+      <code><![CDATA[TestMethod]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/TextUI/Command.php">
+    <UndefinedClass>
+      <code><![CDATA[\PHPUnit\Runner\Version]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bridge/PhpUnit/bin/simple-phpunit.php">
+    <UndefinedMethod>
+      <code><![CDATA[$var->getAttribute('value')]]></code>
+      <code><![CDATA[$var->getAttribute('value')]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bridge/PsrHttpMessage/Factory/PsrHttpFactory.php">
+    <InvalidArgument>
+      <code><![CDATA[$value]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Bridge/Twig/Extension/HttpKernelRuntime.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->handler->render($uri, $strategy, $options);]]></code>
+      <code><![CDATA[return $this->handler->render($uri, $strategy, $options);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Bridge/Twig/Extension/StopwatchExtension.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->stopwatch;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Bridge/Twig/Extension/TranslationExtension.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->translator = new class implements TranslatorInterface {
+                use TranslatorTrait;
+            }]]></code>
+    </InvalidPropertyAssignment>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->translator;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Bridge/Twig/Form/TwigRendererEngine.php">
+    <TooFewArguments>
+      <code><![CDATA[$this->environment->load($theme)->unwrap()]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Bridge/Twig/Node/StopwatchNode.php">
+    <UndefinedClass>
+      <code><![CDATA[AssignNameExpression]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/AboutCommand.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[4 === Kernel::MINOR_VERSION]]></code>
+    </ImpossibleIdenticalComparison>
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/AbstractConfigCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/AssetsInstallCommand.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $this->projectDir]]></code>
+    </ImpossibleIdenticalComparison>
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/CacheClearCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/CachePoolClearCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/CacheWarmupCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/ConfigDebugCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/ConfigDumpReferenceCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/ContainerDebugCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/ContainerLintCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/DebugAutowiringCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/EventDispatcherDebugCommand.php">
+    <InvalidArgument>
+      <code><![CDATA[array_keys($dispatcher->getListeners())]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/RouterDebugCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/SecretsDecryptToLocalCommand.php">
+    <TaintedInput>
+      <code><![CDATA[$this->localVault->seal($k, $v)]]></code>
+    </TaintedInput>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/SecretsEncryptFromLocalCommand.php">
+    <TaintedInput>
+      <code><![CDATA[$this->localVault->reveal($name)]]></code>
+      <code><![CDATA[$this->vault->seal($name, $localValue)]]></code>
+    </TaintedInput>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/SecretsGenerateKeysCommand.php">
+    <TaintedInput>
+      <code><![CDATA[$vault->seal($name, $value)]]></code>
+    </TaintedInput>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/TranslationDebugCommand.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $state;]]></code>
+    </InvalidReturnType>
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/TranslationExtractCommand.php">
+    <InvalidArgument>
+      <code><![CDATA['new']]></code>
+    </InvalidArgument>
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/XliffLintCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/YamlLintCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Application.php">
+    <InvalidArgument>
+      <code><![CDATA[$container->get('event_dispatcher')]]></code>
+      <code><![CDATA[$container->get('console.argument_resolver')]]></code>
+      <code><![CDATA[$container->get('debug.stopwatch')]]></code>
+      <code><![CDATA[$container->get('console.command_loader')]]></code>
+      <code><![CDATA[$container->get($id)]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/Descriptor.php">
+    <ParentNotFound>
+      <code><![CDATA[parent]]></code>
+    </ParentNotFound>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/JsonDescriptor.php">
+    <InvalidArgument>
+      <code><![CDATA[$service::class]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/TextDescriptor.php">
+    <InvalidArgument>
+      <code><![CDATA[$controller]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/XmlDescriptor.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerAliasDocument($alias, $options['id'] ?? null)->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerDefinitionDocument($container->getDefinition((string) $alias), (string) $alias, false, $container)->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$routesXML->appendChild($routesXML->ownerDocument->importNode($routeXML->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$tagXML->appendChild($dom->importNode($definitionXML->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerAliasDocument($service, $id)->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerDefinitionDocument($container->getDefinition((string) $service), (string) $service, false, $container)->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerDefinitionDocument($service, $id, false, $container)->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$containerXML->appendChild($containerXML->ownerDocument->importNode($serviceXML->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$descriptionXML->appendChild($dom->createCDATASection($classDescription))]]></code>
+      <code><![CDATA[$argumentXML->appendChild($dom->importNode($this->getContainerDefinitionDocument($argument, null, false, $container)->childNodes->item(0), true))]]></code>
+      <code><![CDATA[$element->appendChild($element->ownerDocument->importNode($callableXML->childNodes->item(0), true))]]></code>
+    </InvalidTemplateParam>
+    <UndefinedMethod>
+      <code><![CDATA[$callableXML->childNodes->item(0)->setAttribute('priority', $eventDispatcher->getListenerPriority($event, $listener))]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/DependencyInjection/Configuration.php">
+    <UndefinedMethod>
+      <code><![CDATA[$root
+            ->arrayNode('retry_failed')
+                ->canBeEnabled()
+                ->addDefaultsIfNotSet()
+                ->beforeNormalization()
+                    ->ifArray()
+                    ->then(static function ($v) {
+                        if (isset($v['retry_strategy']) && (isset($v['http_codes']) || isset($v['delay']) || isset($v['multiplier']) || isset($v['max_delay']) || isset($v['jitter']))) {
+                            throw new \InvalidArgumentException('The "retry_strategy" option cannot be used along with the "http_codes", "delay", "multiplier", "max_delay" or "jitter" options.');
+                        }
+
+                        return $v;
+                    })
+                ->end()
+                ->children()
+                    ->scalarNode('retry_strategy')->defaultNull()->info('service id to override the retry strategy.')->end()
+                    ->arrayNode('http_codes', 'http_code')
+                        ->performNoDeepMerging()
+                        ->acceptAndWrap(['int', 'string'])
+                        ->beforeNormalization()
+                            ->ifArray()
+                            ->then(static function ($v) {
+                                $list = [];
+                                foreach ($v as $key => $val) {
+                                    if (is_numeric($val)) {
+                                        $list[] = ['code' => $val];
+                                    } elseif (\is_array($val)) {
+                                        if (isset($val['code']) || isset($val['methods'])) {
+                                            $list[] = $val;
+                                        } else {
+                                            $list[] = ['code' => $key, 'methods' => $val];
+                                        }
+                                    } elseif (true === $val || null === $val) {
+                                        $list[] = ['code' => $key];
+                                    }
+                                }
+
+                                return $list;
+                            })
+                        ->end()
+                        ->useAttributeAsKey('code')
+                        ->arrayPrototype()
+                            ->children()
+                                ->integerNode('code')->end()
+                                ->arrayNode('methods', 'method')
+                                    ->acceptAndWrap(['string'])
+                                    ->beforeNormalization()
+                                    ->ifArray()
+                                        ->then(static fn ($v) => array_map('strtoupper', $v))
+                                    ->end()
+                                    ->stringPrototype()->end()
+                                    ->info('A list of HTTP methods that triggers a retry for this status code. When empty, all methods are retried.')
+                                ->end()
+                            ->end()
+                        ->end()
+                        ->info('A list of HTTP status code that triggers a retry.')]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/DependencyInjection/FrameworkExtension.php">
+    <UndefinedConstant>
+      <code><![CDATA[$class::PROVIDER_IPS]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/EventListener/ConsoleProfilerListener.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$command->arguments = $input->getArguments()]]></code>
+      <code><![CDATA[$command->options = $input->getOptions()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/BrowserKitAssertionsTrait.php">
+    <InvalidArgument>
+      <code><![CDATA[$serverExceptionFile[1]]]></code>
+    </InvalidArgument>
+    <UndefinedClass>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[Constraint]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/DomCrawlerAssertionsTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalAnd]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/KernelTestCase.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return self::$kernel->getContainer()->get('test.service_container');]]></code>
+    </NullableReturnStatement>
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/MailerAssertionsTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/NotificationAssertionsTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+      <code><![CDATA[LogicalNot]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/TestContainer.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->getPublicContainer()->get($this->privateServicesLocatorId);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Test/WebTestCase.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return self::getClient($client);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Translation/Translator.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->resourceLocales = array_keys($this->options['resource_files'])]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Bundle/SecurityBundle/DataCollector/SecurityDataCollector.php">
+    <NonExistentArrayOffset>
+      <code><![CDATA['listeners']]></code>
+      <code><![CDATA['firewall']]></code>
+      <code><![CDATA['firewall']]></code>
+      <code><![CDATA['auth_profile_token']]></code>
+      <code><![CDATA['deauth_profile_token']]></code>
+    </NonExistentArrayOffset>
+  </file>
+  <file src="src/Symfony/Bundle/SecurityBundle/DependencyInjection/Security/Factory/CustomAuthenticatorFactory.php">
+    <NullMethodCall>
+      <code><![CDATA[$builder->end()->end()]]></code>
+    </NullMethodCall>
+  </file>
+  <file src="src/Symfony/Bundle/TwigBundle/Command/LintCommand.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->getApplication()->getKernel()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Bundle/WebProfilerBundle/EventListener/WebDebugToolbarListener.php">
+    <TaintedHtml>
+      <code><![CDATA[echo $content;]]></code>
+    </TaintedHtml>
+  </file>
+  <file src="src/Symfony/Bundle/WebProfilerBundle/Profiler/CodeExtension.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $this->projectDir]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/AssetMapper/Command/DebugAssetMapperCommand.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[-$limit]]></code>
+    </ImplicitFloatToIntCast>
+    <InvalidArgument>
+      <code><![CDATA[$limit]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/AssetMapper/Command/ImportMapAuditCommand.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[1 === $vulnerabilityCount]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/AssetMapper/Compressor/BrotliCompressor.php">
+    <InvalidArgument>
+      <code><![CDATA[[$this->executable, '--best', '--force', "--output=$path.".self::FILE_EXTENSION, '--', $path]]]></code>
+    </InvalidArgument>
+    <UndefinedConstant>
+      <code><![CDATA[BROTLI_COMPRESS_LEVEL_MAX]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="src/Symfony/Component/AssetMapper/Compressor/GzipCompressor.php">
+    <InvalidArgument>
+      <code><![CDATA[[$this->executable, '--best', '--force', '--keep', '--', $path]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/AssetMapper/Compressor/ZopfliCompressor.php">
+    <InvalidArgument>
+      <code><![CDATA[[$this->executable, '--', $path]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/AssetMapper/Compressor/ZstandardCompressor.php">
+    <InvalidArgument>
+      <code><![CDATA[[$this->executable, '-19', '--force', '-o', "$path.".self::FILE_EXTENSION, '--', $path]]]></code>
+    </InvalidArgument>
+    <UndefinedConstant>
+      <code><![CDATA[\ZSTD_COMPRESS_LEVEL_MAX]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="src/Symfony/Component/BrowserKit/AbstractBrowser.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->redirect = $this->internalResponse->getHeader('Location')]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/BrowserKit/Test/Constraint/BrowserCookieValueSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/BrowserKit/Test/Constraint/BrowserHasCookie.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/BrowserKit/Test/Constraint/BrowserHistoryIsOnFirstPage.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/BrowserKit/Test/Constraint/BrowserHistoryIsOnLastPage.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/AbstractAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
+            static function ($key, $value, $isHit) {
+                $item = new CacheItem();
+                $item->key = $key;
+                $item->value = $value;
+                $item->isHit = $isHit;
+                $item->unpack();
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[self::$mergeByLifetime ??= \Closure::bind(
+            static function ($deferred, $namespace, &$expiredIds, $getId, $defaultLifetime) {
+                $byLifetime = [];
+                $now = microtime(true);
+                $expiredIds = [];
+
+                foreach ($deferred as $key => $item) {
+                    $key = (string) $key;
+                    if (null === $item->expiry) {
+                        $ttl = 0 < $defaultLifetime ? $defaultLifetime : 0;
+                    } elseif (!$item->expiry) {
+                        $ttl = 0;
+                    } elseif (0 >= $ttl = (int) (0.1 + $item->expiry - $now)) {
+                        $expiredIds[] = $getId($key);
+                        continue;
+                    }
+                    $byLifetime[$ttl][$getId($key)] = $item->pack();
+                }
+
+                return $byLifetime;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+    <UndefinedVariable>
+      <code><![CDATA[$expiredIds]]></code>
+      <code><![CDATA[$expiredIds]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/AbstractTagAwareAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
+            static function ($key, $value, $isHit) {
+                $item = new CacheItem();
+                $item->key = $key;
+                $item->isTaggable = true;
+                // If structure does not match what we expect return item as is (no value and not a hit)
+                if (!\is_array($value) || !\array_key_exists('value', $value)) {
+                    return $item;
+                }
+                $item->isHit = $isHit;
+                // Extract value, tags and meta data from the cache value
+                $item->value = $value['value'];
+                $item->metadata[CacheItem::METADATA_TAGS] = isset($value['tags']) ? array_combine($value['tags'], $value['tags']) : [];
+                if (isset($value['meta'])) {
+                    // For compactness these values are packed, & expiry is offset to reduce size
+                    $v = unpack('Ve/Nc', $value['meta']);
+                    $item->metadata[CacheItem::METADATA_EXPIRY] = $v['e'] + CacheItem::METADATA_EXPIRY_OFFSET;
+                    $item->metadata[CacheItem::METADATA_CTIME] = $v['c'];
+                }
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[self::$mergeByLifetime ??= \Closure::bind(
+            static function ($deferred, &$expiredIds, $getId, $tagPrefix, $defaultLifetime, $rootNamespace) {
+                $byLifetime = [];
+                $now = microtime(true);
+                $expiredIds = [];
+
+                foreach ($deferred as $key => $item) {
+                    $key = (string) $key;
+                    if (null === $item->expiry) {
+                        $ttl = 0 < $defaultLifetime ? $defaultLifetime : 0;
+                    } elseif (!$item->expiry) {
+                        $ttl = 0;
+                    } elseif (0 >= $ttl = (int) (0.1 + $item->expiry - $now)) {
+                        $expiredIds[] = $getId($key);
+                        continue;
+                    }
+                    // Store Value and Tags on the cache value
+                    if (isset(($metadata = $item->newMetadata)[CacheItem::METADATA_TAGS])) {
+                        $value = ['value' => $item->value, 'tags' => $metadata[CacheItem::METADATA_TAGS]];
+                        unset($metadata[CacheItem::METADATA_TAGS]);
+                    } else {
+                        $value = ['value' => $item->value, 'tags' => []];
+                    }
+
+                    if ($metadata) {
+                        // For compactness, expiry and creation duration are packed, using magic numbers as separators
+                        $value['meta'] = pack('VN', (int) (0.1 + $metadata[CacheItem::METADATA_EXPIRY] - CacheItem::METADATA_EXPIRY_OFFSET), $metadata[CacheItem::METADATA_CTIME]);
+                    }
+
+                    // Extract tag changes, these should be removed from values in doSave()
+                    $value['tag-operations'] = ['add' => [], 'remove' => []];
+                    $oldTags = $item->metadata[CacheItem::METADATA_TAGS] ?? [];
+                    foreach (array_diff_key($value['tags'], $oldTags) as $addedTag) {
+                        $value['tag-operations']['add'][] = $getId($tagPrefix.$addedTag, $rootNamespace);
+                    }
+                    foreach (array_diff_key($oldTags, $value['tags']) as $removedTag) {
+                        $value['tag-operations']['remove'][] = $getId($tagPrefix.$removedTag, $rootNamespace);
+                    }
+                    $value['tags'] = array_keys($value['tags']);
+
+                    $byLifetime[$ttl][$getId($key)] = $value;
+                    $item->metadata = $item->newMetadata;
+                }
+
+                return $byLifetime;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+    <UndefinedVariable>
+      <code><![CDATA[$expiredIds]]></code>
+      <code><![CDATA[$expiredIds]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/ApcuAdapter.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/ArrayAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
+            static function ($key, $value, $isHit, $tags, $expiry = null, $clock = null) {
+                $item = new CacheItem();
+                $item->key = $key;
+                $item->value = $value;
+                $item->isHit = $isHit;
+                $item->clock = $clock;
+                if (null !== $tags) {
+                    $item->metadata[CacheItem::METADATA_TAGS] = $tags;
+                }
+                if (null !== $expiry) {
+                    $item->metadata[CacheItem::METADATA_EXPIRY] = $expiry;
+                }
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/ChainAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$syncItem ??= \Closure::bind(
+            static function ($sourceItem, $item, $defaultLifetime, $sourceMetadata = null) {
+                $sourceItem->isTaggable = false;
+                $sourceMetadata ??= $sourceItem->metadata;
+
+                $item->value = $sourceItem->value;
+                $item->isHit = $sourceItem->isHit;
+                $item->metadata = $item->newMetadata = $sourceItem->metadata = $sourceMetadata;
+
+                if (isset($item->metadata[CacheItem::METADATA_EXPIRY])) {
+                    $item->expiresAt(\DateTimeImmutable::createFromFormat('U.u', \sprintf('%.6F', $item->metadata[CacheItem::METADATA_EXPIRY])));
+                } elseif (0 < $defaultLifetime) {
+                    $item->expiresAfter($defaultLifetime);
+                    $item->newMetadata[CacheItem::METADATA_EXPIRY] = $item->expiry;
+                }
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/CouchbaseCollectionAdapter.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+    <UndefinedClass>
+      <code><![CDATA[Collection]]></code>
+      <code><![CDATA[Bucket]]></code>
+      <code><![CDATA[Collection]]></code>
+      <code><![CDATA[ClusterOptions]]></code>
+      <code><![CDATA[Cluster]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[UpsertOptions]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/DoctrineDbalAdapter.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/FilesystemTagAwareAdapter.php">
+    <UndefinedTraitAliasMethod>
+      <code><![CDATA[]]></code>
+    </UndefinedTraitAliasMethod>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/MemcachedAdapter.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $password]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[[__CLASS__, 'encodeKey']]]></code>
+      <code><![CDATA[[__CLASS__, 'encodeKey']]]></code>
+    </InvalidArgument>
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+      <code><![CDATA[return $this->checkResultCode($this->getClient()->setMulti($encodedValues, $lifetime)) ? $failed : false;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/NullAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
+            static function ($key) {
+                $item = new CacheItem();
+                $item->isTaggable = true;
+                $item->key = $key;
+                $item->isHit = false;
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/ParameterNormalizer.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $duration;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/PdoAdapter.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/PhpArrayAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
+            static function ($key, $value, $isHit) {
+                $item = new CacheItem();
+                $item->key = $key;
+                $item->value = $value;
+                $item->isHit = $isHit;
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/ProxyAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->poolHash = spl_object_id($pool)]]></code>
+      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
+            static function ($key, $innerItem, $poolHash) {
+                $item = new CacheItem();
+                $item->key = $key;
+
+                if (null === $innerItem) {
+                    return $item;
+                }
+
+                $item->value = $innerItem->get();
+                $item->isHit = $innerItem->isHit();
+                $item->innerItem = $innerItem;
+                $item->poolHash = $poolHash;
+
+                if (!$item->unpack() && $innerItem instanceof CacheItem) {
+                    $item->metadata = $innerItem->metadata;
+                }
+                $innerItem->set(null);
+
+                return $item;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[self::$setInnerItem ??= \Closure::bind(
+            static function (CacheItemInterface $innerItem, CacheItem $item, $expiry = null) {
+                $innerItem->set($item->pack());
+                $innerItem->expiresAt(($expiry ?? $item->expiry) ? \DateTimeImmutable::createFromFormat('U.u', \sprintf('%.6F', $expiry ?? $item->expiry)) : null);
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/RedisTagAwareAdapter.php">
+    <InaccessibleProperty>
+      <code><![CDATA[rootNamespace]]></code>
+    </InaccessibleProperty>
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+    <UndefinedClass>
+      <code><![CDATA[ClusterInterface]]></code>
+      <code><![CDATA[PredisCluster]]></code>
+      <code><![CDATA[ReplicationInterface]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/TagAwareAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$setCacheItemTags ??= \Closure::bind(
+            static function (array $items, array $itemTags) {
+                foreach ($items as $key => $item) {
+                    $item->isTaggable = true;
+
+                    if (isset($itemTags[$key])) {
+                        $tags = array_keys($itemTags[$key]);
+                        $item->metadata[CacheItem::METADATA_TAGS] = array_combine($tags, $tags);
+                    } else {
+                        $item->value = null;
+                        $item->isHit = false;
+                        $item->metadata = [];
+                    }
+                }
+
+                return $items;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[self::$setTagVersions ??= \Closure::bind(
+            static function (array $items, array $tagVersions) {
+                foreach ($items as $item) {
+                    $item->newMetadata[CacheItem::METADATA_TAGS] = array_intersect_key($tagVersions, $item->newMetadata[CacheItem::METADATA_TAGS] ?? []);
+                }
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[self::$getTagsByKey ??= \Closure::bind(
+            static function ($deferred) {
+                $tagsByKey = [];
+                foreach ($deferred as $key => $item) {
+                    $tagsByKey[$key] = $item->newMetadata[CacheItem::METADATA_TAGS] ?? [];
+                    $item->metadata = $item->newMetadata;
+                }
+
+                return $tagsByKey;
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[self::$saveTags ??= \Closure::bind(
+            static function (AdapterInterface $tagsAdapter, array $tags) {
+                ksort($tags);
+
+                foreach ($tags as $v) {
+                    $v->expiry = 0;
+                    $tagsAdapter->saveDeferred($v);
+                }
+
+                return $tagsAdapter->commit();
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+      <code><![CDATA[$clone->pool = $this->pool->withSubNamespace($namespace)]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Cache/Adapter/TraceableAdapter.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$clone->pool = $this->pool->withSubNamespace($namespace)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/CacheItem.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->metadata = unpack('Vexpiry/Nctime', substr($k, 1, -1))]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Marshaller/DefaultMarshaller.php">
+    <UndefinedFunction>
+      <code><![CDATA[igbinary_serialize($value)]]></code>
+      <code><![CDATA[igbinary_serialize(null)]]></code>
+      <code><![CDATA[igbinary_unserialize($value)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/Cache/Messenger/EarlyExpirationMessage.php">
+    <InvalidReturnType>
+      <code><![CDATA[return '@' === $callback[0] ? $reverseContainer->getService(substr($callback, 1)) : $callback;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Cache/Psr16Cache.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$packCacheItem ??= \Closure::bind(
+            static function (CacheItem $item) {
+                if (!isset($item->metadata[ItemInterface::METADATA_CTIME])) {
+                    return $item->value;
+                }
+
+                $item->newMetadata = $item->metadata;
+
+                return $item->pack();
+            },
+            null,
+            CacheItem::class
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Cache/Traits/FilesystemTrait.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Cache/Traits/RedisTrait.php">
+    <InvalidArgument>
+      <code><![CDATA[$pattern]]></code>
+      <code><![CDATA[$address]]></code>
+      <code><![CDATA['MATCH']]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->redis = $redis]]></code>
+    </InvalidPropertyAssignment>
+    <NullableReturnStatement>
+      <code><![CDATA[return $failed;]]></code>
+      <code><![CDATA[return $failed;]]></code>
+    </NullableReturnStatement>
+    <UndefinedClass>
+      <code><![CDATA[ClusterInterface]]></code>
+      <code><![CDATA[ReplicationInterface]]></code>
+      <code><![CDATA[ClusterInterface]]></code>
+      <code><![CDATA[RedisCluster]]></code>
+      <code><![CDATA[ClusterInterface]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Cache/Traits/Relay/Relay22Trait.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[jsonstrappend]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/Clock/MonotonicClock.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false === $offset = hrtime()]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->sOffset = $time[1] - $offset[0]]]></code>
+      <code><![CDATA[$this->timezone = \is_string($timezone ??= date_default_timezone_get()) ? $this->withTimeZone($timezone)->timezone : $timezone]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Clock/NativeClock.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->timezone = \is_string($timezone ??= date_default_timezone_get()) ? $this->withTimeZone($timezone)->timezone : $timezone]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Builder/ArrayNodeDefinition.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->prototype = $this->getNodeBuilder()->node(null, $type)->setParent($this)]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $this->prototype('variable');]]></code>
+      <code><![CDATA[return $this->prototype('scalar');]]></code>
+      <code><![CDATA[return $this->prototype('string');]]></code>
+      <code><![CDATA[return $this->prototype('boolean');]]></code>
+      <code><![CDATA[return $this->prototype('integer');]]></code>
+      <code><![CDATA[return $this->prototype('float');]]></code>
+      <code><![CDATA[return $this->prototype('enum');]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Builder/NodeBuilder.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->nodeMapping = [
+            'array' => ArrayNodeDefinition::class,
+            'variable' => VariableNodeDefinition::class,
+            'scalar' => ScalarNodeDefinition::class,
+            'string' => StringNodeDefinition::class,
+            'boolean' => BooleanNodeDefinition::class,
+            'integer' => IntegerNodeDefinition::class,
+            'float' => FloatNodeDefinition::class,
+            'enum' => EnumNodeDefinition::class,
+        ]]]></code>
+      <code><![CDATA[$this->parent = $parent]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $this->node($name, 'array');]]></code>
+      <code><![CDATA[return $this->node($name, 'scalar');]]></code>
+      <code><![CDATA[return $this->node($name, 'boolean');]]></code>
+      <code><![CDATA[return $this->node($name, 'integer');]]></code>
+      <code><![CDATA[return $this->node($name, 'float');]]></code>
+      <code><![CDATA[return $this->node($name, 'enum');]]></code>
+      <code><![CDATA[return $this->node($name, 'variable');]]></code>
+      <code><![CDATA[return $this->node($name, 'string');]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Builder/NodeDefinition.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->parent = $parent]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidTemplateParam>
+      <code><![CDATA[$child->setPathSeparator($separator)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Builder/TreeBuilder.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->root = $builder->node($name, $type)->setParent($this)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Configuration.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $treeBuilder;]]></code>
+    </InvalidReturnType>
+    <InvalidTemplateParam>
+      <code><![CDATA[new DefinitionConfigurator($treeBuilder, $loader, $file, $file)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Dumper/XmlReferenceDumper.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $ref;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Dumper/YamlReferenceDumper.php">
+    <InvalidCast>
+      <code><![CDATA[$default]]></code>
+    </InvalidCast>
+    <NullableReturnStatement>
+      <code><![CDATA[return $ref;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Config/Definition/Loader/DefinitionFileLoader.php">
+    <UnhandledMatchCondition>
+      <code><![CDATA[match ($reflectionType->getName()) {
+                DefinitionConfigurator::class => $configurator,
+                TreeBuilder::class => $this->treeBuilder,
+                FileLoader::class, self::class => $this,
+            }]]></code>
+    </UnhandledMatchCondition>
+  </file>
+  <file src="src/Symfony/Component/Config/Resource/ReflectionClassResource.php">
+    <InvalidReturnType>
+      <code><![CDATA[return false;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Console/Application.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->runningCommand = $command]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return array_keys($alternatives);]]></code>
+      <code><![CDATA[return $namespaces;]]></code>
+    </InvalidReturnType>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->addCommand(new Command($name));]]></code>
+    </NullableReturnStatement>
+    <UndefinedMethod>
+      <code><![CDATA[$helpCommand->setCommand($command)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Console/Attribute/Argument.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$self->name = (new UnicodeString($name))->kebab()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Console/Attribute/Option.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$self->name = (new UnicodeString($name))->kebab()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Console/Command/CompleteCommand.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $compval = $completionInput->getCompletionValue()]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Console/Command/DumpCompletionCommand.php">
+    <InvalidArgument>
+      <code><![CDATA[$this->getSupportedShells(...)]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Console/Command/HelpCommand.php">
+    <InvalidArgument>
+      <code><![CDATA[fn () => array_keys((new ApplicationDescription($this->getApplication()))->getCommands())]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Console/Command/TraceableCommand.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->command = $command]]></code>
+      <code><![CDATA[$this->arguments = $input->getArguments()]]></code>
+      <code><![CDATA[$this->options = $input->getOptions()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Console/Completion/CompletionInput.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->completionName = $argumentName]]></code>
+      <code><![CDATA[$this->completionName = $argumentName]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Console/DataCollector/CommandDataCollector.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[Command::class !== $r->getDeclaringClass()]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Console/Descriptor/XmlDescriptor.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$parentNode->appendChild($parentNode->ownerDocument->importNode($childNode, true))]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/Console/Formatter/OutputFormatter.php">
+    <InvalidReturnType>
+      <code><![CDATA[return b($text)->toUnicodeString($encoding)->wordwrap($width, "\n", true)->toByteString($encoding);]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Console/Helper/Helper.php">
+    <InvalidReturnType>
+      <code><![CDATA[return (new UnicodeString($string))->slice($from, $length);]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Console/Helper/ProgressBar.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$completeBars]]></code>
+    </ImplicitFloatToIntCast>
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $this->max]]></code>
+    </ImpossibleIdenticalComparison>
+    <NullableReturnStatement>
+      <code><![CDATA[return preg_replace_callback($regex, $callback, $this->format);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Console/Helper/QuestionHelper.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$default]]></code>
+    </ImplicitFloatToIntCast>
+    <InvalidArgument>
+      <code><![CDATA[[__CLASS__, 'width']]]></code>
+    </InvalidArgument>
+    <InvalidThrow>
+      <code><![CDATA[]]></code>
+    </InvalidThrow>
+    <NullableReturnStatement>
+      <code><![CDATA[return $input;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Console/Helper/SymfonyQuestionHelper.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$default]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Component/Console/Helper/TreeHelper.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $current = $this->current()]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[$visited[$currentNode] = true]]></code>
+    </InvalidArgument>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->children->key();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Console/Input/ArgvInput.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->tokens = $argv]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Console/Input/InputArgument.php">
+    <TooFewArguments>
+      <code><![CDATA[$values($input)]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/Console/Input/InputOption.php">
+    <TooFewArguments>
+      <code><![CDATA[$values($input)]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/Console/Question/Question.php">
+    <InvalidArgument>
+      <code><![CDATA[$callback]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Console/Terminal.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return self::$colorMode;]]></code>
+      <code><![CDATA[return self::$colorMode;]]></code>
+      <code><![CDATA[return self::$colorMode;]]></code>
+      <code><![CDATA[return self::$colorMode;]]></code>
+      <code><![CDATA[return self::$colorMode;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Console/Tester/Constraint/CommandFailed.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Console/Tester/Constraint/CommandIsInvalid.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Console/Tester/Constraint/CommandIsSuccessful.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Console/Tester/TesterTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$this->output->getErrorOutput()]]></code>
+      <code><![CDATA[$this->output->getErrorOutput()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/CssSelector/Parser/TokenStream.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->peeked;]]></code>
+      <code><![CDATA[return $this->peeked;]]></code>
+      <code><![CDATA[return $next->getValue();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Argument/LazyClosure.php">
+    <ReadonlyPropertyAssignment>
+      <code><![CDATA[$this->service]]></code>
+    </ReadonlyPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Attribute/AutowireIterator.php">
+    <InvalidArgument>
+      <code><![CDATA[false]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Attribute/AutowireLocator.php">
+    <InvalidArgument>
+      <code><![CDATA[true]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Compiler/AbstractRecursivePass.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->getConstructor($definition, true);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Compiler/AutowirePass.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $alias]]></code>
+    </ImpossibleIdenticalComparison>
+    <NullableReturnStatement>
+      <code><![CDATA[return (fn () => $this->createTypeNotFoundMessage($reference, $label, $currentId))->bindTo($this->typesClone);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Compiler/CheckTypeDeclarationsPass.php">
+    <UndefinedProperty>
+      <code><![CDATA[class]]></code>
+    </UndefinedProperty>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Compiler/ResolveBindingsPass.php">
+    <UndefinedProperty>
+      <code><![CDATA[class]]></code>
+    </UndefinedProperty>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Compiler/ValidateEnvPlaceholdersPass.php">
+    <InvalidArgument>
+      <code><![CDATA[$configuration]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/ContainerBuilder.php">
+    <UndefinedClass>
+      <code><![CDATA[ClassLoader]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Dumper/GraphvizDumper.php">
+    <ImpossibleLooseComparison>
+      <code><![CDATA[$id == $origin]]></code>
+    </ImpossibleLooseComparison>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php">
+    <InvalidArgument>
+      <code><![CDATA[$definitions[$argument] = 1 + $definitions[$argument]]]></code>
+      <code><![CDATA[$definitions[$argument] = 1]]></code>
+    </InvalidArgument>
+    <UndefinedClass>
+      <code><![CDATA[ClassLoader]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/EnvVarProcessor.php">
+    <InvalidArgument>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+      <code><![CDATA[$env]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Exception/AutowiringFailedException.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->message = new class($this->message, $this->messageCallback) {
+            private string|self $message;
+            private ?\Closure $messageCallback;
+
+            public function __construct(&$message, &$messageCallback)
+            {
+                $this->message = &$message;
+                $this->messageCallback = &$messageCallback;
+            }
+
+            public function __toString(): string
+            {
+                $messageCallback = $this->messageCallback;
+                $this->messageCallback = null;
+
+                try {
+                    return $this->message = $messageCallback();
+                } catch (\Throwable $e) {
+                    return $this->message = $e->getMessage();
+                }
+            }
+        }]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Kernel/KernelTrait.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $container]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Loader/Configurator/ContainerConfigurator.php">
+    <InvalidArgument>
+      <code><![CDATA[false]]></code>
+      <code><![CDATA[true]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Loader/Configurator/Traits/BindTrait.php">
+    <InaccessibleProperty>
+      <code><![CDATA[definition]]></code>
+    </InaccessibleProperty>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Loader/ContentLoaderTrait.php">
+    <InvalidArgument>
+      <code><![CDATA[$forLocator]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/ParameterBag/ParameterBag.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$this->resolveValue($key, $resolving)]]></code>
+      <code><![CDATA[$this->resolveValue($v, $resolving)]]></code>
+      <code><![CDATA[$this->resolveValue($this->get($key), $resolving)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/ReverseContainer.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->getServiceId = \Closure::bind(fn (object $service): ?string => array_search($service, $this->services, true) ?: array_search($service, $this->privates, true) ?: null, $serviceContainer, Container::class)]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[array_search($service, $this->services, true) ?: array_search($service, $this->privates, true) ?: null]]></code>
+    </InvalidReturnType>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->serviceContainer->get($id);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/ServicesResetter.php">
+    <UndefinedMethod>
+      <code><![CDATA[$service->isProxyInitialized()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Crawler.php">
+    <InvalidArgument>
+      <code><![CDATA[$this->createSubCrawler($node)]]></code>
+      <code><![CDATA[$this->createSubCrawler($node)]]></code>
+    </InvalidArgument>
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->getNode(0)->nodeName;]]></code>
+      <code><![CDATA[return $text;]]></code>
+      <code><![CDATA[return $childNode->nodeValue;]]></code>
+    </NullableReturnStatement>
+    <UndefinedMethod>
+      <code><![CDATA[$node->hasAttribute($attribute)]]></code>
+      <code><![CDATA[$node->getAttribute($attribute)]]></code>
+      <code><![CDATA[$node->getAttribute($attribute)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Field/ChoiceFormField.php">
+    <UndefinedMethod>
+      <code><![CDATA[$option->hasAttribute('selected')]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Form.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->node = $node]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerAnySelectorTextContains.php">
+    <InvalidArgument>
+      <code><![CDATA[static fn (Crawler $node) => $node->text(null, true)]]></code>
+    </InvalidArgument>
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerAnySelectorTextSame.php">
+    <InvalidArgument>
+      <code><![CDATA[static fn (Crawler $node) => trim($node->text(null, true))]]></code>
+    </InvalidArgument>
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerSelectorAttributeValueSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerSelectorCount.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerSelectorExists.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerSelectorTextContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerSelectorTextSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Dotenv/Dotenv.php">
+    <InvalidCast>
+      <code><![CDATA[getenv($name)]]></code>
+      <code><![CDATA[getenv($name)]]></code>
+    </InvalidCast>
+  </file>
+  <file src="src/Symfony/Component/Emoji/EmojiTransliterator.php">
+    <ImmutablePropertyModification>
+      <code><![CDATA[$this->quickCheck ??= str_starts_with(array_key_first($this->map), ':') ? ':' : self::QUICK_CHECK]]></code>
+      <code><![CDATA[$this->transliterator ??= clone $transliterator ??= \Transliterator::createFromRules('[:any:]* > '.$cookie)]]></code>
+    </ImmutablePropertyModification>
+    <ImpureFunctionCall>
+      <code><![CDATA[str_starts_with(array_key_first($this->map), ':')]]></code>
+      <code><![CDATA[random_bytes(8)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[self::create($this->id, \Transliterator::REVERSE)]]></code>
+      <code><![CDATA[\Transliterator::createFromRules('[:any:]* > '.$cookie)]]></code>
+    </ImpureMethodCall>
+    <ImpureStaticVariable>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </ImpureStaticVariable>
+  </file>
+  <file src="src/Symfony/Component/Emoji/Resources/bin/build.php">
+    <UndefinedMethod>
+      <code><![CDATA[$result->getAttribute('cp')]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Emoji/Util/GzipStreamWrapper.php">
+    <InvalidArgument>
+      <code><![CDATA[$arg1]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/ErrorEnhancer/ClassNotFoundErrorEnhancer.php">
+    <UndefinedClass>
+      <code><![CDATA[ClassLoader]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/ErrorEnhancer/UndefinedMethodErrorEnhancer.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $methods = get_class_methods($className)]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/ErrorHandler.php">
+    <InvalidArgument>
+      <code><![CDATA[$throw]]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->configureException = \Closure::bind(static function ($e, $trace, $file = null, $line = null) use ($traceReflector) {
+            $traceReflector->setValue($e, $trace);
+            $e->file = $file ?? $e->file;
+            $e->line = $line ?? $e->line;
+        }, null, new class extends \Exception {
+        })]]></code>
+    </InvalidPropertyAssignment>
+    <NullableReturnStatement>
+      <code><![CDATA[return $handler;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/ErrorRenderer/HtmlErrorRenderer.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $dumper->dump($value, true);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/assets/images/symfony-ghost.svg.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/error.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$statusText]]></code>
+      <code><![CDATA[$statusCode]]></code>
+      <code><![CDATA[$statusText]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/exception.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$exceptionMessage]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$statusCode]]></code>
+      <code><![CDATA[$statusText]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$logger]]></code>
+      <code><![CDATA[$currentContent]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/exception_full.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$exceptionMessage]]></code>
+      <code><![CDATA[$statusCode]]></code>
+      <code><![CDATA[$statusText]]></code>
+      <code><![CDATA[$context]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/logs.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$logs]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/trace.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$prefix]]></code>
+      <code><![CDATA[$i]]></code>
+      <code><![CDATA[$style]]></code>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$prefix]]></code>
+      <code><![CDATA[$i]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/traces.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$index]]></code>
+      <code><![CDATA[$index]]></code>
+      <code><![CDATA[$expand]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$index]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/ErrorHandler/Resources/views/traces_text.html.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedVariable>
+      <code><![CDATA[$index]]></code>
+      <code><![CDATA[$index]]></code>
+      <code><![CDATA[$numExceptions]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+      <code><![CDATA[$exception]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/EventDispatcher/Debug/WrappedListener.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->listener = $listener]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $this->listener;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/EventDispatcher/DependencyInjection/RegisterListenersPass.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[ExtractingEventDispatcher::$aliases = $aliases]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/EventDispatcher/GenericEvent.php">
+    <InvalidReturnType>
+      <code><![CDATA[return new \ArrayIterator($this->arguments);]]></code>
+    </InvalidReturnType>
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/ExpressionLanguage/Lexer.php">
+    <InvalidArgument>
+      <code><![CDATA[Token::NUMBER_TYPE]]></code>
+      <code><![CDATA[Token::PUNCTUATION_TYPE]]></code>
+      <code><![CDATA[Token::PUNCTUATION_TYPE]]></code>
+      <code><![CDATA[Token::STRING_TYPE]]></code>
+      <code><![CDATA[Token::OPERATOR_TYPE]]></code>
+      <code><![CDATA[Token::PUNCTUATION_TYPE]]></code>
+      <code><![CDATA[Token::PUNCTUATION_TYPE]]></code>
+      <code><![CDATA[Token::PUNCTUATION_TYPE]]></code>
+      <code><![CDATA[Token::NAME_TYPE]]></code>
+      <code><![CDATA[Token::EOF_TYPE]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/ExpressionLanguage/Parser.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$token->value]]></code>
+      <code><![CDATA[$token->value]]></code>
+      <code><![CDATA[$token->value]]></code>
+      <code><![CDATA[$token->value]]></code>
+      <code><![CDATA[$token->value]]></code>
+      <code><![CDATA[$token->value]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Component/Finder/Finder.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->dirs = array_merge($this->dirs, ...$resolvedDirs)]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/Form/ChoiceList/ArrayChoiceList.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->choices = $choicesByValues]]></code>
+      <code><![CDATA[$this->originalKeys = $keysByValues]]></code>
+      <code><![CDATA[$this->structuredValues = $structuredValues]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Form/Console/Descriptor/JsonDescriptor.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA['default' === $name]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Form/Console/Descriptor/TextDescriptor.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA['default' === $name]]></code>
+      <code><![CDATA['nestedOptions' === $name]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataAccessor/PropertyPathAccessor.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $dataAccessor = $dataMapper->getDataAccessor()]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToHtml5LocalDateTimeTransformer.php">
+    <InvalidArgument>
+      <code><![CDATA[$matches[2]]]></code>
+      <code><![CDATA[$matches[3]]]></code>
+      <code><![CDATA[$matches[1]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToLocalizedStringTransformer.php">
+    <InvalidArgument>
+      <code><![CDATA[$timezone]]></code>
+      <code><![CDATA[\Locale::getDefault()]]></code>
+    </InvalidArgument>
+    <TooFewArguments>
+      <code><![CDATA[new \IntlGregorianCalendar($timezone, \Locale::getDefault())]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToRfc3339Transformer.php">
+    <InvalidArgument>
+      <code><![CDATA[$matches[2]]]></code>
+      <code><![CDATA[$matches[3]]]></code>
+      <code><![CDATA[$matches[1]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToTimestampTransformer.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$value]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/NumberToLocalizedStringTransformer.php">
+    <InvalidArgument>
+      <code><![CDATA[$this->grouping]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/WeekToArrayTransformer.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[transform]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Core/Type/FileType.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$coef]]></code>
+    </ImplicitFloatToIntCast>
+    <InvalidArgument>
+      <code><![CDATA[$double]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Validator/Constraints/FormValidator.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$fieldFormConstraint->groups = $group]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $this->resolvedGroups[$form];]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Form/Extension/Validator/ViolationMapper/ViolationMapper.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $propertyPath]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Form/Flow/FormFlowBuilder.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $currentStep;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Form/Form.php">
+    <UndefinedMethod>
+      <code><![CDATA[$child->getClickedButton()]]></code>
+      <code><![CDATA[$child->getClickedButton()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Form/FormErrorIterator.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $children;]]></code>
+    </InvalidReturnType>
+    <NullableReturnStatement>
+      <code><![CDATA[return key($this->errors);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Form/FormView.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/Form/Test/FormIntegrationTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HtmlSanitizer/Visitor/DomVisitor.php">
+    <UndefinedProperty>
+      <code><![CDATA[attributes]]></code>
+    </UndefinedProperty>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/CachingHttpClient.php">
+    <InvalidArgument>
+      <code><![CDATA[$cacheControlHeader]]></code>
+    </InvalidArgument>
+    <InvalidReturnType>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/CurlHttpClient.php">
+    <TaintedSsrf>
+      <code><![CDATA[curl_setopt($ch, \CURLOPT_PROXY, $proxy ?? '')]]></code>
+    </TaintedSsrf>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/DnsResolvingHttpClient.php">
+    <InvalidArgument>
+      <code><![CDATA[$resolve]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/GuzzleHttpHandler.php">
+    <InvalidArgument>
+      <code><![CDATA[$psrResponse]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Internal/AmpBody.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->offset = ftell($body)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Internal/AmpResolver.php">
+    <NullArgument>
+      <code><![CDATA[$ip]]></code>
+    </NullArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Internal/CurlClientState.php">
+    <InvalidCast>
+      <code><![CDATA[$response->handle]]></code>
+    </InvalidCast>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$curlVersion ??= curl_version()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Internal/FollowRedirectsTrait.php">
+    <InvalidReturnType>
+      <code><![CDATA[return;]]></code>
+      <code><![CDATA[return;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/MockHttpClient.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->responseFactory->valid()]]></code>
+      <code><![CDATA[$this->responseFactory->current()]]></code>
+      <code><![CDATA[$this->responseFactory->next()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/NativeHttpClient.php">
+    <NonExistentArrayOffset>
+      <code><![CDATA['request_header']]></code>
+    </NonExistentArrayOffset>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/NoPrivateNetworkHttpClient.php">
+    <InvalidArgument>
+      <code><![CDATA[$checkHost]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Response/AsyncResponse.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $chunk]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Response/StreamWrapper.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $this->client]]></code>
+      <code><![CDATA[null !== $this->response]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/HttpClient/Response/TransportResponseTrait.php">
+    <AbstractMethodCall>
+      <code><![CDATA[self::schedule($response, $runningResponses)]]></code>
+      <code><![CDATA[self::perform($multi, $responses)]]></code>
+      <code><![CDATA[self::select($multi, min($timeoutMin, max(0, $timeoutMax - $elapsedTimeout)))]]></code>
+    </AbstractMethodCall>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/BinaryFileResponse.php">
+    <InvalidArgument>
+      <code><![CDATA[$this->tempFileObject ? time() : $this->file->getMTime()]]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->tempFileObject = $isTemporaryFile ? $file : null]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/HeaderBag.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/ParameterBag.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->parameters = array_replace($this->parameters, $parameters)]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Request.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === ($requestUri = $this->getRequestUri())]]></code>
+      <code><![CDATA[null === ($baseUrl = $this->getBaseUrlReal())]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[strrpos($host, ']')]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Response.php">
+    <UndefinedFunction>
+      <code><![CDATA[headers_send($statusCode)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Session/Attribute/AttributeBag.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Session/Session.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Handler/AbstractSessionHandler.php">
+    <InvalidArgument>
+      <code><![CDATA[$params]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Handler/MongoDbSessionHandler.php">
+    <UndefinedClass>
+      <code><![CDATA[Client]]></code>
+      <code><![CDATA[Client]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/NativeSessionStorage.php">
+    <InvalidArgument>
+      <code><![CDATA[$this->saveHandler]]></code>
+      <code><![CDATA[false]]></code>
+    </InvalidArgument>
+    <TooFewArguments>
+      <code><![CDATA[session_set_save_handler($this->saveHandler, false)]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Proxy/SessionHandlerProxy.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->saveHandlerName = $this->wrapper || ($handler instanceof StrictSessionHandler && $handler->isWrapper()) ? \ini_get('session.save_handler') : 'user']]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/RequestAttributeValueSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseCookieValueSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseFormatSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseHasCookie.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseHasHeader.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseHeaderLocationSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseHeaderSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseIsRedirected.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseIsSuccessful.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseIsUnprocessable.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/ResponseStatusCodeSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/SessionHasFlashMessage.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Bundle/AbstractBundle.php">
+    <InvalidStaticInvocation>
+      <code><![CDATA[BaseAbstractBundle::getContainerExtension()]]></code>
+      <code><![CDATA[BaseAbstractBundle::getPath()]]></code>
+    </InvalidStaticInvocation>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Controller/ArgumentResolver/QueryParameterValueResolver.php">
+    <InvalidArgument>
+      <code><![CDATA[[$uidType, 'fromString']]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Controller/ArgumentResolver/RequestPayloadValueResolver.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$this->serializer->deserialize($data, $type, $format, self::CONTEXT_DESERIALIZE + $attribute->serializationContext)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Controller/ControllerResolver.php">
+    <InvalidArgument>
+      <code><![CDATA[$controller]]></code>
+      <code><![CDATA[$controller]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/DataCollector/ConfigDataCollector.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[4 === Kernel::MINOR_VERSION]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/DataCollector/DumpDataCollector.php">
+    <InaccessibleProperty>
+      <code><![CDATA[line]]></code>
+    </InaccessibleProperty>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->fileLinkFormat = $fileLinkFormat instanceof FileLinkFormatter && false === $fileLinkFormat->format('', 0) ? false : $fileLinkFormat]]></code>
+    </InvalidPropertyAssignment>
+    <UndefinedMethod>
+      <code><![CDATA[$this->style('meta', '%s')]]></code>
+      <code><![CDATA[$this->style('', $file)]]></code>
+      <code><![CDATA[$this->style('', $name)]]></code>
+      <code><![CDATA[$this->style('', $link)]]></code>
+      <code><![CDATA[$this->style('meta', $name)]]></code>
+      <code><![CDATA[$this->style('meta', $line)]]></code>
+      <code><![CDATA[$this->dumpLine(0)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/DataCollector/LoggerDataCollector.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->processedLogs = $rawLogs]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $this->processedLogs = $rawLogs;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Event/ControllerAttributeEvent.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->controller = match (true) {
+            $kernelEvent instanceof ControllerEvent => $kernelEvent->getController(),
+            $kernelEvent instanceof ControllerArgumentsEvent => $kernelEvent->getController(),
+            default => null,
+        }]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Event/ControllerEvent.php">
+    <InvalidArgument>
+      <code><![CDATA[$controller]]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->controller = $controller]]></code>
+      <code><![CDATA[$this->controller = $controller]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $this->controller;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Event/KernelEvent.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->requestType;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/EventListener/ErrorListener.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $config['log_level'];]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/EventListener/RouterListener.php">
+    <UndefinedFunction>
+      <code><![CDATA[include \dirname(__DIR__)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/HttpCache/HttpCache.php">
+    <InvalidArgument>
+      <code><![CDATA[$ignoreErrors]]></code>
+    </InvalidArgument>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->surrogate;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/HttpClientKernel.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$response->headers = $headers]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/HttpKernel.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $response;]]></code>
+    </NullableReturnStatement>
+    <UndefinedVariable>
+      <code><![CDATA[$controllerMetadata]]></code>
+      <code><![CDATA[$controllerMetadata]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Kernel.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->container->get('http_kernel');]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Log/DebugLoggerConfigurator.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->processor = \is_object($processor) ? $processor : $processor(...)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/HttpKernel/Resources/welcome.html.php">
+    <UndefinedVariable>
+      <code><![CDATA[$version]]></code>
+      <code><![CDATA[$version]]></code>
+      <code><![CDATA[$projectDir]]></code>
+      <code><![CDATA[$docVersion]]></code>
+      <code><![CDATA[$docVersion]]></code>
+      <code><![CDATA[$docVersion]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/Intl/Currencies.php">
+    <InvalidArgument>
+      <code><![CDATA[['Names', $currency, self::INDEX_NAME]]]></code>
+      <code><![CDATA[['Names', $currency, self::INDEX_NAME]]]></code>
+      <code><![CDATA[['Names', $currency, self::INDEX_SYMBOL]]]></code>
+      <code><![CDATA[['Meta', $currency, self::INDEX_FRACTION_DIGITS]]]></code>
+      <code><![CDATA[['Meta', 'DEFAULT', self::INDEX_FRACTION_DIGITS]]]></code>
+      <code><![CDATA[['Meta', $currency, self::INDEX_ROUNDING_INCREMENT]]]></code>
+      <code><![CDATA[['Meta', 'DEFAULT', self::INDEX_ROUNDING_INCREMENT]]]></code>
+      <code><![CDATA[['Meta', $currency, self::INDEX_CASH_FRACTION_DIGITS]]]></code>
+      <code><![CDATA[['Meta', 'DEFAULT', self::INDEX_CASH_FRACTION_DIGITS]]]></code>
+      <code><![CDATA[['Meta', $currency, self::INDEX_CASH_ROUNDING_INCREMENT]]]></code>
+      <code><![CDATA[['Meta', 'DEFAULT', self::INDEX_CASH_ROUNDING_INCREMENT]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Intl/Data/Generator/CurrencyDataGenerator.php">
+    <InvalidArgument>
+      <code><![CDATA[$metadata['to']]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Intl/Data/Generator/LocaleDataGenerator.php">
+    <InvalidArgument>
+      <code><![CDATA[['Languages', \Locale::getPrimaryLanguage($locale)]]]></code>
+      <code><![CDATA[[$extra,  $part]]]></code>
+      <code><![CDATA[[$name,  $extra]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Intl/Data/Generator/RegionDataGenerator.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->regionCodes = array_merge($this->regionCodes, array_keys($data['Names']))]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Intl/Data/Generator/ScriptDataGenerator.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->scriptCodes = array_merge($this->scriptCodes, array_keys($data['Names']))]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Intl/Data/Generator/TimezoneDataGenerator.php">
+    <InvalidArgument>
+      <code><![CDATA[[$city, $name]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Intl/Util/GzipStreamWrapper.php">
+    <InvalidArgument>
+      <code><![CDATA[$arg1]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Intl/Util/IntlTestHelper.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathAssertionsTrait.php">
+    <UndefinedClass>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+    </UndefinedClass>
+    <UndefinedThrowsDocblock>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedThrowsDocblock>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathCount.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathEquals.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathNotContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathNotEquals.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathNotSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonPath/Test/JsonPathSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/JsonStreamer/JsonStreamWriter.php">
+    <InvalidReturnType>
+      <code><![CDATA[return new
+        /**
+         * @implements \IteratorAggregate<int, string>
+         */
+        class($chunks) implements \IteratorAggregate, \Stringable {
+            /**
+             * @param \Traversable<string> $chunks
+             */
+            public function __construct(
+                private \Traversable $chunks,
+            ) {
+            }
+
+            public function getIterator(): \Traversable
+            {
+                return $this->chunks;
+            }
+
+            public function __toString(): string
+            {
+                $string = '';
+                foreach ($this->chunks as $chunk) {
+                    $string .= $chunk;
+                }
+
+                return $string;
+            }
+        };]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/JsonStreamer/Mapping/GenericTypePropertyMetadataLoader.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[Type::intersection(...array_map(fn (Type $t): Type => $this->replaceVariableTypes($t, $variableTypes), $type->getTypes()))]]></code>
+      <code><![CDATA[new CollectionType($this->replaceVariableTypes($type->getWrappedType(), $variableTypes), $type->isList())]]></code>
+      <code><![CDATA[Type::generic(
+                $this->replaceVariableTypes($type->getWrappedType(), $variableTypes),
+                ...array_map(fn (Type $t): Type => $this->replaceVariableTypes($t, $variableTypes), $type->getVariableTypes()),
+            )]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/Collection.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false === $searchCount]]></code>
+      <code><![CDATA[false === $attributes]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/Connection.php">
+    <InvalidArgument>
+      <code><![CDATA[static function (OptionsResolver $options, Options $parent) {
+            $options->setDefined(array_map('strtolower', array_keys((new \ReflectionClass(ConnectionOptions::class))->getConstants())));
+
+            if (true === $parent['debug']) {
+                $options->setDefault('debug_level', 7);
+            }
+
+            if (!isset($parent['network_timeout'])) {
+                $options->setDefault('network_timeout', (int) \ini_get('default_socket_timeout'));
+            }
+
+            $options->setDefaults([
+                'protocol_version' => $parent['version'],
+                'referrals' => $parent['referrals'],
+            ]);
+        }]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/EntryManager.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->connection->getResource();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/Query.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false === $result]]></code>
+      <code><![CDATA[null === $result]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Lock/Store/MemcachedStore.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$cas]]></code>
+    </ImplicitFloatToIntCast>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->useExtendedReturn ??= version_compare(phpversion('memcached'), '2.9.9', '>')]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Lock/Store/MongoDbStore.php">
+    <UndefinedClass>
+      <code><![CDATA[Collection]]></code>
+      <code><![CDATA[Database]]></code>
+      <code><![CDATA[Client]]></code>
+      <code><![CDATA[Collection]]></code>
+      <code><![CDATA[Database]]></code>
+      <code><![CDATA[Client]]></code>
+    </UndefinedClass>
+    <UndefinedThrowsDocblock>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedThrowsDocblock>
+  </file>
+  <file src="src/Symfony/Component/Lock/Store/RedisStore.php">
+    <InvalidArgument>
+      <code><![CDATA[array_merge([$resource], $args)]]></code>
+      <code><![CDATA[array_merge([$resource], $args)]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Lock/Store/StoreFactory.php">
+    <UndefinedClass>
+      <code><![CDATA[\MongoDB\Collection]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Lock/Test/AbstractStoreTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Bridge/AhaSend/Transport/AhaSendApiTransport.php">
+    <InvalidReturnType>
+      <code><![CDATA[return array_map(fn (Address $address) => $this->formatAddress($address), $addresses);]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Bridge/Amazon/Transport/SesHttpAsyncAwsTransport.php">
+    <UndefinedMethod>
+      <code><![CDATA[$message->getOriginalMessage()->getHeaders()]]></code>
+      <code><![CDATA[$message->getOriginalMessage()->getHeaders()]]></code>
+      <code><![CDATA[$message->getOriginalMessage()->getHeaders()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Bridge/Sweego/Transport/SweegoApiTransport.php">
+    <InvalidReturnType>
+      <code><![CDATA[return array_map(fn (Address $address) => $this->formatAddress($address), $addresses);]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Test/AbstractTransportFactoryTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Test/Constraint/EmailCount.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Test/Constraint/EmailIsQueued.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/AmazonSqs/Transport/Connection.php">
+    <InvalidArgument>
+      <code><![CDATA[[
+                'DataType' => 'String',
+                'StringValue' => json_encode($specialHeaders),
+            ]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/Amqp/Transport/AmqpReceiver.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false === $body]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/Amqp/Transport/Connection.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $this->queue($queueName)->ack($message->getDeliveryTag()) ?? true;]]></code>
+      <code><![CDATA[return $this->queue($queueName)->nack($message->getDeliveryTag(), $flags) ?? true;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/Doctrine/Transport/Connection.php">
+    <UndefinedClass>
+      <code><![CDATA[FirebirdPlatform]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/Doctrine/Transport/PostgreSqlConnection.php">
+    <UndefinedMethod>
+      <code><![CDATA[$nativeConnection->getNotify(\PDO::FETCH_ASSOC, 0)]]></code>
+      <code><![CDATA[$nativeConnection->getNotify(\PDO::FETCH_ASSOC, $timeoutMs)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/Redis/Transport/Connection.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $messages ?: null;]]></code>
+    </InvalidReturnType>
+    <NullableReturnStatement>
+      <code><![CDATA[return $id;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Command/ConsumeMessagesCommand.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$limit]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Component/Messenger/DependencyInjection/MessengerPass.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $definition->getClass();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Messenger/MessageBus.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->middlewareAggregate = new class($middlewareHandlers) implements \IteratorAggregate {
+                private \ArrayObject $cachedIterator;
+
+                public function __construct(
+                    private \Traversable $middlewareHandlers,
+                ) {
+                }
+
+                public function getIterator(): \Traversable
+                {
+                    return $this->cachedIterator ??= new \ArrayObject(iterator_to_array($this->middlewareHandlers, false));
+                }
+            }]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Middleware/DispatchAfterCurrentBusMiddleware.php">
+    <InvalidArgument>
+      <code><![CDATA[$queueLengthBefore]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Middleware/HandleMessageMiddleware.php">
+    <InvalidThrow>
+      <code><![CDATA[]]></code>
+    </InvalidThrow>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Test/Middleware/MiddlewareTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Transport/Serialization/PhpSerializer.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[';' === $sep]]></code>
+      <code><![CDATA['E' === $kind]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Transport/Serialization/Serializer.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->classToTypeMap = array_flip($this->typeToClassMap)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Mime/Crypto/SMimeSigner.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->extraCerts = $extraCerts ? realpath($extraCerts) : null]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Mime/Header/ParameterizedHeader.php">
+    <InvalidArgument>
+      <code><![CDATA[array_merge($this->getParameters(), [$parameter => $value])]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailAddressContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$message->getHeaders()]]></code>
+      <code><![CDATA[$message->getHeaders()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailAttachmentCount.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$message->getAttachments()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailHasHeader.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$message->getHeaders()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailHeaderSame.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailHtmlBodyContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$message->getHtmlBody()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailSubjectContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Mime/Test/Constraint/EmailTextBodyContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$message->getTextBody()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Bridge/Clickatell/ClickatellTransport.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $this->from]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Bridge/MicrosoftTeams/Test/Action/Input/AbstractInputTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Bridge/RingCentral/RingCentralTransport.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $this->from]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Exception/IncompleteDsnException.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->dsn;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Notifier/FlashMessage/AbstractFlashMessageImportanceMapper.php">
+    <UndefinedConstant>
+      <code><![CDATA[static::IMPORTANCE_MAP]]></code>
+      <code><![CDATA[static::IMPORTANCE_MAP]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Test/AbstractTransportFactoryTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Test/Constraint/NotificationCount.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Test/Constraint/NotificationIsQueued.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Test/Constraint/NotificationSubjectContains.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Test/Constraint/NotificationTransportIsEqual.php">
+    <UndefinedClass>
+      <code><![CDATA[Constraint]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Test/TransportTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Transport/RoundRobinTransport.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $transport->send($message);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Notifier/Transport/Transports.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $transport->send($message);]]></code>
+      <code><![CDATA[return $this->transports[$transport]->send($message);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/ObjectMapper/Condition/SourceClass.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->sources = \is_array($className) ? $className : [$className]]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/ObjectMapper/Condition/TargetClass.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->targets = \is_array($className) ? $className : [$className]]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/ObjectMapper/ObjectMapper.php">
+    <InvalidArgument>
+      <code><![CDATA[$if]]></code>
+      <code><![CDATA[$if]]></code>
+      <code><![CDATA[$transform]]></code>
+    </InvalidArgument>
+    <InvalidTemplateParam>
+      <code><![CDATA[$this->propertyAccessor->setValue($mappedTarget, $property, $value)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/OptionsResolver/Debug/OptionsResolverIntrospector.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->get = \Closure::bind(function ($property, $option, $message) {
+            /** @var OptionsResolver $this */
+            if (!$this->isDefined($option)) {
+                throw new UndefinedOptionsException(\sprintf('The option "%s" does not exist.', $option));
+            }
+
+            if (!\array_key_exists($option, $this->{$property})) {
+                throw new NoConfigurationException($message);
+            }
+
+            return $this->{$property}[$option];
+        }, $optionsResolver, $optionsResolver)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/OptionsResolver/OptionConfigurator.php">
+    <InvalidArgument>
+      <code><![CDATA[$nested]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/OptionsResolver/OptionsResolver.php">
+    <InvalidReturnType>
+      <code><![CDATA[return array_keys(array_diff_key($this->required, $this->defaults));]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/PasswordHasher/Hasher/NativePasswordHasher.php">
+    <UndefinedFunction>
+      <code><![CDATA[\Sodium\crypto_pwhash_str_verify($hashedPassword, $plainPassword)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/PasswordHasher/Hasher/SodiumPasswordHasher.php">
+    <UndefinedFunction>
+      <code><![CDATA[\Sodium\crypto_pwhash_str($plainPassword, $this->opsLimit, $this->memLimit)]]></code>
+      <code><![CDATA[\Sodium\crypto_pwhash_str_verify($hashedPassword, $plainPassword)]]></code>
+      <code><![CDATA[\Sodium\crypto_pwhash_str_needs_rehash($hashedPassword, $this->opsLimit, $this->memLimit)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/Process/PhpExecutableFinder.php">
+    <InvalidArgument>
+      <code><![CDATA[false]]></code>
+    </InvalidArgument>
+    <NullableReturnStatement>
+      <code><![CDATA[return $php;]]></code>
+      <code><![CDATA[return $this->executableFinder->find('php', false, $dirs);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Process/PhpProcess.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $this->getCommandLine()]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Process/PhpSubprocess.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $this->getCommandLine()]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Process/Pipes/AbstractPipes.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->inputBuffer = $input]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Process/Process.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->cwd = getcwd()]]></code>
+      <code><![CDATA[$this->incrementalOutputOffset = ftell($this->stdout)]]></code>
+      <code><![CDATA[$this->incrementalOutputOffset = ftell($this->stdout)]]></code>
+      <code><![CDATA[$this->incrementalErrorOutputOffset = ftell($this->stderr)]]></code>
+      <code><![CDATA[$this->incrementalErrorOutputOffset = ftell($this->stderr)]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->exitcode;]]></code>
+      <code><![CDATA[return $this->starttime;]]></code>
+      <code><![CDATA[return $this->exitcode;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/PropertyAccess/PropertyAccessor.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$defaultLifetime / 5]]></code>
+    </ImplicitFloatToIntCast>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->writePropertyCache[$key] = $mutator;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/PropertyInfo/Extractor/PhpStanExtractor.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $var->variableName]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[$constExprParser = new ConstExprParser(true, true)]]></code>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[new TypeParser($constExprParser = new ConstExprParser(true, true), true)]]></code>
+      <code><![CDATA[$constExprParser]]></code>
+    </InvalidArgument>
+    <TooFewArguments>
+      <code><![CDATA[new PhpDocParser(new TypeParser($constExprParser = new ConstExprParser(true, true), true), $constExprParser)]]></code>
+      <code><![CDATA[new Lexer()]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/PropertyInfo/Util/PhpDocTypeHelper.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[Type::nullable($type)]]></code>
+      <code><![CDATA[Type::collection($type, $value, $key)]]></code>
+      <code><![CDATA[Type::generic($type, ...array_filter($variableTypes))]]></code>
+      <code><![CDATA[Type::collection($type, $value, $key)]]></code>
+      <code><![CDATA[Type::generic($type, ...$variableTypes)]]></code>
+    </InvalidTemplateParam>
+    <UndefinedClass>
+      <code><![CDATA[Collection]]></code>
+      <code><![CDATA[LegacyScalar]]></code>
+      <code><![CDATA[Collection]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$docType->getFqsen()]]></code>
+      <code><![CDATA[$docType->getValueType()]]></code>
+      <code><![CDATA[$docType->getValueType()]]></code>
+      <code><![CDATA[$docType->getKeyType()]]></code>
+      <code><![CDATA[$docType->getKeyType()]]></code>
+      <code><![CDATA[$docType->getValueType()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/RateLimiter/CompoundLimiter.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $minimalRateLimit;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/RateLimiter/Policy/Rate.php">
+    <InvalidArgument>
+      <code><![CDATA[$rate]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Routing/Matcher/Dumper/CompiledUrlMatcherDumper.php">
+    <InvalidArgument>
+      <code><![CDATA[[__CLASS__, 'export']]]></code>
+      <code><![CDATA[[__CLASS__, 'export']]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Routing/RouteCollection.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/Routing/RouteCompiler.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$pos]]></code>
+      <code><![CDATA[$pos]]></code>
+      <code><![CDATA[$pos]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Component/Routing/Router.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->matcher = new $this->options['matcher_class']($routes, $this->context)]]></code>
+      <code><![CDATA[$this->matcher = new $this->options['matcher_class'](self::getCompiledRoutes($cache->getPath()), $this->context)]]></code>
+      <code><![CDATA[$this->generator = new $this->options['generator_class']($routes, $this->context, $this->logger, $this->defaultLocale)]]></code>
+      <code><![CDATA[$this->generator = new $this->options['generator_class'](self::getCompiledRoutes($cache->getPath()), $this->context, $this->logger, $this->defaultLocale)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Runtime/Internal/ComposerPlugin.php">
+    <UndefinedClass>
+      <code><![CDATA[PluginInterface]]></code>
+      <code><![CDATA[EventSubscriberInterface]]></code>
+      <code><![CDATA[Composer]]></code>
+      <code><![CDATA[IOInterface]]></code>
+      <code><![CDATA[Composer]]></code>
+      <code><![CDATA[IOInterface]]></code>
+      <code><![CDATA[Composer]]></code>
+      <code><![CDATA[IOInterface]]></code>
+      <code><![CDATA[Composer]]></code>
+      <code><![CDATA[IOInterface]]></code>
+      <code><![CDATA[Factory]]></code>
+      <code><![CDATA[ScriptEvents]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Runtime/Runner/FrankenPhpWorkerRunner.php">
+    <UndefinedFunction>
+      <code><![CDATA[frankenphp_handle_request($handler)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/Scheduler/Trigger/CallbackTrigger.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->description = $description ?? spl_object_id($this->callback)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Scheduler/Trigger/CronExpressionTrigger.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->expression->getExpression();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Scheduler/Trigger/PeriodicalTrigger.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false === $i]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Security/Core/Authorization/AccessDecisionManager.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$vote->voter = $voter instanceof \Stringable ? $voter : get_debug_type($voter)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Security/Core/Test/AccessDecisionStrategyTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Security/Csrf/SameOriginCsrfTokenManager.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->tokenIds = array_flip($tokenIds)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/EventListener/LoginThrottlingListener.php">
+    <InvalidArgument>
+      <code><![CDATA[ceil(($limit->getRetryAfter()->getTimestamp() - time()) / 60)]]></code>
+      <code><![CDATA[ceil(($limit->getRetryAfter()->getTimestamp() - time()) / 60)]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/Firewall.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $exceptionListener]]></code>
+      <code><![CDATA[null !== $logoutListener]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/Firewall/ContextListener.php">
+    <UndefinedClass>
+      <code><![CDATA[LazyLoadingInterface]]></code>
+    </UndefinedClass>
+    <UndefinedMethod>
+      <code><![CDATA[$user->isProxyInitialized()]]></code>
+      <code><![CDATA[$user->initializeProxy()]]></code>
+      <code><![CDATA[$refreshedUser->getSalt()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/Firewall/SwitchUserListener.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $original;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/FirewallMap.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $elements[0]]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/LoginLink/LoginLinkHandler.php">
+    <InvalidArgument>
+      <code><![CDATA[$expires]]></code>
+      <code><![CDATA[$expires]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Security/Http/RememberMe/PersistentRememberMeHandler.php">
+    <InvalidArgument>
+      <code><![CDATA[$tokenValue]]></code>
+      <code><![CDATA[$tokenValue]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Semaphore/Store/RedisStore.php">
+    <InvalidArgument>
+      <code><![CDATA[array_merge([$resource], $args)]]></code>
+      <code><![CDATA[array_merge([$resource], $args)]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Context/ContextBuilderTrait.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$instance->context = array_merge($this->context, [$key => $value])]]></code>
+      <code><![CDATA[$instance->context = array_merge($this->context, $context)]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Encoder/XmlEncoder.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$dom->appendChild($root)]]></code>
+      <code><![CDATA[$node->appendChild($nodeText)]]></code>
+      <code><![CDATA[$parentNode->appendChild($node)]]></code>
+      <code><![CDATA[$node->appendChild($child)]]></code>
+      <code><![CDATA[$node->appendChild($child)]]></code>
+    </InvalidTemplateParam>
+    <NullableReturnStatement>
+      <code><![CDATA[return $node->nodeValue;]]></code>
+      <code><![CDATA[return $node->firstChild->nodeValue;]]></code>
+    </NullableReturnStatement>
+    <UndefinedMethod>
+      <code><![CDATA[$parentNode->setAttribute($attributeName, $data)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Mapping/Loader/XmlFileLoader.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return simplexml_import_dom($dom);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Normalizer/AbstractNormalizer.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $allowedAttributes;]]></code>
+    </InvalidReturnType>
+    <NullableReturnStatement>
+      <code><![CDATA[return $instance;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Normalizer/AbstractObjectNormalizer.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $attributesMetadata]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[static fn (Type $c) => $c instanceof CollectionType]]></code>
+    </InvalidArgument>
+    <InvalidTemplateParam>
+      <code><![CDATA[Type::object($parameterType->getName())]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Normalizer/ArrayDenormalizer.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$t->getTypeIdentifier()]]></code>
+    </InvalidTemplateParam>
+    <UndefinedClass>
+      <code><![CDATA[LegacyType]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Normalizer/DataUriNormalizer.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $object->getMimeType();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Serializer/Normalizer/NumberNormalizer.php">
+    <InvalidCast>
+      <code><![CDATA[$data]]></code>
+    </InvalidCast>
+    <UnhandledMatchCondition>
+      <code><![CDATA[match ($type) {
+            Number::class => 'The data must be a "string" representing a decimal number, or an "int".',
+            \GMP::class => 'The data must be a "string" representing an integer, or an "int".',
+        }]]></code>
+    </UnhandledMatchCondition>
+  </file>
+  <file src="src/Symfony/Component/String/AbstractString.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $chunks;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/String/AbstractUnicodeString.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string, $compat ? \Normalizer::NFKC : \Normalizer::NFC)]]></code>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string, \Normalizer::NFKC_CF)]]></code>
+      <code><![CDATA[$str->string = $transliterator->transliterate($str->string)]]></code>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
+      <code><![CDATA[$str->string = $transliterator->transliterate($str->string)]]></code>
+      <code><![CDATA[$str->string = $transliterator->transliterate($str->string)]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return $codePoints;]]></code>
+    </InvalidReturnType>
+    <UndefinedVariable>
+      <code><![CDATA[$matches]]></code>
+      <code><![CDATA[$matches]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/String/ByteString.php">
+    <UndefinedVariable>
+      <code><![CDATA[$matches]]></code>
+      <code><![CDATA[$matches]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/String/LazyString.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $arguments]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/String/UnicodeString.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string)]]></code>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
+      <code><![CDATA[$str->string = normalizer_normalize($str->string)]]></code>
+      <code><![CDATA[$str->string = grapheme_substr($tail, 0, $i)]]></code>
+      <code><![CDATA[$this->string = normalizer_normalize($this->string)]]></code>
+      <code><![CDATA[$this->string = normalizer_normalize($this->string)]]></code>
+    </InvalidPropertyAssignment>
+    <NullableReturnStatement>
+      <code><![CDATA[return grapheme_strlen($this->string);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Translation/Bridge/Loco/LocoProvider.php">
+    <InvalidArgument>
+      <code><![CDATA[$responses[$response] = [
+                    'locale' => $locale,
+                    'domain' => $domain,
+                    'previousCatalogue' => $previousCatalogue,
+                ]]]></code>
+      <code><![CDATA[$responses[$this->client->request('DELETE', \sprintf('assets/%s.json', rawurlencode($id)))] = $id]]></code>
+      <code><![CDATA[$responses[$response] = [
+                    'tag' => $tag,
+                    'assetId' => $id,
+                ]]]></code>
+      <code><![CDATA[$responses[$response] = [
+                'tag' => $tag,
+                'assetId' => null,
+            ]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Translation/Bridge/Lokalise/LokaliseProvider.php">
+    <UndefinedVariable>
+      <code><![CDATA[$h]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/Translation/DataCollectorTranslator.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->translator->getFallbackLocales()]]></code>
+      <code><![CDATA[$this->translator->getGlobalParameters()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Translation/Dumper/XliffFileDumper.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$t->appendChild($text)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/Translation/Extractor/Visitor/TransMethodVisitor.php">
+    <UndefinedMethod>
+      <code><![CDATA[$node->name->getLast()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Translation/Loader/XliffFileLoader.php">
+    <UndefinedMethod>
+      <code><![CDATA[$child->getAttribute('disp')]]></code>
+      <code><![CDATA[$child->getAttribute('hex')]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Translation/LoggingTranslator.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->translator->getFallbackLocales()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/Translation/Provider/Dsn.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->scheme;]]></code>
+      <code><![CDATA[return $this->host;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Translation/Test/AbstractProviderFactoryTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Translation/Test/ProviderTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[MockObject]]></code>
+      <code><![CDATA[MockObject]]></code>
+      <code><![CDATA[MockObject]]></code>
+      <code><![CDATA[MockObject]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Translation/Translator.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $id]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Translation/TranslatorBag.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null !== $existingCatalogue = $this->getCatalogue($catalogue->getLocale())]]></code>
+      <code><![CDATA[null === $diffCatalogue = $diffBag->getCatalogue($locale)]]></code>
+      <code><![CDATA[null === $intersectCatalogue = $intersectBag->getCatalogue($locale)]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[AbstractOperation::NEW_BATCH]]></code>
+      <code><![CDATA[AbstractOperation::OBSOLETE_BATCH]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Translation/Util/XliffUtils.php">
+    <InvalidArgument>
+      <code><![CDATA[$namespace]]></code>
+    </InvalidArgument>
+    <NullableReturnStatement>
+      <code><![CDATA[return $version->nodeValue;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Tui/Focus/FocusManager.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $this->focusables;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Tui/Render/LayoutEngine.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$total]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Component/Tui/Style/Style.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->ansiPrefix;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Tui/Widget/ContainerWidget.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->isVerticallyExpandedCache;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Tui/Widget/ProgressBarWidget.php">
+    <InvalidArgument>
+      <code><![CDATA[$this]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/Type.php">
+    <InvalidArgument>
+      <code><![CDATA[$specification]]></code>
+      <code><![CDATA[$specification]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$specification]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/Type/ArrayShapeType.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[self::generic(self::builtin(TypeIdentifier::ARRAY), $keyType, $valueType)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/Type/CollectionType.php">
+    <InvalidArgument>
+      <code><![CDATA[static fn (Type $t): bool => $t instanceof BuiltinType]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/TypeContext/TypeContextFactory.php">
+    <InvalidArgument>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[$constExprParser = new ConstExprParser(true, true)]]></code>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[new TypeParser($constExprParser = new ConstExprParser(true, true), true)]]></code>
+      <code><![CDATA[$constExprParser]]></code>
+    </InvalidArgument>
+    <TooFewArguments>
+      <code><![CDATA[new Lexer()]]></code>
+      <code><![CDATA[new PhpDocParser(new TypeParser($constExprParser = new ConstExprParser(true, true), true), $constExprParser)]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/TypeResolver/PhpDocAwareReflectionTypeResolver.php">
+    <InvalidArgument>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[$constExprParser = new ConstExprParser(true, true)]]></code>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[new TypeParser($constExprParser = new ConstExprParser(true, true), true)]]></code>
+      <code><![CDATA[$constExprParser]]></code>
+    </InvalidArgument>
+    <TooFewArguments>
+      <code><![CDATA[new Lexer()]]></code>
+      <code><![CDATA[new PhpDocParser(
+                new TypeParser($constExprParser = new ConstExprParser(true, true), true),
+                $constExprParser,
+            )]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/TypeResolver/ReflectionTypeResolver.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[Type::intersection(...array_map(fn (mixed $t): Type => $this->resolve($t, $typeContext), $subject->getTypes()))]]></code>
+      <code><![CDATA[Type::builtin($identifier)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/Symfony/Component/TypeInfo/TypeResolver/StringTypeResolver.php">
+    <InvalidArgument>
+      <code><![CDATA[true]]></code>
+      <code><![CDATA[new ConstExprParser(true, true)]]></code>
+      <code><![CDATA[true]]></code>
+    </InvalidArgument>
+    <InvalidTemplateParam>
+      <code><![CDATA[Type::collection($type)]]></code>
+      <code><![CDATA[Type::generic($type, $keyType, $variableTypes[0])]]></code>
+      <code><![CDATA[Type::collection($type, $variableTypes[1], $variableTypes[0], $asList)]]></code>
+      <code><![CDATA[Type::collection($type, $variableTypes[0])]]></code>
+      <code><![CDATA[Type::collection($type, $variableTypes[1], $variableTypes[0])]]></code>
+      <code><![CDATA[Type::collection($type)]]></code>
+      <code><![CDATA[Type::generic($type, ...$variableTypes)]]></code>
+      <code><![CDATA[Type::intersection(...array_map(fn (TypeNode $t): Type => $this->getTypeFromNode($t, $typeContext), $node->types))]]></code>
+      <code><![CDATA[Type::object($className)]]></code>
+    </InvalidTemplateParam>
+    <TooFewArguments>
+      <code><![CDATA[new Lexer()]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/Symfony/Component/Uid/Factory/TimeBasedUuidFactory.php">
+    <UndefinedClass>
+      <code><![CDATA[$class]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Uid/Ulid.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$rand = $r]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Uid/UuidV6.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[10000 * hexdec(substr($uuid, 20, 3)) + substr($time, -4)]]></code>
+    </ImplicitFloatToIntCast>
+    <InvalidArgument>
+      <code><![CDATA[$ms]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Uid/UuidV7.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$rand = unpack(\PHP_INT_SIZE >= 8 ? 'L*' : 'S*', isset(self::$seed) ? random_bytes(8) : self::$seed = random_bytes(16))]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Validator/ConstraintViolationList.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[getiterator]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/DateValidator.php">
+    <InvalidArgument>
+      <code><![CDATA[$matches['year'] ?? $matches[1]]]></code>
+      <code><![CDATA[$matches['month'] ?? $matches[2]]]></code>
+      <code><![CDATA[$matches['day'] ?? $matches[3]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/EmailValidator.php">
+    <InvalidArgument>
+      <code><![CDATA[false]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/File.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->maxSize = $matches[1] * $factors[$unit = strtolower($matches[2])]]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/FileValidator.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[$coef]]></code>
+    </ImplicitFloatToIntCast>
+    <InvalidArgument>
+      <code><![CDATA[$double]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/GroupSequence.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->groups = $groups]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/LengthValidator.php">
+    <InvalidArgument>
+      <code><![CDATA[$length]]></code>
+      <code><![CDATA[$length]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/TimeValidator.php">
+    <InvalidArgument>
+      <code><![CDATA[$matches[1]]]></code>
+      <code><![CDATA[$matches[2]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/WeekValidator.php">
+    <InvalidArgument>
+      <code><![CDATA[$year]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Constraints/ZeroComparisonConstraintTrait.php">
+    <ParentNotFound>
+      <code><![CDATA[parent]]></code>
+    </ParentNotFound>
+  </file>
+  <file src="src/Symfony/Component/Validator/Mapping/ClassMetadata.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->traversalStrategy = $source->getTraversalStrategy()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Validator/Mapping/Loader/AttributeLoader.php">
+    <InvalidArgument>
+      <code><![CDATA[$constraint->groups]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Validator/Mapping/Loader/XmlFileLoader.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return simplexml_import_dom($dom);]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Validator/Test/CompoundConstraintTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[ExpectationFailedException]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Validator/Test/ConstraintValidatorTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+      <code><![CDATA[IsNull]]></code>
+      <code><![CDATA[IsIdentical]]></code>
+      <code><![CDATA[IsInstanceOf]]></code>
+      <code><![CDATA[LogicalOr]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[ExpectationFailedException]]></code>
+      <code><![CDATA[ExpectationFailedException]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[ExpectationFailedException]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+      <code><![CDATA[Assert]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Validator/Validation.php">
+    <UndefinedVariable>
+      <code><![CDATA[$violations]]></code>
+      <code><![CDATA[$violations]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/DOMCaster.php">
+    <UndefinedClass>
+      <code><![CDATA[\Dom\Exception]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/DoctrineCaster.php">
+    <UndefinedClass>
+      <code><![CDATA[CommonProxy]]></code>
+      <code><![CDATA[OrmProxy]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/FFICaster.php">
+    <UndefinedMethod>
+      <code><![CDATA[$ffi->zend_get_page_size()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/ImagineCaster.php">
+    <UndefinedClass>
+      <code><![CDATA[ImageInterface]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/PgSqlCaster.php">
+    <NullArgument>
+      <code><![CDATA[null]]></code>
+      <code><![CDATA[null]]></code>
+    </NullArgument>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/ProxyManagerCaster.php">
+    <UndefinedClass>
+      <code><![CDATA[ProxyInterface]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/RdKafkaCaster.php">
+    <UndefinedClass>
+      <code><![CDATA[KafkaConsumer]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[Topic]]></code>
+      <code><![CDATA[TopicPartition]]></code>
+      <code><![CDATA[Message]]></code>
+      <code><![CDATA[Conf]]></code>
+      <code><![CDATA[TopicConf]]></code>
+      <code><![CDATA[\RdKafka]]></code>
+      <code><![CDATA[CollectionMetadata]]></code>
+      <code><![CDATA[TopicMetadata]]></code>
+      <code><![CDATA[PartitionMetadata]]></code>
+      <code><![CDATA[BrokerMetadata]]></code>
+      <code><![CDATA[KafkaConsumer]]></code>
+      <code><![CDATA[\RdKafka]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/ResourceCaster.php">
+    <InvalidCast>
+      <code><![CDATA[$dba]]></code>
+    </InvalidCast>
+    <UndefinedClass>
+      <code><![CDATA[\Dba\Connection]]></code>
+    </UndefinedClass>
+    <UndefinedFunction>
+      <code><![CDATA[dba_list()]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/SymfonyCaster.php">
+    <UndefinedConstant>
+      <code><![CDATA[LazyObjectState::STATUS_INITIALIZED_FULL]]></code>
+      <code><![CDATA[LazyObjectState::STATUS_INITIALIZED_PARTIAL]]></code>
+      <code><![CDATA[LazyObjectState::STATUS_UNINITIALIZED_FULL]]></code>
+      <code><![CDATA[LazyObjectState::STATUS_UNINITIALIZED_PARTIAL]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/UuidCaster.php">
+    <UndefinedClass>
+      <code><![CDATA[UuidInterface]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Caster/XmlReaderCaster.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$info[$props]->cut = $count]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Cloner/Data.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$item->type = $item->class]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/VarDumper/Dumper/HtmlDumper.php">
+    <InvalidStaticInvocation>
+      <code><![CDATA[AbstractDumper::dumpLine(0)]]></code>
+      <code><![CDATA[AbstractDumper::dumpLine($depth)]]></code>
+    </InvalidStaticInvocation>
+  </file>
+  <file src="src/Symfony/Component/VarExporter/Internal/LazyDecoratorTrait.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $this->lazyObjectState->realInstance;]]></code>
+    </InvalidReturnType>
+    <TraitConstantAccessedDirectly>
+      <code><![CDATA[$class::LAZY_OBJECT_PROPERTY_SCOPES]]></code>
+    </TraitConstantAccessedDirectly>
+  </file>
+  <file src="src/Symfony/Component/VarExporter/Internal/Registry.php">
+    <UndefinedVariable>
+      <code><![CDATA[$name]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/WebLink/Link.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$that->href = $href]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Symfony/Component/Webhook/Client/AbstractRequestParser.php">
+    <InvalidCatch>
+      <code><![CDATA[]]></code>
+    </InvalidCatch>
+  </file>
+  <file src="src/Symfony/Component/Webhook/Test/AbstractRequestParserTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Component/Workflow/Event/GuardEvent.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return parent::getTransition();]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Workflow/MarkingStore/MethodMarkingStore.php">
+    <InvalidMethodCall>
+      <code><![CDATA[$type->getName()]]></code>
+    </InvalidMethodCall>
+  </file>
+  <file src="src/Symfony/Component/Yaml/Command/LintCommand.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[null === $this->format]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Symfony/Component/Yaml/Exception/ParseException.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->snippet;]]></code>
+      <code><![CDATA[return $this->parsedFile;]]></code>
+    </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Yaml/Inline.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false !== $scalar = $time->getTimestamp()]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidReturnType>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return (object) $output;]]></code>
+    </InvalidReturnType>
+    <UndefinedVariable>
+      <code><![CDATA[$length]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/Symfony/Component/Yaml/Unescaper.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[hexdec(substr($value, 2, 2))]]></code>
+      <code><![CDATA[hexdec(substr($value, 2, 4))]]></code>
+      <code><![CDATA[hexdec(substr($value, 2, 8))]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
+  <file src="src/Symfony/Contracts/HttpClient/Test/Fixtures/web/index.php">
+    <TaintedHeader>
+      <code><![CDATA[header('X-Request-Vars: '.json_encode($vars, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE))]]></code>
+      <code><![CDATA[header('Location: '.$location, true, 302)]]></code>
+      <code><![CDATA[header($header)]]></code>
+    </TaintedHeader>
+    <TaintedHtml>
+      <code><![CDATA[echo $output;]]></code>
+      <code><![CDATA[echo json_encode([]]></code>
+      <code><![CDATA[echo $json;]]></code>
+    </TaintedHtml>
+  </file>
+  <file src="src/Symfony/Contracts/HttpClient/Test/HttpClientTestCase.php">
+    <InvalidArgument>
+      <code><![CDATA[123]]></code>
+    </InvalidArgument>
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Contracts/Service/ServiceSubscriberTrait.php">
+    <UndefinedMethod>
+      <code><![CDATA[$attribute->newInstance()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Symfony/Contracts/Service/Test/ServiceLocatorTestCase.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Contracts/Tests/Cache/CacheTraitTest.php">
+    <InvalidReturnType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </InvalidReturnType>
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Contracts/Tests/Service/LegacyTestService.php">
+    <InvalidReturnType>
+      <code><![CDATA[]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Contracts/Tests/Service/ServiceMethodsSubscriberTraitTest.php">
+    <InvalidReturnType>
+      <code><![CDATA[]]></code>
+    </InvalidReturnType>
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Contracts/Tests/Service/ServiceSubscriberTraitTest.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Symfony/Contracts/Translation/Test/TranslatorTest.php">
+    <UndefinedClass>
+      <code><![CDATA[TestCase]]></code>
+    </UndefinedClass>
+  </file>
+</files>
