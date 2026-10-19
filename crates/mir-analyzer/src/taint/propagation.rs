@@ -374,18 +374,30 @@ pub fn expr_taint(
         }
 
         ExprKind::Binary(op) => {
-            expr_taint(&op.left, ctx, db, file) | expr_taint(&op.right, ctx, db, file)
+            let taint = expr_taint(&op.left, ctx, db, file) | expr_taint(&op.right, ctx, db, file);
+            if op.op == php_ast::ast::BinaryOp::Concat && starts_with_fixed_url_origin(&op.left) {
+                taint.without(Taint::SSRF | Taint::FILE)
+            } else {
+                taint
+            }
         }
 
         ExprKind::UnaryPrefix(u) => expr_taint(&u.operand, ctx, db, file),
 
         ExprKind::InterpolatedString(parts)
         | ExprKind::Heredoc { parts, .. }
-        | ExprKind::ShellExec(parts) => parts.iter().fold(Taint::NONE, |acc, p| match p {
-            StringPart::Expr(e) => acc | expr_taint(e, ctx, db, file),
-            StringPart::Literal(_) => acc,
-            _ => acc,
-        }),
+        | ExprKind::ShellExec(parts) => {
+            let taint = parts.iter().fold(Taint::NONE, |acc, p| match p {
+                StringPart::Expr(e) => acc | expr_taint(e, ctx, db, file),
+                StringPart::Literal(_) => acc,
+                _ => acc,
+            });
+            if !matches!(expr.kind, ExprKind::ShellExec(_)) && starts_with_fixed_url_origin(expr) {
+                taint.without(Taint::SSRF | Taint::FILE)
+            } else {
+                taint
+            }
+        }
 
         // Short ternary (`$x ?: $y`): the true branch's value is the condition itself.
         ExprKind::Ternary(t) => {

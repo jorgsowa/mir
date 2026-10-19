@@ -118,7 +118,7 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
         // Strips directory components, so the value can't traverse out of its directory.
         "basename" => Taint::FILE,
         // Output is limited to `[A-Za-z0-9%+._~-]`.
-        "urlencode" | "rawurlencode" => {
+        "urlencode" | "rawurlencode" | "http_build_query" => {
             Taint::HTML
                 | Taint::SQL
                 | Taint::SHELL
@@ -133,6 +133,50 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
         | "dechex" | "decbin" | "decoct" | "number_format" | "uniqid" => Taint::ALL,
         _ => return None,
     })
+}
+
+/// Whether the literal text opens with `http(s)://host/` (or `ftp(s)`), fixing scheme and host
+/// so whatever is appended lands in the path or query. `host` must end at a `/`, `?` or `#`.
+fn is_fixed_url_origin(literal: &str) -> bool {
+    let Some((scheme, rest)) = literal.split_once("://") else {
+        return false;
+    };
+    if !["http", "https", "ftp", "ftps"]
+        .iter()
+        .any(|s| scheme.eq_ignore_ascii_case(s))
+    {
+        return false;
+    }
+    match rest.find(['/', '?', '#']) {
+        Some(end) => {
+            let host = &rest[..end];
+            !host.is_empty() && !host.contains(['@', '\\', ' '])
+        }
+        None => false,
+    }
+}
+
+/// Whether the expression is a string that starts with a fixed `scheme://host/` origin.
+pub(super) fn starts_with_fixed_url_origin(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::String(s) => is_fixed_url_origin(s),
+        ExprKind::Parenthesized(inner) => starts_with_fixed_url_origin(inner),
+        ExprKind::Binary(b) if matches!(b.op, php_ast::ast::BinaryOp::Concat) => {
+            starts_with_fixed_url_origin(&b.left)
+        }
+        ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
+            // Adjacent literal parts form one run; stop at the first interpolation.
+            let mut prefix = String::new();
+            for part in parts.iter() {
+                match part {
+                    StringPart::Literal(l) => prefix.push_str(l),
+                    _ => break,
+                }
+            }
+            is_fixed_url_origin(&prefix)
+        }
+        _ => false,
+    }
 }
 
 /// Taint kinds a decoding builtin restores on already-tainted input.

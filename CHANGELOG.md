@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A string starting with a literal `http(s)://host/` or `ftp(s)://host/` (`curl_init('https://api.example.com/users/' . urlencode($id))`) no longer reports SSRF or file sinks for the appended data; a tainted host, scheme or authority terminator still does, and `http_build_query()` output is treated as URL-encoded.
 - `new` of a subclass that overrides `__construct` (`class BillingClient extends SoapClient`) or of `SplTempFileObject` no longer reports its first argument as a file or SSRF sink; only the stub constructor is one.
 - A spread of an array literal (`f(...['title' => $t, 'body' => 'b'])`, `f(...[$t, 'b'])`) and `call_user_func()` / `call_user_func_array()` with a literal callback bind each argument to its own parameter by position or name, so taint reaches only the parameters that use it (and the call's result only when the returned parameter is tainted).
 - A variable that held a closure stops using that closure's taint summary once it is rebound by `foreach`, destructuring or a by-reference argument, and a closure no longer snapshots a by-reference captured closure the enclosing scope can reassign (`$f = fn($x) => $x; foreach (['htmlspecialchars'] as $f) echo $f($_GET['x']);` is no longer reported).
