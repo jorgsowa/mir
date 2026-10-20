@@ -466,7 +466,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             rhs_taint
         };
         if let Some(key) = crate::taint::own_property_written(&a.target, ctx, self.db, &self.file) {
-            if !crate::taint::is_injection_safe_type(&rhs_ty) {
+            let plain_this_write = a.op == AssignOp::Assign
+                && !a.by_ref
+                && matches!(&a.target.kind, ExprKind::PropertyAccess(pa)
+                    if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this"));
+            if plain_this_write {
+                self.taint_summary.note_prop_overwrite(key);
+            } else if !crate::taint::is_injection_safe_type(&rhs_ty) {
                 self.taint_summary.record_prop_write(key, rhs_taint);
             }
         }
@@ -625,7 +631,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let ExprKind::Variable(obj_var) = &pa.object.kind {
                             if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                                 let obj_var = obj_var.trim_start_matches('$');
-                                ctx.set_prop_taint(obj_var, &prop_name, rhs_taint);
+                                let stored = if obj_var == "this"
+                                    && crate::taint::is_injection_safe_type(&rhs_ty)
+                                {
+                                    Taint::NONE
+                                } else {
+                                    rhs_taint
+                                };
+                                ctx.set_prop_taint(obj_var, &prop_name, stored);
                             }
                         } else {
                             // `$o->a->b = $tainted` taints `$o->a` as a whole.

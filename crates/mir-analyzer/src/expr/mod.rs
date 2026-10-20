@@ -132,6 +132,22 @@ fn bare_closure() -> Atomic {
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
+    /// A call that can run the class's own code sees the properties as they are now.
+    fn expose_props_to_call(
+        &mut self,
+        target: &php_ast::owned::Expr,
+        args: &[php_ast::owned::Arg],
+        ctx: &FlowState,
+    ) {
+        let is_this = |e: &php_ast::owned::Expr| matches!(&e.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this");
+        let own_class = is_this(target)
+            || matches!(&target.kind, ExprKind::Identifier(n)
+                if ["self", "static", "parent"].iter().any(|k| n.eq_ignore_ascii_case(k)));
+        if own_class || args.iter().any(|a| a.value.as_ref().is_some_and(is_this)) {
+            self.taint_summary.record_overwritten_props(ctx);
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: &'a dyn MirDatabase,
@@ -706,6 +722,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let ty =
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false);
                 ctx.invalidate_escaped_vars();
+                self.expose_props_to_call(&mc.object, &mc.args, ctx);
                 ty
             }
 
@@ -713,6 +730,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let ty =
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true);
                 ctx.invalidate_escaped_vars();
+                self.expose_props_to_call(&mc.object, &mc.args, ctx);
                 ty
             }
 
@@ -721,6 +739,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self, smc, ctx, expr.span,
                 );
                 ctx.invalidate_escaped_vars();
+                self.expose_props_to_call(&smc.class, &smc.args, ctx);
                 ty
             }
 

@@ -36,6 +36,9 @@ pub struct TaintSummary {
     pub return_parts: Taint,
     /// Label slots some `return` carries otherwise, while the body is analyzed.
     pub(super) returned_computed: Taint,
+    /// Properties of `$this` set by a plain assignment while the body is analyzed:
+    /// their `prop_writes` entry is what they hold when the body exits or calls a method.
+    pub(super) overwritten_props: Vec<mir_types::Name>,
 }
 
 impl TaintSummary {
@@ -58,6 +61,28 @@ impl TaintSummary {
         match self.prop_writes.iter_mut().find(|(k, _)| *k == key) {
             Some((_, existing)) => *existing |= taint,
             None => self.prop_writes.push((key, taint)),
+        }
+    }
+
+    pub fn note_prop_overwrite(&mut self, prop: mir_types::Name) {
+        if !self.overwritten_props.contains(&prop) {
+            self.overwritten_props.push(prop);
+        }
+    }
+
+    /// Record what the overwritten properties hold now, at a point where they can be read.
+    pub fn record_overwritten_props(&mut self, ctx: &FlowState) {
+        for i in 0..self.overwritten_props.len() {
+            let prop = self.overwritten_props[i];
+            // The property's own label stands for its old value, which a write doesn't add.
+            let held = self
+                .prop_labels
+                .iter()
+                .filter(|(_, label)| *label == prop)
+                .fold(ctx.prop_taint("this", prop.as_str()), |held, (slot, _)| {
+                    held.without_label(*slot)
+                });
+            self.record_prop_write(prop, held);
         }
     }
 
@@ -390,7 +415,11 @@ pub fn resolve_labels(taint: Taint, slot_taint: impl Fn(usize) -> Taint) -> Tain
 
 /// Take the body's summary; a generator's `return` value isn't the call result.
 pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSummary {
+    if !ctx.diverges {
+        summary.record_overwritten_props(ctx);
+    }
     let mut summary = std::mem::take(summary);
+    summary.overwritten_props.clear();
     if ctx.is_generator {
         summary.returns = Taint::NONE;
     }

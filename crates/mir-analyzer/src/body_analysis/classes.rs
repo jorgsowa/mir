@@ -1305,13 +1305,13 @@ impl<'a> BodyAnalyzer<'a> {
         sa.codebase_symbols_only = self.codebase_symbols_only;
         sa.collect_navigation_facts = self.collect_navigation_facts;
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
+        sa.taint_summary.prop_labels = prop_labels.clone();
         if is_ctor {
             for param in method.params.iter().filter(|p| p.visibility.is_some()) {
                 let name = param.name.as_str().unwrap_or("");
-                sa.taint_summary.record_prop_write(
-                    crate::db::taint_sources::prop_key(name, false),
-                    ctx.var_taint(name),
-                );
+                ctx.set_prop_taint("this", name, ctx.var_taint(name));
+                sa.taint_summary
+                    .note_prop_overwrite(crate::db::taint_sources::prop_key(name, false));
             }
         }
         ctx.is_generator = body_has_yield(&body.stmts);
