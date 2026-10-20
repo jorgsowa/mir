@@ -448,56 +448,6 @@ impl CallAnalyzer {
             }
         };
 
-        // Taint sink check (M19): before evaluating args so we can inspect raw exprs.
-        // A named argument is matched by parameter name, so reordering can't hide it.
-        let fn_name_lower = crate::util::php_ident_lowercase(fn_name.trim_start_matches('\\'));
-        let mut sink_values: Vec<(&php_ast::owned::Expr, SinkKind)> = Vec::new();
-        let format_text = crate::taint::format_text_args(&fn_name_lower, &call.args);
-        for param in crate::taint::builtin_sinks(&fn_name_lower) {
-            if let (Some(text), SinkKind::Html) = (&format_text, param.kind) {
-                sink_values.extend(text.iter().map(|v| (*v, SinkKind::Html)));
-                continue;
-            }
-            if param.kind == SinkKind::Unserialize
-                && crate::taint::unserialize_disallows_classes(&call.args)
-            {
-                continue;
-            }
-            let matches_param = |position: usize, arg: &php_ast::owned::Arg| match &arg.name {
-                Some(name) => crate::parser::name_to_string_owned(name) == param.name,
-                None => param.index.is_none_or(|index| index == position),
-            };
-            let mut position = 0;
-            for arg in call.args.iter() {
-                if param.index.is_none() || matches_param(position, arg) {
-                    sink_values.extend(arg.value.iter().map(|v| (v, param.kind)));
-                }
-                if arg.name.is_none() {
-                    position += 1;
-                }
-            }
-        }
-        sink_values.extend(crate::taint::option_sink_values(&fn_name_lower, &call.args));
-        let mut reported: Vec<SinkKind> = Vec::new();
-        for (value, kind) in sink_values {
-            if reported.contains(&kind) {
-                continue;
-            }
-            let issue = kind.issue();
-            if reaches_sink(
-                value,
-                kind.taint(),
-                &issue,
-                ctx,
-                ea.db,
-                &ea.file,
-                ea.taint_summary,
-            ) {
-                reported.push(kind);
-                ea.emit_taint(issue, span, value, kind.taint(), ctx);
-            }
-        }
-
         // PHP resolves `foo()` as `\App\Ns\foo` first, then `\foo` if not found.
         // A leading `\` means explicit global namespace.
         let was_bare_global_call = fn_name.starts_with('\\') && !fn_name[1..].contains('\\');
@@ -553,6 +503,62 @@ impl CallAnalyzer {
 
         // Resolve once; reused below for by-ref pre-marking and full analysis.
         let resolved = resolve_fn(ea, resolved_fn_name.as_str());
+
+        // A namespaced user function shadowing a builtin name is not that builtin.
+        let fn_name_lower = crate::util::php_ident_lowercase(
+            resolved
+                .as_ref()
+                .map_or(fn_name.as_str(), |r| r.fqn.as_ref())
+                .trim_start_matches('\\'),
+        );
+        // Taint sink check (M19): before evaluating args so we can inspect raw exprs.
+        // A named argument is matched by parameter name, so reordering can't hide it.
+        let mut sink_values: Vec<(&php_ast::owned::Expr, SinkKind)> = Vec::new();
+        let format_text = crate::taint::format_text_args(&fn_name_lower, &call.args);
+        for param in crate::taint::builtin_sinks(&fn_name_lower) {
+            if let (Some(text), SinkKind::Html) = (&format_text, param.kind) {
+                sink_values.extend(text.iter().map(|v| (*v, SinkKind::Html)));
+                continue;
+            }
+            if param.kind == SinkKind::Unserialize
+                && crate::taint::unserialize_disallows_classes(&call.args)
+            {
+                continue;
+            }
+            let matches_param = |position: usize, arg: &php_ast::owned::Arg| match &arg.name {
+                Some(name) => crate::parser::name_to_string_owned(name) == param.name,
+                None => param.index.is_none_or(|index| index == position),
+            };
+            let mut position = 0;
+            for arg in call.args.iter() {
+                if param.index.is_none() || matches_param(position, arg) {
+                    sink_values.extend(arg.value.iter().map(|v| (v, param.kind)));
+                }
+                if arg.name.is_none() {
+                    position += 1;
+                }
+            }
+        }
+        sink_values.extend(crate::taint::option_sink_values(&fn_name_lower, &call.args));
+        let mut reported: Vec<SinkKind> = Vec::new();
+        for (value, kind) in sink_values {
+            if reported.contains(&kind) {
+                continue;
+            }
+            let issue = kind.issue();
+            if reaches_sink(
+                value,
+                kind.taint(),
+                &issue,
+                ctx,
+                ea.db,
+                &ea.file,
+                ea.taint_summary,
+            ) {
+                reported.push(kind);
+                ea.emit_taint(issue, span, value, kind.taint(), ctx);
+            }
+        }
 
         // Pre-mark by-reference parameter variables as defined BEFORE evaluating args
         if let Some(ref resolved) = resolved {

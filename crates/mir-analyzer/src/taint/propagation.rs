@@ -160,6 +160,27 @@ pub fn args_taint(
         .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file))
 }
 
+/// Like `resolve_name`, but honours `use function` imports.
+fn resolve_function_name(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> String {
+    if !name.contains('\\') {
+        if let Some(imported) = db.file_imports(file).get(&mir_types::Name::new(name)) {
+            return imported.as_str().to_string();
+        }
+    }
+    crate::db::resolve_name(db, file, name)
+}
+
+/// An unqualified call that resolves to a namespaced user function of the same name as a builtin.
+fn shadows_builtin(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> bool {
+    if name.contains('\\') {
+        return false;
+    }
+    let resolved = resolve_function_name(db, file, name);
+    resolved.contains('\\')
+        && crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
+            .is_some()
+}
+
 /// Argument positions whose data a builtin's result is built from; `None` when any argument may contribute.
 fn carrying_positions(lower_name: &str) -> Option<&'static [usize]> {
     Some(match lower_name {
@@ -438,8 +459,11 @@ pub fn expr_taint(
                 return closure_call_taint(&closure, &fc.args, ctx, db, file);
             }
             if let ExprKind::Identifier(name) = &fc.name.kind {
-                let lower_name =
-                    crate::util::php_ident_lowercase(name.as_ref().trim_start_matches('\\'));
+                let lower_name = if shadows_builtin(db, file, name.as_ref()) {
+                    String::new()
+                } else {
+                    crate::util::php_ident_lowercase(name.as_ref().trim_start_matches('\\'))
+                };
                 if matches!(
                     lower_name.as_str(),
                     "getallheaders" | "apache_request_headers"
@@ -494,7 +518,7 @@ pub fn expr_taint(
                         },
                     );
                 }
-                let mut resolved = crate::db::resolve_name(db, file, name.as_ref());
+                let mut resolved = resolve_function_name(db, file, name.as_ref());
                 let mut func = crate::db::find_function_from(
                     db,
                     file,
