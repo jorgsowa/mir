@@ -2221,13 +2221,16 @@ pub fn narrow_from_condition(
                     ctx.narrow_var(&var_name, narrowed);
                 } else if !current.is_empty()
                     && !current.is_mixed()
+                    && !current.falsy_stripped
                     && ctx.var_is_defined(&var_name)
                 {
                     // The variable's type can never satisfy this truthiness
                     // constraint → this branch is statically unreachable.
                     // Possibly-undefined variables are exempt: an unset
                     // variable reads as null (falsy), so the branch stays
-                    // reachable at runtime.
+                    // reachable at runtime. So are types with a deliberately
+                    // stripped `false`/`null` failure variant (`falsy_stripped`),
+                    // where `if (!$x)` is a legitimate defensive guard.
                     ctx.diverges = true;
                 }
             } else if let Some((obj_var, prop)) = extract_prop_path_access(expr) {

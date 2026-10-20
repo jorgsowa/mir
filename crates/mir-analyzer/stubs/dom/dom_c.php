@@ -906,8 +906,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * The value of the element. By default, an empty element will be created.
      * You can also set the value later with DOMElement->nodeValue.
      * </p>
-     * @return DOMElement|false A new instance of class DOMElement or false
-     * if an error occurred.
+     * @return DOMElement A new instance of class DOMElement. Invalid names throw.
      * @throws DOMException If invalid $localName
      */
     public function createElement(
@@ -954,7 +953,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * @param string $data <p>
      * The content of the cdata.
      * </p>
-     * @return DOMCDATASection|false The new DOMCDATASection or false if an error occurred.
+     * @return DOMCDATASection The new DOMCDATASection.
      */
     public function createCDATASection(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $data) {}
 
@@ -967,7 +966,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * @param string $data <p>
      * The content of the processing instruction.
      * </p>
-     * @return DOMProcessingInstruction|false The new DOMProcessingInstruction or false if an error occurred.
+     * @return DOMProcessingInstruction The new DOMProcessingInstruction. Invalid targets throw.
      */
     public function createProcessingInstruction(
         #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $target,
@@ -981,7 +980,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * @param string $localName <p>
      * The name of the attribute.
      * </p>
-     * @return DOMAttr|false The new DOMAttr or false if an error occurred.
+     * @return DOMAttr The new DOMAttr. Invalid names throw.
      * @throws DOMException If invalid $localName
      */
     public function createAttribute(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $localName) {}
@@ -994,8 +993,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * the leading &amp; and the trailing
      * ; characters.
      * </p>
-     * @return DOMEntityReference|false The new DOMEntityReference or false if an error
-     * occurred.
+     * @return DOMEntityReference The new DOMEntityReference. Invalid names throw.
      */
     public function createEntityReference(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $name) {}
 
@@ -1047,7 +1045,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * The value of the element. By default, an empty element will be created.
      * You can also set the value later with DOMElement->nodeValue.
      * </p>
-     * @return DOMElement|false The new DOMElement or false if an error occurred.
+     * @return DOMElement The new DOMElement. Invalid names throw.
      * @throws DOMException If invalid $namespace or $qualifiedName
      */
     public function createElementNS(

@@ -435,7 +435,6 @@
       <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerDefinitionDocument($container->getDefinition((string) $service), (string) $service, false, $container)->childNodes->item(0), true))]]></code>
       <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerDefinitionDocument($service, $id, false, $container)->childNodes->item(0), true))]]></code>
       <code><![CDATA[$containerXML->appendChild($containerXML->ownerDocument->importNode($serviceXML->childNodes->item(0), true))]]></code>
-      <code><![CDATA[$descriptionXML->appendChild($dom->createCDATASection($classDescription))]]></code>
       <code><![CDATA[$argumentXML->appendChild($dom->importNode($this->getContainerDefinitionDocument($argument, null, false, $container)->childNodes->item(0), true))]]></code>
       <code><![CDATA[$element->appendChild($element->ownerDocument->importNode($callableXML->childNodes->item(0), true))]]></code>
     </InvalidTemplateParam>
@@ -610,11 +609,6 @@
     <UndefinedMethod>
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Bundle/WebProfilerBundle/EventListener/WebDebugToolbarListener.php">
-    <TaintedHtml>
-      <code><![CDATA[echo $content;]]></code>
-    </TaintedHtml>
   </file>
   <file src="src/Symfony/Bundle/WebProfilerBundle/Profiler/CodeExtension.php">
     <ImpossibleIdenticalComparison>
@@ -3134,9 +3128,6 @@
   </file>
   <file src="src/Symfony/Component/Serializer/Encoder/XmlEncoder.php">
     <InvalidTemplateParam>
-      <code><![CDATA[$dom->appendChild($root)]]></code>
-      <code><![CDATA[$node->appendChild($nodeText)]]></code>
-      <code><![CDATA[$parentNode->appendChild($node)]]></code>
       <code><![CDATA[$node->appendChild($child)]]></code>
       <code><![CDATA[$node->appendChild($child)]]></code>
     </InvalidTemplateParam>
@@ -3271,11 +3262,6 @@
       <code><![CDATA[$this->translator->getFallbackLocales()]]></code>
       <code><![CDATA[$this->translator->getGlobalParameters()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Component/Translation/Dumper/XliffFileDumper.php">
-    <InvalidTemplateParam>
-      <code><![CDATA[$t->appendChild($text)]]></code>
-    </InvalidTemplateParam>
   </file>
   <file src="src/Symfony/Component/Translation/Extractor/Visitor/TransMethodVisitor.php">
     <UndefinedMethod>

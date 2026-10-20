@@ -858,7 +858,7 @@ impl CallAnalyzer {
                     let fqcn_resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     let mut this_self_out = None;
-                    result.merge_with(&resolve_method_return(
+                    let method_return = resolve_method_return(
                         ea,
                         ctx,
                         call,
@@ -874,7 +874,9 @@ impl CallAnalyzer {
                         None,
                         union_has_call_magic || sibling_accepts_arity,
                         union_declares_method,
-                    ));
+                    );
+                    result.falsy_stripped |= method_return.falsy_stripped;
+                    result.merge_with(&method_return);
                     match this_self_out {
                         Some(ty) => {
                             self_out_used = true;
@@ -1212,8 +1214,6 @@ fn resolve_method_return<'a>(
     let resolved = resolve_method_from_db(ea.db, fqcn, &method_name_lower);
 
     if let Some(resolved) = resolved {
-        let dom_create_element_has_valid_literal_name =
-            dom_create_element_has_valid_literal_name(&resolved, call, arg_types);
         if declaring_class.is_none() {
             *declaring_class = Some(resolved.owner_fqcn.clone());
         }
@@ -1940,9 +1940,6 @@ fn resolve_method_return<'a>(
                 )
             },
         );
-        if dom_create_element_has_valid_literal_name {
-            return_ty = return_ty.remove_false();
-        }
         return_ty = crate::generic::bound_unbound_class_string_templates(
             return_ty,
             || crate::db::class_template_params(ea.db, resolved.template_scope.as_ref()),
@@ -1955,6 +1952,9 @@ fn resolve_method_return<'a>(
                 &ctx.template_param_names,
                 native,
             );
+        }
+        if is_throwing_dom_document_factory(&resolved.owner_fqcn, &method_name_lower) {
+            return_ty = return_ty.falsy_stripped();
         }
         ea.apply_method_call_plugins(
             fqcn.as_ref(),
@@ -2053,65 +2053,18 @@ fn resolve_method_return<'a>(
     }
 }
 
-fn dom_create_element_has_valid_literal_name(
-    resolved: &ResolvedMethod,
-    call: &MethodCallExpr,
-    arg_types: &[Type],
-) -> bool {
-    if resolved.owner_fqcn.as_ref() != "DOMDocument"
-        || !resolved.name.eq_ignore_ascii_case("createElement")
-    {
-        return false;
-    }
-    let Some(param_index) = resolved
-        .params
-        .iter()
-        .position(|param| param.name.as_ref() == "localName")
-    else {
-        return false;
-    };
-    let Some(arg_type) =
-        crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, param_index)
-            .and_then(|index| arg_types.get(index))
-    else {
-        return false;
-    };
-
-    !arg_type.types.is_empty()
-        && arg_type.types.iter().all(|atomic| match atomic {
-            Atomic::TLiteralString(name) => is_valid_xml_name(name.as_ref()),
-            _ => false,
-        })
-}
-
-fn is_valid_xml_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars.next().is_some_and(is_xml_name_start_char) && chars.all(is_xml_name_char)
-}
-
-fn is_xml_name_start_char(ch: char) -> bool {
-    matches!(ch,
-        ':' | '_'
-        | 'A'..='Z'
-        | 'a'..='z'
-        | '\u{c0}'..='\u{d6}'
-        | '\u{d8}'..='\u{f6}'
-        | '\u{f8}'..='\u{2ff}'
-        | '\u{370}'..='\u{37d}'
-        | '\u{37f}'..='\u{1fff}'
-        | '\u{200c}'..='\u{200d}'
-        | '\u{2070}'..='\u{218f}'
-        | '\u{2c00}'..='\u{2fef}'
-        | '\u{3001}'..='\u{d7ff}'
-        | '\u{f900}'..='\u{fdcf}'
-        | '\u{fdf0}'..='\u{fffd}'
-        | '\u{10000}'..='\u{effff}'
-    )
-}
-
-fn is_xml_name_char(ch: char) -> bool {
-    is_xml_name_start_char(ch)
-        || matches!(ch, '-' | '.' | '0'..='9' | '\u{b7}' | '\u{300}'..='\u{36f}' | '\u{203f}'..='\u{2040}')
+/// PHP 8 throws `DOMException` instead of returning `false`, but pre-8 code still guards against it.
+fn is_throwing_dom_document_factory(owner: &str, method_lower: &str) -> bool {
+    owner == "DOMDocument"
+        && matches!(
+            method_lower,
+            "createelement"
+                | "createelementns"
+                | "createattribute"
+                | "createcdatasection"
+                | "createprocessinginstruction"
+                | "createentityreference"
+        )
 }
 
 /// Scalar and array atoms: values that can never be an object.

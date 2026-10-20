@@ -1,5 +1,5 @@
 ===description===
-DOMDocument::createElement() returns DOMElement for valid literal XML names.
+DOMDocument::createElement() returns DOMElement for literal and dynamic names alike: PHP 8 throws on an invalid name instead of returning false.
 ===config===
 <mir>
   <issueHandlers>
@@ -34,7 +34,7 @@ $unicode = $document->createElement('élément');
 /** @mir-check $unicode is DOMElement */
 
 $invalid = $document->createElement('not a name');
-/** @mir-check $invalid is DOMElement|false */
+/** @mir-check $invalid is DOMElement */
 
 $dynamic = $document->createElement(runtimeName());
-/** @mir-check $dynamic is DOMElement|false */
+/** @mir-check $dynamic is DOMElement */
