@@ -54,23 +54,50 @@ pub(super) fn receiver_prop_taint(
     receiver: Option<&Expr>,
     prop: mir_types::Name,
     ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) -> Taint {
     match receiver.map(|r| &unwrap_parens(r).kind) {
         Some(ExprKind::Variable(var)) => ctx.prop_taint(var.trim_start_matches('$'), prop.as_str()),
+        Some(ExprKind::New(new)) => constructed_prop_taint(new, prop.as_str(), ctx, db, file),
         _ => Taint::NONE,
     }
 }
 
+/// Taint an inline `new` leaves in `prop` of the object it creates.
+fn constructed_prop_taint(
+    new: &php_ast::owned::NewExpr,
+    prop: &str,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    constructed_prop_taints(new, ctx, db, file)
+        .into_iter()
+        .filter(|(name, _)| name.as_str() == prop)
+        .fold(Taint::NONE, |acc, (_, taint)| acc | taint)
+}
+
 /// Whether the object `receiver` evaluates to holds source data worth a callee
 /// summary; `$this`'s property labels alone would demand one for every call on it.
-pub(super) fn receiver_demands_summary(receiver: Option<&Expr>, ctx: &FlowState) -> bool {
-    let Some(ExprKind::Variable(var)) = receiver.map(|r| &unwrap_parens(r).kind) else {
-        return false;
-    };
-    let var = mir_types::Name::from(var.trim_start_matches('$'));
-    ctx.tainted_props
-        .iter()
-        .any(|((object, _), taint)| *object == var && !taint.concrete().is_empty())
+pub(super) fn receiver_demands_summary(
+    receiver: Option<&Expr>,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    match receiver.map(|r| &unwrap_parens(r).kind) {
+        Some(ExprKind::Variable(var)) => {
+            let var = mir_types::Name::from(var.trim_start_matches('$'));
+            ctx.tainted_props
+                .iter()
+                .any(|((object, _), taint)| *object == var && !taint.concrete().is_empty())
+        }
+        Some(ExprKind::New(new)) => constructed_prop_taints(new, ctx, db, file)
+            .iter()
+            .any(|(_, taint)| !taint.concrete().is_empty()),
+        _ => false,
+    }
 }
 
 /// The part of an argument's taint worth inferring a callee summary for:
@@ -108,7 +135,7 @@ pub(super) fn user_call_taint(
     // arguments or the receiver's tainted properties.
     let worth_summary = || {
         (returns_param() && !demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty())
-            || (receiver_demands_summary(receiver, ctx) && returns_prop())
+            || (receiver_demands_summary(receiver, ctx, db, file) && returns_prop())
             || reads_source()
     };
     let mut taint = match body {
@@ -368,10 +395,11 @@ pub fn expr_taint(
                 }
             }
             // A property of a tainted object (`json_decode($_GET['j'])->name`) is tainted too.
-            let own = match &pa.object.kind {
+            let own = match &unwrap_parens(&pa.object).kind {
                 ExprKind::Variable(obj_var) => {
                     ctx.prop_taint(obj_var.trim_start_matches('$'), &prop_name)
                 }
+                ExprKind::New(new) => constructed_prop_taint(new, &prop_name, ctx, db, file),
                 _ => Taint::NONE,
             };
             let classes = receiver_classes(&pa.object, ctx, db, file);

@@ -288,7 +288,7 @@ impl TaintSummary {
     ) -> Taint {
         let guarded = self.is_object_guard(slot);
         match self.prop_label(slot) {
-            Some(prop) => receiver_prop_taint(receiver, prop, ctx),
+            Some(prop) => receiver_prop_taint(receiver, prop, ctx, db, file),
             None => self
                 .slot_args(slot, params, args, &[], ctx, db, file)
                 .into_iter()

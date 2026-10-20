@@ -49,7 +49,7 @@ pub fn check_call_sinks(
         .collect();
     let mut callee = TaintSummary::default();
     if !demanding_taint(args_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
-        || receiver_demands_summary(receiver, ctx)
+        || receiver_demands_summary(receiver, ctx, ea.db, &ea.file)
     {
         if let Some(summary) = summary(ea.db, &ea.file) {
             callee = summary;
@@ -64,8 +64,10 @@ pub fn check_call_sinks(
     let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();
     for (sink, labels) in sinks {
         if let Some(prop) = labels.prop_label(sink.param) {
-            let (Some(receiver), taint) = (receiver, receiver_prop_taint(receiver, prop, ctx))
-            else {
+            let (Some(receiver), taint) = (
+                receiver,
+                receiver_prop_taint(receiver, prop, ctx, ea.db, &ea.file),
+            ) else {
                 continue;
             };
             ea.taint_summary
