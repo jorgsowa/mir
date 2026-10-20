@@ -534,21 +534,10 @@ impl CallAnalyzer {
         // `unserialize()` (no leading double underscore) is the legacy Serializable interface
         // method, not a magic method, but the manual documents the same re-init idiom for it.
         if method_name.eq_ignore_ascii_case("__construct") {
-            let receiver_is_this = matches!(
-                &call.object.kind,
-                ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
-            );
-            let in_lifecycle_method = ctx.current_method_name.as_deref().is_some_and(|m| {
-                m.eq_ignore_ascii_case("__wakeup")
-                    || m.eq_ignore_ascii_case("__clone")
-                    || m.eq_ignore_ascii_case("__unserialize")
-                    || m.eq_ignore_ascii_case("unserialize")
-            });
+            let is_reinit = is_this_reinitialization(call, ctx);
             for atomic in &obj_ty.types {
                 if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                    let exempt = receiver_is_this
-                        && ctx.self_fqcn.as_deref() == Some(fqcn.as_ref())
-                        && in_lifecycle_method;
+                    let exempt = is_reinit && ctx.self_fqcn.as_deref() == Some(fqcn.as_ref());
                     if !exempt {
                         ea.emit(
                             IssueKind::DirectConstructorCall {
@@ -1260,6 +1249,8 @@ fn resolve_method_return<'a>(
             && !resolved.is_static
             && crate::expr::root_receiver_var(&call.object)
                 .is_some_and(|n| n.trim_start_matches('$') == "this")
+            && !(method_name.eq_ignore_ascii_case("__construct")
+                && is_this_reinitialization(call, ctx))
             && !crate::db::method_is_immutable_class_member(
                 ea.db,
                 &resolved.owner_fqcn,
@@ -2091,4 +2082,19 @@ fn is_non_object_atom(a: &mir_types::Atomic) -> bool {
             | TNonEmptyList { .. }
             | TKeyedArray { .. }
     )
+}
+
+/// `$this->__construct()` inside `__wakeup`/`__clone`/`__unserialize`/`unserialize` re-initializes the object.
+fn is_this_reinitialization(call: &MethodCallExpr, ctx: &FlowState) -> bool {
+    let receiver_is_this = matches!(
+        &call.object.kind,
+        ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+    );
+    receiver_is_this
+        && ctx.current_method_name.as_deref().is_some_and(|m| {
+            m.eq_ignore_ascii_case("__wakeup")
+                || m.eq_ignore_ascii_case("__clone")
+                || m.eq_ignore_ascii_case("__unserialize")
+                || m.eq_ignore_ascii_case("unserialize")
+        })
 }

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `$this->__construct()` in `unserialize`, `__unserialize`, `__wakeup` and `__clone` of a `@psalm-immutable` class is no longer reported as `ImpureMethodCall`.
 - `DOMDocument::createElement()`, `createElementNS()`, `createAttribute()`, `createCDATASection()`, `createProcessingInstruction()` and `createEntityReference()` no longer include `false` in their return type: PHP 8 throws `DOMException` on an invalid name, so `appendChild($document->createElement($name))` with a dynamic name no longer reports `InvalidTemplateParam`.
 - A namespaced user function named like a builtin (`namespace App; function array_map(...)`, `function htmlspecialchars(...)`) is no longer treated as that builtin's sink or sanitizer, including through `use function`; `\array_map()` and namespaces without their own function still reach the builtin.
 - A string starting with a literal `http(s)://host/` or `ftp(s)://host/` (`curl_init('https://api.example.com/users/' . urlencode($id))`) no longer reports SSRF or file sinks for the appended data; a tainted host, scheme or authority terminator still does, and `http_build_query()` output is treated as URL-encoded.
