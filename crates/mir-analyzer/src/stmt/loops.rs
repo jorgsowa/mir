@@ -255,6 +255,21 @@ fn rebind_static_self(ty: Type, fqcn: &str, own_type_params: &[Type]) -> Type {
     out
 }
 
+/// `foreach` never yields a null key, whatever `key()` may return at the end of iteration.
+fn iterator_key_type(declared: Option<Type>) -> Type {
+    match declared {
+        Some(ty) => {
+            let non_null = ty.remove_null();
+            if non_null.types.is_empty() {
+                ty
+            } else {
+                non_null
+            }
+        }
+        None => Type::mixed(),
+    }
+}
+
 /// Resolve the key/value item types `foreach` produces for an instance of
 /// `fqcn<type_params>`. Returns `None` when `fqcn` isn't `Generator` and
 /// doesn't implement `Iterator`/`IteratorAggregate` (or the info needed to
@@ -355,7 +370,7 @@ pub(crate) fn resolve_iterator_item_types(
             .any(|a| matches!(a, Atomic::TStaticObject { .. } | Atomic::TSelf { .. }));
         if returns_self_or_static && implements("Iterator") {
             let value = method_return_ty("current").unwrap_or_else(Type::mixed);
-            let key = method_return_ty("key").unwrap_or_else(Type::mixed);
+            let key = iterator_key_type(method_return_ty("key"));
             return Some((key, value));
         }
         let ret_ty = rebind_static_self(ret_ty, bare, type_params);
@@ -363,7 +378,7 @@ pub(crate) fn resolve_iterator_item_types(
     }
     if implements("Iterator") {
         let value = method_return_ty("current").unwrap_or_else(Type::mixed);
-        let key = method_return_ty("key").unwrap_or_else(Type::mixed);
+        let key = iterator_key_type(method_return_ty("key"));
         return Some((key, value));
     }
     None
