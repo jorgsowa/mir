@@ -199,34 +199,51 @@ fn included_files(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
         .collect()
 }
 
-/// Include edges between every pair of workspace files, both directions.
+/// Include edges between workspace files: what each file includes, and who includes it.
+#[derive(PartialEq, Eq)]
+struct IncludeLinks {
+    includes: FxHashMap<SourceFile, Vec<SourceFile>>,
+    includers: FxHashMap<SourceFile, Vec<SourceFile>>,
+}
+
 #[salsa::tracked]
-fn workspace_include_links(db: &dyn MirDatabase) -> Arc<FxHashMap<SourceFile, Vec<SourceFile>>> {
+fn workspace_include_links(db: &dyn MirDatabase) -> Arc<IncludeLinks> {
     let _ = db.workspace_revision().revision(db);
-    let mut links: FxHashMap<SourceFile, Vec<SourceFile>> = FxHashMap::default();
+    let mut links = IncludeLinks {
+        includes: FxHashMap::default(),
+        includers: FxHashMap::default(),
+    };
     for file in db.all_source_files() {
         for target in included_files(db, file).iter() {
-            links.entry(file).or_default().push(*target);
-            links.entry(*target).or_default().push(file);
+            links.includes.entry(file).or_default().push(*target);
+            links.includers.entry(*target).or_default().push(file);
         }
     }
     Arc::new(links)
 }
 
-/// `file` and the files joined to it by includes, which share its globals.
-#[salsa::tracked]
-pub(crate) fn include_group(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
-    let links = workspace_include_links(db);
-    let mut group = vec![file];
+/// Adds everything reachable from `group` through `edges` to `group`.
+fn extend_reachable(group: &mut Vec<SourceFile>, edges: &FxHashMap<SourceFile, Vec<SourceFile>>) {
     let mut next = 0;
     while let Some(current) = group.get(next).copied() {
         next += 1;
-        for linked in links.get(&current).into_iter().flatten() {
+        for linked in edges.get(&current).into_iter().flatten() {
             if !group.contains(linked) {
                 group.push(*linked);
             }
         }
     }
+}
+
+/// `file`, the files it includes and the files that include it, plus what those
+/// includers include: the files whose top-level code can share `file`'s globals.
+/// Files that merely include a common file stay apart.
+#[salsa::tracked]
+pub(crate) fn include_group(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
+    let links = workspace_include_links(db);
+    let mut group = vec![file];
+    extend_reachable(&mut group, &links.includers);
+    extend_reachable(&mut group, &links.includes);
     Arc::from(group)
 }
 
