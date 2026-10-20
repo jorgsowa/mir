@@ -1262,7 +1262,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
         }
         // Immutability check: assigning to $this->prop in a @psalm-immutable class.
-        if ctx.is_in_immutable_method && recv_stripped == "this" {
+        if ctx.is_in_immutable_method && recv_stripped == "this" && !ctx.in_state_rebuild_hook() {
             self.emit(
                 IssueKind::ImmutablePropertyModification {
                     receiver: "$this".to_string(),

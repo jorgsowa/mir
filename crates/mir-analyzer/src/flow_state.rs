@@ -619,6 +619,15 @@ impl ScopeOverrideGuard {
 }
 
 impl FlowState {
+    /// Hooks that rebuild an object's state in place, so writing `$this` properties is their job.
+    pub(crate) fn in_state_rebuild_hook(&self) -> bool {
+        self.current_method_name.as_deref().is_some_and(|m| {
+            m.eq_ignore_ascii_case("__clone")
+                || m.eq_ignore_ascii_case("__unserialize")
+                || m.eq_ignore_ascii_case("unserialize")
+        })
+    }
+
     pub(crate) fn set_unknown_this(&mut self) {
         let this = Name::from("this");
         Arc::make_mut(&mut self.vars).insert(
