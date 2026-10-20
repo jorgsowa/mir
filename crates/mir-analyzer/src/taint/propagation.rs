@@ -225,6 +225,8 @@ fn carrying_positions(lower_name: &str) -> Option<&'static [usize]> {
         "explode" | "array_search" | "preg_split" => &[1],
         "str_pad" | "wordwrap" | "chunk_split" | "array_pad" => &[0, 2],
         "substr_replace" => &[0, 1],
+        // The search term or pattern is matched against the subject, never copied into the result.
+        "str_replace" | "str_ireplace" | "preg_replace" => &[1, 2],
         "mb_strimwidth" => &[0, 3],
         "array_fill" => &[2],
         _ => return None,
@@ -240,6 +242,10 @@ fn builtin_args_taint(
     file: &str,
 ) -> Taint {
     let positional = args.iter().all(|a| !a.unpack && a.name.is_none());
+    // Without a format argument it returns a word count, not the words.
+    if lower_name == "str_word_count" && positional && args.len() == 1 {
+        return Taint::NONE;
+    }
     match carrying_positions(lower_name) {
         Some(positions) if positional => positions
             .iter()

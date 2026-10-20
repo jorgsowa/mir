@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `str_replace()`, `str_ireplace()` and `preg_replace()` no longer carry the taint of their search term or pattern into the result, and `str_word_count()` without a format returns an untainted count; `echo str_replace($_GET['a'], 'x', 'abc')` no longer reports `TaintedHtml`.
 - A property a constructor overwrites holds the taint of its last write on every path out of it, so a later sanitizing or clean overwrite (`$this->name = htmlspecialchars($this->name)`) no longer leaves the object tainted.
 - Taint on the properties of a constructed object is dropped when its variable is rebound (reassignment, `$g = $g->withX()`, `foreach`, list destructuring, `unset`) and carried over by `$copy = $g` and `clone $g`.
 - Writing `$this` properties in `unserialize`, `__unserialize` and `__clone` of a `@psalm-immutable` class is no longer reported as `ImmutablePropertyModification`.
