@@ -1550,6 +1550,27 @@ impl FlowState {
         }
     }
 
+    /// Make `to` hold the property taints `from` holds, as after `$to = $from` or `clone`.
+    pub fn inherit_prop_taints(&mut self, from: &str, to: &str) {
+        let (from, to) = (
+            Name::from(from.trim_start_matches('$')),
+            Name::from(to.trim_start_matches('$')),
+        );
+        if from == to {
+            return;
+        }
+        let inherited: Vec<_> = self
+            .tainted_props
+            .iter()
+            .filter(|((o, _), _)| *o == from)
+            .map(|((_, prop), taint)| (*prop, *taint))
+            .collect();
+        self.clear_prop_taints(to.as_str());
+        for (prop, taint) in inherited {
+            self.set_prop_taint(to.as_str(), prop.as_str(), taint);
+        }
+    }
+
     pub fn prop_taint(&self, obj_var: &str, prop: &str) -> Taint {
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
@@ -1707,6 +1728,7 @@ impl FlowState {
         Arc::make_mut(&mut self.assigned_vars).remove(&sym);
         Arc::make_mut(&mut self.possibly_assigned_vars).remove(&sym);
         self.drop_guarded_defs_of(sym);
+        self.clear_prop_taints(name);
     }
 
     /// Clone this context to analyze a conditional branch (`if`, `elseif`,

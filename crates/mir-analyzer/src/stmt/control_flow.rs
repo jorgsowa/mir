@@ -415,6 +415,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // `foreach ($_GET as $k => $v)`: the key is attacker-controlled
                 // exactly as much as the value (a reflected-XSS vector via GET
                 // param NAMES).
+                entry.clear_prop_taints(&var_name);
                 entry.taint_var(&var_name, iterable_taint);
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
@@ -448,6 +449,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(ref vname) = value_var {
             let intentionally_unused = is_intentionally_unused_foreach_value(vname, &fe.body);
             entry.set_var(vname.as_str(), value_ty.clone());
+            entry.clear_prop_taints(vname.as_str());
             entry.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
             if let Some(trail) = &iterable_trail {
                 std::sync::Arc::make_mut(&mut entry.taint_trails).insert(
@@ -522,11 +524,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(key_expr) = &fe.key {
                     if let Some(var_name) = extract_simple_var(key_expr) {
                         iter.set_var(&var_name, key_ty.clone());
+                        iter.clear_prop_taints(&var_name);
                         iter.taint_var(&var_name, iterable_taint);
                     }
                 }
                 if let Some(ref vname) = value_var {
                     iter.set_var(vname.as_str(), value_ty.clone());
+                    iter.clear_prop_taints(vname.as_str());
                     iter.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
                 } else {
                     sa.expr_analyzer(iter).assign_to_target(

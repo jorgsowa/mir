@@ -30,12 +30,14 @@ pub(crate) fn taint_destructured_targets(
     let ExprKind::Array(elements) = &target.kind else {
         return;
     };
-    if taint.is_empty() {
-        return;
-    }
     for elem in elements.iter() {
         match &elem.value.kind {
-            ExprKind::Variable(name) => ctx.taint_var_with_parts(name.as_ref(), taint, parts),
+            ExprKind::Variable(name) => {
+                ctx.clear_prop_taints(name);
+                if !taint.is_empty() {
+                    ctx.taint_var_with_parts(name.as_ref(), taint, parts);
+                }
+            }
             ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx, taint, parts),
             _ => {}
         }
@@ -593,14 +595,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some(closure) = closure.filter(|_| !a.by_ref) {
                             ctx.bind_closure(name.as_ref(), closure);
                         }
-                        if let ExprKind::New(new) = &value.kind {
-                            let props = crate::taint::constructed_prop_taints(
-                                new, ctx, self.db, &self.file,
-                            );
-                            ctx.clear_prop_taints(name);
-                            for (prop, taint) in props {
-                                ctx.set_prop_taint(name, prop.as_str(), taint);
+                        match &value.kind {
+                            ExprKind::New(new) => {
+                                let props = crate::taint::constructed_prop_taints(
+                                    new, ctx, self.db, &self.file,
+                                );
+                                ctx.clear_prop_taints(name);
+                                for (prop, taint) in props {
+                                    ctx.set_prop_taint(name, prop.as_str(), taint);
+                                }
                             }
+                            ExprKind::Variable(source) if !a.by_ref => {
+                                ctx.inherit_prop_taints(source, name);
+                            }
+                            ExprKind::Clone(inner) => match &inner.kind {
+                                ExprKind::Variable(source) => ctx.inherit_prop_taints(source, name),
+                                _ => ctx.clear_prop_taints(name),
+                            },
+                            _ => ctx.clear_prop_taints(name),
                         }
                         if let Some(trail) = trail {
                             std::sync::Arc::make_mut(&mut ctx.taint_trails).insert(
