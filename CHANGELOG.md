@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ArrayObject`, `ArrayIterator` and the SPL iterator wrappers carry the taint of the data they are built from or that `append()`, `exchangeArray()` or `offsetSet()` store in them (`foreach (new ArrayIterator($_GET) as $v) echo $v`).
 - A first-class callable of a named function (`$f = id(...); echo $f($_GET['a'])`) and a closure held in a property of a local object or `$this` (`($h->f)($_GET['a'])`) move taint like the function or closure they stand for, sanitizers and sinks included.
 - An object used as a string (`echo new W($_GET['a'])`, concatenation, interpolation, a string cast) carries the taint its `__toString()` returns.
 - Values a generator yields, and their keys, carry their taint to the code iterating it (`function g() { yield $_GET['a']; } foreach (g() as $v) echo $v`), including through `yield from` and a declared `Generator` or `iterable` return type.

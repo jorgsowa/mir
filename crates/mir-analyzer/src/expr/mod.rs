@@ -208,6 +208,39 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Storing data in an `ArrayObject` or `ArrayIterator` taints the container.
+    fn taint_array_container(
+        &mut self,
+        target: &php_ast::owned::Expr,
+        method: &php_ast::owned::Expr,
+        args: &[php_ast::owned::Arg],
+        ctx: &mut FlowState,
+    ) {
+        let (ExprKind::Variable(var), ExprKind::Identifier(name)) = (&target.kind, &method.kind)
+        else {
+            return;
+        };
+        if !["append", "exchangearray", "offsetset"]
+            .iter()
+            .any(|stores| name.eq_ignore_ascii_case(stores))
+        {
+            return;
+        }
+        let taint = crate::taint::args_taint(args, ctx, self.db, &self.file);
+        if taint.is_empty() {
+            return;
+        }
+        let is_container = ctx.get_var(var).types.iter().any(|atom| {
+            matches!(atom, mir_types::Atomic::TNamedObject { fqcn, .. }
+                if ["ArrayObject", "ArrayIterator"]
+                    .iter()
+                    .any(|class| crate::db::extends_or_implements(self.db, fqcn.as_ref(), class)))
+        });
+        if is_container {
+            ctx.taint_var(var, taint);
+        }
+    }
+
     /// A call on a local object leaves its properties as the method stores them.
     fn store_receiver_call_props(
         &mut self,
@@ -808,6 +841,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.store_static_call_props(&mc.object, &mc.method, &mc.args, ctx);
+                self.taint_array_container(&mc.object, &mc.method, &mc.args, ctx);
                 ty
             }
 

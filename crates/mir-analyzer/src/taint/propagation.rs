@@ -30,12 +30,63 @@ pub(super) fn return_drops_taint(ty: &mir_types::Type) -> bool {
         })
 }
 
+/// Builtin classes whose instances hand out the arrays and iterators they are built from.
+const ITERATOR_WRAPPERS: &[&str] = &[
+    "ArrayObject",
+    "ArrayIterator",
+    "RecursiveArrayIterator",
+    "IteratorIterator",
+    "LimitIterator",
+    "InfiniteIterator",
+    "NoRewindIterator",
+    "CachingIterator",
+    "CallbackFilterIterator",
+    "RecursiveCallbackFilterIterator",
+    "RecursiveIteratorIterator",
+    "RegexIterator",
+    "ParentIterator",
+];
+
 /// A class whose instances hand out the values they were built from.
 fn is_iterator_class(fqcn: &str) -> bool {
     let name = fqcn.trim_start_matches('\\');
     ["Generator", "Iterator", "IteratorAggregate", "Traversable"]
         .iter()
+        .chain(ITERATOR_WRAPPERS)
         .any(|class| name.eq_ignore_ascii_case(class))
+}
+
+/// Taint of `new` on a builtin iterator wrapper: the data it is built from.
+fn iterator_wrapper_taint(
+    new: &php_ast::owned::NewExpr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    let ExprKind::Identifier(name) = &new.class.kind else {
+        return Taint::NONE;
+    };
+    if new.args.is_empty() {
+        return Taint::NONE;
+    }
+    let class = match crate::db::resolve_name(db, file, name.as_ref()).as_str() {
+        "self" | "static" => ctx.self_fqcn.clone(),
+        "parent" => ctx.parent_fqcn.clone(),
+        resolved => Some(std::sync::Arc::from(resolved)),
+    };
+    let built_in = class.is_some_and(|class| {
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, &class), "__construct")
+            .is_some_and(|(owner, _)| {
+                ITERATOR_WRAPPERS
+                    .iter()
+                    .any(|wrapper| owner.trim_start_matches('\\').eq_ignore_ascii_case(wrapper))
+            })
+    });
+    if built_in {
+        args_taint(&new.args, ctx, db, file)
+    } else {
+        Taint::NONE
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -793,6 +844,8 @@ pub fn expr_taint(
             }
             Taint::NONE
         }
+
+        ExprKind::New(new) => iterator_wrapper_taint(new, ctx, db, file),
 
         ExprKind::StaticPropertyAccess(spa) => crate::expr::assignment::resolve_static_prop_target(
             spa, ctx, db, file,
