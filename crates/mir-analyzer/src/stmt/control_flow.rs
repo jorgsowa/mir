@@ -1225,15 +1225,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     u
                 };
                 let var_name = var.or_error().trim_start_matches('$');
-                let name_span = crate::symbol::variable_token_span(
-                    self.source,
-                    php_ast::Span {
-                        start: catch.span.start,
-                        end: catch.body.span.start,
-                    },
-                    var_name,
-                );
-                self.record_symbol_for_var(name_span, var_name, exc_ty.clone());
+                self.record_symbol_for_var(var.span, var_name, exc_ty.clone());
                 catch_ctx.set_var(var_name, exc_ty);
                 let (line, col_start) = self.offset_to_line_col(catch.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(catch.span.end);

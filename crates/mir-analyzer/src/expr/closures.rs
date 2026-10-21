@@ -630,7 +630,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ctx.get_var(name)
             };
             self.record_symbol(
-                crate::symbol::variable_token_span(self.source, use_var.span, name),
+                use_var.name.span,
                 ReferenceKind::Variable(Arc::from(name)),
                 captured_ty.clone(),
             );

@@ -829,8 +829,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     },
                 ));
             }
-            let name_span = crate::symbol::variable_token_span(self.source, sv.span, name);
-            self.record_symbol_for_var(name_span, name, ty.clone());
+            self.record_symbol_for_var(sv.name.span, name, ty.clone());
             ctx.set_var(name, ty);
             ctx.alias_var(name);
             std::sync::Arc::make_mut(&mut ctx.static_var_names).insert(mir_types::Name::from(name));

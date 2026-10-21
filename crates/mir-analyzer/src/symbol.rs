@@ -14,23 +14,6 @@ pub(crate) fn class_token_type(fqcn: &str) -> Type {
     Type::single(mir_types::Atomic::TClassString(Some(fqcn.into())))
 }
 
-/// Span of the first `$bare` token inside `within`, or `within` itself when
-/// the source has none.
-pub(crate) fn variable_token_span(source: &str, within: Span, bare: &str) -> Span {
-    let end = (within.end as usize).min(source.len());
-    let needle = format!("${bare}");
-    source
-        .get(within.start as usize..end)
-        .and_then(|slice| slice.find(needle.as_str()))
-        .map_or(within, |rel| {
-            let start = within.start + rel as u32;
-            Span {
-                start,
-                end: start + needle.len() as u32,
-            }
-        })
-}
-
 /// Compact navigation payload for cursor-based name resolution.
 #[derive(Debug, Clone)]
 pub struct NavigationFact {
