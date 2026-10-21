@@ -79,7 +79,8 @@ fn constructed_prop_taint(
 }
 
 /// Whether the object `receiver` evaluates to holds source data worth a callee
-/// summary; `$this`'s property labels alone would demand one for every call on it.
+/// summary; while summarizing, `$this` does too, as its property labels stand
+/// for data its callees may sink or return.
 pub(super) fn receiver_demands_summary(
     receiver: Option<&Expr>,
     ctx: &FlowState,
@@ -89,9 +90,11 @@ pub(super) fn receiver_demands_summary(
     match receiver.map(|r| &unwrap_parens(r).kind) {
         Some(ExprKind::Variable(var)) => {
             let var = mir_types::Name::from(var.trim_start_matches('$'));
-            ctx.tainted_props
-                .iter()
-                .any(|((object, _), taint)| *object == var && !taint.concrete().is_empty())
+            (ctx.summarizing_taint && var.as_str() == "this")
+                || ctx
+                    .tainted_props
+                    .iter()
+                    .any(|((object, _), taint)| *object == var && !taint.concrete().is_empty())
         }
         Some(ExprKind::New(new)) => constructed_prop_taints(new, ctx, db, file)
             .iter()
@@ -792,9 +795,27 @@ pub fn expr_taint(
                     return Taint::ALL;
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                if let Some(taint) =
-                    method_call_taint(here, &method_lower, &smc.args, None, false, ctx, db, file)
-                {
+                let forwards_this = match &smc.class.kind {
+                    ExprKind::Identifier(id) => ["self", "static", "parent"]
+                        .iter()
+                        .any(|k| id.eq_ignore_ascii_case(k)),
+                    ExprKind::Variable(v) => v.trim_start_matches('$') == "this",
+                    _ => false,
+                };
+                let this_receiver = forwards_this.then(|| Expr {
+                    kind: ExprKind::Variable("this".into()),
+                    span: smc.class.span,
+                });
+                if let Some(taint) = method_call_taint(
+                    here,
+                    &method_lower,
+                    &smc.args,
+                    this_receiver.as_ref(),
+                    false,
+                    ctx,
+                    db,
+                    file,
+                ) {
                     return taint;
                 }
             }

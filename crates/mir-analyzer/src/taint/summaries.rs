@@ -464,24 +464,76 @@ pub fn named_params(params: &[mir_codebase::DeclaredParam]) -> &[mir_codebase::D
     }
 }
 
-/// Label the properties of `$this` a method body reads with the slots its
-/// parameters leave free, so its summary can tell which of them flow where.
+/// Label the properties of `$this` a method body reads, itself or through the
+/// methods it calls on `$this`, with the slots its parameters leave free, so
+/// its summary can tell which of them flow where.
 pub fn seed_prop_labels(
     ctx: &mut FlowState,
     param_count: usize,
     body: &[php_ast::owned::Stmt],
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) -> Vec<(usize, mir_types::Name)> {
     if !ctx.summarizing_taint || param_count >= MAX_TRACKED_PARAMS {
         return Vec::new();
     }
-    let mut reads = ThisPropReads(Vec::new());
+    let mut reads = ThisPropReads::default();
     for stmt in body {
         let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut reads, stmt);
     }
+    let mut props = std::mem::take(&mut reads.props);
+    for (receiver, method) in &reads.calls {
+        if props.len() >= MAX_TRACKED_PARAMS - param_count {
+            break;
+        }
+        let class = match receiver {
+            OwnCallReceiver::Own => ctx.self_fqcn.as_deref(),
+            OwnCallReceiver::Parent => ctx.parent_fqcn.as_deref(),
+        };
+        for prop in class
+            .map(|class| called_method_props(db, file, class, method))
+            .unwrap_or_default()
+        {
+            if !props.contains(&prop) {
+                props.push(prop);
+            }
+        }
+    }
     let labels: Vec<(usize, mir_types::Name)> =
-        (param_count..MAX_TRACKED_PARAMS).zip(reads.0).collect();
+        (param_count..MAX_TRACKED_PARAMS).zip(props).collect();
     for (slot, prop) in &labels {
         ctx.set_prop_taint("this", prop.as_str(), Taint::param(*slot));
     }
     labels
+}
+
+/// Properties of `$this` the method `class::method` reads on a path to a sink
+/// or into its result.
+fn called_method_props(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    class: &str,
+    method: &str,
+) -> Vec<mir_types::Name> {
+    let Some((owner, _)) = crate::db::find_method_respecting_precedence(
+        db,
+        crate::db::Fqcn::from_str(db, class),
+        method,
+    ) else {
+        return Vec::new();
+    };
+    if !(crate::db::taint_sources::method_may_reach_sink(db, file, &owner, method)
+        || crate::db::taint_sources::method_returns_prop(db, file, &owner, method))
+    {
+        return Vec::new();
+    }
+    crate::db::method_taint_summary(db, file, &owner, method)
+        .map(|summary| {
+            summary
+                .prop_labels
+                .into_iter()
+                .map(|(_, prop)| prop)
+                .collect()
+        })
+        .unwrap_or_default()
 }

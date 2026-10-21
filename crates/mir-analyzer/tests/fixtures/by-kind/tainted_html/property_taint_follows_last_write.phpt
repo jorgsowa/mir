@@ -318,6 +318,7 @@ function build(): void {
 
 function flushed_then_reset(): void {
     $a = new FlushedThenReset($_GET['q']);
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $a->flush();
 //  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 

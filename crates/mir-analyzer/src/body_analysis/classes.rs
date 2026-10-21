@@ -1260,7 +1260,7 @@ impl<'a> BodyAnalyzer<'a> {
             Vec::new()
         } else {
             let named = crate::taint::named_params(&params).len();
-            crate::taint::seed_prop_labels(&mut ctx, named, &body.stmts)
+            crate::taint::seed_prop_labels(&mut ctx, named, &body.stmts, self.db, file)
         };
         crate::taint::seed_object_guards(&mut ctx, &params, &prop_labels, &body.stmts);
         record_param_symbols(

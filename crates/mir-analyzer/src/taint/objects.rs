@@ -1,22 +1,67 @@
 use super::*;
 
-/// Properties read through `$this->name`, in source order.
-pub(super) struct ThisPropReads(pub(super) Vec<mir_types::Name>);
+/// Properties read through `$this->name`, in source order, and the methods the
+/// body calls on its own instance as `(receiver, lowercased name)`.
+#[derive(Default)]
+pub(super) struct ThisPropReads {
+    pub(super) props: Vec<mir_types::Name>,
+    pub(super) calls: Vec<(OwnCallReceiver, String)>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum OwnCallReceiver {
+    Own,
+    Parent,
+}
+
+fn is_this(expr: &Expr) -> bool {
+    matches!(&expr.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
+}
 
 impl php_ast::owned::visitor::OwnedVisitor for ThisPropReads {
     fn visit_expr(&mut self, expr: &Expr) -> std::ops::ControlFlow<()> {
-        if let ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) = &expr.kind {
-            if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
+        match &expr.kind {
+            ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa)
+                if is_this(&pa.object) =>
             {
                 if let Some(prop) = crate::expr::helpers::extract_string_from_expr(&pa.property) {
                     let prop = mir_types::Name::new(&prop);
-                    if !self.0.contains(&prop) {
-                        self.0.push(prop);
+                    if !self.props.contains(&prop) {
+                        self.props.push(prop);
                     }
                 }
             }
+            ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) if is_this(&mc.object) => {
+                self.note_call(OwnCallReceiver::Own, &mc.method);
+            }
+            ExprKind::StaticMethodCall(smc) => match &smc.class.kind {
+                ExprKind::Identifier(class) if class.eq_ignore_ascii_case("parent") => {
+                    self.note_call(OwnCallReceiver::Parent, &smc.method);
+                }
+                ExprKind::Identifier(class)
+                    if ["self", "static"]
+                        .iter()
+                        .any(|k| class.eq_ignore_ascii_case(k)) =>
+                {
+                    self.note_call(OwnCallReceiver::Own, &smc.method);
+                }
+                _ if is_this(&smc.class) => self.note_call(OwnCallReceiver::Own, &smc.method),
+                _ => {}
+            },
+            _ => {}
         }
         crate::recursion::walk_expr(self, expr)
+    }
+}
+
+impl ThisPropReads {
+    fn note_call(&mut self, receiver: OwnCallReceiver, method: &Expr) {
+        if let ExprKind::Identifier(name) = &method.kind {
+            let call = (receiver, crate::util::php_ident_lowercase(name));
+            if !self.calls.contains(&call) {
+                self.calls.push(call);
+            }
+        }
     }
 }
 

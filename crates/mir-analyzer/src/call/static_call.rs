@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use php_ast::owned::{ExprKind, StaticMethodCallDynamicExpr, StaticMethodCallExpr};
+use php_ast::owned::{Expr, ExprKind, StaticMethodCallDynamicExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -915,13 +915,17 @@ impl CallAnalyzer {
                 }
             }
 
+            let this_receiver = (is_self_parent_call && !resolved.is_static).then(|| Expr {
+                kind: ExprKind::Variable("this".into()),
+                span: call.class.span,
+            });
             crate::taint::check_call_sinks(
                 ea,
                 ctx,
                 &resolved.params,
                 &call.args,
                 &arg_types,
-                None,
+                this_receiver.as_ref(),
                 &resolved.taint_sink_params,
                 |db, file| {
                     crate::db::method_param_sinks(
