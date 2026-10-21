@@ -164,11 +164,17 @@ fn taint_array_element_write(
         ExprKind::Variable(name) => {
             let key = literal_key_name(aa.index.as_deref());
             ctx.write_key_taint(name, key, taint, replace && key.is_some());
+            if let (None, Some(index)) = (key, aa.index.as_deref()) {
+                ctx.taint_key_names(name, crate::taint::expr_taint(index, ctx, db, file));
+            }
         }
         ExprKind::ArrayAccess(inner) => match &inner.array.kind {
             ExprKind::Variable(name) => {
                 let key = literal_key_name(inner.index.as_deref());
                 ctx.write_key_taint(name, key, taint, false);
+                if let (None, Some(index)) = (key, inner.index.as_deref()) {
+                    ctx.taint_key_names(name, crate::taint::expr_taint(index, ctx, db, file));
+                }
             }
             _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
         },
@@ -600,6 +606,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                             }
                             ExprKind::Variable(source) => {
+                                ctx.copy_key_names(source, name);
                                 ctx.inherit_prop_taints(source, name);
                                 if crate::taint::type_may_hold_object(&rhs_ty) {
                                     ctx.alias_objects(name, source);

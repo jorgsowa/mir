@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Writing under a tainted key (`$a[$_GET['k']] = 1`) taints the array's key names: `foreach ($a as $k => $_) echo $k`, `array_keys()`, `array_key_first()`, `array_flip()` and `json_encode()` of it carry the taint, while values under other keys stay clean.
 - `ArrayObject`, `ArrayIterator` and the SPL iterator wrappers carry the taint of the data they are built from or that `append()`, `exchangeArray()` or `offsetSet()` store in them (`foreach (new ArrayIterator($_GET) as $v) echo $v`).
 - A first-class callable of a named function (`$f = id(...); echo $f($_GET['a'])`) and a closure held in a property of a local object or `$this` (`($h->f)($_GET['a'])`) move taint like the function or closure they stand for, sanitizers and sinks included.
 - An object used as a string (`echo new W($_GET['a'])`, concatenation, interpolation, a string cast) carries the taint its `__toString()` returns.

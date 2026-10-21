@@ -277,6 +277,33 @@ pub fn args_taint(
         .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file))
 }
 
+/// Taint of the key names a builtin copies out of its array argument into its result.
+fn builtin_key_names_taint(
+    lower_name: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+) -> Taint {
+    if ctx.key_names.is_empty() {
+        return Taint::NONE;
+    }
+    match lower_name {
+        "array_keys" | "array_key_first" | "array_key_last" | "key" | "array_flip"
+        | "json_encode" | "http_build_query" | "serialize" | "print_r" | "var_export" => args
+            .first()
+            .and_then(|a| a.value.as_ref())
+            .map_or(Taint::NONE, |array| key_names_taint(array, ctx)),
+        _ => Taint::NONE,
+    }
+}
+
+/// Taint of the key names of the array `expr` evaluates to.
+pub fn key_names_taint(expr: &Expr, ctx: &FlowState) -> Taint {
+    match &unwrap_parens(expr).kind {
+        ExprKind::Variable(var) if !ctx.key_names.is_empty() => ctx.key_names_taint(var),
+        _ => Taint::NONE,
+    }
+}
+
 /// Taint of an argument or element: the value's own, plus what the object it holds keeps in properties.
 pub fn value_taint(
     expr: &Expr,
@@ -750,7 +777,8 @@ pub fn expr_taint(
                 }
                 // `JSON_HEX_TAG` encodes `<` and `>`, so the JSON can't open a tag.
                 if lower_name == "json_encode" {
-                    let taint = args_taint(&fc.args[..fc.args.len().min(1)], ctx, db, file);
+                    let taint = args_taint(&fc.args[..fc.args.len().min(1)], ctx, db, file)
+                        | builtin_key_names_taint(&lower_name, &fc.args, ctx);
                     let hex_tag = fc
                         .args
                         .get(1)
@@ -838,7 +866,8 @@ pub fn expr_taint(
                     // is reported at the call itself.
                     let reads_path = classify_sink(&lower_name) == Some(SinkKind::File);
                     if !safe_return && !reads_path {
-                        return builtin_args_taint(&lower_name, &fc.args, ctx, db, file);
+                        return builtin_args_taint(&lower_name, &fc.args, ctx, db, file)
+                            | builtin_key_names_taint(&lower_name, &fc.args, ctx);
                     }
                 }
             }

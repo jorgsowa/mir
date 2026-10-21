@@ -239,6 +239,9 @@ pub struct FlowState {
     /// a variable's `tainted_vars` entry stays the union of its keys.
     pub tainted_keys: Arc<FxHashMap<Name, KeyTaint>>,
 
+    /// Taint of the key names of an array, set by writes under a tainted key.
+    pub key_names: Arc<FxHashMap<Name, Taint>>,
+
     /// Taint summaries of closures analyzed in this scope.
     pub closures: Arc<ClosureSummaries>,
 
@@ -691,6 +694,7 @@ impl FlowState {
             strict_types: false,
             tainted_vars: Arc::default(),
             tainted_keys: Arc::default(),
+            key_names: Arc::default(),
             closures: Arc::default(),
             taint_trails: Arc::default(),
             summarizing_taint: false,
@@ -1428,6 +1432,7 @@ impl FlowState {
         let sym = Name::from(name.trim_start_matches('$'));
         remove_entry(&mut self.param_parts, &sym);
         remove_entry(&mut self.tainted_keys, &sym);
+        remove_entry(&mut self.key_names, &sym);
         remove_entry(&mut self.taint_trails, &sym);
         self.unbind_closure(sym);
         self.clear_plain(sym);
@@ -1508,6 +1513,7 @@ impl FlowState {
     pub fn set_key_taints(&mut self, name: &str, keys: KeyTaint) {
         let sym = Name::from(name.trim_start_matches('$'));
         remove_entry(&mut self.param_parts, &sym);
+        remove_entry(&mut self.key_names, &sym);
         self.clear_plain(sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
         if keys.whole().is_empty() {
@@ -1551,6 +1557,30 @@ impl FlowState {
         set_taint(&mut self.tainted_vars, sym, whole);
         self.drop_param_parts(sym, added);
         self.clear_plain(sym);
+    }
+
+    /// Record that `$name` was written under a key carrying `taint`.
+    pub fn taint_key_names(&mut self, name: &str, taint: Taint) {
+        add_taint(
+            &mut self.key_names,
+            Name::from(name.trim_start_matches('$')),
+            taint,
+        );
+    }
+
+    /// Taint of the key names of `$name`.
+    pub fn key_names_taint(&self, name: &str) -> Taint {
+        self.key_names
+            .get(&Name::from(name.trim_start_matches('$')))
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// `$to` holds a copy of `$from`'s keys.
+    pub fn copy_key_names(&mut self, from: &str, to: &str) {
+        let taint = self.key_names_taint(from);
+        remove_entry(&mut self.key_names, &Name::from(to.trim_start_matches('$')));
+        self.taint_key_names(to, taint);
     }
 
     /// Taint of `$name[key]`.
@@ -2202,6 +2232,14 @@ impl FlowState {
             }
             for (name, trail) in branch.taint_trails.iter() {
                 Arc::make_mut(&mut result.taint_trails).insert(*name, trail.clone());
+            }
+        }
+        for branch in [&if_ctx, &else_ctx] {
+            if Arc::ptr_eq(&branch.key_names, &result.key_names) {
+                continue;
+            }
+            for (name, taint) in branch.key_names.iter() {
+                add_taint(&mut result.key_names, *name, *taint);
             }
         }
         // Taint: conservative union — if either branch taints a var, it stays tainted

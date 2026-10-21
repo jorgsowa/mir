@@ -416,7 +416,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 // exactly as much as the value (a reflected-XSS vector via GET
                 // param NAMES).
                 entry.clear_prop_taints(&var_name);
-                entry.taint_var(&var_name, iterable_taint);
+                entry.taint_var(
+                    &var_name,
+                    iterable_taint | crate::taint::key_names_taint(&fe.expr, ctx),
+                );
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
             }
