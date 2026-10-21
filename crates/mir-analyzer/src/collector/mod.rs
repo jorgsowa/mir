@@ -1594,6 +1594,12 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
+    fn convert_set_visibility(modifiers: &php_ast::Modifiers) -> Option<Visibility> {
+        modifiers
+            .set_visibility
+            .map(|v| Self::convert_visibility(Some(v)))
+    }
+
     fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Type> {
         self.build_type_aliases_inner(doc, false)
     }
@@ -1793,6 +1799,7 @@ impl<'a> DefinitionCollector<'a> {
                     native_ty: None,
                     inferred_ty: None,
                     visibility: Visibility::Public,
+                    set_visibility: None,
                     is_static: false,
                     is_readonly: prop.read_only,
                     default: None,

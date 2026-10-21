@@ -230,6 +230,7 @@ impl<'a> DefinitionCollector<'a> {
                                         native_ty_only,
                                     ),
                                     visibility: Self::convert_visibility(p.modifiers.visibility),
+                                    set_visibility: Self::convert_set_visibility(&p.modifiers),
                                     is_static: false,
                                     is_readonly: decl.modifiers.is_readonly
                                         || p.modifiers.is_readonly
@@ -353,6 +354,7 @@ impl<'a> DefinitionCollector<'a> {
                         inferred_ty: None,
                         native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                         visibility: Self::convert_visibility(p.modifiers.visibility),
+                        set_visibility: Self::convert_set_visibility(&p.modifiers),
                         is_static: p.modifiers.is_static,
                         is_readonly: p.modifiers.is_readonly
                             || decl.modifiers.is_readonly

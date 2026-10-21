@@ -594,6 +594,8 @@ pub struct PropertyDef {
     )]
     pub inferred_ty: Option<Arc<Type>>,
     pub visibility: Visibility,
+    /// Asymmetric write visibility (`private(set)`); `None` follows `visibility`.
+    pub set_visibility: Option<Visibility>,
     pub is_static: bool,
     pub is_readonly: bool,
     #[serde(

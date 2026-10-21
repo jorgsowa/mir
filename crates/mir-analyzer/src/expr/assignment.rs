@@ -1044,6 +1044,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// A write outside the scope an asymmetric `private(set)` / `protected(set)` allows.
+    fn set_visibility_violated(
+        &self,
+        prop: &mir_codebase::definitions::PropertyDef,
+        owner: &str,
+        prop_name: &str,
+        ctx: &FlowState,
+    ) -> bool {
+        prop.set_visibility
+            .is_some_and(|vis| self.property_inaccessible(vis, owner, prop_name, ctx))
+    }
+
     /// Like `check_property_write_purity`, but takes the receiver/property as
     /// plain strings instead of requiring a real `PropertyAccessExpr` AST
     /// node — lets a write reached through a local variable ref-aliased to
@@ -1106,6 +1118,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     if crate::expr::arrays::implements_array_access(db, fqcn))
                             })
                         });
+                    if !dispatches_to_offset_method
+                        && self.set_visibility_violated(&prop_def, &owner, &prop_name, ctx)
+                    {
+                        self.emit(
+                            IssueKind::InaccessibleProperty {
+                                class: owner.to_string(),
+                                property: prop_name.clone(),
+                            },
+                            Severity::Error,
+                            span,
+                        );
+                    }
                     if prop_def.is_readonly && !dispatches_to_offset_method {
                         self.emit(
                             IssueKind::ReadonlyPropertyAssignment {
@@ -1649,6 +1673,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                             message: Some(msg.clone()).filter(|m| !m.is_empty()),
                                         },
                                         Severity::Info,
+                                        span,
+                                    );
+                                }
+                            }
+                            if let Some(p) = &prop_def {
+                                if self.set_visibility_violated(p, &prop_owner, &prop_name, ctx) {
+                                    self.emit(
+                                        IssueKind::InaccessibleProperty {
+                                            class: prop_owner.to_string(),
+                                            property: prop_name.clone(),
+                                        },
+                                        Severity::Error,
                                         span,
                                     );
                                 }

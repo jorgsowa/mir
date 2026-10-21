@@ -1954,7 +1954,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// class, so a private/protected trait property is accessible from
     /// `self_fqcn` whenever that trait is actually part of its own
     /// composition, same as if it had declared the property itself.
-    fn property_inaccessible(
+    pub(crate) fn property_inaccessible(
         &self,
         visibility: mir_codebase::definitions::Visibility,
         owner_fqcn: &str,
