@@ -737,7 +737,23 @@ pub fn expr_taint(
                 {
                     return args_taint(&mc.args, ctx, db, file);
                 }
-                return receiver;
+                // The method's own body decides what an object built in place returns.
+                return produced
+                    .iter()
+                    .filter(|class| !class.is_empty())
+                    .filter_map(|class| {
+                        method_call_taint(
+                            crate::db::Fqcn::from_str(db, class),
+                            &method_lower,
+                            &mc.args,
+                            Some(&mc.object),
+                            false,
+                            ctx,
+                            db,
+                            file,
+                        )
+                    })
+                    .fold(receiver, |acc, taint| acc | taint);
             };
             let mut taint = Taint::NONE;
             let mut receiver_flows = true;
