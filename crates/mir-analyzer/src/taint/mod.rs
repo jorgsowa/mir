@@ -146,6 +146,7 @@ impl std::ops::BitOrAssign for Taint {
 
 mod callbacks;
 mod escapers;
+mod key_names;
 mod objects;
 mod propagation;
 mod sinks;
@@ -155,6 +156,7 @@ mod trace;
 
 pub use self::callbacks::*;
 pub use self::escapers::*;
+pub use self::key_names::*;
 pub use self::objects::*;
 pub use self::propagation::*;
 pub use self::sinks::*;

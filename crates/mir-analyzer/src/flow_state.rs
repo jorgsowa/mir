@@ -242,6 +242,9 @@ pub struct FlowState {
     /// Taint of the key names of an array, set by writes under a tainted key.
     pub key_names: Arc<FxHashMap<Name, Taint>>,
 
+    /// Which arrays' key names `key_names` accounts for completely.
+    pub key_tracking: Arc<KeyTracking>,
+
     /// Taint summaries of closures analyzed in this scope.
     pub closures: Arc<ClosureSummaries>,
 
@@ -695,6 +698,7 @@ impl FlowState {
             tainted_vars: Arc::default(),
             tainted_keys: Arc::default(),
             key_names: Arc::default(),
+            key_tracking: Arc::default(),
             closures: Arc::default(),
             taint_trails: Arc::default(),
             summarizing_taint: false,
@@ -1333,6 +1337,12 @@ impl FlowState {
 
     /// Add `taint` to whatever the variable already carries.
     pub fn taint_var(&mut self, name: &str, taint: Taint) {
+        self.revoke_exact_keys(Name::from(name.trim_start_matches('$')));
+        self.add_var_taint(name, taint);
+    }
+
+    /// [`Self::taint_var`] for a value stored under a key, which adds no key to the array.
+    fn add_var_taint(&mut self, name: &str, taint: Taint) {
         let sym = Name::from(name.trim_start_matches('$'));
         if !taint.is_empty() {
             if let Some(keys) = Arc::make_mut(&mut self.tainted_keys).get_mut(&sym) {
@@ -1433,6 +1443,7 @@ impl FlowState {
         remove_entry(&mut self.param_parts, &sym);
         remove_entry(&mut self.tainted_keys, &sym);
         remove_entry(&mut self.key_names, &sym);
+        self.revoke_exact_keys(sym);
         remove_entry(&mut self.taint_trails, &sym);
         self.unbind_closure(sym);
         self.clear_plain(sym);
@@ -1514,6 +1525,7 @@ impl FlowState {
         let sym = Name::from(name.trim_start_matches('$'));
         remove_entry(&mut self.param_parts, &sym);
         remove_entry(&mut self.key_names, &sym);
+        self.revoke_exact_keys(sym);
         self.clear_plain(sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
         if keys.whole().is_empty() {
@@ -1534,7 +1546,7 @@ impl FlowState {
         let sym = Name::from(name.trim_start_matches('$'));
         let whole = self.tainted_vars.get(&sym).copied().unwrap_or_default();
         let Some(key) = key else {
-            self.taint_var(name, taint);
+            self.add_var_taint(name, taint);
             return;
         };
         if !self.tainted_keys.contains_key(&sym) && whole.is_empty() && taint.is_empty() {
@@ -1568,12 +1580,51 @@ impl FlowState {
         );
     }
 
+    /// `$name` holds an array whose key names are exactly those `key_names` records.
+    pub fn mark_exact_keys(&mut self, name: &str) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        if !self.key_tracking.aliased.contains(&sym) && !self.key_tracking.exact.contains(&sym) {
+            Arc::make_mut(&mut self.key_tracking).exact.insert(sym);
+        }
+    }
+
+    pub fn has_exact_keys(&self, name: &str) -> bool {
+        !self.key_tracking.exact.is_empty()
+            && self
+                .key_tracking
+                .exact
+                .contains(&Name::from(name.trim_start_matches('$')))
+    }
+
+    fn revoke_exact_keys(&mut self, sym: Name) {
+        if self.key_tracking.exact.contains(&sym) {
+            Arc::make_mut(&mut self.key_tracking).exact.remove(&sym);
+        }
+    }
+
+    /// `$name` is shared through a reference, so writes elsewhere can add keys to it.
+    pub fn alias_var(&mut self, name: &str) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        if !self.key_tracking.aliased.contains(&sym) || self.key_tracking.exact.contains(&sym) {
+            let tracking = Arc::make_mut(&mut self.key_tracking);
+            tracking.exact.remove(&sym);
+            tracking.aliased.insert(sym);
+        }
+    }
+
     /// Taint of the key names of `$name`.
     pub fn key_names_taint(&self, name: &str) -> Taint {
         self.key_names
             .get(&Name::from(name.trim_start_matches('$')))
             .copied()
             .unwrap_or_default()
+    }
+
+    /// The key names of `$name` carry exactly `taint`.
+    pub fn set_key_names(&mut self, name: &str, taint: Taint) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        remove_entry(&mut self.key_names, &sym);
+        self.taint_key_names(name, taint);
     }
 
     /// `$to` holds a copy of `$from`'s keys.
@@ -2258,6 +2309,7 @@ impl FlowState {
         }
 
         result.tainted_keys = merge_key_taints(&if_ctx, &else_ctx);
+        result.key_tracking = merge_key_tracking(&if_ctx.key_tracking, &else_ctx.key_tracking);
         result.closures = merge_closures(&if_ctx.closures, &else_ctx.closures);
         for branch in [&else_ctx, &if_ctx] {
             if Arc::ptr_eq(&branch.taint_trails, &result.taint_trails) {
@@ -2522,6 +2574,26 @@ fn merge_closures(a: &Arc<ClosureSummaries>, b: &Arc<ClosureSummaries>) -> Arc<C
             .entry(*name)
             .or_insert_with(|| closure.clone());
     }
+    Arc::new(merged)
+}
+
+/// Arrays whose key names are fully tracked, and variables that are aliased by reference.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct KeyTracking {
+    pub exact: FxHashSet<Name>,
+    pub aliased: FxHashSet<Name>,
+}
+
+/// Exact only where both sides are, aliased where either is.
+fn merge_key_tracking(a: &Arc<KeyTracking>, b: &Arc<KeyTracking>) -> Arc<KeyTracking> {
+    if Arc::ptr_eq(a, b) {
+        return a.clone();
+    }
+    let mut merged = KeyTracking {
+        exact: a.exact.intersection(&b.exact).copied().collect(),
+        aliased: a.aliased.union(&b.aliased).copied().collect(),
+    };
+    merged.exact.retain(|name| !merged.aliased.contains(name));
     Arc::new(merged)
 }
 

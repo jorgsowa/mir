@@ -636,6 +636,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
             closure_ctx.set_var(name, captured_ty.clone());
             if use_var.by_ref {
+                ctx.alias_var(name);
                 byref_captures.push((name, captured_ty));
             }
             closure_ctx.taint_var(

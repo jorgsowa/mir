@@ -571,6 +571,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 self.source,
                             )
                         });
+                        let exact_keys = if a.by_ref {
+                            None
+                        } else {
+                            crate::taint::exact_key_names(&a.value, ctx, self.db, &self.file)
+                        };
                         let keys = match &a.value.kind {
                             ExprKind::Array(elements) => {
                                 array_literal_key_taints(elements, ctx, self.db, &self.file)
@@ -586,7 +591,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if rhs_plain {
                             ctx.mark_plain(name.as_ref());
                         }
+                        if a.by_ref {
+                            ctx.alias_var(name.as_ref());
+                        }
                         if let (true, ExprKind::Variable(source)) = (a.by_ref, &a.value.kind) {
+                            ctx.alias_var(source.as_ref());
                             ctx.clear_plain(mir_types::Name::from(source.trim_start_matches('$')));
                         }
                         let value = crate::taint::unwrap_parens(&a.value);
@@ -617,6 +626,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 _ => ctx.clear_prop_taints(name),
                             },
                             _ => ctx.clear_prop_taints(name),
+                        }
+                        if let Some(keys) = exact_keys {
+                            ctx.mark_exact_keys(name);
+                            ctx.set_key_names(name, keys);
                         }
                         if let Some(trail) = trail {
                             std::sync::Arc::make_mut(&mut ctx.taint_trails).insert(

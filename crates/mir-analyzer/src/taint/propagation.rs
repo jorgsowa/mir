@@ -360,7 +360,11 @@ pub fn args_value_taint(
 }
 
 /// Like `resolve_name`, but honours `use function` imports.
-fn resolve_function_name(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> String {
+pub(super) fn resolve_function_name(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    name: &str,
+) -> String {
     if !name.contains('\\') {
         if let Some(imported) = db.file_imports(file).get(&mir_types::Name::new(name)) {
             return imported.as_str().to_string();
@@ -805,6 +809,20 @@ pub fn expr_taint(
                     } else {
                         taint
                     };
+                }
+                // The keys of an array whose key names are known exactly don't carry its values' taint.
+                if matches!(
+                    lower_name.as_str(),
+                    "array_keys" | "array_key_first" | "array_key_last" | "key"
+                ) {
+                    if let Some(keys) = fc
+                        .args
+                        .first()
+                        .and_then(|a| a.value.as_ref())
+                        .and_then(|array| exact_key_names(array, ctx, db, file))
+                    {
+                        return keys;
+                    }
                 }
                 if let Some(taint) = callback_builtin_taint(&lower_name, &fc.args, ctx, db, file) {
                     return taint;

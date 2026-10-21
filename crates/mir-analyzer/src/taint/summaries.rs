@@ -16,12 +16,35 @@ pub struct ParamSink {
     pub issue: mir_issues::IssueKind,
 }
 
+/// Taint of the key names of the array a body returns.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ReturnKeys {
+    /// No `return` of a value seen.
+    #[default]
+    Unseen,
+    /// The key names carry exactly this taint, from real sources only.
+    Exact(Taint),
+    /// The key names may carry anything the returned value does.
+    Unknown,
+}
+
+impl ReturnKeys {
+    pub(super) fn combine(self, other: ReturnKeys) -> ReturnKeys {
+        match (self, other) {
+            (ReturnKeys::Unseen, x) | (x, ReturnKeys::Unseen) => x,
+            (ReturnKeys::Exact(a), ReturnKeys::Exact(b)) => ReturnKeys::Exact(a | b),
+            _ => ReturnKeys::Unknown,
+        }
+    }
+}
+
 /// How a function or method moves taint, seen from its call sites.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TaintSummary {
     /// Taint of the return value: the source slot is taint the body reads
     /// itself, each parameter slot the kinds of that argument that flow out.
     pub returns: Taint,
+    pub return_keys: ReturnKeys,
     pub param_sinks: Vec<ParamSink>,
     /// Taint written to the class's own properties, keyed like
     /// [`crate::db::taint_sources::prop_key`].
@@ -81,6 +104,15 @@ impl TaintSummary {
         self.returns |= taint;
         self.return_parts |= parts;
         self.returned_computed |= taint.label_slots().difference(parts);
+    }
+
+    /// Record the key names of a `return`ed array, `None` when they are not known exactly.
+    pub fn record_return_keys(&mut self, keys: Option<Taint>) {
+        let keys = match keys {
+            Some(taint) if taint.labels().is_empty() => ReturnKeys::Exact(taint),
+            _ => ReturnKeys::Unknown,
+        };
+        self.return_keys = self.return_keys.combine(keys);
     }
 
     /// Record a `yield` of a key or value with `taint`.
@@ -171,6 +203,7 @@ impl TaintSummary {
         self.return_parts =
             (self.return_parts | other.return_parts).difference(computed(self) | computed(&other));
         self.returns |= other.returns;
+        self.return_keys = self.return_keys.combine(other.return_keys);
         for sink in other.param_sinks {
             match self
                 .param_sinks
@@ -479,6 +512,7 @@ pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSumma
     let mut summary = std::mem::take(summary);
     summary.overwritten_props.clear();
     if ctx.is_generator {
+        summary.return_keys = ReturnKeys::Unknown;
         summary.returns = std::mem::take(&mut summary.yields);
         summary.returned_computed = summary.returns.label_slots();
         summary.return_parts = Taint::NONE;

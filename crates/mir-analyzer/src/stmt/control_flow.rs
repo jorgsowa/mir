@@ -408,6 +408,8 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let pre = ctx.clone();
         let mut entry = ctx.branch();
+        let key_taint =
+            crate::taint::iteration_key_taint(&fe.expr, iterable_taint, ctx, self.db, &self.file);
 
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
@@ -416,10 +418,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // exactly as much as the value (a reflected-XSS vector via GET
                 // param NAMES).
                 entry.clear_prop_taints(&var_name);
-                entry.taint_var(
-                    &var_name,
-                    iterable_taint | crate::taint::key_names_taint(&fe.expr, ctx),
-                );
+                entry.taint_var(&var_name, key_taint);
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
             }
@@ -528,7 +527,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let Some(var_name) = extract_simple_var(key_expr) {
                         iter.set_var(&var_name, key_ty.clone());
                         iter.clear_prop_taints(&var_name);
-                        iter.taint_var(&var_name, iterable_taint);
+                        iter.taint_var(&var_name, key_taint);
                     }
                 }
                 if let Some(ref vname) = value_var {

@@ -178,11 +178,21 @@ impl<'a> StatementsAnalyzer<'a> {
             if crate::taint::is_injection_safe_type(&ret_ty) {
                 self.taint_summary
                     .record_return(crate::taint::Taint::NONE, crate::taint::Taint::NONE);
+                self.taint_summary
+                    .record_return_keys(Some(crate::taint::Taint::NONE));
             } else {
+                let returned = crate::taint::expr_taint(expr, ctx, self.db, &self.file);
                 self.taint_summary.record_return(
-                    crate::taint::expr_taint(expr, ctx, self.db, &self.file),
+                    returned,
                     crate::taint::param_parts(expr, ctx, self.db, &self.file),
                 );
+                let keys =
+                    crate::taint::exact_key_names(expr, ctx, self.db, &self.file).or_else(|| {
+                        (returned | crate::taint::key_names_taint(expr, ctx))
+                            .is_empty()
+                            .then_some(crate::taint::Taint::NONE)
+                    });
+                self.taint_summary.record_return_keys(keys);
             }
 
             // If there's a bare `@var Type` (no variable name) on the return statement,
@@ -822,6 +832,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let name_span = crate::symbol::variable_token_span(self.source, sv.span, name);
             self.record_symbol_for_var(name_span, name, ty.clone());
             ctx.set_var(name, ty);
+            ctx.alias_var(name);
             std::sync::Arc::make_mut(&mut ctx.static_var_names).insert(mir_types::Name::from(name));
             let (line, col_start) = self.offset_to_line_col(sv.span.start);
             let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
@@ -877,6 +888,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .unwrap_or_else(Type::mixed);
                 self.record_symbol_for_var(var.span, var_name, ty.clone());
                 ctx.set_var(var_name, ty);
+                ctx.alias_var(var_name);
                 ctx.mark_escaped(var_name, None);
                 ctx.set_var_taint(
                     var_name,
