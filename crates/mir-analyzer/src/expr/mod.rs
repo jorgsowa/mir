@@ -135,6 +135,19 @@ fn bare_closure() -> Atomic {
     }
 }
 
+/// A call with `?` placeholders creates a closure instead of running the callee (PHP 8.6).
+fn partial_application_type(args: &[php_ast::owned::Arg], called: Type) -> Type {
+    use php_ast::owned::ArgKind;
+    if args
+        .iter()
+        .any(|a| matches!(a.kind, ArgKind::Placeholder | ArgKind::SpreadPlaceholder))
+    {
+        Type::single(bare_closure())
+    } else {
+        called
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     /// A call that can run the class's own code sees the properties as they are now.
     fn expose_props_to_call(
@@ -852,7 +865,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.store_static_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.taint_array_container(&mc.object, &mc.method, &mc.args, ctx);
-                ty
+                partial_application_type(&mc.args, ty)
             }
 
             ExprKind::NullsafeMethodCall(mc) => {
@@ -860,7 +873,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true);
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
-                ty
+                partial_application_type(&mc.args, ty)
             }
 
             ExprKind::StaticMethodCall(smc) => {
@@ -871,7 +884,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.expose_props_to_call(&smc.class, &smc.args, ctx);
                 self.store_own_call_props(&smc.class, &smc.method, &smc.args, ctx);
                 self.store_static_call_props(&smc.class, &smc.method, &smc.args, ctx);
-                ty
+                partial_application_type(&smc.args, ty)
             }
 
             ExprKind::StaticMethodCallDynamic(smc) => {
@@ -891,7 +904,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 let ty = crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span);
                 ctx.invalidate_escaped_vars();
-                ty
+                partial_application_type(&fc.args, ty)
             }
 
             // --- Closures / arrow functions --------------------------------
