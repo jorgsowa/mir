@@ -807,8 +807,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // "sticky" reasoning `.=` already applies: the result stays
                 // tainted if either side was, unlike plain `=` which fully
                 // replaces the value.
-                let should_taint =
-                    rhs_taint | current_target_taint(&a.target, ctx, self.db, &self.file);
+                // Only `+` can still copy text (array union), and not with a scalar operand.
+                let numeric_result = a.op != AssignOp::Plus
+                    || crate::taint::is_injection_safe_type(&lhs_ty)
+                    || crate::taint::is_injection_safe_type(&rhs_ty);
+                let should_taint = if numeric_result {
+                    Taint::NONE
+                } else {
+                    rhs_taint | current_target_taint(&a.target, ctx, self.db, &self.file)
+                };
                 self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                 apply_compound_assign_taint(&a.target, should_taint, ctx, self.db, &self.file);
                 if let (Some(name), Some(pre_count)) = (&target_var_name, pre_lhs_consumed_count) {

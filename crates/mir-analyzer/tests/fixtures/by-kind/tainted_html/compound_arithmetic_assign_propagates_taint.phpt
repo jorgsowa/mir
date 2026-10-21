@@ -1,7 +1,7 @@
 ===description===
-`+=` (and the rest of the arithmetic compound-assign family) never
-propagated taint at all -- unlike `.=`'s already-fixed sticky taint, the
-AssignOp::Plus|Minus|Mul|Div|Mod|Pow arm never called taint_var/taint_prop.
+`+=` stays sticky taint when it can be an array union (`$opts += $_GET`), on
+variable and property targets. With a scalar operand it is arithmetic and the
+result is a number.
 ===config===
 <mir>
   <issueHandlers>
@@ -13,9 +13,24 @@ AssignOp::Plus|Minus|Mul|Div|Mod|Pow arm never called taint_var/taint_prop.
 </mir>
 ===file===
 <?php
-function test(): void {
+class Opts {
+    public array $values = [];
+}
+
+function variableTarget(array $opts): void {
+    $opts += $_GET;
+    echo implode(',', $opts);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
+}
+
+function propertyTarget(Opts $o): void {
+    $o->values += $_GET;
+    echo implode(',', $o->values);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
+}
+
+function scalarTarget(): void {
     $id = 0;
     $id += $_GET['id'];
     echo $id;
-//  ^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }

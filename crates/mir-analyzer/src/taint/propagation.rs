@@ -671,6 +671,10 @@ pub fn expr_taint(
             expr_taint(&crate::expr::pipe_as_call(op, expr.span), ctx, db, file)
         }
 
+        ExprKind::Binary(op) if yields_number_or_bool(op.op, &op.left, &op.right, ctx) => {
+            Taint::NONE
+        }
+
         ExprKind::Binary(op) => {
             let concat = op.op == php_ast::ast::BinaryOp::Concat;
             let operand = |e: &Expr| {
@@ -688,7 +692,12 @@ pub fn expr_taint(
             }
         }
 
-        ExprKind::UnaryPrefix(u) => expr_taint(&u.operand, ctx, db, file),
+        ExprKind::UnaryPrefix(u) => match u.op {
+            php_ast::ast::UnaryPrefixOp::Negate
+            | php_ast::ast::UnaryPrefixOp::Plus
+            | php_ast::ast::UnaryPrefixOp::BooleanNot => Taint::NONE,
+            _ => expr_taint(&u.operand, ctx, db, file),
+        },
 
         ExprKind::InterpolatedString(parts)
         | ExprKind::Heredoc { parts, .. }
@@ -1315,6 +1324,49 @@ pub(super) fn produced_object_classes(
                 .collect()
         }
         _ => Vec::new(),
+    }
+}
+
+/// Whether a binary operator's result is a number or a bool, never a copy of an operand's text.
+fn yields_number_or_bool(
+    op: php_ast::ast::BinaryOp,
+    left: &Expr,
+    right: &Expr,
+    ctx: &FlowState,
+) -> bool {
+    use php_ast::ast::BinaryOp::*;
+    match op {
+        Sub | Mul | Div | Mod | Pow | ShiftLeft | ShiftRight | Spaceship | Equal | NotEqual
+        | Identical | NotIdentical | Less | Greater | LessOrEqual | GreaterOrEqual | BooleanAnd
+        | BooleanOr | LogicalAnd | LogicalOr | LogicalXor | Instanceof => true,
+        // `+` unions arrays and the bitwise operators combine strings byte by byte; a scalar operand rules both out.
+        Add | BitwiseAnd | BitwiseOr | BitwiseXor => {
+            is_known_scalar(left, ctx) || is_known_scalar(right, ctx)
+        }
+        _ => false,
+    }
+}
+
+fn is_known_scalar(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) | ExprKind::Null => true,
+        ExprKind::Parenthesized(inner) => is_known_scalar(inner, ctx),
+        ExprKind::UnaryPrefix(u) => matches!(
+            u.op,
+            php_ast::ast::UnaryPrefixOp::Negate
+                | php_ast::ast::UnaryPrefixOp::Plus
+                | php_ast::ast::UnaryPrefixOp::BooleanNot
+        ),
+        ExprKind::Cast(kind, _) => matches!(
+            kind,
+            php_ast::ast::CastKind::Int
+                | php_ast::ast::CastKind::Float
+                | php_ast::ast::CastKind::Bool
+        ),
+        ExprKind::Variable(name) => {
+            is_injection_safe_type(&ctx.get_var(name.trim_start_matches('$')))
+        }
+        _ => false,
     }
 }
 
