@@ -2,6 +2,7 @@
 //! `preg_match('/^[a-z0-9_]+$/', $x)`. A sink kind is safe once none of the
 //! characters it needs to break out can appear.
 
+use php_ast::ast::BinaryOp;
 use php_ast::owned::{Arg, Expr, ExprKind};
 
 use crate::taint::Taint;
@@ -282,8 +283,74 @@ fn string_arg(args: &[Arg], index: usize) -> Option<&str> {
     }
 }
 
-/// The variable a passing guard call validates, and the kinds it is then safe for.
-pub fn guarded_var(call: &Expr) -> Option<(&str, Taint)> {
+/// What a passing guard call validated.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Guarded<'a> {
+    Var(&'a str),
+    Element { var: &'a str, key: mir_types::Name },
+}
+
+/// The value a passing guard call validates, and the kinds it is then safe for.
+pub fn guarded_var(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
+    guard_of_call(call).map(|(guarded, safe, _)| (guarded, safe))
+}
+
+/// What `cond` proves about a guarded value once it evaluates to `holds`: the bare call, or the
+/// call compared with the result it returns on a match (`preg_match(..) === 1`, `ctype_digit(..) !== false`).
+pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
+    let ExprKind::Binary(b) = &cond.kind else {
+        return holds.then(|| guarded_var(cond)).flatten();
+    };
+    let (call, literal, op) = match (&b.left.kind, &b.right.kind) {
+        (ExprKind::Int(_) | ExprKind::Bool(_), _) => (&*b.right, &b.left.kind, flipped(b.op)?),
+        (_, ExprKind::Int(_) | ExprKind::Bool(_)) => (&*b.left, &b.right.kind, b.op),
+        _ => return None,
+    };
+    let (guarded, safe, is_preg) = guard_of_call(call)?;
+    let matched_when = match *literal {
+        ExprKind::Int(n) => matched_when_int(op, n)?,
+        // `preg_match()` never returns a bool on a match.
+        ExprKind::Bool(v) if !is_preg => matched_when_bool(op, v)?,
+        _ => return None,
+    };
+    (holds == matched_when).then_some((guarded, safe))
+}
+
+fn flipped(op: BinaryOp) -> Option<BinaryOp> {
+    Some(match op {
+        BinaryOp::Identical | BinaryOp::NotIdentical | BinaryOp::Equal | BinaryOp::NotEqual => op,
+        BinaryOp::Less => BinaryOp::Greater,
+        BinaryOp::Greater => BinaryOp::Less,
+        BinaryOp::LessOrEqual => BinaryOp::GreaterOrEqual,
+        BinaryOp::GreaterOrEqual => BinaryOp::LessOrEqual,
+        _ => return None,
+    })
+}
+
+/// The truthiness of `call <op> n` under which `preg_match()` returned 1 (not 0 or false).
+fn matched_when_int(op: BinaryOp, n: i64) -> Option<bool> {
+    match (op, n) {
+        (BinaryOp::Identical | BinaryOp::Equal, 1)
+        | (BinaryOp::Greater, 0)
+        | (BinaryOp::GreaterOrEqual, 1)
+        | (BinaryOp::NotEqual, 0) => Some(true),
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, 1)
+        | (BinaryOp::LessOrEqual, 0)
+        | (BinaryOp::Less, 1)
+        | (BinaryOp::Equal, 0) => Some(false),
+        _ => None,
+    }
+}
+
+fn matched_when_bool(op: BinaryOp, value: bool) -> Option<bool> {
+    match op {
+        BinaryOp::Identical | BinaryOp::Equal => Some(value),
+        BinaryOp::NotIdentical | BinaryOp::NotEqual => Some(!value),
+        _ => None,
+    }
+}
+
+fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
@@ -310,11 +377,29 @@ pub fn guarded_var(call: &Expr) -> Option<(&str, Taint)> {
     if value.name.is_some() || value.unpack {
         return None;
     }
-    let ExprKind::Variable(var) = &value.value.as_ref()?.kind else {
-        return None;
-    };
+    let guarded = guarded_subject(value.value.as_ref()?)?;
     let safe = safe_kinds(allowed);
-    (!safe.is_empty()).then_some((var.trim_start_matches('$'), safe))
+    (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+}
+
+/// `$x`, `$a['k']`, or either under `?? default`: when the left side is unset there is nothing to taint.
+fn guarded_subject(expr: &Expr) -> Option<Guarded<'_>> {
+    match &expr.kind {
+        ExprKind::Variable(var) => Some(Guarded::Var(var.trim_start_matches('$'))),
+        ExprKind::Parenthesized(inner) => guarded_subject(inner),
+        ExprKind::NullCoalesce(nc) => guarded_subject(&nc.left),
+        ExprKind::ArrayAccess(aa) => {
+            let ExprKind::Variable(var) = &aa.array.kind else {
+                return None;
+            };
+            let key = crate::expr::assignment::literal_key_name(aa.index.as_deref())?;
+            Some(Guarded::Element {
+                var: var.trim_start_matches('$'),
+                key,
+            })
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]

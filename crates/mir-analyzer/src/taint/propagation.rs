@@ -598,7 +598,7 @@ pub fn expr_taint(
             ) {
                 let n = name.trim_start_matches('$');
                 if is_superglobal(n) {
-                    Taint::ALL
+                    ctx.key_taints(n).map_or(Taint::ALL, |keys| keys.get(key))
                 } else if ctx
                     .vars
                     .get(&mir_types::Name::from(n))

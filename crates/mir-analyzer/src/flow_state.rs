@@ -1591,6 +1591,23 @@ impl FlowState {
         }
     }
 
+    /// `$name[key]` passed a validation guard that makes it safe for `safe`.
+    pub fn guard_element_taint(&mut self, name: &str, key: Name, safe: Taint) {
+        let name = name.trim_start_matches('$');
+        // A superglobal read is tainted until a key says otherwise.
+        if crate::taint::is_superglobal(name) && self.key_taints(name).is_none() {
+            self.set_key_taints(
+                name,
+                KeyTaint {
+                    rest: Taint::ALL,
+                    keys: Vec::new(),
+                },
+            );
+        }
+        let remaining = self.key_taint(name, key).without(safe);
+        self.write_key_taint(name, Some(key), remaining, true);
+    }
+
     pub fn var_taint(&self, name: &str) -> Taint {
         let sym = Name::from(name.trim_start_matches('$'));
         self.tainted_vars.get(&sym).copied().unwrap_or_default()
@@ -2563,6 +2580,10 @@ fn merge_key_taints(a: &FlowState, b: &FlowState) -> Arc<FxHashMap<Name, KeyTain
         }
         let side = |ctx: &FlowState| match ctx.tainted_keys.get(name) {
             Some(keys) => Some(keys.clone()),
+            None if crate::taint::is_superglobal(name.as_str()) => Some(KeyTaint {
+                rest: Taint::ALL,
+                keys: Vec::new(),
+            }),
             None if !ctx.tainted_vars.contains_key(name) => Some(KeyTaint::default()),
             None => None,
         };
