@@ -1691,12 +1691,13 @@ fn validate_callable_argument(
                 }
             }
         } else {
-            // Check if it's a function name
-            let here = crate::db::Fqcn::from_str(ea.db, s.as_ref());
+            // A runtime function-name string is always fully qualified.
+            let name = s.trim_start_matches('\\');
+            let here = crate::db::Fqcn::from_str(ea.db, name);
             if crate::db::find_function(ea.db, here).is_none() {
                 ea.emit(
                     IssueKind::UndefinedFunction {
-                        name: s.to_string(),
+                        name: name.to_string(),
                     },
                     Severity::Error,
                     arg_span,
