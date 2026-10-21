@@ -3,7 +3,7 @@
 //! `is_subclass_of()` leaves across a condition list (or an OR-chain) that
 //! all target the same variable/property/static-property receiver, and
 //! narrows it to the union of every leaf's narrowing.
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::BinaryOp;
 use php_ast::owned::ExprKind;
 
@@ -448,8 +448,8 @@ fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> 
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let name = call.name.kind.name_ref()?;
-    let bare = name.as_ref().trim_start_matches('\\');
+    let name = call.name.kind.name_bare()?;
+    let bare = name;
     let canonical = NARROWING_TYPE_FNS
         .iter()
         .find(|f| f.eq_ignore_ascii_case(bare))?;
@@ -471,8 +471,8 @@ fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, Stri
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let name = call.name.kind.name_ref()?;
-    let bare = name.as_ref().trim_start_matches('\\');
+    let name = call.name.kind.name_bare()?;
+    let bare = name;
     let canonical = NARROWING_TYPE_FNS
         .iter()
         .find(|f| f.eq_ignore_ascii_case(bare))?;
@@ -593,8 +593,8 @@ fn extract_type_fn_check_static_prop(
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let name = call.name.kind.name_ref()?;
-    let bare = name.as_ref().trim_start_matches('\\');
+    let name = call.name.kind.name_bare()?;
+    let bare = name;
     let canonical = NARROWING_TYPE_FNS
         .iter()
         .find(|f| f.eq_ignore_ascii_case(bare))?;
@@ -670,8 +670,8 @@ fn is_a_or_subclass_of_call_receiver(expr: &php_ast::owned::Expr) -> Option<&php
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let name = call.name.kind.name_ref()?;
-    let bare = name.as_ref().trim_start_matches('\\');
+    let name = call.name.kind.name_bare()?;
+    let bare = name;
     if !(bare.eq_ignore_ascii_case("is_a") || bare.eq_ignore_ascii_case("is_subclass_of")) {
         return None;
     }

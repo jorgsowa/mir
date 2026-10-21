@@ -1,5 +1,5 @@
 use super::StatementsAnalyzer;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameBareExt as _;
 use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use mir_issues::IssueKind;
@@ -15,12 +15,8 @@ impl<'a> StatementsAnalyzer<'a> {
         // statically fixed by a docblock-derived type.
         self.check_docblock_contradiction(expr, ctx);
         if let ExprKind::FunctionCall(call) = &expr.kind {
-            if let Some(fn_name) = call.name.kind.name_ref() {
-                if fn_name
-                    .as_ref()
-                    .trim_start_matches('\\')
-                    .eq_ignore_ascii_case("assert")
-                {
+            if let Some(fn_name) = call.name.kind.name_bare() {
+                if fn_name.eq_ignore_ascii_case("assert") {
                     if let Some(value) = call.args.first().and_then(|a| a.value()) {
                         // Check the asserted condition *before* narrowing, so the
                         // original (docblock) type is still in scope.

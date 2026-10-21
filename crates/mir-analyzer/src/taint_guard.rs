@@ -3,7 +3,7 @@
 //! characters it needs to break out can appear.
 
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Arg, Expr, ExprKind};
@@ -435,8 +435,8 @@ fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
-    let name = fc.name.kind.name_ref()?;
-    if !crate::util::php_ident_lowercase(name.trim_start_matches('\\')).eq("in_array")
+    let name = fc.name.kind.name_bare()?;
+    if !crate::util::php_ident_lowercase(name).eq("in_array")
         || fc.args.iter().any(|a| a.name.is_some() || a.unpack())
     {
         return None;
@@ -535,8 +535,8 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
-    let name = fc.name.kind.name_ref()?;
-    let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
+    let name = fc.name.kind.name_bare()?;
+    let lower = crate::util::php_ident_lowercase(name);
     let (allowed, subject) = match lower.as_str() {
         "ctype_digit" => (digits(), 0),
         "ctype_xdigit" => (
