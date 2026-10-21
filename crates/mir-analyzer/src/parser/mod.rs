@@ -40,9 +40,7 @@ pub(crate) fn parse_error_to_issue(
 
 /// Compile-time rules the parser checks that the analyzer reports itself with a
 /// dedicated issue kind; the parser's diagnostic is dropped as a duplicate.
-// "temporary expression in write context" is a false positive on `(new A)->p = 1`.
 const ANALYZER_COVERED_MESSAGES: &[&str] = &[
-    "Cannot use temporary expression in write context",
     "when current class scope has no parent",
     "when no class scope is active",
     "(): Return type must be string when declared",

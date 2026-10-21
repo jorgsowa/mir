@@ -5,4 +5,5 @@ Undefined property assignment
 class A {
 }
 
-(new A)->foo = "cool";
+$a = new A();
+$a->foo = "cool";

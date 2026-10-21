@@ -6,4 +6,5 @@ Undefined mixin class with property assignment
 //  ^^^^^^^^ UndefinedDocblockClass: Docblock type 'B' does not exist
 class A {}
 
-(new A)->foo = "bar";
+$a = new A();
+$a->foo = "bar";

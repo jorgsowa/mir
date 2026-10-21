@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Writing to a property or offset of a `new` expression (`(new A)->p = 1`, `new A()->p = 1`) is reported as `ParseError` again, as PHP rejects it at compile time.
 - `include \dirname(__DIR__) . '/x.php'` reported `UndefinedFunction` for `include\dirname()`, and a `namespace\f()` call for `namespace\f()`; both resolve against the current namespace.
 - String literals that are not valid UTF-8 (`"\xC0"`) stay distinct as array keys and literal types instead of colliding.
 - The key names of an array built element by element (`$s = []; $s[$k] = $v`) are tracked apart from its values: values from request data stored under validated keys no longer taint the keys seen by `foreach`, `array_keys()` or the callers of the function that returns the array (the Symfony `Secrets*Command` reports). Merges, references, spreads and unknown callees keep the keys tainted.

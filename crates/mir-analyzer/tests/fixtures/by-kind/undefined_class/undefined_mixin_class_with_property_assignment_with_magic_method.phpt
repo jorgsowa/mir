@@ -11,4 +11,5 @@ class A {
     public function __set(string $name, string $value) {}
 }
 
-(new A)->foo = "bar";
+$a = new A();
+$a->foo = "bar";
