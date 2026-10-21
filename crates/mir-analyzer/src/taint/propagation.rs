@@ -3,6 +3,7 @@ use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 
 /// Union of the kinds named by taint annotations (`html`, `sql`, `input`, ...).
 pub(super) fn named_kinds(names: &[std::sync::Arc<str>]) -> Taint {
@@ -1017,9 +1018,9 @@ pub fn expr_taint(
         }
 
         ExprKind::StaticMethodCall(smc) => {
-            let fqcn_opt: Option<std::sync::Arc<str>> = if let Some(id) = smc.class.kind.name_ref()
+            let fqcn_opt: Option<std::sync::Arc<str>> = if let Some(resolved) =
+                smc.class.kind.resolve_name_ref(db, file)
             {
-                let resolved = crate::db::resolve_name(db, file, id.as_ref());
                 match resolved.as_str() {
                     "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
                     "parent" => ctx.parent_fqcn.clone(),
@@ -1308,9 +1309,8 @@ pub(super) fn produced_object_classes(
     file: &str,
 ) -> Vec<String> {
     match &unwrap_parens(expr).kind {
-        ExprKind::New(n) => match n.class.kind.name_ref() {
-            Some(name) => {
-                let resolved = crate::db::resolve_name(db, file, name.as_ref());
+        ExprKind::New(n) => match n.class.kind.resolve_name_ref(db, file) {
+            Some(resolved) => {
                 if matches!(resolved.as_str(), "self" | "static" | "parent") {
                     Vec::new()
                 } else {

@@ -7,7 +7,7 @@ use super::helpers::{
 use super::ExpressionAnalyzer;
 use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::taint::Taint;
@@ -60,8 +60,11 @@ pub(crate) fn resolve_static_prop_target(
 ) -> Option<(std::sync::Arc<str>, String)> {
     let fqcn = match &spa.class.kind {
         ExprKind::Identifier(_) | ExprKind::Name(_) => {
-            let id = spa.class.kind.name_ref().unwrap_or_default();
-            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+            let resolved = spa
+                .class
+                .kind
+                .resolve_name_ref(db, file)
+                .unwrap_or_default();
             match resolved.as_str() {
                 "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
                 "parent" => ctx.parent_fqcn.clone(),
@@ -310,8 +313,7 @@ pub(crate) fn resolve_chained_receiver_type(
         // middle of the chain, the static-call counterpart of the
         // `MethodCall` arm below.
         ExprKind::StaticMethodCall(smc) => {
-            let id = smc.class.kind.name_ref()?;
-            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+            let resolved = smc.class.kind.resolve_name_ref(db, file)?;
             let fqcn: std::sync::Arc<str> = match resolved.as_str() {
                 "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
                 "parent" => ctx.parent_fqcn.clone()?,

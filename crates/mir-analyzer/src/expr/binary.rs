@@ -4,6 +4,7 @@ use super::helpers::{
 };
 use super::ExpressionAnalyzer;
 use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
@@ -162,8 +163,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-            if let Some(name) = b.right.kind.name_ref() {
-                let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
+            if let Some(resolved) = b.right.kind.resolve_name_ref(self.db, &self.file) {
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                     if !crate::db::class_exists(self.db, &fqcn)

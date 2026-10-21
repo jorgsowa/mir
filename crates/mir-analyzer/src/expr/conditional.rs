@@ -1,5 +1,5 @@
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
 use super::helpers::extract_string_from_expr;
@@ -399,9 +399,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         let ExprKind::ClassConstAccess(cca) = &cond.kind else {
             return None;
         };
-        let resolved_class = match cca.class.kind.name_ref() {
-            Some(id) => {
-                let r = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+        let resolved_class = match cca.class.kind.resolve_name_ref(self.db, &self.file) {
+            Some(r) => {
                 if r == "self" || r == "static" {
                     ctx.self_fqcn.as_deref().unwrap_or("").to_string()
                 } else {
@@ -652,18 +651,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                             return None;
                         }
                         if let ExprKind::ClassConstAccess(cca) = &cond.kind {
-                            let resolved_class = match cca.class.kind.name_ref() {
-                                Some(id) => {
-                                    let r =
-                                        crate::db::resolve_name(self.db, &self.file, id.as_ref());
-                                    if r == "self" || r == "static" {
-                                        ctx.self_fqcn.as_deref().unwrap_or("").to_string()
-                                    } else {
-                                        r
+                            let resolved_class =
+                                match cca.class.kind.resolve_name_ref(self.db, &self.file) {
+                                    Some(r) => {
+                                        if r == "self" || r == "static" {
+                                            ctx.self_fqcn.as_deref().unwrap_or("").to_string()
+                                        } else {
+                                            r
+                                        }
                                     }
-                                }
-                                _ => return None,
-                            };
+                                    _ => return None,
+                                };
                             if !resolved_class.eq_ignore_ascii_case(&enum_fqcn) {
                                 return None;
                             }
@@ -749,13 +747,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     else {
                                         return None;
                                     };
-                                    let resolved_class = match cca.class.kind.name_ref() {
-                                        Some(id) => {
-                                            let r = crate::db::resolve_name(
-                                                self.db,
-                                                &self.file,
-                                                id.as_ref(),
-                                            );
+                                    let resolved_class = match cca
+                                        .class
+                                        .kind
+                                        .resolve_name_ref(self.db, &self.file)
+                                    {
+                                        Some(r) => {
                                             if r == "self" || r == "static" {
                                                 ctx.self_fqcn.as_deref().unwrap_or("").to_string()
                                             } else {

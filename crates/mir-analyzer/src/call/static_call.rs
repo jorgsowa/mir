@@ -2,6 +2,7 @@ use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
 use php_ast::owned::{Expr, ExprKind, StaticMethodCallDynamicExpr, StaticMethodCallExpr};
@@ -1496,8 +1497,7 @@ impl CallAnalyzer {
         // The called method's name isn't statically known — mark the target
         // class as dynamically accessed so DeadCodeAnalyzer doesn't flag its
         // private members as unused, mirroring the instance-call fallback.
-        if let Some(name) = call.class.kind.name_ref() {
-            let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
+        if let Some(resolved) = call.class.kind.resolve_name_ref(ea.db, &ea.file) {
             let fqcn = resolve_static_class(&resolved, ctx);
             if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
                 ea.record_dynamic_member_ref(&fqcn, call.method.span);
@@ -1520,8 +1520,7 @@ impl CallAnalyzer {
         // self::/static::/parent:: forward) and, when the target class is
         // known, that class's own static properties.
         ctx.invalidate_prop_refined_receiver("this");
-        if let Some(name) = call.class.kind.name_ref() {
-            let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
+        if let Some(resolved) = call.class.kind.resolve_name_ref(ea.db, &ea.file) {
             let fqcn = resolve_static_class(&resolved, ctx);
             ctx.invalidate_prop_refined_receiver(&fqcn);
         }

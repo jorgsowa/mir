@@ -2,6 +2,7 @@ use crate::ast_ext::ByteStringExt as _;
 /// Expression analyzer — infers the `Type` type of any PHP expression.
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
 use php_ast::owned::ExprKind;
@@ -823,8 +824,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::mixed()
             }
             ExprKind::StaticPropertyAccessDynamic { class, member } => {
-                if let Some(name) = class.kind.name_ref() {
-                    let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
+                if let Some(resolved) = class.kind.resolve_name_ref(self.db, self.file.as_ref()) {
                     let fqcn = match ctx.self_fqcn.as_deref() {
                         Some(self_fqcn) if resolved.eq_ignore_ascii_case("self") => {
                             self_fqcn.to_string()
@@ -1243,9 +1243,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // gets, or a private static method reachable only via
                         // `Foo::$name(...)` (first-class-callable form) is
                         // falsely flagged unused.
-                        if let Some(name) = class.kind.name_ref() {
-                            let resolved =
-                                crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
+                        if let Some(resolved) =
+                            class.kind.resolve_name_ref(self.db, self.file.as_ref())
+                        {
                             let fqcn = match crate::util::php_ident_lowercase(&resolved).as_str() {
                                 "self" => ctx.self_fqcn.as_deref().unwrap_or(&resolved).to_string(),
                                 "parent" => {
@@ -1273,21 +1273,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                 let mut receiver_type_params: Vec<Type> = Vec::new();
                 let is_named_class = class.kind.name_ref().is_some();
-                let fqcn = match class.kind.name_ref() {
-                    Some(name) => {
-                        let resolved =
-                            crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
-                        match crate::util::php_ident_lowercase(&resolved).as_str() {
-                            "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
-                            "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
-                            "static" => ctx
-                                .static_fqcn
-                                .as_deref()
-                                .unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static"))
-                                .to_string(),
-                            _ => resolved,
-                        }
-                    }
+                let fqcn = match class.kind.resolve_name_ref(self.db, self.file.as_ref()) {
+                    Some(resolved) => match crate::util::php_ident_lowercase(&resolved).as_str() {
+                        "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
+                        "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
+                        "static" => ctx
+                            .static_fqcn
+                            .as_deref()
+                            .unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static"))
+                            .to_string(),
+                        _ => resolved,
+                    },
                     _ => {
                         let ty = self.analyze(class, ctx);
                         match ty.types.iter().find_map(|a| {

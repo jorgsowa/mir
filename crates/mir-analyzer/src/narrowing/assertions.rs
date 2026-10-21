@@ -1,7 +1,7 @@
 //! `@psalm-assert-if-true`/`@psalm-assert-if-false` docblock-assertion
 //! narrowing: applies a callee's declared assertions to the calling flow
 //! state for free functions, methods, and static methods.
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use php_ast::owned::ExprKind;
 
@@ -509,8 +509,7 @@ pub(super) fn resolve_static_call_class_fqcn(
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
-    let id = class_expr.kind.name_ref()?;
-    let resolved = crate::db::resolve_name(db, file, id.as_ref());
+    let resolved = class_expr.kind.resolve_name_ref(db, file)?;
     match resolved.as_str() {
         "self" | "static" => Some(std::sync::Arc::from(
             ctx.self_fqcn.as_deref().or(ctx.static_fqcn.as_deref())?,

@@ -3,6 +3,7 @@
 //! multiple narrowing arms.
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
@@ -638,8 +639,7 @@ pub(crate) fn extract_expr_guard_key(
             if !member.eq_ignore_ascii_case("class") {
                 return None;
             }
-            let class_name = cca.class.kind.name_ref()?;
-            let resolved = crate::db::resolve_name(db, file, class_name.as_ref());
+            let resolved = cca.class.kind.resolve_name_ref(db, file)?;
             Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
         }
         // 'Foo\Bar' — a class name as a string literal (the form
