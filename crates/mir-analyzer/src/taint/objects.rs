@@ -452,7 +452,7 @@ pub(super) fn element_preserving_args<'e>(
 }
 
 /// Whether a value of type `ty` may be, or contain, an object.
-pub(super) fn type_may_hold_object(ty: &mir_types::Type) -> bool {
+pub(crate) fn type_may_hold_object(ty: &mir_types::Type) -> bool {
     use mir_types::Atomic;
     ty.types.is_empty()
         || ty.types.iter().any(|atom| match atom {
@@ -868,5 +868,59 @@ pub fn own_call_prop_writes(
         .filter(|(key, _)| !key.as_str().starts_with('$'))
         .map(|(key, taint)| (*key, resolve_labels(*taint, slot_taint)))
         .filter(|(_, taint)| !taint.is_empty())
+        .collect()
+}
+
+/// Taint a call to `method` on the object `$var` holds leaves in each of its instance properties,
+/// from what that method stores there.
+pub fn receiver_call_prop_writes(
+    var: &str,
+    method: &Expr,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<(mir_types::Name, Taint)> {
+    let ExprKind::Identifier(name) = &method.kind else {
+        return Vec::new();
+    };
+    let var_name = mir_types::Name::from(var.trim_start_matches('$'));
+    let holds_prop_taint = ctx
+        .tainted_props
+        .keys()
+        .any(|(object, _)| *object == var_name);
+    if !holds_prop_taint && args_taint(args, ctx, db, file).concrete().is_empty() {
+        return Vec::new();
+    }
+    let ty = ctx.get_var(var);
+    let [mir_types::Atomic::TNamedObject { fqcn: class, .. }] = ty.types.as_slice() else {
+        return Vec::new();
+    };
+    let lower = crate::util::php_ident_lowercase(name);
+    let Some((owner, callee)) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, class), &lower)
+    else {
+        return Vec::new();
+    };
+    if !crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), &lower) {
+        return Vec::new();
+    }
+    let Some(summary) = crate::db::method_taint_summary(db, file, owner.as_ref(), &lower) else {
+        return Vec::new();
+    };
+    let receiver = Expr {
+        kind: ExprKind::Variable(var.into()),
+        span: method.span,
+    };
+    summary
+        .prop_writes
+        .iter()
+        .filter(|(key, _)| !key.as_str().starts_with('$'))
+        .map(|(key, taint)| {
+            let stored = resolve_labels(*taint, |slot| {
+                summary.slot_taint(slot, Some(&receiver), &callee.params, args, ctx, db, file)
+            });
+            (*key, stored)
+        })
         .collect()
 }

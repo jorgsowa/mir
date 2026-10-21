@@ -611,8 +611,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     ctx.set_prop_taint(name, prop.as_str(), taint);
                                 }
                             }
-                            ExprKind::Variable(source) if !a.by_ref => {
+                            ExprKind::Variable(source) => {
                                 ctx.inherit_prop_taints(source, name);
+                                if crate::taint::type_may_hold_object(&rhs_ty) {
+                                    ctx.alias_objects(name, source);
+                                }
                             }
                             ExprKind::Clone(inner) => match &inner.kind {
                                 ExprKind::Variable(source) => ctx.inherit_prop_taints(source, name),
@@ -638,7 +641,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 } else {
                                     rhs_taint
                                 };
-                                ctx.set_prop_taint(obj_var, &prop_name, stored);
+                                ctx.set_prop_taint_through_aliases(obj_var, &prop_name, stored);
                             }
                         } else {
                             // `$o->a->b = $tainted` taints `$o->a` as a whole.

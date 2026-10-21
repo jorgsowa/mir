@@ -267,6 +267,9 @@ pub struct FlowState {
     /// so a later `$obj->prop` access is recognized as tainted.
     pub tainted_props: Arc<FxHashMap<(Name, Name), Taint>>,
 
+    /// Variables that may hold the same object, each mapped to its group's root variable.
+    pub object_aliases: Arc<FxHashMap<Name, Name>>,
+
     /// Static properties that carry tainted (user-controlled) values at this
     /// point. Key: `(fqcn, prop_name)`, mirroring how `prop_refined`'s static
     /// counterpart is keyed by FQCN instead of a receiver variable name (a
@@ -692,6 +695,7 @@ impl FlowState {
             plain_vars: Arc::default(),
             object_guard_slots: None,
             tainted_props: Arc::default(),
+            object_aliases: Arc::default(),
             tainted_static_props: Arc::default(),
             ref_aliases: FxHashMap::default(),
             escaped_vars: Arc::default(),
@@ -1548,6 +1552,61 @@ impl FlowState {
         if self.tainted_props.keys().any(|(o, _)| *o == obj) {
             Arc::make_mut(&mut self.tainted_props).retain(|(o, _), _| *o != obj);
         }
+        if self.object_aliases.contains_key(&obj) {
+            let aliases = Arc::make_mut(&mut self.object_aliases);
+            aliases.remove(&obj);
+            let heirs: Vec<Name> = aliases
+                .iter()
+                .filter(|(_, root)| **root == obj)
+                .map(|(var, _)| *var)
+                .collect();
+            if let Some(&new_root) = heirs.first() {
+                for var in heirs {
+                    aliases.insert(var, new_root);
+                }
+            }
+        }
+    }
+
+    /// Record that `a` and `b` may hold the same object.
+    pub fn alias_objects(&mut self, a: &str, b: &str) {
+        let (a, b) = (
+            Name::from(a.trim_start_matches('$')),
+            Name::from(b.trim_start_matches('$')),
+        );
+        if a == b {
+            return;
+        }
+        let root = self.object_aliases.get(&b).copied().unwrap_or(b);
+        let aliases = Arc::make_mut(&mut self.object_aliases);
+        aliases.insert(a, root);
+        aliases.insert(b, root);
+    }
+
+    /// Set `prop` of `obj_var`, which any variable aliasing it may now hold too.
+    pub fn set_prop_taint_through_aliases(&mut self, obj_var: &str, prop: &str, taint: Taint) {
+        self.set_prop_taint(obj_var, prop, taint);
+        let Some(root) = self
+            .object_aliases
+            .get(&Name::from(obj_var.trim_start_matches('$')))
+            .copied()
+        else {
+            return;
+        };
+        if taint.is_empty() {
+            return;
+        }
+        let others: Vec<Name> = self
+            .object_aliases
+            .iter()
+            .filter(|(var, group)| {
+                **group == root && var.as_str() != obj_var.trim_start_matches('$')
+            })
+            .map(|(var, _)| *var)
+            .collect();
+        for other in others {
+            self.taint_prop(other.as_str(), prop, taint);
+        }
     }
 
     /// Make `to` hold the property taints `from` holds, as after `$to = $from` or `clone`.
@@ -2138,6 +2197,18 @@ impl FlowState {
                 for (key, taint) in branch.tainted_static_props.iter() {
                     add_taint(&mut result.tainted_static_props, *key, *taint);
                 }
+            }
+        }
+
+        for branch in [&if_ctx, &else_ctx] {
+            if branch.object_aliases.is_empty()
+                || Arc::ptr_eq(&branch.object_aliases, &result.object_aliases)
+            {
+                continue;
+            }
+            let aliases = Arc::make_mut(&mut result.object_aliases);
+            for (var, root) in branch.object_aliases.iter() {
+                aliases.entry(*var).or_insert(*root);
             }
         }
 

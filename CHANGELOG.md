@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A method that stores its argument in a property taints that property of the object it is called on (`$o = new S('a'); $o->setN($_GET['b']); echo $o->n`), and a property written through one variable (directly or by a setter) is seen through every variable that may hold the same object (`$t = $o; $t->n = $_GET['b']; echo $o->n`). A later call that stores clean data clears it.
 - A property read straight off an inline `new` (`echo (new W($_GET['a']))->n`) and a call on it (`(new W($_GET['a']))->render()`) now carry what the constructor stored in the property.
 - `str_replace()`, `str_ireplace()` and `preg_replace()` no longer carry the taint of their search term or pattern into the result, and `str_word_count()` without a format returns an untainted count; `echo str_replace($_GET['a'], 'x', 'abc')` no longer reports `TaintedHtml`.
 - A property a constructor overwrites holds the taint of its last write on every path out of it, so a later sanitizing or clean overwrite (`$this->name = htmlspecialchars($this->name)`) no longer leaves the object tainted.

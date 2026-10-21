@@ -165,6 +165,28 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// A call on a local object leaves its properties as the method stores them.
+    fn store_receiver_call_props(
+        &mut self,
+        target: &php_ast::owned::Expr,
+        method: &php_ast::owned::Expr,
+        args: &[php_ast::owned::Arg],
+        ctx: &mut FlowState,
+    ) {
+        let ExprKind::Variable(var) = &target.kind else {
+            return;
+        };
+        let var = var.trim_start_matches('$');
+        if var == "this" {
+            return;
+        }
+        for (prop, taint) in
+            crate::taint::receiver_call_prop_writes(var, method, args, ctx, self.db, &self.file)
+        {
+            ctx.set_prop_taint_through_aliases(var, prop.as_str(), taint);
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: &'a dyn MirDatabase,
@@ -741,6 +763,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
                 self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);
+                self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 ty
             }
 
