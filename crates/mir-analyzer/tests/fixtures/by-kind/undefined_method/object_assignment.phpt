@@ -3,7 +3,6 @@ Object assignment
 ===file===
 <?php
 class A {}
-function f(A $a): A {
+function f(A $a): void {
     $a["b"] = 1;
-    return $a;
 }

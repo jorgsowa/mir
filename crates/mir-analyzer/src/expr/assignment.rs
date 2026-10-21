@@ -2230,6 +2230,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             } else {
                                 let current = ctx.get_var(name_str);
+                                // An offset write on an object goes through its handle
+                                // (`offsetSet`), so it uses the variable like `$obj->p = v`.
+                                if current.types.iter().any(Atomic::is_object) {
+                                    ctx.read_vars.insert(mir_types::Name::from(name_str));
+                                    ctx.mark_consumed(name_str);
+                                }
                                 // `$obj[$k] = $v` on an ArrayAccess-implementing receiver
                                 // calls offsetSet($k, $v) — the object's own tracked type
                                 // doesn't change (unlike a plain array widening), and the
