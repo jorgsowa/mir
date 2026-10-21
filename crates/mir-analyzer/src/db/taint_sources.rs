@@ -678,6 +678,13 @@ impl OwnedVisitor for Scan<'_> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+        if let ExprKind::Yield(y) = &expr.kind {
+            for yielded in [y.key.as_deref(), y.value.as_deref()].into_iter().flatten() {
+                let value = self.value_facts(yielded);
+                self.facts.returns_param |= value.reads_param;
+                self.facts.returns_prop |= value.reads_prop;
+            }
+        }
         if let ExprKind::Assign(a) = &expr.kind {
             if let ExprKind::Variable(name) = &a.target.kind {
                 if let Some(class) = self.class_of(&a.value) {

@@ -17,17 +17,25 @@ pub(super) fn return_drops_taint(ty: &mir_types::Type) -> bool {
     ty.is_void()
         || ty.is_never()
         || is_injection_safe_type(ty)
-        || ty.types.iter().all(|a| {
-            matches!(
+        || ty.types.iter().all(|a| match a {
+            Atomic::TNamedObject { fqcn, .. } => !is_iterator_class(fqcn.as_ref()),
+            _ => matches!(
                 a,
-                Atomic::TNamedObject { .. }
-                    | Atomic::TStaticObject { .. }
+                Atomic::TStaticObject { .. }
                     | Atomic::TSelf { .. }
                     | Atomic::TParent { .. }
                     | Atomic::TClosure { .. }
                     | Atomic::TObject
-            )
+            ),
         })
+}
+
+/// A class whose instances hand out the values they were built from.
+fn is_iterator_class(fqcn: &str) -> bool {
+    let name = fqcn.trim_start_matches('\\');
+    ["Generator", "Iterator", "IteratorAggregate", "Traversable"]
+        .iter()
+        .any(|class| name.eq_ignore_ascii_case(class))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

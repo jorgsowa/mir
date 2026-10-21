@@ -38,6 +38,8 @@ pub struct TaintSummary {
     pub return_parts: Taint,
     /// Label slots some `return` carries otherwise, while the body is analyzed.
     pub(super) returned_computed: Taint,
+    /// Taint of the values a generator body yields; a generator's result stands for them.
+    pub(super) yields: Taint,
     /// Properties of `$this` set by a plain assignment while the body is analyzed:
     /// their `prop_writes` entry is what they hold when the body exits or calls a method.
     pub(super) overwritten_props: Vec<mir_types::Name>,
@@ -79,6 +81,11 @@ impl TaintSummary {
         self.returns |= taint;
         self.return_parts |= parts;
         self.returned_computed |= taint.label_slots().difference(parts);
+    }
+
+    /// Record a `yield` of a key or value with `taint`.
+    pub fn record_yield(&mut self, taint: Taint) {
+        self.yields |= taint;
     }
 
     pub fn record_prop_write(&mut self, key: mir_types::Name, taint: Taint) {
@@ -472,8 +479,11 @@ pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSumma
     let mut summary = std::mem::take(summary);
     summary.overwritten_props.clear();
     if ctx.is_generator {
-        summary.returns = Taint::NONE;
+        summary.returns = std::mem::take(&mut summary.yields);
+        summary.returned_computed = summary.returns.label_slots();
+        summary.return_parts = Taint::NONE;
     }
+    summary.yields = Taint::NONE;
     summary.return_parts = summary
         .return_parts
         .intersection(summary.returns.label_slots())
