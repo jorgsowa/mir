@@ -40,6 +40,7 @@ struct ResolvedFn {
     /// meaning; see `FunctionDef::is_mutation_free`'s own doc comment).
     is_mutation_free: bool,
     taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    location: Option<mir_types::Location>,
 }
 
 /// Weak mode coerces a numeric string to `int|float` for a template bounded by `int|float`.
@@ -122,6 +123,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             is_pure: f.is_pure,
             is_mutation_free: f.is_mutation_free || f.is_external_mutation_free,
             taint_sink_params: f.taint_sink_params.clone(),
+            location: f.location.clone(),
         });
     }
     None
@@ -1046,6 +1048,17 @@ impl CallAnalyzer {
                     }
                 }
             }
+
+            super::taint_byref_outputs(
+                ea,
+                ctx,
+                &params,
+                &call.args,
+                None,
+                || resolved.location.clone(),
+                || crate::db::taint_sources::function_reads_source(ea.db, &ea.file, &resolved.fqn),
+                || crate::db::function_taint_summary(ea.db, &ea.file, &resolved.fqn),
+            );
 
             // A bare-statement (unconditional) `@psalm-assert` call —
             // reuses the exact per-assertion body the conditional if-true/

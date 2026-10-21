@@ -249,6 +249,9 @@ pub struct FlowState {
     /// arguments carrying only parameter labels still need callee summaries.
     pub summarizing_taint: bool,
 
+    /// `(slot, name)` of each by-ref parameter whose exit taint the summary records.
+    pub byref_out_slots: Arc<[(usize, Name)]>,
+
     /// Label slots each variable carries as (part of) that argument's own
     /// value rather than something computed from it; see `taint::param_parts`.
     pub param_parts: Arc<FxHashMap<Name, Taint>>,
@@ -691,6 +694,7 @@ impl FlowState {
             closures: Arc::default(),
             taint_trails: Arc::default(),
             summarizing_taint: false,
+            byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
             object_guard_slots: None,

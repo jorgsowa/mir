@@ -1169,6 +1169,44 @@ impl CallAnalyzer {
                 }
             }
 
+            let forwards_this = matches!(&call.class.kind, ExprKind::Identifier(id)
+                if ["self", "static", "parent"].iter().any(|k| id.eq_ignore_ascii_case(k)));
+            let this_receiver = forwards_this.then(|| php_ast::owned::Expr {
+                kind: ExprKind::Variable("this".into()),
+                span: call.class.span,
+            });
+            super::taint_byref_outputs(
+                ea,
+                ctx,
+                &resolved.params,
+                &call.args,
+                this_receiver.as_ref(),
+                || {
+                    crate::db::find_method_respecting_precedence(
+                        ea.db,
+                        crate::db::Fqcn::from_str(ea.db, resolved.owner_fqcn.as_ref()),
+                        &method_name_lower,
+                    )
+                    .and_then(|(_, m)| m.location.clone())
+                },
+                || {
+                    crate::db::taint_sources::method_reads_source(
+                        ea.db,
+                        &ea.file,
+                        resolved.owner_fqcn.as_ref(),
+                        &method_name_lower,
+                    )
+                },
+                || {
+                    crate::db::method_taint_summary(
+                        ea.db,
+                        &ea.file,
+                        resolved.owner_fqcn.as_ref(),
+                        &method_name_lower,
+                    )
+                },
+            );
+
             // Bare-statement `@psalm-assert` — the static-call counterpart
             // of `call/function.rs`'s unconditional-assert block and
             // `call/method.rs`'s instance-call one. Reuses the exact

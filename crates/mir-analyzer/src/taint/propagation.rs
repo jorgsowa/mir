@@ -167,6 +167,34 @@ pub(super) fn user_call_taint(
     taint.without(escaped).restore(unescaped)
 }
 
+/// Taint a user callee writes into by-ref parameter `param`, beyond what its arguments carry.
+#[allow(clippy::too_many_arguments)]
+pub fn byref_output_taint(
+    param: usize,
+    location: impl FnOnce() -> Option<mir_types::Location>,
+    params: &[mir_codebase::DeclaredParam],
+    args: &[php_ast::owned::Arg],
+    receiver: Option<&Expr>,
+    reads_source: impl FnOnce() -> bool,
+    summary: impl FnOnce() -> Option<TaintSummary>,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    if !db.taint_analysis()
+        || CalleeBody::of(location().as_ref(), file) != CalleeBody::Summarized
+        || !(reads_source() || receiver_demands_summary(receiver, ctx, db, file))
+    {
+        return Taint::NONE;
+    }
+    let Some(summary) = summary() else {
+        return Taint::NONE;
+    };
+    resolve_labels(summary.out_param(param), |slot| {
+        summary.slot_taint(slot, receiver, params, args, ctx, db, file)
+    })
+}
+
 /// Strip any number of redundant parens (`((expr))` -> `expr`) — a call
 /// target keeps its parens in the AST (`(fn() => ...)()`), unlike most
 /// other expression positions.

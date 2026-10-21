@@ -174,6 +174,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(expr) = opt_expr {
             let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
             self.taint_summary.record_overwritten_props(ctx);
+            self.taint_summary.record_out_params(ctx);
             if crate::taint::is_injection_safe_type(&ret_ty) {
                 self.taint_summary
                     .record_return(crate::taint::Taint::NONE, crate::taint::Taint::NONE);
@@ -321,6 +322,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.return_types.push(ret_ty);
         } else {
             self.taint_summary.record_overwritten_props(ctx);
+            self.taint_summary.record_out_params(ctx);
             self.return_types.push(Type::single(Atomic::TVoid));
             // Bare `return;` from a non-void declared function is an error,
             // except inside a generator where it terminates iteration. A bare

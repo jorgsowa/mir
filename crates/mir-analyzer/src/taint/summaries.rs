@@ -31,6 +31,8 @@ pub struct TaintSummary {
     /// `(slot, param)`: label slots past the parameters, each standing for a
     /// parameter's own value once the body proved it an object.
     pub object_guards: Vec<(usize, usize)>,
+    /// `(param, taint)`: what a by-ref parameter holds when the body exits.
+    pub out_params: Vec<(usize, Taint)>,
     /// Label slots the return value carries only as (part of) the argument
     /// itself; see [`param_parts`].
     pub return_parts: Taint,
@@ -43,7 +45,32 @@ pub struct TaintSummary {
 
 impl TaintSummary {
     pub fn is_empty(&self) -> bool {
-        self.returns.is_empty() && self.param_sinks.is_empty() && self.prop_writes.is_empty()
+        self.returns.is_empty()
+            && self.param_sinks.is_empty()
+            && self.prop_writes.is_empty()
+            && self.out_params.is_empty()
+    }
+
+    /// Record what the by-ref parameters hold at a point where the body exits.
+    pub fn record_out_params(&mut self, ctx: &FlowState) {
+        for (slot, name) in ctx.byref_out_slots.iter() {
+            let held = ctx.var_taint(name.as_str());
+            if held.is_empty() {
+                continue;
+            }
+            match self.out_params.iter_mut().find(|(p, _)| p == slot) {
+                Some((_, existing)) => *existing |= held,
+                None => self.out_params.push((*slot, held)),
+            }
+        }
+    }
+
+    /// Taint by-ref parameter `param` holds on exit.
+    pub fn out_param(&self, param: usize) -> Taint {
+        self.out_params
+            .iter()
+            .filter(|(p, _)| *p == param)
+            .fold(Taint::NONE, |acc, (_, t)| acc | *t)
     }
 
     /// Record a `return` of a value with `taint`, `parts` of whose label slots
@@ -150,6 +177,12 @@ impl TaintSummary {
         for (key, taint) in other.prop_writes {
             self.record_prop_write(key, taint);
         }
+        for (param, taint) in other.out_params {
+            match self.out_params.iter_mut().find(|(p, _)| *p == param) {
+                Some((_, existing)) => *existing |= taint,
+                None => self.out_params.push((param, taint)),
+            }
+        }
     }
 
     /// Source taint written to property `key` whatever the arguments.
@@ -183,7 +216,12 @@ impl TaintSummary {
         };
         self.returns = relabel(self.returns);
         self.return_parts = relabel(self.return_parts);
-        for (_, taint) in &mut self.prop_writes {
+        for taint in self
+            .prop_writes
+            .iter_mut()
+            .map(|(_, t)| t)
+            .chain(self.out_params.iter_mut().map(|(_, t)| t))
+        {
             *taint = relabel(*taint);
         }
         for sink in std::mem::take(&mut self.param_sinks) {
@@ -230,7 +268,9 @@ impl TaintSummary {
             || self
                 .prop_writes
                 .iter()
-                .any(|(_, taint)| taint.intersects(label))
+                .map(|(_, taint)| taint)
+                .chain(self.out_params.iter().map(|(_, taint)| taint))
+                .any(|taint| taint.intersects(label))
             || self.param_sinks.iter().any(|sink| sink.param == slot)
     }
 
@@ -244,7 +284,12 @@ impl TaintSummary {
         let move_label =
             |taint: Taint| taint.without_label(slot) | Taint::label(param, taint.param_kinds(slot));
         self.returns = move_label(self.returns);
-        for (_, taint) in &mut self.prop_writes {
+        for taint in self
+            .prop_writes
+            .iter_mut()
+            .map(|(_, t)| t)
+            .chain(self.out_params.iter_mut().map(|(_, t)| t))
+        {
             *taint = move_label(*taint);
         }
         for sink in std::mem::take(&mut self.param_sinks) {
@@ -268,7 +313,12 @@ impl TaintSummary {
     fn drop_label(&mut self, slot: usize) {
         self.returns = self.returns.without_label(slot);
         self.param_sinks.retain(|sink| sink.param != slot);
-        for (_, taint) in &mut self.prop_writes {
+        for taint in self
+            .prop_writes
+            .iter_mut()
+            .map(|(_, t)| t)
+            .chain(self.out_params.iter_mut().map(|(_, t)| t))
+        {
             *taint = taint.without_label(slot);
         }
     }
@@ -417,6 +467,7 @@ pub fn resolve_labels(taint: Taint, slot_taint: impl Fn(usize) -> Taint) -> Tain
 pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSummary {
     if !ctx.diverges {
         summary.record_overwritten_props(ctx);
+        summary.record_out_params(ctx);
     }
     let mut summary = std::mem::take(summary);
     summary.overwritten_props.clear();
@@ -430,7 +481,9 @@ pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSumma
     let flows = summary
         .prop_writes
         .iter()
-        .fold(summary.returns, |acc, (_, taint)| acc | *taint);
+        .map(|(_, taint)| taint)
+        .chain(summary.out_params.iter().map(|(_, taint)| taint))
+        .fold(summary.returns, |acc, taint| acc | *taint);
     summary.object_guards = ctx
         .object_guards()
         .into_iter()
@@ -451,7 +504,15 @@ pub fn seed_param_labels(
 ) {
     if summarize {
         ctx.summarizing_taint = true;
-        label_params(ctx, named_params(params).iter().map(|p| p.name.as_ref()));
+        let named = named_params(params);
+        label_params(ctx, named.iter().map(|p| p.name.as_ref()));
+        ctx.byref_out_slots = named
+            .iter()
+            .take(MAX_TRACKED_PARAMS)
+            .enumerate()
+            .filter(|(_, p)| p.is_byref && !p.is_variadic)
+            .map(|(slot, p)| (slot, mir_types::Name::from(p.name.as_ref())))
+            .collect();
     }
 }
 

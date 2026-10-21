@@ -1849,6 +1849,38 @@ fn resolve_method_return<'a>(
             }
         }
 
+        super::taint_byref_outputs(
+            ea,
+            ctx,
+            &resolved.params,
+            &call.args,
+            Some(&call.object),
+            || {
+                crate::db::find_method_respecting_precedence(
+                    ea.db,
+                    crate::db::Fqcn::from_str(ea.db, resolved.owner_fqcn.as_ref()),
+                    &method_name_lower,
+                )
+                .and_then(|(_, m)| m.location.clone())
+            },
+            || {
+                crate::db::taint_sources::method_reads_source(
+                    ea.db,
+                    &ea.file,
+                    resolved.owner_fqcn.as_ref(),
+                    &method_name_lower,
+                )
+            },
+            || {
+                crate::db::method_taint_summary(
+                    ea.db,
+                    &ea.file,
+                    resolved.owner_fqcn.as_ref(),
+                    &method_name_lower,
+                )
+            },
+        );
+
         // `@psalm-self-out Type` — report how this call narrows/changes the
         // receiver (including `$this`) for this one atomic. The caller merges
         // every atomic's contribution and writes the receiver variable once

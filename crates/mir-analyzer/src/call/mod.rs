@@ -305,6 +305,49 @@ pub(crate) fn for_each_bound_arg<'a>(
     }
 }
 
+/// Taint the variables passed to a user callee's by-ref parameters with the source data it writes into them.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn taint_byref_outputs(
+    ea: &crate::expr::ExpressionAnalyzer<'_>,
+    ctx: &mut crate::flow_state::FlowState,
+    params: &[mir_codebase::definitions::DeclaredParam],
+    args: &[php_ast::owned::Arg],
+    receiver: Option<&php_ast::owned::Expr>,
+    location: impl Fn() -> Option<mir_types::Location>,
+    reads_source: impl Fn() -> bool,
+    summary: impl Fn() -> Option<crate::taint::TaintSummary>,
+) {
+    for (i, param) in params.iter().enumerate() {
+        if !param.is_byref || param.is_variadic {
+            continue;
+        }
+        let Some(value) = resolve_named_arg_type_index(params, args, i)
+            .and_then(|idx| args.get(idx))
+            .and_then(|arg| arg.value.as_ref())
+        else {
+            continue;
+        };
+        let php_ast::owned::ExprKind::Variable(name) = &value.kind else {
+            continue;
+        };
+        let written = crate::taint::byref_output_taint(
+            i,
+            &location,
+            params,
+            args,
+            receiver,
+            &reads_source,
+            &summary,
+            ctx,
+            ea.db,
+            &ea.file,
+        );
+        if !written.is_empty() {
+            ctx.taint_var(name.as_ref(), written);
+        }
+    }
+}
+
 /// Type a by-ref argument holds after the call: `@param-out`, else the declared
 /// param type (the callee may have written anything the type admits).
 pub(crate) fn byref_written_type(
