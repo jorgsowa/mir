@@ -99,3 +99,22 @@ impl NameBareExt for php_ast::owned::ExprKind {
         }
     }
 }
+
+pub(crate) trait NameResolveExt {
+    /// The fully qualified name a function, class or constant reference resolves to.
+    fn resolve_name_ref(&self, db: &dyn crate::db::MirDatabase, file: &str) -> Option<String>;
+}
+
+impl NameResolveExt for php_ast::owned::ExprKind {
+    fn resolve_name_ref(&self, db: &dyn crate::db::MirDatabase, file: &str) -> Option<String> {
+        use php_ast::ast::NameKind;
+        match self {
+            php_ast::owned::ExprKind::Name(n) if n.kind == NameKind::FullyQualified => {
+                Some(n.join_parts())
+            }
+            _ => self
+                .name_ref()
+                .map(|name| crate::db::resolve_name(db, file, &name)),
+        }
+    }
+}

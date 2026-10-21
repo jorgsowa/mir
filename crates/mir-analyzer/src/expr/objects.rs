@@ -1,7 +1,7 @@
 use super::helpers::extract_string_from_expr;
 use super::{root_receiver_var, ExpressionAnalyzer};
 use crate::ast_ext::ArgExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::flow_state::FlowState;
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
@@ -292,8 +292,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         use crate::taint::SinkKind;
         let (value, kind) = match &n.class.kind {
             ExprKind::Identifier(_) | ExprKind::Name(_) => {
-                let name = n.class.kind.name_ref().unwrap_or_default();
-                let fqcn = crate::db::resolve_name(self.db, &self.file, name.as_ref());
+                let fqcn = n
+                    .class
+                    .kind
+                    .resolve_name_ref(self.db, &self.file)
+                    .unwrap_or_default();
                 let Some(kind) = crate::taint::classify_constructor_sink(self.db, &fqcn) else {
                     return;
                 };
@@ -325,8 +328,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         class: &php_ast::owned::Expr,
         ctx: &FlowState,
     ) -> Option<Arc<mir_codebase::definitions::MethodDef>> {
-        let name = class.kind.name_ref()?;
-        let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
+        let resolved = class.kind.resolve_name_ref(self.db, &self.file)?;
         let fqcn: Arc<str> = match resolved.as_str() {
             "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
             "parent" => ctx.parent_fqcn.clone()?,
@@ -441,9 +443,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Generic type params inferred from constructor arguments, attached to
         // the resulting `TNamedObject` so member-access substitution works.
         let mut inferred_type_params: Arc<[Type]> = mir_types::union::empty_type_params();
-        let class_ty = match n.class.kind.name_ref() {
-            Some(name) => {
-                let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
+        let class_ty = match n.class.kind.resolve_name_ref(self.db, &self.file) {
+            Some(resolved) => {
                 let fqcn: Arc<str> = match resolved.as_str() {
                     "self" | "static" => ctx
                         .self_fqcn
@@ -868,14 +869,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         let ExprKind::ClassConstAccess(cca) = &object.kind else {
             return None;
         };
-        let class_id = cca.class.kind.name_ref()?;
+        let resolved = cca.class.kind.resolve_name_ref(self.db, &self.file)?;
         let ExprKind::Identifier(case_name) = &cca.member.kind else {
             return None;
         };
         if case_name.as_ref() == "class" {
             return None;
         }
-        let resolved = crate::db::resolve_name(self.db, &self.file, class_id.as_ref());
         let here = crate::db::Fqcn::from_str(self.db, &resolved);
         let crate::db::ClassLike::Enum(e) = crate::db::find_class_like(self.db, here)? else {
             return None;
@@ -1145,8 +1145,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         let mut result_ty = Type::mixed();
-        if let Some(id) = spa.class.kind.name_ref() {
-            let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+        if let Some(resolved) = spa.class.kind.resolve_name_ref(self.db, &self.file) {
             if matches!(resolved.as_str(), "self" | "static" | "parent") {
                 // Resolve the relative keyword through the FlowState and record
                 // the property read so a `self::$prop` access counts as a use
@@ -1424,8 +1423,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         if expr_name_str(&cca.member) == Some("class") {
-            if let Some(id) = cca.class.kind.name_ref() {
-                let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+            if let Some(resolved) = cca.class.kind.resolve_name_ref(self.db, &self.file) {
                 if resolved.as_str() == "parent"
                     && ctx.parent_fqcn.is_none()
                     && ctx.self_fqcn.is_some()
@@ -1513,8 +1511,11 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let fqcn = match &cca.class.kind {
             ExprKind::Identifier(_) | ExprKind::Name(_) => {
-                let id = cca.class.kind.name_ref().unwrap_or_default();
-                let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                let resolved = cca
+                    .class
+                    .kind
+                    .resolve_name_ref(self.db, &self.file)
+                    .unwrap_or_default();
                 match resolved.as_str() {
                     "self" | "static" => {
                         let Some(self_fqcn) = &ctx.self_fqcn else {
