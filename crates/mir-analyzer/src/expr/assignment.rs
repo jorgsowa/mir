@@ -202,7 +202,7 @@ fn array_literal_key_taints(
                 literal_key_name(Some(key))?
             }
         };
-        keys.set(key, crate::taint::expr_taint(&el.value, ctx, db, file));
+        keys.set(key, crate::taint::value_taint(&el.value, ctx, db, file));
     }
     Some(keys)
 }
@@ -663,7 +663,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // simple-variable base is tracked, matching every other
                     // taint-propagating target arm above.
                     ExprKind::ArrayAccess(aa) => {
-                        taint_array_element_write(aa, ctx, self.db, &self.file, rhs_taint, true);
+                        let stored = rhs_taint
+                            | crate::taint::held_prop_taint(&a.value, ctx, self.db, &self.file);
+                        taint_array_element_write(aa, ctx, self.db, &self.file, stored, true);
                     }
                     // `self::$prop = $tainted;` / `Foo::$prop = $tainted;` —
                     // static properties were entirely untracked for taint,

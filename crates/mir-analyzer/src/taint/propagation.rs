@@ -134,7 +134,7 @@ pub(super) fn user_call_taint(
     // Inferring a summary only pays off when it can return source data, tainted
     // arguments or the receiver's tainted properties.
     let worth_summary = || {
-        (returns_param() && !demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty())
+        (returns_param() && !demanding_taint(args_value_taint(args, ctx, db, file), ctx).is_empty())
             || (receiver_demands_summary(receiver, ctx, db, file) && returns_prop())
             || reads_source()
     };
@@ -144,7 +144,7 @@ pub(super) fn user_call_taint(
                 s.slot_taint(slot, receiver, params, args, ctx, db, file)
             })
         }),
-        CalleeBody::Dependency => args_taint(args, ctx, db, file),
+        CalleeBody::Dependency => args_value_taint(args, ctx, db, file),
         _ => Taint::NONE,
     };
     let Some(annotations) = annotations else {
@@ -185,6 +185,61 @@ pub fn args_taint(
     args.iter()
         .filter_map(|a| a.value.as_ref())
         .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file))
+}
+
+/// Taint of an argument or element: the value's own, plus what the object it holds keeps in properties.
+pub fn value_taint(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    expr_taint(expr, ctx, db, file) | held_prop_taint(expr, ctx, db, file)
+}
+
+/// Taint the object `expr` evaluates to keeps in its properties.
+pub fn held_prop_taint(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    match &unwrap_parens(expr).kind {
+        ExprKind::Variable(var) if !ctx.tainted_props.is_empty() => {
+            let var = mir_types::Name::from(var.trim_start_matches('$'));
+            ctx.tainted_props
+                .iter()
+                .filter(|((object, _), _)| *object == var)
+                .fold(Taint::NONE, |acc, (_, taint)| acc | *taint)
+        }
+        ExprKind::New(new) => constructed_prop_taints(new, ctx, db, file)
+            .into_iter()
+            .fold(Taint::NONE, |acc, (_, taint)| acc | taint),
+        ExprKind::Ternary(t) => {
+            held_prop_taint(
+                t.then_expr.as_deref().unwrap_or(&t.condition),
+                ctx,
+                db,
+                file,
+            ) | held_prop_taint(&t.else_expr, ctx, db, file)
+        }
+        ExprKind::NullCoalesce(nc) => {
+            held_prop_taint(&nc.left, ctx, db, file) | held_prop_taint(&nc.right, ctx, db, file)
+        }
+        _ => Taint::NONE,
+    }
+}
+
+/// Union of the taint every argument of a call passes on, objects' properties included.
+pub fn args_value_taint(
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    args.iter()
+        .filter_map(|a| a.value.as_ref())
+        .fold(Taint::NONE, |acc, v| acc | value_taint(v, ctx, db, file))
 }
 
 /// Like `resolve_name`, but honours `use function` imports.
@@ -485,7 +540,7 @@ pub fn expr_taint(
                 .key
                 .as_ref()
                 .map_or(Taint::NONE, |k| expr_taint(k, ctx, db, file));
-            acc | key | expr_taint(&el.value, ctx, db, file)
+            acc | key | value_taint(&el.value, ctx, db, file)
         }),
 
         ExprKind::FunctionCall(fc) => {

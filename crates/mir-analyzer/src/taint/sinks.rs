@@ -48,7 +48,7 @@ pub fn check_call_sinks(
         })
         .collect();
     let mut callee = TaintSummary::default();
-    if !demanding_taint(args_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
+    if !demanding_taint(args_value_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
         || receiver_demands_summary(receiver, ctx, ea.db, &ea.file)
     {
         if let Some(summary) = summary(ea.db, &ea.file) {
@@ -83,7 +83,7 @@ pub fn check_call_sinks(
             let taint = if guarded {
                 object_arg_taint(value, ctx, ea.db, &ea.file)
             } else {
-                expr_taint(value, ctx, ea.db, &ea.file)
+                value_taint(value, ctx, ea.db, &ea.file)
             };
             ea.taint_summary
                 .record_param_sinks(taint, sink.kinds, &sink.issue);

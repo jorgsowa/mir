@@ -296,7 +296,7 @@ impl TaintSummary {
                     acc | if guarded {
                         object_arg_taint(e, ctx, db, file)
                     } else {
-                        expr_taint(e, ctx, db, file)
+                        value_taint(e, ctx, db, file)
                     }
                 }),
         }

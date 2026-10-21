@@ -203,7 +203,7 @@ pub(super) fn object_arg_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    let taint = expr_taint(value, ctx, db, file);
+    let taint = value_taint(value, ctx, db, file);
     let guards = object_guard_slots(taint, param_parts(value, ctx, db, file), ctx);
     as_object(taint, &guards)
 }

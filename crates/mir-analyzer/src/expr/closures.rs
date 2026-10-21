@@ -646,6 +646,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &mut taint_captures,
                 ),
             );
+            if !ctx.tainted_props.is_empty() {
+                for ((object, prop), taint) in ctx.tainted_props.iter() {
+                    if object.as_str() == name {
+                        closure_ctx.set_prop_taint(name, prop.as_str(), *taint);
+                    }
+                }
+            }
             // The enclosing scope can rebind a by-reference capture after this point.
             if let Some(closure) = ctx
                 .closures

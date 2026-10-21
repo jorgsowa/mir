@@ -322,6 +322,7 @@ function flushed_then_reset(): void {
 //  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 
     $b = new FlushedThroughStatic($_GET['q']);
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $b->flush();
 //  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 
