@@ -1653,8 +1653,17 @@ impl CallAnalyzer {
             .iter()
             .any(|g| g.eq_ignore_ascii_case(&fn_name) || g.eq_ignore_ascii_case(short_fn));
         if !call_user_func_string_arg && !guarded {
+            let is_relative = fn_name
+                .get(..10)
+                .is_some_and(|p| p.eq_ignore_ascii_case("namespace\\"));
             ea.emit(
-                IssueKind::UndefinedFunction { name: fn_name },
+                IssueKind::UndefinedFunction {
+                    name: if is_relative {
+                        resolved_fn_name
+                    } else {
+                        fn_name
+                    },
+                },
                 Severity::Error,
                 span,
             );
