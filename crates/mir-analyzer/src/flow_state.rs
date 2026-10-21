@@ -1453,8 +1453,40 @@ impl FlowState {
     }
 
     fn unbind_closure(&mut self, sym: Name) {
-        if self.closures.by_var.contains_key(&sym) {
-            Arc::make_mut(&mut self.closures).by_var.remove(&sym);
+        if self.closures.by_var.is_empty() {
+            return;
+        }
+        let prefix = format!("{sym}->");
+        if self
+            .closures
+            .by_var
+            .keys()
+            .any(|key| *key == sym || key.as_str().starts_with(&prefix))
+        {
+            Arc::make_mut(&mut self.closures)
+                .by_var
+                .retain(|key, _| *key != sym && !key.as_str().starts_with(&prefix));
+        }
+    }
+
+    /// Bind the closure held in `object->prop`, or drop what the property held.
+    pub fn bind_prop_closure(
+        &mut self,
+        object: &str,
+        prop: &str,
+        closure: Option<Arc<ClosureSummary>>,
+    ) {
+        let key = prop_closure_key(object, prop);
+        match closure {
+            Some(closure) => {
+                Arc::make_mut(&mut self.closures)
+                    .by_var
+                    .insert(key, closure);
+            }
+            None if self.closures.by_var.contains_key(&key) => {
+                Arc::make_mut(&mut self.closures).by_var.remove(&key);
+            }
+            None => {}
         }
     }
 
@@ -2385,6 +2417,11 @@ impl ClosureSummary {
         slot.checked_sub(self.params.len())
             .and_then(|index| self.captures.get(index).copied())
     }
+}
+
+/// The `by_var` key of a closure held in a property; no variable name contains `->`.
+pub fn prop_closure_key(object: &str, prop: &str) -> Name {
+    Name::from(format!("{}->{prop}", object.trim_start_matches('$')).as_str())
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

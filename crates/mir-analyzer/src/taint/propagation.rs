@@ -206,7 +206,7 @@ pub fn byref_output_taint(
 /// Strip any number of redundant parens (`((expr))` -> `expr`) — a call
 /// target keeps its parens in the AST (`(fn() => ...)()`), unlike most
 /// other expression positions.
-pub(super) fn unwrap_parens(expr: &Expr) -> &Expr {
+pub fn unwrap_parens(expr: &Expr) -> &Expr {
     let mut e = expr;
     while let ExprKind::Parenthesized(inner) = &e.kind {
         e = inner;

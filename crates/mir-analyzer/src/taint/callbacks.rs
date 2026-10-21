@@ -37,6 +37,99 @@ pub(super) fn callee_closure(
                 .cloned()
                 .unwrap_or_else(|| std::sync::Arc::new(arrow_summary(af, ctx, db, file))),
         ),
+        ExprKind::PropertyAccess(pa) => {
+            let ExprKind::Variable(object) = &pa.object.kind else {
+                return None;
+            };
+            let prop = crate::expr::helpers::extract_string_from_expr(&pa.property)?;
+            ctx.closures
+                .by_var
+                .get(&crate::flow_state::prop_closure_key(
+                    object.trim_start_matches('$'),
+                    &prop,
+                ))
+                .cloned()
+        }
+        _ => None,
+    }
+}
+
+/// The summary of a first-class callable of a named function (`id(...)`), laid out like a closure's.
+pub fn callable_summary(
+    callable: &Expr,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<crate::flow_state::ClosureSummary>> {
+    if !db.taint_analysis() {
+        return None;
+    }
+    let name = callback_function_name(callable)?;
+    let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
+    let resolved = crate::db::resolve_name(db, file, name);
+    let func = crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))?;
+    let tracked = func.params.len().min(MAX_TRACKED_PARAMS);
+    let through =
+        |kinds: Taint| (0..tracked).fold(Taint::NONE, |acc, slot| acc | Taint::label(slot, kinds));
+    let mut summary = TaintSummary::default();
+    let is_user_body = CalleeBody::of(func.location.as_ref(), file) == CalleeBody::Summarized;
+    if is_user_body {
+        if let Some(inferred) = crate::db::function_taint_summary(db, file, func.fqn.as_ref()) {
+            summary = inferred;
+        }
+    } else if !func
+        .return_type
+        .as_deref()
+        .is_some_and(|ty| ty.is_void() || is_injection_safe_type(ty))
+    {
+        summary.returns = match sanitized_kinds(&lower) {
+            Some(removed) => through(Taint::ALL.difference(removed)),
+            None => through(Taint::ALL),
+        };
+    }
+    if !is_user_body {
+        for sink in builtin_sinks(&lower) {
+            let positions = match sink.index {
+                Some(index) => index..index + 1,
+                None => 0..tracked,
+            };
+            for param in positions.filter(|param| *param < MAX_TRACKED_PARAMS) {
+                summary.param_sinks.push(ParamSink {
+                    param,
+                    kinds: sink.kind.taint(),
+                    issue: sink.kind.issue(),
+                });
+            }
+        }
+    }
+    Some(std::sync::Arc::new(crate::flow_state::ClosureSummary {
+        params: func
+            .params
+            .iter()
+            .map(|p| (mir_types::Name::new(p.name.as_ref()), p.is_variadic))
+            .collect(),
+        summary,
+        captures: Vec::new(),
+    }))
+}
+
+/// The closure an assignment's value evaluates to, when it is one.
+pub fn assigned_closure(
+    value: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<crate::flow_state::ClosureSummary>> {
+    match &value.kind {
+        ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => {
+            ctx.closures.by_span.get(&value.span.start).cloned()
+        }
+        ExprKind::Variable(source) => ctx
+            .closures
+            .by_var
+            .get(&mir_types::Name::from(source.trim_start_matches('$')))
+            .cloned(),
+        ExprKind::PropertyAccess(_) => callee_closure(value, ctx, db, file),
+        ExprKind::CallableCreate(_) => callable_summary(value, db, file),
         _ => None,
     }
 }

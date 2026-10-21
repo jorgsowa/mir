@@ -583,21 +583,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let (true, ExprKind::Variable(source)) = (a.by_ref, &a.value.kind) {
                             ctx.clear_plain(mir_types::Name::from(source.trim_start_matches('$')));
                         }
-                        let mut value = a.value.as_ref();
-                        while let ExprKind::Parenthesized(inner) = &value.kind {
-                            value = inner;
-                        }
-                        let closure = match &value.kind {
-                            ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => {
-                                ctx.closures.by_span.get(&value.span.start).cloned()
-                            }
-                            ExprKind::Variable(source) => ctx
-                                .closures
-                                .by_var
-                                .get(&mir_types::Name::from(source.trim_start_matches('$')))
-                                .cloned(),
-                            _ => None,
-                        };
+                        let value = crate::taint::unwrap_parens(&a.value);
+                        let closure =
+                            crate::taint::assigned_closure(value, ctx, self.db, &self.file);
                         if let Some(closure) = closure.filter(|_| !a.by_ref) {
                             ctx.bind_closure(name.as_ref(), closure);
                         }
@@ -642,6 +630,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     rhs_taint
                                 };
                                 ctx.set_prop_taint_through_aliases(obj_var, &prop_name, stored);
+                                let value = crate::taint::unwrap_parens(&a.value);
+                                let closure =
+                                    crate::taint::assigned_closure(value, ctx, self.db, &self.file)
+                                        .filter(|_| !a.by_ref);
+                                ctx.bind_prop_closure(obj_var, &prop_name, closure);
                             }
                         } else {
                             // `$o->a->b = $tainted` taints `$o->a` as a whole.
