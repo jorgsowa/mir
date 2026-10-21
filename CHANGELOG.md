@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A call to a method that stores its argument in a static property (`Registry::put($_GET['x']); echo Registry::$w`), and a static property passed to a by-ref parameter the callee writes source data into, taints that static property for the reads that follow.
 - Source data a user function or method writes into a by-ref parameter taints the variable passed for it (`function read(&$out) { $out = $_GET['a']; } read($v); echo $v`).
 - A method that stores its argument in a property taints that property of the object it is called on (`$o = new S('a'); $o->setN($_GET['b']); echo $o->n`), and a property written through one variable (directly or by a setter) is seen through every variable that may hold the same object (`$t = $o; $t->n = $_GET['b']; echo $o->n`). A later call that stores clean data clears it.
 - An object holding tainted properties keeps them when it goes into an array or a closure's `use`, or is passed to a function or method (`foreach ([new W($_GET['a'])] as $o) echo $o->n`, `show($o)`).

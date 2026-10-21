@@ -916,6 +916,53 @@ pub fn own_call_prop_writes(
         .collect()
 }
 
+/// Taint a call to `method` on `class` leaves in each static property, with the classes whose
+/// reads should see it, from what the method stores there.
+#[allow(clippy::too_many_arguments)]
+pub fn static_call_prop_writes(
+    class: &str,
+    method: &Expr,
+    args: &[php_ast::owned::Arg],
+    receiver: Option<&Expr>,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<(Vec<std::sync::Arc<str>>, mir_types::Name, Taint)> {
+    let ExprKind::Identifier(name) = &method.kind else {
+        return Vec::new();
+    };
+    if demanding_taint(args_taint(args, ctx, db, file), ctx).is_empty() {
+        return Vec::new();
+    }
+    let lower = crate::util::php_ident_lowercase(name);
+    let Some((owner, callee)) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, class), &lower)
+    else {
+        return Vec::new();
+    };
+    if !crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), &lower) {
+        return Vec::new();
+    }
+    let Some(summary) = crate::db::method_taint_summary(db, file, owner.as_ref(), &lower) else {
+        return Vec::new();
+    };
+    let mut classes = vec![std::sync::Arc::<str>::from(class)];
+    if owner.as_ref() != class {
+        classes.push(std::sync::Arc::from(owner.as_ref()));
+    }
+    summary
+        .prop_writes
+        .iter()
+        .filter_map(|(key, taint)| {
+            let prop = key.as_str().strip_prefix('$')?;
+            let stored = resolve_labels(*taint, |slot| {
+                summary.slot_taint(slot, receiver, &callee.params, args, ctx, db, file)
+            });
+            (!stored.is_empty()).then(|| (classes.clone(), mir_types::Name::from(prop), stored))
+        })
+        .collect()
+}
+
 /// Taint a call to `method` on the object `$var` holds leaves in each of its instance properties,
 /// from what that method stores there.
 pub fn receiver_call_prop_writes(

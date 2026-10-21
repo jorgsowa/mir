@@ -165,6 +165,49 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// A call to a method that stores its arguments in a static property taints that property.
+    fn store_static_call_props(
+        &mut self,
+        target: &php_ast::owned::Expr,
+        method: &php_ast::owned::Expr,
+        args: &[php_ast::owned::Arg],
+        ctx: &mut FlowState,
+    ) {
+        let class = match &target.kind {
+            ExprKind::Identifier(name) => {
+                match crate::db::resolve_name(self.db, &self.file, name).as_str() {
+                    "self" | "static" => ctx.self_fqcn.clone(),
+                    "parent" => ctx.parent_fqcn.clone(),
+                    resolved => Some(Arc::from(resolved)),
+                }
+            }
+            ExprKind::Variable(var) if var.trim_start_matches('$') == "this" => {
+                ctx.self_fqcn.clone()
+            }
+            ExprKind::Variable(var) => match ctx.get_var(var).types.as_slice() {
+                [mir_types::Atomic::TNamedObject { fqcn, .. }] => Some(Arc::from(fqcn.as_ref())),
+                _ => None,
+            },
+            _ => None,
+        };
+        let Some(class) = class else { return };
+        let receiver = matches!(&target.kind, ExprKind::Variable(_)).then_some(target);
+        let writes = crate::taint::static_call_prop_writes(
+            &class, method, args, receiver, ctx, self.db, &self.file,
+        );
+        for (classes, prop, taint) in writes {
+            for class in &classes {
+                ctx.taint_static_prop(class, prop.as_str(), taint);
+            }
+            if ctx.self_fqcn.as_deref() == Some(class.as_ref()) {
+                self.taint_summary.record_prop_write(
+                    crate::db::taint_sources::prop_key(prop.as_str(), true),
+                    taint,
+                );
+            }
+        }
+    }
+
     /// A call on a local object leaves its properties as the method stores them.
     fn store_receiver_call_props(
         &mut self,
@@ -764,6 +807,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
                 self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
+                self.store_static_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 ty
             }
 
@@ -782,6 +826,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&smc.class, &smc.args, ctx);
                 self.store_own_call_props(&smc.class, &smc.method, &smc.args, ctx);
+                self.store_static_call_props(&smc.class, &smc.method, &smc.args, ctx);
                 ty
             }
 
