@@ -371,9 +371,80 @@ fn builtin_args_taint(
         Some(positions) if positional => positions
             .iter()
             .filter_map(|&i| args.get(i)?.value.as_ref())
-            .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file)),
-        _ => args_taint(args, ctx, db, file),
+            .fold(Taint::NONE, |acc, v| {
+                acc | stringified_taint(v, ctx, db, file)
+            }),
+        _ => args
+            .iter()
+            .filter_map(|a| a.value.as_ref())
+            .fold(Taint::NONE, |acc, v| {
+                acc | stringified_taint(v, ctx, db, file)
+            }),
     }
+}
+
+/// Taint of `expr` converted to a string: an object also yields what its `__toString()` returns.
+pub fn stringified_taint(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    expr_taint(expr, ctx, db, file) | to_string_taint(expr, ctx, db, file)
+}
+
+fn to_string_taint(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Taint {
+    if !db.taint_analysis() {
+        return Taint::NONE;
+    }
+    let receiver = unwrap_parens(expr);
+    let classes: Vec<String> = match &receiver.kind {
+        ExprKind::Ternary(t) => {
+            let then_expr = t.then_expr.as_deref().unwrap_or(&t.condition);
+            return to_string_taint(then_expr, ctx, db, file)
+                | to_string_taint(&t.else_expr, ctx, db, file);
+        }
+        ExprKind::NullCoalesce(nc) => {
+            return to_string_taint(&nc.left, ctx, db, file)
+                | to_string_taint(&nc.right, ctx, db, file);
+        }
+        ExprKind::New(_) => produced_object_classes(receiver, db, file),
+        ExprKind::Variable(var) => ctx
+            .vars
+            .get(&mir_types::Name::from(var.trim_start_matches('$')))
+            .map(|ty| {
+                ty.types
+                    .iter()
+                    .filter_map(|atom| match atom {
+                        mir_types::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.to_string()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        _ => return Taint::NONE,
+    };
+    classes
+        .iter()
+        .filter(|class| !class.is_empty())
+        .filter_map(|class| {
+            method_call_taint(
+                crate::db::Fqcn::from_str(db, class),
+                "__tostring",
+                &[],
+                Some(receiver),
+                false,
+                ctx,
+                db,
+                file,
+            )
+        })
+        .fold(Taint::NONE, |acc, taint| acc | taint)
 }
 
 /// The kinds of attacker-controlled data the expression could carry, given the
@@ -523,8 +594,16 @@ pub fn expr_taint(
         }
 
         ExprKind::Binary(op) => {
-            let taint = expr_taint(&op.left, ctx, db, file) | expr_taint(&op.right, ctx, db, file);
-            if op.op == php_ast::ast::BinaryOp::Concat && starts_with_fixed_url_origin(&op.left) {
+            let concat = op.op == php_ast::ast::BinaryOp::Concat;
+            let operand = |e: &Expr| {
+                if concat {
+                    stringified_taint(e, ctx, db, file)
+                } else {
+                    expr_taint(e, ctx, db, file)
+                }
+            };
+            let taint = operand(&op.left) | operand(&op.right);
+            if concat && starts_with_fixed_url_origin(&op.left) {
                 taint.without(Taint::SSRF | Taint::FILE)
             } else {
                 taint
@@ -537,7 +616,7 @@ pub fn expr_taint(
         | ExprKind::Heredoc { parts, .. }
         | ExprKind::ShellExec(parts) => {
             let taint = parts.iter().fold(Taint::NONE, |acc, p| match p {
-                StringPart::Expr(e) => acc | expr_taint(e, ctx, db, file),
+                StringPart::Expr(e) => acc | stringified_taint(e, ctx, db, file),
                 StringPart::Literal(_) => acc,
                 _ => acc,
             });
@@ -566,6 +645,7 @@ pub fn expr_taint(
             php_ast::ast::CastKind::Int
             | php_ast::ast::CastKind::Float
             | php_ast::ast::CastKind::Bool => Taint::NONE,
+            php_ast::ast::CastKind::String => stringified_taint(inner, ctx, db, file),
             _ => expr_taint(inner, ctx, db, file),
         },
 

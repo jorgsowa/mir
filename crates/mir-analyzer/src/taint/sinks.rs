@@ -454,7 +454,7 @@ pub fn reaches_sink(
     file: &str,
     summary: &mut TaintSummary,
 ) -> bool {
-    let taint = expr_taint(expr, ctx, db, file);
+    let taint = stringified_taint(expr, ctx, db, file);
     summary.record_param_sinks(taint, sink, issue);
     taint.concrete().intersects(sink)
 }

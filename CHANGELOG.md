@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An object used as a string (`echo new W($_GET['a'])`, concatenation, interpolation, a string cast) carries the taint its `__toString()` returns.
 - Values a generator yields, and their keys, carry their taint to the code iterating it (`function g() { yield $_GET['a']; } foreach (g() as $v) echo $v`), including through `yield from` and a declared `Generator` or `iterable` return type.
 - A method called straight on an inline `new` returns what its body reads or the arguments carry (`echo (new Source)->fromRequest()`).
 - A call to a method that stores its argument in a static property (`Registry::put($_GET['x']); echo Registry::$w`), and a static property passed to a by-ref parameter the callee writes source data into, taints that static property for the reads that follow.
