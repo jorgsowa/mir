@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Inside a namespace, callbacks of `array_map()` and friends resolved to a namespaced name and lost what they return: `array_map('intval', $_GET['l'])` stayed tainted. A string callback is now a fully qualified name and a first-class callable falls back to the global function.
 - `switch ($_GET['a']) { case 'x': echo $_GET['a']; }` and `$_GET['a'] === 'x'` / `in_array($_GET['a'], ['x', 'y'], true)` clear the element where the check holds; `default:`, fallthrough bodies, non-literal labels and the loose forms stay tainted.
 - A validation guard on an array element clears it: `if (!ctype_digit($_GET['a'])) return; echo $_GET['a'];`, also for `$data['id']`, under `?? ''`, and when `preg_match()` or `ctype_*()` is compared with its result (`=== 1`, `> 0`, `!== false`).
 - Arithmetic, shifts, comparisons and boolean operators yield a number or a bool and no longer carry taint (`$n = $_GET['a'] + 1; echo $n`, `$total += $_GET['a']`); `+` with no scalar operand stays tainted since it may union arrays, as does `.`.
