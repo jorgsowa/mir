@@ -101,20 +101,16 @@ fn body_writes_no_properties(m: &MethodDecl, safe: &HashSet<&str>) -> bool {
     let Some(body) = &m.body else {
         return false;
     };
-    let mut scan = BodyScan { safe, clean: true };
-    body.stmts
-        .iter()
-        .all(|s| scan.visit_stmt(s).is_continue() && scan.clean)
+    let mut scan = BodyScan { safe };
+    body.stmts.iter().all(|s| scan.visit_stmt(s).is_continue())
 }
 
 struct BodyScan<'a> {
     safe: &'a HashSet<&'a str>,
-    clean: bool,
 }
 
 impl BodyScan<'_> {
-    fn reject(&mut self) -> ControlFlow<()> {
-        self.clean = false;
+    fn reject(&self) -> ControlFlow<()> {
         ControlFlow::Break(())
     }
 }
