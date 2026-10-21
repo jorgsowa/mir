@@ -597,14 +597,14 @@ pub fn expr_taint(
                 crate::expr::assignment::literal_key_name(aa.index.as_deref()),
             ) {
                 let n = name.trim_start_matches('$');
-                if is_superglobal(n) {
-                    ctx.key_taints(n).map_or(Taint::ALL, |keys| keys.get(key))
-                } else if ctx
+                if ctx
                     .vars
                     .get(&mir_types::Name::from(n))
                     .is_some_and(|ty| shape_entry_is_safe(ty, key))
                 {
                     Taint::NONE
+                } else if is_superglobal(n) {
+                    ctx.key_taints(n).map_or(Taint::ALL, |keys| keys.get(key))
                 } else {
                     ctx.key_taint(n, key)
                 }
@@ -1388,12 +1388,17 @@ fn branch_taint(
 }
 
 fn has_taint_guard(condition: &Expr) -> bool {
+    if crate::taint_guard::guarded_when(condition, true).is_some()
+        || crate::taint_guard::guarded_when(condition, false).is_some()
+    {
+        return true;
+    }
     match &condition.kind {
         ExprKind::Parenthesized(inner) => has_taint_guard(inner),
         ExprKind::UnaryPrefix(u) if u.op == php_ast::ast::UnaryPrefixOp::BooleanNot => {
             has_taint_guard(&u.operand)
         }
         ExprKind::Binary(b) => has_taint_guard(&b.left) || has_taint_guard(&b.right),
-        _ => crate::taint_guard::guarded_var(condition).is_some(),
+        _ => false,
     }
 }

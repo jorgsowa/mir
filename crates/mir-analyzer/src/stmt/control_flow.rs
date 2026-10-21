@@ -678,6 +678,8 @@ impl<'a> StatementsAnalyzer<'a> {
         // fell-through conditions matched too, OR semantics, not just this
         // case's own. Accumulated here and reset once a body actually runs.
         let mut pending_conditions: Vec<&php_ast::owned::Expr> = Vec::new();
+        // The previous body can run on into this one, so the labels alone don't say what the subject is.
+        let mut entered_by_fallthrough = false;
         for case in sw.body.cases.iter() {
             let mut case_ctx = pre_ctx.branch();
             if let Some(val) = &case.value {
@@ -781,6 +783,15 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             let body_is_empty = case.body.is_empty();
+
+            if !switch_on_true && !entered_by_fallthrough && !body_is_empty && case.value.is_some()
+            {
+                if let Some((guarded, safe)) =
+                    crate::taint_guard::switch_guard(&sw.expr, &pending_conditions)
+                {
+                    case_ctx.apply_taint_guard(guarded, safe);
+                }
+            }
 
             // A body reached via multiple fallen-through labels executes
             // under the UNION of their conditions, not just this case's own
@@ -972,10 +983,11 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             self.analyze_stmts(&case.body, &mut case_ctx);
-            case_results.push(case_ctx);
             if !body_is_empty {
+                entered_by_fallthrough = !case_ctx.diverges;
                 pending_conditions.clear();
             }
+            case_results.push(case_ctx);
         }
 
         let n = case_results.len();

@@ -299,8 +299,13 @@ pub fn guarded_var(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
 /// call compared with the result it returns on a match (`preg_match(..) === 1`, `ctype_digit(..) !== false`).
 pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
     let ExprKind::Binary(b) = &cond.kind else {
-        return holds.then(|| guarded_var(cond)).flatten();
+        return holds
+            .then(|| guarded_var(cond).or_else(|| guarded_by_list(cond)))
+            .flatten();
     };
+    if let Some(guard) = guarded_by_literal(b, holds) {
+        return Some(guard);
+    }
     let (call, literal, op) = match (&b.left.kind, &b.right.kind) {
         (ExprKind::Int(_) | ExprKind::Bool(_), _) => (&*b.right, &b.left.kind, flipped(b.op)?),
         (_, ExprKind::Int(_) | ExprKind::Bool(_)) => (&*b.left, &b.right.kind, b.op),
@@ -314,6 +319,99 @@ pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
         _ => return None,
     };
     (holds == matched_when).then_some((guarded, safe))
+}
+
+/// `$x === 'lit'` proves the value is the program's own literal; the loose `==` also admits
+/// other values, which a variable's type narrowing doesn't treat as a proof either.
+fn guarded_by_literal(b: &php_ast::owned::BinaryExpr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
+    let subject = if is_literal(&b.right) {
+        &*b.left
+    } else if is_literal(&b.left) {
+        &*b.right
+    } else {
+        return None;
+    };
+    let identical = match b.op {
+        BinaryOp::Identical => true,
+        BinaryOp::NotIdentical => false,
+        _ => return None,
+    };
+    (holds == identical).then_some((guarded_subject(subject)?, Taint::ALL))
+}
+
+/// `in_array($x, ['a', 'b'], true)` proves the value is one of the listed literals.
+fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
+    let ExprKind::FunctionCall(fc) = &call.kind else {
+        return None;
+    };
+    let ExprKind::Identifier(name) = &fc.name.kind else {
+        return None;
+    };
+    if !crate::util::php_ident_lowercase(name.trim_start_matches('\\')).eq("in_array")
+        || fc.args.iter().any(|a| a.name.is_some() || a.unpack)
+    {
+        return None;
+    }
+    let strict = matches!(
+        fc.args
+            .get(2)
+            .and_then(|a| a.value.as_ref())
+            .map(|v| &v.kind),
+        Some(ExprKind::Bool(true))
+    );
+    let ExprKind::Array(items) = &fc.args.get(1)?.value.as_ref()?.kind else {
+        return None;
+    };
+    if !strict
+        || items
+            .iter()
+            .any(|item| item.unpack || item.by_ref || !is_literal(&item.value))
+    {
+        return None;
+    }
+    Some((
+        guarded_subject(fc.args.first()?.value.as_ref()?)?,
+        Taint::ALL,
+    ))
+}
+
+fn is_literal(expr: &Expr) -> bool {
+    matches!(
+        expr.kind,
+        ExprKind::String(_)
+            | ExprKind::Int(_)
+            | ExprKind::Float(_)
+            | ExprKind::Bool(_)
+            | ExprKind::Null
+    )
+}
+
+/// Kinds a switch subject is safe for once `==` matched `literal`: a number literal also admits
+/// whitespace-padded numeric strings, and `"1e3" == "1000"` compares numerically.
+fn case_safe_kinds(literal: &Expr) -> Option<Taint> {
+    let numeric = || safe_kinds(digits().union(CharSet::of(" \t\n\r\x0b\x0c+-.eE")));
+    match &literal.kind {
+        ExprKind::String(s) if !looks_numeric(s) => Some(Taint::ALL),
+        ExprKind::String(_) | ExprKind::Int(_) | ExprKind::Float(_) => Some(numeric()),
+        _ => None,
+    }
+}
+
+fn looks_numeric(text: &str) -> bool {
+    let rest = text.trim_start_matches([' ', '\t', '\n', '\r', '\x0b', '\x0c']);
+    let rest = rest.strip_prefix(['+', '-']).unwrap_or(rest);
+    let rest = rest.strip_prefix('.').unwrap_or(rest);
+    rest.starts_with(|c: char| c.is_ascii_digit())
+}
+
+/// Kinds a switch subject is safe for inside a body reached only through `case` labels spelling `labels`.
+pub fn switch_guard<'a>(subject: &'a Expr, labels: &[&Expr]) -> Option<(Guarded<'a>, Taint)> {
+    let guarded = guarded_subject(subject)?;
+    let mut safe = Taint::ALL;
+    for label in labels {
+        safe = safe.intersection(case_safe_kinds(label)?);
+    }
+    (!safe.is_empty()).then_some((guarded, safe))
 }
 
 fn flipped(op: BinaryOp) -> Option<BinaryOp> {
@@ -436,5 +534,20 @@ mod tests {
         assert!(kinds.intersects(Taint::SQL));
         assert!(!kinds.intersects(Taint::CALLABLE));
         assert!(safe_kinds(digits()).intersects(Taint::CALLABLE));
+    }
+
+    #[test]
+    fn numeric_case_labels_keep_whitespace_kinds_tainted() {
+        assert!(looks_numeric(" -1.5e3"));
+        assert!(looks_numeric(".5"));
+        assert!(!looks_numeric("x1"));
+        assert!(!looks_numeric(""));
+        let int = |n| php_ast::owned::Expr {
+            kind: ExprKind::Int(n),
+            span: Default::default(),
+        };
+        let kinds = case_safe_kinds(&int(1)).unwrap();
+        assert!(kinds.intersects(Taint::HTML));
+        assert!(!kinds.intersects(Taint::HEADER));
     }
 }

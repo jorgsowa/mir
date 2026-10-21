@@ -126,15 +126,8 @@ pub fn narrow_from_condition(
             std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
         }
     }
-    match crate::taint_guard::guarded_when(expr, is_true) {
-        Some((crate::taint_guard::Guarded::Var(var), safe)) => {
-            let taint = ctx.var_taint(var).without(safe);
-            ctx.set_var_taint(var, taint);
-        }
-        Some((crate::taint_guard::Guarded::Element { var, key }, safe)) => {
-            ctx.guard_element_taint(var, key, safe);
-        }
-        None => {}
+    if let Some((guarded, safe)) = crate::taint_guard::guarded_when(expr, is_true) {
+        ctx.apply_taint_guard(guarded, safe);
     }
     if let Some(var) = crate::taint::proven_object(expr, is_true) {
         crate::taint::guard_object(ctx, var);

@@ -1591,6 +1591,22 @@ impl FlowState {
         }
     }
 
+    pub(crate) fn apply_taint_guard(
+        &mut self,
+        guarded: crate::taint_guard::Guarded<'_>,
+        safe: Taint,
+    ) {
+        match guarded {
+            crate::taint_guard::Guarded::Var(var) => {
+                let taint = self.var_taint(var).without(safe);
+                self.set_var_taint(var, taint);
+            }
+            crate::taint_guard::Guarded::Element { var, key } => {
+                self.guard_element_taint(var, key, safe)
+            }
+        }
+    }
+
     /// `$name[key]` passed a validation guard that makes it safe for `safe`.
     pub fn guard_element_taint(&mut self, name: &str, key: Name, safe: Taint) {
         let name = name.trim_start_matches('$');
