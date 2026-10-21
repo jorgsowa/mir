@@ -148,6 +148,23 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// A call to the class's own method leaves `$this`'s properties as that method stores them.
+    fn store_own_call_props(
+        &mut self,
+        target: &php_ast::owned::Expr,
+        method: &php_ast::owned::Expr,
+        args: &[php_ast::owned::Arg],
+        ctx: &mut FlowState,
+    ) {
+        for (prop, taint) in
+            crate::taint::own_call_prop_writes(target, method, args, ctx, self.db, &self.file)
+        {
+            let held = ctx.prop_taint("this", prop.as_str());
+            ctx.set_prop_taint("this", prop.as_str(), held | taint);
+            self.taint_summary.note_prop_overwrite(prop);
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: &'a dyn MirDatabase,
@@ -723,6 +740,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false);
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
+                self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 ty
             }
 
@@ -740,6 +758,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&smc.class, &smc.args, ctx);
+                self.store_own_call_props(&smc.class, &smc.method, &smc.args, ctx);
                 ty
             }
 

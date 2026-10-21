@@ -59,6 +59,8 @@ struct DeclFacts {
     body: ValueFacts,
     /// Values written to `$this->prop` or a static property of the class.
     prop_writes: Vec<(Name, ValueFacts)>,
+    /// Calls to the class's own methods `(class, lowercased method)` that pass a parameter's data.
+    own_param_calls: Vec<(Name, Name)>,
     /// Some `return` may carry a parameter's data.
     returns_param: bool,
     /// Some `return` may carry a property of `$this`.
@@ -71,6 +73,7 @@ impl DeclFacts {
     fn is_empty(&self) -> bool {
         self.body.is_empty()
             && self.prop_writes.is_empty()
+            && self.own_param_calls.is_empty()
             && !self.returns_param
             && !self.returns_prop
             && !self.may_reach_sink
@@ -688,6 +691,7 @@ impl OwnedVisitor for Scan<'_> {
         if self.is_sink(expr) {
             self.facts.may_reach_sink = true;
         }
+        self.record_own_param_call(expr);
         match self.inspect(expr) {
             Inspect::Source => self.facts.body.reads_source = true,
             Inspect::Callee(callee) => self.facts.body.push(callee),
@@ -700,6 +704,37 @@ impl OwnedVisitor for Scan<'_> {
 }
 
 impl Scan<'_> {
+    fn record_own_param_call(&mut self, expr: &Expr) {
+        let (class, method, args) = match &expr.kind {
+            ExprKind::MethodCall(mc) if matches!(&mc.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this") => {
+                (self.self_fqcn, &mc.method, &mc.args)
+            }
+            ExprKind::StaticMethodCall(smc)
+                if matches!(&smc.class.kind, ExprKind::Identifier(n)
+                    if ["self", "static", "parent"].iter().any(|k| n.eq_ignore_ascii_case(k))) =>
+            {
+                (self.class_name(&smc.class), &smc.method, &smc.args)
+            }
+            _ => return,
+        };
+        let (Some(class), ExprKind::Identifier(name)) = (class, &method.kind) else {
+            return;
+        };
+        let passes_param = args
+            .iter()
+            .filter_map(|a| a.value.as_ref())
+            .any(|value| self.value_facts(value).reads_param);
+        if passes_param {
+            let call = (
+                class,
+                Name::new(&crate::util::php_ident_lowercase(name.as_ref())),
+            );
+            if !self.facts.own_param_calls.contains(&call) {
+                self.facts.own_param_calls.push(call);
+            }
+        }
+    }
+
     /// A sink, or a call whose target (and so whether it is a sink) is unknown here.
     fn is_sink(&self, expr: &Expr) -> bool {
         match &expr.kind {
@@ -1083,9 +1118,34 @@ pub(crate) fn method_stores_param(
     owner: &str,
     method_lower: &str,
 ) -> bool {
-    decl_fact(db, method_decl(db, from, owner, method_lower), |facts| {
-        facts.prop_writes.iter().any(|(_, value)| value.reads_param)
-    })
+    method_decl(db, from, owner, method_lower)
+        .is_some_and(|(sf, (owner, method))| *decl_stores_param(db, sf, owner, method))
+}
+
+/// Whether the declaration stores a parameter's data, directly or through its own methods.
+#[salsa::tracked(cycle_fn = reads_source_cycle, cycle_initial = reads_source_initial)]
+fn decl_stores_param(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    owner: Name,
+    method: Option<Name>,
+) -> bool {
+    let facts = file_source_facts(db, file);
+    let Some(decl) = facts.decls.get(&(owner, method)) else {
+        return false;
+    };
+    decl.prop_writes.iter().any(|(_, value)| value.reads_param)
+        || decl.own_param_calls.iter().any(|(class, callee)| {
+            let Some((callee_owner, _)) = crate::db::find_method_in_chain(
+                db,
+                crate::db::Fqcn::from_str(db, class.as_str()),
+                callee.as_str(),
+            ) else {
+                return false;
+            };
+            method_decl(db, file.path(db), callee_owner.as_ref(), callee.as_str())
+                .is_some_and(|(sf, (owner, method))| *decl_stores_param(db, sf, owner, method))
+        })
 }
 
 /// Whether the user function `fqn` may pass a parameter's data to a sink.

@@ -821,3 +821,52 @@ pub fn constructed_prop_taints(
         .filter(|(_, taint)| !taint.is_empty())
         .collect()
 }
+
+/// Taint a call to one of the class's own methods leaves in each instance property of `$this`,
+/// from what that method stores there.
+pub fn own_call_prop_writes(
+    target: &Expr,
+    method: &Expr,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<(mir_types::Name, Taint)> {
+    let class = match &unwrap_parens(target).kind {
+        ExprKind::Variable(var) if var.trim_start_matches('$') == "this" => ctx.self_fqcn.clone(),
+        ExprKind::Identifier(name) => match crate::util::php_ident_lowercase(name).as_str() {
+            "self" | "static" => ctx.self_fqcn.clone(),
+            "parent" => ctx.parent_fqcn.clone(),
+            _ => None,
+        },
+        _ => None,
+    };
+    let (Some(class), ExprKind::Identifier(name)) = (class, &method.kind) else {
+        return Vec::new();
+    };
+    let lower = crate::util::php_ident_lowercase(name);
+    let Some((owner, callee)) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, &class), &lower)
+    else {
+        return Vec::new();
+    };
+    if args_taint(args, ctx, db, file).is_empty()
+        || !crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), &lower)
+    {
+        return Vec::new();
+    }
+    let Some(summary) = crate::db::method_taint_summary(db, file, owner.as_ref(), &lower) else {
+        return Vec::new();
+    };
+    let slot_taint = |slot: usize| match summary.prop_label(slot) {
+        Some(prop) => ctx.prop_taint("this", prop.as_str()),
+        None => summary.slot_taint(slot, None, &callee.params, args, ctx, db, file),
+    };
+    summary
+        .prop_writes
+        .iter()
+        .filter(|(key, _)| !key.as_str().starts_with('$'))
+        .map(|(key, taint)| (*key, resolve_labels(*taint, slot_taint)))
+        .filter(|(_, taint)| !taint.is_empty())
+        .collect()
+}
