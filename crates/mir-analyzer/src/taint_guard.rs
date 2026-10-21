@@ -96,7 +96,10 @@ fn safe_kinds(allowed: CharSet) -> Taint {
     let mut safe = Taint::NONE;
     for (kind, dangerous) in rules {
         let mut dangerous = CharSet::of(dangerous);
-        dangerous.add('\0');
+        // A NUL byte breaks nothing out of markup, headers or cookies.
+        if !(Taint::HTML | Taint::HEADER | Taint::COOKIE).intersects(kind) {
+            dangerous.add('\0');
+        }
         if !allowed.intersects(dangerous) {
             safe |= kind;
         }
@@ -108,8 +111,8 @@ fn safe_kinds(allowed: CharSet) -> Taint {
     safe
 }
 
-/// Characters every string accepted by the fully anchored `pattern` is made of.
-fn pattern_chars(pattern: &str) -> Option<CharSet> {
+/// Splits `/body/flags` into its body and modifiers.
+fn split_pattern(pattern: &str) -> Option<(&str, &str)> {
     let delimiter = pattern.chars().next()?;
     if delimiter.is_alphanumeric() || delimiter == '\\' || delimiter.is_whitespace() {
         return None;
@@ -122,8 +125,15 @@ fn pattern_chars(pattern: &str) -> Option<CharSet> {
         other => other,
     };
     let end = pattern.rfind(closing).filter(|&i| i > 0)?;
-    let body = &pattern[delimiter.len_utf8()..end];
-    let modifiers = &pattern[end + closing.len_utf8()..];
+    Some((
+        &pattern[delimiter.len_utf8()..end],
+        &pattern[end + closing.len_utf8()..],
+    ))
+}
+
+/// Characters every string accepted by the fully anchored `pattern` is made of.
+fn pattern_chars(pattern: &str) -> Option<CharSet> {
+    let (body, modifiers) = split_pattern(pattern)?;
     if modifiers.contains(['m', 'x', 's']) {
         return None;
     }
@@ -149,6 +159,84 @@ fn pattern_chars(pattern: &str) -> Option<CharSet> {
         set = set.with_other_case();
     }
     Some(set)
+}
+
+/// Kinds that stay out of what `preg_replace($pattern, $replacement, $subject)` returns when the
+/// pattern is one character class and the replacement a plain literal: whatever the class
+/// matches is replaced, so only the other characters, or the replacement's own, can remain.
+pub fn replace_safe_kinds(args: &[Arg]) -> Option<Taint> {
+    if args.len() > 3 || args.iter().any(|a| a.name.is_some() || a.unpack) {
+        return None;
+    }
+    let replacement = string_arg(args, 1)?;
+    // `$1` and `\1` copy the matched text back in.
+    if replacement.contains(['$', '\\']) {
+        return None;
+    }
+    let mut remaining = survivors(string_arg(args, 0)?)?;
+    for c in replacement.chars() {
+        remaining.add(c);
+    }
+    let safe = safe_kinds(remaining);
+    (!safe.is_empty()).then_some(safe)
+}
+
+/// Characters a replaced single-class `pattern` leaves in the subject.
+fn survivors(pattern: &str) -> Option<CharSet> {
+    let (body, modifiers) = split_pattern(pattern)?;
+    // `x` skips whitespace, `A` anchors the match, `e` evaluates the replacement.
+    if modifiers.contains(|c| !"imsuUDSXJ".contains(c)) {
+        return None;
+    }
+    let unicode = modifiers.contains('u');
+    let mut chars = body.chars().peekable();
+    let (matched, negated) = match chars.next()? {
+        '[' => {
+            let negated = chars.peek() == Some(&'^');
+            if negated {
+                chars.next();
+            }
+            (class_chars(&mut chars)?, negated)
+        }
+        '\\' => {
+            let (class, negated) = match chars.next()? {
+                'd' => (digits(), false),
+                'D' => (digits(), true),
+                'w' => (word(), false),
+                'W' => (word(), true),
+                's' => (space(), false),
+                'S' => (space(), true),
+                _ => return None,
+            };
+            (class, negated)
+        }
+        _ => return None,
+    };
+    // Each repetition is still a match of one character at a time.
+    if !matches!(
+        chars.collect::<String>().as_str(),
+        "" | "+" | "*" | "?" | "+?" | "*?"
+    ) {
+        return None;
+    }
+    let matched = if modifiers.contains('i') {
+        matched.with_other_case()
+    } else {
+        matched
+    };
+    let mut remaining = if negated {
+        matched
+    } else {
+        CharSet {
+            ascii: !matched.ascii,
+            non_ascii: true,
+        }
+    };
+    // Under `u` the shorthand classes also cover non-ASCII letters, digits and spaces.
+    if unicode && body.contains('\\') {
+        remaining.non_ascii = true;
+    }
+    Some(remaining)
 }
 
 fn b_ends_with_escape(body: &str) -> bool {
@@ -516,6 +604,26 @@ mod tests {
         assert!(pattern_chars("/^a|b$/").is_none());
         assert!(pattern_chars("/^(?:yes|no)$/").is_some());
         assert!(pattern_chars("/^\\d{1,5}$/m").is_none());
+    }
+
+    #[test]
+    fn replaced_class_leaves_the_other_characters() {
+        let kept = survivors("/[^0-9]/").unwrap();
+        assert_eq!(kept.ascii, digits().ascii);
+        assert!(!kept.non_ascii);
+        assert_eq!(survivors("/\\D+/").unwrap().ascii, digits().ascii);
+        assert_eq!(survivors("/[^a-z]/i").unwrap().ascii, letters().ascii);
+        let removed = survivors("/[<>]/").unwrap();
+        assert!(!CharSet::of("<>").intersects(CharSet {
+            ascii: removed.ascii,
+            non_ascii: false
+        }));
+        assert!(removed.non_ascii);
+        assert!(survivors("/[^0-9]{2}/").is_none());
+        assert!(survivors("/[^0-9]|x/").is_none());
+        assert!(survivors("/ [^0-9]/x").is_none());
+        assert!(survivors("/[^0-9]/e").is_none());
+        assert!(survivors("/^[^0-9]/").is_none());
     }
 
     #[test]

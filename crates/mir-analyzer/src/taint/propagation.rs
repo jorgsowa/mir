@@ -776,6 +776,13 @@ pub fn expr_taint(
                 if let Some(removed) = sanitized_kinds(&lower_name) {
                     return args_taint(&fc.args, ctx, db, file).without(removed);
                 }
+                if lower_name == "preg_replace" {
+                    if let Some(safe) = crate::taint_guard::replace_safe_kinds(&fc.args) {
+                        return builtin_args_taint(&lower_name, &fc.args, ctx, db, file)
+                            .without(safe)
+                            | builtin_key_names_taint(&lower_name, &fc.args, ctx);
+                    }
+                }
                 if let Some(restored) = unescaped_kinds(&lower_name) {
                     return args_taint(&fc.args, ctx, db, file).restore(restored);
                 }

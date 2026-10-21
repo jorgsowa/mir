@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `preg_replace()` with a single character class and a plain replacement limits what it returns: `preg_replace('/[^0-9]/', '', $_GET['a'])` is digits only, `preg_replace('/[\r\n]/', '', $v)` has no line break. Several patterns, a limit, a back-reference, quantifier counts and a tainted replacement keep the taint.
 - A string callable with a leading backslash (`array_map('\intval', $a)`) no longer reports `UndefinedFunction`.
 - Inside a namespace, callbacks of `array_map()` and friends resolved to a namespaced name and lost what they return: `array_map('intval', $_GET['l'])` stayed tainted. A string callback is now a fully qualified name and a first-class callable falls back to the global function.
 - `switch ($_GET['a']) { case 'x': echo $_GET['a']; }` and `$_GET['a'] === 'x'` / `in_array($_GET['a'], ['x', 'y'], true)` clear the element where the check holds; `default:`, fallthrough bodies, non-literal labels and the loose forms stay tainted.
