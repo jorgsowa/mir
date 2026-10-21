@@ -79,16 +79,19 @@ fn grow<R>(_red_zone: usize, _segment: usize, f: impl FnOnce() -> R) -> R {
 }
 
 /// Guarded [`php_ast::owned::visitor::walk_owned_expr`]; visitors recurse through it.
-pub fn walk_expr<V: OwnedVisitor + ?Sized>(visitor: &mut V, expr: &Expr) -> ControlFlow<()> {
+pub fn walk_expr<V: OwnedVisitor + ?Sized>(visitor: &mut V, expr: &Expr) -> ControlFlow<V::Break> {
     ensure_stack(|| walk_owned_expr(visitor, expr))
 }
 
 /// Guarded [`php_ast::owned::visitor::walk_owned_stmt`].
-pub fn walk_stmt<V: OwnedVisitor + ?Sized>(visitor: &mut V, stmt: &Stmt) -> ControlFlow<()> {
+pub fn walk_stmt<V: OwnedVisitor + ?Sized>(visitor: &mut V, stmt: &Stmt) -> ControlFlow<V::Break> {
     ensure_stack(|| walk_owned_stmt(visitor, stmt))
 }
 
 /// Guarded [`php_ast::owned::visitor::walk_owned_block`].
-pub fn walk_block<V: OwnedVisitor + ?Sized>(visitor: &mut V, block: &Block) -> ControlFlow<()> {
+pub fn walk_block<V: OwnedVisitor + ?Sized>(
+    visitor: &mut V,
+    block: &Block,
+) -> ControlFlow<V::Break> {
     ensure_stack(|| walk_owned_block(visitor, block))
 }

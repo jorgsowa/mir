@@ -1,4 +1,8 @@
 use super::*;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 
 /// Properties read through `$this->name`, in source order, and the methods the
 /// body calls on its own instance as `(receiver, lowercased name)`.
@@ -19,6 +23,8 @@ fn is_this(expr: &Expr) -> bool {
 }
 
 impl php_ast::owned::visitor::OwnedVisitor for ThisPropReads {
+    type Break = ();
+
     fn visit_expr(&mut self, expr: &Expr) -> std::ops::ControlFlow<()> {
         match &expr.kind {
             ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa)
@@ -34,11 +40,11 @@ impl php_ast::owned::visitor::OwnedVisitor for ThisPropReads {
             ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) if is_this(&mc.object) => {
                 self.note_call(OwnCallReceiver::Own, &mc.method);
             }
-            ExprKind::StaticMethodCall(smc) => match &smc.class.kind {
-                ExprKind::Identifier(class) if class.eq_ignore_ascii_case("parent") => {
+            ExprKind::StaticMethodCall(smc) => match smc.class.kind.name_bare() {
+                Some(class) if class.eq_ignore_ascii_case("parent") => {
                     self.note_call(OwnCallReceiver::Parent, &smc.method);
                 }
-                ExprKind::Identifier(class)
+                Some(class)
                     if ["self", "static"]
                         .iter()
                         .any(|k| class.eq_ignore_ascii_case(k)) =>
@@ -155,6 +161,8 @@ impl ObjectTests {
 }
 
 impl php_ast::owned::visitor::OwnedVisitor for ObjectTests {
+    type Break = ();
+
     fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
         if let php_ast::owned::StmtKind::Foreach(fe) = &stmt.kind {
             self.copy(&fe.value, &fe.expr);
@@ -301,7 +309,7 @@ pub(super) fn split_param_parts(
         ExprKind::Array(elements) => either(
             &elements
                 .iter()
-                .flat_map(|el| el.key.iter().chain(std::iter::once(&el.value)))
+                .flat_map(|el| el.key.iter().chain(std::iter::once(el.value())))
                 .collect::<Vec<_>>(),
         ),
         ExprKind::FunctionCall(fc) => match element_preserving_args(&fc.name, &fc.args, db, file) {
@@ -395,10 +403,8 @@ pub(super) fn summarized_callee<'e>(
     };
     match &expr.kind {
         ExprKind::FunctionCall(fc) => {
-            let ExprKind::Identifier(name) = &fc.name.kind else {
-                return None;
-            };
-            let resolved = crate::db::resolve_name(db, file, name);
+            let name = fc.name.kind.name_ref()?;
+            let resolved = crate::db::resolve_name(db, file, &name);
             let f =
                 crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
                     .or_else(|| {
@@ -407,7 +413,7 @@ pub(super) fn summarized_callee<'e>(
                             crate::db::find_function_from(
                                 db,
                                 file,
-                                crate::db::Fqcn::from_str(db, name),
+                                crate::db::Fqcn::from_str(db, &name),
                             )
                         })
                         .flatten()
@@ -428,10 +434,8 @@ pub(super) fn summarized_callee<'e>(
             }
         }
         ExprKind::StaticMethodCall(smc) => {
-            let ExprKind::Identifier(class) = &smc.class.kind else {
-                return None;
-            };
-            let class = match crate::db::resolve_name(db, file, class).as_str() {
+            let class = smc.class.kind.name_ref()?;
+            let class = match crate::db::resolve_name(db, file, &class).as_str() {
                 "self" | "static" => ctx.self_fqcn.clone()?,
                 "parent" => ctx.parent_fqcn.clone()?,
                 resolved => std::sync::Arc::from(resolved),
@@ -450,27 +454,21 @@ pub(super) fn element_preserving_args<'e>(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Option<Vec<&'e Expr>> {
-    let ExprKind::Identifier(name) = &callee.kind else {
-        return None;
-    };
+    let name = callee.kind.name_ref()?;
     let global = name.trim_start_matches('\\');
     if global.contains('\\')
         || (!name.starts_with('\\')
             && crate::db::find_function_from(
                 db,
                 file,
-                crate::db::Fqcn::from_str(db, &crate::db::resolve_name(db, file, name)),
+                crate::db::Fqcn::from_str(db, &crate::db::resolve_name(db, file, &name)),
             )
             .is_some_and(|f| is_user_code(f.location.as_ref())))
     {
         return None;
     }
-    let values = |n: usize| -> Vec<&Expr> {
-        args.iter()
-            .take(n)
-            .filter_map(|a| a.value.as_ref())
-            .collect()
-    };
+    let values =
+        |n: usize| -> Vec<&Expr> { args.iter().take(n).filter_map(|a| a.value()).collect() };
     match crate::util::php_ident_lowercase(global).as_str() {
         "array_filter"
         | "array_values"
@@ -595,7 +593,7 @@ pub fn value_may_hold_object(
         ),
         ExprKind::Array(elements) => elements
             .iter()
-            .any(|el| value_may_hold_object(&el.value, ctx, db, file)),
+            .any(|el| value_may_hold_object(el.value(), ctx, db, file)),
         ExprKind::Ternary(t) => {
             value_may_hold_object(
                 t.then_expr.as_deref().unwrap_or(&t.condition),
@@ -609,10 +607,10 @@ pub fn value_may_hold_object(
                 || value_may_hold_object(&nc.right, ctx, db, file)
         }
         ExprKind::FunctionCall(fc) => {
-            let ExprKind::Identifier(name) = &fc.name.kind else {
+            let Some(name) = fc.name.kind.name_ref() else {
                 return true;
             };
-            let resolved = crate::db::resolve_name(db, file, name);
+            let resolved = crate::db::resolve_name(db, file, &name);
             let func =
                 crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
                     .or_else(|| {
@@ -621,7 +619,7 @@ pub fn value_may_hold_object(
                                 crate::db::find_function_from(
                                     db,
                                     file,
-                                    crate::db::Fqcn::from_str(db, name),
+                                    crate::db::Fqcn::from_str(db, &name),
                                 )
                             })
                             .flatten()
@@ -734,7 +732,7 @@ pub(super) fn bound_arg_exprs<'e>(
     let mut out = Vec::new();
     let mut position = 0;
     for arg in args {
-        let Some(value) = &arg.value else {
+        let Some(value) = arg.value() else {
             position += 1;
             continue;
         };
@@ -744,7 +742,7 @@ pub(super) fn bound_arg_exprs<'e>(
             }
             continue;
         }
-        if !arg.unpack {
+        if !arg.unpack() {
             if position == index || (variadic && position >= index) {
                 out.push(value);
             }
@@ -764,7 +762,7 @@ pub(super) fn bound_arg_exprs<'e>(
             match literal_element_key(el) {
                 ElementKey::Named(key) => {
                     if named_here(key) {
-                        out.push(&el.value);
+                        out.push(el.value());
                     }
                 }
                 ElementKey::Positional => {
@@ -772,13 +770,13 @@ pub(super) fn bound_arg_exprs<'e>(
                         || (variadic && (open_ended || position >= index))
                         || (open_ended && position <= index)
                     {
-                        out.push(&el.value);
+                        out.push(el.value());
                     }
                     position += 1;
                 }
                 ElementKey::Unknown => {
                     open_ended = true;
-                    out.push(&el.value);
+                    out.push(el.value());
                 }
             }
         }
@@ -794,12 +792,12 @@ pub(super) enum ElementKey<'e> {
 }
 
 pub(super) fn literal_element_key(el: &php_ast::owned::ArrayElement) -> ElementKey<'_> {
-    if el.unpack {
+    if el.unpack() {
         return ElementKey::Unknown;
     }
     match el.key.as_ref().map(|k| &k.kind) {
         None | Some(ExprKind::Int(_)) => ElementKey::Positional,
-        Some(ExprKind::String(key)) => ElementKey::Named(key.as_ref()),
+        Some(ExprKind::String(key)) => ElementKey::Named(key.as_str()),
         Some(_) => ElementKey::Unknown,
     }
 }
@@ -826,7 +824,7 @@ pub fn constructed_prop_taints(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Vec<(mir_types::Name, Taint)> {
-    let ExprKind::Identifier(name) = &new.class.kind else {
+    let Some(name) = new.class.kind.name_ref() else {
         return Vec::new();
     };
     let class = match crate::db::resolve_name(db, file, name.as_ref()).as_str() {
@@ -879,11 +877,14 @@ pub fn own_call_prop_writes(
 ) -> Vec<(mir_types::Name, Taint)> {
     let class = match &unwrap_parens(target).kind {
         ExprKind::Variable(var) if var.trim_start_matches('$') == "this" => ctx.self_fqcn.clone(),
-        ExprKind::Identifier(name) => match crate::util::php_ident_lowercase(name).as_str() {
-            "self" | "static" => ctx.self_fqcn.clone(),
-            "parent" => ctx.parent_fqcn.clone(),
-            _ => None,
-        },
+        ExprKind::Identifier(_) | ExprKind::Name(_) => {
+            let name = unwrap_parens(target).kind.name_bare().unwrap_or_default();
+            match crate::util::php_ident_lowercase(name).as_str() {
+                "self" | "static" => ctx.self_fqcn.clone(),
+                "parent" => ctx.parent_fqcn.clone(),
+                _ => None,
+            }
+        }
         _ => None,
     };
     let (Some(class), ExprKind::Identifier(name)) = (class, &method.kind) else {

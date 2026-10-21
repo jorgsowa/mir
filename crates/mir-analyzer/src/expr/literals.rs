@@ -1,3 +1,4 @@
+use crate::ast_ext::ByteStringExt as _;
 use mir_types::{Atomic, Type};
 use php_ast::owned::ExprKind;
 
@@ -11,7 +12,9 @@ pub(crate) fn analyze(kind: &ExprKind) -> Type {
                 (bits & 0xFFFF_FFFF) as i64,
             ))
         }
-        ExprKind::String(s) => Type::single(Atomic::TLiteralString(s.as_ref().into())),
+        ExprKind::String(s) => {
+            Type::single(Atomic::TLiteralString(std::sync::Arc::from(&*s.to_text())))
+        }
         ExprKind::Bool(b) => {
             if *b {
                 Type::single(Atomic::TTrue)

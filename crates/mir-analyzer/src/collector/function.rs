@@ -24,17 +24,13 @@ pub(crate) fn stmts_use_func_get_args(stmts: &[php_ast::owned::Stmt]) -> bool {
         use ExprKind::*;
         match &expr.kind {
             FunctionCall(call) => {
-                if let Identifier(name) = &call.name.kind {
-                    if matches!(
-                        name.as_ref(),
-                        "func_get_args" | "func_get_arg" | "func_num_args"
-                    ) {
-                        return true;
-                    }
+                if matches!(
+                    crate::ast_ext::NameBareExt::name_bare(&call.name.kind),
+                    Some("func_get_args" | "func_get_arg" | "func_num_args")
+                ) {
+                    return true;
                 }
-                call.args
-                    .iter()
-                    .any(|a| a.value.as_ref().is_some_and(check_expr))
+                call.args.iter().any(|a| a.value().is_some_and(check_expr))
             }
             // Do NOT descend into new function/closure/arrow-fn bodies.
             Closure(_) | ArrowFunction(_) | AnonymousClass(_) => false,
@@ -50,31 +46,20 @@ pub(crate) fn stmts_use_func_get_args(stmts: &[php_ast::owned::Stmt]) -> bool {
             }
             NullCoalesce(e) => check_expr(&e.left) || check_expr(&e.right),
             MethodCall(e) | NullsafeMethodCall(e) => {
-                check_expr(&e.object)
-                    || e.args
-                        .iter()
-                        .any(|a| a.value.as_ref().is_some_and(check_expr))
+                check_expr(&e.object) || e.args.iter().any(|a| a.value().is_some_and(check_expr))
             }
             StaticMethodCall(e) => {
-                check_expr(&e.class)
-                    || e.args
-                        .iter()
-                        .any(|a| a.value.as_ref().is_some_and(check_expr))
+                check_expr(&e.class) || e.args.iter().any(|a| a.value().is_some_and(check_expr))
             }
             StaticMethodCallDynamic(e) => {
                 check_expr(&e.class)
                     || check_expr(&e.method)
-                    || e.args
-                        .iter()
-                        .any(|a| a.value.as_ref().is_some_and(check_expr))
+                    || e.args.iter().any(|a| a.value().is_some_and(check_expr))
             }
-            New(e) => e
-                .args
-                .iter()
-                .any(|a| a.value.as_ref().is_some_and(check_expr)),
+            New(e) => e.args.iter().any(|a| a.value().is_some_and(check_expr)),
             Array(elems) => elems
                 .iter()
-                .any(|el| el.key.as_ref().is_some_and(|k| check_expr(k)) || check_expr(&el.value)),
+                .any(|el| el.key.as_ref().is_some_and(|k| check_expr(k)) || check_expr(el.value())),
             ArrayAccess(e) => {
                 check_expr(&e.array) || e.index.as_ref().is_some_and(|i| check_expr(i))
             }

@@ -1,6 +1,8 @@
 //! Shared kernel for the narrowing submodules: expression-shape extractors,
 //! property-refinement helpers, and small cross-cutting utilities used by
 //! multiple narrowing arms.
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
@@ -211,7 +213,7 @@ pub(crate) fn extract_class_fqcn_from_expr(
     match &expr.kind {
         // \Foo\Bar::class  or  Foo\Bar::class  (also self::class/static::class/parent::class)
         ExprKind::ClassConstAccess(cca) => {
-            if let ExprKind::Identifier(id) = &cca.class.kind {
+            if let Some(id) = cca.class.kind.name_ref() {
                 let member = match &cca.member.kind {
                     ExprKind::Identifier(s) => s.as_ref(),
                     _ => return None,
@@ -238,7 +240,7 @@ pub(crate) fn extract_class_fqcn_from_expr(
         }
         // 'Foo\Bar'  or  'Foo\\Bar'  or  'Foo'
         ExprKind::String(s) => {
-            let name = s.as_ref().trim_start_matches('\\');
+            let name = s.as_str().trim_start_matches('\\');
             if !name.is_empty() {
                 Some(std::sync::Arc::from(name))
             } else {
@@ -490,8 +492,8 @@ pub(super) fn extract_static_prop_access_parts(
 ) -> Option<(std::sync::Arc<str>, String)> {
     match &expr.kind {
         ExprKind::StaticPropertyAccess(spa) => {
-            let id = match &spa.class.kind {
-                ExprKind::Identifier(id) => id,
+            let id = match spa.class.kind.name_ref() {
+                Some(id) => id,
                 _ => return None,
             };
             let resolved = crate::db::resolve_name(db, file, id.as_ref());
@@ -563,7 +565,7 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
             let kind = match &strip_parens(lit_side).kind {
                 ExprKind::Null if !holds => GuardKind::NotNull,
                 ExprKind::String(s) if holds => {
-                    GuardKind::Identical(FlagValue::Str(Name::from(&**s)))
+                    GuardKind::Identical(FlagValue::Str(Name::from(s.as_str())))
                 }
                 ExprKind::Int(n) if holds => GuardKind::Identical(FlagValue::Int(*n)),
                 ExprKind::Bool(true) if holds => GuardKind::Identical(FlagValue::True),
@@ -636,9 +638,7 @@ pub(crate) fn extract_expr_guard_key(
             if !member.eq_ignore_ascii_case("class") {
                 return None;
             }
-            let ExprKind::Identifier(class_name) = &cca.class.kind else {
-                return None;
-            };
+            let class_name = cca.class.kind.name_ref()?;
             let resolved = crate::db::resolve_name(db, file, class_name.as_ref());
             Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
         }
@@ -648,7 +648,7 @@ pub(crate) fn extract_expr_guard_key(
         // exactly like the `Foo::class` form above, so both register the
         // same `cls:` key.
         ExprKind::String(s) => {
-            let resolved = crate::db::resolve_name(db, file, s.as_ref());
+            let resolved = crate::db::resolve_name(db, file, s.as_str());
             Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
         }
         _ => None,
@@ -730,11 +730,14 @@ pub(super) fn extract_class_name(
     parent_fqcn: Option<&str>,
 ) -> Option<String> {
     match &expr.kind {
-        ExprKind::Identifier(name) => match name.to_ascii_lowercase().as_str() {
-            "self" | "static" => self_fqcn.map(|s| s.to_string()),
-            "parent" => parent_fqcn.map(|s| s.to_string()),
-            _ => Some(name.to_string()),
-        },
+        ExprKind::Identifier(_) | ExprKind::Name(_) => {
+            let name = expr.kind.name_ref().unwrap_or_default();
+            match name.to_ascii_lowercase().as_str() {
+                "self" | "static" => self_fqcn.map(|s| s.to_string()),
+                "parent" => parent_fqcn.map(|s| s.to_string()),
+                _ => Some(name.to_string()),
+            }
+        }
         ExprKind::Variable(name) if name.trim_start_matches('$') == "this" => {
             self_fqcn.map(|s| s.to_string())
         }
@@ -775,7 +778,7 @@ pub(crate) fn promote_assignment_effects(
             promote_assignment_effects(&u.operand, ctx, db, file);
         }
         ExprKind::FunctionCall(call) => {
-            if let ExprKind::Identifier(fn_name) = &call.name.kind {
+            if let Some(fn_name) = call.name.kind.name_ref() {
                 if has_possibly_assigned_arg(&call.args, ctx) {
                     let resolved = crate::db::resolve_name(db, file, fn_name.as_ref());
                     let find = |name: &str| {
@@ -793,7 +796,7 @@ pub(crate) fn promote_assignment_effects(
                 }
             }
             for arg in call.args.iter() {
-                if let Some(value) = &arg.value {
+                if let Some(value) = arg.value() {
                     promote_assignment_effects(value, ctx, db, file);
                 }
             }
@@ -819,7 +822,7 @@ pub(crate) fn promote_assignment_effects(
                 }
             }
             for arg in mc.args.iter() {
-                if let Some(value) = &arg.value {
+                if let Some(value) = arg.value() {
                     promote_assignment_effects(value, ctx, db, file);
                 }
             }
@@ -835,7 +838,7 @@ pub(crate) fn promote_assignment_effects(
                 }
             }
             for arg in smc.args.iter() {
-                if let Some(value) = &arg.value {
+                if let Some(value) = arg.value() {
                     promote_assignment_effects(value, ctx, db, file);
                 }
             }
@@ -849,7 +852,7 @@ pub(crate) fn promote_assignment_effects(
                 }
             }
             for arg in new.args.iter() {
-                if let Some(value) = &arg.value {
+                if let Some(value) = arg.value() {
                     promote_assignment_effects(value, ctx, db, file);
                 }
             }
@@ -888,7 +891,7 @@ pub(crate) fn promote_assignment_effects(
                 if let Some(key) = &element.key {
                     promote_assignment_effects(key, ctx, db, file);
                 }
-                promote_assignment_effects(&element.value, ctx, db, file);
+                promote_assignment_effects(element.value(), ctx, db, file);
             }
         }
         // `a ?? b`: only `a` is certain to run — `b` is skipped when `a` is set.
@@ -918,7 +921,7 @@ fn promote_var(var_name: &str, ctx: &mut FlowState) {
 /// Cheap pre-check so callee lookup runs only when an argument could be promoted.
 fn has_possibly_assigned_arg(args: &[php_ast::owned::Arg], ctx: &FlowState) -> bool {
     args.iter().any(|arg| {
-        matches!(&arg.value, Some(v) if matches!(&v.kind, ExprKind::Variable(name)
+        matches!(arg.value(), Some(v) if matches!(&v.kind, ExprKind::Variable(name)
             if ctx.possibly_assigned_vars.contains(&mir_types::Name::from(name.trim_start_matches('$')))))
     })
 }
@@ -932,7 +935,7 @@ fn promote_byref_args(
         if !param.is_byref {
             return;
         }
-        if let Some(value) = &arg.value {
+        if let Some(value) = arg.value() {
             if let ExprKind::Variable(name) = &value.kind {
                 promote_var(name.trim_start_matches('$'), ctx);
             }
@@ -960,9 +963,7 @@ fn static_target_fqcn(
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
-    let ExprKind::Identifier(name) = &class.kind else {
-        return None;
-    };
+    let name = class.kind.name_ref()?;
     match name.to_ascii_lowercase().as_str() {
         "self" => ctx.self_fqcn.clone(),
         "static" => ctx.static_fqcn.clone().or_else(|| ctx.self_fqcn.clone()),

@@ -1,4 +1,6 @@
 use super::ExpressionAnalyzer;
+use crate::ast_ext::ArrayElementExt as _;
+use crate::ast_ext::ByteStringExt as _;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
@@ -369,8 +371,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             std::collections::HashSet::new();
 
         for elem in elements.iter() {
-            if elem.unpack {
-                let value_ty = self.analyze(&elem.value, ctx);
+            if elem.unpack() {
+                let value_ty = self.analyze(elem.value(), ctx);
                 all_value_types.merge(&crate::call::spread_element_type(self.db, &value_ty));
                 key_union.merge(&spread_key_type(self.db, &value_ty));
                 // A spread of a single, closed, string-keyed shape (the common
@@ -401,7 +403,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 continue;
             }
-            let value_ty = self.analyze(&elem.value, ctx);
+            let value_ty = self.analyze(elem.value(), ctx);
             let array_key = if let Some(key_expr) = &elem.key {
                 is_list = false;
                 let key_ty = self.analyze(key_expr, ctx);
@@ -466,7 +468,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.emit(
                     IssueKind::DuplicateArrayKey { key: key_str },
                     Severity::Warning,
-                    elem.key.as_ref().map_or(elem.value.span, |k| k.span),
+                    elem.key.as_ref().map_or(elem.value().span, |k| k.span),
                 );
             }
             spread_contributed_keys.remove(&array_key);
@@ -486,13 +488,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             // Closure::fromCallable(...), or invoked directly) — otherwise a
             // private method reachable only this way is falsely flagged unused.
             if is_list && elements.len() == 2 {
-                if let ExprKind::String(method_name) = &elements[1].value.kind {
+                if let ExprKind::String(method_name) = &elements[1].value().kind {
                     if let Some(receiver_ty) = keyed_props.get(&ArrayKey::Int(0)).map(|p| &p.ty) {
                         self.record_array_callable_method_ref(
-                            &elements[0].value,
+                            elements[0].value(),
                             receiver_ty,
-                            method_name,
-                            elements[1].value.span,
+                            method_name.as_str(),
+                            elements[1].value().span,
                         );
                     }
                 }
@@ -514,7 +516,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let key = Box::new(key_union.build());
         let value = Box::new(all_value_types.build());
         // Only spreads can contribute zero entries.
-        if elements.iter().any(|e| !e.unpack) {
+        if elements.iter().any(|e| !e.unpack()) {
             Type::single(Atomic::TNonEmptyArray { key, value })
         } else {
             Type::single(Atomic::TArray { key, value })
@@ -544,7 +546,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let ExprKind::String(class_name) = &receiver_expr.kind {
                 (
                     Some(Arc::from(
-                        crate::db::resolve_name(self.db, self.file.as_ref(), class_name.as_ref())
+                        crate::db::resolve_name(self.db, self.file.as_ref(), class_name.as_str())
                             .as_str(),
                     )),
                     true,

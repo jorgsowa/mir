@@ -15,6 +15,7 @@
 //! state. They are gated by the caller on `php_version == Some(_)`; user code
 //! never reaches them.
 
+use crate::ast_ext::ByteStringExt as _;
 use rustc_hash::FxHashMap;
 
 use php_ast::owned::{Arg, Attribute, Expr, ExprKind};
@@ -58,18 +59,18 @@ fn arg_name_is(arg: &Arg, target: &str) -> bool {
 /// (unnamed) argument or a named argument `name:`. Named takes precedence.
 fn arg_value<'a>(args: &'a [Arg], pos: usize, name: &str) -> Option<&'a Expr> {
     if let Some(a) = args.iter().find(|a| arg_name_is(a, name)) {
-        return a.value.as_ref();
+        return a.value();
     }
     args.iter()
         .filter(|a| a.name.is_none())
         .nth(pos)
-        .and_then(|a| a.value.as_ref())
+        .and_then(|a| a.value())
 }
 
 /// Read a string-literal argument (positional `pos` or named `name`).
 fn string_arg(args: &[Arg], pos: usize, name: &str) -> Option<String> {
     match arg_value(args, pos, name).map(|e| &e.kind) {
-        Some(ExprKind::String(s)) => Some(s.to_string()),
+        Some(ExprKind::String(s)) => Some(s.as_str().to_string()),
         _ => None,
     }
 }
@@ -113,18 +114,18 @@ pub(super) fn type_aware(
     }) = arg_value(&attr.args, 0, "type")
     {
         for el in elems.iter() {
-            let (Some(key), value) = (&el.key, &el.value) else {
+            let (Some(key), value) = (&el.key, el.value()) else {
                 continue;
             };
             let (ExprKind::String(k), ExprKind::String(v)) = (&key.kind, &value.kind) else {
                 continue;
             };
-            let Ok(ver) = k.parse::<PhpVersion>() else {
+            let Ok(ver) = k.as_str().parse::<PhpVersion>() else {
                 continue;
             };
             // Highest key ≤ target wins.
             if ver <= target && chosen.is_none_or(|(best, _)| ver > best) {
-                chosen = Some((ver, v));
+                chosen = Some((ver, v.as_str()));
             }
         }
     }
@@ -145,7 +146,7 @@ pub(super) fn type_aware(
 mod tests {
     use super::*;
     use php_ast::ast::NameKind;
-    use php_ast::owned::{ArrayElement, ExprKind, Name};
+    use php_ast::owned::{ArgKind, ArrayElement, ArrayElementKind, ExprKind, Name};
     use php_ast::Span;
 
     fn span() -> Span {
@@ -169,27 +170,15 @@ mod tests {
     }
 
     fn str_expr(s: &str) -> Expr {
-        expr(ExprKind::String(Box::from(s)))
+        expr(ExprKind::String(s.into()))
     }
 
     fn positional(value: Expr) -> Arg {
-        Arg {
-            name: None,
-            value: Some(value),
-            unpack: false,
-            by_ref: false,
-            span: span(),
-        }
+        Arg::new(None, ArgKind::Value(value), span())
     }
 
     fn named(n: &str, value: Expr) -> Arg {
-        Arg {
-            name: Some(name(&[n], false)),
-            value: Some(value),
-            unpack: false,
-            by_ref: false,
-            span: span(),
-        }
+        Arg::new(Some(name(&[n], false)), ArgKind::Value(value), span())
     }
 
     fn array(pairs: &[(&str, &str)]) -> Expr {
@@ -198,9 +187,7 @@ mod tests {
                 .iter()
                 .map(|(k, v)| ArrayElement {
                     key: Some(str_expr(k)),
-                    value: str_expr(v),
-                    unpack: false,
-                    by_ref: false,
+                    kind: ArrayElementKind::Value(str_expr(v)),
                     span: span(),
                 })
                 .collect(),
@@ -215,11 +202,9 @@ mod tests {
     }
 
     fn attr(name_parts: &[&str], fq: bool, args: Vec<Arg>) -> Attribute {
-        Attribute {
-            name: name(name_parts, fq),
-            args: args.into_boxed_slice(),
-            span: span(),
-        }
+        let mut attribute = Attribute::new(name(name_parts, fq), span());
+        attribute.args = args.into_boxed_slice();
+        attribute
     }
 
     fn v(major: u8, minor: u8) -> PhpVersion {

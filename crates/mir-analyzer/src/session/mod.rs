@@ -7,6 +7,7 @@
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file analysis
 //! entry point that operates against a session.
 
+use crate::ast_ext::NameRefExt as _;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -636,6 +637,8 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
         names: std::collections::HashSet<String>,
     }
     impl OwnedVisitor for V {
+        type Break = ();
+
         fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
             if let Some(doc) = stmt.leading_doc_comment() {
                 collect_from_docblock(&doc.text, &mut self.names);
@@ -663,27 +666,27 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
         fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
             match &expr.kind {
                 ExprKind::New(n) => {
-                    if let ExprKind::Identifier(name) = &n.class.kind {
+                    if let Some(name) = n.class.kind.name_ref() {
                         self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::StaticMethodCall(c) => {
-                    if let ExprKind::Identifier(name) = &c.class.kind {
+                    if let Some(name) = c.class.kind.name_ref() {
                         self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::StaticPropertyAccess(a) => {
-                    if let ExprKind::Identifier(name) = &a.class.kind {
+                    if let Some(name) = a.class.kind.name_ref() {
                         self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::ClassConstAccess(a) => {
-                    if let ExprKind::Identifier(name) = &a.class.kind {
+                    if let Some(name) = a.class.kind.name_ref() {
                         self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-                    if let ExprKind::Identifier(name) = &b.right.kind {
+                    if let Some(name) = b.right.kind.name_ref() {
                         self.names.insert(name.as_ref().to_string());
                     }
                 }

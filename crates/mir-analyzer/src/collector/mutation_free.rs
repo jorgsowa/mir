@@ -1,3 +1,5 @@
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -126,7 +128,7 @@ fn is_local_target(e: &Expr) -> bool {
         ExprKind::Parenthesized(inner) => is_local_target(inner),
         ExprKind::Array(elements) => elements
             .iter()
-            .all(|el| !el.by_ref && !el.unpack && is_local_target(&el.value)),
+            .all(|el| !el.by_ref() && !el.unpack() && is_local_target(el.value())),
         ExprKind::Omit => true,
         _ => false,
     }
@@ -149,11 +151,14 @@ fn is_pure_builtin(name: &str) -> bool {
 }
 
 fn is_self_reference(e: &Expr) -> bool {
-    matches!(&e.kind, ExprKind::Identifier(n)
-        if n.eq_ignore_ascii_case("self") || n.eq_ignore_ascii_case("static"))
+    e.kind
+        .name_bare()
+        .is_some_and(|n| n.eq_ignore_ascii_case("self") || n.eq_ignore_ascii_case("static"))
 }
 
 impl OwnedVisitor for BodyScan<'_> {
+    type Break = ();
+
     fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Unset(targets) if !targets.iter().all(is_local_target) => self.reject(),
@@ -190,11 +195,11 @@ impl OwnedVisitor for BodyScan<'_> {
                 ) || is_local_target(&u.operand)
             }
             ExprKind::FunctionCall(c) => {
-                matches!(&c.name.kind, ExprKind::Identifier(n) if is_pure_builtin(n))
+                c.name.kind.name_bare().is_some_and(is_pure_builtin)
                     && c.args.iter().all(|a| {
-                        !a.unpack
-                            && !a.by_ref
-                            && a.value.as_ref().is_none_or(|v| !is_property_rooted(v))
+                        !a.unpack()
+                            && !a.by_ref()
+                            && a.value().is_none_or(|v| !is_property_rooted(v))
                     })
             }
             ExprKind::MethodCall(c) => {

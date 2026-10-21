@@ -272,7 +272,7 @@ impl AnalyzerDb {
         let mut all_issues: Vec<Issue> = parsed
             .errors
             .iter()
-            .filter(|err| !crate::parser::is_spurious_reserved_class_error(err))
+            .filter(|err| !crate::parser::is_redundant_parse_error(err))
             .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed.source_map))
             .collect();
 

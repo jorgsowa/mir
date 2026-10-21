@@ -2,6 +2,9 @@
 //! `preg_match('/^[a-z0-9_]+$/', $x)`. A sink kind is safe once none of the
 //! characters it needs to break out can appear.
 
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Arg, Expr, ExprKind};
 
@@ -165,7 +168,7 @@ fn pattern_chars(pattern: &str) -> Option<CharSet> {
 /// pattern is one character class and the replacement a plain literal: whatever the class
 /// matches is replaced, so only the other characters, or the replacement's own, can remain.
 pub fn replace_safe_kinds(args: &[Arg]) -> Option<Taint> {
-    if args.len() > 3 || args.iter().any(|a| a.name.is_some() || a.unpack) {
+    if args.len() > 3 || args.iter().any(|a| a.name.is_some() || a.unpack()) {
         return None;
     }
     let replacement = string_arg(args, 1)?;
@@ -365,8 +368,8 @@ fn class_chars(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<C
 }
 
 fn string_arg(args: &[Arg], index: usize) -> Option<&str> {
-    match &args.get(index)?.value.as_ref()?.kind {
-        ExprKind::String(s) => Some(s.as_ref()),
+    match &args.get(index)?.value()?.kind {
+        ExprKind::String(s) => Some(s.as_str()),
         _ => None,
     }
 }
@@ -432,35 +435,27 @@ fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
-    let ExprKind::Identifier(name) = &fc.name.kind else {
-        return None;
-    };
+    let name = fc.name.kind.name_ref()?;
     if !crate::util::php_ident_lowercase(name.trim_start_matches('\\')).eq("in_array")
-        || fc.args.iter().any(|a| a.name.is_some() || a.unpack)
+        || fc.args.iter().any(|a| a.name.is_some() || a.unpack())
     {
         return None;
     }
     let strict = matches!(
-        fc.args
-            .get(2)
-            .and_then(|a| a.value.as_ref())
-            .map(|v| &v.kind),
+        fc.args.get(2).and_then(|a| a.value()).map(|v| &v.kind),
         Some(ExprKind::Bool(true))
     );
-    let ExprKind::Array(items) = &fc.args.get(1)?.value.as_ref()?.kind else {
+    let ExprKind::Array(items) = &fc.args.get(1)?.value()?.kind else {
         return None;
     };
     if !strict
         || items
             .iter()
-            .any(|item| item.unpack || item.by_ref || !is_literal(&item.value))
+            .any(|item| item.unpack() || item.by_ref() || !is_literal(item.value()))
     {
         return None;
     }
-    Some((
-        guarded_subject(fc.args.first()?.value.as_ref()?)?,
-        Taint::ALL,
-    ))
+    Some((guarded_subject(fc.args.first()?.value()?)?, Taint::ALL))
 }
 
 fn is_literal(expr: &Expr) -> bool {
@@ -479,7 +474,7 @@ fn is_literal(expr: &Expr) -> bool {
 fn case_safe_kinds(literal: &Expr) -> Option<Taint> {
     let numeric = || safe_kinds(digits().union(CharSet::of(" \t\n\r\x0b\x0c+-.eE")));
     match &literal.kind {
-        ExprKind::String(s) if !looks_numeric(s) => Some(Taint::ALL),
+        ExprKind::String(s) if !looks_numeric(s.as_str()) => Some(Taint::ALL),
         ExprKind::String(_) | ExprKind::Int(_) | ExprKind::Float(_) => Some(numeric()),
         _ => None,
     }
@@ -540,9 +535,7 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
-    let ExprKind::Identifier(name) = &fc.name.kind else {
-        return None;
-    };
+    let name = fc.name.kind.name_ref()?;
     let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
     let (allowed, subject) = match lower.as_str() {
         "ctype_digit" => (digits(), 0),
@@ -560,10 +553,10 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
         _ => return None,
     };
     let value = fc.args.get(subject)?;
-    if value.name.is_some() || value.unpack {
+    if value.name.is_some() || value.unpack() {
         return None;
     }
-    let guarded = guarded_subject(value.value.as_ref()?)?;
+    let guarded = guarded_subject(value.value()?)?;
     let safe = safe_kinds(allowed);
     (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
 }

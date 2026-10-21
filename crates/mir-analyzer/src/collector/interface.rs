@@ -223,8 +223,11 @@ impl<'a> DefinitionCollector<'a> {
                             name: Arc::from(const_name),
                             ty: const_ty,
                             literal_value,
-                            visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
-                            is_final: c.is_final,
+                            visibility: c
+                                .modifiers
+                                .visibility
+                                .map(|v| Self::convert_visibility(Some(v))),
+                            is_final: c.modifiers.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {
@@ -289,10 +292,10 @@ impl<'a> DefinitionCollector<'a> {
                             ty: mir_codebase::definitions::wrap_property_type(ty),
                             native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                             inferred_ty: None,
-                            visibility: Self::convert_visibility(p.visibility),
-                            is_static: p.is_static,
-                            is_readonly: p.is_readonly,
-                            has_native_readonly: p.is_readonly,
+                            visibility: Self::convert_visibility(p.modifiers.visibility),
+                            is_static: p.modifiers.is_static,
+                            is_readonly: p.modifiers.is_readonly,
+                            has_native_readonly: p.modifiers.is_readonly,
                             default: None,
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(

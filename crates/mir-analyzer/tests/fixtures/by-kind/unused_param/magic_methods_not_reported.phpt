@@ -23,3 +23,5 @@ class Magic {
 
     public function __unset(string $name): void {}
 }
+===expect===
+ParseError@13:4-15:5: Parse error: Method Magic::__callStatic() must be static

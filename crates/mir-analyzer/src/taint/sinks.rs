@@ -1,4 +1,6 @@
 use super::*;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 
 /// Report a call target or class name chosen by user input (`$_GET['f']()`).
 pub fn check_callable_target(
@@ -302,22 +304,22 @@ pub fn option_sink_values<'e>(
     fn_name_lower: &str,
     args: &'e [php_ast::owned::Arg],
 ) -> Vec<(&'e Expr, SinkKind)> {
-    let is_target_option = |e: &Expr| {
-        matches!(&e.kind, ExprKind::Identifier(name)
-            if matches!(name.trim_start_matches('\\'), "CURLOPT_URL" | "CURLOPT_PROXY"))
-    };
+    let is_target_option =
+        |e: &Expr| matches!(e.kind.name_bare(), Some("CURLOPT_URL" | "CURLOPT_PROXY"));
     match fn_name_lower.trim_start_matches('\\') {
-        "curl_setopt" => match (args.get(1).and_then(|a| a.value.as_ref()), args.get(2)) {
-            (Some(option), Some(value)) if is_target_option(option) => {
-                value.value.iter().map(|v| (v, SinkKind::Ssrf)).collect()
-            }
+        "curl_setopt" => match (args.get(1).and_then(|a| a.value()), args.get(2)) {
+            (Some(option), Some(value)) if is_target_option(option) => value
+                .value()
+                .into_iter()
+                .map(|v| (v, SinkKind::Ssrf))
+                .collect(),
             _ => Vec::new(),
         },
-        "curl_setopt_array" => match args.get(1).and_then(|a| a.value.as_ref()).map(|v| &v.kind) {
+        "curl_setopt_array" => match args.get(1).and_then(|a| a.value()).map(|v| &v.kind) {
             Some(ExprKind::Array(elements)) => elements
                 .iter()
                 .filter(|el| el.key.as_ref().is_some_and(is_target_option))
-                .map(|el| (&el.value, SinkKind::Ssrf))
+                .map(|el| (el.value(), SinkKind::Ssrf))
                 .collect(),
             _ => Vec::new(),
         },
@@ -327,14 +329,13 @@ pub fn option_sink_values<'e>(
 
 /// `unserialize($data, ['allowed_classes' => false])` can't instantiate objects.
 pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg]) -> bool {
-    let Some(ExprKind::Array(options)) =
-        args.get(1).and_then(|a| a.value.as_ref()).map(|v| &v.kind)
+    let Some(ExprKind::Array(options)) = args.get(1).and_then(|a| a.value()).map(|v| &v.kind)
     else {
         return false;
     };
     options.iter().any(|el| {
-        matches!(el.key.as_ref().map(|k| &k.kind), Some(ExprKind::String(k)) if &**k == "allowed_classes")
-            && matches!(&el.value.kind, ExprKind::Bool(false))
+        matches!(el.key.as_ref().map(|k| &k.kind), Some(ExprKind::String(k)) if k.as_str() == "allowed_classes")
+            && matches!(el.value().kind, ExprKind::Bool(false))
     })
 }
 

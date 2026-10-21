@@ -230,8 +230,11 @@ impl DefinitionCollector<'_> {
                             name: Arc::from(const_name),
                             ty: const_ty,
                             literal_value,
-                            visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
-                            is_final: c.is_final,
+                            visibility: c
+                                .modifiers
+                                .visibility
+                                .map(|v| Self::convert_visibility(Some(v))),
+                            is_final: c.modifiers.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {

@@ -645,6 +645,8 @@ fn collect_variable_scopes(program: &Program) -> Vec<VariableScope> {
 
     struct Collector(Vec<VariableScope>);
     impl OwnedVisitor for Collector {
+        type Break = ();
+
         fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
             if matches!(stmt.kind, StmtKind::Function(_)) {
                 self.0.push(VariableScope {

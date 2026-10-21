@@ -5,6 +5,9 @@ use super::helpers::{
     type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key, DefiniteKeyState,
 };
 use super::ExpressionAnalyzer;
+use crate::ast_ext::ArrayElementExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::taint::Taint;
@@ -31,14 +34,14 @@ pub(crate) fn taint_destructured_targets(
         return;
     };
     for elem in elements.iter() {
-        match &elem.value.kind {
+        match &elem.value().kind {
             ExprKind::Variable(name) => {
                 ctx.clear_prop_taints(name);
                 if !taint.is_empty() {
                     ctx.taint_var_with_parts(name.as_ref(), taint, parts);
                 }
             }
-            ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx, taint, parts),
+            ExprKind::Array(_) => taint_destructured_targets(elem.value(), ctx, taint, parts),
             _ => {}
         }
     }
@@ -56,7 +59,8 @@ pub(crate) fn resolve_static_prop_target(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     let fqcn = match &spa.class.kind {
-        ExprKind::Identifier(id) => {
+        ExprKind::Identifier(_) | ExprKind::Name(_) => {
+            let id = spa.class.kind.name_ref().unwrap_or_default();
             let resolved = crate::db::resolve_name(db, file, id.as_ref());
             match resolved.as_str() {
                 "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
@@ -144,7 +148,7 @@ fn taint_array_write_base(
 /// A literal array key as a [`Name`]: `'id'`, `3`.
 pub(crate) fn literal_key_name(index: Option<&Expr>) -> Option<mir_types::Name> {
     match &index?.kind {
-        ExprKind::String(s) => Some(mir_types::Name::new(s)),
+        ExprKind::String(s) => Some(mir_types::Name::new(s.as_str())),
         ExprKind::Int(i) => Some(mir_types::Name::new(&i.to_string())),
         _ => None,
     }
@@ -192,7 +196,7 @@ fn array_literal_key_taints(
     let mut keys = crate::flow_state::KeyTaint::default();
     let mut next_index: i64 = 0;
     for el in elements {
-        if el.unpack || el.by_ref {
+        if el.unpack() || el.by_ref() {
             return None;
         }
         let key = match el.key.as_ref() {
@@ -208,7 +212,7 @@ fn array_literal_key_taints(
                 literal_key_name(Some(key))?
             }
         };
-        keys.set(key, crate::taint::value_taint(&el.value, ctx, db, file));
+        keys.set(key, crate::taint::value_taint(el.value(), ctx, db, file));
     }
     Some(keys)
 }
@@ -306,9 +310,7 @@ pub(crate) fn resolve_chained_receiver_type(
         // middle of the chain, the static-call counterpart of the
         // `MethodCall` arm below.
         ExprKind::StaticMethodCall(smc) => {
-            let ExprKind::Identifier(id) = &smc.class.kind else {
-                return None;
-            };
+            let id = smc.class.kind.name_ref()?;
             let resolved = crate::db::resolve_name(db, file, id.as_ref());
             let fqcn: std::sync::Arc<str> = match resolved.as_str() {
                 "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
@@ -1553,7 +1555,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // `[$this->x, $this->y] = $vals;` would collide with the
                     // first's under the issue buffer's (kind, file, line,
                     // col_start) dedup key and be discarded.
-                    self.assign_to_target(&elem.value, elem_ty, ctx, elem.value.span);
+                    self.assign_to_target(elem.value(), elem_ty, ctx, elem.value().span);
                 }
             }
             ExprKind::PropertyAccess(pa) => {

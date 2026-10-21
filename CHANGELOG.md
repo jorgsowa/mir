@@ -13,11 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Parser crates updated to 0.23: faster parsing (~13% on a 96 MB corpus) and a nesting limit of 512 instead of a lower one.
+- Parser crates updated to 0.24: faster parsing (~13% on a 96 MB corpus), a nesting limit of 512 instead of a lower one, byte-string literals and many more compile-time checks. The checks that mir reports itself (`ParentNotFound`, `InvalidToString`, `InvalidAttribute`, ...) are not repeated as `ParseError`.
 - Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
 
 ### Fixed
 
+- `include \dirname(__DIR__) . '/x.php'` reported `UndefinedFunction` for `include\dirname()`, and a `namespace\f()` call for `namespace\f()`; both resolve against the current namespace.
+- String literals that are not valid UTF-8 (`"\xC0"`) stay distinct as array keys and literal types instead of colliding.
 - The key names of an array built element by element (`$s = []; $s[$k] = $v`) are tracked apart from its values: values from request data stored under validated keys no longer taint the keys seen by `foreach`, `array_keys()` or the callers of the function that returns the array (the Symfony `Secrets*Command` reports). Merges, references, spreads and unknown callees keep the keys tainted.
 - `preg_replace()` with a single character class and a plain replacement limits what it returns: `preg_replace('/[^0-9]/', '', $_GET['a'])` is digits only, `preg_replace('/[\r\n]/', '', $v)` has no line break. Several patterns, a limit, a back-reference, quantifier counts and a tainted replacement keep the taint.
 - A string callable with a leading backslash (`array_map('\intval', $a)`) no longer reports `UndefinedFunction`.

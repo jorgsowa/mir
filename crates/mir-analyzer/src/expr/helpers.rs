@@ -1,3 +1,4 @@
+use crate::ast_ext::ByteStringExt as _;
 use indexmap::IndexMap;
 use mir_types::{ArrayKey, Atomic, Name, Type};
 use php_ast::ast::BinaryOp;
@@ -45,9 +46,9 @@ pub fn canonical_int_array_key(s: &str) -> Option<i64> {
 /// dynamic (non-literal) index.
 pub fn literal_array_key_of_kind(kind: &ExprKind) -> Option<ArrayKey> {
     match kind {
-        ExprKind::String(s) => Some(match canonical_int_array_key(s) {
+        ExprKind::String(s) => Some(match canonical_int_array_key(s.as_str()) {
             Some(i) => ArrayKey::Int(i),
-            None => ArrayKey::String(std::sync::Arc::from(s.as_ref())),
+            None => ArrayKey::String(std::sync::Arc::from(&*s.to_text())),
         }),
         ExprKind::Int(i) => Some(ArrayKey::Int(*i)),
         ExprKind::Bool(b) => Some(ArrayKey::Int(if *b { 1 } else { 0 })),
@@ -1475,7 +1476,7 @@ pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Identifier(s) => Some(s.trim_start_matches('$').to_string()),
         ExprKind::Variable(_) => None,
-        ExprKind::String(s) => Some(s.to_string()),
+        ExprKind::String(s) => Some(s.as_str().to_string()),
         _ => None,
     }
 }
@@ -1491,7 +1492,10 @@ pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
 fn literal_condition_key(expr: &Expr) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::Int(n) => Some((format!("int:{n}"), n.to_string())),
-        ExprKind::String(s) => Some((format!("str:{s}"), format!("\"{s}\""))),
+        ExprKind::String(s) => {
+            let s = s.as_str();
+            Some((format!("str:{s}"), format!("\"{s}\"")))
+        }
         ExprKind::Bool(b) => Some((format!("bool:{b}"), b.to_string())),
         ExprKind::Null => Some(("null".to_string(), "null".to_string())),
         _ => None,

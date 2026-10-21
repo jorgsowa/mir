@@ -1,4 +1,7 @@
 use super::*;
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 
 /// Whether a call in `expr` takes a `function () {}` literal argument.
 pub fn has_closure_argument(expr: &Expr) -> bool {
@@ -9,7 +12,7 @@ pub fn has_closure_argument(expr: &Expr) -> bool {
         _ => return false,
     };
     args.iter().any(|a| {
-        a.value.as_ref().is_some_and(|v| {
+        a.value().is_some_and(|v| {
             matches!(unwrap_parens(v).kind, ExprKind::Closure(_)) || has_closure_argument(v)
         })
     })
@@ -150,6 +153,8 @@ pub fn captured_taint(outer: Taint, param_count: usize, captures: &mut Vec<Taint
 pub(super) struct VariableReads(pub(super) Vec<mir_types::Name>);
 
 impl php_ast::owned::visitor::OwnedVisitor for VariableReads {
+    type Break = ();
+
     fn visit_expr(&mut self, expr: &Expr) -> std::ops::ControlFlow<()> {
         if let ExprKind::Variable(name) = &expr.kind {
             let name = mir_types::Name::from(name.trim_start_matches('$'));
@@ -243,12 +248,9 @@ pub(super) fn closure_call_taint(
 /// A callback named by a string (`'trim'`) or a first-class callable (`trim(...)`).
 pub(super) fn callback_function_name(callback: &Expr) -> Option<&str> {
     match &unwrap_parens(callback).kind {
-        ExprKind::String(name) if !name.contains("::") => Some(name.as_ref()),
+        ExprKind::String(name) if !name.as_str().contains("::") => Some(name.as_str()),
         ExprKind::CallableCreate(c) => match &c.kind {
-            php_ast::owned::CallableCreateKind::Function(callee) => match &callee.kind {
-                ExprKind::Identifier(name) => Some(name.as_ref()),
-                _ => None,
-            },
+            php_ast::owned::CallableCreateKind::Function(callee) => callee.kind.name_bare(),
             _ => None,
         },
         _ => None,
@@ -392,7 +394,7 @@ fn array_literal_inputs<'e>(
         if slot >= inputs.len() {
             inputs.resize(slot + 1, None);
         }
-        inputs[slot] = Some(&el.value);
+        inputs[slot] = Some(el.value());
     }
     Some(inputs)
 }
@@ -406,14 +408,14 @@ pub(super) fn callback_inputs<'e>(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Option<(usize, Vec<Option<&'e Expr>>)> {
-    let value = |index: usize| args.get(index).and_then(|a| a.value.as_ref());
+    let value = |index: usize| args.get(index).and_then(|a| a.value());
     let (callback_index, input_args): (usize, Vec<usize>) = match fn_name_lower {
         "array_map" => (0, (1..args.len().max(2)).collect()),
         "array_filter" | "array_walk" | "array_walk_recursive" => (1, vec![0]),
         "usort" | "uasort" | "uksort" => (1, vec![0, 0]),
         "array_reduce" => (1, vec![2, 0]),
         "preg_replace_callback" => (1, vec![2]),
-        "call_user_func" if args.iter().all(|a| !a.unpack && a.name.is_none()) => {
+        "call_user_func" if args.iter().all(|a| !a.unpack() && a.name.is_none()) => {
             (0, (1..args.len()).collect())
         }
         "call_user_func_array" if args.len() == 2 && args.iter().all(|a| a.name.is_none()) => {
@@ -437,14 +439,14 @@ pub(super) fn callback_builtin_taint(
     let (callback_index, input_args) = callback_inputs(fn_name_lower, args, ctx, db, file)?;
     let arg_taint = |index: usize| {
         args.get(index)
-            .and_then(|a| a.value.as_ref())
+            .and_then(|a| a.value())
             .map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file))
     };
     let inputs: Vec<Taint> = input_args
         .iter()
         .map(|v| v.map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file)))
         .collect();
-    let callback = args.get(callback_index).and_then(|a| a.value.as_ref());
+    let callback = args.get(callback_index).and_then(|a| a.value());
     let called = || {
         callback.map_or(Taint::NONE, |cb| {
             callback_result(cb, &inputs, ctx, db, file)
@@ -479,7 +481,7 @@ pub fn check_callback_sinks(
     else {
         return;
     };
-    let Some(callback) = args.get(callback_index).and_then(|a| a.value.as_ref()) else {
+    let Some(callback) = args.get(callback_index).and_then(|a| a.value()) else {
         return;
     };
     let closure = callee_closure(callback, ctx, ea.db, &ea.file);

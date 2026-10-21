@@ -13,3 +13,5 @@ $foo = "bar";
 $a = function (string $foo) use ($foo) : string {
   return $foo;
 };
+===expect===
+ParseError@4:33-4:37: Parse error: Cannot use lexical variable $foo as a parameter name

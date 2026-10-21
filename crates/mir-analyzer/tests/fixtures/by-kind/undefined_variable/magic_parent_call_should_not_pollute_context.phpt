@@ -13,7 +13,7 @@ Magic parent call should not pollute context
  */
 class Foo
 {
-    public function __call()
+    public function __call($name, $args)
     {
         return new self();
     }

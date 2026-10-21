@@ -1,6 +1,7 @@
 //! `array_key_exists()`/`key_exists()` narrowing for property and
 //! static-property receivers, plus the sealed-shape key-presence helpers
 //! shared with the variable case and with `shapes`'s nested-path variants.
+use crate::ast_ext::ByteStringExt as _;
 use php_ast::owned::{ExprKind, FunctionCallExpr};
 
 use mir_types::Atomic;
@@ -226,14 +227,14 @@ pub(crate) fn narrow_array_key_exists_condition(
     // `key_exists()` is a built-in alias of `array_key_exists()`
     // with identical semantics.
     if let (Some(key_arg), Some(arr_arg)) = (call.args.first(), call.args.get(1)) {
-        let (Some(key_value), Some(arr_value)) = (&key_arg.value, &arr_arg.value) else {
+        let (Some(key_value), Some(arr_value)) = (key_arg.value(), arr_arg.value()) else {
             // A partial-application placeholder (`?`/`...`) as either
             // argument leaves nothing concrete to narrow on.
             return;
         };
         let literal_key = match &key_value.kind {
             ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(std::sync::Arc::from(
-                s.as_ref(),
+                &*s.to_text(),
             ))),
             ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
             // `$key = 'name'; array_key_exists($key, $arr)` — resolve a

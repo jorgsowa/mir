@@ -1,4 +1,6 @@
 use super::*;
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
 
 // ---------------------------------------------------------------------------
 // Superglobal names (without the $ prefix, as stored in FlowState::vars)
@@ -47,14 +49,14 @@ pub fn server_dynamic_key(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&Expr>
 /// Whether a key expression starts with the `HTTP_` header prefix.
 pub fn starts_with_header_prefix(key: &Expr) -> bool {
     match &key.kind {
-        ExprKind::String(s) => s.starts_with("HTTP_"),
+        ExprKind::String(s) => s.as_str().starts_with("HTTP_"),
         ExprKind::Parenthesized(inner) => starts_with_header_prefix(inner),
         ExprKind::Binary(b) if matches!(b.op, php_ast::ast::BinaryOp::Concat) => {
             starts_with_header_prefix(&b.left)
         }
         ExprKind::InterpolatedString(parts) => matches!(
             parts.first(),
-            Some(StringPart::Literal(l)) if l.starts_with("HTTP_")
+            Some(StringPart::Literal(l)) if l.as_str().starts_with("HTTP_")
         ),
         _ => false,
     }
@@ -98,29 +100,31 @@ pub fn server_bag_read_key<'a>(
     method: &Expr,
     args: &'a [php_ast::owned::Arg],
 ) -> Option<&'a Expr> {
-    let first = args.first().filter(|a| !a.unpack && a.name.is_none())?;
+    let first = args.first().filter(|a| !a.unpack() && a.name.is_none())?;
     let (ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa)) =
         &unwrap_parens(object).kind
     else {
         return None;
     };
-    let (ExprKind::Identifier(prop) | ExprKind::String(prop)) = &pa.property.kind else {
-        return None;
+    let prop = match &pa.property.kind {
+        ExprKind::Identifier(prop) => &**prop,
+        ExprKind::String(prop) => prop.as_str(),
+        _ => return None,
     };
     let ExprKind::Identifier(method) = &method.kind else {
         return None;
     };
-    (&**prop == "server"
+    (prop == "server"
         && ["get", "getstring", "filter"]
             .iter()
             .any(|name| method.eq_ignore_ascii_case(name)))
-    .then_some(first.value.as_ref()?)
+    .then_some(first.value()?)
 }
 
 /// Whether a key expression names a client-controlled `$_SERVER` entry.
 pub fn is_request_server_key_expr(key: &Expr) -> bool {
     starts_with_header_prefix(key)
-        || matches!(&unwrap_parens(key).kind, ExprKind::String(k) if is_request_server_key(k))
+        || matches!(&unwrap_parens(key).kind, ExprKind::String(k) if is_request_server_key(k.as_str()))
 }
 
 /// Taint of a `$request->server->get($key, $default)` read.
@@ -132,7 +136,7 @@ pub(super) fn server_bag_read_taint(
     file: &str,
 ) -> Taint {
     let entry = match &unwrap_parens(key).kind {
-        ExprKind::String(k) if is_request_server_key(k) => Taint::ALL,
+        ExprKind::String(k) if is_request_server_key(k.as_str()) => Taint::ALL,
         ExprKind::String(_) => Taint::NONE,
         _ => server_dynamic_read_taint(key, ctx, db, file),
     };
@@ -150,12 +154,12 @@ pub fn is_trusted_superglobal_field(aa: &php_ast::owned::ArrayAccessExpr) -> boo
         return false;
     };
     if is_superglobal_var(&aa.array, "_SERVER") {
-        return !is_request_server_key(key);
+        return !is_request_server_key(key.as_str());
     }
     let ExprKind::ArrayAccess(file_entry) = &aa.array.kind else {
         return false;
     };
-    matches!(&**key, "tmp_name" | "size" | "error")
+    matches!(key.as_str(), "tmp_name" | "size" | "error")
         && is_superglobal_var(&file_entry.array, "_FILES")
 }
 
@@ -164,12 +168,12 @@ pub(super) fn globals_entry(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&str
     let Some(ExprKind::String(key)) = aa.index.as_deref().map(|i| &i.kind) else {
         return None;
     };
-    is_superglobal_var(&aa.array, "GLOBALS").then_some(key.as_ref())
+    is_superglobal_var(&aa.array, "GLOBALS").then_some(key.as_str())
 }
 
 /// `$GLOBALS['_GET']` reads the superglobal itself.
 pub fn is_globals_superglobal_alias(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
-    matches!(aa.index.as_deref().map(|i| &i.kind), Some(ExprKind::String(key)) if is_superglobal(key))
+    matches!(aa.index.as_deref().map(|i| &i.kind), Some(ExprKind::String(key)) if is_superglobal(key.as_str()))
         && is_superglobal_var(&aa.array, "GLOBALS")
 }
 
@@ -330,8 +334,8 @@ pub(super) fn reads_raw_request_body(fn_name_lower: &str, args: &[php_ast::owned
         fn_name_lower,
         "file_get_contents" | "fopen" | "file" | "readfile" | "stream_get_contents"
     ) && matches!(
-        args.first().and_then(|a| a.value.as_ref()).map(|v| &v.kind),
+        args.first().and_then(|a| a.value()).map(|v| &v.kind),
         Some(ExprKind::String(path))
-            if path.eq_ignore_ascii_case("php://input")
+            if path.as_str().eq_ignore_ascii_case("php://input")
     )
 }

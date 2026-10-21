@@ -1,5 +1,6 @@
 //! `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists` type-check
 //! narrowing, for variable, property, and static-property receivers.
+use crate::ast_ext::NameRefExt as _;
 use std::borrow::Cow;
 
 use php_ast::ast::{BinaryOp, UnaryPrefixOp};
@@ -444,24 +445,22 @@ pub(crate) fn classify_var_predicate<'a>(
         }
     }
     let is_var = |e: &Expr| matches!(&unwrap(e).kind, ExprKind::Variable(name) if name.trim_start_matches('$') == var_name);
-    let call_fn_name = |e: &'a Expr| -> Option<&'a str> {
+    let call_fn_name = |e: &'a Expr| -> Option<Cow<'a, str>> {
         let ExprKind::FunctionCall(call) = &unwrap(e).kind else {
             return None;
         };
-        let ExprKind::Identifier(name) = &call.name.kind else {
-            return None;
-        };
+        let name = call.name.kind.name_ref()?;
         let [arg] = &*call.args else {
             return None;
         };
-        arg.value.as_ref().filter(|v| is_var(v))?;
-        Some(name.as_ref())
+        arg.value().filter(|v| is_var(v))?;
+        Some(name)
     };
 
     let e = unwrap(expr);
     match &e.kind {
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
-            call_fn_name(&u.operand).map(|name| (Cow::Borrowed(name), false))
+            call_fn_name(&u.operand).map(|name| (name, false))
         }
         ExprKind::Binary(b) => {
             let is_true = match b.op {
@@ -473,6 +472,6 @@ pub(crate) fn classify_var_predicate<'a>(
                 || (is_var(&b.right) && matches!(unwrap(&b.left).kind, ExprKind::Null));
             matches_null.then_some((Cow::Borrowed("is_null"), is_true))
         }
-        _ => call_fn_name(e).map(|name| (Cow::Borrowed(name), true)),
+        _ => call_fn_name(e).map(|name| (name, true)),
     }
 }

@@ -1,3 +1,4 @@
+use crate::ast_ext::ArgExt as _;
 use std::sync::Arc;
 
 use php_ast::owned::{ExprKind, MethodCallExpr};
@@ -72,7 +73,7 @@ fn inline_closure_rebind(
     if !super::is_closure_literal(&call.object) {
         return None;
     }
-    let arg = |i: usize| call.args.get(i).and_then(|a| a.value.as_ref());
+    let arg = |i: usize| call.args.get(i).and_then(|a| a.value());
     if method.eq_ignore_ascii_case("bindTo") {
         super::closure_rebind(ea.db, &ea.file, arg(0), arg(1))
     } else if method.eq_ignore_ascii_case("call") {
@@ -224,7 +225,7 @@ fn positional_arity_fits(
     fqcn: &str,
     method_name: &str,
 ) -> Option<bool> {
-    if call.args.iter().any(|a| a.unpack || a.name.is_some()) {
+    if call.args.iter().any(|a| a.unpack() || a.name.is_some()) {
         return None;
     }
     let resolved_fqcn: Arc<str> =
@@ -521,7 +522,7 @@ impl CallAnalyzer {
                 ea.record_dynamic_member_access(&obj_ty, call.method.span);
                 // Analyze arguments so variables used in them are marked as consumed.
                 for arg in &call.args {
-                    let Some(value) = &arg.value else { continue };
+                    let Some(value) = arg.value() else { continue };
                     ea.analyze(value, ctx);
                 }
                 return Type::mixed();
@@ -619,14 +620,14 @@ impl CallAnalyzer {
         for (arg_index, arg) in call.args.iter().enumerate() {
             // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
             // — not yet modeled; keep positional slots aligned with `mixed`.
-            let Some(value) = &arg.value else {
+            let Some(value) = arg.value() else {
                 arg_types.push(Type::mixed());
                 continue;
             };
             if matches!(
                 value.kind,
                 ExprKind::Closure(_) | ExprKind::ArrowFunction(_)
-            ) && !arg.unpack
+            ) && !arg.unpack()
                 && arg.name.is_none()
             {
                 ea.callback_param_hints = callback_ctx.as_ref().and_then(|(params, bindings)| {
@@ -647,10 +648,10 @@ impl CallAnalyzer {
             };
             ea.callback_param_hints = None;
             super::consume_arg_assignment(value, ctx);
-            if arg.unpack && call.args.len() == 1 {
+            if arg.unpack() && call.args.len() == 1 {
                 sole_spread_ty = Some(ty.clone());
             }
-            arg_types.push(if arg.unpack {
+            arg_types.push(if arg.unpack() {
                 spread_element_type(ea.db, &ty)
             } else {
                 ty
@@ -1332,7 +1333,7 @@ fn resolve_method_return<'a>(
             && !resolved.is_mutation_free
         {
             for arg in call.args.iter() {
-                let Some(value) = &arg.value else { continue };
+                let Some(value) = arg.value() else { continue };
                 let Some(recv_name) = crate::expr::root_receiver_var(value) else {
                     continue;
                 };
@@ -1400,11 +1401,7 @@ fn resolve_method_return<'a>(
         let mut arg_can_be_byref: Vec<bool> = call
             .args
             .iter()
-            .map(|a| {
-                a.value
-                    .as_ref()
-                    .is_some_and(expr_can_be_passed_by_reference_owned)
-            })
+            .map(|a| a.value().is_some_and(expr_can_be_passed_by_reference_owned))
             .collect();
         // `effective_arg_types`/`effective_arg_spans` are kept distinct from
         // the `arg_types`/`arg_spans` parameters (rather than shadowing them)
@@ -1413,7 +1410,7 @@ fn resolve_method_return<'a>(
         // off the original per-argument positions.
         let mut effective_arg_types = arg_types.to_vec();
         let mut effective_arg_spans = arg_spans.to_vec();
-        let mut has_spread = call.args.iter().any(|a| a.unpack);
+        let mut has_spread = call.args.iter().any(|a| a.unpack());
         // A sole spread arg over a literal, sequentially-keyed shape can be
         // expanded into one binding per element so each parameter (and
         // template-binding inference below) is checked individually instead
@@ -1576,7 +1573,7 @@ fn resolve_method_return<'a>(
         // the call itself (e.g. `$this->save($logger)` mutating `$logger`).
         if !resolved.is_pure && !resolved.is_external_mutation_free {
             for arg in call.args.iter() {
-                if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
+                if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
                     ctx.invalidate_prop_refined_receiver(name);
                 }
             }
@@ -1598,7 +1595,7 @@ fn resolve_method_return<'a>(
         // procedural classify_sink): $pdo->query($sql) etc.
         if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
             for arg in call.args.iter() {
-                let Some(value) = &arg.value else { continue };
+                let Some(value) = arg.value() else { continue };
                 let issue = sink_kind.issue();
                 if reaches_sink(
                     value,
@@ -1791,13 +1788,13 @@ fn resolve_method_return<'a>(
             }
             if param.is_variadic {
                 for arg in call.args.iter().skip(i) {
-                    let Some(value) = &arg.value else { continue };
+                    let Some(value) = arg.value() else { continue };
                     ea.check_byref_arg_purity(value, ctx, value.span);
                 }
             } else if let Some(value) =
                 super::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                     .and_then(|idx| call.args.get(idx))
-                    .and_then(|arg| arg.value.as_ref())
+                    .and_then(|arg| arg.value())
             {
                 ea.check_byref_arg_purity(value, ctx, value.span);
             }
@@ -1829,7 +1826,7 @@ fn resolve_method_return<'a>(
             if param.is_variadic {
                 for arg in call.args.iter().skip(i) {
                     if let Some(php_ast::owned::ExprKind::Variable(name)) =
-                        arg.value.as_ref().map(|v| &v.kind)
+                        arg.value().map(|v| &v.kind)
                     {
                         let var_name = name.as_ref().trim_start_matches('$');
                         ctx.set_var(var_name, out_ty.clone());
@@ -1839,7 +1836,7 @@ fn resolve_method_return<'a>(
             } else if let Some(value) =
                 super::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                     .and_then(|idx| call.args.get(idx))
-                    .and_then(|arg| arg.value.as_ref())
+                    .and_then(|arg| arg.value())
             {
                 if let php_ast::owned::ExprKind::Variable(name) = &value.kind {
                     let var_name = name.as_ref().trim_start_matches('$');

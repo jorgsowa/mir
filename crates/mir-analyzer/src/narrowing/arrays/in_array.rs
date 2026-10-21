@@ -4,6 +4,7 @@
 //! builtins' dispatch arms (`array_search()`'s own dispatch arm stays in
 //! `mod.rs` since it also spans the string domain via
 //! `strings::narrow_string_false_comparable_condition`).
+use crate::ast_ext::ByteStringExt as _;
 use php_ast::owned::{ExprKind, FunctionCallExpr};
 
 use mir_types::{Atomic, Type};
@@ -80,9 +81,9 @@ pub(crate) fn extract_haystack_type(
         ExprKind::Array(elements) => {
             let mut ty = Type::empty();
             for item in elements.iter() {
-                match &item.value.kind {
+                match &item.value().kind {
                     ExprKind::String(s) => {
-                        ty.add_type(Atomic::TLiteralString(std::sync::Arc::from(s.as_ref())))
+                        ty.add_type(Atomic::TLiteralString(std::sync::Arc::from(&*s.to_text())))
                     }
                     ExprKind::Int(n) => ty.add_type(Atomic::TLiteralInt(*n)),
                     _ => return None, // non-literal element — bail out
@@ -211,7 +212,7 @@ pub(crate) fn narrow_in_array_condition(
     file: &str,
 ) {
     if let Some(haystack_arg) = call.args.get(1) {
-        if let Some(value) = &haystack_arg.value {
+        if let Some(value) = haystack_arg.value() {
             strip_haystack_null(value, ctx, db, file);
         }
     }
@@ -229,14 +230,14 @@ pub(crate) fn narrow_in_array_condition(
     let strict = call
         .args
         .get(2)
-        .and_then(|a| a.value.as_ref())
+        .and_then(|a| a.value())
         .map(is_truthy_bool_literal)
         .unwrap_or(false);
     if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
-        let Some(needle_value) = &needle_arg.value else {
+        let Some(needle_value) = needle_arg.value() else {
             return;
         };
-        let Some(haystack_value) = &haystack_arg.value else {
+        let Some(haystack_value) = haystack_arg.value() else {
             return;
         };
         if let Some(var_name) = extract_var_name(needle_value) {

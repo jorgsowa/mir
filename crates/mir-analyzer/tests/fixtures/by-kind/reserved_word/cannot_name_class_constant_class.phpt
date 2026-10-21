@@ -9,3 +9,5 @@ class Foo
 }
 
 class Bar {}
+===expect===
+ParseError@5:20-5:25: Parse error: A class constant must not be called 'class'; it is reserved for class name fetching

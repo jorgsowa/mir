@@ -10,5 +10,5 @@ interface X {
      * @param B $class
      */
     public function boo(A $class): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: interface method cannot contain a body
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: Interface function X::boo() cannot contain body
 }

@@ -571,7 +571,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut byref_captures: Vec<(&str, Type)> = Vec::new();
         let mut taint_captures = Vec::new();
         for use_var in c.use_vars.iter() {
-            let name = use_var.name.trim_start_matches('$');
+            let name = use_var.name.or_error().trim_start_matches('$');
             // A by-ref capture (`use (&$f)`) binds by reference and auto-creates
             // the variable in the parent scope if it does not yet exist, so it is
             // never "undefined" — this is what makes a self-referential closure
@@ -697,7 +697,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // never propagated into a closure's own `FlowState` at all.
             let mut extended_byref_param_names = (*closure_ctx.byref_param_names).clone();
             for use_var in c.use_vars.iter() {
-                let name = use_var.name.trim_start_matches('$');
+                let name = use_var.name.or_error().trim_start_matches('$');
                 if ctx.param_names.contains(&Name::from(name)) {
                     extended_param_names.insert(Name::from(name));
                 }

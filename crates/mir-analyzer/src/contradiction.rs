@@ -15,6 +15,8 @@
 //!
 //! Both analyses are conservative: open atomics (mixed, scalar, callable,
 //! template params) are never treated as disjoint.
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::{BinaryOp, UnaryPrefixOp};
 use php_ast::owned::{Expr, ExprKind};
 
@@ -39,7 +41,7 @@ fn extract_var(expr: &Expr) -> Option<String> {
 fn extract_lit(expr: &Expr) -> Option<Lit> {
     match &expr.kind {
         ExprKind::Int(n) => Some(Lit::Int(*n)),
-        ExprKind::String(s) => Some(Lit::Str(s.to_string())),
+        ExprKind::String(s) => Some(Lit::Str(s.as_str().to_string())),
         ExprKind::Parenthesized(inner) => extract_lit(inner),
         // PHP parses `-1` as UnaryPrefix(Negate, Int(1)), not Int(-1).
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::Negate => {
@@ -283,17 +285,11 @@ pub(crate) fn gettype_call_arg(expr: &Expr) -> Option<&Expr> {
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let name = match &call.name.kind {
-        ExprKind::Identifier(n) => n.as_ref(),
-        _ => return None,
-    };
-    if !name
-        .trim_start_matches('\\')
-        .eq_ignore_ascii_case("gettype")
-    {
+    let name = call.name.kind.name_bare()?;
+    if !name.eq_ignore_ascii_case("gettype") {
         return None;
     }
-    call.args.first().and_then(|a| a.value.as_ref())
+    call.args.first().and_then(|a| a.value())
 }
 
 /// The set of `gettype()` strings a value of type `ty` could yield, or `None`

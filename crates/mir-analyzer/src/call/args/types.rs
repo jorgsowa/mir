@@ -1,3 +1,4 @@
+use crate::ast_ext::ByteStringExt as _;
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
@@ -1594,7 +1595,7 @@ fn array_callable_guard_key(
     let element = items
         .iter()
         .find(|item| is_list_position_zero(item.key.as_ref()))?;
-    crate::narrowing::extract_expr_guard_key(&element.value, ctx, ea.db, &ea.file)
+    crate::narrowing::extract_expr_guard_key(element.value(), ctx, ea.db, &ea.file)
 }
 
 /// True when an array literal element occupies list position `0` — an
@@ -1604,7 +1605,7 @@ fn is_list_position_zero(key: Option<&Expr>) -> bool {
     match key.map(|k| &k.kind) {
         None => true,
         Some(ExprKind::Int(0)) => true,
-        Some(ExprKind::String(s)) => s.as_ref() == "0",
+        Some(ExprKind::String(s)) => s.as_str() == "0",
         _ => false,
     }
 }

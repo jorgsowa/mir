@@ -41,6 +41,9 @@
 //! A bare unbraced `namespace F\Q;` applies to all *following sibling*
 //! declarations (PHP semantics, mirrored by the parser's `NsKind::Unbraced`),
 //! so the scanner tracks the namespace across sibling statements.
+use crate::ast_ext::ArrayElementExt as _;
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 
@@ -87,6 +90,8 @@ pub(super) fn scan_static_property_writes(program: &Program) -> StaticWrites {
 }
 
 impl OwnedVisitor for WriteScanner {
+    type Break = ();
+
     fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Namespace(decl) => {
@@ -193,10 +198,7 @@ impl WriteScanner {
     /// and single-segment names (possible `use` aliases) are unresolvable;
     /// multi-segment relative names resolve against the current namespace.
     fn resolve_class(&self, class: &Expr) -> Option<String> {
-        let id = match &class.kind {
-            ExprKind::Identifier(s) => s.as_ref(),
-            _ => return None,
-        };
+        let id = class.kind.name_ref()?;
         let absolute = id.starts_with('\\');
         let trimmed = id.trim_start_matches('\\');
         let lower = trimmed.to_lowercase();
@@ -243,10 +245,7 @@ fn qualify(ns: Option<&str>, class: &str) -> String {
 /// else (qualified names, variables, `${$x}`), which the caller treats as
 /// unresolvable.
 fn single_name(expr: &Expr) -> Option<&str> {
-    match &expr.kind {
-        ExprKind::Identifier(s) if !s.contains('\\') => Some(s.as_ref()),
-        _ => None,
-    }
+    expr.kind.name_bare().filter(|s| !s.contains('\\'))
 }
 
 /// The type of a *literal* expression: integer, float, string, boolean,
@@ -275,7 +274,7 @@ pub(super) fn literal_type(expr: &Expr) -> Option<Type> {
 /// non-literal value to `mixed`. A positional list is never built as an open
 /// keyed array: consumers of `array_keys()` on a list read the `int` key kind.
 fn literal_array(elems: &[ArrayElement]) -> Type {
-    if elems.iter().any(|e| e.unpack) {
+    if elems.iter().any(|e| e.unpack()) {
         // `...$x` unpacking: keys and values are unknown.
         return bare_array();
     }
@@ -294,7 +293,7 @@ fn literal_array(elems: &[ArrayElement]) -> Type {
             None => e_key,
             Some(acc) => merge_keys(&acc, &e_key),
         });
-        let v = literal_type(&e.value).unwrap_or_else(Type::mixed);
+        let v = literal_type(e.value()).unwrap_or_else(Type::mixed);
         value = Type::merge(&value, &v);
     }
     match key {

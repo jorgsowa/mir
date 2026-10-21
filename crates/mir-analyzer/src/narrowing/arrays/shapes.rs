@@ -1,6 +1,7 @@
 //! The shape-narrowing core: tracks `$var['key']`/`$obj->prop['key']`-style
 //! array-shape access paths for `isset()`/`empty()`/`array_key_exists()`, plus
 //! the `$arr === []`/`!== []` array-emptiness narrowing.
+use crate::ast_ext::ByteStringExt as _;
 use php_ast::owned::ExprKind;
 
 use mir_types::{Atomic, Type};
@@ -201,7 +202,7 @@ pub(crate) fn collect_array_access_path(
     let idx = aa.index.as_ref()?;
     let key = match &idx.kind {
         ExprKind::String(s) => {
-            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref()))
+            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(&*s.to_text()))
         }
         ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
         _ => return None,

@@ -129,7 +129,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
     let parsed = prepared.parse_result();
 
     for err in &parsed.errors {
-        if crate::parser::is_spurious_reserved_class_error(err) {
+        if crate::parser::is_redundant_parse_error(err) {
             continue;
         }
         issues.push(crate::parser::parse_error_to_issue(
@@ -140,9 +140,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
         ));
     }
 
-    // Run full analysis unless there are hard parse errors. ForbiddenWarning
-    // diagnostics are non-fatal and leave the AST complete, so analysis can
-    // still proceed.
+    // Run full analysis unless there are hard parse errors.
     let mut ref_locs: Vec<RefLoc> = Vec::new();
     if !prepared.has_hard_parse_errors {
         let (scope_issues, scope_refs) = super::scopes::analyze_file_per_scope(db, file);

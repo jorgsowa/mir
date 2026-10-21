@@ -2,6 +2,8 @@
 //! can't express that condition; unconditionally pure builtins are tagged in
 //! the stubs instead.
 
+use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::{ArgExt as _, ByteStringExt as _};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{Arg, CallableCreateKind, Expr, ExprKind};
 
@@ -40,7 +42,7 @@ pub(crate) fn callback_builtin_call_is_pure(
         return false;
     }
     // A spread can land on the callback position.
-    if args.iter().any(|a| a.unpack) {
+    if args.iter().any(|a| a.unpack()) {
         return false;
     }
     let Some(idx) = params.iter().position(|p| p.name.as_ref() == "callback") else {
@@ -48,7 +50,7 @@ pub(crate) fn callback_builtin_call_is_pure(
     };
     match crate::call::resolve_named_arg_type_index(params, args, idx)
         .and_then(|i| args.get(i))
-        .and_then(|a| a.value.as_ref())
+        .and_then(|a| a.value())
     {
         Some(callback) => callback_is_pure(ea, ctx, callback),
         None => true,
@@ -71,11 +73,12 @@ fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -
         ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => ctx.is_in_pure_fn,
         // Callable strings always name a global function.
         ExprKind::String(name) => {
-            !name.contains("::") && function_is_pure(ea, name.trim_start_matches('\\'), None)
+            !name.contains(&b':')
+                && function_is_pure(ea, name.as_str().trim_start_matches('\\'), None)
         }
         ExprKind::CallableCreate(cc) => match &cc.kind {
-            CallableCreateKind::Function(target) => match &target.kind {
-                ExprKind::Identifier(name) => {
+            CallableCreateKind::Function(target) => match target.kind.name_ref() {
+                Some(name) => {
                     let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
                     let fallback = (!name.contains('\\')).then_some(name.as_ref());
                     function_is_pure(ea, &resolved, fallback)
@@ -83,8 +86,8 @@ fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -
                 _ => false,
             },
             CallableCreateKind::StaticMethod { class, method } => {
-                let (ExprKind::Identifier(class), ExprKind::Identifier(method)) =
-                    (&class.kind, &method.kind)
+                let (Some(class), ExprKind::Identifier(method)) =
+                    (class.kind.name_ref(), &method.kind)
                 else {
                     return false;
                 };

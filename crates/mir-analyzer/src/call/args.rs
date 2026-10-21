@@ -506,7 +506,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
     } in &bindings
     {
         // PHP 8.6 partial-application placeholder (`?`/`...`): no value to check.
-        if args.get(*arg_idx).is_some_and(|a| a.value.is_none()) {
+        if args.get(*arg_idx).is_some_and(|a| a.value().is_none()) {
             continue;
         }
 
@@ -557,7 +557,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
             // consult `method_exists()` guards on the callable's receiver.
             // `arg_idx` can run past `args` for a sole spread arg expanded
             // into per-element bindings; `.get` yields `None` there.
-            let arg_expr = args.get(*arg_idx).and_then(|a| a.value.as_ref());
+            let arg_expr = args.get(*arg_idx).and_then(|a| a.value());
 
             // types::check_one handles the full per-binding sequence: callable-sig validations,
             // null checks (via nullability::check_one), and type-compat checks.

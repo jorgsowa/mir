@@ -1,6 +1,8 @@
 //! Include closure: the files reachable from a set of seeds through statically
 //! resolvable `require`/`include` targets.
 
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use php_ast::ast::{BinaryOp, MagicConstKind};
 use php_ast::owned::visitor::OwnedVisitor;
 use php_ast::owned::{Expr, ExprKind};
@@ -131,6 +133,8 @@ struct IncludeTargetScanner<'a> {
 }
 
 impl OwnedVisitor for IncludeTargetScanner<'_> {
+    type Break = ();
+
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::Include(_, inner) = &expr.kind {
             if let Some(target) = resolve_static_include_target(inner, self.file) {
@@ -148,7 +152,7 @@ impl OwnedVisitor for IncludeTargetScanner<'_> {
 /// is left alone.
 fn resolve_static_include_target(expr: &Expr, file: &Path) -> Option<String> {
     match &expr.kind {
-        ExprKind::String(s) => Some(s.to_string()),
+        ExprKind::String(s) => Some(s.as_str().to_string()),
         ExprKind::MagicConst(MagicConstKind::File) => Some(file.to_string_lossy().into_owned()),
         ExprKind::MagicConst(MagicConstKind::Dir) => {
             Some(file.parent()?.to_string_lossy().into_owned())
@@ -160,16 +164,14 @@ fn resolve_static_include_target(expr: &Expr, file: &Path) -> Option<String> {
             Some(format!("{left}{right}"))
         }
         ExprKind::FunctionCall(call) => {
-            let ExprKind::Identifier(name) = &call.name.kind else {
-                return None;
-            };
+            let name = call.name.kind.name_ref()?;
             if !name.eq_ignore_ascii_case("dirname") || call.args.len() > 2 {
                 return None;
             }
-            let path = resolve_static_include_target(call.args.first()?.value.as_ref()?, file)?;
+            let path = resolve_static_include_target(call.args.first()?.value()?, file)?;
             let levels = match call.args.get(1) {
                 None => 1,
-                Some(arg) => match arg.value.as_ref()?.kind {
+                Some(arg) => match arg.value()?.kind {
                     ExprKind::Int(n) if n >= 1 => n,
                     _ => return None,
                 },

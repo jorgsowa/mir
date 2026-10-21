@@ -8,6 +8,7 @@ mod loops;
 mod return_type;
 pub(crate) use return_type::erase_templates_to_bounds;
 
+use crate::ast_ext::NameRefExt as _;
 pub(crate) use flow::return_type_is_invalid;
 pub(crate) use loops::infer_foreach_types;
 pub(crate) use loops::resolve_iterator_item_types;
@@ -69,9 +70,9 @@ fn for_each_destructured_var(target: &php_ast::owned::Expr, f: &mut impl FnMut(&
         return;
     };
     for elem in elements.iter() {
-        match &elem.value.kind {
+        match &elem.value().kind {
             php_ast::owned::ExprKind::Variable(name) => f(name.trim_start_matches('$')),
-            php_ast::owned::ExprKind::Array(_) => for_each_destructured_var(&elem.value, f),
+            php_ast::owned::ExprKind::Array(_) => for_each_destructured_var(elem.value(), f),
             _ => {}
         }
     }
@@ -176,10 +177,8 @@ fn closure_var_rebind(
 
     match &call_expr.kind {
         ExprKind::StaticMethodCall(smc) => {
-            let ExprKind::Identifier(class_name) = &smc.class.kind else {
-                return None;
-            };
-            if !crate::db::resolve_name(db, file, class_name).eq_ignore_ascii_case("Closure") {
+            let class_name = smc.class.kind.name_ref()?;
+            if !crate::db::resolve_name(db, file, &class_name).eq_ignore_ascii_case("Closure") {
                 return None;
             }
             let ExprKind::Identifier(method_name) = &smc.method.kind else {
@@ -188,11 +187,11 @@ fn closure_var_rebind(
             if !method_name.eq_ignore_ascii_case("bind") {
                 return None;
             }
-            let first_arg = smc.args.first()?.value.as_ref()?;
+            let first_arg = smc.args.first()?.value()?;
             if !matches!(&first_arg.kind, ExprKind::Variable(v) if v == var_name) {
                 return None;
             }
-            let arg = |i: usize| smc.args.get(i).and_then(|a| a.value.as_ref());
+            let arg = |i: usize| smc.args.get(i).and_then(|a| a.value());
             crate::call::closure_rebind(db, file, arg(1), arg(2))
         }
         ExprKind::MethodCall(mc) => {
@@ -202,7 +201,7 @@ fn closure_var_rebind(
             let ExprKind::Identifier(method_name) = &mc.method.kind else {
                 return None;
             };
-            let arg = |i: usize| mc.args.get(i).and_then(|a| a.value.as_ref());
+            let arg = |i: usize| mc.args.get(i).and_then(|a| a.value());
             if method_name.eq_ignore_ascii_case("bindTo") {
                 crate::call::closure_rebind(db, file, arg(0), arg(1))
             } else if method_name.eq_ignore_ascii_case("call") {

@@ -46,10 +46,10 @@ pub fn type_from_hint(hint: &TypeHint<'_, '_>, context_fqcn: Option<&str>) -> Ty
 
 fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
     match ty {
-        BuiltinType::Int | BuiltinType::Integer => Type::single(Atomic::TInt),
-        BuiltinType::Float | BuiltinType::Double => Type::single(Atomic::TFloat),
+        BuiltinType::Int => Type::single(Atomic::TInt),
+        BuiltinType::Float => Type::single(Atomic::TFloat),
         BuiltinType::String => Type::single(Atomic::TString),
-        BuiltinType::Bool | BuiltinType::Boolean => Type::single(Atomic::TBool),
+        BuiltinType::Bool => Type::single(Atomic::TBool),
         BuiltinType::Void => Type::single(Atomic::TVoid),
         BuiltinType::Never => Type::single(Atomic::TNever),
         BuiltinType::Mixed => Type::mixed(),

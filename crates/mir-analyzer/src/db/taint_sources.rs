@@ -3,6 +3,9 @@
 //! in, directly or through calls whose target resolves from declared types
 //! alone. Only these need a taint summary when no argument is tainted.
 
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -275,7 +278,11 @@ fn scan_method(
         .as_str()
         .is_some_and(|name| name.eq_ignore_ascii_case("__construct"))
     {
-        for param in method.params.iter().filter(|p| p.visibility.is_some()) {
+        for param in method
+            .params
+            .iter()
+            .filter(|p| p.modifiers.visibility.is_some())
+        {
             let key = prop_key(param.name.as_str().unwrap_or(""), false);
             let value = ValueFacts {
                 reads_param: true,
@@ -372,9 +379,7 @@ impl<'a> Scan<'a> {
     }
 
     fn class_name(&self, expr: &Expr) -> Option<Name> {
-        let ExprKind::Identifier(name) = &expr.kind else {
-            return None;
-        };
+        let name = expr.kind.name_ref()?;
         match crate::util::php_ident_lowercase(name.as_ref()).as_str() {
             "self" | "static" => self.self_fqcn,
             "parent" => self.parent_fqcn,
@@ -485,7 +490,7 @@ impl<'a> Scan<'a> {
             {
                 Inspect::Source
             }
-            ExprKind::String(s) if s.contains("php://input") => Inspect::Source,
+            ExprKind::String(s) if s.as_str().contains("php://input") => Inspect::Source,
             ExprKind::ArrayAccess(aa) if crate::taint::is_globals_superglobal_alias(aa) => {
                 Inspect::Source
             }
@@ -520,7 +525,7 @@ impl<'a> Scan<'a> {
                 None => Inspect::Nothing,
             },
             ExprKind::FunctionCall(fc) => {
-                let ExprKind::Identifier(name) = &fc.name.kind else {
+                let Some(name) = fc.name.kind.name_ref() else {
                     return Inspect::Nothing;
                 };
                 let lower = crate::util::php_ident_lowercase(name.as_ref());
@@ -587,7 +592,7 @@ impl<'a> Scan<'a> {
             ExprKind::ArrayAccess(aa) => self.record_assign(&aa.array, value),
             ExprKind::Array(elements) => {
                 for el in elements.iter() {
-                    self.record_assign(&el.value, value.clone());
+                    self.record_assign(el.value(), value.clone());
                 }
             }
             ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) if !matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this") =>
@@ -610,10 +615,10 @@ impl<'a> Scan<'a> {
     }
 }
 
-fn visit_index<V: OwnedVisitor>(visitor: &mut V, expr: &Expr) -> ControlFlow<()> {
+fn visit_index<V: OwnedVisitor>(visitor: &mut V, expr: &Expr) -> ControlFlow<V::Break> {
     match &expr.kind {
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
-            for value in mc.args.iter().filter_map(|a| a.value.as_ref()) {
+            for value in mc.args.iter().filter_map(|a| a.value()) {
                 visitor.visit_expr(value)?;
             }
             ControlFlow::Continue(())
@@ -633,6 +638,8 @@ struct ValueScan<'s, 'a> {
 }
 
 impl OwnedVisitor for ValueScan<'_, '_> {
+    type Break = ();
+
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::Variable(name) = &expr.kind {
             if let Some(local) = self.scan.local_values.get(name.trim_start_matches('$')) {
@@ -657,6 +664,8 @@ impl OwnedVisitor for ValueScan<'_, '_> {
 }
 
 impl OwnedVisitor for Scan<'_> {
+    type Break = ();
+
     fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Foreach(f) => {
@@ -717,8 +726,11 @@ impl Scan<'_> {
                 (self.self_fqcn, &mc.method, &mc.args)
             }
             ExprKind::StaticMethodCall(smc)
-                if matches!(&smc.class.kind, ExprKind::Identifier(n)
-                    if ["self", "static", "parent"].iter().any(|k| n.eq_ignore_ascii_case(k))) =>
+                if smc.class.kind.name_bare().is_some_and(|n| {
+                    ["self", "static", "parent"]
+                        .iter()
+                        .any(|k| n.eq_ignore_ascii_case(k))
+                }) =>
             {
                 (self.class_name(&smc.class), &smc.method, &smc.args)
             }
@@ -729,7 +741,7 @@ impl Scan<'_> {
         };
         let passes_param = args
             .iter()
-            .filter_map(|a| a.value.as_ref())
+            .filter_map(|a| a.value())
             .any(|value| self.value_facts(value).reads_param);
         if passes_param {
             let call = (
@@ -750,10 +762,8 @@ impl Scan<'_> {
             | ExprKind::Include(..)
             | ExprKind::Eval(_)
             | ExprKind::ShellExec(_) => true,
-            ExprKind::FunctionCall(fc) => match &fc.name.kind {
-                ExprKind::Identifier(name) => {
-                    crate::taint::classify_sink(name.trim_start_matches('\\')).is_some()
-                }
+            ExprKind::FunctionCall(fc) => match fc.name.kind.name_ref() {
+                Some(name) => crate::taint::classify_sink(name.trim_start_matches('\\')).is_some(),
                 _ => true,
             },
             ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {

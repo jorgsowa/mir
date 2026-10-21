@@ -14,6 +14,7 @@
 /// let file = db.symbol_defining_file("strlen"); // → "stubs/standard/standard_0.php"
 /// let src  = stub_vfs.get(&file).unwrap();           // → &'static str PHP source
 /// ```
+use crate::ast_ext::NameRefExt as _;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
@@ -171,39 +172,43 @@ struct BuiltinRefVisitor {
 }
 
 impl OwnedVisitor for BuiltinRefVisitor {
+    type Break = ();
+
     fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
         match &expr.kind {
             ExprKind::FunctionCall(call) => {
-                if let ExprKind::Identifier(name) = &call.name.kind {
+                if let Some(name) = call.name.kind.name_ref() {
                     if let Some(p) = stub_path_for_function(name.as_ref()) {
                         self.paths.insert(p);
                     }
                 }
             }
             ExprKind::New(new_expr) => {
-                if let ExprKind::Identifier(name) = &new_expr.class.kind {
+                if let Some(name) = new_expr.class.kind.name_ref() {
                     if let Some(p) = stub_path_for_class(name.as_ref()) {
                         self.paths.insert(p);
                     }
                 }
             }
             ExprKind::StaticMethodCall(call) => {
-                if let ExprKind::Identifier(name) = &call.class.kind {
+                if let Some(name) = call.class.kind.name_ref() {
                     if let Some(p) = stub_path_for_class(name.as_ref()) {
                         self.paths.insert(p);
                     }
                 }
             }
             ExprKind::ClassConstAccess(access) => {
-                if let ExprKind::Identifier(name) = &access.class.kind {
+                if let Some(name) = access.class.kind.name_ref() {
                     if let Some(p) = stub_path_for_class(name.as_ref()) {
                         self.paths.insert(p);
                     }
                 }
             }
-            ExprKind::Identifier(name) => {
-                if let Some(p) = stub_path_for_constant(name.as_ref()) {
-                    self.paths.insert(p);
+            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+                if let Some(name) = expr.kind.name_ref() {
+                    if let Some(p) = stub_path_for_constant(name.as_ref()) {
+                        self.paths.insert(p);
+                    }
                 }
             }
             _ => {}

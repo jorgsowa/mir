@@ -1,6 +1,7 @@
 //! `gettype()`/`get_debug_type()`/`get_parent_class()`/`class_implements()`/
 //! `class_parents()`/`$obj::class` narrowing, for variable, property, and
 //! static-property receivers.
+use crate::ast_ext::NameRefExt as _;
 use php_ast::owned::ExprKind;
 
 use crate::db::MirDatabase;
@@ -21,13 +22,13 @@ use super::type_fn::{
 
 pub(super) fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_class")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return ScalarArgTarget::extract(value);
                 }
             }
@@ -47,13 +48,13 @@ pub(super) fn extract_get_class_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_class")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return extract_static_prop_access(value, ctx, db, file);
                 }
             }
@@ -64,13 +65,13 @@ pub(super) fn extract_get_class_static_prop_arg(
 
 pub(super) fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("gettype")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return ScalarArgTarget::extract(value);
                 }
             }
@@ -81,13 +82,13 @@ pub(super) fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<ScalarA
 
 pub(super) fn extract_get_debug_type_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_debug_type")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return ScalarArgTarget::extract(value);
                 }
             }
@@ -109,13 +110,13 @@ pub(super) fn extract_gettype_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("gettype")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return extract_static_prop_access(value, ctx, db, file);
                 }
             }
@@ -132,13 +133,13 @@ pub(super) fn extract_get_debug_type_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_debug_type")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return extract_static_prop_access(value, ctx, db, file);
                 }
             }
@@ -149,13 +150,13 @@ pub(super) fn extract_get_debug_type_static_prop_arg(
 
 pub(super) fn extract_get_parent_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_parent_class")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return ScalarArgTarget::extract(value);
                 }
             }
@@ -175,13 +176,13 @@ pub(super) fn extract_get_parent_class_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_parent_class")
             {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return extract_static_prop_access(value, ctx, db, file);
                 }
             }
@@ -203,12 +204,12 @@ pub(super) fn extract_class_implements_or_parents_arg(
     expr: &php_ast::owned::Expr,
 ) -> Option<(ScalarArgTarget, bool)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             let bare = name.trim_start_matches('\\');
             let is_parents = bare.eq_ignore_ascii_case("class_parents");
             if is_parents || bare.eq_ignore_ascii_case("class_implements") {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return ScalarArgTarget::extract(value).map(|t| (t, is_parents));
                 }
             }
@@ -230,12 +231,12 @@ pub(super) fn extract_class_implements_or_parents_static_prop_arg(
     file: &str,
 ) -> Option<((std::sync::Arc<str>, String), bool)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        if let ExprKind::Identifier(name) = &call.name.kind {
+        if let Some(name) = call.name.kind.name_ref() {
             let bare = name.trim_start_matches('\\');
             let is_parents = bare.eq_ignore_ascii_case("class_parents");
             if is_parents || bare.eq_ignore_ascii_case("class_implements") {
                 if let Some(arg) = call.args.first() {
-                    let value = arg.value.as_ref()?;
+                    let value = arg.value()?;
                     return extract_static_prop_access(value, ctx, db, file)
                         .map(|t| (t, is_parents));
                 }

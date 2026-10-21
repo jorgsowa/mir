@@ -163,7 +163,7 @@ impl<'a> DefinitionCollector<'a> {
                             .chain(class_template_names.iter().cloned())
                             .collect();
                         for p in m.params.iter() {
-                            if p.visibility.is_some() {
+                            if p.modifiers.visibility.is_some() {
                                 let param_name = p.name.as_str().unwrap_or_default();
                                 let native_ty = self.resolve_union_opt(
                                     p.type_hint
@@ -229,13 +229,13 @@ impl<'a> DefinitionCollector<'a> {
                                     native_ty: mir_codebase::definitions::wrap_property_type(
                                         native_ty_only,
                                     ),
-                                    visibility: Self::convert_visibility(p.visibility),
+                                    visibility: Self::convert_visibility(p.modifiers.visibility),
                                     is_static: false,
                                     is_readonly: decl.modifiers.is_readonly
-                                        || p.is_readonly
+                                        || p.modifiers.is_readonly
                                         || class_doc.is_readonly,
                                     has_native_readonly: decl.modifiers.is_readonly
-                                        || p.is_readonly,
+                                        || p.modifiers.is_readonly,
                                     default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     ),
@@ -341,21 +341,24 @@ impl<'a> DefinitionCollector<'a> {
                         &self.static_writes,
                         &fqcn,
                         prop_name,
-                        matches!(p.visibility.as_ref(), Some(php_ast::Visibility::Private)),
-                        p.is_static,
+                        matches!(
+                            p.modifiers.visibility.as_ref(),
+                            Some(php_ast::Visibility::Private)
+                        ),
+                        p.modifiers.is_static,
                     );
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
                         ty: mir_codebase::definitions::wrap_property_type(refined_ty),
                         inferred_ty: None,
                         native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
-                        visibility: Self::convert_visibility(p.visibility),
-                        is_static: p.is_static,
-                        is_readonly: p.is_readonly
+                        visibility: Self::convert_visibility(p.modifiers.visibility),
+                        is_static: p.modifiers.is_static,
+                        is_readonly: p.modifiers.is_readonly
                             || decl.modifiers.is_readonly
                             || prop_doc.is_readonly
                             || class_doc.is_readonly,
-                        has_native_readonly: p.is_readonly || decl.modifiers.is_readonly,
+                        has_native_readonly: p.modifiers.is_readonly || decl.modifiers.is_readonly,
                         default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
@@ -381,7 +384,7 @@ impl<'a> DefinitionCollector<'a> {
                     // caught by the parser itself as a `ParseError`, so it's
                     // not duplicated here.) A docblock-only `@readonly` tag is
                     // advisory, not native syntax, so it's excluded.
-                    let has_native_readonly = p.is_readonly || decl.modifiers.is_readonly;
+                    let has_native_readonly = p.modifiers.is_readonly || decl.modifiers.is_readonly;
                     if has_native_readonly && p.default.is_some() {
                         self.issues.add(mir_issues::Issue::new(
                             mir_issues::IssueKind::InvalidReadonlyPropertyDeclaration {
@@ -439,8 +442,11 @@ impl<'a> DefinitionCollector<'a> {
                         name: Arc::from(const_name),
                         ty: const_ty,
                         literal_value,
-                        visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
-                        is_final: c.is_final,
+                        visibility: c
+                            .modifiers
+                            .visibility
+                            .map(|v| Self::convert_visibility(Some(v))),
+                        is_final: c.modifiers.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                             if c.attributes.iter().any(|a| {
@@ -488,6 +494,7 @@ impl<'a> DefinitionCollector<'a> {
                                 method,
                                 new_modifier,
                                 new_name,
+                                ..
                             } => {
                                 // `new_name` is `None` for a visibility-only adaptation
                                 // (`use T { foo as protected; }`) — still record it,
@@ -737,8 +744,7 @@ pub(crate) fn parse_attribute_flags(attrs: &[php_ast::owned::Attribute]) -> Opti
             ATTR_TARGET_ALL
         } else {
             attr.args[0]
-                .value
-                .as_ref()
+                .value()
                 .and_then(eval_attribute_flags_expr)
                 .unwrap_or(ATTR_TARGET_ALL)
         };

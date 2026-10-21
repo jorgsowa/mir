@@ -1,4 +1,7 @@
+use crate::ast_ext::ByteStringExt as _;
 /// Expression analyzer — infers the `Type` type of any PHP expression.
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::sync::Arc;
 
 use php_ast::owned::ExprKind;
@@ -141,9 +144,12 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) {
         let is_this = |e: &php_ast::owned::Expr| matches!(&e.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this");
         let own_class = is_this(target)
-            || matches!(&target.kind, ExprKind::Identifier(n)
-                if ["self", "static", "parent"].iter().any(|k| n.eq_ignore_ascii_case(k)));
-        if own_class || args.iter().any(|a| a.value.as_ref().is_some_and(is_this)) {
+            || target.kind.name_bare().is_some_and(|n| {
+                ["self", "static", "parent"]
+                    .iter()
+                    .any(|k| n.eq_ignore_ascii_case(k))
+            });
+        if own_class || args.iter().any(|a| a.value().is_some_and(is_this)) {
             self.taint_summary.record_overwritten_props(ctx);
         }
     }
@@ -174,8 +180,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) {
         let class = match &target.kind {
-            ExprKind::Identifier(name) => {
-                match crate::db::resolve_name(self.db, &self.file, name).as_str() {
+            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+                let name = target.kind.name_ref().unwrap_or_default();
+                match crate::db::resolve_name(self.db, &self.file, &name).as_str() {
                     "self" | "static" => ctx.self_fqcn.clone(),
                     "parent" => ctx.parent_fqcn.clone(),
                     resolved => Some(Arc::from(resolved)),
@@ -347,13 +354,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// `define('NAME', …)`: the quoted name is the constant's declaration site.
     fn record_define_name_fact(&self, fc: &php_ast::owned::FunctionCallExpr) {
-        let ExprKind::Identifier(callee) = &fc.name.kind else {
+        let Some(callee) = fc.name.kind.name_ref() else {
             return;
         };
         if !callee.eq_ignore_ascii_case("define") {
             return;
         }
-        let Some(name_expr) = fc.args.first().and_then(|a| a.value.as_ref()) else {
+        let Some(name_expr) = fc.args.first().and_then(|a| a.value()) else {
             return;
         };
         let ExprKind::String(name) = &name_expr.kind else {
@@ -367,7 +374,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.navigation_facts.borrow_mut().push(NavigationFact {
             span: php_ast::Span::new(span.start + 1, span.end - 1),
             expr_span: None,
-            name: crate::Name::global_constant(name.as_ref()),
+            name: crate::Name::global_constant(name.as_str()),
         });
     }
 
@@ -561,7 +568,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             if !s.is_empty() {
                                 any_non_empty_literal = true;
                             }
-                            literal.push_str(s);
+                            literal.push_str(s.as_str());
                         }
                         php_ast::owned::StringPart::Expr(e) => {
                             all_literal = false;
@@ -630,7 +637,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Variables --------------------------------------------------
             ExprKind::Variable(name) => self.analyze_variable(name.as_ref(), expr, ctx),
             ExprKind::VariableVariable(inner) => self.analyze_variable_variable(inner, ctx),
-            ExprKind::Identifier(name) => self.analyze_identifier(name.as_ref(), expr, ctx),
+            ExprKind::Identifier(_) | ExprKind::Name(_) => match expr.kind.name_ref() {
+                Some(name) => self.analyze_identifier(name.as_ref(), expr, ctx),
+                None => Type::mixed(),
+            },
 
             // --- Assignment -------------------------------------------------
             ExprKind::Assign(a) => self.analyze_assign(a, expr.span, ctx),
@@ -813,8 +823,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::mixed()
             }
             ExprKind::StaticPropertyAccessDynamic { class, member } => {
-                if let ExprKind::Identifier(name) = &class.kind {
-                    let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), name);
+                if let Some(name) = class.kind.name_ref() {
+                    let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
                     let fqcn = match ctx.self_fqcn.as_deref() {
                         Some(self_fqcn) if resolved.eq_ignore_ascii_case("self") => {
                             self_fqcn.to_string()
@@ -866,7 +876,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::StaticMethodCallDynamic(smc) => {
                 crate::taint::check_callable_target(self, &smc.method, ctx, expr.span);
-                if !matches!(smc.class.kind, ExprKind::Identifier(_)) {
+                if smc.class.kind.name_ref().is_none() {
                     crate::taint::check_callable_target(self, &smc.class, ctx, expr.span);
                 }
                 let ty = crate::call::CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx);
@@ -1041,7 +1051,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         use php_ast::owned::CallableCreateKind;
         match &cc.kind {
             CallableCreateKind::Function(name_expr) => {
-                if let ExprKind::Identifier(name) = &name_expr.kind {
+                if let Some(name) = name_expr.kind.name_ref() {
                     let resolved_fqn =
                         crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
                     let db = self.db;
@@ -1233,7 +1243,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // gets, or a private static method reachable only via
                         // `Foo::$name(...)` (first-class-callable form) is
                         // falsely flagged unused.
-                        if let ExprKind::Identifier(name) = &class.kind {
+                        if let Some(name) = class.kind.name_ref() {
                             let resolved =
                                 crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
                             let fqcn = match crate::util::php_ident_lowercase(&resolved).as_str() {
@@ -1262,9 +1272,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                 let mut receiver_type_params: Vec<Type> = Vec::new();
-                let is_named_class = matches!(&class.kind, ExprKind::Identifier(_));
-                let fqcn = match &class.kind {
-                    ExprKind::Identifier(name) => {
+                let is_named_class = class.kind.name_ref().is_some();
+                let fqcn = match class.kind.name_ref() {
+                    Some(name) => {
                         let resolved =
                             crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
                         match crate::util::php_ident_lowercase(&resolved).as_str() {

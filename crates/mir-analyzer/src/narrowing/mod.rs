@@ -1,7 +1,9 @@
+use crate::ast_ext::ByteStringExt as _;
 /// Type narrowing — refines variable types based on conditional expressions.
 ///
 /// Given a condition expression and a branch direction (true/false), this
 /// module updates the `FlowState` to narrow variable types accordingly.
+use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
@@ -445,7 +447,7 @@ pub fn narrow_from_condition(
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(target) = extract_get_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -467,7 +469,7 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.left, ctx, db, file)
                 {
                     // `get_class(self::$prop) === 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -480,7 +482,7 @@ pub fn narrow_from_condition(
                     narrow_from_gettype_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -489,7 +491,7 @@ pub fn narrow_from_condition(
                     narrow_from_get_debug_type_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -501,7 +503,7 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                     );
@@ -512,13 +514,13 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
@@ -530,7 +532,7 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.left, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
@@ -541,7 +543,7 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.left) {
                     // `$obj::class === 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -563,7 +565,7 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
                 {
                     // `self::$prop::class === 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -574,7 +576,7 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
-                    narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
+                    narrow_var_literal_string(ctx, &name, class_name_str.as_str(), effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     // `$this->prop === 'literal'`
                     narrow_prop_literal_string(
@@ -583,7 +585,7 @@ pub fn narrow_from_condition(
                         &prop,
                         db,
                         file,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                     );
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -596,13 +598,13 @@ pub fn narrow_from_condition(
                         &fqcn,
                         &prop,
                         db,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                     );
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -624,7 +626,7 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.right, ctx, db, file)
                 {
                     // `'ClassName' === get_class(self::$prop)`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -637,7 +639,7 @@ pub fn narrow_from_condition(
                     narrow_from_gettype_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -646,7 +648,7 @@ pub fn narrow_from_condition(
                     narrow_from_get_debug_type_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -658,7 +660,7 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                     );
@@ -669,13 +671,13 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
@@ -687,7 +689,7 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.right, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
@@ -698,7 +700,7 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.right) {
                     // `'ClassName' === $obj::class`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -720,7 +722,7 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
                 {
                     // `'ClassName' === self::$prop::class`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -731,7 +733,7 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
-                    narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
+                    narrow_var_literal_string(ctx, &name, class_name_str.as_str(), effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     // `'literal' === $this->prop`
                     narrow_prop_literal_string(
@@ -740,7 +742,7 @@ pub fn narrow_from_condition(
                         &prop,
                         db,
                         file,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                     );
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -753,7 +755,7 @@ pub fn narrow_from_condition(
                         &fqcn,
                         &prop,
                         db,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                     );
                 }
@@ -1046,7 +1048,7 @@ pub fn narrow_from_condition(
             // comparison agrees with strict comparison here.
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(target) = extract_get_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -1068,7 +1070,7 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.left, ctx, db, file)
                 {
                     // `get_class(self::$prop) == 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -1081,7 +1083,7 @@ pub fn narrow_from_condition(
                     narrow_from_gettype_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -1090,7 +1092,7 @@ pub fn narrow_from_condition(
                     narrow_from_get_debug_type_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -1102,7 +1104,7 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                     );
@@ -1113,13 +1115,13 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
@@ -1131,7 +1133,7 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.left, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
@@ -1141,7 +1143,7 @@ pub fn narrow_from_condition(
                         effective_true,
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -1163,7 +1165,7 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
                 {
                     // `self::$prop::class == 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -1175,7 +1177,7 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -1197,7 +1199,7 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.right, ctx, db, file)
                 {
                     // `'ClassName' == get_class(self::$prop)`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -1210,7 +1212,7 @@ pub fn narrow_from_condition(
                     narrow_from_gettype_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -1219,7 +1221,7 @@ pub fn narrow_from_condition(
                     narrow_from_get_debug_type_literal(
                         ctx,
                         &target,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
@@ -1231,7 +1233,7 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                     );
@@ -1242,13 +1244,13 @@ pub fn narrow_from_condition(
                         ctx,
                         &fqcn,
                         &prop,
-                        class_name_str,
+                        class_name_str.as_str(),
                         effective_true,
                         db,
                         file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
@@ -1260,7 +1262,7 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.right, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
@@ -1270,7 +1272,7 @@ pub fn narrow_from_condition(
                         effective_true,
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
                             narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
@@ -1292,7 +1294,7 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
                 {
                     // `'ClassName' == self::$prop::class`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
@@ -1430,17 +1432,14 @@ pub fn narrow_from_condition(
             // check below would only ever match by coincidence (e.g. a
             // variable literally named `$is_array`) while never actually
             // calling that builtin.
-            let fn_name_opt: Option<&str> = match &call.name.kind {
-                ExprKind::Identifier(name) => Some(name.as_ref()),
-                _ => None,
-            };
+            let fn_name_opt = call.name.kind.name_bare();
             if let Some(fn_name) = fn_name_opt {
                 let bare = fn_name.trim_start_matches('\\');
                 if is_true && bare.eq_ignore_ascii_case("is_callable") {
                     if let Some(ExprKind::Variable(var)) = call
                         .args
                         .first()
-                        .and_then(|arg| arg.value.as_ref())
+                        .and_then(|arg| arg.value())
                         .map(|v| &v.kind)
                     {
                         ctx.function_exists_guards
@@ -1463,10 +1462,8 @@ pub fn narrow_from_condition(
                     // `enum_exists($var)`/`trait_exists($var)` narrow like class_exists —
                     // no dedicated enum-string/trait-string atomic exists.
                     if is_true {
-                        if let Some(arg_value) = call
-                            .args
-                            .first()
-                            .and_then(|arg_expr| arg_expr.value.as_ref())
+                        if let Some(arg_value) =
+                            call.args.first().and_then(|arg_expr| arg_expr.value())
                         {
                             if let Some(fqcn) = extract_class_fqcn_from_expr(
                                 arg_value,
@@ -1531,9 +1528,9 @@ pub fn narrow_from_condition(
                     // proven-defined in the true branch to suppress
                     // UndefinedConstant within the guarded block.
                     if is_true {
-                        if let Some(value) = call.args.first().and_then(|arg| arg.value.as_ref()) {
+                        if let Some(value) = call.args.first().and_then(|arg| arg.value()) {
                             if let ExprKind::String(name) = &value.kind {
-                                let name = name.as_ref().trim_start_matches('\\');
+                                let name = name.as_str().trim_start_matches('\\');
                                 if !name.is_empty() {
                                     ctx.defined_guards.insert(std::sync::Arc::from(name));
                                 }
@@ -1547,9 +1544,9 @@ pub fn narrow_from_condition(
                     // negation + divergence (`if (!function_exists('fn')) throw;`)
                     // this also covers the early-exit pattern.
                     if is_true {
-                        if let Some(value) = call.args.first().and_then(|arg| arg.value.as_ref()) {
+                        if let Some(value) = call.args.first().and_then(|arg| arg.value()) {
                             if let ExprKind::String(name) = &value.kind {
-                                let name = name.as_ref().trim_start_matches('\\');
+                                let name = name.as_str().trim_start_matches('\\');
                                 if !name.is_empty() {
                                     ctx.function_exists_guards
                                         .insert(std::sync::Arc::from(name));
@@ -1571,21 +1568,18 @@ pub fn narrow_from_condition(
                     // present). The false-branch / early-exit pattern also works via
                     // the normal divergence+narrowing mechanism.
                     if is_true {
-                        if let Some(value) = call.args.first().and_then(|arg| arg.value.as_ref()) {
+                        if let Some(value) = call.args.first().and_then(|arg| arg.value()) {
                             if let ExprKind::String(ext) = &value.kind {
                                 if !ext.is_empty() {
                                     ctx.extension_loaded_guards
-                                        .insert(std::sync::Arc::from(ext.as_ref()));
+                                        .insert(std::sync::Arc::from(ext.as_str()));
                                 }
                             }
                         }
                     }
                 } else if bare.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
-                    if let Some(arg_value) = call
-                        .args
-                        .first()
-                        .and_then(|arg_expr| arg_expr.value.as_ref())
+                    if let Some(arg_value) = call.args.first().and_then(|arg_expr| arg_expr.value())
                     {
                         narrow_from_condition(arg_value, ctx, is_true, db, file);
                     }
@@ -1597,10 +1591,7 @@ pub fn narrow_from_condition(
                     // property-access first args where variable narrowing can't reach — but only
                     // for method_exists(): properties and methods are independent namespaces in
                     // PHP, so property_exists($obj, 'foo') proves nothing about a method 'foo'.
-                    if let Some(arg_value) = call
-                        .args
-                        .first()
-                        .and_then(|arg_expr| arg_expr.value.as_ref())
+                    if let Some(arg_value) = call.args.first().and_then(|arg_expr| arg_expr.value())
                     {
                         if let Some(var_name) = extract_var_name(arg_value) {
                             narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
@@ -1614,12 +1605,11 @@ pub fn narrow_from_condition(
                         if is_true && bare.eq_ignore_ascii_case("method_exists") {
                             if let Some(expr_key) = extract_expr_guard_key(arg_value, ctx, db, file)
                             {
-                                if let Some(method_value) =
-                                    call.args.get(1).and_then(|a| a.value.as_ref())
+                                if let Some(method_value) = call.args.get(1).and_then(|a| a.value())
                                 {
                                     if let ExprKind::String(method_name) = &method_value.kind {
                                         let method_lc = std::sync::Arc::from(
-                                            crate::util::php_ident_lowercase(method_name),
+                                            crate::util::php_ident_lowercase(method_name.as_str()),
                                         );
                                         ctx.method_exists_guards.insert((expr_key, method_lc));
                                     }
@@ -1633,13 +1623,11 @@ pub fn narrow_from_condition(
                         if is_true && bare.eq_ignore_ascii_case("property_exists") {
                             if let Some(expr_key) = extract_expr_guard_key(arg_value, ctx, db, file)
                             {
-                                if let Some(prop_value) =
-                                    call.args.get(1).and_then(|a| a.value.as_ref())
-                                {
+                                if let Some(prop_value) = call.args.get(1).and_then(|a| a.value()) {
                                     if let ExprKind::String(prop_name) = &prop_value.kind {
                                         ctx.property_exists_guards.insert((
                                             expr_key,
-                                            std::sync::Arc::from(prop_name.as_ref()),
+                                            std::sync::Arc::from(prop_name.as_str()),
                                         ));
                                     }
                                 }
@@ -1662,8 +1650,8 @@ pub fn narrow_from_condition(
                     // only be found in a non-empty haystack).
                     if is_true {
                         if let (Some(haystack_value), Some(needle_value)) = (
-                            call.args.first().and_then(|a| a.value.as_ref()),
-                            call.args.get(1).and_then(|a| a.value.as_ref()),
+                            call.args.first().and_then(|a| a.value()),
+                            call.args.get(1).and_then(|a| a.value()),
                         ) {
                             let needle_non_empty =
                                 expr_is_nonempty_string_literal(needle_value, ctx, db, file);
@@ -1725,8 +1713,8 @@ pub fn narrow_from_condition(
                     // — preserve string/class-string atoms so the true branch stays reachable
                     // and no false diverge is set in the false branch.
                     if let (Some(obj_value), Some(class_value)) = (
-                        call.args.first().and_then(|a| a.value.as_ref()),
-                        call.args.get(1).and_then(|a| a.value.as_ref()),
+                        call.args.first().and_then(|a| a.value()),
+                        call.args.get(1).and_then(|a| a.value()),
                     ) {
                         if let Some(var_name) = extract_var_name(obj_value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
@@ -1740,7 +1728,7 @@ pub fn narrow_from_condition(
                                 let allow_string = call
                                     .args
                                     .get(2)
-                                    .and_then(|a| a.value.as_ref())
+                                    .and_then(|a| a.value())
                                     .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
                                 let current = ctx.get_var(&var_name);
@@ -1807,7 +1795,7 @@ pub fn narrow_from_condition(
                                 let allow_string = call
                                     .args
                                     .get(2)
-                                    .and_then(|a| a.value.as_ref())
+                                    .and_then(|a| a.value())
                                     .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
                                 narrow_prop_is_a(
@@ -1836,7 +1824,7 @@ pub fn narrow_from_condition(
                                 let allow_string = call
                                     .args
                                     .get(2)
-                                    .and_then(|a| a.value.as_ref())
+                                    .and_then(|a| a.value())
                                     .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
                                 narrow_static_prop_is_a(
@@ -1859,8 +1847,8 @@ pub fn narrow_from_condition(
                     // the variable isn't Foo; Foo is not a subclass of itself, so Foo atoms
                     // must be kept (removing them would make a later `Foo` use diverge).
                     if let (Some(obj_value), Some(class_value)) = (
-                        call.args.first().and_then(|a| a.value.as_ref()),
-                        call.args.get(1).and_then(|a| a.value.as_ref()),
+                        call.args.first().and_then(|a| a.value()),
+                        call.args.get(1).and_then(|a| a.value()),
                     ) {
                         if let Some(var_name) = extract_var_name(obj_value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
@@ -1929,10 +1917,8 @@ pub fn narrow_from_condition(
                     }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
-                } else if let Some(arg_value) = call
-                    .args
-                    .first()
-                    .and_then(|arg_expr| arg_expr.value.as_ref())
+                } else if let Some(arg_value) =
+                    call.args.first().and_then(|arg_expr| arg_expr.value())
                 {
                     if let Some(var_name) = extract_var_name(arg_value) {
                         narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
@@ -2292,10 +2278,7 @@ fn narrow_from_false_comparable_call(
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return;
     };
-    let fn_name_opt: Option<&str> = match &call.name.kind {
-        ExprKind::Identifier(name) => Some(name.as_ref()),
-        _ => None,
-    };
+    let fn_name_opt = call.name.kind.name_bare();
     let Some(fn_name) = fn_name_opt else {
         return;
     };
@@ -2319,12 +2302,12 @@ fn narrow_from_false_comparable_call(
         let strict = call
             .args
             .get(2)
-            .and_then(|a| a.value.as_ref())
+            .and_then(|a| a.value())
             .map(is_truthy_bool_literal)
             .unwrap_or(false);
         if let (Some(needle_value), Some(haystack_value)) = (
-            call.args.first().and_then(|a| a.value.as_ref()),
-            call.args.get(1).and_then(|a| a.value.as_ref()),
+            call.args.first().and_then(|a| a.value()),
+            call.args.get(1).and_then(|a| a.value()),
         ) {
             strip_haystack_null(haystack_value, ctx, db, file);
             if let Some(target) = ScalarArgTarget::extract(needle_value) {

@@ -3,6 +3,7 @@
 //! `is_subclass_of()` leaves across a condition list (or an OR-chain) that
 //! all target the same variable/property/static-property receiver, and
 //! narrows it to the union of every leaf's narrowing.
+use crate::ast_ext::NameRefExt as _;
 use php_ast::ast::BinaryOp;
 use php_ast::owned::ExprKind;
 
@@ -447,9 +448,7 @@ fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> 
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let ExprKind::Identifier(name) = &call.name.kind else {
-        return None;
-    };
+    let name = call.name.kind.name_ref()?;
     let bare = name.as_ref().trim_start_matches('\\');
     let canonical = NARROWING_TYPE_FNS
         .iter()
@@ -457,7 +456,7 @@ fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> 
     if call.args.len() != 1 {
         return None;
     }
-    let var_name = extract_var_name(call.args[0].value.as_ref()?)?;
+    let var_name = extract_var_name(call.args[0].value()?)?;
     Some((canonical, var_name))
 }
 
@@ -472,9 +471,7 @@ fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, Stri
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let ExprKind::Identifier(name) = &call.name.kind else {
-        return None;
-    };
+    let name = call.name.kind.name_ref()?;
     let bare = name.as_ref().trim_start_matches('\\');
     let canonical = NARROWING_TYPE_FNS
         .iter()
@@ -482,7 +479,7 @@ fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, Stri
     if call.args.len() != 1 {
         return None;
     }
-    let (obj, prop) = extract_prop_access(call.args[0].value.as_ref()?)?;
+    let (obj, prop) = extract_prop_access(call.args[0].value()?)?;
     Some((canonical, obj, prop))
 }
 
@@ -596,9 +593,7 @@ fn extract_type_fn_check_static_prop(
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let ExprKind::Identifier(name) = &call.name.kind else {
-        return None;
-    };
+    let name = call.name.kind.name_ref()?;
     let bare = name.as_ref().trim_start_matches('\\');
     let canonical = NARROWING_TYPE_FNS
         .iter()
@@ -607,7 +602,7 @@ fn extract_type_fn_check_static_prop(
         return None;
     }
     let (fqcn, prop) = extract_static_prop_access_parts(
-        call.args[0].value.as_ref()?,
+        call.args[0].value()?,
         db,
         file,
         self_fqcn,
@@ -675,14 +670,12 @@ fn is_a_or_subclass_of_call_receiver(expr: &php_ast::owned::Expr) -> Option<&php
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
-    let ExprKind::Identifier(name) = &call.name.kind else {
-        return None;
-    };
+    let name = call.name.kind.name_ref()?;
     let bare = name.as_ref().trim_start_matches('\\');
     if !(bare.eq_ignore_ascii_case("is_a") || bare.eq_ignore_ascii_case("is_subclass_of")) {
         return None;
     }
-    call.args.first()?.value.as_ref()
+    call.args.first()?.value()
 }
 
 /// Extract the single variable a leaf disjunct condition narrows — either a

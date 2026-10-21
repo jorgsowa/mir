@@ -117,7 +117,7 @@ impl<'a> DefinitionCollector<'a> {
                 ClassMemberKind::Method(m) => {
                     if m.name.as_str() == Some("__construct") {
                         for p in m.params.iter() {
-                            if p.visibility.is_some() {
+                            if p.modifiers.visibility.is_some() {
                                 let param_name = p.name.as_str().unwrap_or_default();
                                 let ty = self.resolve_union_opt(
                                     p.type_hint
@@ -129,10 +129,10 @@ impl<'a> DefinitionCollector<'a> {
                                     ty: mir_codebase::definitions::wrap_property_type(ty.clone()),
                                     inferred_ty: None,
                                     native_ty: mir_codebase::definitions::wrap_property_type(ty),
-                                    visibility: Self::convert_visibility(p.visibility),
+                                    visibility: Self::convert_visibility(p.modifiers.visibility),
                                     is_static: false,
-                                    is_readonly: p.is_readonly,
-                                    has_native_readonly: p.is_readonly,
+                                    is_readonly: p.modifiers.is_readonly,
+                                    has_native_readonly: p.modifiers.is_readonly,
                                     default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| Type::mixed()),
                                     ),
@@ -209,10 +209,10 @@ impl<'a> DefinitionCollector<'a> {
                             ty: mir_codebase::definitions::wrap_property_type(ty),
                             native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                             inferred_ty: None,
-                            visibility: Self::convert_visibility(p.visibility),
-                            is_static: p.is_static,
-                            is_readonly: p.is_readonly,
-                            has_native_readonly: p.is_readonly,
+                            visibility: Self::convert_visibility(p.modifiers.visibility),
+                            is_static: p.modifiers.is_static,
+                            is_readonly: p.modifiers.is_readonly,
+                            has_native_readonly: p.modifiers.is_readonly,
                             default: mir_codebase::definitions::wrap_property_type(
                                 p.default.as_ref().map(|_| Type::mixed()),
                             ),
@@ -286,7 +286,7 @@ impl<'a> DefinitionCollector<'a> {
                             ty: const_ty,
                             literal_value,
                             visibility: None,
-                            is_final: c.is_final,
+                            is_final: c.modifiers.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {

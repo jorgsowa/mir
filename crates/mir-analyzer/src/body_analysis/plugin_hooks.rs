@@ -1,4 +1,5 @@
 use super::*;
+use crate::ast_ext::NameRefExt as _;
 use mir_plugin::{AttributeArgInfo, AttributeInfo, FunctionLikeParamInfo};
 
 pub(super) struct FunctionLikeSite<'s> {
@@ -91,8 +92,7 @@ impl<'a> BodyAnalyzer<'a> {
                                 .join("\\")
                         }),
                         type_string: arg
-                            .value
-                            .as_ref()
+                            .value()
                             .and_then(|v| self.constant_expr_type(v, file, site.class)),
                     })
                     .collect(),
@@ -114,19 +114,18 @@ impl<'a> BodyAnalyzer<'a> {
         file: &Arc<str>,
         class: Option<&str>,
     ) -> Option<String> {
+        use crate::ast_ext::ByteStringExt as _;
         use php_ast::owned::ExprKind;
         match &expr.kind {
             ExprKind::String(s) => Some(format!(
                 "'{}'",
-                s.replace('\\', "\\\\").replace('\'', "\\'")
+                s.as_str().replace('\\', "\\\\").replace('\'', "\\'")
             )),
             ExprKind::Int(i) => Some(i.to_string()),
             ExprKind::Bool(b) => Some(b.to_string()),
             ExprKind::Null => Some("null".to_string()),
             ExprKind::ClassConstAccess(cca) => {
-                let ExprKind::Identifier(class_name) = &cca.class.kind else {
-                    return None;
-                };
+                let class_name = cca.class.kind.name_ref()?;
                 let ExprKind::Identifier(member) = &cca.member.kind else {
                     return None;
                 };

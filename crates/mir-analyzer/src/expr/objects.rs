@@ -1,5 +1,7 @@
 use super::helpers::extract_string_from_expr;
 use super::{root_receiver_var, ExpressionAnalyzer};
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::NameRefExt as _;
 use crate::flow_state::FlowState;
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
@@ -289,12 +291,13 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn check_new_taint(&mut self, n: &NewExpr, span: php_ast::Span, ctx: &FlowState) {
         use crate::taint::SinkKind;
         let (value, kind) = match &n.class.kind {
-            ExprKind::Identifier(name) => {
+            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+                let name = n.class.kind.name_ref().unwrap_or_default();
                 let fqcn = crate::db::resolve_name(self.db, &self.file, name.as_ref());
                 let Some(kind) = crate::taint::classify_constructor_sink(self.db, &fqcn) else {
                     return;
                 };
-                let Some(value) = n.args.first().and_then(|a| a.value.as_ref()) else {
+                let Some(value) = n.args.first().and_then(|a| a.value()) else {
                     return;
                 };
                 (value, kind)
@@ -322,9 +325,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         class: &php_ast::owned::Expr,
         ctx: &FlowState,
     ) -> Option<Arc<mir_codebase::definitions::MethodDef>> {
-        let ExprKind::Identifier(name) = &class.kind else {
-            return None;
-        };
+        let name = class.kind.name_ref()?;
         let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
         let fqcn: Arc<str> = match resolved.as_str() {
             "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
@@ -360,7 +361,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if crate::call::has_unbound_template(out_ty) {
                 return;
             }
-            if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
+            if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
                 let var_name = name.as_ref().trim_start_matches('$');
                 ctx.set_var(var_name, (**out_ty).clone());
                 ctx.set_var_taint(var_name, args_taint);
@@ -380,7 +381,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         arg_types.clear();
         let mut sole_spread_ty: Option<Type> = None;
         let passes_undefined_var = n.args.iter().any(|a| {
-            matches!(&a.value, Some(v) if matches!(&v.kind, ExprKind::Variable(name) if !ctx.var_is_defined(name)))
+            matches!(a.value(), Some(v) if matches!(&v.kind, ExprKind::Variable(name) if !ctx.var_is_defined(name)))
         });
         if passes_undefined_var {
             if let Some(ctor) = self.named_ctor(&n.class, ctx) {
@@ -388,13 +389,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         for a in n.args.iter() {
-            let Some(value) = &a.value else {
+            let Some(value) = a.value() else {
                 arg_types.push(Type::mixed());
                 continue;
             };
             let ty = self.analyze_arg(value, ctx);
             crate::call::consume_arg_assignment(value, ctx);
-            if a.unpack {
+            if a.unpack() {
                 if n.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
                 }
@@ -413,13 +414,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut arg_can_be_byref: Vec<bool> = n
             .args
             .iter()
-            .map(|a| {
-                a.value
-                    .as_ref()
-                    .is_some_and(expr_can_be_passed_by_reference_owned)
-            })
+            .map(|a| a.value().is_some_and(expr_can_be_passed_by_reference_owned))
             .collect();
-        let mut ctor_has_spread = n.args.iter().any(|a| a.unpack);
+        let mut ctor_has_spread = n.args.iter().any(|a| a.unpack());
         let mut ctor_arity_unknown = ctor_has_spread;
         // A sole spread arg over a literal, sequentially-keyed shape can be
         // expanded into one binding per element so each constructor
@@ -444,8 +441,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Generic type params inferred from constructor arguments, attached to
         // the resulting `TNamedObject` so member-access substitution works.
         let mut inferred_type_params: Arc<[Type]> = mir_types::union::empty_type_params();
-        let class_ty = match &n.class.kind {
-            ExprKind::Identifier(name) => {
+        let class_ty = match n.class.kind.name_ref() {
+            Some(name) => {
                 let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = match resolved.as_str() {
                     "self" | "static" => ctx
@@ -609,7 +606,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             && !crate::db::class_is_immutable(self.db, ctor_owner)
                         {
                             for arg in n.args.iter() {
-                                let Some(value) = &arg.value else { continue };
+                                let Some(value) = arg.value() else { continue };
                                 let Some(recv_name) = root_receiver_var(value) else {
                                     continue;
                                 };
@@ -740,7 +737,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                     } else if !arg_types.is_empty()
-                        && !n.args.iter().any(|a| a.unpack)
+                        && !n.args.iter().any(|a| a.unpack())
                         && !trait_relative_new
                         // `new static(args)` may construct a subclass that
                         // declares a constructor, even when the current class
@@ -871,9 +868,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let ExprKind::ClassConstAccess(cca) = &object.kind else {
             return None;
         };
-        let ExprKind::Identifier(class_id) = &cca.class.kind else {
-            return None;
-        };
+        let class_id = cca.class.kind.name_ref()?;
         let ExprKind::Identifier(case_name) = &cca.member.kind else {
             return None;
         };
@@ -1150,7 +1145,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         let mut result_ty = Type::mixed();
-        if let ExprKind::Identifier(id) = &spa.class.kind {
+        if let Some(id) = spa.class.kind.name_ref() {
             let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
             if matches!(resolved.as_str(), "self" | "static" | "parent") {
                 // Resolve the relative keyword through the FlowState and record
@@ -1429,7 +1424,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         if expr_name_str(&cca.member) == Some("class") {
-            if let ExprKind::Identifier(id) = &cca.class.kind {
+            if let Some(id) = cca.class.kind.name_ref() {
                 let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 if resolved.as_str() == "parent"
                     && ctx.parent_fqcn.is_none()
@@ -1517,7 +1512,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
 
         let fqcn = match &cca.class.kind {
-            ExprKind::Identifier(id) => {
+            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+                let id = cca.class.kind.name_ref().unwrap_or_default();
                 let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 match resolved.as_str() {
                     "self" | "static" => {

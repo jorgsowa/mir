@@ -127,7 +127,7 @@ pub(super) fn propagate_delegated_assertions(
     let methods: Vec<&php_ast::owned::MethodDecl> = members
         .iter()
         .filter_map(|m| match &m.kind {
-            ClassMemberKind::Method(m) if !m.is_static => Some(m),
+            ClassMemberKind::Method(m) if !m.modifiers.is_static => Some(m),
             _ => None,
         })
         .collect();

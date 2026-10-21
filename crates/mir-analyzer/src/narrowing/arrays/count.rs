@@ -1,6 +1,7 @@
 //! `count()`/`sizeof()`/`iterator_count()` and `array_key_first()`/
 //! `array_key_last()` narrowing, for variable, property, and
 //! static-property receivers.
+use crate::ast_ext::NameBareExt as _;
 use mir_types::{Atomic, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::ExprKind;
@@ -20,17 +21,13 @@ use super::super::literals::{extract_int_literal, flip_comparison_op};
 /// identically.
 pub(crate) fn extract_count_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        let name = match &call.name.kind {
-            ExprKind::Identifier(n) => n.as_ref(),
-            _ => return None,
-        };
-        let bare = name.trim_start_matches('\\');
+        let bare = call.name.kind.name_bare()?;
         if bare.eq_ignore_ascii_case("count")
             || bare.eq_ignore_ascii_case("sizeof")
             || bare.eq_ignore_ascii_case("iterator_count")
         {
             if let Some(arg) = call.args.first() {
-                let value = arg.value.as_ref()?;
+                let value = arg.value()?;
                 return ScalarArgTarget::extract(value);
             }
         }
@@ -48,17 +45,13 @@ pub(crate) fn extract_count_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        let name = match &call.name.kind {
-            ExprKind::Identifier(n) => n.as_ref(),
-            _ => return None,
-        };
-        let bare = name.trim_start_matches('\\');
+        let bare = call.name.kind.name_bare()?;
         if bare.eq_ignore_ascii_case("count")
             || bare.eq_ignore_ascii_case("sizeof")
             || bare.eq_ignore_ascii_case("iterator_count")
         {
             if let Some(arg) = call.args.first() {
-                let value = arg.value.as_ref()?;
+                let value = arg.value()?;
                 return extract_static_prop_access(value, ctx, db, file);
             }
         }
@@ -72,16 +65,12 @@ pub(crate) fn extract_array_key_first_or_last_arg(
     expr: &php_ast::owned::Expr,
 ) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        let name = match &call.name.kind {
-            ExprKind::Identifier(n) => n.as_ref(),
-            _ => return None,
-        };
-        let bare = name.trim_start_matches('\\');
+        let bare = call.name.kind.name_bare()?;
         if bare.eq_ignore_ascii_case("array_key_first")
             || bare.eq_ignore_ascii_case("array_key_last")
         {
             if let Some(arg) = call.args.first() {
-                let value = arg.value.as_ref()?;
+                let value = arg.value()?;
                 return ScalarArgTarget::extract(value);
             }
         }
@@ -100,16 +89,12 @@ pub(crate) fn extract_array_key_first_or_last_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        let name = match &call.name.kind {
-            ExprKind::Identifier(n) => n.as_ref(),
-            _ => return None,
-        };
-        let bare = name.trim_start_matches('\\');
+        let bare = call.name.kind.name_bare()?;
         if bare.eq_ignore_ascii_case("array_key_first")
             || bare.eq_ignore_ascii_case("array_key_last")
         {
             if let Some(arg) = call.args.first() {
-                let value = arg.value.as_ref()?;
+                let value = arg.value()?;
                 return extract_static_prop_access(value, ctx, db, file);
             }
         }

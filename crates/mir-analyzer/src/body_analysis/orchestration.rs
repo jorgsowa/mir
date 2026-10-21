@@ -1,4 +1,5 @@
 use super::*;
+use crate::ast_ext::NameBareExt as _;
 
 impl<'a> BodyAnalyzer<'a> {
     /// body analysis: walk all function/method bodies in one file, return issues, and
@@ -492,12 +493,11 @@ pub(crate) fn accumulate_class_exists_guard(
     let ExprKind::FunctionCall(call) = &u.operand.kind else {
         return;
     };
-    let fn_name = match &call.name.kind {
-        ExprKind::Identifier(name) => name.as_ref(),
-        _ => return,
+    let Some(fn_name) = call.name.kind.name_bare() else {
+        return;
     };
     if !matches!(
-        fn_name.trim_start_matches('\\'),
+        fn_name,
         "class_exists" | "interface_exists" | "trait_exists"
     ) {
         return;
@@ -506,7 +506,7 @@ pub(crate) fn accumulate_class_exists_guard(
     if !then_branch_diverges(&if_stmt.then_branch) {
         return;
     }
-    if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
+    if let Some(value) = call.args.first().and_then(|a| a.value()) {
         if let Some(fqcn) =
             crate::narrowing::extract_class_fqcn_from_expr(value, None, None, None, db, file)
         {

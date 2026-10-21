@@ -1,3 +1,4 @@
+use crate::ast_ext::ArgExt as _;
 mod args;
 mod array_builtins;
 mod builtin_purity;
@@ -246,7 +247,7 @@ pub(crate) fn premark_byref_arg_vars(
         if !param.is_byref {
             return;
         }
-        let Some(value) = &arg.value else { return };
+        let Some(value) = arg.value() else { return };
         if matches!(value.kind, ExprKind::ArrayAccess(_)) {
             crate::expr::helpers::vivify_reference_base(value, ctx);
         }
@@ -281,7 +282,7 @@ pub(crate) fn for_each_bound_arg<'a>(
     let mut positional = 0usize;
 
     for arg in args {
-        if arg.unpack {
+        if arg.unpack() {
             break;
         }
         if let Some(name) = &arg.name {
@@ -323,7 +324,7 @@ pub(crate) fn taint_byref_outputs(
         }
         let Some(value) = resolve_named_arg_type_index(params, args, i)
             .and_then(|idx| args.get(idx))
-            .and_then(|arg| arg.value.as_ref())
+            .and_then(|arg| arg.value())
         else {
             continue;
         };

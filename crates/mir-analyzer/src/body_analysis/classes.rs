@@ -998,7 +998,7 @@ impl<'a> BodyAnalyzer<'a> {
         for param in method.params.iter() {
             if self.collect_navigation_facts
                 && is_constructor
-                && (param.visibility.is_some() || param.is_readonly)
+                && (param.modifiers.visibility.is_some() || param.modifiers.is_readonly)
             {
                 let name = param.name.as_str().unwrap_or("");
                 let span = super::property_name_span(source, &param.span, name);
@@ -1091,7 +1091,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         if method_name == "__construct" && self.mode == AnalysisMode::Full {
             for param in method.params.iter() {
-                if param.visibility.is_some() && param.type_hint.is_none() {
+                if param.modifiers.visibility.is_some() && param.type_hint.is_none() {
                     // A `@param` docblock on the constructor can already give this
                     // promoted property a resolved type even with no native hint —
                     // same reasoning as the plain-property check above.
@@ -1140,7 +1140,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         if method_name == "__construct" {
             for param in method.params.iter() {
-                if param.visibility.is_none() || param.hooks.is_empty() {
+                if param.modifiers.visibility.is_none() || param.hooks.is_empty() {
                     continue;
                 }
                 let property_name = param.name.as_str().unwrap_or("").trim_start_matches('$');
@@ -1210,7 +1210,7 @@ impl<'a> BodyAnalyzer<'a> {
             Some(cx.fqcn.clone()),
             cx.strict_types,
             is_ctor,
-            method.is_static,
+            method.modifiers.is_static,
             templates,
         );
         if let Some(class_templates) = crate::db::declared_template_params(self.db, fqcn) {
@@ -1245,7 +1245,7 @@ impl<'a> BodyAnalyzer<'a> {
         // Set is_in_immutable_method for non-constructor methods of @psalm-immutable
         // classes (own declaration, or inherited from an ancestor). Static methods
         // are exempt: immutability covers instance state only.
-        if !is_ctor && !method.is_static && crate::db::class_is_immutable(self.db, fqcn) {
+        if !is_ctor && !method.modifiers.is_static && crate::db::class_is_immutable(self.db, fqcn) {
             ctx.is_in_immutable_method = true;
         }
         // An immutable constructor may initialize `$this` but not mutate its arguments,
@@ -1256,7 +1256,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.summarize_taint);
-        let prop_labels = if method.is_static {
+        let prop_labels = if method.modifiers.is_static {
             Vec::new()
         } else {
             let named = crate::taint::named_params(&params).len();
@@ -1279,7 +1279,7 @@ impl<'a> BodyAnalyzer<'a> {
         // the definite-assignment check below never flags them.
         if is_ctor {
             for param in method.params.iter() {
-                if param.visibility.is_some() {
+                if param.modifiers.visibility.is_some() {
                     if let Some(name) = param.name.as_str() {
                         ctx.mark_this_prop_assigned(name);
                     }
@@ -1307,7 +1307,11 @@ impl<'a> BodyAnalyzer<'a> {
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         sa.taint_summary.prop_labels = prop_labels.clone();
         if is_ctor {
-            for param in method.params.iter().filter(|p| p.visibility.is_some()) {
+            for param in method
+                .params
+                .iter()
+                .filter(|p| p.modifiers.visibility.is_some())
+            {
                 let name = param.name.as_str().unwrap_or("");
                 ctx.set_prop_taint("this", name, ctx.var_taint(name));
                 sa.taint_summary

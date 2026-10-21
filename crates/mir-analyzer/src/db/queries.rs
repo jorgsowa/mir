@@ -102,6 +102,16 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         return name.to_string();
     }
 
+    if let Some(rest) = lower
+        .starts_with("namespace\\")
+        .then(|| &name["namespace\\".len()..])
+    {
+        return match db.file_namespace(file) {
+            Some(ns) => format!("{ns}\\{rest}"),
+            None => rest.to_string(),
+        };
+    }
+
     if name.contains('\\') {
         if let Some((first, rest)) = name.split_once('\\') {
             let imports = db.file_class_imports(file);
@@ -828,7 +838,7 @@ pub fn collect_file_definitions_uncached(
     let mut all_issues: Vec<Issue> = parsed
         .errors
         .iter()
-        .filter(|err| !crate::parser::is_spurious_reserved_class_error(err))
+        .filter(|err| !crate::parser::is_redundant_parse_error(err))
         .map(|err| crate::parser::parse_error_to_issue(err, path, text, &parsed.source_map))
         .collect();
 

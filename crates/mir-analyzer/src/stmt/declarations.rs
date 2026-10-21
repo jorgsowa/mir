@@ -375,7 +375,7 @@ impl<'a> StatementsAnalyzer<'a> {
             }
             if method_name == "__construct" {
                 for p in method.params.iter() {
-                    if p.visibility.is_none() || p.hooks.is_empty() {
+                    if p.modifiers.visibility.is_none() || p.hooks.is_empty() {
                         continue;
                     }
                     let property_name = p.name.as_str().unwrap_or("").trim_start_matches('$');
@@ -448,7 +448,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 Some(fqcn.clone()),
                 ctx.strict_types,
                 is_ctor,
-                method.is_static,
+                method.modifiers.is_static,
             );
             method_ctx.current_method_name = Some(Arc::from(method_name));
             for p in method.params.iter() {

@@ -3,12 +3,13 @@ use super::helpers::{
     is_non_empty_when_concat,
 };
 use super::ExpressionAnalyzer;
+use crate::ast_ext::NameRefExt as _;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{
-    Arg, BinaryExpr, CallableCreateKind, Expr, ExprKind, FunctionCallExpr, MethodCallExpr,
+    Arg, ArgKind, BinaryExpr, CallableCreateKind, Expr, ExprKind, FunctionCallExpr, MethodCallExpr,
     StaticMethodCallDynamicExpr, StaticMethodCallExpr,
 };
 use php_ast::Span;
@@ -16,13 +17,11 @@ use std::sync::Arc;
 
 /// `$x |> f(...)` as the call `f($x)` it evaluates to; any other callable `$c` as `$c($x)`.
 pub(crate) fn pipe_as_call(b: &BinaryExpr, span: Span) -> Expr {
-    let args: Box<[Arg]> = Box::new([Arg {
-        name: None,
-        value: Some((*b.left).clone()),
-        unpack: false,
-        by_ref: false,
-        span: b.left.span,
-    }]);
+    let args: Box<[Arg]> = Box::new([Arg::new(
+        None,
+        ArgKind::Value((*b.left).clone()),
+        b.left.span,
+    )]);
     let kind = match &b.right.kind {
         ExprKind::CallableCreate(cc) => match &cc.kind {
             CallableCreateKind::Function(name) => ExprKind::FunctionCall(FunctionCallExpr {
@@ -43,7 +42,7 @@ pub(crate) fn pipe_as_call(b: &BinaryExpr, span: Span) -> Expr {
                     args,
                 }))
             }
-            CallableCreateKind::StaticMethod { class, method } => match method.kind {
+            CallableCreateKind::StaticMethod { class, method } => match &method.kind {
                 ExprKind::Identifier(_) => {
                     ExprKind::StaticMethodCall(Box::new(StaticMethodCallExpr {
                         class: class.clone(),
@@ -144,7 +143,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // expression (`$x instanceof $class`), analyze it so that the
             // variable is marked as consumed — otherwise it is falsely reported
             // as unused.
-            if !matches!(b.right.kind, ExprKind::Identifier(_)) {
+            if b.right.kind.name_ref().is_none() {
                 let right_ty = self.analyze(&b.right, ctx);
                 // `instanceof $cls` where `$cls` holds a known class-string
                 // (`$cls = Foo::class;`) is a real reference to `Foo` — record it,
@@ -163,7 +162,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-            if let ExprKind::Identifier(name) = &b.right.kind {
+            if let Some(name) = b.right.kind.name_ref() {
                 let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {

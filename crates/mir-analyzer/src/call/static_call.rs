@@ -1,3 +1,7 @@
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::sync::Arc;
 
 use php_ast::owned::{Expr, ExprKind, StaticMethodCallDynamicExpr, StaticMethodCallExpr};
@@ -163,15 +167,12 @@ pub(crate) fn resolve_literal_class_scope(
 ) -> Option<Arc<str>> {
     let name = match &expr.kind {
         ExprKind::ClassConstAccess(cca) if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) => {
-            match &cca.class.kind {
-                ExprKind::Identifier(name) => name.as_ref(),
-                _ => return None,
-            }
+            cca.class.kind.name_ref()?
         }
-        ExprKind::String(s) => s.as_ref(),
+        ExprKind::String(s) => std::borrow::Cow::Borrowed(s.as_str()),
         _ => return None,
     };
-    let resolved = crate::db::resolve_name(db, file, name);
+    let resolved = crate::db::resolve_name(db, file, &name);
     crate::db::class_exists(db, &resolved).then(|| Arc::from(resolved.as_str()))
 }
 
@@ -209,7 +210,7 @@ pub(crate) fn closure_this_param_rebind(
     arg: &php_ast::owned::Arg,
     receiver: Option<&str>,
 ) -> Option<ClosureRebind> {
-    if arg.unpack || arg.name.is_some() || !arg.value.as_ref().is_some_and(is_closure_literal) {
+    if arg.unpack() || arg.name.is_some() || !arg.value().is_some_and(is_closure_literal) {
         return None;
     }
     let param = params
@@ -242,7 +243,7 @@ fn static_closure_bind_rebind(
     ea: &ExpressionAnalyzer<'_>,
     call: &StaticMethodCallExpr,
 ) -> Option<ClosureRebind> {
-    let arg = |i: usize| call.args.get(i).and_then(|a| a.value.as_ref());
+    let arg = |i: usize| call.args.get(i).and_then(|a| a.value());
     let rebind = closure_rebind(ea.db, &ea.file, arg(1), arg(2))?;
     // Only a closure literal is known to receive the rebound `$this`.
     let literal_closure = arg(0).is_some_and(is_closure_literal);
@@ -270,7 +271,7 @@ fn analyze_args_unresolved(
     call: &StaticMethodCallExpr,
     ctx: &mut FlowState,
 ) -> Type {
-    for value in call.args.iter().filter_map(|a| a.value.as_ref()) {
+    for value in call.args.iter().filter_map(|a| a.value()) {
         ea.analyze_arg(value, ctx);
         super::consume_arg_assignment(value, ctx);
     }
@@ -284,7 +285,7 @@ impl CallAnalyzer {
         ctx: &mut FlowState,
         span: Span,
     ) -> Type {
-        if !matches!(call.class.kind, ExprKind::Identifier(_)) {
+        if call.class.kind.name_ref().is_none() {
             crate::taint::check_callable_target(ea, &call.class, ctx, span);
         }
         let method_name = match &call.method.kind {
@@ -308,9 +309,9 @@ impl CallAnalyzer {
         // variable receiver (`$var::bar()`) — an object or class-string typed as
         // the interface — dispatches at runtime to whatever concrete class it
         // actually holds, which is valid PHP regardless of the declared type.
-        let is_literal_class_receiver = matches!(&call.class.kind, ExprKind::Identifier(_));
-        let fqcn = match &call.class.kind {
-            ExprKind::Identifier(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
+        let is_literal_class_receiver = call.class.kind.name_ref().is_some();
+        let fqcn = match call.class.kind.name_ref() {
+            Some(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
             _ => {
                 let ty = ea.analyze(&call.class, ctx);
                 // $obj::method() / $this::method(): resolve against the object's class
@@ -456,7 +457,7 @@ impl CallAnalyzer {
         for (i, arg) in call.args.iter().enumerate() {
             // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
             // — not yet modeled; keep positional slots aligned with `mixed`.
-            let Some(value) = &arg.value else {
+            let Some(value) = arg.value() else {
                 arg_types.push(Type::mixed());
                 continue;
             };
@@ -471,7 +472,7 @@ impl CallAnalyzer {
                 None => ea.analyze_arg(value, ctx),
             };
             super::consume_arg_assignment(value, ctx);
-            if arg.unpack {
+            if arg.unpack() {
                 if call.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
                 }
@@ -575,9 +576,8 @@ impl CallAnalyzer {
             // needs it too, to scope itself to a self/parent/$this call the
             // same way method.rs's instance-call counterpart scopes to $this.
             let is_self_parent_call = match &call.class.kind {
-                ExprKind::Identifier(id) => matches!(id.as_ref(), "self" | "static" | "parent"),
                 ExprKind::Variable(name) => name.trim_start_matches('$') == "this",
-                _ => false,
+                kind => matches!(kind.name_bare(), Some("self" | "static" | "parent")),
             };
             // Purity check: a static call has no receiver to scope the
             // "only externally-visible mutations matter" exception to (unlike
@@ -632,7 +632,7 @@ impl CallAnalyzer {
                 && !resolved.is_mutation_free
             {
                 for arg in call.args.iter() {
-                    let Some(value) = &arg.value else { continue };
+                    let Some(value) = arg.value() else { continue };
                     let Some(recv_name) = crate::expr::root_receiver_var(value) else {
                         continue;
                     };
@@ -679,8 +679,8 @@ impl CallAnalyzer {
             // always a concrete instance. self::, parent::, an explicit class
             // name, and a class-string receiver (which may hold the literal
             // abstract class name itself) get no such guarantee.
-            let uses_late_static_binding = match &call.class.kind {
-                ExprKind::Identifier(id) => id.as_ref() == "static",
+            let uses_late_static_binding = match call.class.kind.name_ref() {
+                Some(id) => id.as_ref() == "static",
                 _ => receiver_is_object_instance,
             };
             if resolved.is_abstract && !uses_late_static_binding {
@@ -770,13 +770,9 @@ impl CallAnalyzer {
             let mut arg_can_be_byref: Vec<bool> = call
                 .args
                 .iter()
-                .map(|a| {
-                    a.value
-                        .as_ref()
-                        .is_some_and(expr_can_be_passed_by_reference_owned)
-                })
+                .map(|a| a.value().is_some_and(expr_can_be_passed_by_reference_owned))
                 .collect();
-            let mut has_spread = call.args.iter().any(|a| a.unpack);
+            let mut has_spread = call.args.iter().any(|a| a.unpack());
             let mut arity_unknown = has_spread;
             // A sole spread arg over a literal, sequentially-keyed shape can be
             // expanded into one binding per element so each parameter (and
@@ -909,7 +905,7 @@ impl CallAnalyzer {
             // mutation-free, regardless of what's being called on.
             if !resolved.is_pure && !resolved.is_external_mutation_free {
                 for arg in call.args.iter() {
-                    if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
+                    if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
                         ctx.invalidate_prop_refined_receiver(name);
                     }
                 }
@@ -1108,13 +1104,13 @@ impl CallAnalyzer {
                 }
                 if param.is_variadic {
                     for arg in call.args.iter().skip(i) {
-                        let Some(value) = &arg.value else { continue };
+                        let Some(value) = arg.value() else { continue };
                         ea.check_byref_arg_purity(value, ctx, value.span);
                     }
                 } else if let Some(value) =
                     crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                         .and_then(|idx| call.args.get(idx))
-                        .and_then(|arg| arg.value.as_ref())
+                        .and_then(|arg| arg.value())
                 {
                     ea.check_byref_arg_purity(value, ctx, value.span);
                 }
@@ -1149,7 +1145,7 @@ impl CallAnalyzer {
                 }
                 if param.is_variadic {
                     for arg in call.args.iter().skip(i) {
-                        let Some(value) = &arg.value else { continue };
+                        let Some(value) = arg.value() else { continue };
                         if let ExprKind::Variable(name) = &value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
                             ctx.set_var(var_name, out_ty.clone());
@@ -1159,7 +1155,7 @@ impl CallAnalyzer {
                 } else if let Some(value) =
                     crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                         .and_then(|idx| call.args.get(idx))
-                        .and_then(|arg| arg.value.as_ref())
+                        .and_then(|arg| arg.value())
                 {
                     if let ExprKind::Variable(name) = &value.kind {
                         let var_name = name.as_ref().trim_start_matches('$');
@@ -1169,8 +1165,11 @@ impl CallAnalyzer {
                 }
             }
 
-            let forwards_this = matches!(&call.class.kind, ExprKind::Identifier(id)
-                if ["self", "static", "parent"].iter().any(|k| id.eq_ignore_ascii_case(k)));
+            let forwards_this = call.class.kind.name_bare().is_some_and(|id| {
+                ["self", "static", "parent"]
+                    .iter()
+                    .any(|k| id.eq_ignore_ascii_case(k))
+            });
             let this_receiver = forwards_this.then(|| php_ast::owned::Expr {
                 kind: ExprKind::Variable("this".into()),
                 span: call.class.span,
@@ -1239,7 +1238,7 @@ impl CallAnalyzer {
             // Also applies to `$var::staticMethod()` through an object-typed
             // variable (the `_` catch-all match arm above, which extracted
             // `fqcn`/`receiver_type_params` from the receiver's concrete type).
-            let is_object_var_call = !matches!(&call.class.kind, ExprKind::Identifier(_));
+            let is_object_var_call = call.class.kind.name_ref().is_none();
             if is_self_parent_call || is_object_var_call {
                 if let Some(original_constraint) = resolved.if_this_is.clone() {
                     // Substitute this call's own inferred method-level
@@ -1365,8 +1364,8 @@ impl CallAnalyzer {
             // Suppress when caller guarded with `method_exists(Foo::class, 'method')`
             // (literal class name — keyed by the already-resolved `fqcn`) or
             // `method_exists($cls, 'method')` (dynamic class-string variable).
-            let guard_key: Option<Arc<str>> = match &call.class.kind {
-                ExprKind::Identifier(_) => Some(Arc::from(format!("cls:{fqcn}").as_str())),
+            let guard_key: Option<Arc<str>> = match call.class.kind.name_ref() {
+                Some(_) => Some(Arc::from(format!("cls:{fqcn}").as_str())),
                 _ => extract_expr_guard_key(&call.class, ctx, ea.db, &ea.file),
             };
             let guarded_by_method_exists = guard_key
@@ -1497,7 +1496,7 @@ impl CallAnalyzer {
         // The called method's name isn't statically known — mark the target
         // class as dynamically accessed so DeadCodeAnalyzer doesn't flag its
         // private members as unused, mirroring the instance-call fallback.
-        if let ExprKind::Identifier(name) = &call.class.kind {
+        if let Some(name) = call.class.kind.name_ref() {
             let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
             let fqcn = resolve_static_class(&resolved, ctx);
             if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
@@ -1509,7 +1508,7 @@ impl CallAnalyzer {
         }
         ea.analyze(&call.method, ctx);
         for arg in call.args.iter() {
-            let Some(value) = &arg.value else { continue };
+            let Some(value) = arg.value() else { continue };
             ea.analyze(value, ctx);
             super::consume_arg_assignment(value, ctx);
             if let ExprKind::Variable(name) = &value.kind {
@@ -1521,7 +1520,7 @@ impl CallAnalyzer {
         // self::/static::/parent:: forward) and, when the target class is
         // known, that class's own static properties.
         ctx.invalidate_prop_refined_receiver("this");
-        if let ExprKind::Identifier(name) = &call.class.kind {
+        if let Some(name) = call.class.kind.name_ref() {
             let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
             let fqcn = resolve_static_class(&resolved, ctx);
             ctx.invalidate_prop_refined_receiver(&fqcn);

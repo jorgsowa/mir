@@ -22,6 +22,9 @@
 //! positional args) — a reasonable V1 simplification since the vast
 //! majority of `array_map`-style callback params are positional.
 
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -97,15 +100,13 @@ fn resolve_concrete_callback_return(db: &dyn MirDatabase, file: &str, expr: &Exp
             let CallableCreateKind::Function(target) = &cc.kind else {
                 return None;
             };
-            let ExprKind::Identifier(name) = &target.kind else {
-                return None;
-            };
+            let name = target.kind.name_ref()?;
             let fqn = resolve_plain_function_name(db, file, name.as_ref());
             let f = crate::db::find_function(db, crate::db::Fqcn::from_str(db, &fqn))?;
             f.return_type.as_deref().cloned()
         }
         ExprKind::String(s) if !s.is_empty() => {
-            let fqn = resolve_plain_function_name(db, file, s.as_ref());
+            let fqn = resolve_plain_function_name(db, file, s.as_str());
             let f = crate::db::find_function(db, crate::db::Fqcn::from_str(db, &fqn))?;
             f.return_type.as_deref().cloned()
         }
@@ -120,17 +121,18 @@ struct OpaqueCallScanner<'a> {
 }
 
 impl OwnedVisitor for OpaqueCallScanner<'_> {
+    type Break = ();
+
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::FunctionCall(call) = &expr.kind {
-            if let ExprKind::Identifier(name) = &call.name.kind {
+            if let Some(name) = call.name.kind.name_ref() {
                 let fqn = resolve_plain_function_name(self.db, self.file, name.as_ref());
                 let callee = CalleeKey::Function(Arc::from(fqn.as_str()));
                 let mut position = 0u16;
                 for arg in call.args.iter() {
-                    if arg.name.is_none() && !arg.unpack {
+                    if arg.name.is_none() && !arg.unpack() {
                         if let Some(return_type) = arg
-                            .value
-                            .as_ref()
+                            .value()
                             .and_then(|v| resolve_concrete_callback_return(self.db, self.file, v))
                         {
                             self.out.push(CallArgReturn {

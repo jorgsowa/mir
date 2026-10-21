@@ -13,8 +13,7 @@ pub use type_from_hint::{type_from_hint, type_from_hint_owned};
 // ---------------------------------------------------------------------------
 
 /// Convert a parser diagnostic to a [`mir_issues::Issue`], using the source
-/// and source map to derive a precise location. `ForbiddenWarning` diagnostics
-/// become `Severity::Warning`; all other variants become `Severity::Error`.
+/// and source map to derive a precise location.
 pub(crate) fn parse_error_to_issue(
     err: &php_rs_parser::diagnostics::ParseError,
     file: &Arc<str>,
@@ -25,7 +24,7 @@ pub(crate) fn parse_error_to_issue(
     let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
     let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
 
-    let mut issue = mir_issues::Issue::new(
+    mir_issues::Issue::new(
         mir_issues::IssueKind::ParseError {
             message: err.to_string(),
         },
@@ -36,14 +35,7 @@ pub(crate) fn parse_error_to_issue(
             col_start,
             col_end,
         },
-    );
-    if matches!(
-        err.severity(),
-        php_rs_parser::diagnostics::Severity::Warning
-    ) {
-        issue.severity = mir_issues::Severity::Warning;
-    }
-    issue
+    )
 }
 
 /// php-rs-parser 0.17 over-broadly rejects `numeric` and `resource` as reserved
@@ -69,14 +61,44 @@ pub(crate) fn is_spurious_reserved_class_error(
         && matches!(name.to_ascii_lowercase().as_str(), "numeric" | "resource")
 }
 
+/// Compile-time rules the parser checks that the analyzer reports itself with a
+/// dedicated issue kind; the parser's diagnostic is dropped as a duplicate.
+// "temporary expression in write context" is a false positive on `(new A)->p = 1`.
+const ANALYZER_COVERED_MESSAGES: &[&str] = &[
+    "Cannot use temporary expression in write context",
+    "when current class scope has no parent",
+    "when no class scope is active",
+    "(): Return type must be string when declared",
+    "Cannot apply #[\\Attribute] to",
+    "Cannot apply #[\\Deprecated] to",
+    "cannot target",
+    "must return a value",
+    "Generator return type must be a supertype of Generator",
+    "Readonly property cannot have default value",
+    "Redefinition of parameter",
+    "Cannot re-assign $this",
+];
+
+fn is_analyzer_covered_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
+    matches!(
+        err,
+        php_rs_parser::diagnostics::ParseError::Forbidden { .. }
+    ) && {
+        let msg = err.to_string();
+        ANALYZER_COVERED_MESSAGES.iter().any(|m| msg.contains(m))
+    }
+}
+
+/// Parser diagnostics that are dropped from the issue stream and never block
+/// analysis: the spurious reserved-class-name error and the ones the analyzer
+/// reports itself.
+pub(crate) fn is_redundant_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
+    is_spurious_reserved_class_error(err) || is_analyzer_covered_error(err)
+}
+
 /// Returns `true` for parser diagnostics that should block semantic analysis.
-/// `ForbiddenWarning` diagnostics are non-fatal (PHP only warns) and leave the
-/// AST complete, so they do not block analysis. The spurious
-/// reserved-class-name diagnostic (see [`is_spurious_reserved_class_error`]) is
-/// likewise treated as non-blocking — the declaration it flags is valid PHP.
 pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
-    matches!(err.severity(), php_rs_parser::diagnostics::Severity::Error)
-        && !is_spurious_reserved_class_error(err)
+    !is_redundant_parse_error(err)
 }
 
 /// Returns `true` for parser diagnostics that leave the AST incomplete.

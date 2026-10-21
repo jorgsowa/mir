@@ -1,3 +1,5 @@
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::sync::Arc;
 
 use super::helpers::extract_string_from_expr;
@@ -125,7 +127,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let ExprKind::String(s) = &cond.kind else {
                         continue;
                     };
-                    let s = s.as_ref();
+                    let s = s.as_str();
                     let reason = if !crate::contradiction::gettype_is_valid(s) {
                         let hint = crate::contradiction::gettype_suggestion(s)
                             .map(|h| format!(" (did you mean \"{h}\"?)"))
@@ -397,8 +399,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         let ExprKind::ClassConstAccess(cca) = &cond.kind else {
             return None;
         };
-        let resolved_class = match &cca.class.kind {
-            ExprKind::Identifier(id) => {
+        let resolved_class = match cca.class.kind.name_ref() {
+            Some(id) => {
                 let r = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 if r == "self" || r == "static" {
                     ctx.self_fqcn.as_deref().unwrap_or("").to_string()
@@ -499,7 +501,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         return None;
                     }
                     if let ExprKind::String(s) = &cond.kind {
-                        Some(s.clone())
+                        Some(Box::from(s.as_str()))
                     } else if let Some(Atomic::TLiteralString(s)) =
                         self.resolve_class_const_literal(cond, ctx)
                     {
@@ -650,8 +652,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             return None;
                         }
                         if let ExprKind::ClassConstAccess(cca) = &cond.kind {
-                            let resolved_class = match &cca.class.kind {
-                                ExprKind::Identifier(id) => {
+                            let resolved_class = match cca.class.kind.name_ref() {
+                                Some(id) => {
                                     let r =
                                         crate::db::resolve_name(self.db, &self.file, id.as_ref());
                                     if r == "self" || r == "static" {
@@ -747,8 +749,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     else {
                                         return None;
                                     };
-                                    let resolved_class = match &cca.class.kind {
-                                        ExprKind::Identifier(id) => {
+                                    let resolved_class = match cca.class.kind.name_ref() {
+                                        Some(id) => {
                                             let r = crate::db::resolve_name(
                                                 self.db,
                                                 &self.file,

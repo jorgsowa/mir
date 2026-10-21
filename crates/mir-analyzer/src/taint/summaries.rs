@@ -1,4 +1,5 @@
 use super::*;
+use crate::ast_ext::ArgExt as _;
 
 /// What a label slot past the parameters stands for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -409,14 +410,14 @@ impl TaintSummary {
         if !self.is_object_guard(slot) {
             return param_arg_exprs(params, args, slot);
         }
-        let typed = arg_types.len() == args.len() && !args.iter().any(|a| a.unpack);
+        let typed = arg_types.len() == args.len() && !args.iter().any(|a| a.unpack());
         self.guarded_params(slot)
             .flat_map(|param| param_arg_exprs(params, args, param))
             .filter(|value| {
                 let ty = typed
                     .then(|| {
                         args.iter()
-                            .position(|a| a.value.as_ref().is_some_and(|v| std::ptr::eq(v, *value)))
+                            .position(|a| a.value().is_some_and(|v| std::ptr::eq(v, *value)))
                     })
                     .flatten()
                     .and_then(|index| arg_types.get(index));

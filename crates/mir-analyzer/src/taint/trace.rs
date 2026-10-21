@@ -67,13 +67,14 @@ pub fn taint_trail(
         ExprKind::Array(elements) => first(
             &mut elements
                 .iter()
-                .flat_map(|el| el.key.iter().chain(std::iter::once(&el.value))),
+                .flat_map(|el| el.key.iter().chain(std::iter::once(el.value()))),
         ),
-        ExprKind::FunctionCall(fc) => first(&mut fc.args.iter().filter_map(|a| a.value.as_ref()))
-            .map(|mut trail| {
+        ExprKind::FunctionCall(fc) => {
+            first(&mut fc.args.iter().filter_map(|a| a.value())).map(|mut trail| {
                 trail.push(trail_step(expr, source));
                 trail
-            }),
+            })
+        }
         _ => None,
     };
     match nested.filter(|trail| !trail.is_empty()) {

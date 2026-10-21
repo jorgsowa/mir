@@ -1,6 +1,8 @@
 //! `@psalm-assert-if-true`/`@psalm-assert-if-false` docblock-assertion
 //! narrowing: applies a callee's declared assertions to the calling flow
 //! state for free functions, methods, and static methods.
+use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use php_ast::owned::ExprKind;
 
 use mir_codebase::definitions::AssertionKind;
@@ -258,7 +260,7 @@ pub(crate) fn apply_one_assertion(
         // call, not a false positive).
         variadic_args = call_args
             .iter()
-            .filter(|a| a.name.is_none() && !a.unpack)
+            .filter(|a| a.name.is_none() && !a.unpack())
             .skip(index)
             .collect();
         &variadic_args
@@ -271,7 +273,7 @@ pub(crate) fn apply_one_assertion(
     for arg in args_to_check {
         // A partial-application placeholder (`?`/`...`) has no expression
         // to narrow on for this assertion — skip it.
-        let Some(arg_value) = &arg.value else {
+        let Some(arg_value) = arg.value() else {
             continue;
         };
         // `@psalm-assert-if-true Type $arr['key']` — the assertion
@@ -393,8 +395,7 @@ pub(crate) fn compute_assertion_template_bindings(
     let arg_types: Vec<Type> = call_args
         .iter()
         .map(|arg| {
-            arg.value
-                .as_ref()
+            arg.value()
                 .map(|v| assertion_arg_type(v, ctx, db, file))
                 .unwrap_or_else(Type::mixed)
         })
@@ -508,9 +509,7 @@ pub(super) fn resolve_static_call_class_fqcn(
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
-    let ExprKind::Identifier(id) = &class_expr.kind else {
-        return None;
-    };
+    let id = class_expr.kind.name_ref()?;
     let resolved = crate::db::resolve_name(db, file, id.as_ref());
     match resolved.as_str() {
         "self" | "static" => Some(std::sync::Arc::from(
@@ -627,25 +626,23 @@ fn expand_literal_spread_call_args(
     let [sole] = call_args else {
         return None;
     };
-    if !sole.unpack {
+    if !sole.unpack() {
         return None;
     }
-    let sole_value = sole.value.as_ref()?;
+    let sole_value = sole.value()?;
     let ExprKind::Array(elements) = &sole_value.kind else {
         return None;
     };
     let mut expanded = Vec::with_capacity(elements.len());
     for el in elements.iter() {
-        if el.key.is_some() || el.unpack || el.by_ref {
+        if el.key.is_some() || el.unpack() || el.by_ref() {
             return None;
         }
-        expanded.push(php_ast::owned::Arg {
-            name: None,
-            value: Some(el.value.clone()),
-            unpack: false,
-            by_ref: false,
-            span: el.span,
-        });
+        expanded.push(php_ast::owned::Arg::new(
+            None,
+            php_ast::owned::ArgKind::Value(el.value().clone()),
+            el.span,
+        ));
     }
     Some(expanded)
 }

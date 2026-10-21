@@ -1,3 +1,6 @@
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -757,15 +760,12 @@ fn callback_predicate_narrowed(
 /// callable or an `is_string(...)` first-class callable.
 fn type_guard_callable_name(callback_expr: &Expr) -> Option<&str> {
     let name = match &callback_expr.kind {
-        ExprKind::String(s) => s.as_ref(),
+        ExprKind::String(s) => s.as_str(),
         ExprKind::CallableCreate(cc) => {
             let CallableCreateKind::Function(target) = &cc.kind else {
                 return None;
             };
-            let ExprKind::Identifier(name) = &target.kind else {
-                return None;
-            };
-            name.as_ref()
+            target.kind.name_bare()?
         }
         _ => return None,
     };
@@ -1652,19 +1652,17 @@ pub(crate) fn compact_return_type(ctx: &FlowState, args: &[php_ast::owned::Arg])
     use mir_types::atomic::KeyedProperty;
     let mut properties = IndexMap::new();
     for arg in args {
-        if arg.unpack {
+        if arg.unpack() {
             return None;
         }
-        let Some(value) = &arg.value else {
-            return None;
-        };
+        let value = arg.value()?;
         let ExprKind::String(name) = &value.kind else {
             return None;
         };
-        let ty = ctx.get_var(name.as_ref());
+        let ty = ctx.get_var(name.as_str());
         let optional = ty.possibly_undefined;
         properties.insert(
-            ArrayKey::String(std::sync::Arc::from(name.as_ref())),
+            ArrayKey::String(std::sync::Arc::from(name.as_str())),
             KeyedProperty { ty, optional },
         );
     }

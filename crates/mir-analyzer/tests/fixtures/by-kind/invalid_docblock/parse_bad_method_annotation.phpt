@@ -6,7 +6,7 @@ Parse bad method annotation
                      * @method aaa
                      */
                     class AAA {
-                        function __call() {
+                        function __call($name, $args) {
                             echo $b."
 //                               ^^ UndefinedVariable: Variable $b is not defined
 ";

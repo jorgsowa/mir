@@ -1,5 +1,6 @@
 //! Enum-case (`EnumName::CaseName`) and class-string (`Foo::class`) narrowing,
 //! for variable, property, and static-property receivers.
+use crate::ast_ext::ByteStringExt as _;
 use php_ast::owned::ExprKind;
 
 use mir_types::{Atomic, Type};
@@ -72,7 +73,7 @@ pub(super) fn extract_enum_value_case(
         return None;
     }
     let literal = match &literal_expr.kind {
-        ExprKind::String(s) => Atomic::TLiteralString(std::sync::Arc::from(s.as_ref())),
+        ExprKind::String(s) => Atomic::TLiteralString(std::sync::Arc::from(&*s.to_text())),
         ExprKind::Int(n) => Atomic::TLiteralInt(*n),
         _ => return None,
     };

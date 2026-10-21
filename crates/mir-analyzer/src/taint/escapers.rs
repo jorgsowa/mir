@@ -1,4 +1,6 @@
 use super::*;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 
 /// A value of this type can't carry an injection payload: numbers, booleans,
 /// numeric strings, or string literals the program itself spells out (e.g. after
@@ -48,7 +50,7 @@ pub(super) fn shape_entry_is_safe(ty: &mir_types::Type, key: mir_types::Name) ->
 /// Whether a flags expression includes the constant `flag` (`A | B`).
 pub(super) fn has_flag(expr: &Expr, flag: &str) -> bool {
     match &expr.kind {
-        ExprKind::Identifier(name) => name.trim_start_matches('\\') == flag,
+        ExprKind::Identifier(_) | ExprKind::Name(_) => expr.kind.name_bare() == Some(flag),
         ExprKind::Binary(op) if op.op == php_ast::ast::BinaryOp::BitwiseOr => {
             has_flag(&op.left, flag) || has_flag(&op.right, flag)
         }
@@ -67,7 +69,7 @@ pub(super) fn filter_call_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Option<Taint> {
-    let arg = |i: usize| args.get(i).and_then(|a| a.value.as_ref());
+    let arg = |i: usize| args.get(i).and_then(|a| a.value());
     let (input, filter) = match fn_name_lower {
         "filter_var" => (
             arg(0).map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file)),
@@ -77,9 +79,11 @@ pub(super) fn filter_call_taint(
         "filter_input_array" => return Some(Taint::ALL),
         _ => return None,
     };
-    let filter_name = match filter.map(|f| &f.kind) {
-        Some(ExprKind::Identifier(name)) => name.trim_start_matches('\\').to_ascii_uppercase(),
-        _ => return Some(input),
+    let Some(filter_name) = filter
+        .and_then(|f| f.kind.name_bare())
+        .map(str::to_ascii_uppercase)
+    else {
+        return Some(input);
     };
     Some(match filter_name.as_str() {
         "FILTER_VALIDATE_INT"
@@ -159,7 +163,7 @@ fn is_fixed_url_origin(literal: &str) -> bool {
 /// Whether the expression is a string that starts with a fixed `scheme://host/` origin.
 pub(super) fn starts_with_fixed_url_origin(expr: &Expr) -> bool {
     match &expr.kind {
-        ExprKind::String(s) => is_fixed_url_origin(s),
+        ExprKind::String(s) => is_fixed_url_origin(s.as_str()),
         ExprKind::Parenthesized(inner) => starts_with_fixed_url_origin(inner),
         ExprKind::Binary(b) if matches!(b.op, php_ast::ast::BinaryOp::Concat) => {
             starts_with_fixed_url_origin(&b.left)
@@ -169,7 +173,7 @@ pub(super) fn starts_with_fixed_url_origin(expr: &Expr) -> bool {
             let mut prefix = String::new();
             for part in parts.iter() {
                 match part {
-                    StringPart::Literal(l) => prefix.push_str(l),
+                    StringPart::Literal(l) => prefix.push_str(l.as_str()),
                     _ => break,
                 }
             }

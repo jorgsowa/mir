@@ -60,6 +60,8 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
         spans: Vec<(u32, u32)>,
     }
     impl OwnedVisitor for BodySpans {
+        type Break = ();
+
         fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
             if let StmtKind::Function(f) = &stmt.kind {
                 if f.return_type.is_some() {

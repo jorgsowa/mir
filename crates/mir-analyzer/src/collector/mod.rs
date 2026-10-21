@@ -4,6 +4,9 @@
 //! containing class, function, and constant signatures. No type inference
 //! happens here.
 
+use crate::ast_ext::ArrayElementExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
@@ -576,9 +579,9 @@ pub(super) fn infer_const_value(
 
     match expr_kind {
         php_ast::owned::ExprKind::Int(i) => Some(Type::single(Atomic::TLiteralInt(*i))),
-        php_ast::owned::ExprKind::String(s) => {
-            Some(Type::single(Atomic::TLiteralString(Arc::from(&**s))))
-        }
+        php_ast::owned::ExprKind::String(s) => Some(Type::single(Atomic::TLiteralString(
+            Arc::from(&*s.to_text()),
+        ))),
         php_ast::owned::ExprKind::Float(_f) => Some(Type::single(Atomic::TFloat)),
         php_ast::owned::ExprKind::Bool(_b) => Some(Type::single(Atomic::TBool)),
         php_ast::owned::ExprKind::Null => Some(Type::single(Atomic::TNull)),
@@ -618,10 +621,10 @@ pub(super) fn infer_const_value(
             let mut is_list = true;
             let mut next_int_key: i64 = 0;
             for elem in elements.iter() {
-                if elem.unpack || elem.by_ref {
+                if elem.unpack() || elem.by_ref() {
                     return None;
                 }
-                let value_ty = infer_const_value(collector, &elem.value.kind)?;
+                let value_ty = infer_const_value(collector, &elem.value().kind)?;
                 let key = if let Some(key_expr) = &elem.key {
                     is_list = false;
                     match infer_const_value(collector, &key_expr.kind)?
@@ -704,9 +707,7 @@ pub(super) fn infer_const_value(
         // `Foo::BAR` / `self::BAR` referencing an enum case or a plain class
         // constant of an already-collected same-file class-like.
         php_ast::owned::ExprKind::ClassConstAccess(cca) => {
-            let php_ast::owned::ExprKind::Identifier(class_name) = &cca.class.kind else {
-                return None;
-            };
+            let class_name = cca.class.kind.name_ref()?;
             let php_ast::owned::ExprKind::Identifier(const_name) = &cca.member.kind else {
                 return None;
             };
@@ -1972,7 +1973,7 @@ impl<'a> DefinitionCollector<'a> {
         let php_ast::owned::ExprKind::FunctionCall(call) = &expr.kind else {
             return;
         };
-        let php_ast::owned::ExprKind::Identifier(fn_name) = &call.name.kind else {
+        let Some(fn_name) = call.name.kind.name_ref() else {
             return;
         };
         if !fn_name.eq_ignore_ascii_case("define") {
@@ -1981,7 +1982,7 @@ impl<'a> DefinitionCollector<'a> {
         let Some(name_arg) = call.args.first() else {
             return;
         };
-        let Some(name_value) = &name_arg.value else {
+        let Some(name_value) = name_arg.value() else {
             return;
         };
         let php_ast::owned::ExprKind::String(name) = &name_value.kind else {
@@ -1995,12 +1996,12 @@ impl<'a> DefinitionCollector<'a> {
         if !self.version_allows(&define_doc) {
             return;
         }
-        let fqn: Arc<str> = Arc::from(name.as_ref());
+        let fqn: Arc<str> = Arc::from(name.as_str());
         // Try to infer the type of the constant value from the second argument
         let const_type = call
             .args
             .get(1)
-            .and_then(|arg| arg.value.as_ref())
+            .and_then(|arg| arg.value())
             .and_then(|value| infer_const_value(self, &value.kind))
             .unwrap_or(Type::mixed());
         let const_type = widen_environment_dependent_constant(&fqn, const_type);
@@ -2056,6 +2057,8 @@ impl<'a> DefinitionCollector<'a> {
 }
 
 impl<'a> OwnedVisitor for DefinitionCollector<'a> {
+    type Break = ();
+
     fn visit_program(&mut self, program: &Program) -> ControlFlow<()> {
         walk_owned_program(self, program)
     }
@@ -2099,7 +2102,8 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                         .to_string();
                     let alias = item
                         .alias
-                        .as_deref()
+                        .as_ref()
+                        .and_then(|a| a.as_str())
                         .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
                     // `accumulated_imports` (→ `file_imports()`) keeps every kind: Pass 2
                     // function-call resolution (`call/function.rs`) relies on `use
@@ -2637,13 +2641,8 @@ impl<'a> DefinitionCollector<'a> {
             if !is_data_provider {
                 return None;
             }
-            match a
-                .args
-                .first()
-                .and_then(|arg| arg.value.as_ref())
-                .map(|v| &v.kind)
-            {
-                Some(php_ast::owned::ExprKind::String(s)) => Some(Arc::from(s.as_ref())),
+            match a.args.first().and_then(|arg| arg.value()).map(|v| &v.kind) {
+                Some(php_ast::owned::ExprKind::String(s)) => Some(Arc::from(s.as_str())),
                 _ => None,
             }
         }));
@@ -2654,10 +2653,10 @@ impl<'a> DefinitionCollector<'a> {
             return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             native_return,
-            visibility: Self::convert_visibility(m.visibility),
-            is_static: m.is_static,
-            is_abstract: m.is_abstract,
-            is_final: m.is_final,
+            visibility: Self::convert_visibility(m.modifiers.visibility),
+            is_static: m.modifiers.is_static,
+            is_abstract: m.modifiers.is_abstract,
+            is_final: m.modifiers.is_final,
             is_constructor: method_name == "__construct",
             template_params,
             assertions,

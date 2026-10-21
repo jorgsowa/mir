@@ -14,6 +14,7 @@
 //! - Attribute applied to element that doesn't match its declared target → `InvalidAttribute`
 //! - Same non-repeatable attribute applied twice on the same element → `InvalidAttribute`
 
+use crate::ast_ext::NameRefExt as _;
 use std::sync::Arc;
 
 use mir_issues::{Issue, IssueKind, Location};
@@ -42,7 +43,7 @@ const TARGET_PARAMETER: i64 = 32;
 /// A promoted constructor parameter is reflectable as both a `ReflectionParameter`
 /// and a `ReflectionProperty`, so its attributes must be checked against either target.
 fn param_target_flags(param: &php_ast::owned::Param) -> i64 {
-    if param.visibility.is_some() {
+    if param.modifiers.visibility.is_some() {
         TARGET_PARAMETER | TARGET_PROPERTY
     } else {
         TARGET_PARAMETER
@@ -115,7 +116,7 @@ fn record_class_refs_in_expr(
 
     match &expr.kind {
         ExprKind::ClassConstAccess(cca) => {
-            if let ExprKind::Identifier(id) = &cca.class.kind {
+            if let Some(id) = cca.class.kind.name_ref() {
                 record(id.as_ref(), cca.class.span);
                 // `Foo::CONST`/`Foo::Case` (but not `Foo::class`, which has no
                 // constant/case of its own) is also a real reference to that
@@ -147,13 +148,13 @@ fn record_class_refs_in_expr(
             }
         }
         ExprKind::New(n) => {
-            if let ExprKind::Identifier(id) = &n.class.kind {
+            if let Some(id) = n.class.kind.name_ref() {
                 record(id.as_ref(), n.class.span);
             } else {
                 record_class_refs_in_expr(&n.class, db, file, source, source_map);
             }
             for arg in n.args.iter() {
-                let Some(value) = &arg.value else { continue };
+                let Some(value) = arg.value() else { continue };
                 record_class_refs_in_expr(value, db, file, source, source_map);
             }
         }
@@ -162,7 +163,7 @@ fn record_class_refs_in_expr(
                 if let Some(key) = &el.key {
                     record_class_refs_in_expr(key, db, file, source, source_map);
                 }
-                record_class_refs_in_expr(&el.value, db, file, source, source_map);
+                record_class_refs_in_expr(el.value(), db, file, source, source_map);
             }
         }
         ExprKind::Binary(b) => {
@@ -322,7 +323,10 @@ pub(crate) fn check_class_attributes(
             if !method_name.eq_ignore_ascii_case("__construct") {
                 continue;
             }
-            if matches!(method.visibility, Some(php_ast::ast::Visibility::Private)) {
+            if matches!(
+                method.modifiers.visibility,
+                Some(php_ast::ast::Visibility::Private)
+            ) {
                 let loc =
                     span_to_location(file, source, source_map, member.span.start, member.span.end);
                 issues.push(invalid_attr(
@@ -798,9 +802,9 @@ pub(crate) fn check_parent_in_class_attrs(
     use php_ast::owned::ExprKind;
     for attr in attrs {
         for arg in attr.args.iter() {
-            let Some(value) = &arg.value else { continue };
+            let Some(value) = arg.value() else { continue };
             if let ExprKind::ClassConstAccess(cca) = &value.kind {
-                if let ExprKind::Identifier(id) = &cca.class.kind {
+                if let Some(id) = cca.class.kind.name_ref() {
                     if id.as_ref().eq_ignore_ascii_case("parent") {
                         let loc = span_to_location(
                             file,
@@ -859,7 +863,7 @@ fn check_attribute_list(
         // flagged UnusedClass.
         if record_refs {
             for arg in attr.args.iter() {
-                let Some(value) = &arg.value else { continue };
+                let Some(value) = arg.value() else { continue };
                 record_class_refs_in_expr(value, db, file, source, source_map);
             }
         }

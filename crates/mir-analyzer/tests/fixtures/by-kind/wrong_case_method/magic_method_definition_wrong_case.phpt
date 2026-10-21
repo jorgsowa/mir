@@ -20,3 +20,5 @@ class Foo {
     public function __debuginfo(): array { return []; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__debuginfo' has incorrect casing; use '__debugInfo'
 }
+===expect===
+ParseError@9:4-9:83: Parse error: Method Foo::__CallStatic() must be static

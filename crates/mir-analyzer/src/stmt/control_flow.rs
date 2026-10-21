@@ -1,3 +1,4 @@
+use crate::ast_ext::ByteStringExt as _;
 use std::sync::Arc;
 
 use php_ast::owned::{
@@ -629,7 +630,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 let ExprKind::String(s) = &val.kind else {
                     continue;
                 };
-                let s = s.as_ref();
+                let s = s.as_str();
                 let reason = if !crate::contradiction::gettype_is_valid(s) {
                     let hint = crate::contradiction::gettype_suggestion(s)
                         .map(|h| format!(" (did you mean \"{h}\"?)"))
@@ -688,9 +689,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 } else if let Some(target) = &subject_target {
                     let narrow_ty = match &val.kind {
                         ExprKind::Int(n) => Some(Type::single(Atomic::TLiteralInt(*n))),
-                        ExprKind::String(s) => {
-                            Some(Type::single(Atomic::TLiteralString(Arc::from(&**s))))
-                        }
+                        ExprKind::String(s) => Some(Type::single(Atomic::TLiteralString(
+                            Arc::from(&*s.to_text()),
+                        ))),
                         ExprKind::Bool(b) => Some(Type::single(if *b {
                             Atomic::TTrue
                         } else {
@@ -910,7 +911,9 @@ impl<'a> StatementsAnalyzer<'a> {
                     let all_literal = pending_conditions.iter().all(|cond| {
                         let atom = match &cond.kind {
                             ExprKind::Int(n) => Some(Atomic::TLiteralInt(*n)),
-                            ExprKind::String(s) => Some(Atomic::TLiteralString(Arc::from(&**s))),
+                            ExprKind::String(s) => {
+                                Some(Atomic::TLiteralString(Arc::from(&*s.to_text())))
+                            }
                             ExprKind::Bool(b) => {
                                 Some(if *b { Atomic::TTrue } else { Atomic::TFalse })
                             }
@@ -1221,7 +1224,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                     u
                 };
-                let var_name = var.trim_start_matches('$');
+                let var_name = var.or_error().trim_start_matches('$');
                 let name_span = crate::symbol::variable_token_span(
                     self.source,
                     php_ast::Span {
@@ -1337,7 +1340,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // UnusedVariable for them by tracking their names in catch_var_names.
         for catch in tc.catches.iter() {
             if let Some(var) = &catch.var {
-                let sym = mir_types::Name::from(var.trim_start_matches('$'));
+                let sym = mir_types::Name::from(var.or_error().trim_start_matches('$'));
                 result.catch_var_names.insert(sym);
             }
         }

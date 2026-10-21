@@ -11,6 +11,8 @@
 //! Arc-wrap makes salsa's identity comparison cheap (ptr_eq) and avoids
 //! deep clones.
 
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use std::sync::Arc;
 
 use mir_codebase::definitions::{
@@ -1301,14 +1303,16 @@ pub fn class_array_property_defaults<'db>(
 
     let expr_to_string = |e: &php_ast::owned::Expr| -> Option<String> {
         match &e.kind {
-            ExprKind::String(s) => Some(s.to_string()),
+            ExprKind::String(s) => Some(s.as_str().to_string()),
             ExprKind::Int(n) => Some(n.to_string()),
-            ExprKind::ClassConstAccess(cca) => match (&cca.class.kind, &cca.member.kind) {
-                (ExprKind::Identifier(cls), ExprKind::Identifier(m)) if m.as_ref() == "class" => {
-                    Some(crate::db::resolve_name(db, path.as_ref(), cls))
+            ExprKind::ClassConstAccess(cca) => {
+                match (cca.class.kind.name_ref(), &cca.member.kind) {
+                    (Some(cls), ExprKind::Identifier(m)) if m.as_ref() == "class" => {
+                        Some(crate::db::resolve_name(db, path.as_ref(), &cls))
+                    }
+                    _ => None,
                 }
-                _ => None,
-            },
+            }
             _ => None,
         }
     };
@@ -1346,7 +1350,7 @@ pub fn class_array_property_defaults<'db>(
                     },
                     None => idx.to_string(),
                 };
-                let Some(value) = expr_to_string(&el.value) else {
+                let Some(value) = expr_to_string(el.value()) else {
                     continue;
                 };
                 entries.push((key, value));

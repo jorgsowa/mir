@@ -2,6 +2,7 @@ use rustc_hash::FxHashMap;
 use std::sync::{Arc, OnceLock};
 
 pub(crate) mod analyzer_db;
+pub(crate) mod ast_ext;
 pub(crate) mod attributes;
 pub mod batch;
 pub(crate) mod body_analysis;

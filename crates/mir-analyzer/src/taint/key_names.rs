@@ -1,4 +1,6 @@
 use super::*;
+use crate::ast_ext::ArrayElementExt as _;
+use crate::ast_ext::NameRefExt as _;
 
 /// Taint of the key names of the array `expr` yields when iterated, given the `whole` taint of its
 /// contents: arrays whose keys are tracked exactly don't pass their values' taint on to their keys.
@@ -32,7 +34,7 @@ pub fn exact_key_names(
         ExprKind::Array(elements) => {
             let mut keys = Taint::NONE;
             for element in elements {
-                if element.unpack {
+                if element.unpack() {
                     return None;
                 }
                 if let Some(key) = &element.key {
@@ -61,9 +63,7 @@ fn call_keys_taint(
     }
     match &call.kind {
         ExprKind::FunctionCall(fc) => {
-            let ExprKind::Identifier(name) = &fc.name.kind else {
-                return None;
-            };
+            let name = fc.name.kind.name_ref()?;
             if callee_closure(&fc.name, ctx, db, file).is_some() {
                 return None;
             }
@@ -124,8 +124,8 @@ fn call_keys_taint(
             keys
         }
         ExprKind::StaticMethodCall(smc) => {
-            let (ExprKind::Identifier(class), ExprKind::Identifier(method_name)) =
-                (&smc.class.kind, &smc.method.kind)
+            let (Some(class), ExprKind::Identifier(method_name)) =
+                (smc.class.kind.name_ref(), &smc.method.kind)
             else {
                 return None;
             };

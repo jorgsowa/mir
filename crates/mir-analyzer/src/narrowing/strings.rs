@@ -1,6 +1,7 @@
 //! `strlen()`/`mb_strlen()`/`iconv_strlen()` length narrowing and the
 //! `strpos()`/`stripos()`-family `!== false` idiom, for variable, property,
 //! and static-property receivers.
+use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::BinaryOp;
 use php_ast::owned::ExprKind;
 
@@ -20,17 +21,13 @@ use super::literals::{
 /// `mb_strlen($var, ...)` / `iconv_strlen($var, ...)`.
 pub(super) fn extract_strlen_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        let name = match &call.name.kind {
-            ExprKind::Identifier(n) => n.as_ref(),
-            _ => return None,
-        };
-        let bare = name.trim_start_matches('\\');
+        let bare = call.name.kind.name_bare()?;
         if bare.eq_ignore_ascii_case("strlen")
             || bare.eq_ignore_ascii_case("mb_strlen")
             || bare.eq_ignore_ascii_case("iconv_strlen")
         {
             if let Some(arg) = call.args.first() {
-                let value = arg.value.as_ref()?;
+                let value = arg.value()?;
                 return ScalarArgTarget::extract(value);
             }
         }
@@ -46,17 +43,13 @@ pub(super) fn extract_strlen_static_prop_arg(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
-        let name = match &call.name.kind {
-            ExprKind::Identifier(n) => n.as_ref(),
-            _ => return None,
-        };
-        let bare = name.trim_start_matches('\\');
+        let bare = call.name.kind.name_bare()?;
         if bare.eq_ignore_ascii_case("strlen")
             || bare.eq_ignore_ascii_case("mb_strlen")
             || bare.eq_ignore_ascii_case("iconv_strlen")
         {
             if let Some(arg) = call.args.first() {
-                let value = arg.value.as_ref()?;
+                let value = arg.value()?;
                 return extract_static_prop_access(value, ctx, db, file);
             }
         }
@@ -196,7 +189,7 @@ pub(super) fn narrow_string_false_comparable_condition(
     };
     // A partial-application placeholder (`?`/`...`) for either argument
     // leaves nothing concrete to narrow on.
-    let (Some(haystack_value), Some(needle_value)) = (&haystack_arg.value, &needle_arg.value)
+    let (Some(haystack_value), Some(needle_value)) = (haystack_arg.value(), needle_arg.value())
     else {
         return;
     };

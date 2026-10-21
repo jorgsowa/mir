@@ -1,3 +1,6 @@
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameRefExt as _;
 use php_ast::owned::{ExprKind, FunctionCallExpr};
 use php_ast::Span;
 
@@ -136,8 +139,8 @@ impl CallAnalyzer {
         ctx: &mut FlowState,
         span: Span,
     ) -> Type {
-        let fn_name = match &call.name.kind {
-            ExprKind::Identifier(name) => name.as_ref().to_string(),
+        let fn_name = match call.name.kind.name_ref() {
+            Some(name) => name.as_ref().to_string(),
             _ => {
                 crate::taint::check_callable_target(ea, &call.name, ctx, span);
                 let callee_ty = ea.analyze(&call.name, ctx);
@@ -217,13 +220,13 @@ impl CallAnalyzer {
                         for arg in call.args.iter() {
                             // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
                             // — not yet modeled; keep positional slots aligned with `mixed`.
-                            let Some(value) = &arg.value else {
+                            let Some(value) = arg.value() else {
                                 inner_arg_types.push(Type::mixed());
                                 continue;
                             };
                             let ty = ea.analyze_arg(value, ctx);
                             super::consume_arg_assignment(value, ctx);
-                            if arg.unpack {
+                            if arg.unpack() {
                                 if call.args.len() == 1 {
                                     sole_spread_ty = Some(ty.clone());
                                 }
@@ -242,13 +245,9 @@ impl CallAnalyzer {
                         let mut inner_arg_byref: Vec<bool> = call
                             .args
                             .iter()
-                            .map(|a| {
-                                a.value
-                                    .as_ref()
-                                    .is_some_and(expr_can_be_passed_by_reference_owned)
-                            })
+                            .map(|a| a.value().is_some_and(expr_can_be_passed_by_reference_owned))
                             .collect();
-                        let mut has_spread = call.args.iter().any(|a| a.unpack);
+                        let mut has_spread = call.args.iter().any(|a| a.unpack());
                         let mut arity_unknown = has_spread;
                         // A sole spread arg over a literal, sequentially-keyed shape can be
                         // expanded into one binding per element so each parameter is checked
@@ -345,7 +344,7 @@ impl CallAnalyzer {
                                         .unwrap_or_else(Type::mixed);
                                     if param.is_variadic {
                                         for arg in call.args.iter().skip(i) {
-                                            let Some(value) = &arg.value else { continue };
+                                            let Some(value) = arg.value() else { continue };
                                             if let ExprKind::Variable(name) = &value.kind {
                                                 let var_name = name.trim_start_matches('$');
                                                 ea.check_var_write_purity(
@@ -362,7 +361,7 @@ impl CallAnalyzer {
                                             params, &call.args, i,
                                         )
                                         .and_then(|idx| call.args.get(idx))
-                                        .and_then(|arg| arg.value.as_ref())
+                                        .and_then(|arg| arg.value())
                                     {
                                         if let ExprKind::Variable(name) = &value.kind {
                                             let var_name = name.trim_start_matches('$');
@@ -394,9 +393,7 @@ impl CallAnalyzer {
                             ctx.invalidate_prop_refined_receiver("this");
                         }
                         for arg in call.args.iter() {
-                            if let Some(ExprKind::Variable(name)) =
-                                arg.value.as_ref().map(|v| &v.kind)
-                            {
+                            if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
                                 ctx.invalidate_prop_refined_receiver(name);
                             }
                         }
@@ -534,7 +531,7 @@ impl CallAnalyzer {
             let mut position = 0;
             for arg in call.args.iter() {
                 if param.index.is_none() || matches_param(position, arg) {
-                    sink_values.extend(arg.value.iter().map(|v| (v, param.kind)));
+                    sink_values.extend(arg.value().into_iter().map(|v| (v, param.kind)));
                 }
                 if arg.name.is_none() {
                     position += 1;
@@ -578,17 +575,13 @@ impl CallAnalyzer {
             resolved_fn_name.as_str(),
         )
         .filter(|&i| {
-            call.args.iter().all(|a| !a.unpack && a.name.is_none())
-                && call
-                    .args
-                    .get(i)
-                    .and_then(|a| a.value.as_ref())
-                    .is_some_and(|v| {
-                        matches!(v.kind, ExprKind::Closure(_) | ExprKind::ArrowFunction(_))
-                    })
+            call.args.iter().all(|a| !a.unpack() && a.name.is_none())
+                && call.args.get(i).and_then(|a| a.value()).is_some_and(|v| {
+                    matches!(v.kind, ExprKind::Closure(_) | ExprKind::ArrowFunction(_))
+                })
         });
         for (arg_index, arg) in call.args.iter().enumerate() {
-            let Some(value) = &arg.value else {
+            let Some(value) = arg.value() else {
                 arg_types.push(Type::mixed());
                 continue;
             };
@@ -604,7 +597,7 @@ impl CallAnalyzer {
                 None => ea.analyze_arg(value, ctx),
             };
             super::consume_arg_assignment(value, ctx);
-            if arg.unpack {
+            if arg.unpack() {
                 if call.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
                 }
@@ -614,7 +607,7 @@ impl CallAnalyzer {
             }
         }
         if let Some(i) = deferred_callback {
-            if let Some(value) = &call.args[i].value {
+            if let Some(value) = &call.args[i].value() {
                 ea.callback_param_hints = super::array_builtins::element_callback_param_hints(
                     resolved_fn_name.as_str(),
                     &arg_types,
@@ -640,11 +633,7 @@ impl CallAnalyzer {
         let mut arg_can_be_byref: Vec<bool> = call
             .args
             .iter()
-            .map(|a| {
-                a.value
-                    .as_ref()
-                    .is_some_and(expr_can_be_passed_by_reference_owned)
-            })
+            .map(|a| a.value().is_some_and(expr_can_be_passed_by_reference_owned))
             .collect();
         // array_multisort accepts ANY expression for both the sort-key arrays
         // and the trailing SORT_* order/flags scalars bound to its `&...$rest`
@@ -654,7 +643,7 @@ impl CallAnalyzer {
         if fn_name.eq_ignore_ascii_case("array_multisort") {
             arg_can_be_byref = vec![true; call.args.len()];
         }
-        let mut has_spread = call.args.iter().any(|a| a.unpack);
+        let mut has_spread = call.args.iter().any(|a| a.unpack());
         let mut arity_unknown = has_spread;
         // A sole spread arg over a literal, sequentially-keyed shape can be
         // expanded into one binding per element so each parameter (and
@@ -685,10 +674,10 @@ impl CallAnalyzer {
             resolved_fn_name.as_str(),
             "call_user_func" | "call_user_func_array"
         ) {
-            if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
+            if let Some(value) = call.args.first().and_then(|a| a.value()) {
                 if let ExprKind::String(name) = &value.kind {
                     call_user_func_string_arg = true;
-                    if let Some((class_name, method_name)) = name.as_ref().split_once("::") {
+                    if let Some((class_name, method_name)) = name.as_str().split_once("::") {
                         // "Class::method" static-callable string — resolve
                         // and record both, or a static method reachable only
                         // this way is falsely flagged UnusedMethod (and its
@@ -715,7 +704,7 @@ impl CallAnalyzer {
                         // `strip_prefix` above for `resolved_fn_name`), so a lookup
                         // must strip one here too, not add one — a prepended `\`
                         // makes every lookup key mismatch and silently fail.
-                        let fqn = name.as_ref().trim_start_matches('\\');
+                        let fqn = name.as_str().trim_start_matches('\\');
                         let here = crate::db::Fqcn::from_str(ea.db, fqn);
                         let canonical_fqn: Option<Arc<str>> =
                             crate::db::find_function_from(ea.db, &ea.file, here)
@@ -751,8 +740,8 @@ impl CallAnalyzer {
         };
         if let Some(idx) = class_name_arg_index {
             if let Some(arg) = call.args.get(idx) {
-                if let Some(ExprKind::String(name)) = arg.value.as_ref().map(|v| &v.kind) {
-                    let resolved_class = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
+                if let Some(ExprKind::String(name)) = arg.value().map(|v| &v.kind) {
+                    let resolved_class = crate::db::resolve_name(ea.db, &ea.file, name.as_str());
                     if crate::db::class_exists(ea.db, &resolved_class) {
                         ea.record_class_ref(&resolved_class, arg.span);
                     }
@@ -766,9 +755,9 @@ impl CallAnalyzer {
         // below rather than risk flagging a variable that's actually read this way.
         if fn_name == "compact" {
             for arg in call.args.iter() {
-                if let Some(ExprKind::String(name)) = arg.value.as_ref().map(|v| &v.kind) {
-                    ctx.read_vars.insert(mir_types::Name::from(name.as_ref()));
-                    ctx.mark_consumed(name.as_ref());
+                if let Some(ExprKind::String(name)) = arg.value().map(|v| &v.kind) {
+                    ctx.read_vars.insert(mir_types::Name::from(name.as_str()));
+                    ctx.mark_consumed(name.as_str());
                 } else {
                     ctx.has_dynamic_var_read = true;
                 }
@@ -786,7 +775,7 @@ impl CallAnalyzer {
             // names aren't known statically, so mark the WHOLE scope as
             // possibly holding a tainted dynamically-defined variable rather
             // than trying (and failing) to taint a specific name.
-            if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
+            if let Some(value) = call.args.first().and_then(|a| a.value()) {
                 if !crate::taint::expr_taint(value, ctx, ea.db, &ea.file)
                     .concrete()
                     .is_empty()
@@ -846,7 +835,7 @@ impl CallAnalyzer {
                 && !is_mutation_free
             {
                 for arg in call.args.iter() {
-                    let Some(value) = &arg.value else { continue };
+                    let Some(value) = arg.value() else { continue };
                     let Some(recv_name) = crate::expr::root_receiver_var(value) else {
                         continue;
                     };
@@ -889,7 +878,7 @@ impl CallAnalyzer {
             // free`), so `is_pure` is the only safe "touches nothing" check.
             if !is_pure {
                 for arg in call.args.iter() {
-                    if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
+                    if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
                         ctx.invalidate_prop_refined_receiver(name);
                     }
                 }
@@ -1018,7 +1007,7 @@ impl CallAnalyzer {
                     };
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
-                            let Some(value) = &arg.value else { continue };
+                            let Some(value) = arg.value() else { continue };
                             if let ExprKind::Variable(name) = &value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
                                 // A plain-variable by-ref argument (`sort($items)`)
@@ -1035,7 +1024,7 @@ impl CallAnalyzer {
                     } else if let Some(value) =
                         crate::call::resolve_named_arg_type_index(&params, &call.args, i)
                             .and_then(|idx| call.args.get(idx))
-                            .and_then(|arg| arg.value.as_ref())
+                            .and_then(|arg| arg.value())
                     {
                         if let ExprKind::Variable(name) = &value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
@@ -1105,7 +1094,7 @@ impl CallAnalyzer {
             // value type. Falls back to the stub return when inference is unsure.
             let return_ty = match resolved_fn_name.as_str() {
                 "array_map" => {
-                    let callback_expr = call.args.first().and_then(|a| a.value.as_ref());
+                    let callback_expr = call.args.first().and_then(|a| a.value());
                     super::array_builtins::infer_array_map_return(
                         ea,
                         &arg_types,
@@ -1115,7 +1104,7 @@ impl CallAnalyzer {
                     .unwrap_or(return_ty)
                 }
                 "array_filter" => {
-                    let callback_expr = call.args.get(1).and_then(|a| a.value.as_ref());
+                    let callback_expr = call.args.get(1).and_then(|a| a.value());
                     super::array_builtins::infer_array_filter_return(
                         &arg_types,
                         callback_expr,
@@ -1124,7 +1113,7 @@ impl CallAnalyzer {
                     .unwrap_or(return_ty)
                 }
                 "array_reduce" => {
-                    let callback_expr = call.args.get(1).and_then(|a| a.value.as_ref());
+                    let callback_expr = call.args.get(1).and_then(|a| a.value());
                     super::array_builtins::infer_array_reduce_return(
                         ea,
                         &arg_types,
@@ -1381,7 +1370,7 @@ impl CallAnalyzer {
                 // already proved the argument's class is loaded — the stub's bare
                 // `array|false` return only models the "class doesn't exist" case.
                 "class_implements" | "class_parents" | "class_uses" => {
-                    let arg_value = call.args.first().and_then(|arg| arg.value.as_ref());
+                    let arg_value = call.args.first().and_then(|arg| arg.value());
                     // Literal class-name argument (`class_implements(Foo::class)`) —
                     // matches an identical literal already proven loaded via a
                     // preceding `class_exists(Foo::class)` guard.
@@ -1499,8 +1488,7 @@ impl CallAnalyzer {
             if matches!(resolved_fn_name.as_str(), "array_push" | "array_unshift") {
                 if let (Some(arr_arg), Some(original_arr)) = (call.args.first(), arg_types.first())
                 {
-                    if let Some(ExprKind::Variable(name)) = arr_arg.value.as_ref().map(|v| &v.kind)
-                    {
+                    if let Some(ExprKind::Variable(name)) = arr_arg.value().map(|v| &v.kind) {
                         let var_name = name.as_ref().trim_start_matches('$');
                         let push_types: Vec<Type> = arg_types.iter().skip(1).cloned().collect();
                         let new_type = super::array_builtins::array_push_unshift_byref_type(
@@ -1540,9 +1528,7 @@ impl CallAnalyzer {
                     if let (Some(arr_arg), Some(original_arr)) =
                         (call.args.first(), arg_types.first())
                     {
-                        if let Some(ExprKind::Variable(name)) =
-                            arr_arg.value.as_ref().map(|v| &v.kind)
-                        {
+                        if let Some(ExprKind::Variable(name)) = arr_arg.value().map(|v| &v.kind) {
                             let var_name = name.as_ref().trim_start_matches('$');
                             let new_type =
                                 super::array_builtins::sort_byref_type(original_arr, reindex);
@@ -1558,9 +1544,7 @@ impl CallAnalyzer {
             // preg_match_all wraps one more list level.
             if matches!(resolved_fn_name.as_str(), "preg_match" | "preg_match_all") {
                 if let Some(matches_arg) = call.args.get(2) {
-                    if let Some(ExprKind::Variable(name)) =
-                        matches_arg.value.as_ref().map(|v| &v.kind)
-                    {
+                    if let Some(ExprKind::Variable(name)) = matches_arg.value().map(|v| &v.kind) {
                         let var_name = name.as_ref().trim_start_matches('$');
                         let flags: i64 = arg_types
                             .get(3)

@@ -991,7 +991,7 @@ fn seed_param_locations(
         // Promoted properties (`public/protected/private $param`) are implicitly
         // assigned to `$this->prop` by PHP — mark them read so that constructors
         // with an empty body don't trigger UnusedParam.
-        if p.visibility.is_some() {
+        if p.modifiers.visibility.is_some() {
             ctx.read_vars.insert(Name::from(name));
         }
     }
@@ -1750,6 +1750,8 @@ pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
     struct YieldFinder;
 
     impl OwnedVisitor for YieldFinder {
+        type Break = ();
+
         fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
             match &stmt.kind {
                 // These are separate declaration scopes — don't descend.

@@ -13,3 +13,5 @@ class Bar {
     public function __sleep(): array { return []; }
     public function __wakeup(): void {}
 }
+===expect===
+ParseError@6:4-6:83: Parse error: Method Bar::__callStatic() must be static

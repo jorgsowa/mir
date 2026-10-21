@@ -1,4 +1,8 @@
 use super::*;
+use crate::ast_ext::ArgExt as _;
+use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameRefExt as _;
 
 /// Union of the kinds named by taint annotations (`html`, `sql`, `input`, ...).
 pub(super) fn named_kinds(names: &[std::sync::Arc<str>]) -> Taint {
@@ -63,7 +67,7 @@ fn iterator_wrapper_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    let ExprKind::Identifier(name) = &new.class.kind else {
+    let Some(name) = new.class.kind.name_ref() else {
         return Taint::NONE;
     };
     if new.args.is_empty() {
@@ -273,7 +277,7 @@ pub fn args_taint(
     file: &str,
 ) -> Taint {
     args.iter()
-        .filter_map(|a| a.value.as_ref())
+        .filter_map(|a| a.value())
         .fold(Taint::NONE, |acc, v| acc | expr_taint(v, ctx, db, file))
 }
 
@@ -290,7 +294,7 @@ fn builtin_key_names_taint(
         "array_keys" | "array_key_first" | "array_key_last" | "key" | "array_flip"
         | "json_encode" | "http_build_query" | "serialize" | "print_r" | "var_export" => args
             .first()
-            .and_then(|a| a.value.as_ref())
+            .and_then(|a| a.value())
             .map_or(Taint::NONE, |array| key_names_taint(array, ctx)),
         _ => Taint::NONE,
     }
@@ -355,7 +359,7 @@ pub fn args_value_taint(
     file: &str,
 ) -> Taint {
     args.iter()
-        .filter_map(|a| a.value.as_ref())
+        .filter_map(|a| a.value())
         .fold(Taint::NONE, |acc, v| acc | value_taint(v, ctx, db, file))
 }
 
@@ -444,7 +448,7 @@ fn builtin_args_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    let positional = args.iter().all(|a| !a.unpack && a.name.is_none());
+    let positional = args.iter().all(|a| !a.unpack() && a.name.is_none());
     // Without a format argument it returns a word count, not the words.
     if lower_name == "str_word_count" && positional && args.len() == 1 {
         return Taint::NONE;
@@ -452,13 +456,13 @@ fn builtin_args_taint(
     match carrying_positions(lower_name) {
         Some(positions) if positional => positions
             .iter()
-            .filter_map(|&i| args.get(i)?.value.as_ref())
+            .filter_map(|&i| args.get(i)?.value())
             .fold(Taint::NONE, |acc, v| {
                 acc | stringified_taint(v, ctx, db, file)
             }),
         _ => args
             .iter()
-            .filter_map(|a| a.value.as_ref())
+            .filter_map(|a| a.value())
             .fold(Taint::NONE, |acc, v| {
                 acc | stringified_taint(v, ctx, db, file)
             }),
@@ -750,14 +754,14 @@ pub fn expr_taint(
                 .key
                 .as_ref()
                 .map_or(Taint::NONE, |k| expr_taint(k, ctx, db, file));
-            acc | key | value_taint(&el.value, ctx, db, file)
+            acc | key | value_taint(el.value(), ctx, db, file)
         }),
 
         ExprKind::FunctionCall(fc) => {
             if let Some(closure) = callee_closure(&fc.name, ctx, db, file) {
                 return closure_call_taint(&closure, &fc.args, ctx, db, file);
             }
-            if let ExprKind::Identifier(name) = &fc.name.kind {
+            if let Some(name) = fc.name.kind.name_ref() {
                 let lower_name = if shadows_builtin(db, file, name.as_ref()) {
                     String::new()
                 } else {
@@ -802,7 +806,7 @@ pub fn expr_taint(
                     let hex_tag = fc
                         .args
                         .get(1)
-                        .and_then(|a| a.value.as_ref())
+                        .and_then(|a| a.value())
                         .is_some_and(|flags| has_flag(flags, "JSON_HEX_TAG"));
                     return if hex_tag {
                         taint.without(Taint::HTML)
@@ -818,7 +822,7 @@ pub fn expr_taint(
                     if let Some(keys) = fc
                         .args
                         .first()
-                        .and_then(|a| a.value.as_ref())
+                        .and_then(|a| a.value())
                         .and_then(|array| exact_key_names(array, ctx, db, file))
                     {
                         return keys;
@@ -831,13 +835,14 @@ pub fn expr_taint(
                 // returned array; only literal names are resolved, matching
                 // `compact_return_type`.
                 if lower_name == "compact" {
-                    return fc.args.iter().filter_map(|a| a.value.as_ref()).fold(
-                        Taint::NONE,
-                        |acc, v| match &v.kind {
-                            ExprKind::String(var_name) => acc | ctx.var_taint(var_name.as_ref()),
+                    return fc
+                        .args
+                        .iter()
+                        .filter_map(|a| a.value())
+                        .fold(Taint::NONE, |acc, v| match &v.kind {
+                            ExprKind::String(var_name) => acc | ctx.var_taint(var_name.as_str()),
                             _ => acc,
-                        },
-                    );
+                        });
                 }
                 let mut resolved = resolve_function_name(db, file, name.as_ref());
                 let mut func = crate::db::find_function_from(
@@ -1012,8 +1017,7 @@ pub fn expr_taint(
         }
 
         ExprKind::StaticMethodCall(smc) => {
-            let fqcn_opt: Option<std::sync::Arc<str>> = if let ExprKind::Identifier(id) =
-                &smc.class.kind
+            let fqcn_opt: Option<std::sync::Arc<str>> = if let Some(id) = smc.class.kind.name_ref()
             {
                 let resolved = crate::db::resolve_name(db, file, id.as_ref());
                 match resolved.as_str() {
@@ -1044,11 +1048,12 @@ pub fn expr_taint(
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 let forwards_this = match &smc.class.kind {
-                    ExprKind::Identifier(id) => ["self", "static", "parent"]
-                        .iter()
-                        .any(|k| id.eq_ignore_ascii_case(k)),
                     ExprKind::Variable(v) => v.trim_start_matches('$') == "this",
-                    _ => false,
+                    kind => kind.name_bare().is_some_and(|id| {
+                        ["self", "static", "parent"]
+                            .iter()
+                            .any(|k| id.eq_ignore_ascii_case(k))
+                    }),
                 };
                 let this_receiver = forwards_this.then(|| Expr {
                     kind: ExprKind::Variable("this".into()),
@@ -1269,19 +1274,15 @@ pub fn format_text_args<'e>(
         "vfprintf" => (1, true),
         _ => return None,
     };
-    if args.iter().any(|a| a.name.is_some() || a.unpack) {
+    if args.iter().any(|a| a.name.is_some() || a.unpack()) {
         return None;
     }
-    let format = args.get(format_index)?.value.as_ref()?;
-    let values = || {
-        args.iter()
-            .skip(format_index + 1)
-            .filter_map(|a| a.value.as_ref())
-    };
+    let format = args.get(format_index)?.value()?;
+    let values = || args.iter().skip(format_index + 1).filter_map(|a| a.value());
     let ExprKind::String(literal) = &format.kind else {
         return Some(std::iter::once(format).chain(values()).collect());
     };
-    let Some(positions) = format_text_positions(literal) else {
+    let Some(positions) = format_text_positions(literal.as_str()) else {
         return Some(std::iter::once(format).chain(values()).collect());
     };
     if values_as_array {
@@ -1307,8 +1308,8 @@ pub(super) fn produced_object_classes(
     file: &str,
 ) -> Vec<String> {
     match &unwrap_parens(expr).kind {
-        ExprKind::New(n) => match &n.class.kind {
-            ExprKind::Identifier(name) => {
+        ExprKind::New(n) => match n.class.kind.name_ref() {
+            Some(name) => {
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 if matches!(resolved.as_str(), "self" | "static" | "parent") {
                     Vec::new()
@@ -1319,7 +1320,7 @@ pub(super) fn produced_object_classes(
             _ => Vec::new(),
         },
         ExprKind::FunctionCall(fc) => {
-            let ExprKind::Identifier(name) = &fc.name.kind else {
+            let Some(name) = fc.name.kind.name_ref() else {
                 return Vec::new();
             };
             let mut resolved = crate::db::resolve_name(db, file, name.as_ref());
