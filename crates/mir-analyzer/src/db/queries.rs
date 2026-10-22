@@ -97,19 +97,19 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         return name.trim_start_matches('\\').to_string();
     }
 
-    let lower = name.to_ascii_lowercase();
-    if matches!(lower.as_str(), "self" | "static" | "parent") {
+    if ["self", "static", "parent"]
+        .iter()
+        .any(|kw| name.eq_ignore_ascii_case(kw))
+    {
         return name.to_string();
     }
 
-    if let Some(rest) = lower
-        .starts_with("namespace\\")
-        .then(|| &name["namespace\\".len()..])
+    const RELATIVE: &str = "namespace\\";
+    if name
+        .get(..RELATIVE.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(RELATIVE))
     {
-        return match db.file_namespace(file) {
-            Some(ns) => format!("{ns}\\{rest}"),
-            None => rest.to_string(),
-        };
+        return prefix_file_namespace(db, file, &name[RELATIVE.len()..]);
     }
 
     if name.contains('\\') {
@@ -135,10 +135,7 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         }
         // Qualified name not yet in the DB (PSR-4 lazy-load will fire after this call):
         // PHP always prepends the current namespace unconditionally.
-        if let Some(ns) = db.file_namespace(file) {
-            return format!("{}\\{}", ns, name);
-        }
-        return name.to_string();
+        return prefix_file_namespace(db, file, name);
     }
 
     let imports = db.file_class_imports(file);
@@ -154,10 +151,15 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     {
         return fqcn.as_str().to_string();
     }
-    if let Some(ns) = db.file_namespace(file) {
-        return format!("{}\\{}", ns, name);
+    prefix_file_namespace(db, file, name)
+}
+
+/// `name` qualified with the namespace of `file`; unchanged in the global namespace.
+pub(crate) fn prefix_file_namespace(db: &dyn MirDatabase, file: &str, name: &str) -> String {
+    match db.file_namespace(file) {
+        Some(ns) => format!("{ns}\\{name}"),
+        None => name.to_string(),
     }
-    name.to_string()
 }
 
 /// The `@template` params `fqcn` itself declares in its own docblock — empty

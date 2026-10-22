@@ -120,13 +120,17 @@ pub(crate) trait NameResolveExt {
 impl NameResolveExt for php_ast::owned::ExprKind {
     fn resolve_name_ref(&self, db: &dyn crate::db::MirDatabase, file: &str) -> Option<String> {
         use php_ast::ast::NameKind;
-        match self {
-            php_ast::owned::ExprKind::Name(n) if n.kind == NameKind::FullyQualified => {
-                Some(n.join_parts())
-            }
-            _ => self
+        let php_ast::owned::ExprKind::Name(n) = self else {
+            return self
                 .name_ref()
-                .map(|name| crate::db::resolve_name(db, file, &name)),
-        }
+                .map(|name| crate::db::resolve_name(db, file, &name));
+        };
+        Some(match (n.kind, &*n.parts) {
+            (NameKind::Error, _) => return None,
+            (NameKind::FullyQualified, _) => n.join_parts(),
+            (NameKind::Relative, _) => crate::db::prefix_file_namespace(db, file, &n.join_parts()),
+            (_, [only]) => crate::db::resolve_name(db, file, only),
+            _ => crate::db::resolve_name(db, file, &n.join_parts()),
+        })
     }
 }
