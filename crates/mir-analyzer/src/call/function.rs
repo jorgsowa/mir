@@ -140,14 +140,14 @@ impl CallAnalyzer {
         span: Span,
     ) -> Type {
         let fn_name = match call.name.kind.name_ref() {
-            Some(name) => name.as_ref().to_string(),
+            Some(name) => name,
             _ => {
                 crate::taint::check_callable_target(ea, &call.name, ctx, span);
                 let callee_ty = ea.analyze(&call.name, ctx);
                 crate::taint::check_closure_call_sinks(ea, &call.name, &call.args, ctx, span);
 
                 match literal_function_name(&callee_ty, ctx, &call.name) {
-                    Some(name) => name,
+                    Some(name) => std::borrow::Cow::Owned(name),
                     None => {
                         if callee_ty.is_mixed() {
                             ea.emit(IssueKind::MixedFunctionCall, Severity::Info, span);
@@ -450,11 +450,17 @@ impl CallAnalyzer {
         // PHP resolves `foo()` as `\App\Ns\foo` first, then `\foo` if not found.
         // A leading `\` means explicit global namespace.
         let was_bare_global_call = fn_name.starts_with('\\') && !fn_name[1..].contains('\\');
-        let fn_name = fn_name
-            .strip_prefix('\\')
-            .map(|s: &str| s.to_string())
-            .unwrap_or(fn_name);
-        if ea.db.is_forbidden_function(&fn_name) {
+        let fn_name_cow: std::borrow::Cow<'_, str> = match fn_name {
+            std::borrow::Cow::Borrowed(s) => {
+                std::borrow::Cow::Borrowed(s.strip_prefix('\\').unwrap_or(s))
+            }
+            std::borrow::Cow::Owned(s) if s.starts_with('\\') => {
+                std::borrow::Cow::Owned(s[1..].to_string())
+            }
+            owned => owned,
+        };
+        let fn_name: &str = &fn_name_cow;
+        if ea.db.is_forbidden_function(fn_name) {
             ea.emit(
                 IssueKind::ForbiddenCode {
                     message: format!("Use of {} is forbidden", fn_name),
@@ -474,17 +480,17 @@ impl CallAnalyzer {
             // { return \json_encode(...); }`), mirroring how
             // `db::resolve_name` already short-circuits on a leading `\` for
             // class names.
-            fn_name.clone()
+            fn_name.to_string()
         } else {
             let imports = ea.db.file_imports(&ea.file);
-            let qualified = if let Some(imported) = imports.get(&Name::new(fn_name.as_str())) {
+            let qualified = if let Some(imported) = imports.get(&Name::new(fn_name)) {
                 imported.as_str().to_string()
             } else if fn_name.contains('\\') {
-                crate::db::resolve_name(ea.db, &ea.file, &fn_name)
+                crate::db::resolve_name(ea.db, &ea.file, fn_name)
             } else if let Some(ns) = ea.db.file_namespace(&ea.file) {
                 format!("{}\\{}", ns, fn_name)
             } else {
-                fn_name.clone()
+                fn_name.to_string()
             };
             let fn_exists = |name: &str| -> bool {
                 let db = ea.db;
@@ -493,8 +499,8 @@ impl CallAnalyzer {
             };
             if fn_exists(qualified.as_str()) {
                 qualified
-            } else if fn_exists(fn_name.as_str()) {
-                fn_name.clone()
+            } else if fn_exists(fn_name) {
+                fn_name.to_string()
             } else {
                 qualified
             }
@@ -507,7 +513,7 @@ impl CallAnalyzer {
         let fn_name_lower = crate::util::php_ident_lowercase(
             resolved
                 .as_ref()
-                .map_or(fn_name.as_str(), |r| r.fqn.as_ref())
+                .map_or(fn_name, |r| r.fqn.as_ref())
                 .trim_start_matches('\\'),
         );
         // Taint sink check (M19): before evaluating args so we can inspect raw exprs.
@@ -816,7 +822,7 @@ impl CallAnalyzer {
             {
                 ea.emit(
                     IssueKind::ImpureFunctionCall {
-                        fn_name: fn_name.rsplit('\\').next().unwrap_or(&fn_name).to_string(),
+                        fn_name: fn_name.rsplit('\\').next().unwrap_or(fn_name).to_string(),
                     },
                     Severity::Warning,
                     span,
@@ -856,11 +862,7 @@ impl CallAnalyzer {
                     if arg_mutation_risk {
                         ea.emit(
                             IssueKind::ImpureFunctionCall {
-                                fn_name: fn_name
-                                    .rsplit('\\')
-                                    .next()
-                                    .unwrap_or(&fn_name)
-                                    .to_string(),
+                                fn_name: fn_name.rsplit('\\').next().unwrap_or(fn_name).to_string(),
                             },
                             Severity::Warning,
                             span,
@@ -911,7 +913,7 @@ impl CallAnalyzer {
             check_args(
                 ea,
                 CheckArgsParams {
-                    fn_name: &fn_name,
+                    fn_name,
                     params: &params,
                     arg_types: &arg_types,
                     arg_spans: &arg_spans,
@@ -1624,10 +1626,10 @@ impl CallAnalyzer {
         // the lazy-stub setup. However, don't suppress if the function is
         // version-filtered (e.g. @removed in the target version) — it should
         // be reported as undefined.
-        if let Some(stub_path) = crate::stubs::stub_path_for_function(&fn_name) {
+        if let Some(stub_path) = crate::stubs::stub_path_for_function(fn_name) {
             if let Some(stub_src) = crate::stubs::stub_content_for_path(stub_path) {
                 // Parse the stub to check if this function is version-compatible.
-                if let Some(docblock_text) = extract_function_docblock(stub_src, &fn_name) {
+                if let Some(docblock_text) = extract_function_docblock(stub_src, fn_name) {
                     let doc = crate::parser::DocblockParser::parse(docblock_text);
                     // Check if the function is available in the current PHP version.
                     if ea
@@ -1647,11 +1649,11 @@ impl CallAnalyzer {
         // Also skip when guarded by `function_exists('fn')` (PHP function names
         // are case-insensitive). The short name is matched too, since a bare
         // call in a namespace falls back to the global function the guard names.
-        let short_fn = fn_name.rsplit('\\').next().unwrap_or(&fn_name);
+        let short_fn = fn_name.rsplit('\\').next().unwrap_or(fn_name);
         let guarded = ctx
             .function_exists_guards
             .iter()
-            .any(|g| g.eq_ignore_ascii_case(&fn_name) || g.eq_ignore_ascii_case(short_fn));
+            .any(|g| g.eq_ignore_ascii_case(fn_name) || g.eq_ignore_ascii_case(short_fn));
         if !call_user_func_string_arg && !guarded {
             let is_relative = fn_name
                 .get(..10)
@@ -1661,7 +1663,7 @@ impl CallAnalyzer {
                     name: if is_relative {
                         resolved_fn_name
                     } else {
-                        fn_name
+                        fn_name.to_string()
                     },
                 },
                 Severity::Error,
