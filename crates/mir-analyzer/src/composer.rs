@@ -58,8 +58,6 @@ pub struct Psr4Map {
     /// `vendor/composer/autoload_files.php` if present, falling back to the
     /// per-package `installed.json` walk.
     vendor_eager_files: Vec<PathBuf>,
-    #[allow(dead_code)] // used by issue #50 (lazy FQCN resolution)
-    root: PathBuf,
     extensions: PhpFileExtensions,
 }
 
@@ -472,7 +470,6 @@ impl Psr4Map {
             vendor_extra_paths,
             classmap,
             vendor_eager_files,
-            root: root.to_path_buf(),
             extensions,
         })
     }

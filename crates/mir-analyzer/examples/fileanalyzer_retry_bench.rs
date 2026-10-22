@@ -21,7 +21,6 @@
 //!   file analyses        : N
 //!   body analysis runs   : M  (avg per analysis: M/N)
 //!   whole-file walks     : W
-//!   lazy load attempts   : A  resolved: R'
 //!
 //! Avg per analysis = M/N is still a useful sanity check for duplicate work:
 //! once the open-file path is single-pass, it should stay ~1.000 unless a

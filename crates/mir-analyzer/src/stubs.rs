@@ -232,14 +232,6 @@ pub fn stub_files() -> &'static [(&'static str, &'static str)] {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-/// Default-version entry point retained for callers (CLI, benches, tests) that
-/// don't track a target PHP version. Equivalent to
-/// [`load_stubs_for_version`] with `PhpVersion::LATEST`.
-#[allow(dead_code)]
-pub(crate) fn load_stubs(db: &mut MirDbStorage) {
-    load_stubs_for_version(db, PhpVersion::LATEST);
-}
-
 /// Load stubs filtered for `php_version`. Symbols whose `@since` post-dates
 /// the target, or whose `@removed` is at or before the target, are skipped —
 /// so multiple declarations of the same name (e.g. `each` on PHP 7 vs.
@@ -502,9 +494,7 @@ mod tests {
     use crate::test_utils::fresh_session;
 
     fn stubs_codebase() -> MirDbStorage {
-        let mut db = MirDbStorage::default();
-        load_stubs(&mut db);
-        db
+        stubs_codebase_for(PhpVersion::LATEST)
     }
 
     fn stubs_codebase_for(version: PhpVersion) -> MirDbStorage {
@@ -916,7 +906,7 @@ mod tests {
     #[test]
     fn symbol_to_file_paths_are_resolvable_via_stub_vfs() {
         let mut db = MirDbStorage::default();
-        load_stubs(&mut db);
+        load_stubs_for_version(&mut db, PhpVersion::LATEST);
         let vfs = StubVfs::new();
 
         let functions = crate::db::workspace_functions(&db);

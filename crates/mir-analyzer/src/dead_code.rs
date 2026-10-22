@@ -48,14 +48,6 @@ pub struct DeadCodeAnalyzer<'a> {
 }
 
 impl<'a> DeadCodeAnalyzer<'a> {
-    #[allow(dead_code)]
-    pub fn new(db: &'a dyn MirDatabase) -> Self {
-        Self {
-            db,
-            analyzed_files: rustc_hash::FxHashSet::default(),
-        }
-    }
-
     pub fn with_files(
         db: &'a dyn MirDatabase,
         analyzed_files: rustc_hash::FxHashSet<Arc<str>>,
@@ -271,7 +263,7 @@ mod tests {
         let mut session = fresh_session(PhpVersion::LATEST);
         session.ensure_all_stubs();
         let db = session.snapshot_db();
-        let issues = DeadCodeAnalyzer::new(&db).analyze();
+        let issues = DeadCodeAnalyzer::with_files(&db, Default::default()).analyze();
         let builtin_false_positives: Vec<_> = issues
             .iter()
             .filter(|i| {

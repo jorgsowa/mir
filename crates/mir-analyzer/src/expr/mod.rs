@@ -32,8 +32,7 @@ mod variables;
 
 pub(crate) use assignment::root_receiver_var;
 pub(crate) use binary::{operand_is_definitely_zero, pipe_as_call};
-#[allow(unused_imports)]
-pub use helpers::{duplicate_literal_conditions, extract_simple_var, infer_arithmetic, infer_div};
+pub use helpers::{duplicate_literal_conditions, extract_simple_var};
 
 /// Parses `text` as a standalone PHP expression by wrapping it as a
 /// throwaway one-statement program — the parser crate only exposes a

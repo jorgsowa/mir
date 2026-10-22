@@ -116,20 +116,6 @@ impl FileDeclarations {
             .map(|row| row.materialize(self.file))
             .filter(|_| idx < self.class_like.len())
     }
-
-    pub fn function_at(&self, idx: usize) -> Option<FileDecl> {
-        self.rows
-            .get(self.functions.start + idx)
-            .map(|row| row.materialize(self.file))
-            .filter(|_| idx < self.functions.len())
-    }
-
-    pub fn constant_at(&self, idx: usize) -> Option<FileDecl> {
-        self.rows
-            .get(self.constants.start + idx)
-            .map(|row| row.materialize(self.file))
-            .filter(|_| idx < self.constants.len())
-    }
 }
 
 impl PartialEq for FileDeclarations {

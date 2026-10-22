@@ -39,10 +39,6 @@ pub struct Counters {
     pub file_analyses: AtomicU64,
     /// Number of body-analysis invocations summed across all analyses.
     pub body_analysis_runs: AtomicU64,
-    /// Lazy loads attempted (one per unresolved FQCN passed to `load_class`).
-    pub lazy_loads_attempted: AtomicU64,
-    /// Lazy loads that resolved to a class (the call returned `Some`).
-    pub lazy_loads_resolved: AtomicU64,
     /// Total body-analysis wall time in microseconds.
     pub body_analysis_micros: AtomicU64,
 
@@ -51,10 +47,8 @@ pub struct Counters {
     /// `collect_and_ingest_file` calls that missed and had to parse.
     pub stub_cache_misses: AtomicU64,
 
-    // Failure-bucket counts for `AnalysisSession::load_class`. Sum of
-    // these three == `lazy_loads_attempted - lazy_loads_resolved` (the
-    // total failure count). Diagnoses *why* lazy-load fails on real
-    // workloads — drives the Phase 3 decision in `docs/perf-baseline.md`.
+    // Failure-bucket counts for `AnalysisSession::load_class`: why lazy
+    // loads fail on real workloads.
     /// No resolver configured (`with_psr4` / `with_class_resolver` never
     /// called).
     pub ll_fail_no_resolver: AtomicU64,
@@ -122,8 +116,6 @@ pub struct Counters {
 static COUNTERS: Counters = Counters {
     file_analyses: AtomicU64::new(0),
     body_analysis_runs: AtomicU64::new(0),
-    lazy_loads_attempted: AtomicU64::new(0),
-    lazy_loads_resolved: AtomicU64::new(0),
     body_analysis_micros: AtomicU64::new(0),
     stub_cache_hits: AtomicU64::new(0),
     stub_cache_misses: AtomicU64::new(0),
@@ -169,17 +161,6 @@ pub fn record_body_analysis(duration_micros: u64) {
         COUNTERS
             .body_analysis_micros
             .fetch_add(duration_micros, Ordering::Relaxed);
-    }
-}
-
-pub fn record_lazy_load_attempt(resolved: bool) {
-    if enabled() {
-        COUNTERS
-            .lazy_loads_attempted
-            .fetch_add(1, Ordering::Relaxed);
-        if resolved {
-            COUNTERS.lazy_loads_resolved.fetch_add(1, Ordering::Relaxed);
-        }
     }
 }
 
@@ -484,8 +465,6 @@ pub fn dump() -> Option<String> {
     }
     let analyses = COUNTERS.file_analyses.load(Ordering::Relaxed);
     let body_analysis_runs = COUNTERS.body_analysis_runs.load(Ordering::Relaxed);
-    let attempts = COUNTERS.lazy_loads_attempted.load(Ordering::Relaxed);
-    let resolved = COUNTERS.lazy_loads_resolved.load(Ordering::Relaxed);
     let body_analysis_micros = COUNTERS.body_analysis_micros.load(Ordering::Relaxed);
     let cache_hits = COUNTERS.stub_cache_hits.load(Ordering::Relaxed);
     let cache_misses = COUNTERS.stub_cache_misses.load(Ordering::Relaxed);
@@ -567,7 +546,6 @@ pub fn dump() -> Option<String> {
          name_at path         : compact {name_at_compact_hits}  fallback {name_at_fallback_walks}\n  \
          symbol_at            : {symbol_at_calls} calls  {symbol_at_micros} us total  (avg {avg_symbol_at_us} us)\n  \
          symbol_at path       : compact {symbol_at_compact_hits}  fallback {symbol_at_fallback_walks}\n  \
-         lazy load attempts   : {attempts}  resolved: {resolved}\n  \
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \
          stub cache           : hits {cache_hits}  misses {cache_misses}\n  \
@@ -586,8 +564,6 @@ pub(crate) fn test_reset() {
     TEST_ENABLED.store(true, Ordering::Relaxed);
     COUNTERS.file_analyses.store(0, Ordering::Relaxed);
     COUNTERS.body_analysis_runs.store(0, Ordering::Relaxed);
-    COUNTERS.lazy_loads_attempted.store(0, Ordering::Relaxed);
-    COUNTERS.lazy_loads_resolved.store(0, Ordering::Relaxed);
     COUNTERS.body_analysis_micros.store(0, Ordering::Relaxed);
     COUNTERS.stub_cache_hits.store(0, Ordering::Relaxed);
     COUNTERS.stub_cache_misses.store(0, Ordering::Relaxed);

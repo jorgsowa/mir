@@ -305,11 +305,6 @@ impl AnalysisCache {
         }
     }
 
-    /// Open the default cache directory: `{project_root}/.mir-cache/`.
-    pub fn open_default(project_root: &Path, php_version: u8, user_stub_fp: u64) -> Self {
-        Self::open(&project_root.join(".mir-cache"), php_version, user_stub_fp)
-    }
-
     /// Directory the cache was opened from. Useful for callers that want to
     /// open a sibling cache (e.g. the definition-collection `StubSliceCache`) under the
     /// same root.

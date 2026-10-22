@@ -1,5 +1,4 @@
 //! Per-query tests against the full Symfony fixture (ignored by default).
-#![allow(dead_code)]
 
 mod analyze_file;
 mod class_ancestors_by_fqcn;
@@ -34,7 +33,6 @@ use crate::{AnalysisSession, IndexCancel, IndexParallelism, PhpVersion};
 use mir_types::Name;
 
 pub struct FullSymfonyFixture {
-    pub root: PathBuf,
     pub session: AnalysisSession,
     pub request: Arc<str>,
     pub request_stack: Arc<str>,
@@ -73,11 +71,6 @@ fn is_valid_fixture_root(root: &Path) -> bool {
 
 fn arc_path(path: PathBuf) -> Arc<str> {
     Arc::from(path.to_string_lossy().as_ref())
-}
-
-fn batch_entry(path: &Arc<str>) -> (Arc<str>, Arc<str>) {
-    let text = std::fs::read_to_string(path.as_ref()).unwrap();
-    (path.clone(), Arc::from(text.as_str()))
 }
 
 fn chunked<T>(items: &[T], size: usize) -> impl Iterator<Item = &[T]> {
@@ -156,7 +149,6 @@ fn build_full_symfony_fixture() -> Option<FullSymfonyFixture> {
     let router = arc_path(root.join("src/Symfony/Component/Routing/Router.php"));
 
     let mut fx = FullSymfonyFixture {
-        root,
         session,
         request,
         request_stack,
@@ -182,15 +174,6 @@ pub fn analyze_fixture_files(fx: &mut FullSymfonyFixture, files: &[Arc<str>]) {
     let _ = fx
         .session
         .analyze_paths(&paths, &crate::BatchOptions::new().without_symbols());
-}
-
-pub fn reanalyze_fixture_files(fx: &mut FullSymfonyFixture, files: &[Arc<str>]) {
-    let cancel = IndexCancel::new();
-    let _ = fx.session.reanalyze_files_cancellable(files, &cancel);
-}
-
-pub fn fixture_batch_entry(path: &Arc<str>) -> (Arc<str>, Arc<str>) {
-    batch_entry(path)
 }
 
 pub fn fqcn<'db>(db: &'db dyn MirDatabase, name: &str) -> Fqcn<'db> {

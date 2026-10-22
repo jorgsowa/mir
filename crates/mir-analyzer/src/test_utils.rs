@@ -211,7 +211,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::{batch::BatchOptions, session::AnalysisSession, PhpVersion, ReferenceIncludes};
-use mir_issues::{Issue, IssueKind};
+use mir_issues::Issue;
 use parking_lot::Mutex;
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -259,18 +259,6 @@ struct FixtureConfig {
 /// Run the full analyzer on an inline PHP string and return all unsuppressed issues.
 pub fn check(src: &str) -> Vec<Issue> {
     run_analyzer(&[("test.php", src)], &FixtureConfig::default())
-}
-
-/// Analyze a set of named PHP files together, returning all unsuppressed issues.
-///
-/// Each entry is `(filename, php_source)`. Files are written to a unique temp
-/// directory, analyzed together, then cleaned up.
-///
-/// If a `"composer.json"` entry is included, a `Psr4Map` is built from it.
-/// Files under PSR-4-mapped directories are left for lazy discovery and are
-/// **not** passed to `analyze()` explicitly.
-pub fn check_files(files: &[(&str, &str)]) -> Vec<Issue> {
-    run_analyzer(files, &FixtureConfig::default())
 }
 
 // ---------------------------------------------------------------------------
@@ -1864,53 +1852,6 @@ fn rewrite_edit_expect_sections(path: &str, content: &str, before: &[String], af
     }
 
     write_fixture(path, &out);
-}
-
-// ---------------------------------------------------------------------------
-// Assertion helpers (used by inline tests)
-// ---------------------------------------------------------------------------
-
-/// Assert that `issues` contains at least one issue with the exact `IssueKind`
-/// at `line` and `col_start`.
-pub fn assert_issue(issues: &[Issue], kind: IssueKind, line: u32, col_start: u16) {
-    let found = issues
-        .iter()
-        .any(|i| i.kind == kind && i.location.line == line && i.location.col_start == col_start);
-    if !found {
-        panic!(
-            "Expected issue {:?} at line {line}, col {col_start}.\nActual issues:\n{}",
-            kind,
-            fmt_issues(issues, false),
-        );
-    }
-}
-
-/// Assert that `issues` contains at least one issue whose `kind.name()` equals
-/// `kind_name` at `line` and `col_start`.
-pub fn assert_issue_kind(issues: &[Issue], kind_name: &str, line: u32, col_start: u16) {
-    let found = issues.iter().any(|i| {
-        i.kind.name() == kind_name && i.location.line == line && i.location.col_start == col_start
-    });
-    if !found {
-        panic!(
-            "Expected issue {kind_name} at line {line}, col {col_start}.\nActual issues:\n{}",
-            fmt_issues(issues, false),
-        );
-    }
-}
-
-/// Assert that `issues` contains no issue whose `kind.name()` equals `kind_name`.
-pub fn assert_no_issue(issues: &[Issue], kind_name: &str) {
-    let found: Vec<_> = issues
-        .iter()
-        .filter(|i| i.kind.name() == kind_name)
-        .collect();
-    if !found.is_empty() {
-        panic!(
-            "Expected no {kind_name} issues, but found:\n{}",
-            fmt_issues(&found.into_iter().cloned().collect::<Vec<_>>(), false),
-        );
-    }
 }
 
 // ---------------------------------------------------------------------------

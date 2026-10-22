@@ -270,7 +270,6 @@ pub use self::inferred_types::{
     inferred_method_return_type_demand, inferred_property_type_demand, method_param_sinks,
     method_taint_summary,
 };
-#[allow(unused_imports)]
 pub use self::mirdb::MirDbStorage;
 pub use self::nodes::*;
 pub use self::path_interner::PathInterner;
