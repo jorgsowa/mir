@@ -967,12 +967,20 @@ impl FunctionDef {
 // ---------------------------------------------------------------------------
 
 /// A `namespace` declaration's byte range with the names it resolves against.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NamespaceBlock {
     pub start: u32,
     pub end: u32,
     pub namespace: Option<Arc<str>>,
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
     pub imports: Arc<FxHashMap<Name, Name>>,
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
     pub class_imports: Arc<FxHashMap<Name, Name>>,
 }
 
@@ -1033,7 +1041,7 @@ pub struct StubSlice {
     pub class_imports: Arc<FxHashMap<Name, Name>>,
     /// Per-block namespace and imports; populated only when the file declares
     /// two or more `namespace` blocks, otherwise empty.
-    #[serde(skip)]
+    #[serde(default)]
     pub namespace_blocks: Arc<[NamespaceBlock]>,
     /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
     /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.

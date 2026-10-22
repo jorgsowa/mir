@@ -45,7 +45,7 @@ const MAGIC: u32 = 0x0152_494D;
 /// `inferred_return_type: Option<Type>` → `Option<Arc<Type>>`), so stale
 /// entries are rejected. Also bumped whenever the trailing payload shape
 /// changes (e.g. adding the `Vec<Issue>` section).
-const FORMAT_VERSION: u8 = 19;
+const FORMAT_VERSION: u8 = 20;
 
 /// Cache header. Any mismatch (magic, version, content_hash, php_version)
 /// forces the consumer to treat the entry as a miss and recompute.
@@ -400,6 +400,27 @@ mod tests {
         );
         assert!(issues.is_empty());
         assert_eq!(cache.hits(), 1);
+    }
+
+    #[test]
+    fn roundtrip_keeps_namespace_blocks() {
+        let (_dir, cache) = make_cache();
+        let src = "<?php\nnamespace A { use X\\Y; }\nnamespace { class C {} }\n";
+        let hash = hash_source(src);
+        let parsed = php_rs_parser::parse(src);
+        let collector = crate::collector::DefinitionCollector::new_for_slice(
+            std::sync::Arc::from("/x/a.php"),
+            src,
+            &parsed.source_map,
+        );
+        let (slice, _) = collector.collect_slice(&parsed.program);
+        assert_eq!(slice.namespace_blocks.len(), 2);
+        let slice = std::sync::Arc::new(slice);
+        cache.put("/x/a.php", &hash, 8, &slice, &no_issues());
+        cache.flush();
+
+        let (got, _) = cache.get("/x/a.php", &hash, 8).expect("hit");
+        assert_eq!(got.namespace_blocks, slice.namespace_blocks);
     }
 
     #[test]
