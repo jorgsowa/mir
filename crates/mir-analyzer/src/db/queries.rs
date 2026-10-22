@@ -831,9 +831,9 @@ pub fn collect_file_definitions_uncached(
         crate::metrics::record_stub_cache_miss();
     }
 
-    let parsed = php_rs_parser::parse(text);
+    let parsed = crate::recursion::parse_versioned(text, php_version.parser_version());
 
-    let skip_cache = crate::parser::parse_errors_block_cache(path, &parsed.errors);
+    let skip_cache = crate::parser::parse_errors_block_cache(&parsed.errors);
 
     let mut all_issues: Vec<Issue> = parsed
         .errors

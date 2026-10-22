@@ -81,8 +81,7 @@ impl AnalysisSession {
             .par_iter()
             .map(|parsed| {
                 let content_hash = hash_source(parsed.source());
-                let skip_cache =
-                    crate::parser::parse_errors_block_cache(&parsed.file, parsed.errors());
+                let skip_cache = crate::parser::parse_errors_block_cache(parsed.errors());
                 let mut all_issues: Vec<Issue> = parsed
                     .errors()
                     .iter()

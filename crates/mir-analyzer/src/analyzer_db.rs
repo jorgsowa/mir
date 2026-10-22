@@ -267,7 +267,7 @@ impl AnalyzerDb {
 
         let parsed = crate::recursion::parse_versioned(source, php_version.parser_version());
 
-        let skip_cache = crate::parser::parse_errors_block_cache(&file, &parsed.errors);
+        let skip_cache = crate::parser::parse_errors_block_cache(&parsed.errors);
 
         let mut all_issues: Vec<Issue> = parsed
             .errors

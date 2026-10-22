@@ -74,24 +74,12 @@ pub(crate) fn blocks_body_analysis(errors: &[php_rs_parser::diagnostics::ParseEr
     errors.iter().any(|err| err.leaves_ast_incomplete())
 }
 
-fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
-    !is_redundant_parse_error(err)
-}
-
-/// Whether `errors` keep the definition slice collected from `path` out of
-/// the parse and stub caches. Bundled stubs only need a complete AST: several
-/// (`Core.php`, `intl.php`, ...) trip `Forbidden` checks because they declare
-/// per-version variants side by side, and would otherwise be re-parsed every
-/// session. Every other file is kept out by any parse error mir reports.
-pub(crate) fn parse_errors_block_cache(
-    path: &str,
-    errors: &[php_rs_parser::diagnostics::ParseError],
-) -> bool {
-    if crate::stubs::is_stub_path(path) {
-        blocks_body_analysis(errors)
-    } else {
-        errors.iter().any(is_hard_parse_error)
-    }
+/// Whether `errors` keep the definition slice out of the parse and stub caches.
+/// The parser's diagnostics are cached with the slice, so only an incomplete
+/// AST blocks: `Forbidden` and `VersionTooLow` files (bundled stubs declaring
+/// per-version variants, polyfills behind `PHP_VERSION_ID` checks) are cached.
+pub(crate) fn parse_errors_block_cache(errors: &[php_rs_parser::diagnostics::ParseError]) -> bool {
+    blocks_body_analysis(errors)
 }
 
 // ---------------------------------------------------------------------------
@@ -210,63 +198,39 @@ pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> String {
 
 #[cfg(test)]
 mod ast_incomplete_tests {
-    use super::{blocks_body_analysis, is_hard_parse_error, parse_errors_block_cache};
+    use super::{blocks_body_analysis, parse_errors_block_cache};
 
-    fn classify(src: &str) -> (bool, bool) {
+    fn blocks(src: &str) -> bool {
         let parsed = php_rs_parser::parse(src);
-        (
-            parsed.errors.iter().any(is_hard_parse_error),
-            blocks_body_analysis(&parsed.errors),
-        )
+        assert!(!parsed.errors.is_empty());
+        parse_errors_block_cache(&parsed.errors)
     }
 
     #[test]
-    fn redeclared_method_is_hard_but_ast_complete() {
-        let src = "<?php\nclass A { function f() {} function f() {} }\n";
-        assert_eq!(classify(src), (true, false));
+    fn redeclared_method_leaves_ast_complete() {
+        assert!(!blocks(
+            "<?php\nclass A { function f() {} function f() {} }\n"
+        ));
     }
 
     #[test]
-    fn reserved_function_name_is_hard_but_ast_complete() {
-        assert_eq!(classify("<?php\nfunction exit() {}\n"), (true, false));
+    fn reserved_function_name_leaves_ast_complete() {
+        assert!(!blocks("<?php\nfunction exit() {}\n"));
     }
 
     #[test]
-    fn version_too_low_keeps_body_analysis() {
+    fn version_too_low_leaves_ast_complete() {
         let mut options = php_rs_parser::ParseOptions::default();
         options.version = php_rs_parser::PhpVersion::Php74;
         let parsed = php_rs_parser::parse_with("<?php\n$x = match (1) { 1 => 2 };\n", &options);
         assert!(!parsed.errors.is_empty());
         assert!(!blocks_body_analysis(&parsed.errors));
+        assert!(!parse_errors_block_cache(&parsed.errors));
     }
 
     #[test]
     fn syntax_error_leaves_ast_incomplete() {
-        assert_eq!(classify("<?php\nfunction f( {}\n"), (true, true));
-    }
-
-    #[test]
-    fn forbidden_errors_block_caching_only_outside_bundled_stubs() {
-        let parsed = php_rs_parser::parse("<?php\nclass A { function f() {} function f() {} }\n");
-        assert!(!parse_errors_block_cache(
-            "stubs/Core/Core.php",
-            &parsed.errors
-        ));
-        assert!(parse_errors_block_cache("src/A.php", &parsed.errors));
-        // A user file that merely mirrors a stub's virtual path is still user code.
-        assert!(parse_errors_block_cache(
-            "/app/stubs/Core/Core.php",
-            &parsed.errors
-        ));
-    }
-
-    #[test]
-    fn syntax_errors_block_caching_for_bundled_stubs() {
-        let parsed = php_rs_parser::parse("<?php\nfunction f( {}\n");
-        assert!(parse_errors_block_cache(
-            "stubs/Core/Core.php",
-            &parsed.errors
-        ));
+        assert!(blocks("<?php\nfunction f( {}\n"));
     }
 
     /// The depth diagnostic must block caching on its own, so a slice built
