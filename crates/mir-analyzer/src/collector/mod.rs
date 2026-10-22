@@ -6,6 +6,7 @@
 
 use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
@@ -1980,7 +1981,7 @@ impl<'a> DefinitionCollector<'a> {
         let php_ast::owned::ExprKind::FunctionCall(call) = &expr.kind else {
             return;
         };
-        let Some(fn_name) = call.name.kind.name_ref() else {
+        let Some(fn_name) = call.name.kind.name_bare() else {
             return;
         };
         if !fn_name.eq_ignore_ascii_case("define") {

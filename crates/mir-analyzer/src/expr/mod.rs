@@ -368,7 +368,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// `define('NAME', …)`: the quoted name is the constant's declaration site.
     fn record_define_name_fact(&self, fc: &php_ast::owned::FunctionCallExpr) {
-        let Some(callee) = fc.name.kind.name_ref() else {
+        let Some(callee) = fc.name.kind.name_bare() else {
             return;
         };
         if !callee.eq_ignore_ascii_case("define") {
