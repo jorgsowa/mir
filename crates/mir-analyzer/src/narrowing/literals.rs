@@ -2,7 +2,7 @@
 //! `$x === 'lit'`, `$x === true`/`false`, `$x === null` and their loose
 //! (`==`/`!=`) counterparts, for variable, property, and static-property
 //! receivers.
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use php_ast::ast::{BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
@@ -92,11 +92,11 @@ pub(super) fn extract_int_bound(
     let ExprKind::ClassConstAccess(cca) = &peel_parens(expr).kind else {
         return None;
     };
-    let (Some(class), ExprKind::Identifier(name)) = (cca.class.kind.name_ref(), &cca.member.kind)
+    let (Some(resolved), ExprKind::Identifier(name)) =
+        (cca.class.kind.resolve_name_ref(db, file), &cca.member.kind)
     else {
         return None;
     };
-    let resolved = crate::db::resolve_name(db, file, class.as_ref());
     let owner = match resolved.as_str() {
         "static" => return None,
         "self" => ctx.self_fqcn.as_deref()?,

@@ -493,11 +493,7 @@ pub(super) fn extract_static_prop_access_parts(
 ) -> Option<(std::sync::Arc<str>, String)> {
     match &expr.kind {
         ExprKind::StaticPropertyAccess(spa) => {
-            let id = match spa.class.kind.name_ref() {
-                Some(id) => id,
-                _ => return None,
-            };
-            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+            let resolved = spa.class.kind.resolve_name_ref(db, file)?;
             let fqcn = match resolved.as_str() {
                 "self" | "static" => std::sync::Arc::from(self_fqcn.or(static_fqcn)?),
                 "parent" => std::sync::Arc::from(parent_fqcn?),
@@ -963,14 +959,15 @@ fn static_target_fqcn(
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
-    let name = class.kind.name_ref()?;
-    match name.to_ascii_lowercase().as_str() {
-        "self" => ctx.self_fqcn.clone(),
-        "static" => ctx.static_fqcn.clone().or_else(|| ctx.self_fqcn.clone()),
-        "parent" => ctx.parent_fqcn.clone(),
-        _ => Some(std::sync::Arc::from(
-            crate::db::resolve_name(db, file, name.as_ref()).as_str(),
-        )),
+    let name = class.kind.resolve_name_ref(db, file)?;
+    if name.eq_ignore_ascii_case("self") {
+        ctx.self_fqcn.clone()
+    } else if name.eq_ignore_ascii_case("static") {
+        ctx.static_fqcn.clone().or_else(|| ctx.self_fqcn.clone())
+    } else if name.eq_ignore_ascii_case("parent") {
+        ctx.parent_fqcn.clone()
+    } else {
+        Some(std::sync::Arc::from(name.as_str()))
     }
 }
 

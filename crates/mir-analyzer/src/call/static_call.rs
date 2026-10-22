@@ -311,8 +311,8 @@ impl CallAnalyzer {
         // the interface — dispatches at runtime to whatever concrete class it
         // actually holds, which is valid PHP regardless of the declared type.
         let is_literal_class_receiver = call.class.kind.name_ref().is_some();
-        let fqcn = match call.class.kind.name_ref() {
-            Some(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
+        let fqcn = match call.class.kind.resolve_name_ref(ea.db, &ea.file) {
+            Some(name) => name,
             _ => {
                 let ty = ea.analyze(&call.class, ctx);
                 // $obj::method() / $this::method(): resolve against the object's class
