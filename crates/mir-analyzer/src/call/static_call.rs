@@ -286,7 +286,7 @@ impl CallAnalyzer {
         ctx: &mut FlowState,
         span: Span,
     ) -> Type {
-        if call.class.kind.name_ref().is_none() {
+        if !call.class.kind.is_name_ref() {
             crate::taint::check_callable_target(ea, &call.class, ctx, span);
         }
         let method_name = match &call.method.kind {
@@ -310,7 +310,7 @@ impl CallAnalyzer {
         // variable receiver (`$var::bar()`) — an object or class-string typed as
         // the interface — dispatches at runtime to whatever concrete class it
         // actually holds, which is valid PHP regardless of the declared type.
-        let is_literal_class_receiver = call.class.kind.name_ref().is_some();
+        let is_literal_class_receiver = call.class.kind.is_name_ref();
         let fqcn = match call.class.kind.resolve_name_ref(ea.db, &ea.file) {
             Some(name) => name,
             _ => {
@@ -1239,7 +1239,7 @@ impl CallAnalyzer {
             // Also applies to `$var::staticMethod()` through an object-typed
             // variable (the `_` catch-all match arm above, which extracted
             // `fqcn`/`receiver_type_params` from the receiver's concrete type).
-            let is_object_var_call = call.class.kind.name_ref().is_none();
+            let is_object_var_call = !call.class.kind.is_name_ref();
             if is_self_parent_call || is_object_var_call {
                 if let Some(original_constraint) = resolved.if_this_is.clone() {
                     // Substitute this call's own inferred method-level

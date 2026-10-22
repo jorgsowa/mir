@@ -58,6 +58,8 @@ pub(crate) trait NameRefExt {
     /// The text of a function, class or constant reference as the parser wrote it
     /// (`\Foo\bar` keeps its leading backslash).
     fn name_ref(&self) -> Option<std::borrow::Cow<'_, str>>;
+    /// Whether `name_ref()` would be `Some`, without building the text.
+    fn is_name_ref(&self) -> bool;
 }
 
 impl NameRefExt for php_ast::owned::ExprKind {
@@ -75,6 +77,16 @@ impl NameRefExt for php_ast::owned::ExprKind {
                 _ => std::borrow::Cow::Owned(n.to_string_repr()),
             }),
             _ => None,
+        }
+    }
+
+    fn is_name_ref(&self) -> bool {
+        use php_ast::ast::NameKind;
+        use php_ast::owned::ExprKind;
+        match self {
+            ExprKind::Identifier(_) => true,
+            ExprKind::Name(n) => n.kind != NameKind::Error,
+            _ => false,
         }
     }
 }

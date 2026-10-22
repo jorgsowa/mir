@@ -889,7 +889,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::StaticMethodCallDynamic(smc) => {
                 crate::taint::check_callable_target(self, &smc.method, ctx, expr.span);
-                if smc.class.kind.name_ref().is_none() {
+                if !smc.class.kind.is_name_ref() {
                     crate::taint::check_callable_target(self, &smc.class, ctx, expr.span);
                 }
                 let ty = crate::call::CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx);
@@ -1285,7 +1285,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                 let mut receiver_type_params: Vec<Type> = Vec::new();
-                let is_named_class = class.kind.name_ref().is_some();
+                let is_named_class = class.kind.is_name_ref();
                 let fqcn = match class.kind.resolve_name_ref(self.db, self.file.as_ref()) {
                     Some(resolved) => match crate::util::php_ident_lowercase(&resolved).as_str() {
                         "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),

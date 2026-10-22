@@ -144,7 +144,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // expression (`$x instanceof $class`), analyze it so that the
             // variable is marked as consumed — otherwise it is falsely reported
             // as unused.
-            if b.right.kind.name_ref().is_none() {
+            if !b.right.kind.is_name_ref() {
                 let right_ty = self.analyze(&b.right, ctx);
                 // `instanceof $cls` where `$cls` holds a known class-string
                 // (`$cls = Foo::class;`) is a real reference to `Foo` — record it,
