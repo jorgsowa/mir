@@ -15,6 +15,6 @@ function add(int $a, int $b): int {
 }
 
 $addFive = add(?, 5);
-//             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
+//             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]
 $result = $addFive(10);
 //<^^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $result is assigned a mixed type

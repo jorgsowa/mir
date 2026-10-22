@@ -29,6 +29,7 @@ pub(crate) fn parse_error_to_issue(
     mir_issues::Issue::new(
         mir_issues::IssueKind::ParseError {
             message: err.to_string(),
+            code: err.code().to_owned(),
         },
         mir_issues::Location {
             file: file.clone(),

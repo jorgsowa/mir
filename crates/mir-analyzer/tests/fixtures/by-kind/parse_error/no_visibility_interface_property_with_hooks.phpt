@@ -4,5 +4,5 @@ No visibility interface property with hooks
 <?php
 interface SomeInterface {
     string $value { get; }
-//  ^^^^^^ ParseError: Parse error: expected modifier, found identifier
+//  ^^^^^^ ParseError: Parse error: expected modifier, found identifier [expected]
 }

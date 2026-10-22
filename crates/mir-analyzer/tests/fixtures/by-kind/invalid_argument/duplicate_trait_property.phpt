@@ -5,5 +5,5 @@ Duplicate trait property
 trait T {
     public mixed $foo = 5;
     protected static mixed $foo;
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: Cannot redeclare T::$foo
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: Cannot redeclare T::$foo [duplicate-property]
 }

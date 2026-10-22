@@ -707,7 +707,11 @@ pub enum IssueKind {
     ImplicitFloatToIntCast { from: String },
     /// Emitted by `mir-analyzer/src/parser/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/parse_error/`.
-    ParseError { message: String },
+    ParseError {
+        message: String,
+        /// The parser's stable kebab-case identifier, e.g. `version-too-low`.
+        code: String,
+    },
     /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_docblock/`.
     InvalidDocblock { message: String },
@@ -2165,7 +2169,7 @@ impl IssueKind {
             IssueKind::ImplicitFloatToIntCast { from } => {
                 format!("Implicit cast from {from} to int truncates the fractional part")
             }
-            IssueKind::ParseError { message } => format!("Parse error: {message}"),
+            IssueKind::ParseError { message, code } => format!("Parse error: {message} [{code}]"),
             IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),
             IssueKind::UndefinedThrowsDocblock { name } => {
                 format!("@throws class '{name}' does not exist")
@@ -2914,7 +2918,10 @@ mod code_tests {
                 trait_name: s(),
                 reason: s(),
             },
-            IssueKind::ParseError { message: s() },
+            IssueKind::ParseError {
+                message: s(),
+                code: s(),
+            },
             IssueKind::InvalidThrow { ty: s() },
             IssueKind::InvalidCatch { ty: s() },
             IssueKind::UnreachableCatch {

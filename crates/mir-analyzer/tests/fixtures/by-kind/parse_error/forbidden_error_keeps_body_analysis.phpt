@@ -10,6 +10,6 @@ class A {
     }
 }
 ===expect===
-ParseError@3:4-3:49: Parse error: Method A::__callStatic() must be static
+ParseError@3:4-3:49: Parse error: Method A::__callStatic() must be static [magic-method-static]
 MixedAssignment@5:8-5:26: Variable $u is assigned a mixed type
 UndefinedVariable@5:13-5:26: Variable $undefinedVar is not defined

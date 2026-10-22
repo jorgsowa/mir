@@ -18,4 +18,4 @@ class MathUtil {
 }
 
 $partial = MathUtil::add(?, 5);
-//                       ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
+//                       ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]

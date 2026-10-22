@@ -13,4 +13,4 @@ $target = 1;
 #[Attribute($target)]
 class Foo {}
 ===expect===
-ParseError@4:12-4:19: Parse error: Constant expression contains invalid operations
+ParseError@4:12-4:19: Parse error: Constant expression contains invalid operations [invalid-constant-expression]
