@@ -225,9 +225,11 @@ impl<'a> StatementsAnalyzer<'a> {
             if let Some(declared) = &declared_opt.cloned() {
                 // Check return type compatibility. Special case: `void` functions must not
                 // return any value (named_object_return_compatible considers TVoid compatible
-                // with TNull, so handle void separately to avoid false suppression).
+                // with TNull, so handle void separately to avoid false suppression), and
+                // `never` functions must not return at all.
                 let has_invalid = !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                     && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
+                        || declared.is_never()
                         || return_type_is_invalid(
                             &check_ty,
                             declared,

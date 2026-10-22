@@ -205,7 +205,7 @@ impl AnalysisSession {
             }
         }
 
-        let mut files_with_parse_errors: HashSet<Arc<str>> = HashSet::default();
+        let mut files_with_incomplete_ast: HashSet<Arc<str>> = HashSet::default();
         {
             // Commit subtype-index class edges alongside issue collection —
             // parity with `ingest_file`'s single-file path, so goto-implementation
@@ -213,12 +213,8 @@ impl AnalysisSession {
             // each file to be individually touched by an on-demand commit path.
             let db = &self.db.salsa;
             for (parsed, (defs, _hash, _hard_err, _surface)) in parsed_files.iter().zip(file_defs) {
-                for issue in defs.issues.iter() {
-                    if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
-                        && issue.severity == mir_issues::Severity::Error
-                    {
-                        files_with_parse_errors.insert(issue.location.file.clone());
-                    }
+                if crate::parser::blocks_body_analysis(parsed.errors()) {
+                    files_with_incomplete_ast.insert(parsed.file.clone());
                 }
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
                 let file_no = db.intern_path(&parsed.file);
@@ -301,7 +297,7 @@ impl AnalysisSession {
         );
         let body_results: Vec<BodyResult> = parsed_files
             .par_iter()
-            .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
+            .filter(|parsed| !files_with_incomplete_ast.contains(&parsed.file))
             .map_with((db_main, self.cache.clone()), |(db, cache), parsed| {
                 let mut driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                 // Diagnostics-only consumers never read the symbol vecs —
@@ -424,7 +420,7 @@ impl AnalysisSession {
                 crate::body_analysis::class_like_plugins::ClassLikePluginOutput,
             )> = parsed_files
                 .par_iter()
-                .filter(|p| !files_with_parse_errors.contains(&p.file))
+                .filter(|p| !files_with_incomplete_ast.contains(&p.file))
                 .map_with(self.db.snapshot_db(), |db, parsed| {
                     let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                     let output = driver.run_after_class_like_plugins(
@@ -498,7 +494,7 @@ impl AnalysisSession {
                 psr4,
                 php_version,
                 &file_data,
-                &files_with_parse_errors,
+                &files_with_incomplete_ast,
                 &mut all_issues,
                 &mut all_symbols,
                 opts.skip_symbols,
@@ -665,7 +661,7 @@ impl AnalysisSession {
             });
             let surface_hash = surface_fingerprint(new_content, &parsed.program);
 
-            let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+            let has_hard_errors = crate::parser::blocks_body_analysis(&parsed.errors);
             let symbols = if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &*db;
                 let mut driver = BodyAnalyzer::new(db_ref, php_version);

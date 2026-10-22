@@ -133,7 +133,7 @@ impl AnalysisSession {
         psr4: Arc<crate::composer::Psr4Map>,
         php_version: PhpVersion,
         file_data: &[(Arc<str>, Arc<str>)],
-        files_with_parse_errors: &HashSet<Arc<str>>,
+        files_with_incomplete_ast: &HashSet<Arc<str>>,
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
         skip_symbols: bool,
@@ -204,7 +204,7 @@ impl AnalysisSession {
                 file_data
                     .par_iter()
                     .filter(|(f, _)| {
-                        !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
+                        !files_with_incomplete_ast.contains(f) && files_to_reanalyze.contains(f)
                     })
                     .map_with(db_full, |db, (file, src)| {
                         let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);

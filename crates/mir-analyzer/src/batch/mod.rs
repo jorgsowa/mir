@@ -425,10 +425,7 @@ pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> Analysi
     };
     let suppressions = crate::suppression::SuppressionMap::from_source(source);
     let mut all_issues = Arc::unwrap_or_clone(issues_arc);
-    if all_issues.iter().any(|issue| {
-        matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
-            && issue.severity == mir_issues::Severity::Error
-    }) {
+    if crate::parser::blocks_body_analysis(&parsed.errors) {
         mark_suppressed(&mut all_issues, &suppressions);
         return AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), Vec::new());
     }

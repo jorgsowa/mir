@@ -1,17 +1,16 @@
 ===description===
-P2: A bare `return;` inside a `: never`-declared function is a PHP parse error.
-Documents that PHP's parse-level enforcement covers bare returns in never functions.
+A bare `return;` inside a `: never` function is an error.
 ===file===
 <?php
 
 function bare_return(): never {
     return;
-//  ^^^^^^^ ParseError: Parse error: A never-returning function must not return
+//  ^^^^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'never'
 }
 
 class Foo {
     public function method_bare_return(): never {
         return;
-//      ^^^^^^^ ParseError: Parse error: A never-returning function must not return
+//      ^^^^^^^ InvalidReturnType: Return type 'void' is not compatible with declared 'never'
     }
 }

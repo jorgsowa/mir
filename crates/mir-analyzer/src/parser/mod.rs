@@ -48,6 +48,8 @@ const ANALYZER_COVERED_MESSAGES: &[&str] = &[
     "Cannot apply #[\\Deprecated] to",
     "cannot target",
     "must return a value",
+    "A void function must not return a value",
+    "A never-returning function must not return",
     "Generator return type must be a supertype of Generator",
     "Readonly property cannot have default value",
     "Redefinition of parameter",
@@ -71,35 +73,27 @@ pub(crate) fn is_redundant_parse_error(err: &php_rs_parser::diagnostics::ParseEr
     is_analyzer_covered_error(err)
 }
 
-/// Returns `true` for parser diagnostics that should block semantic analysis.
-pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
-    !is_redundant_parse_error(err)
+/// Whether `errors` leave a recovery guess in the AST, which blocks body
+/// analysis. `Forbidden` and `VersionTooLow` are raised on a fully built node.
+pub(crate) fn blocks_body_analysis(errors: &[php_rs_parser::diagnostics::ParseError]) -> bool {
+    errors.iter().any(|err| err.leaves_ast_incomplete())
 }
 
-/// Returns `true` for parser diagnostics that leave the AST incomplete.
-/// Narrower than [`is_hard_parse_error`]: `Forbidden` diagnostics (redeclared
-/// method, reserved function name, valued case on a pure enum, ...) are
-/// emitted after the node is fully built.
-fn leaves_ast_incomplete(err: &php_rs_parser::diagnostics::ParseError) -> bool {
-    match err {
-        // Past the nesting limit the subtree becomes `ExprKind::Error`.
-        php_rs_parser::diagnostics::ParseError::NestingTooDeep { .. } => true,
-        php_rs_parser::diagnostics::ParseError::Forbidden { .. } => false,
-        _ => is_hard_parse_error(err),
-    }
+fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
+    !is_redundant_parse_error(err)
 }
 
 /// Whether `errors` keep the definition slice collected from `path` out of
 /// the parse and stub caches. Bundled stubs only need a complete AST: several
 /// (`Core.php`, `intl.php`, ...) trip `Forbidden` checks because they declare
 /// per-version variants side by side, and would otherwise be re-parsed every
-/// session. Every other file keeps the stricter [`is_hard_parse_error`] rule.
+/// session. Every other file is kept out by any parse error mir reports.
 pub(crate) fn parse_errors_block_cache(
     path: &str,
     errors: &[php_rs_parser::diagnostics::ParseError],
 ) -> bool {
     if crate::stubs::is_stub_path(path) {
-        errors.iter().any(leaves_ast_incomplete)
+        blocks_body_analysis(errors)
     } else {
         errors.iter().any(is_hard_parse_error)
     }
@@ -221,13 +215,13 @@ pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> String {
 
 #[cfg(test)]
 mod ast_incomplete_tests {
-    use super::{is_hard_parse_error, leaves_ast_incomplete, parse_errors_block_cache};
+    use super::{blocks_body_analysis, is_hard_parse_error, parse_errors_block_cache};
 
     fn classify(src: &str) -> (bool, bool) {
         let parsed = php_rs_parser::parse(src);
         (
             parsed.errors.iter().any(is_hard_parse_error),
-            parsed.errors.iter().any(leaves_ast_incomplete),
+            blocks_body_analysis(&parsed.errors),
         )
     }
 
@@ -240,6 +234,15 @@ mod ast_incomplete_tests {
     #[test]
     fn reserved_function_name_is_hard_but_ast_complete() {
         assert_eq!(classify("<?php\nfunction exit() {}\n"), (true, false));
+    }
+
+    #[test]
+    fn version_too_low_keeps_body_analysis() {
+        let mut options = php_rs_parser::ParseOptions::default();
+        options.version = php_rs_parser::PhpVersion::Php74;
+        let parsed = php_rs_parser::parse_with("<?php\n$x = match (1) { 1 => 2 };\n", &options);
+        assert!(!parsed.errors.is_empty());
+        assert!(!blocks_body_analysis(&parsed.errors));
     }
 
     #[test]
@@ -287,7 +290,7 @@ mod ast_incomplete_tests {
                 )
             })
             .expect("parser no longer emits the depth-limit diagnostic");
-        assert!(leaves_ast_incomplete(depth_err));
+        assert!(depth_err.leaves_ast_incomplete());
     }
 }
 
@@ -304,6 +307,8 @@ mod analyzer_covered_tests {
         "<?php\n#[Deprecated] class A {}\n",
         "<?php\n#[Override] class A {}\n",
         "<?php\nfunction f(): int { return; }\n",
+        "<?php\nfunction f(): void { return 1; }\n",
+        "<?php\nfunction f(): never { return; }\n",
         "<?php\nfunction f(): int { yield 1; }\n",
         "<?php\nclass A { public readonly int $x = 1; }\n",
         "<?php\nfunction f($a, $a) {}\n",

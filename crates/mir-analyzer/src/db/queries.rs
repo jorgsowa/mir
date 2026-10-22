@@ -1048,11 +1048,7 @@ pub fn prepare_analysis_file(db: &dyn MirDatabase, file: SourceFile) -> Prepared
     PreparedAnalysisFile {
         path,
         text,
-        has_hard_parse_errors: parsed
-            .0
-            .errors
-            .iter()
-            .any(crate::parser::is_hard_parse_error),
+        has_hard_parse_errors: crate::parser::blocks_body_analysis(&parsed.0.errors),
         parsed,
         php_version: db_php_version(db),
     }
