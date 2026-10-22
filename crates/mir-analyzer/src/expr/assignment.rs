@@ -1145,6 +1145,41 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Offset write/unset through a static property (`Foo::$items[] = x`);
+    /// an `ArrayAccess` value dispatches to `offsetSet`, so it is exempt.
+    pub(crate) fn check_static_prop_offset_write_visibility(
+        &mut self,
+        fqcn: &str,
+        prop_name: &str,
+        ctx: &FlowState,
+        span: Span,
+    ) {
+        let db = self.db;
+        let Some((owner, prop_def)) =
+            crate::db::find_property_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), prop_name)
+        else {
+            return;
+        };
+        let dispatches_to_offset_method = prop_def.ty.as_deref().is_some_and(|ty| {
+            ty.types.iter().any(|a| {
+                matches!(a, Atomic::TNamedObject { fqcn, .. }
+                    if crate::expr::arrays::implements_array_access(db, fqcn))
+            })
+        });
+        if !dispatches_to_offset_method
+            && self.set_visibility_violated(&prop_def, &owner, prop_name, ctx)
+        {
+            self.emit(
+                IssueKind::InaccessibleProperty {
+                    class: owner.to_string(),
+                    property: prop_name.to_string(),
+                },
+                Severity::Error,
+                span,
+            );
+        }
+    }
+
     /// A by-ref call argument that's a property (`array_push($this->items,
     /// $n)`, `sort($this->items)`) mutates that property exactly as much as
     /// an explicit `$this->items = …` write would — but every by-ref
@@ -1291,6 +1326,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             if prop_def.is_readonly {
                 self.emit(
                     IssueKind::ReadonlyPropertyAssignment {
+                        class: owner.to_string(),
+                        property: prop_name.clone(),
+                    },
+                    Severity::Error,
+                    span,
+                );
+            }
+            if self.set_visibility_violated(&prop_def, &owner, &prop_name, ctx) {
+                self.emit(
+                    IssueKind::InaccessibleProperty {
                         class: owner.to_string(),
                         property: prop_name,
                     },
@@ -2015,6 +2060,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     span,
                                 );
                             }
+                            if self.set_visibility_violated(&prop_def, &owner_cls, &prop_name, ctx)
+                            {
+                                self.emit(
+                                    IssueKind::InaccessibleProperty {
+                                        class: owner_cls.to_string(),
+                                        property: prop_name.clone(),
+                                    },
+                                    Severity::Error,
+                                    span,
+                                );
+                            }
                             let prop_has_native_type = prop_def.has_native_type;
                             if let Some(prop_ty) = prop_def.ty.as_deref() {
                                 if !prop_ty.is_mixed_not_template() && !ty.is_mixed_not_template() {
@@ -2508,6 +2564,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 // already does, unconditionally (readonly
                                 // is a class contract, not scoped to
                                 // @pure-annotated functions).
+                                self.check_static_prop_offset_write_visibility(
+                                    &fqcn, &prop_name, ctx, span,
+                                );
                                 if let Some((owner_cls, prop_def)) =
                                     crate::db::find_property_in_chain(
                                         self.db,

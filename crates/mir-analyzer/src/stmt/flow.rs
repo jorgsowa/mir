@@ -722,6 +722,10 @@ impl<'a> StatementsAnalyzer<'a> {
                                             var.span,
                                         );
                                     }
+                                    self.expr_analyzer(ctx)
+                                        .check_static_prop_offset_write_visibility(
+                                            &fqcn, &prop_name, ctx, var.span,
+                                        );
                                     if let Some((owner_cls, prop_def)) =
                                         crate::db::find_property_in_chain(
                                             self.db,
