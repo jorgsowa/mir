@@ -55,12 +55,13 @@ const ANALYZER_COVERED_MESSAGES: &[&str] = &[
 ];
 
 fn is_analyzer_covered_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
-    matches!(
-        err,
-        php_rs_parser::diagnostics::ParseError::Forbidden { .. }
-    ) && {
-        let msg = err.to_string();
-        ANALYZER_COVERED_MESSAGES.iter().any(|m| msg.contains(m))
+    match err {
+        php_rs_parser::diagnostics::ParseError::Forbidden { message, .. } => {
+            ANALYZER_COVERED_MESSAGES
+                .iter()
+                .any(|m| message.contains(m))
+        }
+        _ => false,
     }
 }
 
@@ -287,6 +288,48 @@ mod ast_incomplete_tests {
             })
             .expect("parser no longer emits the depth-limit diagnostic");
         assert!(leaves_ast_incomplete(depth_err));
+    }
+}
+
+#[cfg(test)]
+mod analyzer_covered_tests {
+    use super::{is_redundant_parse_error, ANALYZER_COVERED_MESSAGES};
+
+    /// One source per rule in `ANALYZER_COVERED_MESSAGES`; the parser must report each.
+    const SOURCES: &[&str] = &[
+        "<?php\nclass A { function f() { parent::f(); } }\n",
+        "<?php\nfunction f() { self::g(); }\n",
+        "<?php\nclass A { function __toString(): int { return 1; } }\n",
+        "<?php\n#[Attribute] trait T {}\n",
+        "<?php\n#[Deprecated] class A {}\n",
+        "<?php\n#[Override] class A {}\n",
+        "<?php\nfunction f(): int { return; }\n",
+        "<?php\nfunction f(): int { yield 1; }\n",
+        "<?php\nclass A { public readonly int $x = 1; }\n",
+        "<?php\nfunction f($a, $a) {}\n",
+        "<?php\nfunction f() { $this = 1; }\n",
+    ];
+
+    #[test]
+    fn every_covered_message_matches_a_parser_diagnostic() {
+        let errors: Vec<_> = SOURCES
+            .iter()
+            .flat_map(|src| php_rs_parser::parse(src).errors)
+            .collect();
+        for src in SOURCES {
+            let parsed = php_rs_parser::parse(src);
+            assert!(
+                !parsed.errors.is_empty() && parsed.errors.iter().all(is_redundant_parse_error),
+                "{src:?}: {:?}",
+                parsed.errors
+            );
+        }
+        for m in ANALYZER_COVERED_MESSAGES {
+            assert!(
+                errors.iter().any(|e| e.to_string().contains(m)),
+                "no parser diagnostic contains {m:?}"
+            );
+        }
     }
 }
 
