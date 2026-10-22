@@ -2074,7 +2074,10 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
     fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Namespace(ns) => {
-                let new_ns = ns.name.as_ref().map(name_to_string_owned);
+                let new_ns = ns
+                    .name
+                    .as_ref()
+                    .map(|n| name_to_string_owned(n).into_owned());
                 if self.first_namespace.is_none() {
                     self.first_namespace = new_ns.clone();
                 }

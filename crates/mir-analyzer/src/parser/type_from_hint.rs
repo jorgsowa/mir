@@ -103,43 +103,28 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
 }
 
 fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Type {
-    match crate::util::php_ident_lowercase(name).as_str() {
-        "self" => {
-            if let Some(fqcn) = context_fqcn {
-                Type::single(Atomic::TSelf { fqcn: fqcn.into() })
-            } else {
-                Type::single(Atomic::TObject)
-            }
-        }
-        "parent" => {
-            if let Some(fqcn) = context_fqcn {
-                Type::single(Atomic::TParent { fqcn: fqcn.into() })
-            } else {
-                Type::single(Atomic::TObject)
-            }
-        }
-        "static" => {
-            if let Some(fqcn) = context_fqcn {
-                Type::single(Atomic::TStaticObject { fqcn: fqcn.into() })
-            } else {
-                Type::single(Atomic::TObject)
-            }
-        }
+    let class_relative = |make: fn(mir_types::Name) -> Atomic| match context_fqcn {
+        Some(fqcn) => Type::single(make(fqcn.into())),
+        None => Type::single(Atomic::TObject),
+    };
+    if name.eq_ignore_ascii_case("self") {
+        class_relative(|fqcn| Atomic::TSelf { fqcn })
+    } else if name.eq_ignore_ascii_case("parent") {
+        class_relative(|fqcn| Atomic::TParent { fqcn })
+    } else if name.eq_ignore_ascii_case("static") {
+        class_relative(|fqcn| Atomic::TStaticObject { fqcn })
+    } else if name.eq_ignore_ascii_case("resource") {
         // `resource` is a legacy native type name, not a class. mir does not
         // model resources precisely yet, so keep it as `mixed` rather than
         // misclassifying it as a named object and emitting `UndefinedClass`.
-        "resource" => Type::mixed(),
-        _ => Type::single(Atomic::TNamedObject {
-            fqcn: normalize_fqcn(name).into(),
+        Type::mixed()
+    } else {
+        // A leading `\` is kept so the collector's resolve_type_name skips namespace prepending.
+        Type::single(Atomic::TNamedObject {
+            fqcn: name.into(),
             type_params: mir_types::union::empty_type_params(),
-        }),
+        })
     }
-}
-
-fn normalize_fqcn(s: &str) -> String {
-    // Preserve a leading `\` for globally-qualified names so the collector's
-    // resolve_type_name can skip namespace prepending for them.
-    s.to_string()
 }
 
 /// Same as [`type_from_hint`] but for the owned (lifetime-free) AST.

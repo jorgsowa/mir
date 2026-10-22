@@ -767,7 +767,11 @@ impl CallAnalyzer {
             let mut arg_names: Vec<Option<String>> = call
                 .args
                 .iter()
-                .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
+                .map(|a| {
+                    a.name
+                        .as_ref()
+                        .map(|n| crate::parser::name_to_string_owned(n).into_owned())
+                })
                 .collect();
             let mut arg_can_be_byref: Vec<bool> = call
                 .args

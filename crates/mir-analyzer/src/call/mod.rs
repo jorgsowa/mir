@@ -287,7 +287,7 @@ pub(crate) fn for_each_bound_arg<'a>(
         }
         if let Some(name) = &arg.name {
             let name = crate::parser::name_to_string_owned(name);
-            if let Some(param) = params.iter().find(|p| p.name.as_ref() == name.as_str()) {
+            if let Some(param) = params.iter().find(|p| p.name.as_ref() == name) {
                 f(param, arg);
             } else if let Some(vi) = variadic_index {
                 f(&params[vi], arg);

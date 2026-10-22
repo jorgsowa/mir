@@ -402,7 +402,11 @@ pub(crate) fn compute_assertion_template_bindings(
         .collect();
     let arg_names: Vec<Option<String>> = call_args
         .iter()
-        .map(|arg| arg.name.as_ref().map(crate::parser::name_to_string_owned))
+        .map(|arg| {
+            arg.name
+                .as_ref()
+                .map(|n| crate::parser::name_to_string_owned(n).into_owned())
+        })
         .collect();
     Some(
         crate::generic::infer_template_bindings(

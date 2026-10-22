@@ -1,6 +1,7 @@
 pub mod docblock;
 pub(crate) mod type_from_hint;
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use php_ast::Span;
@@ -177,23 +178,27 @@ fn strip_trailing_reopen_tag(s: &str) -> Option<&str> {
 // Name resolution helper — join Name parts to a string
 // ---------------------------------------------------------------------------
 
-pub(crate) fn name_to_string(name: &php_ast::ast::Name<'_, '_>) -> String {
-    name.to_string_repr().into_owned()
+pub(crate) fn name_to_string<'src>(name: &php_ast::ast::Name<'_, 'src>) -> Cow<'src, str> {
+    name.to_string_repr()
 }
 
 /// Same as [`name_to_string`] but for the owned (lifetime-free) AST.
-pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> String {
-    let joined = name
-        .parts
-        .iter()
-        .map(|p| p.as_ref())
-        .collect::<Vec<&str>>()
-        .join("\\");
-    if name.kind == php_ast::ast::NameKind::FullyQualified {
-        format!("\\{}", joined)
-    } else {
-        joined
+pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> Cow<'_, str> {
+    let fully_qualified = name.kind == php_ast::ast::NameKind::FullyQualified;
+    if let [single] = &*name.parts {
+        if !fully_qualified {
+            return Cow::Borrowed(single);
+        }
     }
+    let len = name.parts.iter().map(|p| p.len() + 1).sum::<usize>();
+    let mut out = String::with_capacity(len);
+    for (i, part) in name.parts.iter().enumerate() {
+        if fully_qualified || i > 0 {
+            out.push('\\');
+        }
+        out.push_str(part);
+    }
+    Cow::Owned(out)
 }
 
 #[cfg(test)]

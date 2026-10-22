@@ -1135,7 +1135,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
                             if let Some(class) = crate::db::find_class_like(self.db, here) {
                                 if let Some((used, canonical_str)) =
-                                    crate::fqcn_case_mismatch(raw.as_str(), class.fqcn().as_ref())
+                                    crate::fqcn_case_mismatch(&raw, class.fqcn().as_ref())
                                 {
                                     let (line_end, col_end2) = self.offset_to_line_col(span.end);
                                     self.issues.add(Issue::new(

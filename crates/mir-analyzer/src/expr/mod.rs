@@ -776,10 +776,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 let mut anon_supers: Vec<String> = Vec::new();
                 if let Some(parent) = &anon.extends {
-                    anon_supers.push(crate::parser::name_to_string_owned(parent));
+                    anon_supers.push(crate::parser::name_to_string_owned(parent).into_owned());
                 }
                 for iface in anon.implements.iter() {
-                    anon_supers.push(crate::parser::name_to_string_owned(iface));
+                    anon_supers.push(crate::parser::name_to_string_owned(iface).into_owned());
                 }
                 for name in anon_supers {
                     let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
