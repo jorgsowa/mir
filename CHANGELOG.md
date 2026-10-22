@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Parser crates updated to 0.24: faster parsing (~13% on a 96 MB corpus), a nesting limit of 512 instead of a lower one, byte-string literals and many more compile-time checks. The checks that mir reports itself (`ParentNotFound`, `InvalidToString`, `InvalidAttribute`, ...) are not repeated as `ParseError`.
+- Parser crates updated to 0.25: faster parsing (~13% on a 96 MB corpus), a nesting limit of 512 instead of a lower one, byte-string literals, many more compile-time checks and parse errors that follow each PHP version from 7.4 to 8.6 more closely. The checks that mir reports itself (`ParentNotFound`, `InvalidToString`, `InvalidAttribute`, ...) are not repeated as `ParseError`.
 - Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
 
 ### Fixed
