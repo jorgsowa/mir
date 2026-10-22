@@ -344,7 +344,8 @@ impl<'a> ClassAnalyzer<'a> {
                         // storage, computed on access), so it never forces a
                         // constructor. A `set`-hooked property is backed and
                         // still can.
-                        !p.get_only_hook
+                        !p.is_static
+                            && !p.get_only_hook
                             && p.has_native_type
                             && p.default.is_none()
                             && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable())

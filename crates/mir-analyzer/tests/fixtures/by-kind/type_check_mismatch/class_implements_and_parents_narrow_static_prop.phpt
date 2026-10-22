@@ -19,7 +19,6 @@ class Cat extends Animal {}
 class Rock {}
 
 class Holder {
-//<^^^^^^^^^^^^^^ MissingConstructor: Class Holder has uninitialized properties but no constructor
     /** @var Animal|Duck */
     public static mixed $pet;
 
