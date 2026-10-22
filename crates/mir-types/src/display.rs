@@ -128,7 +128,17 @@ impl fmt::Display for Atomic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Atomic::TString => write!(f, "string"),
-            Atomic::TLiteralString(s) => write!(f, "\"{s}\""),
+            Atomic::TLiteralString(s) => {
+                f.write_str("\"")?;
+                for c in s.chars() {
+                    match u32::from(c) {
+                        // Bytes that are not valid UTF-8 are stored as U+F700 + byte.
+                        b @ 0xF700..=0xF7FF => write!(f, "\\x{:02x}", b - 0xF700)?,
+                        _ => write!(f, "{c}")?,
+                    }
+                }
+                f.write_str("\"")
+            }
             Atomic::TCallableString => write!(f, "callable-string"),
             Atomic::TClassString(None) => write!(f, "class-string"),
             Atomic::TClassString(Some(cls)) => write!(f, "class-string<{cls}>"),
