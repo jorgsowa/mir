@@ -836,6 +836,18 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/function_redefinition*.phpt`.
     DuplicateFunction { name: String },
 
+    // --- Compile-time warnings ----------------------------------------------
+    /// A `use` of a single-segment name with no alias outside any namespace —
+    /// PHP warns that it has no effect.
+    /// Emitted by `mir-analyzer/src/collector/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/use_statement_has_no_effect/`.
+    UseStatementHasNoEffect { name: String },
+    /// A method other than the constructor is declared both `private` and
+    /// `final` — PHP warns since a private method is never overridden.
+    /// Emitted by `mir-analyzer/src/collector/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/private_final_method/`.
+    PrivateFinalMethod { class: String, method: String },
+
     // --- Plugins --------------------------------------------------------------
     /// Raised by a registered plugin (mir-plugin). `name` is the plugin's own
     /// issue identifier, used for display and suppression matching.
@@ -970,7 +982,9 @@ impl IssueKind {
             | IssueKind::DuplicateArrayKey { .. }
             | IssueKind::ForbiddenCode { .. }
             | IssueKind::UndefinedThrowsDocblock { .. }
-            | IssueKind::InvalidDocblockType { .. } => Severity::Warning,
+            | IssueKind::InvalidDocblockType { .. }
+            | IssueKind::UseStatementHasNoEffect { .. }
+            | IssueKind::PrivateFinalMethod { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -1299,6 +1313,8 @@ impl IssueKind {
             IssueKind::PluginIssue { .. } => "MIR1509",
             IssueKind::ImplicitToStringCast { .. } => "MIR1501",
             IssueKind::ImplicitFloatToIntCast { .. } => "MIR1502",
+            IssueKind::UseStatementHasNoEffect { .. } => "MIR1511",
+            IssueKind::PrivateFinalMethod { .. } => "MIR1512",
         }
     }
 
@@ -1327,9 +1343,8 @@ impl IssueKind {
             | "MIR0222" | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405"
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501"
             | "MIR1502" | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705"
-            | "MIR1706" | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" => {
-                Some(Severity::Warning)
-            }
+            | "MIR1706" | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511"
+            | "MIR1512" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1535,6 +1550,8 @@ impl IssueKind {
             IssueKind::DuplicateTrait { .. } => "DuplicateTrait",
             IssueKind::DuplicateEnum { .. } => "DuplicateEnum",
             IssueKind::DuplicateFunction { .. } => "DuplicateFunction",
+            IssueKind::UseStatementHasNoEffect { .. } => "UseStatementHasNoEffect",
+            IssueKind::PrivateFinalMethod { .. } => "PrivateFinalMethod",
             IssueKind::PluginIssue { .. } => "PluginIssue",
         }
     }
@@ -2241,6 +2258,12 @@ impl IssueKind {
             IssueKind::DuplicateFunction { name } => {
                 format!("Function {name}() has already been defined")
             }
+            IssueKind::UseStatementHasNoEffect { name } => {
+                format!("The use statement with non-compound name '{name}' has no effect")
+            }
+            IssueKind::PrivateFinalMethod { class, method } => {
+                format!("Private method {class}::{method}() cannot be final as it is never overridden by other classes")
+            }
             IssueKind::PluginIssue { message, .. } => message.clone(),
         }
     }
@@ -2921,6 +2944,11 @@ mod code_tests {
             IssueKind::DuplicateTrait { name: s() },
             IssueKind::DuplicateEnum { name: s() },
             IssueKind::DuplicateFunction { name: s() },
+            IssueKind::UseStatementHasNoEffect { name: s() },
+            IssueKind::PrivateFinalMethod {
+                class: s(),
+                method: s(),
+            },
         ]
     }
 
@@ -2978,6 +3006,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 168);
+        assert_eq!(one_of_each().len(), 170);
     }
 }

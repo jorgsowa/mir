@@ -225,6 +225,8 @@ All issue types mir can emit, grouped by category.
 | `UndefinedDocblockClass` | A class referenced only in a docblock does not exist. |
 | `UnsupportedReferenceUsage` | A PHP reference assignment is used in a form mir cannot model precisely (e.g. `$b = &$arr[$x]`). |
 | `MissingConstructor` | A class has non-nullable, uninitialized typed properties but no constructor to initialize them. |
+| `UseStatementHasNoEffect` | A single-segment name is imported without an alias outside any namespace. |
+| `PrivateFinalMethod` | A method other than the constructor is declared both `private` and `final`. |
 
 ## Attributes
 

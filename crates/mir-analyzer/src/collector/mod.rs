@@ -2104,6 +2104,17 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
             StmtKind::Use(use_decl) => {
                 use php_ast::ast::UseKind;
                 for item in use_decl.uses.iter() {
+                    if item.alias.is_none()
+                        && item.name.parts.len() == 1
+                        && self.namespace.is_none()
+                    {
+                        self.issues.add(Issue::new(
+                            mir_issues::IssueKind::UseStatementHasNoEffect {
+                                name: item.name.parts[0].to_string(),
+                            },
+                            self.location(item.span.start, item.span.end),
+                        ));
+                    }
                     let full_name = name_to_string_owned(&item.name)
                         .trim_start_matches('\\')
                         .to_string();
@@ -2245,6 +2256,22 @@ impl<'a> DefinitionCollector<'a> {
 
         if let Some(c) = m.doc_comment.as_ref() {
             self.emit_docblock_issues(&doc, c.span.start);
+        }
+
+        if m.modifiers.is_final
+            && m.modifiers.visibility == Some(AstVisibility::Private)
+            && !m
+                .name
+                .as_str()
+                .is_some_and(|n| n.eq_ignore_ascii_case("__construct"))
+        {
+            self.issues.add(Issue::new(
+                mir_issues::IssueKind::PrivateFinalMethod {
+                    class: class_fqcn.to_string(),
+                    method: m.name.as_str().unwrap_or_default().to_string(),
+                },
+                self.location(m.name.span.start, m.name.span.end),
+            ));
         }
 
         if !self.version_allows(&doc) || !self.version_attr_available(&m.attributes) {

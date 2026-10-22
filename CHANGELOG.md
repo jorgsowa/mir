@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--no-taint` skips taint analysis: no `Tainted*` issues are reported and no taint summaries are built.
+- `UseStatementHasNoEffect` (MIR1511, warning) for `use Foo;` outside any namespace and `PrivateFinalMethod` (MIR1512, warning) for a `final private` method other than the constructor. PHP warns about both; parser 0.24 no longer reports them.
 
 ### Changed
 

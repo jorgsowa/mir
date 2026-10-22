@@ -3,7 +3,9 @@ Only implements one requirement
 ===file===
 <?php
 use ImplementationRequirementsTraitImposesImplementationRequirements;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UseStatementHasNoEffect: The use statement with non-compound name 'ImplementationRequirementsTraitImposesImplementationRequirements' has no effect
 use ImplementationRequirementsBaseA;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UseStatementHasNoEffect: The use statement with non-compound name 'ImplementationRequirementsBaseA' has no effect
 
 class Invalid implements A {
 //                       ^ UndefinedClass: Class A does not exist
