@@ -14,4 +14,4 @@ class Bar {
     public function __wakeup(): void {}
 }
 ===expect===
-ParseError@6:4-6:83: Parse error: Method Bar::__callStatic() must be static [magic-method-static]
+CompileError@6:4-6:83: Compile error: Method Bar::__callStatic() must be static [magic-method-static]

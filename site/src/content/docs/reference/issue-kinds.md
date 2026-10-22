@@ -212,6 +212,7 @@ All issue types mir can emit, grouped by category.
 | Kind | Description |
 |------|-------------|
 | `ParseError` | A PHP file could not be parsed. |
+| `CompileError` | PHP rejects the code at compile time. |
 
 ## Other
 

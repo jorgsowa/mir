@@ -191,6 +191,7 @@ issues keep their code.
 | MIR1300  | InvalidTraitUse               | [other/invalid-trait-use](../other/invalid-trait-use/) |
 | MIR1301  | ForbiddenCode                 | [other/forbidden-code](../other/forbidden-code/) |
 | MIR1400  | ParseError                    | [other/parse-error](../other/parse-error/) |
+| MIR1401  | CompileError                  | [other/compile-error](../other/compile-error/) |
 | MIR1500  | InvalidThrow                  | [other/invalid-throw](../other/invalid-throw/) |
 | MIR1501  | ImplicitToStringCast          | [other/implicit-to-string-cast](../other/implicit-to-string-cast/) |
 | MIR1502  | ImplicitFloatToIntCast        | [other/implicit-float-to-int-cast](../other/implicit-float-to-int-cast/) |

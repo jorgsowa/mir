@@ -511,7 +511,7 @@ pub enum IssueKind {
     },
     /// A native `readonly` property declaration carries a default value — a
     /// PHP fatal. (The sibling untyped-readonly-property fatal is already
-    /// caught by the parser itself as a `ParseError`.)
+    /// caught by the parser itself as a `CompileError`.)
     /// Emitted by `mir-analyzer/src/collector/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_readonly_property_declaration/`.
     InvalidReadonlyPropertyDeclaration { class: String, property: String },
@@ -710,6 +710,13 @@ pub enum IssueKind {
     ParseError {
         message: String,
         /// The parser's stable kebab-case identifier, e.g. `version-too-low`.
+        code: String,
+    },
+    /// Emitted by `mir-analyzer/src/parser/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/compile_error/`.
+    CompileError {
+        message: String,
+        /// The parser's stable kebab-case identifier, e.g. `magic-method-static`.
         code: String,
     },
     /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
@@ -917,6 +924,7 @@ impl IssueKind {
             | IssueKind::ReadonlyPropertyAssignment { .. }
             | IssueKind::ReadonlyPropertyAlreadyInitialized { .. }
             | IssueKind::ParseError { .. }
+            | IssueKind::CompileError { .. }
             | IssueKind::TaintedInput { .. }
             | IssueKind::TaintedHtml
             | IssueKind::TaintedSql
@@ -1300,6 +1308,7 @@ impl IssueKind {
 
             // Parse (1400-1499)
             IssueKind::ParseError { .. } => "MIR1400",
+            IssueKind::CompileError { .. } => "MIR1401",
 
             // Attribute (1600-1699)
             IssueKind::InvalidAttribute { .. } => "MIR1600",
@@ -1338,8 +1347,8 @@ impl IssueKind {
             | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228"
             | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805"
             | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205"
-            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
-            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602"
+            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1527,6 +1536,7 @@ impl IssueKind {
             IssueKind::ImplicitToStringCast { .. } => "ImplicitToStringCast",
             IssueKind::ImplicitFloatToIntCast { .. } => "ImplicitFloatToIntCast",
             IssueKind::ParseError { .. } => "ParseError",
+            IssueKind::CompileError { .. } => "CompileError",
             IssueKind::InvalidDocblock { .. } => "InvalidDocblock",
             IssueKind::UndefinedThrowsDocblock { .. } => "UndefinedThrowsDocblock",
             IssueKind::InvalidDocblockType { .. } => "InvalidDocblockType",
@@ -2170,6 +2180,9 @@ impl IssueKind {
                 format!("Implicit cast from {from} to int truncates the fractional part")
             }
             IssueKind::ParseError { message, code } => format!("Parse error: {message} [{code}]"),
+            IssueKind::CompileError { message, code } => {
+                format!("Compile error: {message} [{code}]")
+            }
             IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),
             IssueKind::UndefinedThrowsDocblock { name } => {
                 format!("@throws class '{name}' does not exist")
@@ -2922,6 +2935,10 @@ mod code_tests {
                 message: s(),
                 code: s(),
             },
+            IssueKind::CompileError {
+                message: s(),
+                code: s(),
+            },
             IssueKind::InvalidThrow { ty: s() },
             IssueKind::InvalidCatch { ty: s() },
             IssueKind::UnreachableCatch {
@@ -3013,6 +3030,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 170);
+        assert_eq!(one_of_each().len(), 171);
     }
 }

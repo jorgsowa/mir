@@ -6,4 +6,4 @@ interface A {
     private string $value { get; }
 }
 ===expect===
-ParseError@3:4-3:25: Parse error: Property in interface cannot be protected or private [invalid-interface-property-modifier]
+CompileError@3:4-3:25: Compile error: Property in interface cannot be protected or private [invalid-interface-property-modifier]

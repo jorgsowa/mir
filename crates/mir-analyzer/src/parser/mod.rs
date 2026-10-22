@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use php_ast::Span;
-use php_rs_parser::diagnostics::ForbiddenRule;
+use php_rs_parser::diagnostics::{ForbiddenRule, Phase};
 
 pub use docblock::{DocblockParser, ParsedDocblock};
 pub use type_from_hint::{type_from_hint, type_from_hint_owned};
@@ -26,11 +26,15 @@ pub(crate) fn parse_error_to_issue(
     let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
     let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
 
+    let message = err.to_string();
+    let code = err.code().to_owned();
+    let kind = if err.forbidden_rule().map(ForbiddenRule::phase) == Some(Phase::Compile) {
+        mir_issues::IssueKind::CompileError { message, code }
+    } else {
+        mir_issues::IssueKind::ParseError { message, code }
+    };
     mir_issues::Issue::new(
-        mir_issues::IssueKind::ParseError {
-            message: err.to_string(),
-            code: err.code().to_owned(),
-        },
+        kind,
         mir_issues::Location {
             file: file.clone(),
             line,

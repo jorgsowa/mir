@@ -7,9 +7,9 @@ sidebar:
   order: 7
 ---
 
-A PHP file could not be parsed due to a syntax error, or the parser found code PHP rejects at compile time.
+A PHP file could not be parsed due to a syntax error, or uses syntax that the target PHP version does not have. Code that parses but that PHP rejects at compile time is reported as [CompileError](../compile-error/).
 
-The message ends with the parser's identifier for the error, e.g. `[expected]`, `[version-too-low]` or `[duplicate-property]`. The same identifier is the `code` field of the issue in `--format json`. Unlike the message wording, it stays the same between parser releases.
+The message ends with the parser's identifier for the error, e.g. `[expected]`, `[version-too-low]` or `[invalid-assign-target]`. The same identifier is the `code` field of the issue in `--format json`. Unlike the message wording, it stays the same between parser releases.
 
 ## Example
 
