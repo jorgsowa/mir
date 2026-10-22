@@ -1,5 +1,5 @@
 use super::*;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use mir_plugin::{AttributeArgInfo, AttributeInfo, FunctionLikeParamInfo};
 
 pub(super) struct FunctionLikeSite<'s> {
@@ -125,13 +125,13 @@ impl<'a> BodyAnalyzer<'a> {
             ExprKind::Bool(b) => Some(b.to_string()),
             ExprKind::Null => Some("null".to_string()),
             ExprKind::ClassConstAccess(cca) => {
-                let class_name = cca.class.kind.name_ref()?;
+                let resolved = cca.class.kind.resolve_name_ref(self.db, file.as_ref())?;
                 let ExprKind::Identifier(member) = &cca.member.kind else {
                     return None;
                 };
-                let resolved = match class_name.as_ref() {
+                let resolved = match resolved.as_str() {
                     "self" | "static" => class?.to_string(),
-                    other => resolve_name(self.db, file.as_ref(), other),
+                    _ => resolved,
                 };
                 if member.as_ref() == "class" {
                     return Some(format!("class-string<{resolved}>"));

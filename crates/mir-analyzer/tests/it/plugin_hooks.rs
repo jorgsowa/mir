@@ -371,6 +371,8 @@ final class PluginHolder {
         #[PluginAttr('literal')] string $a,
         #[PluginAttr(self::KEY)] ?int $b,
         #[PluginAttr(PluginHolder::KEY)] $c,
+        #[PluginAttr(\App\PluginHolder::KEY)] $d,
+        #[PluginAttr(namespace\PluginHolder::KEY)] $e,
     ): void {}
 }
 
@@ -381,7 +383,7 @@ function plugin_fl_function(array $items): void {}
     assert_eq!(
         messages,
         vec![
-            "App\\PluginHolder|plugin_fl_method|a:string[App\\PluginAttr('literal')] b:int|null[App\\PluginAttr(\"held\")] c:-[App\\PluginAttr(\"held\")]".to_string(),
+            "App\\PluginHolder|plugin_fl_method|a:string[App\\PluginAttr('literal')] b:int|null[App\\PluginAttr(\"held\")] c:-[App\\PluginAttr(\"held\")] d:-[App\\PluginAttr(\"held\")] e:-[App\\PluginAttr(\"held\")]".to_string(),
             "-|plugin_fl_function|items:list<int>[]".to_string(),
         ]
     );
