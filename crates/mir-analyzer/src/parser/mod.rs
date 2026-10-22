@@ -4,6 +4,7 @@ pub(crate) mod type_from_hint;
 use std::sync::Arc;
 
 use php_ast::Span;
+use php_rs_parser::diagnostics::ForbiddenRule;
 
 pub use docblock::{DocblockParser, ParsedDocblock};
 pub use type_from_hint::{type_from_hint, type_from_hint_owned};
@@ -40,31 +41,25 @@ pub(crate) fn parse_error_to_issue(
 
 /// Compile-time rules the parser checks that the analyzer reports itself with a
 /// dedicated issue kind; the parser's diagnostic is dropped as a duplicate.
-const ANALYZER_COVERED_MESSAGES: &[&str] = &[
-    "when current class scope has no parent",
-    "when no class scope is active",
-    "(): Return type must be string when declared",
-    "Cannot apply #[\\Attribute] to",
-    "Cannot apply #[\\Deprecated] to",
-    "cannot target",
-    "must return a value",
-    "A void function must not return a value",
-    "A never-returning function must not return",
-    "Generator return type must be a supertype of Generator",
-    "Readonly property cannot have default value",
-    "Redefinition of parameter",
-    "Cannot re-assign $this",
+const ANALYZER_COVERED_RULES: &[ForbiddenRule] = &[
+    ForbiddenRule::ParentWithoutParentClass,
+    ForbiddenRule::ClassKeywordOutsideClass,
+    ForbiddenRule::ToStringReturnType,
+    ForbiddenRule::AttributeOnInvalidClass,
+    ForbiddenRule::DeprecatedOnInvalidTarget,
+    ForbiddenRule::AttributeTargetMismatch,
+    ForbiddenRule::MissingReturnValue,
+    ForbiddenRule::VoidReturnValue,
+    ForbiddenRule::NeverReturn,
+    ForbiddenRule::GeneratorReturnType,
+    ForbiddenRule::ReadonlyPropertyDefault,
+    ForbiddenRule::DuplicateParameter,
+    ForbiddenRule::ReassignThis,
 ];
 
 fn is_analyzer_covered_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
-    match err {
-        php_rs_parser::diagnostics::ParseError::Forbidden { message, .. } => {
-            ANALYZER_COVERED_MESSAGES
-                .iter()
-                .any(|m| message.contains(m))
-        }
-        _ => false,
-    }
+    err.forbidden_rule()
+        .is_some_and(|rule| ANALYZER_COVERED_RULES.contains(&rule))
 }
 
 /// Parser diagnostics that are dropped from the issue stream and never block
@@ -296,9 +291,9 @@ mod ast_incomplete_tests {
 
 #[cfg(test)]
 mod analyzer_covered_tests {
-    use super::{is_redundant_parse_error, ANALYZER_COVERED_MESSAGES};
+    use super::{is_redundant_parse_error, ANALYZER_COVERED_RULES};
 
-    /// One source per rule in `ANALYZER_COVERED_MESSAGES`; the parser must report each.
+    /// One source per rule in `ANALYZER_COVERED_RULES`, in the same order.
     const SOURCES: &[&str] = &[
         "<?php\nclass A { function f() { parent::f(); } }\n",
         "<?php\nfunction f() { self::g(); }\n",
@@ -316,23 +311,28 @@ mod analyzer_covered_tests {
     ];
 
     #[test]
-    fn every_covered_message_matches_a_parser_diagnostic() {
-        let errors: Vec<_> = SOURCES
-            .iter()
-            .flat_map(|src| php_rs_parser::parse(src).errors)
-            .collect();
-        for src in SOURCES {
+    fn every_covered_rule_matches_its_parser_diagnostic() {
+        assert_eq!(SOURCES.len(), ANALYZER_COVERED_RULES.len());
+        for (src, rule) in SOURCES.iter().zip(ANALYZER_COVERED_RULES) {
+            let parsed = php_rs_parser::parse(src);
+            let rules: Vec<_> = parsed.errors.iter().map(|e| e.forbidden_rule()).collect();
+            assert_eq!(rules, [Some(*rule)], "{src:?}: {:?}", parsed.errors);
+            assert!(parsed.errors.iter().all(is_redundant_parse_error));
+        }
+    }
+
+    #[test]
+    fn neighbouring_rules_are_not_covered() {
+        for src in [
+            "<?php\nclass A { function __serialize(): int { return 1; } }\n",
+            "<?php\nfunction f($_GET) {}\n",
+            "<?php\nfunction f() { unset($this); }\n",
+        ] {
             let parsed = php_rs_parser::parse(src);
             assert!(
-                !parsed.errors.is_empty() && parsed.errors.iter().all(is_redundant_parse_error),
+                !parsed.errors.is_empty() && !parsed.errors.iter().any(is_redundant_parse_error),
                 "{src:?}: {:?}",
                 parsed.errors
-            );
-        }
-        for m in ANALYZER_COVERED_MESSAGES {
-            assert!(
-                errors.iter().any(|e| e.to_string().contains(m)),
-                "no parser diagnostic contains {m:?}"
             );
         }
     }
