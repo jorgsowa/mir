@@ -680,9 +680,10 @@ impl CallAnalyzer {
             // always a concrete instance. self::, parent::, an explicit class
             // name, and a class-string receiver (which may hold the literal
             // abstract class name itself) get no such guarantee.
-            let uses_late_static_binding = match call.class.kind.name_ref() {
-                Some(id) => id.as_ref() == "static",
-                _ => receiver_is_object_instance,
+            let uses_late_static_binding = if call.class.kind.is_name_ref() {
+                call.class.kind.name_bare() == Some("static")
+            } else {
+                receiver_is_object_instance
             };
             if resolved.is_abstract && !uses_late_static_binding {
                 ea.emit(
@@ -1365,9 +1366,10 @@ impl CallAnalyzer {
             // Suppress when caller guarded with `method_exists(Foo::class, 'method')`
             // (literal class name — keyed by the already-resolved `fqcn`) or
             // `method_exists($cls, 'method')` (dynamic class-string variable).
-            let guard_key: Option<Arc<str>> = match call.class.kind.name_ref() {
-                Some(_) => Some(Arc::from(format!("cls:{fqcn}").as_str())),
-                _ => extract_expr_guard_key(&call.class, ctx, ea.db, &ea.file),
+            let guard_key: Option<Arc<str>> = if call.class.kind.is_name_ref() {
+                Some(Arc::from(format!("cls:{fqcn}").as_str()))
+            } else {
+                extract_expr_guard_key(&call.class, ctx, ea.db, &ea.file)
             };
             let guarded_by_method_exists = guard_key
                 .map(|key| {
