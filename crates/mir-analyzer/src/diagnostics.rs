@@ -1,4 +1,4 @@
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
 use crate::db::{class_exists, resolve_name, MirDatabase};
@@ -455,9 +455,7 @@ pub(crate) fn check_expr_for_undefined_classes(
     use php_ast::owned::ExprKind;
     if let ExprKind::ClassConstAccess(cca) = &expr.kind {
         // Check for undefined class in ::CONSTANT or ::class
-        if let Some(class_name) = cca.class.kind.name_ref() {
-            let name_str = class_name.to_string();
-            let resolved = resolve_name(db, file.as_ref(), &name_str);
+        if let Some(resolved) = cca.class.kind.resolve_name_ref(db, file.as_ref()) {
             if !class_exists(db, &resolved) {
                 let (line, col_start) =
                     offset_to_line_col(source, cca.class.span.start, source_map);

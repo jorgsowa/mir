@@ -12,7 +12,7 @@
 //! deep clones.
 
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
 use mir_codebase::definitions::{
@@ -1306,10 +1306,11 @@ pub fn class_array_property_defaults<'db>(
             ExprKind::String(s) => Some(s.as_str().to_string()),
             ExprKind::Int(n) => Some(n.to_string()),
             ExprKind::ClassConstAccess(cca) => {
-                match (cca.class.kind.name_ref(), &cca.member.kind) {
-                    (Some(cls), ExprKind::Identifier(m)) if m.as_ref() == "class" => {
-                        Some(crate::db::resolve_name(db, path.as_ref(), &cls))
-                    }
+                match (
+                    cca.class.kind.resolve_name_ref(db, path.as_ref()),
+                    &cca.member.kind,
+                ) {
+                    (Some(cls), ExprKind::Identifier(m)) if m.as_ref() == "class" => Some(cls),
                     _ => None,
                 }
             }

@@ -2,6 +2,7 @@ use super::*;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 
 /// Properties read through `$this->name`, in source order, and the methods the
@@ -434,8 +435,8 @@ pub(super) fn summarized_callee<'e>(
             }
         }
         ExprKind::StaticMethodCall(smc) => {
-            let class = smc.class.kind.name_ref()?;
-            let class = match crate::db::resolve_name(db, file, &class).as_str() {
+            let class = smc.class.kind.resolve_name_ref(db, file)?;
+            let class = match class.as_str() {
                 "self" | "static" => ctx.self_fqcn.clone()?,
                 "parent" => ctx.parent_fqcn.clone()?,
                 resolved => std::sync::Arc::from(resolved),
@@ -824,10 +825,10 @@ pub fn constructed_prop_taints(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Vec<(mir_types::Name, Taint)> {
-    let Some(name) = new.class.kind.name_ref() else {
+    let Some(resolved) = new.class.kind.resolve_name_ref(db, file) else {
         return Vec::new();
     };
-    let class = match crate::db::resolve_name(db, file, name.as_ref()).as_str() {
+    let class = match resolved.as_str() {
         "self" | "static" => ctx.self_fqcn.clone(),
         "parent" => ctx.parent_fqcn.clone(),
         resolved => Some(std::sync::Arc::from(resolved)),
