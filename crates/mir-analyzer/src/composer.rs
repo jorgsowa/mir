@@ -834,6 +834,34 @@ mod tests {
     }
 
     #[test]
+    fn project_files_follows_fully_qualified_dirname_require() {
+        let root = make_temp_project("require_fq_dirname");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php namespace App; require_once \\dirname(__DIR__) . '/legacy/bootstrap.php'; class Bootstrap {}",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("bootstrap.php"),
+            "<?php function legacy_init() {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert!(files.iter().any(|f| f.ends_with("bootstrap.php")));
+    }
+
+    #[test]
     fn project_files_follows_bare_literal_require_relative_to_including_file() {
         let root = make_temp_project("require_bare_literal");
         let src = root.join("src");

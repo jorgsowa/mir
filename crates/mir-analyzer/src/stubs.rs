@@ -14,7 +14,6 @@
 /// let file = db.symbol_defining_file("strlen"); // → "stubs/standard/standard_0.php"
 /// let src  = stub_vfs.get(&file).unwrap();           // → &'static str PHP source
 /// ```
-use crate::ast_ext::NameRefExt as _;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
@@ -175,45 +174,39 @@ impl OwnedVisitor for BuiltinRefVisitor {
     type Break = ();
 
     fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
-        match &expr.kind {
+        let path = match &expr.kind {
             ExprKind::FunctionCall(call) => {
-                if let Some(name) = call.name.kind.name_ref() {
-                    if let Some(p) = stub_path_for_function(name.as_ref()) {
-                        self.paths.insert(p);
-                    }
-                }
+                global_name(&call.name.kind).and_then(|n| stub_path_for_function(&n))
             }
             ExprKind::New(new_expr) => {
-                if let Some(name) = new_expr.class.kind.name_ref() {
-                    if let Some(p) = stub_path_for_class(name.as_ref()) {
-                        self.paths.insert(p);
-                    }
-                }
+                global_name(&new_expr.class.kind).and_then(|n| stub_path_for_class(&n))
             }
             ExprKind::StaticMethodCall(call) => {
-                if let Some(name) = call.class.kind.name_ref() {
-                    if let Some(p) = stub_path_for_class(name.as_ref()) {
-                        self.paths.insert(p);
-                    }
-                }
+                global_name(&call.class.kind).and_then(|n| stub_path_for_class(&n))
             }
             ExprKind::ClassConstAccess(access) => {
-                if let Some(name) = access.class.kind.name_ref() {
-                    if let Some(p) = stub_path_for_class(name.as_ref()) {
-                        self.paths.insert(p);
-                    }
-                }
+                global_name(&access.class.kind).and_then(|n| stub_path_for_class(&n))
             }
-            ExprKind::Identifier(_) | ExprKind::Name(_) => {
-                if let Some(name) = expr.kind.name_ref() {
-                    if let Some(p) = stub_path_for_constant(name.as_ref()) {
-                        self.paths.insert(p);
-                    }
-                }
-            }
-            _ => {}
+            ExprKind::Name(_) => global_name(&expr.kind).and_then(|n| stub_path_for_constant(&n)),
+            _ => None,
+        };
+        if let Some(p) = path {
+            self.paths.insert(p);
         }
         crate::recursion::walk_expr(self, expr)
+    }
+}
+
+/// A name reference's text without the leading backslash; `None` for `namespace\...`.
+fn global_name(kind: &ExprKind) -> Option<std::borrow::Cow<'_, str>> {
+    use php_ast::ast::NameKind;
+    let ExprKind::Name(n) = kind else {
+        return None;
+    };
+    match (n.kind, &*n.parts) {
+        (NameKind::Relative | NameKind::Error, _) => None,
+        (_, [only]) => Some(std::borrow::Cow::Borrowed(only)),
+        _ => Some(std::borrow::Cow::Owned(n.join_parts())),
     }
 }
 
@@ -921,6 +914,22 @@ mod tests {
                 symbol.as_str(),
                 path
             );
+        }
+    }
+
+    #[test]
+    fn ast_scan_finds_fully_qualified_builtin_references() {
+        let program = php_rs_parser::parse(
+            "<?php namespace App; \\strlen('a'); new \\ArrayObject(); echo \\PHP_EOL;",
+        )
+        .program;
+        let paths = collect_referenced_builtin_paths_from_ast(&program);
+        for path in [
+            stub_path_for_function("strlen"),
+            stub_path_for_class("ArrayObject"),
+            stub_path_for_constant("PHP_EOL"),
+        ] {
+            assert!(paths.contains(&path.unwrap()), "{path:?} not in {paths:?}");
         }
     }
 

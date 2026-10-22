@@ -2,7 +2,7 @@
 //! resolvable `require`/`include` targets.
 
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::{BinaryOp, MagicConstKind};
 use php_ast::owned::visitor::OwnedVisitor;
 use php_ast::owned::{Expr, ExprKind};
@@ -164,7 +164,7 @@ fn resolve_static_include_target(expr: &Expr, file: &Path) -> Option<String> {
             Some(format!("{left}{right}"))
         }
         ExprKind::FunctionCall(call) => {
-            let name = call.name.kind.name_ref()?;
+            let name = call.name.kind.name_bare()?;
             if !name.eq_ignore_ascii_case("dirname") || call.args.len() > 2 {
                 return None;
             }
