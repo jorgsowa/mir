@@ -1427,16 +1427,6 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Variable(name) => {
                 let name_str = name.trim_start_matches('$').to_string();
                 let name_sym = mir_types::Name::from(name_str.as_str());
-                // Assigning to $this is not allowed
-                if name_str == "this" {
-                    self.emit(
-                        IssueKind::InvalidScope {
-                            in_class: ctx.self_fqcn.is_some(),
-                        },
-                        Severity::Error,
-                        span,
-                    );
-                }
                 // Purity check: a bare (whole-array) superglobal write
                 // (`$_SESSION = [];`) reaches the same external mutable
                 // state as `$_SESSION['x'] = ...`; the indexed-write shape

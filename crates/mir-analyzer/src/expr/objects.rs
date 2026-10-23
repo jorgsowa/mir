@@ -1428,12 +1428,6 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Type {
         if expr_name_str(&cca.member) == Some("class") {
             if let Some(resolved) = cca.class.kind.resolve_name_ref(self.db, &self.file) {
-                if resolved.as_str() == "parent"
-                    && ctx.parent_fqcn.is_none()
-                    && ctx.self_fqcn.is_some()
-                {
-                    self.emit(IssueKind::ParentNotFound, Severity::Error, cca.class.span);
-                }
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                     // `Foo::class` is a PHP compile-time string constant — the class
                     // need not be loaded or even defined.  Never emit UndefinedClass
@@ -1583,13 +1577,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     "parent" => {
                         let Some(parent_fqcn) = &ctx.parent_fqcn else {
-                            if ctx.self_fqcn.is_some() {
-                                self.emit(
-                                    IssueKind::ParentNotFound,
-                                    Severity::Error,
-                                    cca.class.span,
-                                );
-                            }
                             return Type::mixed();
                         };
                         let here = crate::db::Fqcn::from_str(self.db, parent_fqcn);

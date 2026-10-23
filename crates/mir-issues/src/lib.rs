@@ -110,8 +110,8 @@ pub enum IssueKind {
         trait_name: Option<String>,
         method: String,
     },
-    /// Emitted when `parent::` is used in a class that has no parent.
-    /// Fixtures: `tests/fixtures/by-kind/undefined_class/no_parent*.phpt`.
+    /// Emitted when `parent` is used in a class that has no parent (the parser's `ParentWithoutParentClass`).
+    /// Fixtures: `tests/fixtures/by-kind/parent_not_found/`.
     ParentNotFound,
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_string_class/`.

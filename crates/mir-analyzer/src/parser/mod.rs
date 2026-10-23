@@ -28,7 +28,10 @@ pub(crate) fn parse_error_to_issue(
 
     let message = err.to_string();
     let code = err.code().to_owned();
-    let kind = if err.forbidden_rule().map(ForbiddenRule::phase) == Some(Phase::Compile) {
+    let rule = err.forbidden_rule();
+    let kind = if rule == Some(ForbiddenRule::ParentWithoutParentClass) {
+        mir_issues::IssueKind::ParentNotFound
+    } else if rule.map(ForbiddenRule::phase) == Some(Phase::Compile) {
         mir_issues::IssueKind::CompileError { message, code }
     } else {
         mir_issues::IssueKind::ParseError { message, code }
@@ -48,8 +51,6 @@ pub(crate) fn parse_error_to_issue(
 /// Compile-time rules the parser checks that the analyzer reports itself with a
 /// dedicated issue kind; the parser's diagnostic is dropped as a duplicate.
 const ANALYZER_COVERED_RULES: &[ForbiddenRule] = &[
-    ForbiddenRule::ParentWithoutParentClass,
-    ForbiddenRule::ClassKeywordOutsideClass,
     ForbiddenRule::ToStringReturnType,
     ForbiddenRule::AttributeOnInvalidClass,
     ForbiddenRule::DeprecatedOnInvalidTarget,
@@ -57,10 +58,7 @@ const ANALYZER_COVERED_RULES: &[ForbiddenRule] = &[
     ForbiddenRule::MissingReturnValue,
     ForbiddenRule::VoidReturnValue,
     ForbiddenRule::NeverReturn,
-    ForbiddenRule::GeneratorReturnType,
     ForbiddenRule::ReadonlyPropertyDefault,
-    ForbiddenRule::DuplicateParameter,
-    ForbiddenRule::ReassignThis,
 ];
 
 fn is_analyzer_covered_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
@@ -269,8 +267,6 @@ mod analyzer_covered_tests {
 
     /// One source per rule in `ANALYZER_COVERED_RULES`, in the same order.
     const SOURCES: &[&str] = &[
-        "<?php\nclass A { function f() { parent::f(); } }\n",
-        "<?php\nfunction f() { self::g(); }\n",
         "<?php\nclass A { function __toString(): int { return 1; } }\n",
         "<?php\n#[Attribute] trait T {}\n",
         "<?php\n#[Deprecated] class A {}\n",
@@ -278,10 +274,7 @@ mod analyzer_covered_tests {
         "<?php\nfunction f(): int { return; }\n",
         "<?php\nfunction f(): void { return 1; }\n",
         "<?php\nfunction f(): never { return; }\n",
-        "<?php\nfunction f(): int { yield 1; }\n",
         "<?php\nclass A { public readonly int $x = 1; }\n",
-        "<?php\nfunction f($a, $a) {}\n",
-        "<?php\nfunction f() { $this = 1; }\n",
     ];
 
     #[test]
@@ -301,6 +294,11 @@ mod analyzer_covered_tests {
             "<?php\nclass A { function __serialize(): int { return 1; } }\n",
             "<?php\nfunction f($_GET) {}\n",
             "<?php\nfunction f() { unset($this); }\n",
+            "<?php\nclass A { function f() { parent::f(); } }\n",
+            "<?php\nfunction f() { self::g(); }\n",
+            "<?php\nfunction f(): int { yield 1; }\n",
+            "<?php\nfunction f($a, $a) {}\n",
+            "<?php\nfunction f() { $this = 1; }\n",
         ] {
             let parsed = php_rs_parser::parse(src);
             assert!(

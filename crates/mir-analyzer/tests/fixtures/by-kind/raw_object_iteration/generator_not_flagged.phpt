@@ -7,6 +7,6 @@ function gen(): \Generator {
     yield 2;
 }
 
-function process(): void {
+function process(): \Generator {
     yield from gen();
 }

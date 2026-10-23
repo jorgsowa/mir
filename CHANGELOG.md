@@ -15,12 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Parser crates updated to 0.25: faster parsing (~13% on a 96 MB corpus), a nesting limit of 512 instead of a lower one, byte-string literals, many more compile-time checks and parse errors that follow each PHP version from 7.4 to 8.6 more closely. The checks that mir reports itself (`ParentNotFound`, `InvalidToString`, `InvalidAttribute`, ...) are not repeated as `ParseError`.
+- Parser crates updated to 0.25: faster parsing (~13% on a 96 MB corpus), a nesting limit of 512 instead of a lower one, byte-string literals, many more compile-time checks and parse errors that follow each PHP version from 7.4 to 8.6 more closely. The checks that mir reports itself (`InvalidToString`, `InvalidAttribute`, `InvalidReturnType`, ...) are not repeated as `ParseError`.
 - `ParseError` carries the parser's stable identifier: the message ends with it (`[version-too-low]`, `[duplicate-property]`, ...) and `--format json` has it as `code`.
 - Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
 
 ### Fixed
 
+- `parent` in a class without a parent is reported as `ParentNotFound` for every use, once: `parent::$p`, `new parent` and class attributes were missed, and `parent::X` / `parent::class` inside a trait were false positives.
+- `self` / `static` / `parent` in a function outside a class, a duplicate parameter (`function f($a, $a)`), a generator whose return type does not accept `Generator` (`function f(): int { yield 1; }`) and any write to `$this` (destructuring, `foreach`, `catch`) are reported as `CompileError`. `$this = 1` was `InvalidScope` with a message about static methods.
 - Writing to a property or offset of a `new` expression (`(new A)->p = 1`, `new A()->p = 1`) is reported again (as `CompileError`), as PHP rejects it at compile time.
 - An offset write on an object (`$bag['k'] = 1` on an `ArrayAccess`) counts as using the variable: no more `UnusedVariable` or `UnusedParam` for it.
 - `include \dirname(__DIR__) . '/x.php'` reported `UndefinedFunction` for `include\dirname()`, and a `namespace\f()` call for `namespace\f()`; both resolve against the current namespace.

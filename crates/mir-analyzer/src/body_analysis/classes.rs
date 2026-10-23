@@ -1554,15 +1554,6 @@ impl<'a> BodyAnalyzer<'a> {
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
-        crate::attributes::check_parent_in_class_attrs(
-            &decl.attributes,
-            parent_fqcn.is_some(),
-            file,
-            source,
-            source_map,
-            all_issues,
-        );
-
         if let Some(parent) = &decl.extends {
             let parent_str = crate::parser::name_to_string_owned(parent);
             let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
@@ -1826,15 +1817,6 @@ impl<'a> BodyAnalyzer<'a> {
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
-
-        crate::attributes::check_parent_in_class_attrs(
-            &decl.attributes,
-            parent_fqcn.is_some(),
-            file,
-            source,
-            source_map,
-            all_issues,
-        );
 
         if let Some(parent) = &decl.extends {
             let parent_str = crate::parser::name_to_string_owned(parent);

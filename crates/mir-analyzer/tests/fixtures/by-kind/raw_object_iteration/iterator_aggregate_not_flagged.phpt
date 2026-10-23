@@ -14,6 +14,6 @@ class MyCollection implements \IteratorAggregate {
     }
 }
 
-function process(MyCollection $col): void {
+function process(MyCollection $col): \Generator {
     yield from $col;
 }

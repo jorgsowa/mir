@@ -16,7 +16,7 @@ use mir_types::Name;
 use rustc_hash::FxHashMap;
 
 use crate::expr::ExpressionAnalyzer;
-use crate::flow_state::{self_is_trait, FlowState};
+use crate::flow_state::FlowState;
 use crate::narrowing::extract_expr_guard_key;
 use crate::symbol::ReferenceKind;
 
@@ -352,17 +352,6 @@ impl CallAnalyzer {
                 }
             }
         };
-
-        // Detect `parent::` used in a class that has no parent. Skip inside a
-        // trait: `parent::` there resolves against the using class at runtime,
-        // not the trait (which never has a parent).
-        if fqcn.eq_ignore_ascii_case("parent")
-            && ctx.parent_fqcn.is_none()
-            && ctx.self_fqcn.is_some()
-            && !self_is_trait(ea.db, ctx)
-        {
-            ea.emit(IssueKind::ParentNotFound, Severity::Error, call.class.span);
-        }
 
         // A `@template T of static` bound reflects the actual late-static-bound
         // receiver at this call site, which is identical for `self::`/

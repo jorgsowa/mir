@@ -786,41 +786,6 @@ fn check_property_hook_attributes(
     }
 }
 
-/// Emit `ParentNotFound` for any `parent::class` expression found in a flat
-/// attribute argument list when the containing class has no parent.
-pub(crate) fn check_parent_in_class_attrs(
-    attrs: &[Attribute],
-    has_parent: bool,
-    file: &Arc<str>,
-    source: &str,
-    source_map: &SourceMap,
-    issues: &mut Vec<Issue>,
-) {
-    if has_parent {
-        return;
-    }
-    use php_ast::owned::ExprKind;
-    for attr in attrs {
-        for arg in attr.args.iter() {
-            let Some(value) = arg.value() else { continue };
-            if let ExprKind::ClassConstAccess(cca) = &value.kind {
-                if let Some(id) = cca.class.kind.name_ref() {
-                    if id.as_ref().eq_ignore_ascii_case("parent") {
-                        let loc = span_to_location(
-                            file,
-                            source,
-                            source_map,
-                            cca.class.span.start,
-                            cca.class.span.end,
-                        );
-                        issues.push(Issue::new(IssueKind::ParentNotFound, loc));
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Cross-file attribute list validation
 // ---------------------------------------------------------------------------
