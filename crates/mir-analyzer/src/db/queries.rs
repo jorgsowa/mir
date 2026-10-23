@@ -309,6 +309,7 @@ fn owner_mutation_free_by_construction_kind(
         // still be so if it (or any base along its native `extends` spine) eventually
         // derives from a native readonly base.
         ClassLike::Class(mut cls) => {
+            let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
             loop {
                 if cls.is_readonly {
                     return Some(OwnerMutationFreeKind::NativeReadonly);
@@ -316,6 +317,9 @@ fn owner_mutation_free_by_construction_kind(
                 let Some(parent_fqcn) = cls.parent.clone() else {
                     break;
                 };
+                if !visited.insert(parent_fqcn.clone()) {
+                    break;
+                }
                 let here = crate::db::Fqcn::from_str(db, parent_fqcn.as_ref());
                 match crate::db::find_class_like(db, here) {
                     Some(ClassLike::Class(pcls)) => cls = pcls,
