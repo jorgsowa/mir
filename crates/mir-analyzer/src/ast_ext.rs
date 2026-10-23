@@ -215,21 +215,31 @@ impl FunctionRefExt for php_ast::owned::ExprKind {
     }
 }
 
-/// The target of a `use function` alias for `name`; class imports never name a function.
+/// The target of a `use function` or `use const` alias for `name`; class imports name neither.
+pub(crate) fn imported_non_class(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    name: &str,
+) -> Option<String> {
+    let imports = db.file_imports(file);
+    let class_imports = db.file_class_imports(file);
+    let alias = mir_types::Name::new(name);
+    imports
+        .get(&alias)
+        .filter(|target| class_imports.get(&alias) != Some(*target))
+        .map(|target| target.as_str().to_string())
+}
+
+/// Like [`imported_non_class`], but function aliases also match case-insensitively.
 fn imported_function(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> Option<String> {
+    if let Some(target) = imported_non_class(db, file, name) {
+        return Some(target);
+    }
     let imports = db.file_imports(file);
     let class_imports = db.file_class_imports(file);
     let is_function_import = |alias: &mir_types::Name, target: &mir_types::Name| {
         class_imports.get(alias) != Some(target)
     };
-    let alias = mir_types::Name::new(name);
-    if let Some(target) = imports
-        .get(&alias)
-        .filter(|t| is_function_import(&alias, t))
-    {
-        return Some(target.as_str().to_string());
-    }
-    // Function aliases match case-insensitively.
     if imports.len() == class_imports.len() {
         return None;
     }

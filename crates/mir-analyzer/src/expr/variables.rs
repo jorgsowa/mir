@@ -149,8 +149,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
 
         let imported = (name.kind == NameKind::Unqualified)
-            .then(|| self.db.file_imports(self.file.as_ref()))
-            .and_then(|imports| imports.get(&mir_types::Name::new(name_str)).cloned());
+            .then(|| crate::ast_ext::imported_non_class(self.db, &self.file, name_str))
+            .flatten();
 
         let resolved = imported
             .as_deref()
