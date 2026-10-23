@@ -1,6 +1,7 @@
 use super::*;
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
@@ -362,31 +363,6 @@ pub fn args_value_taint(
     args.iter()
         .filter_map(|a| a.value())
         .fold(Taint::NONE, |acc, v| acc | value_taint(v, ctx, db, file))
-}
-
-/// Like `resolve_name`, but honours `use function` imports.
-pub(super) fn resolve_function_name(
-    db: &dyn crate::db::MirDatabase,
-    file: &str,
-    name: &str,
-) -> String {
-    if !name.contains('\\') {
-        if let Some(imported) = db.file_imports(file).get(&mir_types::Name::new(name)) {
-            return imported.as_str().to_string();
-        }
-    }
-    crate::db::resolve_name(db, file, name)
-}
-
-/// An unqualified call that resolves to a namespaced user function of the same name as a builtin.
-fn shadows_builtin(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> bool {
-    if name.contains('\\') {
-        return false;
-    }
-    let resolved = resolve_function_name(db, file, name);
-    resolved.contains('\\')
-        && crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
-            .is_some()
 }
 
 /// Argument positions whose data a builtin's result is built from; `None` when any argument may contribute.
@@ -762,12 +738,10 @@ pub fn expr_taint(
             if let Some(closure) = callee_closure(&fc.name, ctx, db, file) {
                 return closure_call_taint(&closure, &fc.args, ctx, db, file);
             }
-            if let Some(name) = fc.name.kind.name_ref() {
-                let lower_name = if shadows_builtin(db, file, name.as_ref()) {
-                    String::new()
-                } else {
-                    crate::util::php_ident_lowercase(name.as_ref().trim_start_matches('\\'))
-                };
+            if let Some(name) = fc.name.kind.function_ref(db, file) {
+                let lower_name = name
+                    .global_name(db, file)
+                    .map_or_else(String::new, crate::util::php_ident_lowercase);
                 if matches!(
                     lower_name.as_str(),
                     "getallheaders" | "apache_request_headers"
@@ -845,21 +819,11 @@ pub fn expr_taint(
                             _ => acc,
                         });
                 }
-                let mut resolved = resolve_function_name(db, file, name.as_ref());
-                let mut func = crate::db::find_function_from(
-                    db,
-                    file,
-                    crate::db::Fqcn::from_str(db, &resolved),
-                );
-                // An unqualified call falls back to the global function.
-                if func.is_none() && !name.contains('\\') && resolved.contains('\\') {
-                    resolved = name.to_string();
-                    func = crate::db::find_function_from(
-                        db,
-                        file,
-                        crate::db::Fqcn::from_str(db, &resolved),
-                    );
-                }
+                let found = name.find(db, file);
+                let resolved = found
+                    .as_ref()
+                    .map_or(name.global.unwrap_or(&name.qualified), |(n, _)| n);
+                let func = found.as_ref().map(|(_, f)| f);
                 if func.as_ref().is_some_and(|f| f.is_taint_source) {
                     return Taint::ALL;
                 }
@@ -894,9 +858,10 @@ pub fn expr_taint(
                 }
                 // A builtin's result is derived from its arguments unless it can
                 // only return values that carry no payload (`strlen`, `is_numeric`).
-                let global = resolved.trim_start_matches('\\');
-                if !global.contains('\\')
-                    && crate::stubs::is_builtin_function(&crate::util::php_ident_lowercase(global))
+                if !resolved.contains('\\')
+                    && crate::stubs::is_builtin_function(&crate::util::php_ident_lowercase(
+                        resolved,
+                    ))
                 {
                     let safe_return = func
                         .as_ref()
@@ -1320,21 +1285,12 @@ pub(super) fn produced_object_classes(
             _ => Vec::new(),
         },
         ExprKind::FunctionCall(fc) => {
-            let Some(name) = fc.name.kind.name_ref() else {
+            let Some(name) = fc.name.kind.function_ref(db, file) else {
                 return Vec::new();
             };
-            let mut resolved = crate::db::resolve_name(db, file, name.as_ref());
-            let mut func =
-                crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved));
-            if func.is_none() && !name.contains('\\') && resolved.contains('\\') {
-                resolved = name.to_string();
-                func = crate::db::find_function_from(
-                    db,
-                    file,
-                    crate::db::Fqcn::from_str(db, &resolved),
-                );
-            }
-            let Some(ty) = func
+            let Some(ty) = name
+                .find(db, file)
+                .map(|(_, f)| f)
                 .filter(|f| !f.is_taint_source)
                 .and_then(|f| f.return_type.as_deref().cloned())
             else {

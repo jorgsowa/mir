@@ -1,6 +1,6 @@
 //! `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists` type-check
 //! narrowing, for variable, property, and static-property receivers.
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameBareExt as _;
 use std::borrow::Cow;
 
 use php_ast::ast::{BinaryOp, UnaryPrefixOp};
@@ -449,7 +449,7 @@ pub(crate) fn classify_var_predicate<'a>(
         let ExprKind::FunctionCall(call) = &unwrap(e).kind else {
             return None;
         };
-        let name = call.name.kind.name_ref()?;
+        let name = Cow::Borrowed(call.name.kind.name_bare()?);
         let [arg] = &*call.args else {
             return None;
         };

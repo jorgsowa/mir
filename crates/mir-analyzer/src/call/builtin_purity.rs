@@ -4,6 +4,7 @@
 
 use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::{ArgExt as _, ByteStringExt as _};
+use crate::ast_ext::{FunctionRef, FunctionRefExt as _};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{Arg, CallableCreateKind, Expr, ExprKind};
 
@@ -73,18 +74,13 @@ fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -
         ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => ctx.is_in_pure_fn,
         // Callable strings always name a global function.
         ExprKind::String(name) => {
-            !name.contains(&b':')
-                && function_is_pure(ea, name.as_str().trim_start_matches('\\'), None)
+            !name.contains(&b':') && function_is_pure(ea, &FunctionRef::from_text(name.as_str()))
         }
         ExprKind::CallableCreate(cc) => match &cc.kind {
-            CallableCreateKind::Function(target) => match target.kind.name_ref() {
-                Some(name) => {
-                    let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
-                    let fallback = (!name.contains('\\')).then_some(name.as_ref());
-                    function_is_pure(ea, &resolved, fallback)
-                }
-                _ => false,
-            },
+            CallableCreateKind::Function(target) => target
+                .kind
+                .function_ref(ea.db, &ea.file)
+                .is_some_and(|name| function_is_pure(ea, &name)),
             CallableCreateKind::StaticMethod { class, method } => {
                 let (Some(class), ExprKind::Identifier(method)) =
                     (class.kind.name_ref(), &method.kind)
@@ -112,14 +108,8 @@ fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -
     }
 }
 
-fn function_is_pure(ea: &ExpressionAnalyzer<'_>, fqn: &str, fallback: Option<&str>) -> bool {
-    let lookup = |n: &str| {
-        crate::db::find_function_from(ea.db, &ea.file, crate::db::Fqcn::from_str(ea.db, n))
-    };
-    let Some(f) = lookup(fqn).or_else(|| fallback.and_then(lookup)) else {
-        return false;
-    };
-    f.is_pure
+fn function_is_pure(ea: &ExpressionAnalyzer<'_>, name: &FunctionRef<'_>) -> bool {
+    name.find(ea.db, &ea.file).is_some_and(|(_, f)| f.is_pure)
 }
 
 /// Whether invoking a value of type `ty` may have side effects, judged only from
@@ -130,7 +120,7 @@ pub(crate) fn invoked_type_is_impure(ea: &ExpressionAnalyzer<'_>, ty: &Type) -> 
         Atomic::TClosure { data } => !data.is_pure,
         Atomic::TCallableString => true,
         Atomic::TLiteralString(name) => {
-            !name.contains("::") && !function_is_pure(ea, name.trim_start_matches('\\'), None)
+            !name.contains("::") && !function_is_pure(ea, &FunctionRef::from_text(name))
         }
         _ => false,
     })

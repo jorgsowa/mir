@@ -1,7 +1,7 @@
 use super::*;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 
@@ -404,21 +404,7 @@ pub(super) fn summarized_callee<'e>(
     };
     match &expr.kind {
         ExprKind::FunctionCall(fc) => {
-            let name = fc.name.kind.name_ref()?;
-            let resolved = crate::db::resolve_name(db, file, &name);
-            let f =
-                crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
-                    .or_else(|| {
-                    (!name.contains('\\'))
-                        .then(|| {
-                            crate::db::find_function_from(
-                                db,
-                                file,
-                                crate::db::Fqcn::from_str(db, &name),
-                            )
-                        })
-                        .flatten()
-                })?;
+            let (_, f) = fc.name.kind.function_ref(db, file)?.find(db, file)?;
             if f.taint.is_some()
                 || CalleeBody::of(f.location.as_ref(), file) != CalleeBody::Summarized
                 || !crate::db::taint_sources::function_returns_param(db, file, f.fqn.as_ref())
@@ -455,19 +441,8 @@ pub(super) fn element_preserving_args<'e>(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Option<Vec<&'e Expr>> {
-    let name = callee.kind.name_ref()?;
-    let global = name.trim_start_matches('\\');
-    if global.contains('\\')
-        || (!name.starts_with('\\')
-            && crate::db::find_function_from(
-                db,
-                file,
-                crate::db::Fqcn::from_str(db, &crate::db::resolve_name(db, file, &name)),
-            )
-            .is_some_and(|f| is_user_code(f.location.as_ref())))
-    {
-        return None;
-    }
+    let name = callee.kind.function_ref(db, file)?;
+    let global = name.global_name(db, file)?;
     let values =
         |n: usize| -> Vec<&Expr> { args.iter().take(n).filter_map(|a| a.value()).collect() };
     match crate::util::php_ident_lowercase(global).as_str() {
@@ -608,24 +583,11 @@ pub fn value_may_hold_object(
                 || value_may_hold_object(&nc.right, ctx, db, file)
         }
         ExprKind::FunctionCall(fc) => {
-            let Some(name) = fc.name.kind.name_ref() else {
+            let Some(name) = fc.name.kind.function_ref(db, file) else {
                 return true;
             };
-            let resolved = crate::db::resolve_name(db, file, &name);
-            let func =
-                crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
-                    .or_else(|| {
-                        (!name.contains('\\'))
-                            .then(|| {
-                                crate::db::find_function_from(
-                                    db,
-                                    file,
-                                    crate::db::Fqcn::from_str(db, &name),
-                                )
-                            })
-                            .flatten()
-                    });
-            func.is_none_or(|f| declared(f.return_type.as_deref()))
+            name.find(db, file)
+                .is_none_or(|(_, f)| declared(f.return_type.as_deref()))
         }
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             let ExprKind::Identifier(method) = &mc.method.kind else {

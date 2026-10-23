@@ -1,5 +1,6 @@
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameRefExt as _;
 use php_ast::owned::{ExprKind, FunctionCallExpr};
 use php_ast::Span;
@@ -451,9 +452,6 @@ impl CallAnalyzer {
             }
         };
 
-        // PHP resolves `foo()` as `\App\Ns\foo` first, then `\foo` if not found.
-        // A leading `\` means explicit global namespace.
-        let was_bare_global_call = fn_name.starts_with('\\') && !fn_name[1..].contains('\\');
         let fn_name_cow: std::borrow::Cow<'_, str> = match fn_name {
             std::borrow::Cow::Borrowed(s) => {
                 std::borrow::Cow::Borrowed(s.strip_prefix('\\').unwrap_or(s))
@@ -473,42 +471,13 @@ impl CallAnalyzer {
                 span,
             );
         }
-        let resolved_fn_name: String = if was_bare_global_call {
-            // `\foo()` unconditionally names the global-namespace function —
-            // PHP never falls back to a same-named function in the current
-            // namespace here, unlike a bare `foo()` call. Trying the
-            // namespace-qualified name first (as the bare-call path below
-            // does) would silently resolve to an unrelated in-namespace
-            // function of the same name if one happens to exist (e.g. a
-            // namespaced wrapper like `namespace App; function json_encode()
-            // { return \json_encode(...); }`), mirroring how
-            // `db::resolve_name` already short-circuits on a leading `\` for
-            // class names.
-            fn_name.to_string()
-        } else {
-            let imports = ea.db.file_imports(&ea.file);
-            let qualified = if let Some(imported) = imports.get(&Name::new(fn_name)) {
-                imported.as_str().to_string()
-            } else if fn_name.contains('\\') {
-                crate::db::resolve_name(ea.db, &ea.file, fn_name)
-            } else if let Some(ns) = ea.db.file_namespace(&ea.file) {
-                format!("{}\\{}", ns, fn_name)
-            } else {
-                fn_name.to_string()
-            };
-            let fn_exists = |name: &str| -> bool {
-                let db = ea.db;
-                let here = crate::db::Fqcn::from_str(db, name);
-                crate::db::find_function(db, here).is_some()
-            };
-            if fn_exists(qualified.as_str()) {
-                qualified
-            } else if fn_exists(fn_name) {
-                fn_name.to_string()
-            } else {
-                qualified
-            }
-        };
+        let resolved_fn_name: String = call
+            .name
+            .kind
+            .function_ref(ea.db, &ea.file)
+            .unwrap_or_else(|| crate::ast_ext::FunctionRef::from_text(fn_name))
+            .resolve(ea.db, &ea.file)
+            .to_string();
 
         // Resolve once; reused below for by-ref pre-marking and full analysis.
         let resolved = resolve_fn(ea, resolved_fn_name.as_str());

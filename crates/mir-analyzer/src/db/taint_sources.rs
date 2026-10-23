@@ -4,6 +4,7 @@
 //! alone. Only these need a taint summary when no argument is tainted.
 
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
 use std::ops::ControlFlow;
@@ -525,10 +526,11 @@ impl<'a> Scan<'a> {
                 None => Inspect::Nothing,
             },
             ExprKind::FunctionCall(fc) => {
-                let Some(name) = fc.name.kind.name_ref() else {
+                let Some(name) = fc.name.kind.function_ref(self.db, self.path) else {
                     return Inspect::Nothing;
                 };
-                let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
+                let lower =
+                    crate::util::php_ident_lowercase(name.global.unwrap_or(&name.qualified));
                 if crate::taint::is_source_function(&lower)
                     || crate::taint::is_request_helper_source(&lower, &fc.args)
                 {
@@ -536,8 +538,7 @@ impl<'a> Scan<'a> {
                 } else if crate::stubs::is_builtin_function(&lower) {
                     Inspect::Nothing
                 } else {
-                    let resolved = crate::db::resolve_name(self.db, self.path, name.as_ref());
-                    Inspect::Callee(Callee::Function(Name::new(&resolved)))
+                    Inspect::Callee(Callee::Function(Name::new(&name.qualified)))
                 }
             }
             ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc)
@@ -762,8 +763,10 @@ impl Scan<'_> {
             | ExprKind::Include(..)
             | ExprKind::Eval(_)
             | ExprKind::ShellExec(_) => true,
-            ExprKind::FunctionCall(fc) => match fc.name.kind.name_ref() {
-                Some(name) => crate::taint::classify_sink(name.trim_start_matches('\\')).is_some(),
+            ExprKind::FunctionCall(fc) => match fc.name.kind.function_ref(self.db, self.path) {
+                Some(name) => {
+                    crate::taint::classify_sink(name.global.unwrap_or(&name.qualified)).is_some()
+                }
                 _ => true,
             },
             ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {

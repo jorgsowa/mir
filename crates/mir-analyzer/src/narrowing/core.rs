@@ -2,6 +2,7 @@
 //! property-refinement helpers, and small cross-cutting utilities used by
 //! multiple narrowing arms.
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
@@ -774,21 +775,14 @@ pub(crate) fn promote_assignment_effects(
             promote_assignment_effects(&u.operand, ctx, db, file);
         }
         ExprKind::FunctionCall(call) => {
-            if let Some(fn_name) = call.name.kind.name_ref() {
-                if has_possibly_assigned_arg(&call.args, ctx) {
-                    let resolved = crate::db::resolve_name(db, file, fn_name.as_ref());
-                    let find = |name: &str| {
-                        crate::db::find_function(db, crate::db::Fqcn::from_str(db, name))
-                    };
-                    // Unqualified calls fall back to the global function.
-                    let func = find(&resolved).or_else(|| {
-                        (!fn_name.starts_with('\\') && !fn_name.contains('\\'))
-                            .then(|| find(fn_name.as_ref()))
-                            .flatten()
-                    });
-                    if let Some(func) = func {
-                        promote_byref_args(&func.params, &call.args, ctx);
-                    }
+            if has_possibly_assigned_arg(&call.args, ctx) {
+                if let Some(func) = call
+                    .name
+                    .kind
+                    .function_ref(db, file)
+                    .and_then(|name| name.find(db, file).map(|(_, f)| f))
+                {
+                    promote_byref_args(&func.params, &call.args, ctx);
                 }
             }
             for arg in call.args.iter() {

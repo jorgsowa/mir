@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Function names resolve the same way everywhere: `\Foo\bar()` no longer goes through a `use Other\Foo;` class import, and a first-class callable of a `use function` import (`array_map(enum_value(...), $ids)`) has the function's signature and taint. A first-class callable of a fully qualified namespaced function (`\Foo\bar(...)`) carries taint.
 - In a file with several `namespace {}` blocks, a call to a function or method declared in another block of the same file lost its return taint: the file's declarations were named after the namespace block that first asked for them.
 - `\getallheaders()`, `\filter_input()` and `\request(...)` written fully qualified are taint sources when their value is returned from a function or stored in a property, like the unqualified form.
 - `namespace\C` resolves in the current namespace (was `UndefinedConstant: namespace\C`), and `\C` names only the global constant: a missing global constant with a namespaced namesake is reported.

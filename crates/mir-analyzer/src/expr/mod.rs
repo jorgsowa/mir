@@ -1,4 +1,5 @@
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 /// Expression analyzer — infers the `Type` type of any PHP expression.
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
@@ -1062,69 +1063,60 @@ impl<'a> ExpressionAnalyzer<'a> {
         use php_ast::owned::CallableCreateKind;
         match &cc.kind {
             CallableCreateKind::Function(name_expr) => {
-                if let Some(name) = name_expr.kind.name_ref() {
-                    let resolved_fqn =
-                        crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
-                    let db = self.db;
-                    let lookup =
-                        |n: &str| crate::db::find_function(db, crate::db::Fqcn::from_str(db, n));
-                    // An unqualified name falls back to the global function, as a call does.
-                    let found = lookup(&resolved_fqn)
-                        .map(|f| (resolved_fqn.clone(), f))
-                        .or_else(|| {
-                            let bare = name.as_ref();
-                            (!bare.contains('\\'))
-                                .then(|| lookup(bare).map(|f| (bare.to_string(), f)))
-                                .flatten()
-                        });
-                    if let Some((resolved_fqn, f)) = found {
-                        self.record_function_ref(&f.fqn, name_expr.span);
-                        if let Some((used, canonical)) =
-                            crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
-                        {
-                            let span = if name_expr.span.start < name_expr.span.end {
-                                name_expr.span
-                            } else {
-                                outer_span
-                            };
-                            self.emit(
-                                mir_issues::IssueKind::WrongCaseFunction { used, canonical },
-                                mir_issues::Severity::Info,
-                                span,
-                            );
-                        }
-                        let return_ty = f
-                            .return_type
-                            .as_deref()
-                            .cloned()
-                            .unwrap_or_else(Type::mixed);
-                        // No receiver for a plain function — self/static/parent can't
-                        // legally appear in its signature, so an empty fqcn/type-param
-                        // list is a safe no-op for build_closure_from_resolved_params's
-                        // static-substitution step. Routed through the same helper as
-                        // the method FCC cases below so the function's own @template
-                        // params get bound to their declared bound (see the helper's
-                        // doc comment) instead of leaking as bare, unchecked
-                        // TTemplateParam atoms into every call through the closure.
-                        let empty_fqcn: Arc<str> = Arc::from("");
-                        let closure_ty = Type::single(Self::build_closure_from_resolved_params(
-                            self.db,
-                            &f.params,
-                            return_ty,
-                            &rustc_hash::FxHashMap::default(),
-                            &f.template_params,
-                            &empty_fqcn,
-                            &[],
-                            f.is_pure,
-                        ));
-                        // Hover on the name shows the Closure the expression produces.
-                        self.record_symbol(
-                            name_expr.span,
-                            ReferenceKind::FunctionCall(f.fqn.clone()),
-                            closure_ty.clone(),
+                let found = name_expr
+                    .kind
+                    .function_ref(self.db, &self.file)
+                    .and_then(|name| {
+                        name.find(self.db, &self.file)
+                            .map(|(resolved, f)| (resolved.to_string(), f))
+                    });
+                if let Some((resolved_fqn, f)) = found {
+                    self.record_function_ref(&f.fqn, name_expr.span);
+                    if let Some((used, canonical)) =
+                        crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
+                    {
+                        let span = if name_expr.span.start < name_expr.span.end {
+                            name_expr.span
+                        } else {
+                            outer_span
+                        };
+                        self.emit(
+                            mir_issues::IssueKind::WrongCaseFunction { used, canonical },
+                            mir_issues::Severity::Info,
+                            span,
                         );
-                        return closure_ty;
                     }
+                    let return_ty = f
+                        .return_type
+                        .as_deref()
+                        .cloned()
+                        .unwrap_or_else(Type::mixed);
+                    // No receiver for a plain function — self/static/parent can't
+                    // legally appear in its signature, so an empty fqcn/type-param
+                    // list is a safe no-op for build_closure_from_resolved_params's
+                    // static-substitution step. Routed through the same helper as
+                    // the method FCC cases below so the function's own @template
+                    // params get bound to their declared bound (see the helper's
+                    // doc comment) instead of leaking as bare, unchecked
+                    // TTemplateParam atoms into every call through the closure.
+                    let empty_fqcn: Arc<str> = Arc::from("");
+                    let closure_ty = Type::single(Self::build_closure_from_resolved_params(
+                        self.db,
+                        &f.params,
+                        return_ty,
+                        &rustc_hash::FxHashMap::default(),
+                        &f.template_params,
+                        &empty_fqcn,
+                        &[],
+                        f.is_pure,
+                    ));
+                    // Hover on the name shows the Closure the expression produces.
+                    self.record_symbol(
+                        name_expr.span,
+                        ReferenceKind::FunctionCall(f.fqn.clone()),
+                        closure_ty.clone(),
+                    );
+                    return closure_ty;
                 }
                 Type::single(bare_closure())
             }

@@ -24,7 +24,7 @@
 
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::{FunctionRef, FunctionRefExt as _};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -51,34 +51,6 @@ pub(crate) struct CallArgReturn {
     pub return_type: Type,
 }
 
-/// Resolve a bare function-call name (`foo(...)`) to its FQN using the same
-/// import / namespace / exists-fallback logic as
-/// `call::function::analyze_function_call` — duplicated here rather than
-/// shared because that logic lives on an `ExpressionAnalyzer` instance this
-/// purely syntactic per-file scan does not construct.
-fn resolve_plain_function_name(db: &dyn MirDatabase, file: &str, fn_name: &str) -> String {
-    let imports = db.file_imports(file);
-    let qualified = if let Some(imported) = imports.get(&mir_types::Name::new(fn_name)) {
-        imported.as_str().to_string()
-    } else if fn_name.contains('\\') {
-        crate::db::resolve_name(db, file, fn_name)
-    } else if let Some(ns) = db.file_namespace(file) {
-        format!("{ns}\\{fn_name}")
-    } else {
-        fn_name.to_string()
-    };
-    let exists = |name: &str| -> bool {
-        crate::db::find_function(db, crate::db::Fqcn::from_str(db, name)).is_some()
-    };
-    if exists(&qualified) {
-        qualified
-    } else if exists(fn_name) {
-        fn_name.to_string()
-    } else {
-        qualified
-    }
-}
-
 /// Attempt to resolve `expr` (an argument expression at a call site) to a
 /// concrete callable's return type, without any flow-sensitive analysis.
 /// Returns `None` for anything not statically resolvable this way (a bare
@@ -100,14 +72,11 @@ fn resolve_concrete_callback_return(db: &dyn MirDatabase, file: &str, expr: &Exp
             let CallableCreateKind::Function(target) = &cc.kind else {
                 return None;
             };
-            let name = target.kind.name_ref()?;
-            let fqn = resolve_plain_function_name(db, file, name.as_ref());
-            let f = crate::db::find_function(db, crate::db::Fqcn::from_str(db, &fqn))?;
+            let (_, f) = target.kind.function_ref(db, file)?.find(db, file)?;
             f.return_type.as_deref().cloned()
         }
         ExprKind::String(s) if !s.is_empty() => {
-            let fqn = resolve_plain_function_name(db, file, s.as_str());
-            let f = crate::db::find_function(db, crate::db::Fqcn::from_str(db, &fqn))?;
+            let (_, f) = FunctionRef::from_text(s.as_str()).find(db, file)?;
             f.return_type.as_deref().cloned()
         }
         _ => None,
@@ -125,9 +94,8 @@ impl OwnedVisitor for OpaqueCallScanner<'_> {
 
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::FunctionCall(call) = &expr.kind {
-            if let Some(name) = call.name.kind.name_ref() {
-                let fqn = resolve_plain_function_name(self.db, self.file, name.as_ref());
-                let callee = CalleeKey::Function(Arc::from(fqn.as_str()));
+            if let Some(name) = call.name.kind.function_ref(self.db, self.file) {
+                let callee = CalleeKey::Function(Arc::from(name.resolve(self.db, self.file)));
                 let mut position = 0u16;
                 for arg in call.args.iter() {
                     if arg.name.is_none() && !arg.unpack() {

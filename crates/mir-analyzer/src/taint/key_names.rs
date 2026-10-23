@@ -1,5 +1,6 @@
 use super::*;
 use crate::ast_ext::ArrayElementExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameRefExt as _;
 
 /// Taint of the key names of the array `expr` yields when iterated, given the `whole` taint of its
@@ -63,22 +64,11 @@ fn call_keys_taint(
     }
     match &call.kind {
         ExprKind::FunctionCall(fc) => {
-            let name = fc.name.kind.name_ref()?;
+            let name = fc.name.kind.function_ref(db, file)?;
             if callee_closure(&fc.name, ctx, db, file).is_some() {
                 return None;
             }
-            let mut resolved = resolve_function_name(db, file, name.as_ref());
-            let mut func =
-                crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved));
-            if func.is_none() && !name.contains('\\') && resolved.contains('\\') {
-                resolved = name.to_string();
-                func = crate::db::find_function_from(
-                    db,
-                    file,
-                    crate::db::Fqcn::from_str(db, &resolved),
-                );
-            }
-            let func = func.filter(|f| {
+            let (_, func) = name.find(db, file).filter(|(_, f)| {
                 !f.is_taint_source
                     && f.taint.is_none()
                     && CalleeBody::of(f.location.as_ref(), file) == CalleeBody::Summarized

@@ -1,7 +1,7 @@
 use super::*;
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
-use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::{FunctionRef, FunctionRefExt as _};
 
 /// Whether a call in `expr` takes a `function () {}` literal argument.
 pub fn has_closure_argument(expr: &Expr) -> bool {
@@ -66,10 +66,9 @@ pub fn callable_summary(
     if !db.taint_analysis() {
         return None;
     }
-    let name = callback_function_name(callable)?;
-    let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
-    let resolved = callback_function_fqn(callable, db, file)?;
-    let func = crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))?;
+    let name = callback_function(callable, db, file)?;
+    let (resolved, func) = name.find(db, file)?;
+    let lower = crate::util::php_ident_lowercase(resolved);
     let tracked = func.params.len().min(MAX_TRACKED_PARAMS);
     let through =
         |kinds: Taint| (0..tracked).fold(Taint::NONE, |acc, slot| acc | Taint::label(slot, kinds));
@@ -246,38 +245,23 @@ pub(super) fn closure_call_taint(
 }
 
 /// A callback named by a string (`'trim'`) or a first-class callable (`trim(...)`).
-pub(super) fn callback_function_name(callback: &Expr) -> Option<&str> {
+pub(super) fn callback_function<'e>(
+    callback: &'e Expr,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<FunctionRef<'e>> {
     match &unwrap_parens(callback).kind {
-        ExprKind::String(name) if !name.as_str().contains("::") => Some(name.as_str()),
+        ExprKind::String(name) if !name.as_str().contains("::") => {
+            Some(FunctionRef::from_text(name.as_str()))
+        }
         ExprKind::CallableCreate(c) => match &c.kind {
-            php_ast::owned::CallableCreateKind::Function(callee) => callee.kind.name_bare(),
+            php_ast::owned::CallableCreateKind::Function(callee) => {
+                callee.kind.function_ref(db, file)
+            }
             _ => None,
         },
         _ => None,
     }
-}
-
-/// The fully qualified name a named callback calls: a string is already one, a first-class
-/// callable resolves like a call and falls back to the global function.
-fn callback_function_fqn(
-    callback: &Expr,
-    db: &dyn crate::db::MirDatabase,
-    file: &str,
-) -> Option<String> {
-    let name = callback_function_name(callback)?;
-    if matches!(unwrap_parens(callback).kind, ExprKind::String(_)) {
-        return Some(name.trim_start_matches('\\').to_string());
-    }
-    let resolved = crate::db::resolve_name(db, file, name);
-    let namespaced_fallback = !name.contains('\\')
-        && resolved.contains('\\')
-        && crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
-            .is_none();
-    Some(if namespaced_fallback {
-        name.to_string()
-    } else {
-        resolved
-    })
 }
 
 /// Taint of what calling `callback` returns when it receives `inputs`.
@@ -305,22 +289,19 @@ pub(super) fn callback_result(
             })
         });
     }
-    let Some(name) = callback_function_name(callback) else {
+    let Some(name) = callback_function(callback, db, file) else {
         return all;
     };
-    let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
-    if let Some(removed) = sanitized_kinds(&lower) {
-        return all.without(removed);
+    if let Some(global) = name.global_name(db, file) {
+        let lower = crate::util::php_ident_lowercase(global);
+        if let Some(removed) = sanitized_kinds(&lower) {
+            return all.without(removed);
+        }
+        if let Some(restored) = unescaped_kinds(&lower) {
+            return all.restore(restored);
+        }
     }
-    if let Some(restored) = unescaped_kinds(&lower) {
-        return all.restore(restored);
-    }
-    let Some(resolved) = callback_function_fqn(callback, db, file) else {
-        return all;
-    };
-    let Some(func) =
-        crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))
-    else {
+    let Some((_, func)) = name.find(db, file) else {
         return all;
     };
     if func
@@ -356,8 +337,7 @@ fn callback_param_names(
     if let Some(closure) = callee_closure(callback, ctx, db, file) {
         return Some(closure.params.iter().map(|(n, _)| n.to_string()).collect());
     }
-    let resolved = callback_function_fqn(callback, db, file)?;
-    let func = crate::db::find_function_from(db, file, crate::db::Fqcn::from_str(db, &resolved))?;
+    let (_, func) = callback_function(callback, db, file)?.find(db, file)?;
     Some(func.params.iter().map(|p| p.name.to_string()).collect())
 }
 
@@ -460,7 +440,8 @@ pub(super) fn callback_builtin_taint(
         // A callback that isn't a literal name or closure is data the call result may carry.
         "call_user_func" | "call_user_func_array" => {
             let literal = callback.is_some_and(|cb| {
-                callee_closure(cb, ctx, db, file).is_some() || callback_function_name(cb).is_some()
+                callee_closure(cb, ctx, db, file).is_some()
+                    || callback_function(cb, db, file).is_some()
             });
             called() | if literal { Taint::NONE } else { arg_taint(0) }
         }
@@ -488,10 +469,10 @@ pub fn check_callback_sinks(
     let param_sinks = match &closure {
         Some(closure) => closure.summary.param_sinks.clone(),
         None => {
-            let Some(resolved) = callback_function_fqn(callback, ea.db, &ea.file) else {
+            let Some(name) = callback_function(callback, ea.db, &ea.file) else {
                 return;
             };
-            crate::db::function_param_sinks(ea.db, &ea.file, &resolved)
+            crate::db::function_param_sinks(ea.db, &ea.file, name.resolve(ea.db, &ea.file))
                 .map(|s| {
                     s.param_sinks
                         .iter()
