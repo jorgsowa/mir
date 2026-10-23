@@ -32,7 +32,7 @@ impl ArrayElementExt for ArrayElement {
 
 pub(crate) trait ByteStringExt {
     fn as_str(&self) -> &str;
-    /// Distinct non-UTF-8 values stay distinct (each byte maps to a private-use char).
+    /// Distinct non-UTF-8 values stay distinct (each invalid byte maps to a private-use char).
     fn to_text(&self) -> std::borrow::Cow<'_, str>;
 }
 
@@ -44,12 +44,19 @@ impl ByteStringExt for php_ast::owned::ByteString {
     fn to_text(&self) -> std::borrow::Cow<'_, str> {
         match self.to_str() {
             Some(s) => std::borrow::Cow::Borrowed(s),
-            None => std::borrow::Cow::Owned(
-                self.as_bytes()
-                    .iter()
-                    .filter_map(|&b| char::from_u32(0xF700 + u32::from(b)))
-                    .collect(),
-            ),
+            None => {
+                let mut text = String::with_capacity(self.as_bytes().len());
+                for chunk in self.as_bytes().utf8_chunks() {
+                    text.push_str(chunk.valid());
+                    text.extend(
+                        chunk
+                            .invalid()
+                            .iter()
+                            .filter_map(|&b| char::from_u32(0xF700 + u32::from(b))),
+                    );
+                }
+                std::borrow::Cow::Owned(text)
+            }
         }
     }
 }

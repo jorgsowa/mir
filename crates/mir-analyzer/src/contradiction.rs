@@ -41,7 +41,7 @@ fn extract_var(expr: &Expr) -> Option<String> {
 fn extract_lit(expr: &Expr) -> Option<Lit> {
     match &expr.kind {
         ExprKind::Int(n) => Some(Lit::Int(*n)),
-        ExprKind::String(s) => Some(Lit::Str(s.as_str().to_string())),
+        ExprKind::String(s) => Some(Lit::Str(s.to_text().into_owned())),
         ExprKind::Parenthesized(inner) => extract_lit(inner),
         // PHP parses `-1` as UnaryPrefix(Negate, Int(1)), not Int(-1).
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::Negate => {
@@ -58,7 +58,7 @@ fn extract_lit(expr: &Expr) -> Option<Lit> {
 fn lit_repr(lit: &Lit) -> String {
     match lit {
         Lit::Int(n) => n.to_string(),
-        Lit::Str(s) => format!("\"{s}\""),
+        Lit::Str(s) => Atomic::TLiteralString(std::sync::Arc::from(s.as_str())).to_string(),
     }
 }
 

@@ -124,21 +124,34 @@ impl fmt::Display for Type {
     }
 }
 
+/// String literal text with its non-UTF-8 bytes written as `\xNN`.
+pub struct LiteralText<'a>(pub &'a str);
+
+impl fmt::Display for LiteralText<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !self
+            .0
+            .chars()
+            .any(|c| ('\u{F700}'..='\u{F7FF}').contains(&c))
+        {
+            return f.write_str(self.0);
+        }
+        for c in self.0.chars() {
+            match u32::from(c) {
+                // Bytes that are not valid UTF-8 are stored as U+F700 + byte.
+                b @ 0xF700..=0xF7FF => write!(f, "\\x{:02x}", b - 0xF700)?,
+                _ => write!(f, "{c}")?,
+            }
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for Atomic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Atomic::TString => write!(f, "string"),
-            Atomic::TLiteralString(s) => {
-                f.write_str("\"")?;
-                for c in s.chars() {
-                    match u32::from(c) {
-                        // Bytes that are not valid UTF-8 are stored as U+F700 + byte.
-                        b @ 0xF700..=0xF7FF => write!(f, "\\x{:02x}", b - 0xF700)?,
-                        _ => write!(f, "{c}")?,
-                    }
-                }
-                f.write_str("\"")
-            }
+            Atomic::TLiteralString(s) => write!(f, "\"{}\"", LiteralText(s)),
             Atomic::TCallableString => write!(f, "callable-string"),
             Atomic::TClassString(None) => write!(f, "class-string"),
             Atomic::TClassString(Some(cls)) => write!(f, "class-string<{cls}>"),
@@ -264,7 +277,7 @@ impl fmt::Display for Atomic {
                         f.write_str(", ")?;
                     }
                     match k {
-                        crate::atomic::ArrayKey::String(s) => write!(f, "'{s}'")?,
+                        crate::atomic::ArrayKey::String(s) => write!(f, "'{}'", LiteralText(s))?,
                         crate::atomic::ArrayKey::Int(n) => write!(f, "{n}")?,
                     }
                     if v.optional {

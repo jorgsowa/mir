@@ -558,7 +558,7 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
             let kind = match &strip_parens(lit_side).kind {
                 ExprKind::Null if !holds => GuardKind::NotNull,
                 ExprKind::String(s) if holds => {
-                    GuardKind::Identical(FlagValue::Str(Name::from(s.as_str())))
+                    GuardKind::Identical(FlagValue::Str(Name::from(&*s.to_text())))
                 }
                 ExprKind::Int(n) if holds => GuardKind::Identical(FlagValue::Int(*n)),
                 ExprKind::Bool(true) if holds => GuardKind::Identical(FlagValue::True),

@@ -576,7 +576,12 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
-                    narrow_var_literal_string(ctx, &name, class_name_str.as_str(), effective_true);
+                    narrow_var_literal_string(
+                        ctx,
+                        &name,
+                        &class_name_str.to_text(),
+                        effective_true,
+                    );
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     // `$this->prop === 'literal'`
                     narrow_prop_literal_string(
@@ -585,7 +590,7 @@ pub fn narrow_from_condition(
                         &prop,
                         db,
                         file,
-                        class_name_str.as_str(),
+                        &class_name_str.to_text(),
                         effective_true,
                     );
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -598,7 +603,7 @@ pub fn narrow_from_condition(
                         &fqcn,
                         &prop,
                         db,
-                        class_name_str.as_str(),
+                        &class_name_str.to_text(),
                         effective_true,
                     );
                 }
@@ -733,7 +738,12 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
-                    narrow_var_literal_string(ctx, &name, class_name_str.as_str(), effective_true);
+                    narrow_var_literal_string(
+                        ctx,
+                        &name,
+                        &class_name_str.to_text(),
+                        effective_true,
+                    );
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     // `'literal' === $this->prop`
                     narrow_prop_literal_string(
@@ -742,7 +752,7 @@ pub fn narrow_from_condition(
                         &prop,
                         db,
                         file,
-                        class_name_str.as_str(),
+                        &class_name_str.to_text(),
                         effective_true,
                     );
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -755,7 +765,7 @@ pub fn narrow_from_condition(
                         &fqcn,
                         &prop,
                         db,
-                        class_name_str.as_str(),
+                        &class_name_str.to_text(),
                         effective_true,
                     );
                 }

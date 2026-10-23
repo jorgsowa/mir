@@ -1493,8 +1493,8 @@ fn literal_condition_key(expr: &Expr) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::Int(n) => Some((format!("int:{n}"), n.to_string())),
         ExprKind::String(s) => {
-            let s = s.as_str();
-            Some((format!("str:{s}"), format!("\"{s}\"")))
+            let literal = Atomic::TLiteralString(std::sync::Arc::from(&*s.to_text()));
+            Some((format!("str:{literal}"), literal.to_string()))
         }
         ExprKind::Bool(b) => Some((format!("bool:{b}"), b.to_string())),
         ExprKind::Null => Some(("null".to_string(), "null".to_string())),

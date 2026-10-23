@@ -500,7 +500,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         return None;
                     }
                     if let ExprKind::String(s) = &cond.kind {
-                        Some(Box::from(s.as_str()))
+                        Some(Box::from(&*s.to_text()))
                     } else if let Some(Atomic::TLiteralString(s)) =
                         self.resolve_class_const_literal(cond, ctx)
                     {

@@ -462,7 +462,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if keyed_props.contains_key(&array_key) && !spread_contributed_keys.contains(&array_key)
             {
                 let key_str = match &array_key {
-                    ArrayKey::String(s) => format!("'{s}'"),
+                    ArrayKey::String(s) => format!("'{}'", mir_types::display::LiteralText(s)),
                     ArrayKey::Int(i) => i.to_string(),
                 };
                 self.emit(
