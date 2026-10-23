@@ -37,13 +37,7 @@ impl<'a> BodyAnalyzer<'a> {
             if let Some((fqn, _)) =
                 lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map)
             {
-                self.push_decl_name_fact(
-                    source,
-                    0..decl.body.span.start,
-                    "function",
-                    decl.name.as_str().unwrap_or(""),
-                    crate::Name::function(fqn),
-                );
+                self.push_decl_name_fact(&decl.name, crate::Name::function(fqn));
             }
         }
         self.run_after_function_like_plugins(
@@ -154,7 +148,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         self.check_and_record_throws_classes(
             &declared_throws,
-            fn_header_name_span(source, decl),
+            decl.name.span,
             file,
             source,
             source_map,
@@ -206,7 +200,6 @@ impl<'a> BodyAnalyzer<'a> {
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
-            source,
             &decl.params,
             &ctx,
             self.collect_symbols,
@@ -302,7 +295,7 @@ impl<'a> BodyAnalyzer<'a> {
             && stored.is_none_or(|s| s.return_type.is_none())
             && !fn_name.is_empty()
         {
-            let span = fn_header_name_span(source, decl);
+            let span = decl.name.span;
             let (line, col_start) =
                 crate::diagnostics::offset_to_line_col(source, span.start, source_map);
             let (line_end, col_end) =
@@ -330,7 +323,7 @@ impl<'a> BodyAnalyzer<'a> {
                     .unwrap_or("")
                     .trim_start_matches('$')
                     .to_string();
-                let span = param_name_span(source, ast_param);
+                let span = ast_param.name.span;
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                 let (line_end, col_end) =
@@ -379,7 +372,7 @@ impl<'a> BodyAnalyzer<'a> {
                     && !doc_ty.is_mixed()
                     && docblock_conflicts_with_hint(self.db, doc_ty, &hint_ty)
                 {
-                    let span = fn_header_name_span(source, decl);
+                    let span = decl.name.span;
                     let (line, col_start) =
                         crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                     let (line_end, col_end) =
@@ -404,7 +397,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
         // UndefinedDocblockClass: docblock @return type references a non-existent class.
         if let Some(doc_ty) = stored.return_type.as_deref().filter(|t| t.from_docblock) {
-            let span = fn_header_name_span(source, decl);
+            let span = decl.name.span;
             let (line, col_start) =
                 crate::diagnostics::offset_to_line_col(source, span.start, source_map);
             let (line_end, col_end) =
@@ -508,7 +501,7 @@ impl<'a> BodyAnalyzer<'a> {
                     .unwrap_or("")
                     .trim_start_matches('$')
                     .to_string();
-                let span = param_name_span(source, ast_param);
+                let span = ast_param.name.span;
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                 let (line_end, col_end) =
@@ -536,7 +529,7 @@ impl<'a> BodyAnalyzer<'a> {
         // loop requires both a native hint and a docblock type, while this check
         // only needs a docblock type.
         {
-            let fn_span = fn_header_name_span(source, decl);
+            let fn_span = decl.name.span;
             let (fn_line, fn_col_start) =
                 crate::diagnostics::offset_to_line_col(source, fn_span.start, source_map);
             let (fn_line_end, fn_col_end) =
@@ -749,7 +742,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         self.check_and_record_throws_classes(
             &declared_throws,
-            fn_header_name_span(source, decl),
+            decl.name.span,
             file,
             source,
             source_map,
@@ -949,7 +942,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         self.check_and_record_throws_classes(
             &declared_throws,
-            fn_header_name_span(source, decl),
+            decl.name.span,
             file,
             source,
             source_map,
@@ -985,7 +978,6 @@ impl<'a> BodyAnalyzer<'a> {
         record_param_symbols(
             Some(all_symbols),
             file,
-            source,
             &decl.params,
             &ctx,
             self.collect_symbols,

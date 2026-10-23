@@ -938,7 +938,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let Some(name) = item.name.as_str().filter(|n| !n.is_empty()) else {
             return;
         };
-        let span = crate::body_analysis::bare_name_span_in(self.source, &item.span, name);
+        let span = item.name.span;
         let fqn: Arc<str> = match self.db.file_namespace(self.file.as_ref()) {
             Some(ns) => format!("{ns}\\{name}").into(),
             None => Arc::from(name),

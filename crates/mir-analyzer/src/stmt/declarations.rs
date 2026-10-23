@@ -1,6 +1,5 @@
 use super::StatementsAnalyzer;
 use crate::flow_state::FlowState;
-use crate::util::param_name_span;
 use mir_issues::{Issue, IssueKind, Location};
 use mir_types::Name;
 use php_ast::ast::PropertyHookKind;
@@ -99,7 +98,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(raw) = p.name.as_str() {
                     let trimmed = raw.trim_start_matches('$');
                     let ty = hook_ctx.get_var(trimmed);
-                    self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
+                    self.record_symbol_for_var(p.name.span, trimmed, ty);
                 }
             }
             let mut sa = StatementsAnalyzer::new(
@@ -231,7 +230,7 @@ impl<'a> StatementsAnalyzer<'a> {
             if let Some(raw) = p.name.as_str() {
                 let trimmed = raw.trim_start_matches('$');
                 let ty = fn_ctx.get_var(trimmed);
-                self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
+                self.record_symbol_for_var(p.name.span, trimmed, ty);
             }
         }
         let mut sa = StatementsAnalyzer::new(
@@ -455,7 +454,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(raw) = p.name.as_str() {
                     let trimmed = raw.trim_start_matches('$');
                     let ty = method_ctx.get_var(trimmed);
-                    self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
+                    self.record_symbol_for_var(p.name.span, trimmed, ty);
                 }
             }
             let mut sa = StatementsAnalyzer::new(

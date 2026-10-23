@@ -1,4 +1,3 @@
-use crate::util::param_name_span;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -715,24 +714,15 @@ impl<'a> BodyAnalyzer<'a> {
 
     /// Records the declaration name token before `body_start` (or inside
     /// `region` for members) as a navigation fact.
-    fn push_decl_name_fact(
-        &self,
-        source: &str,
-        region: std::ops::Range<u32>,
-        keyword: &str,
-        short_name: &str,
-        name: crate::Name,
-    ) {
-        if !self.collect_navigation_facts || short_name.is_empty() {
+    fn push_decl_name_fact(&self, ident: &php_ast::owned::Ident, name: crate::Name) {
+        if !self.collect_navigation_facts || ident.as_str().is_none_or(str::is_empty) {
             return;
         }
-        if let Some(span) = keyword_name_span(source, region, keyword, short_name) {
-            self.navigation_facts.borrow_mut().push(NavigationFact {
-                span,
-                expr_span: None,
-                name,
-            });
-        }
+        self.navigation_facts.borrow_mut().push(NavigationFact {
+            span: ident.span,
+            expr_span: None,
+            name,
+        });
     }
 
     pub(crate) fn take_navigation_facts(&self) -> Vec<NavigationFact> {
@@ -1251,218 +1241,12 @@ fn docblock_type_unresolvable(ty: &mir_types::Type, template_names: &[&str]) -> 
     })
 }
 
-/// Tight span for the function name in a `function name(...)` header. The
-/// owned `Ident` carries no span, so search backward from the first param /
-/// body for the last `name` occurrence; fall back to the body span.
-fn fn_header_name_span(source: &str, decl: &php_ast::owned::FunctionDecl) -> php_ast::Span {
-    let anchor = decl
-        .params
-        .first()
-        .map(|p| p.span.start)
-        .unwrap_or(decl.body.span.start) as usize;
-    let anchor = anchor.min(source.len());
-    // `decl.body.span` always covers a real `{ ... }` block, so it's never
-    // degenerate — unlike a synthesized single-byte span, it's a safe fallback.
-    let fallback = decl.body.span;
-    let Some(name) = decl.name.as_str() else {
-        return fallback;
-    };
-    if name.is_empty() {
-        return fallback;
-    }
-    // Search the whole prefix rather than a fixed lookback window, so long
-    // attribute lists or doc comments before the name can't push it out of range.
-    let anchor = (anchor..=source.len())
-        .find(|&i| source.is_char_boundary(i))
-        .unwrap_or(source.len());
-    match source[..anchor].rfind(name) {
-        Some(rel) => {
-            let start = rel as u32;
-            php_ast::Span {
-                start,
-                end: start + name.len() as u32,
-            }
-        }
-        None => fallback,
-    }
-}
-
-/// Tight span for the method name in a `function name(...)` header, mirroring
-/// [`fn_header_name_span`] for [`php_ast::owned::MethodDecl`] (whose `name` is
-/// never absent and whose `body` is optional for abstract/interface methods).
-fn method_header_name_span(source: &str, method: &php_ast::owned::MethodDecl) -> php_ast::Span {
-    let fallback = method
-        .body
-        .as_deref()
-        .map(|b| b.span)
-        .unwrap_or(php_ast::Span { start: 0, end: 0 });
-    let anchor = method
-        .params
-        .first()
-        .map(|p| p.span.start)
-        .unwrap_or(fallback.start) as usize;
-    let anchor = anchor.min(source.len());
-    let Some(name) = method.name.as_str() else {
-        return fallback;
-    };
-    if name.is_empty() {
-        return fallback;
-    }
-    let anchor = (anchor..=source.len())
-        .find(|&i| source.is_char_boundary(i))
-        .unwrap_or(source.len());
-    match source[..anchor].rfind(name) {
-        Some(rel) => {
-            let start = rel as u32;
-            php_ast::Span {
-                start,
-                end: start + name.len() as u32,
-            }
-        }
-        None => fallback,
-    }
-}
-
-/// Tight span for the `$name` token in a property declaration, mirroring
-/// [`param_name_span`] but searching within the member's own span (properties
-/// carry no dedicated name span either).
-pub(super) fn property_name_span(
-    source: &str,
-    member_span: &php_ast::Span,
-    bare_name: &str,
-) -> php_ast::Span {
-    if bare_name.is_empty() {
-        return *member_span;
-    }
-    let start = (member_span.start as usize).min(source.len());
-    let end = (member_span.end as usize).min(source.len());
-    if start >= end || !source.is_char_boundary(start) {
-        return *member_span;
-    }
-    let needle = format!("${bare_name}");
-    match source[start..end].find(needle.as_str()) {
-        Some(rel) => {
-            let s = member_span.start + rel as u32;
-            php_ast::Span {
-                start: s,
-                end: s + needle.len() as u32,
-            }
-        }
-        None => *member_span,
-    }
-}
-
-/// Span of a method's declared name, found after the `function` keyword inside
-/// the member's span. Works for bodyless (abstract/interface) methods, which
-/// have no param or body to anchor on.
-pub(super) fn method_decl_name_span(
-    source: &str,
-    member_span: &php_ast::Span,
-    method: &php_ast::owned::MethodDecl,
-) -> php_ast::Span {
-    let Some(name) = method.name.as_str().filter(|n| !n.is_empty()) else {
-        return method_header_name_span(source, method);
-    };
-    let start = member_span.start as usize;
-    let end = (member_span.end as usize).min(source.len());
-    let Some(text) = source.get(start..end) else {
-        return method_header_name_span(source, method);
-    };
-    let lowered = text.to_ascii_lowercase();
-    let mut from = 0;
-    while let Some(rel) = lowered[from..].find("function") {
-        let after_keyword = from + rel + "function".len();
-        let rest = &text[after_keyword..];
-        let trimmed = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '&');
-        let name_start = after_keyword + (rest.len() - trimmed.len());
-        if trimmed.starts_with(name)
-            && !trimmed[name.len()..]
-                .starts_with(|c: char| c.is_alphanumeric() || c == '_' || !c.is_ascii())
-        {
-            let abs = (start + name_start) as u32;
-            return php_ast::Span {
-                start: abs,
-                end: abs + name.len() as u32,
-            };
-        }
-        from = after_keyword;
-    }
-    method_header_name_span(source, method)
-}
-
-/// Span of `name` in the last `keyword name` pair inside `region` — a
-/// declaration's own name token, past attributes, modifiers and keyword.
-pub(crate) fn keyword_name_span(
-    source: &str,
-    region: std::ops::Range<u32>,
-    keyword: &str,
-    name: &str,
-) -> Option<php_ast::Span> {
-    let text = source.get(region.start as usize..(region.end as usize).min(source.len()))?;
-    let lowered = text.to_ascii_lowercase();
-    let is_ident = |c: char| c.is_alphanumeric() || c == '_' || !c.is_ascii();
-    let mut found = None;
-    let mut from = 0;
-    while let Some(rel) = lowered[from..].find(keyword) {
-        let kw_start = from + rel;
-        let after = kw_start + keyword.len();
-        from = after;
-        if text[..kw_start].ends_with(is_ident) {
-            continue;
-        }
-        let rest = &text[after..];
-        let trimmed = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '&');
-        if trimmed.len() == rest.len() || !trimmed.starts_with(name) {
-            continue;
-        }
-        if trimmed[name.len()..].starts_with(is_ident) {
-            continue;
-        }
-        found = Some(region.start + (after + rest.len() - trimmed.len()) as u32);
-    }
-    found.map(|start| php_ast::Span {
-        start,
-        end: start + name.len() as u32,
-    })
-}
-
-/// Tight span for a bare identifier (no `$` sigil) within a bounded region —
-/// a class constant's name within its declaration span, or an interface
-/// method's name within its member span (interface methods have no body and
-/// often no params, so `method_header_name_span`'s param/body anchor doesn't
-/// apply).
-pub(crate) fn bare_name_span_in(
-    source: &str,
-    member_span: &php_ast::Span,
-    name: &str,
-) -> php_ast::Span {
-    if name.is_empty() {
-        return *member_span;
-    }
-    let start = (member_span.start as usize).min(source.len());
-    let end = (member_span.end as usize).min(source.len());
-    if start >= end || !source.is_char_boundary(start) {
-        return *member_span;
-    }
-    match source[start..end].find(name) {
-        Some(rel) => {
-            let s = member_span.start + rel as u32;
-            php_ast::Span {
-                start: s,
-                end: s + name.len() as u32,
-            }
-        }
-        None => *member_span,
-    }
-}
-
 /// Push one `Variable` symbol per parameter declaration into `all_symbols`.
 /// Called immediately after [`seed_param_locations`] at every function/method body entry.
 #[allow(clippy::too_many_arguments)]
 fn record_param_symbols(
     all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     file: &Arc<str>,
-    source: &str,
     ast_params: &[php_ast::owned::Param],
     ctx: &crate::flow_state::FlowState,
     collect_symbols: bool,
@@ -1481,7 +1265,7 @@ fn record_param_symbols(
             continue;
         };
         let bare = raw.trim_start_matches('$');
-        let span = param_name_span(source, p);
+        let span = p.name.span;
         let ty = ctx.get_var(bare);
         all_symbols.push(ResolvedSymbol {
             file: file.clone(),

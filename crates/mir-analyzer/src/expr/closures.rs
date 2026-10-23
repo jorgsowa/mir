@@ -5,7 +5,6 @@ use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::stmt::{mir_check_matches, return_type_is_invalid, widen_for_check};
 use crate::symbol::ReferenceKind;
-use crate::util::param_name_span;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
 use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind};
@@ -561,11 +560,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let Some(raw) = p.name.as_str() {
                 let trimmed = raw.trim_start_matches('$');
                 let ty = closure_ctx.get_var(trimmed);
-                self.record_symbol(
-                    param_name_span(self.source, p),
-                    ReferenceKind::Variable(Arc::from(trimmed)),
-                    ty,
-                );
+                self.record_symbol(p.name.span, ReferenceKind::Variable(Arc::from(trimmed)), ty);
             }
         }
         let mut byref_captures: Vec<(&str, Type)> = Vec::new();
@@ -964,11 +959,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Use arrow_ctx.get_var to get the resolved type (params take priority
                 // over outer-scope vars of the same name since they were inserted first).
                 let ty = arrow_ctx.get_var(trimmed);
-                self.record_symbol(
-                    param_name_span(self.source, p),
-                    ReferenceKind::Variable(Arc::from(trimmed)),
-                    ty,
-                );
+                self.record_symbol(p.name.span, ReferenceKind::Variable(Arc::from(trimmed)), ty);
             }
         }
 

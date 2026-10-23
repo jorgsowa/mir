@@ -248,7 +248,6 @@ impl<'a> BodyAnalyzer<'a> {
             record_param_symbols(
                 all_symbols.as_deref_mut(),
                 file,
-                source,
                 &hook.params,
                 &ctx,
                 self.collect_symbols,
@@ -312,7 +311,7 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         if self.collect_navigation_facts {
             if let Some(name) = prop.name.as_str().filter(|n| !n.is_empty()) {
-                let span = super::property_name_span(source, member_span, name);
+                let span = prop.name.span;
                 if span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
                         span,
@@ -329,7 +328,7 @@ impl<'a> BodyAnalyzer<'a> {
         if self.mode == AnalysisMode::Full && self.record_reference_locations {
             if let Some(name) = prop.name.as_str() {
                 if !name.is_empty() {
-                    let span = super::property_name_span(source, member_span, name);
+                    let span = prop.name.span;
                     if span.end > span.start {
                         let (line, col_start) =
                             crate::diagnostics::offset_to_line_col(source, span.start, source_map);
@@ -408,7 +407,6 @@ impl<'a> BodyAnalyzer<'a> {
     pub(super) fn record_class_const_decl(
         &self,
         constant: &php_ast::owned::ClassConstDecl,
-        member_span: &php_ast::Span,
         fqcn: &str,
         file: &Arc<str>,
         source: &str,
@@ -420,7 +418,7 @@ impl<'a> BodyAnalyzer<'a> {
         if name.is_empty() {
             return;
         }
-        let span = super::bare_name_span_in(source, member_span, name);
+        let span = constant.name.span;
         if span.end <= span.start {
             return;
         }
@@ -558,7 +556,7 @@ impl<'a> BodyAnalyzer<'a> {
                 .iter()
                 .any(|a| matches!(a, mir_types::Atomic::TNamedObject { .. }))
             {
-                let header_span = method_header_name_span(source, method);
+                let header_span = method.name.span;
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);
                 let (line_end, col_end) =
@@ -617,7 +615,7 @@ impl<'a> BodyAnalyzer<'a> {
         // are already resolved exactly like the `@return` check above, with no
         // need to re-derive alias/template awareness by hand.
         if method.params.len() == params.len() {
-            let header_span = method_header_name_span(source, method);
+            let header_span = method.name.span;
             let (header_line, header_col_start) =
                 crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);
             let (header_line_end, header_col_end) =
@@ -933,7 +931,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         if self.collect_navigation_facts {
             if let Some(name) = method.name.as_str() {
-                let span = super::method_decl_name_span(source, member_span, method);
+                let span = method.name.span;
                 if span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
                         span,
@@ -949,7 +947,7 @@ impl<'a> BodyAnalyzer<'a> {
         // untyped `$x`) can still surface matching declarations.
         if self.mode == AnalysisMode::Full {
             if let Some(name) = method.name.as_str() {
-                let span = super::method_decl_name_span(source, member_span, method);
+                let span = method.name.span;
                 if span.end > span.start {
                     let (line, col_start) =
                         crate::diagnostics::offset_to_line_col(source, span.start, source_map);
@@ -1001,7 +999,7 @@ impl<'a> BodyAnalyzer<'a> {
                 && (param.modifiers.visibility.is_some() || param.modifiers.is_readonly)
             {
                 let name = param.name.as_str().unwrap_or("");
-                let span = super::property_name_span(source, &param.span, name);
+                let span = param.name.span;
                 if !name.is_empty() && span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
                         span,
@@ -1175,7 +1173,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         self.check_and_record_throws_classes(
             &declared_throws,
-            method_header_name_span(source, method),
+            method.name.span,
             file,
             source,
             source_map,
@@ -1266,7 +1264,6 @@ impl<'a> BodyAnalyzer<'a> {
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
-            source,
             &method.params,
             &ctx,
             self.collect_symbols,
@@ -1389,7 +1386,7 @@ impl<'a> BodyAnalyzer<'a> {
                         {
                             continue;
                         }
-                        let name_span = method_header_name_span(source, method);
+                        let name_span = method.name.span;
                         let (line, col_start) = crate::diagnostics::offset_to_line_col(
                             source,
                             name_span.start,
@@ -1550,14 +1547,8 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
-        if let Some(name) = decl.name.as_ref().and_then(|i| i.as_str()) {
-            self.push_decl_name_fact(
-                source,
-                0..decl.body.span.start,
-                "class",
-                name,
-                crate::Name::class(fqcn),
-            );
+        if let Some(ident) = &decl.name {
+            self.push_decl_name_fact(ident, crate::Name::class(fqcn));
         }
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
@@ -1717,7 +1708,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
+                    self.record_class_const_decl(c, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -1947,7 +1938,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
+                    self.record_class_const_decl(c, fqcn, file, source, source_map);
                 }
                 continue;
             };

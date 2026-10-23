@@ -38,13 +38,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
-        self.push_decl_name_fact(
-            source,
-            0..decl.body.span.start,
-            "trait",
-            decl.name.as_str().unwrap_or(""),
-            crate::Name::class(fqcn),
-        );
+        self.push_decl_name_fact(&decl.name, crate::Name::class(fqcn));
         self.check_class_generic_type_args(
             &decl.doc_comment,
             fqcn,
@@ -114,7 +108,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
+                    self.record_class_const_decl(c, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -202,7 +196,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
+                    self.record_class_const_decl(c, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -343,13 +337,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
-        self.push_decl_name_fact(
-            source,
-            0..decl.body.span.start,
-            "enum",
-            enum_name,
-            crate::Name::class(fqcn),
-        );
+        self.push_decl_name_fact(&decl.name, crate::Name::class(fqcn));
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -364,20 +352,10 @@ impl<'a> BodyAnalyzer<'a> {
             let EnumMemberKind::Method(method) = &member.kind else {
                 match &member.kind {
                     EnumMemberKind::ClassConst(c) => {
-                        self.record_class_const_decl(
-                            c,
-                            &member.span,
-                            fqcn,
-                            file,
-                            source,
-                            source_map,
-                        );
+                        self.record_class_const_decl(c, fqcn, file, source, source_map);
                     }
                     EnumMemberKind::Case(case) => self.push_decl_name_fact(
-                        source,
-                        member.span.start..member.span.end,
-                        "case",
-                        case.name.as_str().unwrap_or(""),
+                        &case.name,
                         crate::Name::class_constant(fqcn, case.name.as_str().unwrap_or("")),
                     ),
                     _ => {}
@@ -482,7 +460,7 @@ impl<'a> BodyAnalyzer<'a> {
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 if let EnumMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
+                    self.record_class_const_decl(c, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -583,26 +561,13 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
-        self.push_decl_name_fact(
-            source,
-            0..decl.body.span.start,
-            "interface",
-            iface_name,
-            crate::Name::class(iface_fqcn.as_str()),
-        );
+        self.push_decl_name_fact(&decl.name, crate::Name::class(iface_fqcn.as_str()));
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);
 
         for member in decl.body.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
                 if let ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(
-                        c,
-                        &member.span,
-                        &iface_fqcn,
-                        file,
-                        source,
-                        source_map,
-                    );
+                    self.record_class_const_decl(c, &iface_fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -613,7 +578,7 @@ impl<'a> BodyAnalyzer<'a> {
             // surfaces an interface's own method declarations.
             if self.collect_navigation_facts {
                 if let Some(name) = method.name.as_str() {
-                    let span = super::method_decl_name_span(source, &member.span, method);
+                    let span = method.name.span;
                     if span.end > span.start {
                         self.navigation_facts
                             .borrow_mut()
@@ -630,7 +595,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             if self.mode == AnalysisMode::Full && self.record_reference_locations {
                 if let Some(name) = method.name.as_str() {
-                    let span = super::method_decl_name_span(source, &member.span, method);
+                    let span = method.name.span;
                     if span.end > span.start {
                         let (line, col_start) =
                             crate::diagnostics::offset_to_line_col(source, span.start, source_map);
@@ -702,7 +667,7 @@ impl<'a> BodyAnalyzer<'a> {
                                 .unwrap_or("")
                                 .trim_start_matches('$')
                                 .to_string();
-                            let span = param_name_span(source, ast_param);
+                            let span = ast_param.name.span;
                             let (line, col_start) = crate::diagnostics::offset_to_line_col(
                                 source, span.start, source_map,
                             );
