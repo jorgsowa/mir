@@ -18,6 +18,14 @@ fn find_alias<'a>(alias: &str, use_aliases: &'a FxHashMap<String, String>) -> Op
     })
 }
 
+/// The rest of a relative name (`namespace\Foo`), which names `Foo` in the current namespace.
+fn strip_relative(name: &str) -> Option<&str> {
+    const RELATIVE: &str = "namespace\\";
+    name.get(..RELATIVE.len())
+        .filter(|prefix| prefix.eq_ignore_ascii_case(RELATIVE))
+        .map(|_| &name[RELATIVE.len()..])
+}
+
 pub(super) fn resolve_name(
     name: &str,
     namespace: &Option<String>,
@@ -25,6 +33,12 @@ pub(super) fn resolve_name(
 ) -> String {
     if name.starts_with('\\') {
         return name.trim_start_matches('\\').to_string();
+    }
+    if let Some(rest) = strip_relative(name) {
+        return match namespace {
+            Some(ns) => format!("{ns}\\{rest}"),
+            None => rest.to_string(),
+        };
     }
     let first_part = name.split('\\').next().unwrap_or(name);
     if let Some(resolved) = find_alias(first_part, use_aliases) {
@@ -75,6 +89,12 @@ pub(super) fn resolve_type_name(
             use_aliases,
         );
         return Name::from(format!("{class}::{member}"));
+    }
+    if strip_relative(name).is_some() {
+        return match full_qualify {
+            true => resolve_name(name, namespace, use_aliases).as_str().into(),
+            false => Name::from(name),
+        };
     }
     let stripped = name.trim_start_matches('\\');
     // Already-resolved `@psalm-import-type` placeholder.

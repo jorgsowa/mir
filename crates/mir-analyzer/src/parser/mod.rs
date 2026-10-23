@@ -181,22 +181,30 @@ fn strip_trailing_reopen_tag(s: &str) -> Option<&str> {
 // Name resolution helper — join Name parts to a string
 // ---------------------------------------------------------------------------
 
+/// A relative name keeps its `namespace\` prefix so resolution skips `use` imports.
 pub(crate) fn name_to_string<'src>(name: &php_ast::ast::Name<'_, 'src>) -> Cow<'src, str> {
+    if name.kind() == php_ast::ast::NameKind::Relative {
+        return Cow::Owned(format!("namespace\\{}", name.join_parts()));
+    }
     name.to_string_repr()
 }
 
 /// Same as [`name_to_string`] but for the owned (lifetime-free) AST.
 pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> Cow<'_, str> {
     let fully_qualified = name.kind == php_ast::ast::NameKind::FullyQualified;
+    let relative = name.kind == php_ast::ast::NameKind::Relative;
     if let [single] = &*name.parts {
-        if !fully_qualified {
+        if !fully_qualified && !relative {
             return Cow::Borrowed(single);
         }
     }
     let len = name.parts.iter().map(|p| p.len() + 1).sum::<usize>();
-    let mut out = String::with_capacity(len);
+    let mut out = String::with_capacity(len + 9);
+    if relative {
+        out.push_str("namespace");
+    }
     for (i, part) in name.parts.iter().enumerate() {
-        if fully_qualified || i > 0 {
+        if fully_qualified || relative || i > 0 {
             out.push('\\');
         }
         out.push_str(part);
