@@ -528,12 +528,12 @@ impl<'a> Scan<'a> {
                 let Some(name) = fc.name.kind.name_ref() else {
                     return Inspect::Nothing;
                 };
-                let lower = crate::util::php_ident_lowercase(name.as_ref());
+                let lower = crate::util::php_ident_lowercase(name.trim_start_matches('\\'));
                 if crate::taint::is_source_function(&lower)
                     || crate::taint::is_request_helper_source(&lower, &fc.args)
                 {
                     Inspect::Source
-                } else if crate::stubs::is_builtin_function(lower.trim_start_matches('\\')) {
+                } else if crate::stubs::is_builtin_function(&lower) {
                     Inspect::Nothing
                 } else {
                     let resolved = crate::db::resolve_name(self.db, self.path, name.as_ref());

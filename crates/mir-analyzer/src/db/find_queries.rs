@@ -1329,6 +1329,7 @@ pub fn class_array_property_defaults<'db>(
         let Some(name) = decl.name.as_ref().and_then(|n| n.as_str()) else {
             return;
         };
+        let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
         if !crate::db::resolve_name(db, path.as_ref(), name).eq_ignore_ascii_case(target.as_str()) {
             return;
         }

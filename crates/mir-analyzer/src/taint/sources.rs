@@ -317,7 +317,7 @@ pub fn is_request_bag_property(db: &dyn crate::db::MirDatabase, fqcn: &str, prop
 
 /// Laravel's `request('q')` helper reads input; `request()` returns the request object.
 pub fn is_request_helper_source(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
-    fn_name_lower.trim_start_matches('\\') == "request" && !args.is_empty()
+    fn_name_lower == "request" && !args.is_empty()
 }
 
 /// Builtins whose result is request data.
