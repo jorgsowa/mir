@@ -14,7 +14,7 @@
 //! - Attribute applied to element that doesn't match its declared target → `InvalidAttribute`
 //! - Same non-repeatable attribute applied twice on the same element → `InvalidAttribute`
 
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
 use mir_issues::{Issue, IssueKind, Location};
@@ -98,9 +98,8 @@ fn record_class_refs_in_expr(
     source: &str,
     source_map: &SourceMap,
 ) {
-    let record = |name: &str, span: php_ast::Span| {
-        let resolved = resolve_name(db, file.as_ref(), name);
-        if matches!(resolved.as_str(), "self" | "static" | "parent") {
+    let record = |resolved: &str, span: php_ast::Span| {
+        if matches!(resolved, "self" | "static" | "parent") {
             return;
         }
         let (line, col_start) = offset_to_line_col(source, span.start, source_map);
@@ -116,8 +115,8 @@ fn record_class_refs_in_expr(
 
     match &expr.kind {
         ExprKind::ClassConstAccess(cca) => {
-            if let Some(id) = cca.class.kind.name_ref() {
-                record(id.as_ref(), cca.class.span);
+            if let Some(resolved) = cca.class.kind.resolve_name_ref(db, file) {
+                record(&resolved, cca.class.span);
                 // `Foo::CONST`/`Foo::Case` (but not `Foo::class`, which has no
                 // constant/case of its own) is also a real reference to that
                 // specific constant/enum case — without this, `#[Attr(Status::Active)]`
@@ -125,7 +124,6 @@ fn record_class_refs_in_expr(
                 // and dead-code analysis both missed this usage.
                 if !matches!(&cca.member.kind, ExprKind::Identifier(m) if m.as_ref() == "class") {
                     if let ExprKind::Identifier(member) = &cca.member.kind {
-                        let resolved = resolve_name(db, file.as_ref(), id.as_ref());
                         if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                             let (line, col_start) =
                                 offset_to_line_col(source, cca.member.span.start, source_map);
@@ -148,8 +146,8 @@ fn record_class_refs_in_expr(
             }
         }
         ExprKind::New(n) => {
-            if let Some(id) = n.class.kind.name_ref() {
-                record(id.as_ref(), n.class.span);
+            if let Some(resolved) = n.class.kind.resolve_name_ref(db, file) {
+                record(&resolved, n.class.span);
             } else {
                 record_class_refs_in_expr(&n.class, db, file, source, source_map);
             }

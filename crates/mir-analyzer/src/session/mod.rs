@@ -585,20 +585,6 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
     use php_ast::owned::{ClassMemberKind, ExprKind};
     use std::ops::ControlFlow;
 
-    fn owned_name_str(name: &php_ast::owned::Name) -> String {
-        let joined: String = name
-            .parts
-            .iter()
-            .map(|p| p.as_ref())
-            .collect::<Vec<&str>>()
-            .join("\\");
-        if name.kind == php_ast::ast::NameKind::FullyQualified {
-            format!("\\{joined}")
-        } else {
-            joined
-        }
-    }
-
     /// Recursively collect all `TNamedObject` FQCNs from a mir type, including
     /// those nested inside generic type parameters (e.g. `Collection<Item>`).
     fn collect_from_type(ty: &mir_types::Type, out: &mut std::collections::HashSet<String>) {
@@ -697,9 +683,9 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
 
         // Walker routes every class/type-position Name here: type hints, catch types, extends/implements, trait use, attributes.
         fn visit_name(&mut self, name: &php_ast::owned::Name) -> ControlFlow<()> {
-            let s = owned_name_str(name);
+            let s = crate::parser::name_to_string_owned(name);
             if !s.is_empty() {
-                self.names.insert(s);
+                self.names.insert(s.into_owned());
             }
             ControlFlow::Continue(())
         }

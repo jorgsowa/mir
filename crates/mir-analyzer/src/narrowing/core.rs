@@ -215,27 +215,22 @@ pub(crate) fn extract_class_fqcn_from_expr(
     match &expr.kind {
         // \Foo\Bar::class  or  Foo\Bar::class  (also self::class/static::class/parent::class)
         ExprKind::ClassConstAccess(cca) => {
-            if let Some(id) = cca.class.kind.name_ref() {
+            if let Some(id) = cca.class.kind.resolve_name_ref(db, file) {
                 let member = match &cca.member.kind {
                     ExprKind::Identifier(s) => s.as_ref(),
                     _ => return None,
                 };
                 if member.eq_ignore_ascii_case("class") {
-                    match id.to_ascii_lowercase().as_str() {
-                        "self" | "static" => {
-                            let fqcn = if id.eq_ignore_ascii_case("static") {
-                                static_fqcn.or(self_fqcn)
-                            } else {
-                                self_fqcn
-                            };
-                            return fqcn.map(std::sync::Arc::from);
-                        }
-                        "parent" => return parent_fqcn.map(std::sync::Arc::from),
-                        _ => {
-                            let resolved = crate::db::resolve_name(db, file, id.as_ref());
-                            return Some(std::sync::Arc::from(resolved.as_str()));
-                        }
-                    }
+                    let fqcn = if id.eq_ignore_ascii_case("self") {
+                        self_fqcn
+                    } else if id.eq_ignore_ascii_case("static") {
+                        static_fqcn.or(self_fqcn)
+                    } else if id.eq_ignore_ascii_case("parent") {
+                        parent_fqcn
+                    } else {
+                        Some(id.as_str())
+                    };
+                    return fqcn.map(std::sync::Arc::from);
                 }
             }
             None

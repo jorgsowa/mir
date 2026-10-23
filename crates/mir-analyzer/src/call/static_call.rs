@@ -166,14 +166,13 @@ pub(crate) fn resolve_literal_class_scope(
     file: &str,
     expr: &php_ast::owned::Expr,
 ) -> Option<Arc<str>> {
-    let name = match &expr.kind {
+    let resolved = match &expr.kind {
         ExprKind::ClassConstAccess(cca) if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) => {
-            cca.class.kind.name_ref()?
+            cca.class.kind.resolve_name_ref(db, file)?
         }
-        ExprKind::String(s) => std::borrow::Cow::Borrowed(s.as_str()),
+        ExprKind::String(s) => crate::db::resolve_name(db, file, s.as_str()),
         _ => return None,
     };
-    let resolved = crate::db::resolve_name(db, file, &name);
     crate::db::class_exists(db, &resolved).then(|| Arc::from(resolved.as_str()))
 }
 

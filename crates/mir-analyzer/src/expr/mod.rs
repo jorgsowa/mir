@@ -195,8 +195,11 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) {
         let class = match &target.kind {
             ExprKind::Name(_) => {
-                let name = target.kind.name_ref().unwrap_or_default();
-                match crate::db::resolve_name(self.db, &self.file, &name).as_str() {
+                let name = target
+                    .kind
+                    .resolve_name_ref(self.db, &self.file)
+                    .unwrap_or_default();
+                match name.as_str() {
                     "self" | "static" => ctx.self_fqcn.clone(),
                     "parent" => ctx.parent_fqcn.clone(),
                     resolved => Some(Arc::from(resolved)),

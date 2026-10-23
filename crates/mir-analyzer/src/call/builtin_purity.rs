@@ -2,7 +2,7 @@
 //! can't express that condition; unconditionally pure builtins are tagged in
 //! the stubs instead.
 
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::ast_ext::{ArgExt as _, ByteStringExt as _};
 use crate::ast_ext::{FunctionRef, FunctionRefExt as _};
 use mir_types::{Atomic, Type};
@@ -82,12 +82,11 @@ fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -
                 .function_ref(ea.db, &ea.file)
                 .is_some_and(|name| function_is_pure(ea, &name)),
             CallableCreateKind::StaticMethod { class, method } => {
-                let (Some(class), ExprKind::Identifier(method)) =
-                    (class.kind.name_ref(), &method.kind)
+                let (Some(resolved), ExprKind::Identifier(method)) =
+                    (class.kind.resolve_name_ref(ea.db, &ea.file), &method.kind)
                 else {
                     return false;
                 };
-                let resolved = crate::db::resolve_name(ea.db, &ea.file, class.as_ref());
                 let fqcn = match crate::util::php_ident_lowercase(&resolved).as_str() {
                     "self" => ctx.self_fqcn.as_deref(),
                     "parent" => ctx.parent_fqcn.as_deref(),

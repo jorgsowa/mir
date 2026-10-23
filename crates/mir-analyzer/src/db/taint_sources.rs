@@ -6,7 +6,7 @@
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -380,15 +380,13 @@ impl<'a> Scan<'a> {
     }
 
     fn class_name(&self, expr: &Expr) -> Option<Name> {
-        let name = expr.kind.name_ref()?;
-        match crate::util::php_ident_lowercase(name.as_ref()).as_str() {
-            "self" | "static" => self.self_fqcn,
-            "parent" => self.parent_fqcn,
-            _ => Some(Name::new(&crate::db::resolve_name(
-                self.db,
-                self.path,
-                name.as_ref(),
-            ))),
+        let name = expr.kind.resolve_name_ref(self.db, self.path)?;
+        match name.as_str() {
+            n if n.eq_ignore_ascii_case("self") || n.eq_ignore_ascii_case("static") => {
+                self.self_fqcn
+            }
+            n if n.eq_ignore_ascii_case("parent") => self.parent_fqcn,
+            n => Some(Name::new(n)),
         }
     }
 

@@ -8,7 +8,7 @@ mod loops;
 mod return_type;
 pub(crate) use return_type::erase_templates_to_bounds;
 
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 pub(crate) use flow::return_type_is_invalid;
 pub(crate) use loops::infer_foreach_types;
 pub(crate) use loops::resolve_iterator_item_types;
@@ -177,8 +177,12 @@ fn closure_var_rebind(
 
     match &call_expr.kind {
         ExprKind::StaticMethodCall(smc) => {
-            let class_name = smc.class.kind.name_ref()?;
-            if !crate::db::resolve_name(db, file, &class_name).eq_ignore_ascii_case("Closure") {
+            if !smc
+                .class
+                .kind
+                .resolve_name_ref(db, file)?
+                .eq_ignore_ascii_case("Closure")
+            {
                 return None;
             }
             let ExprKind::Identifier(method_name) = &smc.method.kind else {

@@ -115,9 +115,7 @@ impl NameResolveExt for php_ast::owned::ExprKind {
     fn resolve_name_ref(&self, db: &dyn crate::db::MirDatabase, file: &str) -> Option<String> {
         use php_ast::ast::NameKind;
         let php_ast::owned::ExprKind::Name(n) = self else {
-            return self
-                .name_ref()
-                .map(|name| crate::db::resolve_name(db, file, &name));
+            return None;
         };
         Some(match (n.kind, &*n.parts) {
             (NameKind::Error, _) => return None,

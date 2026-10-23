@@ -1,7 +1,7 @@
 use super::*;
 use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::FunctionRefExt as _;
-use crate::ast_ext::NameRefExt as _;
+use crate::ast_ext::NameResolveExt as _;
 
 /// Taint of the key names of the array `expr` yields when iterated, given the `whole` taint of its
 /// contents: arrays whose keys are tracked exactly don't pass their values' taint on to their keys.
@@ -114,12 +114,11 @@ fn call_keys_taint(
             keys
         }
         ExprKind::StaticMethodCall(smc) => {
-            let (Some(class), ExprKind::Identifier(method_name)) =
-                (smc.class.kind.name_ref(), &smc.method.kind)
+            let (Some(resolved), ExprKind::Identifier(method_name)) =
+                (smc.class.kind.resolve_name_ref(db, file), &smc.method.kind)
             else {
                 return None;
             };
-            let resolved = crate::db::resolve_name(db, file, class.as_ref());
             let fqcn = match resolved.as_str() {
                 "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
                 "parent" => ctx.parent_fqcn.clone()?,
@@ -127,7 +126,7 @@ fn call_keys_taint(
             };
             let forwards_this = ["self", "static", "parent"]
                 .iter()
-                .any(|k| class.eq_ignore_ascii_case(k));
+                .any(|k| resolved.eq_ignore_ascii_case(k));
             let this_receiver = forwards_this.then(|| Expr {
                 kind: ExprKind::Variable("this".into()),
                 span: smc.class.span,

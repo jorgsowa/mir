@@ -3,7 +3,6 @@ use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
 
 /// Union of the kinds named by taint annotations (`html`, `sql`, `input`, ...).
@@ -69,13 +68,13 @@ fn iterator_wrapper_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    let Some(name) = new.class.kind.name_ref() else {
-        return Taint::NONE;
-    };
     if new.args.is_empty() {
         return Taint::NONE;
     }
-    let class = match crate::db::resolve_name(db, file, name.as_ref()).as_str() {
+    let Some(resolved) = new.class.kind.resolve_name_ref(db, file) else {
+        return Taint::NONE;
+    };
+    let class = match resolved.as_str() {
         "self" | "static" => ctx.self_fqcn.clone(),
         "parent" => ctx.parent_fqcn.clone(),
         resolved => Some(std::sync::Arc::from(resolved)),
