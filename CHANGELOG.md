@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- In a file with several `namespace {}` blocks, a call to a function or method declared in another block of the same file lost its return taint: the file's declarations were named after the namespace block that first asked for them.
+- `\getallheaders()`, `\filter_input()` and `\request(...)` written fully qualified are taint sources when their value is returned from a function or stored in a property, like the unqualified form.
+- `namespace\C` resolves in the current namespace (was `UndefinedConstant: namespace\C`), and `\C` names only the global constant: a missing global constant with a namespaced namesake is reported.
+- A static-property write through `\Foo::$x` or `namespace\Foo::$x` is attributed to the right class: the first no longer disables literal typing of `private static` arrays for the whole file, and the second no longer lets the property be typed by its default (false `InvalidPropertyAssignment`).
+- Issues on a function, method, property, constant or parameter name point at the name itself, not at an earlier occurrence of the same text in a comment or attribute argument.
 - `parent` in a class without a parent is reported as `ParentNotFound` for every use, once: `parent::$p`, `new parent` and class attributes were missed, and `parent::X` / `parent::class` inside a trait were false positives.
 - `self` / `static` / `parent` in a function outside a class, a duplicate parameter (`function f($a, $a)`), a generator whose return type does not accept `Generator` (`function f(): int { yield 1; }`) and any write to `$this` (destructuring, `foreach`, `catch`) are reported as `CompileError`. `$this = 1` was `InvalidScope` with a message about static methods.
 - Writing to a property or offset of a `new` expression (`(new A)->p = 1`, `new A()->p = 1`) is reported again (as `CompileError`), as PHP rejects it at compile time.
