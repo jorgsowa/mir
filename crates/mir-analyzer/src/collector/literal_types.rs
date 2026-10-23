@@ -42,12 +42,11 @@
 //! declarations (PHP semantics, mirrored by the parser's `NsKind::Unbraced`),
 //! so the scanner tracks the namespace across sibling statements.
 use crate::ast_ext::ArrayElementExt as _;
-use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::NameRefExt as _;
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 
 use mir_types::{Atomic, Type};
+use php_ast::ast::NameKind;
 use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
 use php_ast::owned::{ArrayElement, Expr, ExprKind, Name, NamespaceBody, Program, Stmt, StmtKind};
 
@@ -191,33 +190,23 @@ impl WriteScanner {
         }
     }
 
-    /// Resolves the class side of a static access to a lowercased FQCN. In the
-    /// owned AST a class reference is a single `Identifier` string (possibly
-    /// backslash-qualified, possibly leading-backslash-absolute). `self::` /
-    /// `static::` resolve to the enclosing class-like declaration; `parent::`
-    /// and single-segment names (possible `use` aliases) are unresolvable;
-    /// multi-segment relative names resolve against the current namespace.
+    /// Resolves the class side of a static access to a lowercased FQCN.
+    /// `parent::` and unqualified names (possible `use` aliases) are unresolvable.
     fn resolve_class(&self, class: &Expr) -> Option<String> {
-        let id = class.kind.name_ref()?;
-        let absolute = id.starts_with('\\');
-        let trimmed = id.trim_start_matches('\\');
-        let lower = trimmed.to_lowercase();
-        let first = lower.split('\\').next().unwrap_or("");
-        let segments = lower.split('\\').filter(|p| !p.is_empty()).count();
-        match first {
-            "self" | "static" => self.class.clone(),
-            "parent" => None,
-            _ => {
-                if segments <= 1 {
-                    return None;
-                }
-                let full = if absolute {
-                    trimmed.to_string()
-                } else {
-                    qualify(self.ns.as_deref(), trimmed)
-                };
-                Some(full.to_lowercase())
+        let ExprKind::Name(name) = &class.kind else {
+            return None;
+        };
+        match (name.kind, &*name.parts) {
+            (NameKind::Unqualified, [only])
+                if only.eq_ignore_ascii_case("self") || only.eq_ignore_ascii_case("static") =>
+            {
+                self.class.clone()
             }
+            (NameKind::FullyQualified, _) => Some(lower_name(name)),
+            (NameKind::Qualified | NameKind::Relative, _) => {
+                Some(qualify(self.ns.as_deref(), &lower_name(name)))
+            }
+            _ => None,
         }
     }
 }
@@ -240,12 +229,12 @@ fn qualify(ns: Option<&str>, class: &str) -> String {
     }
 }
 
-/// The identifier of a member expression that is a plain single-segment
-/// `Identifier` — the property name of a static access. `None` for anything
-/// else (qualified names, variables, `${$x}`), which the caller treats as
-/// unresolvable.
+/// The property name of a static access; `None` for `${$x}` and other dynamic names.
 fn single_name(expr: &Expr) -> Option<&str> {
-    expr.kind.name_bare().filter(|s| !s.contains('\\'))
+    match &expr.kind {
+        ExprKind::Identifier(name) => Some(name),
+        _ => None,
+    }
 }
 
 /// The type of a *literal* expression: integer, float, string, boolean,

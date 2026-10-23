@@ -878,7 +878,7 @@ pub fn own_call_prop_writes(
 ) -> Vec<(mir_types::Name, Taint)> {
     let class = match &unwrap_parens(target).kind {
         ExprKind::Variable(var) if var.trim_start_matches('$') == "this" => ctx.self_fqcn.clone(),
-        ExprKind::Identifier(_) | ExprKind::Name(_) => {
+        ExprKind::Name(_) => {
             let name = unwrap_parens(target).kind.name_bare().unwrap_or_default();
             match crate::util::php_ident_lowercase(name).as_str() {
                 "self" | "static" => ctx.self_fqcn.clone(),

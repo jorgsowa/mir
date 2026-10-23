@@ -50,7 +50,7 @@ pub(super) fn shape_entry_is_safe(ty: &mir_types::Type, key: mir_types::Name) ->
 /// Whether a flags expression includes the constant `flag` (`A | B`).
 pub(super) fn has_flag(expr: &Expr, flag: &str) -> bool {
     match &expr.kind {
-        ExprKind::Identifier(_) | ExprKind::Name(_) => expr.kind.name_bare() == Some(flag),
+        ExprKind::Name(_) => expr.kind.name_bare() == Some(flag),
         ExprKind::Binary(op) if op.op == php_ast::ast::BinaryOp::BitwiseOr => {
             has_flag(&op.left, flag) || has_flag(&op.right, flag)
         }

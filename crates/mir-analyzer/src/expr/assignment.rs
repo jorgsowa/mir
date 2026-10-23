@@ -59,7 +59,7 @@ pub(crate) fn resolve_static_prop_target(
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
     let fqcn = match &spa.class.kind {
-        ExprKind::Identifier(_) | ExprKind::Name(_) => {
+        ExprKind::Name(_) => {
             let resolved = spa
                 .class
                 .kind

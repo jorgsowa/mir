@@ -726,7 +726,7 @@ pub(super) fn extract_class_name(
     parent_fqcn: Option<&str>,
 ) -> Option<String> {
     match &expr.kind {
-        ExprKind::Identifier(_) | ExprKind::Name(_) => {
+        ExprKind::Name(_) => {
             let name = expr.kind.name_ref().unwrap_or_default();
             match name.to_ascii_lowercase().as_str() {
                 "self" | "static" => self_fqcn.map(|s| s.to_string()),

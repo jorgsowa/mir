@@ -291,7 +291,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn check_new_taint(&mut self, n: &NewExpr, span: php_ast::Span, ctx: &FlowState) {
         use crate::taint::SinkKind;
         let (value, kind) = match &n.class.kind {
-            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+            ExprKind::Name(_) => {
                 let fqcn = n
                     .class
                     .kind
@@ -1514,7 +1514,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
 
         let fqcn = match &cca.class.kind {
-            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+            ExprKind::Name(_) => {
                 let resolved = cca
                     .class
                     .kind

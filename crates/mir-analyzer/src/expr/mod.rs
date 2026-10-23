@@ -193,7 +193,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) {
         let class = match &target.kind {
-            ExprKind::Identifier(_) | ExprKind::Name(_) => {
+            ExprKind::Name(_) => {
                 let name = target.kind.name_ref().unwrap_or_default();
                 match crate::db::resolve_name(self.db, &self.file, &name).as_str() {
                     "self" | "static" => ctx.self_fqcn.clone(),
@@ -650,7 +650,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Variables --------------------------------------------------
             ExprKind::Variable(name) => self.analyze_variable(name.as_ref(), expr, ctx),
             ExprKind::VariableVariable(inner) => self.analyze_variable_variable(inner, ctx),
-            ExprKind::Identifier(_) | ExprKind::Name(_) => match expr.kind.name_ref() {
+            ExprKind::Name(_) => match expr.kind.name_ref() {
                 Some(name) => self.analyze_identifier(name.as_ref(), expr, ctx),
                 None => Type::mixed(),
             },

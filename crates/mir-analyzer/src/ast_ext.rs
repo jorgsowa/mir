@@ -67,7 +67,6 @@ impl NameRefExt for php_ast::owned::ExprKind {
         use php_ast::ast::NameKind;
         use php_ast::owned::ExprKind;
         match self {
-            ExprKind::Identifier(s) => Some(std::borrow::Cow::Borrowed(s)),
             ExprKind::Name(n) => Some(match (n.kind, &*n.parts) {
                 (NameKind::Unqualified, [only]) => std::borrow::Cow::Borrowed(only),
                 (NameKind::Error, _) => return None,
@@ -83,11 +82,7 @@ impl NameRefExt for php_ast::owned::ExprKind {
     fn is_name_ref(&self) -> bool {
         use php_ast::ast::NameKind;
         use php_ast::owned::ExprKind;
-        match self {
-            ExprKind::Identifier(_) => true,
-            ExprKind::Name(n) => n.kind != NameKind::Error,
-            _ => false,
-        }
+        matches!(self, ExprKind::Name(n) if n.kind != NameKind::Error)
     }
 }
 
@@ -102,7 +97,6 @@ impl NameBareExt for php_ast::owned::ExprKind {
         use php_ast::ast::NameKind;
         use php_ast::owned::ExprKind;
         match self {
-            ExprKind::Identifier(s) => Some(s.trim_start_matches('\\')),
             ExprKind::Name(n) => match (n.kind, &*n.parts) {
                 (NameKind::Unqualified | NameKind::FullyQualified, [only]) => Some(only),
                 _ => None,
