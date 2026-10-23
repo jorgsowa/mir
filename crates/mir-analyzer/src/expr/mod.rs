@@ -650,10 +650,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Variables --------------------------------------------------
             ExprKind::Variable(name) => self.analyze_variable(name.as_ref(), expr, ctx),
             ExprKind::VariableVariable(inner) => self.analyze_variable_variable(inner, ctx),
-            ExprKind::Name(_) => match expr.kind.name_ref() {
-                Some(name) => self.analyze_identifier(name.as_ref(), expr, ctx),
-                None => Type::mixed(),
-            },
+            ExprKind::Name(name) if name.kind != php_ast::ast::NameKind::Error => {
+                self.analyze_constant(name, expr, ctx)
+            }
 
             // --- Assignment -------------------------------------------------
             ExprKind::Assign(a) => self.analyze_assign(a, expr.span, ctx),

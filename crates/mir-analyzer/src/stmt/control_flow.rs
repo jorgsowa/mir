@@ -425,15 +425,7 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
         let value_var = extract_simple_var(&fe.value);
-        // The PHP parser silently discards the `&` in `foreach ($arr as &$val)`.
-        // Detect it by checking whether the source character immediately preceding
-        // the value span (skipping whitespace) is `&`. Reference iteration writes
-        // back through the reference, so dead-write checks don't apply.
-        let value_is_by_ref = value_var.is_some() && {
-            let start = fe.value.span.start as usize;
-            let pre = &self.source[..start.min(self.source.len())];
-            pre.chars().rev().find(|c| !c.is_whitespace()) == Some('&')
-        };
+        let value_is_by_ref = value_var.is_some() && fe.by_ref;
         // Writes through a by-reference value change the iterated array too.
         let value_parts = if value_is_by_ref {
             crate::taint::Taint::NONE

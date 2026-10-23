@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use super::helpers::extract_simple_var;
@@ -6,7 +7,8 @@ use crate::flow_state::FlowState;
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
-use php_ast::owned::Expr;
+use php_ast::ast::NameKind;
+use php_ast::owned::{Expr, Name};
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_variable(
@@ -116,25 +118,37 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_identifier(
+    pub(super) fn analyze_constant(
         &mut self,
-        name: &str,
+        name: &Name,
         expr: &Expr,
         ctx: &mut FlowState,
     ) -> Type {
-        let name_str: &str = name;
-        let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
-        let ns_qualified = self
-            .db
-            .file_namespace(self.file.as_ref())
-            .map(|ns| format!("{}\\{}", ns, name_str));
+        let joined: Cow<'_, str> = match &*name.parts {
+            [only] => Cow::Borrowed(only),
+            _ => Cow::Owned(name.join_parts()),
+        };
+        let namespace = self.db.file_namespace(self.file.as_ref());
+        let in_namespace = |n: &str| namespace.as_ref().map(|ns| format!("{ns}\\{n}"));
+        // Fully qualified and relative names have no global fallback.
+        let exact = match name.kind {
+            NameKind::FullyQualified => Some(joined.to_string()),
+            NameKind::Relative => Some(in_namespace(&joined).unwrap_or_else(|| joined.to_string())),
+            _ => None,
+        };
+        let name_str: &str = exact.as_deref().unwrap_or(&joined);
+        let ns_qualified = if exact.is_some() {
+            None
+        } else {
+            in_namespace(name_str)
+        };
 
         let resolve_pull = |fqn: &str| -> Option<mir_types::Type> {
             let here = crate::db::Fqcn::from_str(self.db, fqn);
             crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
         };
 
-        let imported = (!name_str.contains('\\'))
+        let imported = (name.kind == NameKind::Unqualified)
             .then(|| self.db.file_imports(self.file.as_ref()))
             .and_then(|imports| imports.get(&mir_types::Name::new(name_str)).cloned());
 
