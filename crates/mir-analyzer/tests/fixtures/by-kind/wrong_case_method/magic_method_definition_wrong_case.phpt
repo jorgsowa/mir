@@ -15,10 +15,9 @@ class Foo {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__Destruct' has incorrect casing; use '__destruct'
     public function __ToString(): string { return "x"; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__ToString' has incorrect casing; use '__toString'
-    public function __CallStatic(string $name, array $args): mixed { return null; }
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__CallStatic' has incorrect casing; use '__callStatic'
+    public static function __CallStatic(string $name, array $args): mixed { return null; }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__CallStatic' has incorrect casing; use '__callStatic'
     public function __debuginfo(): array { return []; }
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseMethod: Method name 'Foo::__debuginfo' has incorrect casing; use '__debugInfo'
 }
 ===expect===
-CompileError@9:4-9:83: Compile error: Method Foo::__CallStatic() must be static [magic-method-static]

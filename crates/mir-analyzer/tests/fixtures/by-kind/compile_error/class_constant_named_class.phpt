@@ -1,5 +1,5 @@
 ===description===
-Cannot name class constant class
+A class constant cannot be named `class`.
 ===file===
 <?php
 class Foo

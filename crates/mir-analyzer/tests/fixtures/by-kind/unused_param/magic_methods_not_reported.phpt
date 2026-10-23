@@ -13,7 +13,7 @@ class Magic {
         return null;
     }
 
-    public function __callStatic(string $name, array $arguments): mixed {
+    public static function __callStatic(string $name, array $arguments): mixed {
         return null;
     }
 
@@ -24,4 +24,3 @@ class Magic {
     public function __unset(string $name): void {}
 }
 ===expect===
-CompileError@13:4-15:5: Compile error: Method Magic::__callStatic() must be static [magic-method-static]

@@ -6,7 +6,7 @@ class Bar {
     public function __construct() {}
     public function __destruct() {}
     public function __toString(): string { return "x"; }
-    public function __callStatic(string $name, array $args): mixed { return null; }
+    public static function __callStatic(string $name, array $args): mixed { return null; }
     public function __debugInfo(): array { return []; }
     public function __invoke(): void {}
     public function __clone(): void {}
@@ -14,4 +14,3 @@ class Bar {
     public function __wakeup(): void {}
 }
 ===expect===
-CompileError@6:4-6:83: Compile error: Method Bar::__callStatic() must be static [magic-method-static]

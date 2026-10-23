@@ -1,5 +1,5 @@
 ===description===
-Attribute target arg cannot be variable
+An attribute argument must be a constant expression, not a variable.
 ===config===
 <mir>
   <issueHandlers>
