@@ -244,13 +244,13 @@ fn re_analyze_file_without_symbols_skips_symbol_retention() {
     );
 }
 
-/// After re_analyze_file, file_imports and file_namespaces must be restored so
+/// After re_analyze_file, file imports and file_namespaces must be restored so
 /// that use-alias resolution still works on the re-analyzed file.
 ///
 /// Mechanism: re_analyze_file calls DefinitionCollector::collect →
 /// inject_stub_slice. inject_stub_slice is the sole write path that
-/// repopulates file_namespaces and file_imports (via StubSlice::namespace and
-/// StubSlice::imports). If either field is missing from the slice, the maps stay
+/// repopulates file_namespaces and file imports (via StubSlice::namespace and
+/// StubSlice::class_imports). If either field is missing from the slice, the maps stay
 /// empty after re-analysis and StatementsAnalyzer emits false UndefinedClass
 /// diagnostics for `use`-aliased classes (`new Entity()`, `catch (Entity $e)`,
 /// type hints, etc.).

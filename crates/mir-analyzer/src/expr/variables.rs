@@ -149,7 +149,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
 
         let imported = (name.kind == NameKind::Unqualified)
-            .then(|| crate::ast_ext::imported_non_class(self.db, &self.file, name_str))
+            .then(|| crate::ast_ext::imported_constant(self.db, &self.file, name_str))
             .flatten();
 
         let resolved = imported

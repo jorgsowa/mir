@@ -450,15 +450,32 @@ impl MirDatabase for MirDbStorage {
         )
     }
 
-    fn file_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
+    fn file_function_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
         if let Some(block) = self.active_ns_block(file) {
-            return block.imports;
+            return block.function_imports;
         }
         let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
-        // O(1) Arc refcount inc — `slice.imports` is itself `Arc<FxHashMap<...>>`.
-        Arc::clone(&crate::db::collect_file_definitions(self, sf).slice.imports)
+        Arc::clone(
+            &crate::db::collect_file_definitions(self, sf)
+                .slice
+                .function_imports,
+        )
+    }
+
+    fn file_const_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
+        if let Some(block) = self.active_ns_block(file) {
+            return block.const_imports;
+        }
+        let Some(sf) = self.lookup_source_file(file) else {
+            return Arc::new(HashMap::default());
+        };
+        Arc::clone(
+            &crate::db::collect_file_definitions(self, sf)
+                .slice
+                .const_imports,
+        )
     }
 
     fn file_class_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
@@ -504,8 +521,12 @@ impl MirDatabase for MirDbStorage {
         self.source_files
             .iter()
             .map(|(path, &sf)| {
-                let imports =
-                    Arc::clone(&crate::db::collect_file_definitions(self, sf).slice.imports);
+                let slice = &crate::db::collect_file_definitions(self, sf).slice;
+                let imports = [
+                    Arc::clone(&slice.class_imports),
+                    Arc::clone(&slice.function_imports),
+                    Arc::clone(&slice.const_imports),
+                ];
                 (path.clone(), imports)
             })
             .collect()

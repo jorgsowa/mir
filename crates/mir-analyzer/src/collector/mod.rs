@@ -810,13 +810,32 @@ pub(super) fn const_type_with_literal_narrowing(
 struct NsBlockBuilder {
     start: u32,
     namespace: Option<Arc<str>>,
-    imports: FxHashMap<String, String>,
-    class_imports: FxHashMap<String, String>,
+    imports: ImportMaps,
 }
 
-fn intern_imports(
-    raw: FxHashMap<String, String>,
-) -> Arc<FxHashMap<mir_types::Name, mir_types::Name>> {
+/// `use` aliases, one map per `UseKind`: alias → FQN.
+#[derive(Default)]
+struct ImportMaps {
+    class: FxHashMap<String, String>,
+    function: FxHashMap<String, String>,
+    constant: FxHashMap<String, String>,
+}
+
+impl ImportMaps {
+    fn insert(&mut self, kind: php_ast::ast::UseKind, alias: &str, full_name: &str) {
+        use php_ast::ast::UseKind;
+        let map = match kind {
+            UseKind::Function => &mut self.function,
+            UseKind::Const => &mut self.constant,
+            _ => &mut self.class,
+        };
+        map.insert(alias.to_string(), full_name.to_string());
+    }
+}
+
+type InternedImports = Arc<FxHashMap<mir_types::Name, mir_types::Name>>;
+
+fn intern_imports(raw: FxHashMap<String, String>) -> InternedImports {
     Arc::new(
         raw.into_iter()
             .map(|(alias, fqcn)| (mir_types::Name::new(&alias), mir_types::Name::new(&fqcn)))
@@ -841,17 +860,10 @@ pub struct DefinitionCollector<'a> {
     /// The first namespace declaration seen in this file. Matches the semantics
     /// of `project.rs` which only records the first namespace per file.
     first_namespace: Option<String>,
-    /// All `use` imports ever encountered in this file — every `UseKind`,
-    /// unlike `use_aliases` — accumulated across all namespace blocks. Unlike
-    /// `use_aliases`, this is never cleared or restored, so braced-namespace
-    /// imports are not lost. Feeds `slice.imports` / `file_imports()`, which
-    /// Pass-2 function-call resolution relies on for `use function` aliases.
-    accumulated_imports: FxHashMap<String, String>,
-    /// Subset of `accumulated_imports` containing only `UseKind::Normal`
-    /// (class/interface/trait/enum) aliases — excludes `use function`/`use const`.
-    /// Feeds `slice.class_imports`, consulted by class-name resolution so a
-    /// function/constant import can't shadow a same-named class reference.
-    accumulated_class_imports: FxHashMap<String, String>,
+    /// Every `use` import in this file across all namespace blocks; never
+    /// cleared, so braced-namespace imports are not lost. Feeds the slice's
+    /// `class_imports` / `function_imports` / `const_imports`.
+    accumulated_imports: ImportMaps,
     /// One entry per `namespace` declaration, in source order.
     ns_blocks: Vec<NsBlockBuilder>,
     /// Static-property write targets found in this file, from
@@ -882,8 +894,7 @@ impl<'a> DefinitionCollector<'a> {
             issues: IssueBuffer::new(),
             php_version: None,
             first_namespace: None,
-            accumulated_imports: FxHashMap::default(),
-            accumulated_class_imports: FxHashMap::default(),
+            accumulated_imports: ImportMaps::default(),
             ns_blocks: Vec::new(),
             static_writes: literal_types::StaticWrites::default(),
         }
@@ -970,7 +981,7 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     /// Writes accumulated namespace and import data into `self.slice` so that
-    /// `file_namespace()` and `file_imports()` can derive them via
+    /// `file_namespace()` and the `file_*_imports()` queries can derive them via
     /// `collect_file_definitions`. Called at the end of `collect_slice`.
     fn finalize_slice(&mut self) {
         if self.ns_blocks.len() >= 2 {
@@ -988,34 +999,24 @@ impl<'a> DefinitionCollector<'a> {
                     start: b.start,
                     end,
                     namespace: b.namespace,
-                    imports: intern_imports(b.imports),
-                    class_imports: intern_imports(b.class_imports),
+                    class_imports: intern_imports(b.imports.class),
+                    function_imports: intern_imports(b.imports.function),
+                    const_imports: intern_imports(b.imports.constant),
                 })
                 .collect();
         }
         if let Some(ns) = self.first_namespace.take() {
             self.slice.namespace = Some(Arc::from(ns.as_str()));
         }
-        if !self.accumulated_imports.is_empty() {
-            // Convert collector's String-keyed map into the storage shape:
-            // Arc<FxHashMap<Name, Name>>. `Name::new` interns each string
-            // via the global ustr pool once per unique alias/FQCN.
-            let raw = std::mem::take(&mut self.accumulated_imports);
-            let mut interned: FxHashMap<mir_types::Name, mir_types::Name> =
-                FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
-            for (alias, fqcn) in raw {
-                interned.insert(mir_types::Name::new(&alias), mir_types::Name::new(&fqcn));
+        let imports = std::mem::take(&mut self.accumulated_imports);
+        for (raw, slot) in [
+            (imports.class, &mut self.slice.class_imports),
+            (imports.function, &mut self.slice.function_imports),
+            (imports.constant, &mut self.slice.const_imports),
+        ] {
+            if !raw.is_empty() {
+                *slot = intern_imports(raw);
             }
-            self.slice.imports = Arc::new(interned);
-        }
-        if !self.accumulated_class_imports.is_empty() {
-            let raw = std::mem::take(&mut self.accumulated_class_imports);
-            let mut interned: FxHashMap<mir_types::Name, mir_types::Name> =
-                FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
-            for (alias, fqcn) in raw {
-                interned.insert(mir_types::Name::new(&alias), mir_types::Name::new(&fqcn));
-            }
-            self.slice.class_imports = Arc::new(interned);
         }
     }
 
@@ -2084,8 +2085,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                 self.ns_blocks.push(NsBlockBuilder {
                     start: stmt.span.start,
                     namespace: new_ns.as_deref().map(Arc::from),
-                    imports: FxHashMap::default(),
-                    class_imports: FxHashMap::default(),
+                    imports: ImportMaps::default(),
                 });
                 self.namespace = new_ns;
                 match &ns.body {
@@ -2127,32 +2127,13 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                         .as_ref()
                         .and_then(|a| a.as_str())
                         .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
-                    // `accumulated_imports` (→ `file_imports()`) keeps every kind: Pass 2
-                    // function-call resolution (`call/function.rs`) relies on `use
-                    // function` aliases showing up there. `use_aliases` and
-                    // `accumulated_class_imports` (→ `file_class_imports()`) are
-                    // Normal-only: every Pass-1 consumer of `use_aliases` resolves a
-                    // class/type/attribute/exception name, so a `use function`/`use
-                    // const` alias (including per-item overrides inside a grouped `use
-                    // Foo\{Bar, function baz, const QUX}`) must never populate them —
-                    // otherwise a type hint/`new`/`extends` reference sharing that short
-                    // name would incorrectly resolve to the function/constant's FQN.
-                    self.accumulated_imports
-                        .insert(alias.to_string(), full_name.clone());
-                    let is_class_import = item.kind.unwrap_or(use_decl.kind) == UseKind::Normal;
+                    let kind = item.kind.unwrap_or(use_decl.kind);
+                    self.accumulated_imports.insert(kind, alias, &full_name);
                     if let Some(block) = self.ns_blocks.last_mut() {
-                        block.imports.insert(alias.to_string(), full_name.clone());
-                        if is_class_import {
-                            block
-                                .class_imports
-                                .insert(alias.to_string(), full_name.clone());
-                        }
+                        block.imports.insert(kind, alias, &full_name);
                     }
-                    if is_class_import {
-                        self.use_aliases
-                            .insert(alias.to_string(), full_name.clone());
-                        self.accumulated_class_imports
-                            .insert(alias.to_string(), full_name);
+                    if kind == UseKind::Normal {
+                        self.use_aliases.insert(alias.to_string(), full_name);
                     }
                 }
             }
@@ -2783,14 +2764,11 @@ mod tests {
 
     #[test]
     fn collect_slice_captures_use_imports() {
-        // All `use` imports (plain and aliased) must end up in slice.imports so
-        // that file_imports() can derive them via collect_file_definitions and
-        // body analysis can resolve short names like `new Entity()` correctly.
         let slice = parse_and_collect_slice(
             "src/Handler.php",
             "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\nuse App\\Repository\\EntityRepo as Repo;\nclass Handler {}\n",
         );
-        let imports = &slice.imports;
+        let imports = &slice.class_imports;
         assert_eq!(
             imports
                 .get(&mir_types::Name::new("Entity"))
@@ -2808,11 +2786,7 @@ mod tests {
     }
 
     #[test]
-    fn collect_slice_class_imports_excludes_use_function_and_const() {
-        // `use function`/`use const` (plain or grouped) must still land in
-        // slice.imports (Pass-2 function-call resolution needs them), but never
-        // in slice.class_imports — otherwise a same-named class/type-hint
-        // reference would incorrectly resolve to the function/constant's FQN.
+    fn collect_slice_keeps_one_import_map_per_use_kind() {
         let slice = parse_and_collect_slice(
             "src/Handler.php",
             concat!(
@@ -2822,53 +2796,47 @@ mod tests {
                 "use function App\\Helpers\\foo;\n",
                 "use const App\\Helpers\\BAR;\n",
                 "use App\\Helpers\\{Baz, function qux, const QUUX};\n",
+                "use function Fns\\x;\n",
+                "use const Consts\\x;\n",
                 "class Handler {}\n",
             ),
         );
-
-        for (alias, fqcn) in [
-            ("Entity", "App\\Model\\Entity"),
-            ("foo", "App\\Helpers\\foo"),
-            ("BAR", "App\\Helpers\\BAR"),
-            ("Baz", "App\\Helpers\\Baz"),
-            ("qux", "App\\Helpers\\qux"),
-            ("QUUX", "App\\Helpers\\QUUX"),
-        ] {
-            assert_eq!(
-                slice
-                    .imports
-                    .get(&mir_types::Name::new(alias))
-                    .map(|s| s.as_str()),
-                Some(fqcn),
-                "slice.imports must capture every UseKind for alias {alias}"
-            );
-        }
-
+        let entries = |map: &FxHashMap<mir_types::Name, mir_types::Name>| {
+            let mut v: Vec<(String, String)> = map
+                .iter()
+                .map(|(a, t)| (a.as_str().to_string(), t.as_str().to_string()))
+                .collect();
+            v.sort();
+            v
+        };
+        let pairs = |p: &[(&str, &str)]| -> Vec<(String, String)> {
+            p.iter()
+                .map(|(a, t)| (a.to_string(), t.to_string()))
+                .collect()
+        };
         assert_eq!(
-            slice
-                .class_imports
-                .get(&mir_types::Name::new("Entity"))
-                .map(|s| s.as_str()),
-            Some("App\\Model\\Entity"),
-            "slice.class_imports must capture a Normal-kind alias"
+            entries(&slice.class_imports),
+            pairs(&[
+                ("Baz", "App\\Helpers\\Baz"),
+                ("Entity", "App\\Model\\Entity")
+            ])
         );
         assert_eq!(
-            slice
-                .class_imports
-                .get(&mir_types::Name::new("Baz"))
-                .map(|s| s.as_str()),
-            Some("App\\Helpers\\Baz"),
-            "slice.class_imports must capture a Normal-kind alias from a grouped use"
+            entries(&slice.function_imports),
+            pairs(&[
+                ("foo", "App\\Helpers\\foo"),
+                ("qux", "App\\Helpers\\qux"),
+                ("x", "Fns\\x")
+            ])
         );
-        for alias in ["foo", "BAR", "qux", "QUUX"] {
-            assert!(
-                slice
-                    .class_imports
-                    .get(&mir_types::Name::new(alias))
-                    .is_none(),
-                "slice.class_imports must not contain function/const alias {alias}"
-            );
-        }
+        assert_eq!(
+            entries(&slice.const_imports),
+            pairs(&[
+                ("BAR", "App\\Helpers\\BAR"),
+                ("QUUX", "App\\Helpers\\QUUX"),
+                ("x", "Consts\\x")
+            ])
+        );
     }
 
     #[test]

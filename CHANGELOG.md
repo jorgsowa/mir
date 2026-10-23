@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Function names resolve the same way everywhere: `\Foo\bar()` no longer goes through a `use Other\Foo;` class import, and a first-class callable of a `use function` import (`array_map(enum_value(...), $ids)`) has the function's signature and taint. A first-class callable of a fully qualified namespaced function (`\Foo\bar(...)`) carries taint.
 - A class import no longer names a constant: `MODE` with `use Lib\Sub\MODE;` resolved to the constant `Lib\Sub\MODE` instead of reporting `UndefinedConstant`.
+- `use function` and `use const` aliases are kept apart: `use function Fns\v;` with `use const Consts\v;` resolves both `v()` and `v` (one replaced the other), a constant import no longer names a function (`LIMIT()`) and a function import no longer names a constant.
 - A `use function Lib\Fmt;` alias matches `fmt()` (function names are case-insensitive; was `UndefinedFunction`), and a class import no longer names a function: `Tool()` with `use Lib\Sub\Tool;` called the function `Lib\Sub\Tool()`.
 - Analysis no longer hangs on a method call or immutable-context argument whose class is in a circular `extends` chain (`class A extends B {}` / `class B extends A {}`).
 - A first-class callable of an undefined function (`nope(...)`) is reported as `UndefinedFunction`, as PHP throws when it creates the closure; `function_exists()` guards and lazily loaded builtins are honoured as for calls.

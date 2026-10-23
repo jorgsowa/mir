@@ -976,12 +976,17 @@ pub struct NamespaceBlock {
         deserialize_with = "deserialize_imports",
         serialize_with = "serialize_imports"
     )]
-    pub imports: Arc<FxHashMap<Name, Name>>,
+    pub class_imports: Arc<FxHashMap<Name, Name>>,
     #[serde(
         deserialize_with = "deserialize_imports",
         serialize_with = "serialize_imports"
     )]
-    pub class_imports: Arc<FxHashMap<Name, Name>>,
+    pub function_imports: Arc<FxHashMap<Name, Name>>,
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
+    pub const_imports: Arc<FxHashMap<Name, Name>>,
 }
 
 /// A snapshot of all PHP definitions contributed by a single stub file set.
@@ -1012,33 +1017,27 @@ pub struct StubSlice {
     /// `file_namespaces` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
     pub namespace: Option<Arc<str>>,
-    /// `use` alias map for this file: alias → FQCN.
-    ///
-    /// Stored as `Arc<FxHashMap<Name, Name>>` so that `file_imports()`
-    /// returns a cheap Arc clone instead of deep-cloning the map on every
-    /// `resolve_name` call (which fires once per symbol reference in
-    /// Pass 2). `Name` keys/values shrink each entry from ~108 bytes
-    /// (two `String` headers + two heap allocs averaging ~30 chars) to
-    /// 16 bytes (two `Ustr` u64 handles); the global ustr interner holds
-    /// one copy of each unique alias / FQCN string for the whole session.
-    #[serde(
-        deserialize_with = "deserialize_imports",
-        serialize_with = "serialize_imports"
-    )]
-    #[serde(default = "default_imports")]
-    pub imports: Arc<FxHashMap<Name, Name>>,
-    /// Subset of `imports` containing only `use` items that import a
-    /// class/interface/trait/enum (`UseKind::Normal`) — excludes `use
-    /// function`/`use const` aliases. Class-name resolution consults this
-    /// instead of `imports` so a function/constant import can't shadow a
-    /// same-named class reference (`use function Foo\bar;` must not make an
-    /// unrelated `bar` type hint resolve to `Foo\bar`).
+    /// `use` class-like aliases: alias → FQCN. Each `use` kind has its own map, as in PHP.
     #[serde(
         deserialize_with = "deserialize_imports",
         serialize_with = "serialize_imports"
     )]
     #[serde(default = "default_imports")]
     pub class_imports: Arc<FxHashMap<Name, Name>>,
+    /// `use function` aliases: alias → function FQN.
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
+    #[serde(default = "default_imports")]
+    pub function_imports: Arc<FxHashMap<Name, Name>>,
+    /// `use const` aliases: alias → constant FQN.
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
+    #[serde(default = "default_imports")]
+    pub const_imports: Arc<FxHashMap<Name, Name>>,
     /// Per-block namespace and imports; populated only when the file declares
     /// two or more `namespace` blocks, otherwise empty.
     #[serde(default)]

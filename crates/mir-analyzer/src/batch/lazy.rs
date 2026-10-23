@@ -41,7 +41,8 @@ impl AnalysisSession {
                     .into_iter()
                     .flat_map(|(_, imports)| {
                         imports
-                            .values()
+                            .iter()
+                            .flat_map(|map| map.values())
                             .map(|sym| sym.as_str().to_string())
                             .collect::<Vec<_>>()
                     })

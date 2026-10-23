@@ -215,36 +215,34 @@ impl FunctionRefExt for php_ast::owned::ExprKind {
     }
 }
 
-/// The target of a `use function` or `use const` alias for `name`; class imports name neither.
-pub(crate) fn imported_non_class(
+/// The target of a `use const` alias for `name`.
+pub(crate) fn imported_constant(
     db: &dyn crate::db::MirDatabase,
     file: &str,
     name: &str,
 ) -> Option<String> {
-    let imports = db.file_imports(file);
-    let class_imports = db.file_class_imports(file);
-    let alias = mir_types::Name::new(name);
-    imports
-        .get(&alias)
-        .filter(|target| class_imports.get(&alias) != Some(*target))
-        .map(|target| target.as_str().to_string())
-}
-
-/// Like [`imported_non_class`], but function aliases also match case-insensitively.
-fn imported_function(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> Option<String> {
-    if let Some(target) = imported_non_class(db, file, name) {
-        return Some(target);
-    }
-    let imports = db.file_imports(file);
-    let class_imports = db.file_class_imports(file);
-    let is_function_import = |alias: &mir_types::Name, target: &mir_types::Name| {
-        class_imports.get(alias) != Some(target)
-    };
-    if imports.len() == class_imports.len() {
+    let imports = db.file_const_imports(file);
+    if imports.is_empty() {
         return None;
     }
     imports
-        .iter()
-        .find(|(a, t)| a.as_str().eq_ignore_ascii_case(name) && is_function_import(a, t))
-        .map(|(_, t)| t.as_str().to_string())
+        .get(&mir_types::Name::new(name))
+        .map(|target| target.as_str().to_string())
+}
+
+/// The target of a `use function` alias for `name`, matched case-insensitively like PHP.
+fn imported_function(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> Option<String> {
+    let imports = db.file_function_imports(file);
+    if imports.is_empty() {
+        return None;
+    }
+    imports
+        .get(&mir_types::Name::new(name))
+        .or_else(|| {
+            imports
+                .iter()
+                .find(|(alias, _)| alias.as_str().eq_ignore_ascii_case(name))
+                .map(|(_, target)| target)
+        })
+        .map(|target| target.as_str().to_string())
 }

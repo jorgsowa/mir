@@ -165,13 +165,17 @@ impl AnalysisSession {
         use rustc_hash::FxHashSet;
 
         let db = self.snapshot_db();
-        let imports = db.file_imports(file);
-        if imports.is_empty() {
+        let imports = [
+            db.file_class_imports(file),
+            db.file_function_imports(file),
+            db.file_const_imports(file),
+        ];
+        if imports.iter().all(|map| map.is_empty()) {
             return Vec::new();
         }
         let mut out = Vec::new();
         let mut seen: FxHashSet<Arc<str>> = FxHashSet::default();
-        for fqcn in imports.values() {
+        for fqcn in imports.iter().flat_map(|map| map.values()) {
             let here = crate::db::Fqcn::interned(&db, *fqcn);
             if crate::db::class_like_indexed(&db, here) {
                 continue;

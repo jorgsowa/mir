@@ -154,8 +154,14 @@ fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(
         }
     }
 
-    for fqcn in slice.imports.values() {
-        add_symbol(*fqcn);
+    for imports in [
+        &slice.class_imports,
+        &slice.function_imports,
+        &slice.const_imports,
+    ] {
+        for fqcn in imports.values() {
+            add_symbol(*fqcn);
+        }
     }
 }
 

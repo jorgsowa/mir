@@ -1,5 +1,5 @@
 //! Selects the active `namespace` block while analyzing a declaration in a
-//! file with several, so `file_namespace`/`file_imports` answer per block.
+//! file with several, so `file_namespace` and the import maps answer per block.
 
 use std::cell::RefCell;
 use std::sync::Arc;

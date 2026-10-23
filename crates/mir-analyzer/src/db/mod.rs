@@ -3,10 +3,9 @@ use std::sync::Arc;
 
 use mir_types::{Name, Type};
 
-/// `(file_path, alias→FQCN map)` pair returned by
-/// [`MirDatabase::file_import_snapshots`]. The map is `Arc`-shared with the
-/// file's `StubSlice` so producing a snapshot is O(1) per file.
-pub type FileImportSnapshot = (Arc<str>, Arc<FxHashMap<Name, Name>>);
+/// `(file_path, [class, function, const] alias→FQN maps)` returned by
+/// [`MirDatabase::file_import_snapshots`], `Arc`-shared with the file's `StubSlice`.
+pub type FileImportSnapshot = (Arc<str>, [Arc<FxHashMap<Name, Name>>; 3]);
 
 /// Pass-scoped cache for `extends_or_implements`, keyed by the FxHash of the
 /// `(child, ancestor)` `&str` pair so lookups need no interning. The stored
@@ -42,20 +41,14 @@ pub trait MirDatabase: salsa::Database {
     /// Per-`namespace`-block data; empty unless the file declares several.
     fn file_namespace_blocks(&self, file: &str) -> Arc<[mir_codebase::NamespaceBlock]>;
 
-    /// Return this file's `use` alias map.
-    ///
-    /// Cheap to call: returns a cloned `Arc` of the underlying map stored
-    /// inside the file's `StubSlice`, not a deep clone of the entries. body-analysis
-    /// `resolve_name` calls this on every symbol reference.
-    fn file_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
-
-    /// Return this file's `use` alias map restricted to class/interface/trait/enum
-    /// imports (`UseKind::Normal`), excluding `use function`/`use const` aliases.
-    ///
-    /// Class-name resolution (`resolve_name`) must consult this instead of
-    /// `file_imports` so a `use function Foo\bar;` can't make an unrelated `bar`
-    /// class/type-hint reference resolve to `Foo\bar`.
+    /// This file's (or active namespace block's) `use` class-like aliases.
     fn file_class_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
+
+    /// This file's (or active namespace block's) `use function` aliases.
+    fn file_function_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
+
+    /// This file's (or active namespace block's) `use const` aliases.
+    fn file_const_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
 
     /// Cached `Fqcn` interning id for `name`, if this db clone has already
     /// interned it since the last salsa input write — see
