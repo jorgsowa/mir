@@ -14,7 +14,7 @@ pub use args::{
     spread_element_type, CheckArgsParams,
 };
 pub(crate) use callable::callable_string_token_span;
-pub(crate) use function::extract_class_docblock;
+pub(crate) use function::{extract_class_docblock, report_undefined_function};
 pub(crate) use static_call::{
     analyze_with_scope_override, closure_rebind, closure_this_param_rebind, is_closure_literal,
     ClosureRebind,

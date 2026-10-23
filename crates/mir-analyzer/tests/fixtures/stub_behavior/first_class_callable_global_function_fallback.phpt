@@ -41,3 +41,5 @@ function build(array $source): void {
 
     $missing = mapKeys(not_a_function(...), $source);
 }
+===expect===
+UndefinedFunction@32:23-32:42: Function not_a_function() is not defined

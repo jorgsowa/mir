@@ -1594,60 +1594,80 @@ impl CallAnalyzer {
             return return_ty;
         }
 
-        // Soft-fallback: if the build-time stub index recognises this name as
-        // a PHP built-in, the codebase miss is a stub-loading race rather
-        // than user error — the auto-discovery scanner missed it, the
-        // session is in essentials-only mode without auto-discovery, or the
-        // analyzer is mid-ingest. Suppressing the diagnostic avoids a class
-        // of false positives that would otherwise plague consumers running
-        // the lazy-stub setup. However, don't suppress if the function is
-        // version-filtered (e.g. @removed in the target version) — it should
-        // be reported as undefined.
-        if let Some(stub_path) = crate::stubs::stub_path_for_function(fn_name) {
-            if let Some(stub_src) = crate::stubs::stub_content_for_path(stub_path) {
-                // Parse the stub to check if this function is version-compatible.
-                if let Some(docblock_text) = extract_function_docblock(stub_src, fn_name) {
-                    let doc = crate::parser::DocblockParser::parse(docblock_text);
-                    // Check if the function is available in the current PHP version.
-                    if ea
-                        .php_version
-                        .includes_symbol(doc.since.as_deref(), doc.removed.as_deref())
-                    {
-                        return Type::mixed();
-                    }
-                } else {
-                    // No docblock found; assume the function is available (conservative).
-                    return Type::mixed();
+        report_undefined_function(
+            ea,
+            fn_name,
+            &resolved_fn_name,
+            ctx,
+            span,
+            call_user_func_string_arg,
+        );
+        Type::mixed()
+    }
+}
+
+/// `UndefinedFunction` for `fn_name`, unless it is a builtin missing from a
+/// lazy stub load or the call is guarded by `function_exists()`.
+pub(crate) fn report_undefined_function(
+    ea: &mut ExpressionAnalyzer<'_>,
+    fn_name: &str,
+    resolved_fn_name: &str,
+    ctx: &FlowState,
+    span: Span,
+    call_user_func_string_arg: bool,
+) {
+    // Soft-fallback: if the build-time stub index recognises this name as
+    // a PHP built-in, the codebase miss is a stub-loading race rather
+    // than user error — the auto-discovery scanner missed it, the
+    // session is in essentials-only mode without auto-discovery, or the
+    // analyzer is mid-ingest. Suppressing the diagnostic avoids a class
+    // of false positives that would otherwise plague consumers running
+    // the lazy-stub setup. However, don't suppress if the function is
+    // version-filtered (e.g. @removed in the target version) — it should
+    // be reported as undefined.
+    if let Some(stub_path) = crate::stubs::stub_path_for_function(fn_name) {
+        if let Some(stub_src) = crate::stubs::stub_content_for_path(stub_path) {
+            // Parse the stub to check if this function is version-compatible.
+            if let Some(docblock_text) = extract_function_docblock(stub_src, fn_name) {
+                let doc = crate::parser::DocblockParser::parse(docblock_text);
+                // Check if the function is available in the current PHP version.
+                if ea
+                    .php_version
+                    .includes_symbol(doc.since.as_deref(), doc.removed.as_deref())
+                {
+                    return;
                 }
+            } else {
+                // No docblock found; assume the function is available (conservative).
+                return;
             }
         }
-        // Don't emit UndefinedFunction if call_user_func/call_user_func_array with string arg
-        // - string args are runtime callable names that may not exist at compile time
-        // Also skip when guarded by `function_exists('fn')` (PHP function names
-        // are case-insensitive). The short name is matched too, since a bare
-        // call in a namespace falls back to the global function the guard names.
-        let short_fn = fn_name.rsplit('\\').next().unwrap_or(fn_name);
-        let guarded = ctx
-            .function_exists_guards
-            .iter()
-            .any(|g| g.eq_ignore_ascii_case(fn_name) || g.eq_ignore_ascii_case(short_fn));
-        if !call_user_func_string_arg && !guarded {
-            let is_relative = fn_name
-                .get(..10)
-                .is_some_and(|p| p.eq_ignore_ascii_case("namespace\\"));
-            ea.emit(
-                IssueKind::UndefinedFunction {
-                    name: if is_relative {
-                        resolved_fn_name
-                    } else {
-                        fn_name.to_string()
-                    },
+    }
+    // Don't emit UndefinedFunction if call_user_func/call_user_func_array with string arg
+    // - string args are runtime callable names that may not exist at compile time
+    // Also skip when guarded by `function_exists('fn')` (PHP function names
+    // are case-insensitive). The short name is matched too, since a bare
+    // call in a namespace falls back to the global function the guard names.
+    let short_fn = fn_name.rsplit('\\').next().unwrap_or(fn_name);
+    let guarded = ctx
+        .function_exists_guards
+        .iter()
+        .any(|g| g.eq_ignore_ascii_case(fn_name) || g.eq_ignore_ascii_case(short_fn));
+    if !call_user_func_string_arg && !guarded {
+        let is_relative = fn_name
+            .get(..10)
+            .is_some_and(|p| p.eq_ignore_ascii_case("namespace\\"));
+        ea.emit(
+            IssueKind::UndefinedFunction {
+                name: if is_relative {
+                    resolved_fn_name.to_string()
+                } else {
+                    fn_name.to_string()
                 },
-                Severity::Error,
-                span,
-            );
-        }
-        Type::mixed()
+            },
+            Severity::Error,
+            span,
+        );
     }
 }
 
