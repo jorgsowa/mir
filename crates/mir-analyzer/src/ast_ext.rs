@@ -199,15 +199,13 @@ impl FunctionRefExt for php_ast::owned::ExprKind {
                 Cow::Owned(crate::db::prefix_file_namespace(db, file, &n.join_parts())),
                 None,
             ),
-            (NameKind::Unqualified, [only]) => {
-                match db.file_imports(file).get(&mir_types::Name::new(only)) {
-                    Some(imported) => (Cow::Owned(imported.as_str().to_string()), None),
-                    None => match db.file_namespace(file) {
-                        Some(ns) => (Cow::Owned(format!("{ns}\\{only}")), Some(&**only)),
-                        None => (Cow::Borrowed(&**only), None),
-                    },
-                }
-            }
+            (NameKind::Unqualified, [only]) => match imported_function(db, file, only) {
+                Some(imported) => (Cow::Owned(imported), None),
+                None => match db.file_namespace(file) {
+                    Some(ns) => (Cow::Owned(format!("{ns}\\{only}")), Some(&**only)),
+                    None => (Cow::Borrowed(&**only), None),
+                },
+            },
             _ => (
                 Cow::Owned(crate::db::resolve_name(db, file, &n.join_parts())),
                 None,
@@ -215,4 +213,28 @@ impl FunctionRefExt for php_ast::owned::ExprKind {
         };
         Some(FunctionRef { qualified, global })
     }
+}
+
+/// The target of a `use function` alias for `name`; class imports never name a function.
+fn imported_function(db: &dyn crate::db::MirDatabase, file: &str, name: &str) -> Option<String> {
+    let imports = db.file_imports(file);
+    let class_imports = db.file_class_imports(file);
+    let is_function_import = |alias: &mir_types::Name, target: &mir_types::Name| {
+        class_imports.get(alias) != Some(target)
+    };
+    let alias = mir_types::Name::new(name);
+    if let Some(target) = imports
+        .get(&alias)
+        .filter(|t| is_function_import(&alias, t))
+    {
+        return Some(target.as_str().to_string());
+    }
+    // Function aliases match case-insensitively.
+    if imports.len() == class_imports.len() {
+        return None;
+    }
+    imports
+        .iter()
+        .find(|(a, t)| a.as_str().eq_ignore_ascii_case(name) && is_function_import(a, t))
+        .map(|(_, t)| t.as_str().to_string())
 }
