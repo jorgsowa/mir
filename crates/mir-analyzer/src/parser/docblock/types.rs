@@ -1106,6 +1106,7 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
                 this_type: None,
                 is_pure,
                 is_static: false,
+                rejects_surplus_args: false,
             }),
         }))
     } else {

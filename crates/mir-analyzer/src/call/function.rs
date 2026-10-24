@@ -209,7 +209,7 @@ impl CallAnalyzer {
                         // args, so a previously-undefined variable passed to an out-param
                         // (e.g. `$fn($x, $out)` where $out is fresh) is not flagged as
                         // UndefinedVariable when the argument expression is analyzed.
-                        if let Some((_, ref params)) = callee_params {
+                        if let Some((_, ref params, _)) = callee_params {
                             super::premark_byref_arg_vars(params, &call.args, ctx);
                         } else if let Some(f) = literal_named_function(&callee_ty, ea) {
                             super::premark_byref_arg_vars(&f.params, &call.args, ctx);
@@ -275,7 +275,9 @@ impl CallAnalyzer {
                             arity_unknown = true;
                         }
 
-                        if let Some((ref callee_fn_name, ref params)) = callee_params {
+                        if let Some((ref callee_fn_name, ref params, accepts_surplus)) =
+                            callee_params
+                        {
                             // Full type + arity checking via check_args.
                             check_args(
                                 ea,
@@ -289,7 +291,7 @@ impl CallAnalyzer {
                                     call_span: span,
                                     has_spread,
                                     arity_unknown,
-                                    too_many_arity_unknown: false,
+                                    too_many_arity_unknown: accepts_surplus,
                                     template_params: &[],
                                     no_named_arguments: false,
                                     ctx,
@@ -336,7 +338,7 @@ impl CallAnalyzer {
                         }
 
                         // Write back output types to by-ref argument variables.
-                        if let Some((_, ref params)) = callee_params {
+                        if let Some((_, ref params, _)) = callee_params {
                             let args_taint =
                                 crate::taint::args_taint(&call.args, ctx, ea.db, &ea.file);
                             for (i, param) in params.iter().enumerate() {
@@ -1774,10 +1776,11 @@ fn literal_named_function(
     crate::db::find_function_from(ea.db, &ea.file, crate::db::Fqcn::from_str(ea.db, fqn))
 }
 
+/// The third element is whether surplus arguments are silently accepted (a closure literal).
 fn typed_params_from_callee(
     union: &Type,
     ea: &ExpressionAnalyzer<'_>,
-) -> Option<(String, Vec<DeclaredParam>)> {
+) -> Option<(String, Vec<DeclaredParam>, bool)> {
     // Bare callable with unknown arity — we cannot determine params statically.
     if union
         .types
@@ -1795,14 +1798,18 @@ fn typed_params_from_callee(
                     .iter()
                     .map(type_param_to_storage_param)
                     .collect();
-                return Some(("{closure}".to_string(), storage_params));
+                return Some((
+                    "{closure}".to_string(),
+                    storage_params,
+                    !data.rejects_surplus_args,
+                ));
             }
             Atomic::TCallable {
                 params: Some(params),
                 ..
             } => {
                 let storage_params = params.iter().map(type_param_to_storage_param).collect();
-                return Some(("callable".to_string(), storage_params));
+                return Some(("callable".to_string(), storage_params, false));
             }
             Atomic::TNamedObject { fqcn, .. } => {
                 if let Some((_, storage)) = crate::db::find_method_respecting_precedence(
@@ -1811,7 +1818,7 @@ fn typed_params_from_callee(
                     "__invoke",
                 ) {
                     let fn_name = format!("{}::__invoke", fqcn);
-                    return Some((fn_name, storage.params.to_vec()));
+                    return Some((fn_name, storage.params.to_vec(), false));
                 }
             }
             _ => {}

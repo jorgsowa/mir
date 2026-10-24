@@ -492,6 +492,7 @@ where
                 this_type: data.this_type.map(|t| expand_aliases_only(t, aliases)),
                 is_pure: data.is_pure,
                 is_static: data.is_static,
+                rejects_surplus_args: data.rejects_surplus_args,
             }),
         }),
         // `@return ($param is X ? A : B)` — a type alias used in either
@@ -1465,6 +1466,7 @@ impl<'a> DefinitionCollector<'a> {
                             this_type: data.this_type.clone(),
                             is_pure: data.is_pure,
                             is_static: data.is_static,
+                            rejects_surplus_args: data.rejects_surplus_args,
                         }),
                     });
                 }

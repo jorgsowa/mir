@@ -104,6 +104,9 @@ pub struct ClosureData {
     pub is_pure: bool,
     /// A `static` closure literal, which has no `$this` to mutate.
     pub is_static: bool,
+    /// A first-class callable of a named function or method, so surplus arguments are reported.
+    #[serde(default)]
+    pub rejects_surplus_args: bool,
 }
 
 /// Payload of [`Atomic::TConditional`].

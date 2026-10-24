@@ -1701,6 +1701,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 this_type: None,
                 is_pure,
                 is_static: false,
+                rejects_surplus_args: true,
             }),
         }
     }

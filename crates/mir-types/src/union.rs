@@ -1319,6 +1319,7 @@ impl Type {
                                 .map(|t| t.substitute_templates(bindings)),
                             is_pure: data.is_pure,
                             is_static: data.is_static,
+                            rejects_surplus_args: data.rejects_surplus_args,
                         }),
                     });
                 }
@@ -3205,6 +3206,7 @@ mod tests {
                 this_type: Some(t_param("T")),
                 is_pure: false,
                 is_static: false,
+                rejects_surplus_args: false,
             }),
         });
         let result = ty.substitute_templates(&bindings_t_string());

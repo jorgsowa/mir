@@ -832,6 +832,7 @@ fn resolve_atomic_for_file(
                         .map(|t| resolve_union_for_file_inner(t, db, file, allow_builtin_shortcut)),
                     is_pure: data.is_pure,
                     is_static: data.is_static,
+                    rejects_surplus_args: data.rejects_surplus_args,
                 }),
             }
         }

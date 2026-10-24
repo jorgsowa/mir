@@ -302,6 +302,7 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
                     this_type: data.this_type.map(|t| ru!(t)),
                     is_pure: data.is_pure,
                     is_static: data.is_static,
+                    rejects_surplus_args: data.rejects_surplus_args,
                 }),
             }
         }

@@ -810,6 +810,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }),
                 is_pure: ctx.is_in_pure_fn,
                 is_static: c.is_static,
+                rejects_surplus_args: false,
             }),
         })
     }
@@ -1095,6 +1096,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 },
                 is_pure: ctx.is_in_pure_fn,
                 is_static: af.is_static,
+                rejects_surplus_args: false,
             }),
         })
     }

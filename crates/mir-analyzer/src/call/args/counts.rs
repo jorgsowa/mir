@@ -150,15 +150,11 @@ pub(super) fn check_counts(
         );
     }
 
-    // PHP silently ignores surplus positional arguments passed to a closure
-    // (they remain reachable via func_get_args()), so a direct closure call with
-    // extra args is not an error. Named functions/methods keep the lint.
     if variadic_index.is_none()
         && arg_types.len() > params.len()
         && !arity_unknown
         && !too_many_arity_unknown
         && !has_shape_error
-        && fn_name != "{closure}"
     {
         ea.emit(
             IssueKind::TooManyArguments {
