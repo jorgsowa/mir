@@ -444,7 +444,8 @@ pub(crate) fn classify_var_predicate<'a>(
             _ => e,
         }
     }
-    let is_var = |e: &Expr| matches!(&unwrap(e).kind, ExprKind::Variable(name) if name.trim_start_matches('$') == var_name);
+    let is_var =
+        |e: &Expr| matches!(&unwrap(e).kind, ExprKind::Variable(name) if &**name == var_name);
     let call_fn_name = |e: &'a Expr| -> Option<Cow<'a, str>> {
         let ExprKind::FunctionCall(call) = &unwrap(e).kind else {
             return None;

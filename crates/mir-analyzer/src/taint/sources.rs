@@ -144,7 +144,7 @@ pub(super) fn server_bag_read_taint(
 }
 
 pub(super) fn is_superglobal_var(expr: &Expr, name: &str) -> bool {
-    matches!(&expr.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == name)
+    matches!(&expr.kind, ExprKind::Variable(v) if &**v == name)
 }
 
 /// A superglobal entry PHP, the server or the environment sets rather than the

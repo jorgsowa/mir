@@ -297,7 +297,7 @@ pub(crate) fn method_chain_key(expr: &php_ast::owned::Expr) -> Option<String> {
 /// call chain.
 pub(crate) fn memoized_receiver_key(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.to_string()),
         _ => method_chain_key(expr),
     }
 }
@@ -418,7 +418,7 @@ pub(crate) fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(St
 /// middle is NOT covered.
 pub(crate) fn chained_prop_receiver_key(object_expr: &php_ast::owned::Expr) -> Option<String> {
     match &object_expr.kind {
-        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.to_string()),
         ExprKind::MethodCall(_) => method_chain_key(object_expr),
         ExprKind::PropertyAccess(inner_pa) | ExprKind::NullsafePropertyAccess(inner_pa) => {
             let base = extract_var_name(&inner_pa.object)?;
@@ -534,7 +534,7 @@ pub(super) fn array_access_under_prop_hops(
 /// The guard that holds when `expr` evaluates to `is_true`, for conditions on a plain variable.
 pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> Option<Guard> {
     let plain_var = |e: &php_ast::owned::Expr| match &strip_parens(e).kind {
-        ExprKind::Variable(v) => Some(Name::from(v.trim_start_matches('$'))),
+        ExprKind::Variable(v) => Some(Name::from(&**v)),
         _ => None,
     };
     let (var, kind) = match &expr.kind {
@@ -584,7 +584,7 @@ fn strip_parens(mut e: &php_ast::owned::Expr) -> &php_ast::owned::Expr {
 
 pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.to_string()),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
         // is_null($x = expr) — narrow the assigned variable, not the RHS
         ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign) => extract_var_name(&a.target),
@@ -607,13 +607,13 @@ pub(crate) fn extract_expr_guard_key(
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(std::sync::Arc::from(name.trim_start_matches('$'))),
+        ExprKind::Variable(name) => Some(std::sync::Arc::from(&**name)),
         ExprKind::Parenthesized(inner) => extract_expr_guard_key(inner, ctx, db, file),
         ExprKind::PropertyAccess(pa) => {
             let base = extract_var_name(&pa.object)?;
             let prop = match &pa.property.kind {
                 ExprKind::Identifier(s) => s.as_ref(),
-                ExprKind::Variable(s) => s.trim_start_matches('$'),
+                ExprKind::Variable(s) => &**s,
                 _ => return None,
             };
             Some(std::sync::Arc::from(format!("{base}->{prop}").as_str()))
@@ -730,9 +730,7 @@ pub(super) fn extract_class_name(
                 _ => Some(name.to_string()),
             }
         }
-        ExprKind::Variable(name) if name.trim_start_matches('$') == "this" => {
-            self_fqcn.map(|s| s.to_string())
-        }
+        ExprKind::Variable(name) if &**name == "this" => self_fqcn.map(|s| s.to_string()),
         ExprKind::Variable(_) => None, // dynamic class — can't narrow
         _ => None,
     }

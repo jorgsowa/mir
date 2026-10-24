@@ -295,7 +295,7 @@ pub(crate) fn int_comparison_predicate_narrowed(
     let ExprKind::Binary(b) = &peel_parens(body).kind else {
         return None;
     };
-    let is_param = |e: &php_ast::owned::Expr| matches!(&peel_parens(e).kind, ExprKind::Variable(n) if n.trim_start_matches('$') == param);
+    let is_param = |e: &php_ast::owned::Expr| matches!(&peel_parens(e).kind, ExprKind::Variable(n) if &**n == param);
     let (op, n) = if is_param(&b.left) {
         (b.op, extract_int_literal(&b.right)?)
     } else if is_param(&b.right) {

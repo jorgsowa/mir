@@ -230,7 +230,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         args: &[php_ast::owned::Arg],
         ctx: &FlowState,
     ) {
-        let is_this = |e: &php_ast::owned::Expr| matches!(&e.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this");
+        let is_this =
+            |e: &php_ast::owned::Expr| matches!(&e.kind, ExprKind::Variable(v) if &**v == "this");
         let own_class = is_this(target)
             || target.kind.name_bare().is_some_and(|n| {
                 ["self", "static", "parent"]
@@ -279,9 +280,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     resolved => Some(Arc::from(resolved)),
                 }
             }
-            ExprKind::Variable(var) if var.trim_start_matches('$') == "this" => {
-                ctx.self_fqcn.clone()
-            }
+            ExprKind::Variable(var) if &**var == "this" => ctx.self_fqcn.clone(),
             ExprKind::Variable(var) => match ctx.get_var(var).types.as_slice() {
                 [mir_types::Atomic::TNamedObject { fqcn, .. }] => Some(Arc::from(fqcn.as_ref())),
                 _ => None,

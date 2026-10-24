@@ -119,7 +119,7 @@ impl BodyScan<'_> {
 /// of one, or a destructuring pattern over those.
 fn is_local_target(e: &Expr) -> bool {
     match &e.kind {
-        ExprKind::Variable(name) => name.trim_start_matches('$') != "this",
+        ExprKind::Variable(name) => &**name != "this",
         ExprKind::ArrayAccess(a) => is_local_target(&a.array),
         ExprKind::Parenthesized(inner) => is_local_target(inner),
         ExprKind::Array(elements) => elements
@@ -199,7 +199,7 @@ impl OwnedVisitor for BodyScan<'_> {
                     })
             }
             ExprKind::MethodCall(c) => {
-                matches!(&c.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
+                matches!(&c.object.kind, ExprKind::Variable(v) if &**v == "this")
                     && matches!(&c.method.kind, ExprKind::Identifier(n)
                         if self.safe.contains(crate::util::php_ident_lowercase(n).as_str()))
             }

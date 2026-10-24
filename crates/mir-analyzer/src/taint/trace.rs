@@ -45,7 +45,7 @@ pub fn taint_trail(
         | ExprKind::Print(inner) => Some(child(inner)),
         ExprKind::Assign(a) => Some(child(&a.value)),
         ExprKind::ArrayAccess(aa) => match &aa.array.kind {
-            ExprKind::Variable(name) if is_superglobal(name.trim_start_matches('$')) => None,
+            ExprKind::Variable(name) if is_superglobal(name) => None,
             _ => Some(child(&aa.array)),
         },
         ExprKind::Binary(op) => first(&mut [&*op.left, &*op.right].into_iter()),

@@ -93,7 +93,7 @@ pub(crate) fn resolve_static_prop_target(
 /// to every trackable target shape for the arithmetic/`??=` arms below.
 fn current_target_taint(target: &Expr, ctx: &FlowState, db: &dyn MirDatabase, file: &str) -> Taint {
     match &target.kind {
-        ExprKind::Variable(name) => ctx.var_taint(name.trim_start_matches('$')),
+        ExprKind::Variable(name) => ctx.var_taint(name),
         ExprKind::PropertyAccess(pa) => match &pa.object.kind {
             ExprKind::Variable(obj_var) => extract_string_from_expr(&pa.property)
                 .map_or(Taint::NONE, |prop| {
@@ -128,7 +128,7 @@ fn taint_array_write_base(
         return;
     }
     match &base.kind {
-        ExprKind::Variable(name) => ctx.taint_var(name.trim_start_matches('$'), taint),
+        ExprKind::Variable(name) => ctx.taint_var(name, taint),
         ExprKind::PropertyAccess(pa) => match &pa.object.kind {
             ExprKind::Variable(obj_var) => {
                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {
@@ -440,7 +440,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // loop iteration) must NOT be re-armed, to prevent false "unused" reports on
         // patterns like `foreach (...) { use($prev); $prev = $item; }`.
         let target_var_name: Option<String> = match &a.target.kind {
-            ExprKind::Variable(v) => Some(v.trim_start_matches('$').to_string()),
+            ExprKind::Variable(v) => Some(v.to_string()),
             _ => None,
         };
         let pre_rhs_consumed_count = target_var_name.as_deref().map(|name| {
@@ -478,7 +478,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             let plain_this_write = a.op == AssignOp::Assign
                 && !a.by_ref
                 && matches!(&a.target.kind, ExprKind::PropertyAccess(pa)
-                    if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this"));
+                    if matches!(&pa.object.kind, ExprKind::Variable(v) if &**v == "this"));
             if plain_this_write {
                 self.taint_summary.note_prop_overwrite(key);
             } else if !crate::taint::is_injection_safe_type(&rhs_ty) {
@@ -995,7 +995,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // only the plain-assignment arm ever ran this check.
         let is_this_receiver = matches!(
             &pa.object.kind,
-            ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+            ExprKind::Variable(n) if &**n == "this"
         );
         // A write through a variable directly holding a fresh `clone $this`
         // (the standard immutable "wither" idiom: clone, mutate the clone,

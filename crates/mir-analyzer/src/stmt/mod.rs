@@ -71,7 +71,7 @@ fn for_each_destructured_var(target: &php_ast::owned::Expr, f: &mut impl FnMut(&
     };
     for elem in elements.iter() {
         match &elem.value().kind {
-            php_ast::owned::ExprKind::Variable(name) => f(name.trim_start_matches('$')),
+            php_ast::owned::ExprKind::Variable(name) => f(name),
             php_ast::owned::ExprKind::Array(_) => for_each_destructured_var(elem.value(), f),
             _ => {}
         }

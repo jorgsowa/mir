@@ -20,7 +20,7 @@ pub(super) enum OwnCallReceiver {
 }
 
 fn is_this(expr: &Expr) -> bool {
-    matches!(&expr.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
+    matches!(&expr.kind, ExprKind::Variable(v) if &**v == "this")
 }
 
 impl php_ast::owned::visitor::OwnedVisitor for ThisPropReads {
@@ -199,7 +199,7 @@ pub fn proven_object(expr: &Expr, is_true: bool) -> Option<&str> {
         }
         ExprKind::Binary(b) if is_true && b.op == BinaryOp::Instanceof => {
             match &unwrap_parens(&b.left).kind {
-                ExprKind::Variable(v) => Some(v.trim_start_matches('$')),
+                ExprKind::Variable(v) => Some(&**v),
                 _ => None,
             }
         }
@@ -627,7 +627,7 @@ pub fn own_property_written(
     match &target.kind {
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
             match &pa.object.kind {
-                ExprKind::Variable(v) if v.trim_start_matches('$') == "this" => {
+                ExprKind::Variable(v) if &**v == "this" => {
                     let prop = crate::expr::helpers::extract_string_from_expr(&pa.property)?;
                     Some(crate::db::taint_sources::prop_key(&prop, false))
                 }
@@ -839,7 +839,7 @@ pub fn own_call_prop_writes(
     file: &str,
 ) -> Vec<(mir_types::Name, Taint)> {
     let class = match &unwrap_parens(target).kind {
-        ExprKind::Variable(var) if var.trim_start_matches('$') == "this" => ctx.self_fqcn.clone(),
+        ExprKind::Variable(var) if &**var == "this" => ctx.self_fqcn.clone(),
         ExprKind::Name(_) => {
             let name = unwrap_parens(target).kind.name_bare().unwrap_or_default();
             match crate::util::php_ident_lowercase(name).as_str() {

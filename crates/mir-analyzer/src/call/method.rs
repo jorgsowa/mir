@@ -2121,7 +2121,7 @@ fn is_non_object_atom(a: &mir_types::Atomic) -> bool {
 fn is_this_reinitialization(call: &MethodCallExpr, ctx: &FlowState) -> bool {
     let receiver_is_this = matches!(
         &call.object.kind,
-        ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+        ExprKind::Variable(n) if &**n == "this"
     );
     receiver_is_this
         && ctx.current_method_name.as_deref().is_some_and(|m| {

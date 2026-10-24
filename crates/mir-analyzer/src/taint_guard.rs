@@ -564,7 +564,7 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
 /// `$x`, `$a['k']`, or either under `?? default`: when the left side is unset there is nothing to taint.
 fn guarded_subject(expr: &Expr) -> Option<Guarded<'_>> {
     match &expr.kind {
-        ExprKind::Variable(var) => Some(Guarded::Var(var.trim_start_matches('$'))),
+        ExprKind::Variable(var) => Some(Guarded::Var(var)),
         ExprKind::Parenthesized(inner) => guarded_subject(inner),
         ExprKind::NullCoalesce(nc) => guarded_subject(&nc.left),
         ExprKind::ArrayAccess(aa) => {

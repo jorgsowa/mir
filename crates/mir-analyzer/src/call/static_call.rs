@@ -197,7 +197,7 @@ pub(crate) fn closure_rebind(
     }
     match &new_this?.kind {
         ExprKind::Null => None,
-        ExprKind::Variable(v) if v.trim_start_matches('$') == "this" => None,
+        ExprKind::Variable(v) if &**v == "this" => None,
         _ => Some(ClosureRebind::UnknownThis),
     }
 }
@@ -565,7 +565,7 @@ impl CallAnalyzer {
             // needs it too, to scope itself to a self/parent/$this call the
             // same way method.rs's instance-call counterpart scopes to $this.
             let is_self_parent_call = match &call.class.kind {
-                ExprKind::Variable(name) => name.trim_start_matches('$') == "this",
+                ExprKind::Variable(name) => &**name == "this",
                 kind => matches!(kind.name_bare(), Some("self" | "static" | "parent")),
             };
             // Purity check: a static call has no receiver to scope the

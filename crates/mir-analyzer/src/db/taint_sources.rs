@@ -594,7 +594,7 @@ impl<'a> Scan<'a> {
                     self.record_assign(el.value(), value.clone());
                 }
             }
-            ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) if !matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this") =>
+            ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) if !matches!(&pa.object.kind, ExprKind::Variable(v) if &**v == "this") =>
             {
                 self.record_assign(&pa.object, value);
             }
@@ -646,8 +646,7 @@ impl OwnedVisitor for ValueScan<'_, '_> {
             }
         }
         if let ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) = &expr.kind {
-            if matches!(&pa.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this")
-            {
+            if matches!(&pa.object.kind, ExprKind::Variable(v) if &**v == "this") {
                 self.facts.reads_prop = true;
             }
         }
@@ -721,7 +720,7 @@ impl OwnedVisitor for Scan<'_> {
 impl Scan<'_> {
     fn record_own_param_call(&mut self, expr: &Expr) {
         let (class, method, args) = match &expr.kind {
-            ExprKind::MethodCall(mc) if matches!(&mc.object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this") => {
+            ExprKind::MethodCall(mc) if matches!(&mc.object.kind, ExprKind::Variable(v) if &**v == "this") => {
                 (self.self_fqcn, &mc.method, &mc.args)
             }
             ExprKind::StaticMethodCall(smc)

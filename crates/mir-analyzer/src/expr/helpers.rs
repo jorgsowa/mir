@@ -1271,7 +1271,7 @@ pub fn as_concat_str(ty: &Type) -> Option<String> {
 
 pub fn extract_simple_var(expr: &Expr) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.to_string()),
         ExprKind::Parenthesized(inner) => extract_simple_var(inner),
         _ => None,
     }

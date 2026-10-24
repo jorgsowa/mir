@@ -1301,7 +1301,7 @@ fn fmt_symbol(symbol: &crate::ResolvedSymbol) -> Vec<String> {
 fn fmt_reference_kind(kind: &crate::ReferenceKind) -> String {
     use crate::ReferenceKind as K;
     match kind {
-        K::Variable(name) => format!("variable ${}", name.trim_start_matches('$')),
+        K::Variable(name) => format!("variable ${}", name),
         K::MethodCall { class, method } => format!("method call {class}::{method}"),
         K::StaticCall { class, method } => format!("static call {class}::{method}"),
         K::PropertyAccess { class, property } => format!("property {class}::${property}"),

@@ -122,7 +122,7 @@ pub(super) fn receiver_prop_taint(
     file: &str,
 ) -> Taint {
     match receiver.map(|r| &unwrap_parens(r).kind) {
-        Some(ExprKind::Variable(var)) => ctx.prop_taint(var.trim_start_matches('$'), prop.as_str()),
+        Some(ExprKind::Variable(var)) => ctx.prop_taint(var, prop.as_str()),
         Some(ExprKind::New(new)) => constructed_prop_taint(new, prop.as_str(), ctx, db, file),
         _ => Taint::NONE,
     }
@@ -1013,7 +1013,7 @@ pub fn expr_taint(
                 }
                 let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                 let forwards_this = match &smc.class.kind {
-                    ExprKind::Variable(v) => v.trim_start_matches('$') == "this",
+                    ExprKind::Variable(v) => &**v == "this",
                     kind => kind.name_bare().is_some_and(|id| {
                         ["self", "static", "parent"]
                             .iter()
@@ -1072,7 +1072,7 @@ pub(super) fn receiver_classes(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Vec<std::sync::Arc<str>> {
-    if matches!(&object.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "this") {
+    if matches!(&object.kind, ExprKind::Variable(v) if &**v == "this") {
         return ctx.self_fqcn.iter().cloned().collect();
     }
     crate::expr::assignment::resolve_chained_receiver_type(object, ctx, db, file)

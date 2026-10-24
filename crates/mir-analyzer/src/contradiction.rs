@@ -32,7 +32,7 @@ enum Lit {
 
 fn extract_var(expr: &Expr) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.to_string()),
         ExprKind::Parenthesized(inner) => extract_var(inner),
         _ => None,
     }
