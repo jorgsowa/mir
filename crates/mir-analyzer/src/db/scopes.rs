@@ -100,7 +100,7 @@ pub fn file_scopes(db: &dyn MirDatabase, file: SourceFile) -> Arc<[ScopeKey]> {
             _ => return,
         };
         let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
-        let fqn: Arc<str> = Arc::from(resolve_name(db, path.as_ref(), name));
+        let fqn: Arc<str> = Arc::from(crate::db::prefix_file_namespace(db, path.as_ref(), name));
         let occ = occurrences.entry((is_fn, fqn.clone())).or_insert(0);
         let key = if is_fn {
             ScopeKey::Function(fqn, *occ)
@@ -381,7 +381,9 @@ fn analyze_scope(
                         StmtKind::Trait(decl) => (false, decl.name.as_str().unwrap_or("")),
                         _ => return,
                     };
-                    if is_fn != want_fn || resolve_name(db, path.as_ref(), name) != fqn.as_ref() {
+                    if is_fn != want_fn
+                        || crate::db::prefix_file_namespace(db, path.as_ref(), name) != fqn.as_ref()
+                    {
                         return;
                     }
                     if seen != *occ {

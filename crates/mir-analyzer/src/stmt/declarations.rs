@@ -260,7 +260,7 @@ impl<'a> StatementsAnalyzer<'a> {
             .as_ref()
             .and_then(|i| i.as_str())
             .unwrap_or("<anonymous>");
-        let resolved = crate::db::resolve_name(self.db, &self.file, class_name);
+        let resolved = crate::db::prefix_file_namespace(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
         // Anonymous classes are not collected into the DB (the collector skips

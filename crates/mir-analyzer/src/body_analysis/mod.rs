@@ -6,7 +6,7 @@ use mir_issues::Issue;
 use mir_types::{Name, Type};
 use parking_lot::Mutex;
 
-use crate::db::{resolve_name, MirDatabase};
+use crate::db::MirDatabase;
 use crate::diagnostics::{
     check_expr_for_undefined_classes, check_name_class, check_type_hint_classes,
     collect_type_hint_class_refs, emit_unused_params, emit_unused_variables,
@@ -350,7 +350,7 @@ fn lookup_function_node_for_decl(
 
 /// Canonical FQCN of a class-like declaration, matched by source range so a
 /// declaration in a later `namespace X { }` block isn't resolved against the
-/// file's first namespace. Falls back to `resolve_name` when nothing matches.
+/// file's first namespace. Falls back to the file namespace when nothing matches.
 fn declared_class_like_fqcn(
     db: &dyn MirDatabase,
     file: &str,
@@ -402,7 +402,7 @@ fn declared_class_like_fqcn(
             return fqcn.to_string();
         }
     }
-    resolve_name(db, file, name)
+    crate::db::prefix_file_namespace(db, file, name)
 }
 
 /// Build `DeclaredParam`s directly from the declaration AST when no storage match is

@@ -112,7 +112,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
     let mut facts = FileSourceFacts::default();
     crate::body_analysis::for_each_file_scope_decl(&parsed.program.stmts, &mut |stmt| {
         let _scope = crate::db::ns_scope::enter(db, &path, stmt.span.start);
-        let resolve = |name: &str| Name::new(&crate::db::resolve_name(db, &path, name));
+        let resolve = |name: &str| Name::new(&crate::db::prefix_file_namespace(db, &path, name));
         match &stmt.kind {
             StmtKind::Function(decl) => {
                 let fqn = resolve(decl.name.as_str().unwrap_or(""));

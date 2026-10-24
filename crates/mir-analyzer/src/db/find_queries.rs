@@ -1330,7 +1330,9 @@ pub fn class_array_property_defaults<'db>(
             return;
         };
         let _scope = crate::db::ns_scope::enter(db, path, stmt.span.start);
-        if !crate::db::resolve_name(db, path.as_ref(), name).eq_ignore_ascii_case(target.as_str()) {
+        if !crate::db::prefix_file_namespace(db, path.as_ref(), name)
+            .eq_ignore_ascii_case(target.as_str())
+        {
             return;
         }
         for member in decl.body.members.iter() {
