@@ -35,6 +35,6 @@ function bad(K $k): void {
 }
 function takesInt(int $i): void { echo $i; }
 ===expect===
-InvalidArgument@21:16-21:25: Argument $s of takesString() expects 'string', got 'Closure'
-InvalidArgument@22:16-22:24: Argument $s of takesString() expects 'string', got 'Closure'
-InvalidArgument@23:16-23:23: Argument $s of takesString() expects 'string', got 'Closure'
+InvalidArgument@21:16-21:25: Argument $s of takesString() expects 'string', got 'Closure(int): int'
+InvalidArgument@22:16-22:24: Argument $s of takesString() expects 'string', got 'Closure(int): string'
+InvalidArgument@23:16-23:23: Argument $s of takesString() expects 'string', got 'Closure(int): int'

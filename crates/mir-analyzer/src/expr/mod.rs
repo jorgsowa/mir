@@ -135,17 +135,86 @@ fn bare_closure() -> Atomic {
     }
 }
 
+fn is_partial_application(args: &[php_ast::owned::Arg]) -> bool {
+    args.iter().any(|a| a.is_placeholder())
+}
+
 /// A call with `?` placeholders creates a closure instead of running the callee (PHP 8.6).
-fn partial_application_type(args: &[php_ast::owned::Arg], called: Type) -> Type {
-    use php_ast::owned::ArgKind;
-    if args
-        .iter()
-        .any(|a| matches!(a.kind, ArgKind::Placeholder | ArgKind::SpreadPlaceholder))
-    {
-        Type::single(bare_closure())
-    } else {
-        called
+fn partial_application_type(
+    args: &[php_ast::owned::Arg],
+    called: Type,
+    callee: impl FnOnce() -> Option<Atomic>,
+) -> Type {
+    if !is_partial_application(args) {
+        return called;
     }
+    Type::single(
+        callee()
+            .and_then(|closure| bind_placeholders(closure, args))
+            .unwrap_or_else(bare_closure),
+    )
+}
+
+/// The callee's closure with only the parameters the placeholders leave open.
+fn bind_placeholders(closure: Atomic, args: &[php_ast::owned::Arg]) -> Option<Atomic> {
+    use php_ast::owned::ArgKind;
+    let Atomic::TClosure { mut data } = closure else {
+        return None;
+    };
+    let params = std::mem::take(&mut data.params).into_vec();
+    let mut open = Vec::new();
+    let mut bound = vec![false; params.len()];
+    let mut position = 0;
+    let mut rest = false;
+    for arg in args {
+        if let Some(name) = &arg.name {
+            let name = crate::parser::name_to_string_owned(name);
+            let index = params
+                .iter()
+                .position(|p| !p.is_variadic && p.name.as_str() == name)?;
+            bound[index] = true;
+            if matches!(arg.kind, ArgKind::Placeholder) {
+                open.push(params[index].clone());
+            }
+            continue;
+        }
+        let index = match params.get(position) {
+            Some(_) => position,
+            None if params.last().is_some_and(|p| p.is_variadic) => params.len() - 1,
+            None if matches!(arg.kind, ArgKind::SpreadPlaceholder) => position,
+            None => return None,
+        };
+        match arg.kind {
+            ArgKind::SpreadPlaceholder => {
+                rest = true;
+                break;
+            }
+            ArgKind::Spread(_) => return None,
+            ArgKind::Placeholder => {
+                let mut param = params[index].clone();
+                param.is_variadic = false;
+                param.is_optional = false;
+                open.push(param);
+            }
+            _ => {}
+        }
+        if !params[index].is_variadic {
+            bound[index] = true;
+        }
+        position += 1;
+    }
+    if rest {
+        open.extend(
+            params
+                .iter()
+                .zip(&bound)
+                .enumerate()
+                .filter(|(i, (p, bound))| !**bound && (*i >= position || p.is_variadic))
+                .map(|(_, (p, _))| p.clone()),
+        );
+    }
+    data.params = open.into_boxed_slice();
+    Some(Atomic::TClosure { data })
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -867,7 +936,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.store_static_call_props(&mc.object, &mc.method, &mc.args, ctx);
                 self.taint_array_container(&mc.object, &mc.method, &mc.args, ctx);
-                partial_application_type(&mc.args, ty)
+                partial_application_type(&mc.args, ty, || {
+                    self.method_call_closure(&mc.object, &mc.method, ctx)
+                })
             }
 
             ExprKind::NullsafeMethodCall(mc) => {
@@ -875,7 +946,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true);
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
-                partial_application_type(&mc.args, ty)
+                partial_application_type(&mc.args, ty, || None)
             }
 
             ExprKind::StaticMethodCall(smc) => {
@@ -886,7 +957,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.expose_props_to_call(&smc.class, &smc.args, ctx);
                 self.store_own_call_props(&smc.class, &smc.method, &smc.args, ctx);
                 self.store_static_call_props(&smc.class, &smc.method, &smc.args, ctx);
-                partial_application_type(&smc.args, ty)
+                partial_application_type(&smc.args, ty, || {
+                    self.static_call_closure(&smc.class, &smc.method, ctx)
+                })
             }
 
             ExprKind::StaticMethodCallDynamic(smc) => {
@@ -906,7 +979,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 let ty = crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span);
                 ctx.invalidate_escaped_vars();
-                partial_application_type(&fc.args, ty)
+                partial_application_type(&fc.args, ty, || self.function_call_closure(fc))
             }
 
             // --- Closures / arrow functions --------------------------------
@@ -1194,39 +1267,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             },
                             resolved.return_ty_raw.clone(),
                         );
-                        // Substitute this receiver's own bound type params (e.g.
-                        // `Box<int>`'s T -> int) into the method's raw param/return
-                        // types before building the callable — otherwise a
-                        // first-class-callable on a generic method loses the
-                        // binding that the direct-call path already applies.
-                        let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)
-                            .map(|tps| tps.to_vec())
-                            .unwrap_or_default();
-                        let mut bindings =
-                            crate::generic::build_class_bindings(&class_tps, &receiver_type_params);
-                        let inherited_bindings =
-                            crate::db::inherited_template_bindings(self.db, &fqcn_arc, &bindings);
-                        // The resolved method's params/return are declared on
-                        // `resolved.owner_fqcn` — own-bindings-wins only when
-                        // the receiver's own class declares the method
-                        // (same collision the direct-call path already
-                        // guards against, see call/method.rs).
-                        if resolved.owner_fqcn.as_ref() == fqcn_arc.as_ref() {
-                            for (k, v) in inherited_bindings {
-                                bindings.entry(k).or_insert(v);
-                            }
-                        } else {
-                            bindings.extend(inherited_bindings);
-                        }
-                        let closure = Self::build_closure_from_resolved_params(
+                        let closure = Self::resolved_method_closure(
                             self.db,
-                            &resolved.params,
-                            resolved.return_ty_raw,
-                            &bindings,
-                            &resolved.template_params,
                             &fqcn_arc,
                             &receiver_type_params,
-                            resolved.is_pure,
+                            resolved,
                         );
                         return if nullsafe {
                             Type::nullable(closure)
@@ -1366,35 +1411,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         },
                         resolved.return_ty_raw.clone(),
                     );
-                    // Same reasoning as the instance-method FCC case above: substitute
-                    // the receiver's own bound type params before building the callable.
-                    let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)
-                        .map(|tps| tps.to_vec())
-                        .unwrap_or_default();
-                    let mut bindings =
-                        crate::generic::build_class_bindings(&class_tps, &receiver_type_params);
-                    let inherited_bindings =
-                        crate::db::inherited_template_bindings(self.db, &fqcn_arc, &bindings);
-                    // Own-bindings-wins only when the receiver's own class
-                    // declares the method (`resolved.owner_fqcn`); otherwise
-                    // the ancestor that actually declares it wins — same
-                    // collision guard as the instance-method FCC case above.
-                    if resolved.owner_fqcn.as_ref() == fqcn_arc.as_ref() {
-                        for (k, v) in inherited_bindings {
-                            bindings.entry(k).or_insert(v);
-                        }
-                    } else {
-                        bindings.extend(inherited_bindings);
-                    }
-                    return Type::single(Self::build_closure_from_resolved_params(
+                    return Type::single(Self::resolved_method_closure(
                         self.db,
-                        &resolved.params,
-                        resolved.return_ty_raw,
-                        &bindings,
-                        &resolved.template_params,
                         &fqcn_arc,
                         &receiver_type_params,
-                        resolved.is_pure,
+                        resolved,
                     ));
                 }
                 self.emit_undefined_static_method_for_callable(
@@ -1476,6 +1497,127 @@ impl<'a> ExpressionAnalyzer<'a> {
             Severity::Error,
             span,
         );
+    }
+
+    /// The `Closure` a first-class callable of this function call would produce.
+    fn function_call_closure(&self, fc: &php_ast::owned::FunctionCallExpr) -> Option<Atomic> {
+        let (_, f) = fc
+            .name
+            .kind
+            .function_ref(self.db, &self.file)?
+            .find(self.db, &self.file)?;
+        let return_ty = f
+            .return_type
+            .as_deref()
+            .cloned()
+            .unwrap_or_else(Type::mixed);
+        Some(Self::build_closure_from_resolved_params(
+            self.db,
+            &f.params,
+            return_ty,
+            &rustc_hash::FxHashMap::default(),
+            &f.template_params,
+            &Arc::from(""),
+            &[],
+            f.is_pure,
+        ))
+    }
+
+    /// The `Closure` of `$var->method(...)`; other receivers are not re-analyzed.
+    fn method_call_closure(
+        &self,
+        object: &php_ast::owned::Expr,
+        method: &php_ast::owned::Expr,
+        ctx: &FlowState,
+    ) -> Option<Atomic> {
+        let (ExprKind::Variable(var), ExprKind::Identifier(method_name)) =
+            (&object.kind, &method.kind)
+        else {
+            return None;
+        };
+        let (fqcn, receiver_type_params) =
+            ctx.get_var(var)
+                .remove_null()
+                .types
+                .iter()
+                .find_map(|a| match a {
+                    Atomic::TNamedObject { fqcn, type_params } => {
+                        Some((*fqcn, type_params.to_vec()))
+                    }
+                    _ => None,
+                })?;
+        let fqcn: Arc<str> = Arc::from(
+            crate::db::resolve_receiver_fqcn(self.db, self.file.as_ref(), fqcn.as_ref()).as_str(),
+        );
+        let resolved = crate::call::method::resolve_method_from_db(
+            self.db,
+            &fqcn,
+            &crate::util::php_ident_lowercase(method_name.as_ref()),
+        )?;
+        Some(Self::resolved_method_closure(
+            self.db,
+            &fqcn,
+            &receiver_type_params,
+            resolved,
+        ))
+    }
+
+    /// The `Closure` of `Class::method(...)` for a named class.
+    fn static_call_closure(
+        &self,
+        class: &php_ast::owned::Expr,
+        method: &php_ast::owned::Expr,
+        ctx: &FlowState,
+    ) -> Option<Atomic> {
+        let ExprKind::Identifier(method_name) = &method.kind else {
+            return None;
+        };
+        let resolved_class = class.kind.resolve_name_ref(self.db, self.file.as_ref())?;
+        let fqcn: Arc<str> = match crate::util::php_ident_lowercase(&resolved_class).as_str() {
+            "self" => ctx.self_fqcn.clone()?,
+            "parent" => ctx.parent_fqcn.clone()?,
+            "static" => ctx.static_fqcn.clone().or_else(|| ctx.self_fqcn.clone())?,
+            _ => Arc::from(resolved_class.as_str()),
+        };
+        let resolved = crate::call::method::resolve_method_from_db(
+            self.db,
+            &fqcn,
+            &crate::util::php_ident_lowercase(method_name.as_ref()),
+        )?;
+        Some(Self::resolved_method_closure(self.db, &fqcn, &[], resolved))
+    }
+
+    /// The `Closure` of `resolved` called on `fqcn`, with the receiver's template bindings applied.
+    fn resolved_method_closure(
+        db: &dyn crate::db::MirDatabase,
+        fqcn: &Arc<str>,
+        receiver_type_params: &[Type],
+        resolved: crate::call::method::ResolvedMethod,
+    ) -> Atomic {
+        let class_tps = crate::db::class_template_params(db, fqcn)
+            .map(|tps| tps.to_vec())
+            .unwrap_or_default();
+        let mut bindings = crate::generic::build_class_bindings(&class_tps, receiver_type_params);
+        let inherited_bindings = crate::db::inherited_template_bindings(db, fqcn, &bindings);
+        // Own bindings win only when the receiver's class declares the method; otherwise the
+        // declaring ancestor's do (same collision guard as call/method.rs).
+        if resolved.owner_fqcn.as_ref() == fqcn.as_ref() {
+            for (k, v) in inherited_bindings {
+                bindings.entry(k).or_insert(v);
+            }
+        } else {
+            bindings.extend(inherited_bindings);
+        }
+        Self::build_closure_from_resolved_params(
+            db,
+            &resolved.params,
+            resolved.return_ty_raw,
+            &bindings,
+            &resolved.template_params,
+            fqcn,
+            receiver_type_params,
+            resolved.is_pure,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
