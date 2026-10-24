@@ -2011,10 +2011,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // records both. Key by the declaring owner, not the
                         // accessed-through class, matching the read path.
                         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                        let prop_owner =
-                            crate::db::find_property_in_chain(self.db, here, prop_name)
-                                .map(|(cls, _)| cls)
-                                .unwrap_or_else(|| fqcn.clone());
+                        let found = crate::db::find_property_in_chain(self.db, here, prop_name);
+                        let late_bound = matches!(&spa.class.kind, ExprKind::Name(n)
+                            if matches!(&*n.parts, [only] if only.eq_ignore_ascii_case("static")));
+                        if found.is_none() && !late_bound {
+                            self.report_undefined_static_property(
+                                &fqcn,
+                                prop_name,
+                                spa.member.span,
+                            );
+                        }
+                        let prop_owner = found.map(|(cls, _)| cls).unwrap_or_else(|| fqcn.clone());
                         self.record_ref(
                             std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
                             spa.member.span,

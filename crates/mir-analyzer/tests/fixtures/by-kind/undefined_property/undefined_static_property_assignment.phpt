@@ -8,5 +8,6 @@ class A {
         /** @suppress UndefinedPropertyFetch */
 //                    ^^^^^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedPropertyFetch' is never used
         self::$foo = 5;
+//            ^^^^ UndefinedProperty: Property A::$foo does not exist
     }
 }

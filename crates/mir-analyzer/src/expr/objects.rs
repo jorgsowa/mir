@@ -1310,7 +1310,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     /// Traits and `class_exists()`-guarded undeclared classes are skipped: the property may exist.
-    fn report_undefined_static_property(
+    pub(super) fn report_undefined_static_property(
         &mut self,
         fqcn: &str,
         prop_name: &str,
