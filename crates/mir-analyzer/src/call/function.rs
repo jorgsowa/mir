@@ -656,7 +656,8 @@ impl CallAnalyzer {
                         // and record both, or a static method reachable only
                         // this way is falsely flagged UnusedMethod (and its
                         // class UnusedClass).
-                        let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
+                        let resolved_class =
+                            super::callable::callable_string_class(ctx, class_name);
                         let here = crate::db::Fqcn::from_str(ea.db, &resolved_class);
                         if let Some((owner_fqcn, method)) =
                             crate::db::find_method_in_chain(ea.db, here, method_name)
@@ -903,17 +904,17 @@ impl CallAnalyzer {
             // Functions with a fixed callback arity are declared in callback_max_arity_spec.
             match resolved_fn_name.as_str() {
                 "array_map" => {
-                    super::array_builtins::check_array_map_callback(ea, &arg_types, &arg_spans)
+                    super::array_builtins::check_array_map_callback(ea, ctx, &arg_types, &arg_spans)
                 }
-                "array_filter" => {
-                    super::array_builtins::check_array_filter_callback(ea, &arg_types, &arg_spans)
-                }
+                "array_filter" => super::array_builtins::check_array_filter_callback(
+                    ea, ctx, &arg_types, &arg_spans,
+                ),
                 fn_name => {
                     if let Some((cb_idx, max_arity)) =
                         super::callable::callback_max_arity_spec(fn_name)
                     {
                         super::callable::check_max_arity_callback(
-                            ea, fn_name, cb_idx, max_arity, &arg_types, &arg_spans,
+                            ea, ctx, fn_name, cb_idx, max_arity, &arg_types, &arg_spans,
                         );
                     }
                 }

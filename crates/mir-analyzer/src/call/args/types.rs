@@ -133,7 +133,7 @@ pub(crate) fn check_one(
     if !skip_validation
         && param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TCallableString))
     {
-        super::super::callable::record_callable_string_ref(ea, arg_ty, arg_span);
+        super::super::callable::record_callable_string_ref(ea, ctx, arg_ty, arg_span);
     }
 
     let (param_ty, arg_ty) = (
@@ -1650,8 +1650,8 @@ fn validate_callable_argument(
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
         // Check for "ClassName::methodName" format
         if let Some((class_name, method_name)) = s.split_once("::") {
-            // A runtime class-name string is always fully qualified.
-            let resolved_class = class_name.trim_start_matches('\\').to_string();
+            let resolved_class =
+                super::super::callable::callable_string_class(ctx, class_name).into_owned();
             if !crate::db::class_exists(ea.db, &resolved_class) {
                 ea.emit(
                     IssueKind::UndefinedClass {

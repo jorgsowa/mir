@@ -129,6 +129,7 @@ pub(crate) fn element_callback_param_hints(
 /// array_map(callback, array1, array2, ...) → callback receives one element from each array.
 pub(crate) fn check_array_map_callback(
     ea: &mut ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
     arg_types: &[Type],
     arg_spans: &[Span],
 ) {
@@ -153,7 +154,7 @@ pub(crate) fn check_array_map_callback(
         return;
     }
 
-    super::callable::record_callable_string_ref(ea, callback_ty, callback_span);
+    super::callable::record_callable_string_ref(ea, ctx, callback_ty, callback_span);
 
     if arg_types.len() > 1 {
         validate_callback_arity(ea, callback_ty, callback_span, arg_types.len() - 1);
@@ -203,6 +204,7 @@ const ARRAY_FILTER_USE_KEY: i64 = 2; // pass only key to callback
 /// - else/missing: 1 arg (value)
 pub(crate) fn check_array_filter_callback(
     ea: &mut ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
     arg_types: &[Type],
     arg_spans: &[Span],
 ) {
@@ -227,7 +229,7 @@ pub(crate) fn check_array_filter_callback(
         return;
     }
 
-    super::callable::record_callable_string_ref(ea, callback_ty, callback_span);
+    super::callable::record_callable_string_ref(ea, ctx, callback_ty, callback_span);
 
     let expected_arity = if arg_types.len() > 2 {
         match arg_types[2].types.first() {

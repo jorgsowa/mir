@@ -8,6 +8,27 @@ use mir_types::atomic::FnParam;
 use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
+
+/// The class a runtime `'Class::method'` string names: `self` / `static` / `parent` mean the
+/// calling class, any other name is fully qualified.
+pub(crate) fn callable_string_class<'s>(
+    ctx: &FlowState,
+    class: &'s str,
+) -> std::borrow::Cow<'s, str> {
+    let scope = if class.eq_ignore_ascii_case("self") {
+        ctx.self_fqcn.as_deref()
+    } else if class.eq_ignore_ascii_case("static") {
+        ctx.static_fqcn.as_deref().or(ctx.self_fqcn.as_deref())
+    } else if class.eq_ignore_ascii_case("parent") {
+        ctx.parent_fqcn.as_deref()
+    } else {
+        return std::borrow::Cow::Borrowed(class.strip_prefix('\\').unwrap_or(class));
+    };
+    scope.map_or(std::borrow::Cow::Borrowed(class), |fqcn| {
+        std::borrow::Cow::Owned(fqcn.to_string())
+    })
+}
 
 /// A bare string-literal callback (`array_map('formatRow', ...)`, `usort($a, 'my_cmp')`,
 /// `usort($a, 'MyComparator::compare')`) is a real runtime reference to the named
@@ -15,6 +36,7 @@ use crate::expr::ExpressionAnalyzer;
 /// reachable only through one of these builtins is falsely flagged as dead code.
 pub(crate) fn record_callable_string_ref(
     ea: &mut ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
     callback_ty: &Type,
     callback_span: Span,
 ) {
@@ -26,7 +48,7 @@ pub(crate) fn record_callable_string_ref(
             continue;
         }
         if let Some((class_name, method_name)) = name.as_ref().split_once("::") {
-            let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
+            let resolved_class = callable_string_class(ctx, class_name);
             let here = crate::db::Fqcn::from_str(ea.db, &resolved_class);
             // Precedence-aware so a trait-conflict-resolved callable string
             // ('Class::method' where two composed traits both declare it, or
@@ -901,6 +923,7 @@ pub(crate) fn single_param_predicate_body(callback_expr: &Expr) -> Option<(&str,
 /// requiring more than `max_arity` parameters is invalid.
 pub(crate) fn check_max_arity_callback(
     ea: &mut ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
     fn_name: &str,
     callback_idx: usize,
     max_arity: usize,
@@ -928,7 +951,7 @@ pub(crate) fn check_max_arity_callback(
         return;
     }
 
-    record_callable_string_ref(ea, callback_ty, callback_span);
+    record_callable_string_ref(ea, ctx, callback_ty, callback_span);
 
     if let Some(params) = extract_callable_params(callback_ty, ea) {
         let required_count = params

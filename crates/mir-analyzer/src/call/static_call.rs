@@ -529,7 +529,7 @@ impl CallAnalyzer {
             if let (Some(callback_ty), Some(&callback_span)) =
                 (arg_types.first(), arg_spans.first())
             {
-                super::callable::record_callable_string_ref(ea, callback_ty, callback_span);
+                super::callable::record_callable_string_ref(ea, ctx, callback_ty, callback_span);
             }
         }
 
