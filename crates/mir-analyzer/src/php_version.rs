@@ -29,8 +29,8 @@ impl PhpVersion {
     }
 
     /// Parser target; versions below 7.4 parse as 7.4, the parser's oldest.
-    pub fn parser_version(self) -> php_rs_parser::PhpVersion {
-        use php_rs_parser::PhpVersion as P;
+    pub fn parser_version(self) -> php_ast::PhpVersion {
+        use php_ast::PhpVersion as P;
         match (self.major, self.minor) {
             (..=7, _) => P::Php74,
             (8, 0) => P::Php80,

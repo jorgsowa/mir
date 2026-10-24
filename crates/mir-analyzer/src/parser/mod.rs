@@ -258,7 +258,7 @@ mod ast_incomplete_tests {
     #[test]
     fn version_too_low_leaves_ast_complete() {
         let mut options = php_rs_parser::ParseOptions::default();
-        options.version = php_rs_parser::PhpVersion::Php74;
+        options.version = php_ast::PhpVersion::Php74;
         let parsed = php_rs_parser::parse_with("<?php\n$x = match (1) { 1 => 2 };\n", &options);
         assert!(!parsed.errors.is_empty());
         assert!(!blocks_body_analysis(&parsed.errors));

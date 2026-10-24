@@ -54,7 +54,7 @@ impl Drop for GuardedParse {
 }
 
 /// Parses `source`, guaranteeing enough stack for deeply nested input.
-pub fn parse_versioned(source: &str, version: php_rs_parser::PhpVersion) -> GuardedParse {
+pub fn parse_versioned(source: &str, version: php_ast::PhpVersion) -> GuardedParse {
     GuardedParse(Some(ensure_phase_stack(|| {
         php_rs_parser::parse_with(
             source,
