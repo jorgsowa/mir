@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use mir_codebase::definitions::{ConstantDef, EnumCaseDef};
+use mir_codebase::definitions::{ConstantDef, EnumCaseDef, PropertyDef};
 use mir_issues::{Issue, IssueKind};
 use mir_types::Type;
 use php_ast::owned::EnumMemberKind;
@@ -104,6 +104,7 @@ impl DefinitionCollector<'_> {
         // silently leaving any alias reference in its docblock unexpanded.
         let type_aliases = self.build_type_aliases_deferring_imports(&enum_doc);
 
+        let mut declared_properties = Vec::new();
         for member in decl.body.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
@@ -255,6 +256,47 @@ impl DefinitionCollector<'_> {
                         },
                     );
                 }
+                // PHP rejects this (the parser reports `enum-property`); registering it
+                // keeps that the only issue. `name` / `value` already exist on every enum.
+                EnumMemberKind::Property(p)
+                    if !matches!(p.name.as_str(), Some("name" | "value")) =>
+                {
+                    let prop_doc = self.parse_docblock_from_node(p.doc_comment.as_ref());
+                    let hint_ty = self.resolve_union_opt(
+                        p.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    let ty = prop_doc
+                        .var_type
+                        .map(|t| self.resolve_union_doc_with_aliases(t, &type_aliases))
+                        .or_else(|| hint_ty.clone());
+                    let default_ty = p
+                        .default
+                        .as_ref()
+                        .map(|d| super::literal_types::literal_type(d).unwrap_or_else(Type::mixed));
+                    let prop_name = p.name.as_str().unwrap_or_default();
+                    declared_properties.push(PropertyDef {
+                        name: Arc::from(prop_name),
+                        ty: mir_codebase::definitions::wrap_property_type(ty),
+                        inferred_ty: None,
+                        native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
+                        visibility: Self::convert_visibility(p.modifiers.visibility),
+                        set_visibility: Self::convert_set_visibility(&p.modifiers),
+                        is_static: p.modifiers.is_static,
+                        is_readonly: p.modifiers.is_readonly || prop_doc.is_readonly,
+                        has_native_readonly: p.modifiers.is_readonly,
+                        default: mir_codebase::definitions::wrap_property_type(default_ty),
+                        location: Some(self.location(member.span.start, member.span.end)),
+                        deprecated: Self::deprecated_from_doc_or_attrs(
+                            prop_doc.deprecated.as_deref(),
+                            &p.attributes,
+                        ),
+                        has_native_type: p.type_hint.is_some(),
+                        get_only_hook: super::is_get_only_hook(&p.hooks),
+                        from_docblock: false,
+                    });
+                }
                 EnumMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
                         let trait_fqcn: Arc<str> = self.resolve_ast_name(t).into();
@@ -336,6 +378,9 @@ impl DefinitionCollector<'_> {
             .collect();
 
         let mut own_properties = mir_codebase::definitions::MemberMap::default();
+        for prop in declared_properties {
+            own_properties.insert(prop.name.clone(), prop);
+        }
         self.add_docblock_members(
             &enum_doc,
             &type_aliases,
