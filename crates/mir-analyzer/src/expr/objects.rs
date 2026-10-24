@@ -1216,6 +1216,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 } else {
                                     ty.substitute_templates(&bindings)
                                 };
+                            } else if resolved != "static" {
+                                self.report_undefined_static_property(
+                                    &fqcn,
+                                    prop_name,
+                                    spa.member.span,
+                                );
                             }
                         }
                         self.record_ref(
@@ -1303,6 +1309,29 @@ impl<'a> ExpressionAnalyzer<'a> {
         result_ty
     }
 
+    /// Traits and `class_exists()`-guarded undeclared classes are skipped: the property may exist.
+    fn report_undefined_static_property(
+        &mut self,
+        fqcn: &str,
+        prop_name: &str,
+        span: php_ast::Span,
+    ) {
+        if self.in_existence_check
+            || crate::db::class_kind(self.db, fqcn).is_none_or(|k| k.is_trait)
+            || crate::db::has_unknown_ancestor(self.db, fqcn)
+        {
+            return;
+        }
+        self.emit(
+            IssueKind::UndefinedProperty {
+                class: fqcn.to_string(),
+                property: prop_name.to_string(),
+            },
+            Severity::Warning,
+            span,
+        );
+    }
+
     /// Record and resolve a static property access (`Class::$prop`) once the
     /// concrete class FQCN is known — shared by the plain-identifier class
     /// name path and the object-instance/class-string variable path.
@@ -1387,6 +1416,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     } else {
                         ty.substitute_templates(&bindings)
                     };
+                } else {
+                    self.report_undefined_static_property(&resolved, prop_name, member_expr.span);
                 }
             }
             // Reading a static property is just as non-deterministic across
