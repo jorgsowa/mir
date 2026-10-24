@@ -148,11 +148,16 @@ fn partial_application_type(
     if !is_partial_application(args) {
         return called;
     }
-    Type::single(
-        callee()
-            .and_then(|closure| bind_placeholders(closure, args))
-            .unwrap_or_else(bare_closure),
-    )
+    Type::single(partial_closure(args, callee))
+}
+
+fn partial_closure(
+    args: &[php_ast::owned::Arg],
+    callee: impl FnOnce() -> Option<Atomic>,
+) -> Atomic {
+    callee()
+        .and_then(|closure| bind_placeholders(closure, args))
+        .unwrap_or_else(bare_closure)
 }
 
 /// The callee's closure with only the parameters the placeholders leave open.
@@ -946,7 +951,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true);
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
-                partial_application_type(&mc.args, ty, || None)
+                if is_partial_application(&mc.args) {
+                    Type::nullable(partial_closure(&mc.args, || {
+                        self.method_call_closure(&mc.object, &mc.method, ctx)
+                    }))
+                } else {
+                    ty
+                }
             }
 
             ExprKind::StaticMethodCall(smc) => {
@@ -979,7 +990,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 let ty = crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span);
                 ctx.invalidate_escaped_vars();
-                partial_application_type(&fc.args, ty, || self.function_call_closure(fc))
+                partial_application_type(&fc.args, ty, || self.function_call_closure(fc, ctx))
             }
 
             // --- Closures / arrow functions --------------------------------
@@ -1500,7 +1511,17 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     /// The `Closure` a first-class callable of this function call would produce.
-    fn function_call_closure(&self, fc: &php_ast::owned::FunctionCallExpr) -> Option<Atomic> {
+    fn function_call_closure(
+        &self,
+        fc: &php_ast::owned::FunctionCallExpr,
+        ctx: &FlowState,
+    ) -> Option<Atomic> {
+        if let ExprKind::Variable(var) = &fc.name.kind {
+            return match ctx.get_var(var).types.as_slice() {
+                [closure @ Atomic::TClosure { .. }] => Some(closure.clone()),
+                _ => None,
+            };
+        }
         let (_, f) = fc
             .name
             .kind

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `--no-taint` skips taint analysis: no `Tainted*` issues are reported and no taint summaries are built.
 - `UseStatementHasNoEffect` (MIR1511, warning) for `use Foo;` outside any namespace and `PrivateFinalMethod` (MIR1512, warning) for a `final private` method other than the constructor. PHP warns about both; parser 0.24 no longer reports them.
-- A PHP 8.6 partial application (`add(?, 5)`, `$obj->m(1, ...)`, `Cls::m(?)`) has a typed `Closure` with the parameters its placeholders leave open, so calls through it are checked. It was a bare `Closure` and its calls returned `mixed`. Instance methods are typed when the receiver is a variable.
+- A PHP 8.6 partial application (`add(?, 5)`, `$obj->m(1, ...)`, `Cls::m(?)`) has a typed `Closure` with the parameters its placeholders leave open, so calls through it are checked. It was a bare `Closure` and its calls returned `mixed`. Instance methods are typed when the receiver is a variable; a placeholder call of a typed closure variable (`$fn(?, 's')`) and a nullsafe call (`$obj?->m(?)`, nullable) are typed too.
 - `CompileError` (MIR1401, error) for code that parses but that PHP rejects at compile time (`php -l` prints `Fatal error`), such as a non-static `__callStatic()` or a duplicate property. These were reported as `ParseError`, which now covers syntax errors and syntax the target version does not have; suppressions and baselines for them need the new name.
 
 ### Changed

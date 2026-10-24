@@ -41,6 +41,17 @@ function f(Calc $calc): void {
     $result = $addFive(10);
     echo $result;
 }
+
+function g(?Calc $calc): void {
+    $fn = fn(int $x, string $y): int => $x;
+    $bound = $fn(?, "s");
+    $bound("bad");
+    $maybe = $calc?->mul(?, 2);
+    $maybe("bad");
+    $addFive = add(?, 5);
+    $again = $addFive(?);
+    $again("bad");
+}
 ===expect===
 InvalidArgument@12:16-12:19: Argument $a of {closure}() expects 'int', got '"x"'
 InvalidArgument@14:14-14:17: Argument $a of {closure}() expects 'int', got '"y"'
@@ -49,3 +60,6 @@ InvalidArgument@22:10-22:12: Argument $name of {closure}() expects 'string', got
 InvalidArgument@24:11-24:13: Argument $name of {closure}() expects 'string', got 'array{}'
 InvalidArgument@26:11-26:14: Argument $nums of {closure}() expects 'int', got '"z"'
 InvalidArgument@28:12-28:17: Argument $a of {closure}() expects 'int', got '"bad"'
+InvalidArgument@38:11-38:16: Argument $x of {closure}() expects 'int', got '"bad"'
+InvalidArgument@40:11-40:16: Argument $a of {closure}() expects 'int', got '"bad"'
+InvalidArgument@43:11-43:16: Argument $a of {closure}() expects 'int', got '"bad"'
