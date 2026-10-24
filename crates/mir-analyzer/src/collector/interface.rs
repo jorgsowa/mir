@@ -133,28 +133,18 @@ impl<'a> DefinitionCollector<'a> {
         // See `collector/class.rs` for why this runs before the loop: it lets
         // `int-mask-of<self::*>` in a method docblock below resolve against
         // this interface's own literal-int constants.
-        let self_int_constants: Arc<Vec<(Arc<str>, mir_types::Atomic)>> = Arc::new(
-            decl.body
-                .members
-                .iter()
-                .filter_map(|m| match &m.kind {
-                    ClassMemberKind::ClassConst(c) => {
-                        let name = c.name.as_str()?;
-                        match super::infer_const_value(self, &c.value.kind) {
-                            Some(t) if t.types.len() == 1 => match &t.types[0] {
-                                a @ (mir_types::Atomic::TLiteralInt(_)
-                                | mir_types::Atomic::TLiteralString(_)) => {
-                                    Some((Arc::from(name), a.clone()))
-                                }
-                                _ => None,
-                            },
-                            _ => None,
-                        }
-                    }
-                    _ => None,
-                })
-                .collect(),
-        );
+        let own_consts: Vec<(&str, &php_ast::owned::Expr)> = decl
+            .body
+            .members
+            .iter()
+            .filter_map(|m| match &m.kind {
+                ClassMemberKind::ClassConst(c) => Some((c.name.as_str()?, &c.value)),
+                _ => None,
+            })
+            .collect();
+        let prev_own_constants =
+            self.enter_own_constants(&fqcn, None, Default::default(), &own_consts);
+        let self_int_constants = self.own_literal_constants(&own_consts);
         let _int_mask_guard =
             crate::parser::docblock::SelfIntConstantsGuard::activate(&fqcn, &self_int_constants);
 
@@ -359,6 +349,7 @@ impl<'a> DefinitionCollector<'a> {
                 type_aliases: Self::stored_type_aliases(&type_aliases),
             }));
 
+        self.own_constants = prev_own_constants;
         ControlFlow::Continue(())
     }
 }

@@ -71,28 +71,29 @@ impl DefinitionCollector<'_> {
         // `int-mask-of<self::*>` in a method docblock below resolve against
         // the enum's own literal-int `const` declarations (not its cases —
         // those aren't class constants).
-        let self_int_constants: Arc<Vec<(Arc<str>, mir_types::Atomic)>> = Arc::new(
+        let own_consts: Vec<(&str, &php_ast::owned::Expr)> = decl
+            .body
+            .members
+            .iter()
+            .filter_map(|m| match &m.kind {
+                EnumMemberKind::ClassConst(c) => Some((c.name.as_str()?, &c.value)),
+                _ => None,
+            })
+            .collect();
+        let prev_own_constants = self.enter_own_constants(
+            &fqcn,
+            None,
             decl.body
                 .members
                 .iter()
                 .filter_map(|m| match &m.kind {
-                    EnumMemberKind::ClassConst(c) => {
-                        let name = c.name.as_str()?;
-                        match super::infer_const_value(self, &c.value.kind) {
-                            Some(t) if t.types.len() == 1 => match &t.types[0] {
-                                a @ (mir_types::Atomic::TLiteralInt(_)
-                                | mir_types::Atomic::TLiteralString(_)) => {
-                                    Some((Arc::from(name), a.clone()))
-                                }
-                                _ => None,
-                            },
-                            _ => None,
-                        }
-                    }
+                    EnumMemberKind::Case(c) => c.name.as_str().map(str::to_string),
                     _ => None,
                 })
                 .collect(),
+            &own_consts,
         );
+        let self_int_constants = self.own_literal_constants(&own_consts);
         let _int_mask_guard =
             crate::parser::docblock::SelfIntConstantsGuard::activate(&fqcn, &self_int_constants);
 
@@ -370,6 +371,7 @@ impl DefinitionCollector<'_> {
                 type_aliases: Self::stored_type_aliases(&type_aliases),
                 own_properties,
             }));
+        self.own_constants = prev_own_constants;
         ControlFlow::Continue(())
     }
 }

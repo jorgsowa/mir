@@ -28,10 +28,10 @@ class Keys {
 
     public static function check(): void {
         $a = self::DOTTED;
-        /** @mir-check $a is non-empty-string */
+        /** @mir-check $a is "k." */
         $_a = $a;
         $b = self::TYPED;
-        /** @mir-check $b is non-empty-string */
+        /** @mir-check $b is "k:" */
         $_b = $b;
         $c = self::FROM_FUNCTION_LEFT;
         /** @mir-check $c is non-empty-string */
@@ -67,7 +67,7 @@ class Keys {
 
     public static function fillKeys(): void {
         $filled = array_fill_keys([self::DOTTED], 1);
-        /** @mir-check $filled is non-empty-array<non-empty-string, 1> */
+        /** @mir-check $filled is non-empty-array<"k.", 1> */
         $_filled = $filled;
         $_ = $filled;
     }

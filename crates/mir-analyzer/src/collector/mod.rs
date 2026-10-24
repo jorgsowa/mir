@@ -6,7 +6,7 @@
 
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
 
@@ -566,7 +566,8 @@ pub(crate) fn print_collector_stats() {
 /// This handles literal values like integers, strings, etc. used in define().
 ///
 /// `collector` is consulted only for the `ClassConstAccess` arm (`Foo::BAR`),
-/// to resolve a same-file, already-collected enum case/constant — this
+/// to resolve the class-like being collected (`self::`, `parent::`, its own
+/// name) or a same-file, already-collected enum case/constant — this
 /// collector has no cross-file or database access, so a reference to a class
 /// declared later in the file, or in a different file, still falls through to
 /// `None` (the pre-existing `mixed` fallback), same as today.
@@ -715,7 +716,29 @@ pub(super) fn infer_const_value(
             if const_name.as_ref() == "class" {
                 return None;
             }
-            let resolved = collector.resolve_name(&crate::parser::name_to_string_owned(class_name));
+            let own = collector.own_constants.as_ref();
+            let resolved = match (class_name.kind, &*class_name.parts) {
+                (php_ast::ast::NameKind::Unqualified, [only])
+                    if only.eq_ignore_ascii_case("self") =>
+                {
+                    own?.fqcn.clone()
+                }
+                (php_ast::ast::NameKind::Unqualified, [only])
+                    if only.eq_ignore_ascii_case("parent") =>
+                {
+                    own?.parent.clone()?
+                }
+                _ => collector.resolve_name(&crate::parser::name_to_string_owned(class_name)),
+            };
+            if let Some(own) = own.filter(|own| own.fqcn.eq_ignore_ascii_case(&resolved)) {
+                if own.cases.contains(const_name.as_ref()) {
+                    return Some(Type::single(Atomic::TNamedObject {
+                        fqcn: Name::from(own.fqcn.as_str()),
+                        type_params: mir_types::union::empty_type_params(),
+                    }));
+                }
+                return own.types.get(const_name.as_ref()).cloned();
+            }
             if let Some(enum_def) = collector
                 .slice
                 .enums
@@ -872,6 +895,15 @@ pub struct DefinitionCollector<'a> {
     /// property written to anywhere in its own file must not be refined from
     /// its literal default.
     static_writes: literal_types::StaticWrites,
+    /// Constants of the class-like being collected, for `self::X` in constant initializers.
+    own_constants: Option<OwnConstants>,
+}
+
+pub(super) struct OwnConstants {
+    fqcn: String,
+    parent: Option<String>,
+    cases: FxHashSet<String>,
+    types: FxHashMap<String, Type>,
 }
 
 impl<'a> DefinitionCollector<'a> {
@@ -897,6 +929,7 @@ impl<'a> DefinitionCollector<'a> {
             accumulated_imports: ImportMaps::default(),
             ns_blocks: Vec::new(),
             static_writes: literal_types::StaticWrites::default(),
+            own_constants: None,
         }
     }
 
@@ -1041,6 +1074,64 @@ impl<'a> DefinitionCollector<'a> {
 
     fn resolve_name(&self, name: &str) -> String {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
+    }
+
+    /// Types a class-like's own constants up front, so references between them resolve in any
+    /// declaration order; returns the scope to restore once the class-like is collected.
+    fn enter_own_constants(
+        &mut self,
+        fqcn: &str,
+        parent: Option<&str>,
+        cases: FxHashSet<String>,
+        consts: &[(&str, &php_ast::owned::Expr)],
+    ) -> Option<OwnConstants> {
+        let prev = self.own_constants.replace(OwnConstants {
+            fqcn: fqcn.to_string(),
+            parent: parent.map(str::to_string),
+            cases,
+            types: FxHashMap::default(),
+        });
+        let mut pending: Vec<(&str, &php_ast::owned::Expr)> = consts.to_vec();
+        while !pending.is_empty() {
+            let mut resolved = Vec::new();
+            pending.retain(
+                |&(name, value)| match infer_const_value(self, &value.kind) {
+                    Some(ty) => {
+                        resolved.push((name.to_string(), ty));
+                        false
+                    }
+                    None => true,
+                },
+            );
+            if resolved.is_empty() {
+                break;
+            }
+            if let Some(own) = self.own_constants.as_mut() {
+                own.types.extend(resolved);
+            }
+        }
+        prev
+    }
+
+    /// The own constants with a single literal int or string type, in declaration order.
+    fn own_literal_constants(
+        &self,
+        consts: &[(&str, &php_ast::owned::Expr)],
+    ) -> Arc<Vec<(Arc<str>, Atomic)>> {
+        let Some(own) = &self.own_constants else {
+            return Arc::default();
+        };
+        Arc::new(
+            consts
+                .iter()
+                .filter_map(|(name, _)| match own.types.get(*name)?.types.as_slice() {
+                    [a @ (Atomic::TLiteralInt(_) | Atomic::TLiteralString(_))] => {
+                        Some((Arc::from(*name), a.clone()))
+                    }
+                    _ => None,
+                })
+                .collect(),
+        )
     }
 
     /// Compute the FQCN a class/interface/trait/enum *declaration* establishes
