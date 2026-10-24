@@ -351,13 +351,13 @@ pub(super) fn narrow_from_get_debug_type_literal(
             }
         }
     } else {
-        let fqcn = crate::db::resolve_name(db, file, literal);
+        let fqcn = crate::util::runtime_class_name(literal);
         match target {
             ScalarArgTarget::Var(var_name) => {
-                narrow_var_to_specific_class(ctx, var_name, &fqcn, is_true, db)
+                narrow_var_to_specific_class(ctx, var_name, fqcn, is_true, db)
             }
             ScalarArgTarget::Prop(obj, prop) => {
-                narrow_prop_to_specific_class(ctx, obj, prop, &fqcn, is_true, db, file);
+                narrow_prop_to_specific_class(ctx, obj, prop, fqcn, is_true, db, file);
                 narrow_receiver_non_null_on_prop_match(ctx, obj, is_true);
             }
         }
@@ -397,7 +397,6 @@ pub(super) fn narrow_static_prop_from_get_debug_type_literal(
     literal: &str,
     is_true: bool,
     db: &dyn MirDatabase,
-    file: &str,
 ) {
     let type_fn = match literal {
         "null" => Some("is_null"),
@@ -412,7 +411,7 @@ pub(super) fn narrow_static_prop_from_get_debug_type_literal(
     if let Some(type_fn) = type_fn {
         narrow_static_prop_from_type_fn(ctx, type_fn, fqcn, prop, db, is_true);
     } else {
-        let resolved = crate::db::resolve_name(db, file, literal);
-        narrow_static_prop_to_specific_class(ctx, fqcn, prop, &resolved, is_true, db);
+        let resolved = crate::util::runtime_class_name(literal);
+        narrow_static_prop_to_specific_class(ctx, fqcn, prop, resolved, is_true, db);
     }
 }

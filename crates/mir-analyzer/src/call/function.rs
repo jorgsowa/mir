@@ -716,9 +716,9 @@ impl CallAnalyzer {
         if let Some(idx) = class_name_arg_index {
             if let Some(arg) = call.args.get(idx) {
                 if let Some(ExprKind::String(name)) = arg.value().map(|v| &v.kind) {
-                    let resolved_class = crate::db::resolve_name(ea.db, &ea.file, name.as_str());
-                    if crate::db::class_exists(ea.db, &resolved_class) {
-                        ea.record_class_ref(&resolved_class, arg.span);
+                    let resolved_class = crate::util::runtime_class_name(name.as_str());
+                    if crate::db::class_exists(ea.db, resolved_class) {
+                        ea.record_class_ref(resolved_class, arg.span);
                     }
                 }
             }

@@ -170,7 +170,7 @@ pub(crate) fn resolve_literal_class_scope(
         ExprKind::ClassConstAccess(cca) if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) => {
             cca.class.kind.resolve_name_ref(db, file)?
         }
-        ExprKind::String(s) => crate::db::resolve_name(db, file, s.as_str()),
+        ExprKind::String(s) => crate::util::runtime_class_name(s.as_str()).to_string(),
         _ => return None,
     };
     crate::db::class_exists(db, &resolved).then(|| Arc::from(resolved.as_str()))

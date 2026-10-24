@@ -352,3 +352,8 @@ pub(crate) fn is_unresolved_class(
         "self" | "static" | "parent"
     ) && !crate::db::class_exists(db, crate::diagnostics::docblock_class_part(fqcn.as_ref()))
 }
+
+/// A class name held in a string, which PHP never resolves against the namespace or imports.
+pub(crate) fn runtime_class_name(name: &str) -> &str {
+    name.strip_prefix('\\').unwrap_or(name)
+}

@@ -22,7 +22,7 @@ pub(crate) fn callable_string_class<'s>(
     } else if class.eq_ignore_ascii_case("parent") {
         ctx.parent_fqcn.as_deref()
     } else {
-        return std::borrow::Cow::Borrowed(class.strip_prefix('\\').unwrap_or(class));
+        return std::borrow::Cow::Borrowed(crate::util::runtime_class_name(class));
     };
     scope.map_or(std::borrow::Cow::Borrowed(class), |fqcn| {
         std::borrow::Cow::Owned(fqcn.to_string())

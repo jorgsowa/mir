@@ -447,17 +447,17 @@ pub fn narrow_from_condition(
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(target) = extract_get_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -469,12 +469,12 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.left, ctx, db, file)
                 {
                     // `get_class(self::$prop) === 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
@@ -517,14 +517,13 @@ pub fn narrow_from_condition(
                         class_name_str.as_str(),
                         effective_true,
                         db,
-                        file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                         file,
@@ -532,28 +531,28 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.left, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         db,
                         effective_true,
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.left) {
                     // `$obj::class === 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -565,12 +564,12 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
                 {
                     // `self::$prop::class === 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
@@ -609,17 +608,17 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -631,12 +630,12 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.right, ctx, db, file)
                 {
                     // `'ClassName' === get_class(self::$prop)`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
@@ -679,14 +678,13 @@ pub fn narrow_from_condition(
                         class_name_str.as_str(),
                         effective_true,
                         db,
-                        file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                         file,
@@ -694,28 +692,28 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.right, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         db,
                         effective_true,
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.right) {
                     // `'ClassName' === $obj::class`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -727,12 +725,12 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
                 {
                     // `'ClassName' === self::$prop::class`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
@@ -1058,17 +1056,17 @@ pub fn narrow_from_condition(
             // comparison agrees with strict comparison here.
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(target) = extract_get_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -1080,12 +1078,12 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.left, ctx, db, file)
                 {
                     // `get_class(self::$prop) == 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
@@ -1128,14 +1126,13 @@ pub fn narrow_from_condition(
                         class_name_str.as_str(),
                         effective_true,
                         db,
-                        file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                         file,
@@ -1143,27 +1140,27 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.left, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         db,
                         effective_true,
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.left) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -1175,29 +1172,29 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
                 {
                     // `self::$prop::class == 'ClassName'`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -1209,12 +1206,12 @@ pub fn narrow_from_condition(
                     extract_get_class_static_prop_arg(&b.right, ctx, db, file)
                 {
                     // `'ClassName' == get_class(self::$prop)`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );
@@ -1257,14 +1254,13 @@ pub fn narrow_from_condition(
                         class_name_str.as_str(),
                         effective_true,
                         db,
-                        file,
                     );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_from_get_parent_class_literal(
                         ctx,
                         &target,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                         file,
@@ -1272,27 +1268,27 @@ pub fn narrow_from_condition(
                 } else if let Some((fqcn_recv, prop)) =
                     extract_get_parent_class_static_prop_arg(&b.right, ctx, db, file)
                 {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_is_subclass_of(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         db,
                         effective_true,
                     );
                 } else if let Some(target) = extract_dynamic_class_const_var(&b.right) {
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     match target {
                         ScalarArgTarget::Var(name) => {
-                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                            narrow_var_to_specific_class(ctx, &name, fqcn, effective_true, db)
                         }
                         ScalarArgTarget::Prop(obj, prop) => {
                             narrow_prop_to_specific_class(
                                 ctx,
                                 &obj,
                                 &prop,
-                                &fqcn,
+                                fqcn,
                                 effective_true,
                                 db,
                                 file,
@@ -1304,12 +1300,12 @@ pub fn narrow_from_condition(
                     extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
                 {
                     // `'ClassName' == self::$prop::class`
-                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_str());
+                    let fqcn = crate::util::runtime_class_name(class_name_str.as_str());
                     narrow_static_prop_to_specific_class(
                         ctx,
                         &fqcn_recv,
                         &prop,
-                        &fqcn,
+                        fqcn,
                         effective_true,
                         db,
                     );

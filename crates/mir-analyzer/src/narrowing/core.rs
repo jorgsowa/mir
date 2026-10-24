@@ -635,11 +635,9 @@ pub(crate) fn extract_expr_guard_key(
         }
         // 'Foo\Bar' — a class name as a string literal (the form
         // method_exists()/property_exists() take when the object can't be
-        // named as an expression). Resolved against the file's namespace
-        // exactly like the `Foo::class` form above, so both register the
-        // same `cls:` key.
+        // named as an expression); it registers the same `cls:` key as `Foo::class`.
         ExprKind::String(s) => {
-            let resolved = crate::db::resolve_name(db, file, s.as_str());
+            let resolved = crate::util::runtime_class_name(s.as_str());
             Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
         }
         _ => None,

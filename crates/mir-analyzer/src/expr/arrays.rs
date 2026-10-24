@@ -544,10 +544,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         let (fqcn, by_class_name): (Option<Arc<str>>, bool) =
             if let ExprKind::String(class_name) = &receiver_expr.kind {
                 (
-                    Some(Arc::from(
-                        crate::db::resolve_name(self.db, self.file.as_ref(), class_name.as_str())
-                            .as_str(),
-                    )),
+                    Some(Arc::from(crate::util::runtime_class_name(
+                        class_name.as_str(),
+                    ))),
                     true,
                 )
             } else {
