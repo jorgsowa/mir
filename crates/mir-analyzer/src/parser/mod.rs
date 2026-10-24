@@ -249,6 +249,125 @@ fn strip_trailing_reopen_tag(s: &str) -> Option<&str> {
     None
 }
 
+/// Gives each class member and parameter the docblock PHP reads for it. The parser looks for it
+/// only before the first `#[`, so one written after the attributes went to the next member.
+pub(crate) fn attach_docblocks_after_attributes(parsed: &mut php_rs_parser::ParseResult) {
+    use php_ast::owned::fold::{
+        fold_owned_class_member, fold_owned_enum_member, fold_owned_param, OwnedFold,
+    };
+    use php_ast::owned::{
+        Attribute, ClassMember, ClassMemberKind, Comment, EnumMember, EnumMemberKind, Param,
+        Program,
+    };
+
+    struct Attach<'s> {
+        source: &'s str,
+        prev_end: u32,
+    }
+
+    impl Attach<'_> {
+        fn fix(&self, floor: u32, doc: &mut Option<Comment>, attrs: &[Attribute], name_start: u32) {
+            if doc.as_ref().is_some_and(|d| d.span.start < floor) {
+                *doc = None;
+            }
+            let Some(last_attr) = attrs.last() else {
+                return;
+            };
+            let from = last_attr.span.end as usize;
+            let Some(between) = self.source.get(from..name_start as usize) else {
+                return;
+            };
+            let Some(open) = between.rfind("/**") else {
+                return;
+            };
+            let Some(len) = between[open..].find("*/") else {
+                return;
+            };
+            let start = (from + open) as u32;
+            let text = &between[open..open + len + 2];
+            *doc = Some(Comment {
+                kind: php_ast::ast::CommentKind::Doc,
+                text: text.into(),
+                span: Span::new(start, start + text.len() as u32),
+            });
+        }
+    }
+
+    impl OwnedFold for Attach<'_> {
+        fn fold_class_member(&mut self, member: ClassMember) -> ClassMember {
+            let floor = self.prev_end;
+            let mut member = fold_owned_class_member(self, member);
+            match &mut member.kind {
+                ClassMemberKind::Property(p) => {
+                    self.fix(floor, &mut p.doc_comment, &p.attributes, p.name.span.start)
+                }
+                ClassMemberKind::Method(m) => {
+                    self.fix(floor, &mut m.doc_comment, &m.attributes, m.name.span.start)
+                }
+                ClassMemberKind::ClassConst(c) => {
+                    self.fix(floor, &mut c.doc_comment, &c.attributes, c.name.span.start)
+                }
+                _ => {}
+            }
+            self.prev_end = member.span.end;
+            member
+        }
+
+        fn fold_enum_member(&mut self, member: EnumMember) -> EnumMember {
+            let floor = self.prev_end;
+            let mut member = fold_owned_enum_member(self, member);
+            match &mut member.kind {
+                EnumMemberKind::Case(c) => {
+                    self.fix(floor, &mut c.doc_comment, &c.attributes, c.name.span.start)
+                }
+                EnumMemberKind::Property(p) => {
+                    self.fix(floor, &mut p.doc_comment, &p.attributes, p.name.span.start)
+                }
+                EnumMemberKind::Method(m) => {
+                    self.fix(floor, &mut m.doc_comment, &m.attributes, m.name.span.start)
+                }
+                EnumMemberKind::ClassConst(c) => {
+                    self.fix(floor, &mut c.doc_comment, &c.attributes, c.name.span.start)
+                }
+                _ => {}
+            }
+            self.prev_end = member.span.end;
+            member
+        }
+
+        fn fold_param(&mut self, param: Param) -> Param {
+            let floor = self.prev_end;
+            let mut param = fold_owned_param(self, param);
+            self.fix(
+                floor,
+                &mut param.doc_comment,
+                &param.attributes,
+                param.name.span.start,
+            );
+            self.prev_end = param.span.end;
+            param
+        }
+    }
+
+    let source = parsed.source.as_str();
+    let docblock_after_attribute = source
+        .match_indices("/**")
+        .any(|(i, _)| source[..i].trim_end().ends_with(']'));
+    if !docblock_after_attribute {
+        return;
+    }
+    let empty = Program {
+        stmts: Box::new([]),
+        span: parsed.program.span,
+    };
+    let program = std::mem::replace(&mut parsed.program, empty);
+    parsed.program = Attach {
+        source: &parsed.source,
+        prev_end: 0,
+    }
+    .fold_program(program);
+}
+
 // ---------------------------------------------------------------------------
 // Name resolution helper — join Name parts to a string
 // ---------------------------------------------------------------------------
@@ -476,5 +595,56 @@ mod skip_leading_attributes_tests {
     #[test]
     fn stops_at_end_of_unterminated_attribute() {
         assert_eq!(after("#[A('x"), "");
+    }
+}
+
+#[cfg(test)]
+mod attach_docblocks_tests {
+    use php_ast::owned::{ClassMemberKind, EnumMemberKind, StmtKind};
+
+    #[test]
+    fn member_and_param_docblocks_after_attributes() {
+        let src = "<?php\nclass C {\n    #[A]\n    /** p */\n    public $p;\n    public $plain;\n    #[A]\n    /** c */\n    const X = 1;\n    #[A] /** m */\n    public function m(#[A] /** q */ $q) {}\n}\nenum E {\n    #[A]\n    /** e */\n    case K;\n}\n";
+        let mut parsed = php_rs_parser::parse(src);
+        super::attach_docblocks_after_attributes(&mut parsed);
+        let mut docs = Vec::new();
+        for stmt in parsed.program.stmts.iter() {
+            match &stmt.kind {
+                StmtKind::Class(c) => {
+                    for m in c.body.members.iter() {
+                        match &m.kind {
+                            ClassMemberKind::Property(p) => docs.push(p.doc_comment.clone()),
+                            ClassMemberKind::ClassConst(k) => docs.push(k.doc_comment.clone()),
+                            ClassMemberKind::Method(f) => {
+                                docs.push(f.doc_comment.clone());
+                                docs.push(f.params[0].doc_comment.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                StmtKind::Enum(e) => {
+                    for m in e.body.members.iter() {
+                        if let EnumMemberKind::Case(k) = &m.kind {
+                            docs.push(k.doc_comment.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let texts: Vec<_> = docs
+            .iter()
+            .map(|d| d.as_ref().map(|c| c.text.to_string()))
+            .collect();
+        let expected = [
+            Some("/** p */"),
+            None,
+            Some("/** c */"),
+            Some("/** m */"),
+            Some("/** q */"),
+            Some("/** e */"),
+        ];
+        assert_eq!(texts, expected.map(|t| t.map(str::to_string)));
     }
 }
