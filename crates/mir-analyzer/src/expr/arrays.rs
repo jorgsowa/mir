@@ -1,5 +1,4 @@
 use super::ExpressionAnalyzer;
-use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
@@ -371,7 +370,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             std::collections::HashSet::new();
 
         for elem in elements.iter() {
-            if elem.unpack() {
+            if elem.is_spread() {
                 let value_ty = self.analyze(elem.value(), ctx);
                 all_value_types.merge(&crate::call::spread_element_type(self.db, &value_ty));
                 key_union.merge(&spread_key_type(self.db, &value_ty));
@@ -516,7 +515,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let key = Box::new(key_union.build());
         let value = Box::new(all_value_types.build());
         // Only spreads can contribute zero entries.
-        if elements.iter().any(|e| !e.unpack()) {
+        if elements.iter().any(|e| !e.is_spread()) {
             Type::single(Atomic::TNonEmptyArray { key, value })
         } else {
             Type::single(Atomic::TArray { key, value })

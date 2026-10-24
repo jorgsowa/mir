@@ -1,9 +1,9 @@
 use super::*;
+use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameResolveExt as _;
-use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 
 /// Properties read through `$this->name`, in source order, and the methods the
 /// body calls on its own instance as `(receiver, lowercased name)`.
@@ -755,7 +755,7 @@ pub(super) enum ElementKey<'e> {
 }
 
 pub(super) fn literal_element_key(el: &php_ast::owned::ArrayElement) -> ElementKey<'_> {
-    if el.unpack() {
+    if el.is_spread() {
         return ElementKey::Unknown;
     }
     match el.key.as_ref().map(|k| &k.kind) {

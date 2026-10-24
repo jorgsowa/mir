@@ -1,5 +1,5 @@
+use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -124,7 +124,7 @@ fn is_local_target(e: &Expr) -> bool {
         ExprKind::Parenthesized(inner) => is_local_target(inner),
         ExprKind::Array(elements) => elements
             .iter()
-            .all(|el| !el.by_ref() && !el.unpack() && is_local_target(el.value())),
+            .all(|el| !el.is_by_ref() && !el.is_spread() && is_local_target(el.value())),
         ExprKind::Omit => true,
         _ => false,
     }
@@ -143,7 +143,7 @@ fn is_property_rooted(e: &Expr) -> bool {
 }
 
 fn is_pure_builtin(name: &str) -> bool {
-    PURE_BUILTINS.contains(&name.trim_start_matches('\\').to_ascii_lowercase().as_str())
+    PURE_BUILTINS.contains(&name.to_ascii_lowercase().as_str())
 }
 
 fn is_self_reference(e: &Expr) -> bool {
@@ -194,7 +194,7 @@ impl OwnedVisitor for BodyScan<'_> {
                 c.name.kind.name_bare().is_some_and(is_pure_builtin)
                     && c.args.iter().all(|a| {
                         !a.unpack()
-                            && !a.by_ref()
+                            && !matches!(a.kind, php_ast::owned::ArgKind::ByRef(_))
                             && a.value().is_none_or(|v| !is_property_rooted(v))
                     })
             }

@@ -4,7 +4,6 @@
 //! containing class, function, and constant signatures. No type inference
 //! happens here.
 
-use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameRefExt as _;
@@ -622,7 +621,7 @@ pub(super) fn infer_const_value(
             let mut is_list = true;
             let mut next_int_key: i64 = 0;
             for elem in elements.iter() {
-                if elem.unpack() || elem.by_ref() {
+                if elem.is_spread() || elem.is_by_ref() {
                     return None;
                 }
                 let value_ty = infer_const_value(collector, &elem.value().kind)?;

@@ -41,7 +41,6 @@
 //! A bare unbraced `namespace F\Q;` applies to all *following sibling*
 //! declarations (PHP semantics, mirrored by the parser's `NsKind::Unbraced`),
 //! so the scanner tracks the namespace across sibling statements.
-use crate::ast_ext::ArrayElementExt as _;
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 
@@ -263,7 +262,7 @@ pub(super) fn literal_type(expr: &Expr) -> Option<Type> {
 /// non-literal value to `mixed`. A positional list is never built as an open
 /// keyed array: consumers of `array_keys()` on a list read the `int` key kind.
 fn literal_array(elems: &[ArrayElement]) -> Type {
-    if elems.iter().any(|e| e.unpack()) {
+    if elems.iter().any(|e| e.is_spread()) {
         // `...$x` unpacking: keys and values are unknown.
         return bare_array();
     }

@@ -1442,9 +1442,8 @@ pub fn narrow_from_condition(
             // check below would only ever match by coincidence (e.g. a
             // variable literally named `$is_array`) while never actually
             // calling that builtin.
-            let fn_name_opt = call.name.kind.name_bare();
-            if let Some(fn_name) = fn_name_opt {
-                let bare = fn_name.trim_start_matches('\\');
+            if let Some(bare) = call.name.kind.name_bare() {
+                let lower = bare.to_ascii_lowercase();
                 if is_true && bare.eq_ignore_ascii_case("is_callable") {
                     if let Some(ExprKind::Variable(var)) = call
                         .args
@@ -1460,7 +1459,7 @@ pub fn narrow_from_condition(
                     }
                 }
                 if matches!(
-                    bare.to_ascii_lowercase().as_str(),
+                    lower.as_str(),
                     "class_exists" | "interface_exists" | "trait_exists" | "enum_exists"
                 ) {
                     // `if (class_exists(\Foo\Bar::class)) { ... }` — record \Foo\Bar as
@@ -1644,15 +1643,12 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
-                } else if matches!(
-                    bare.to_ascii_lowercase().as_str(),
-                    "array_key_exists" | "key_exists"
-                ) {
+                } else if matches!(lower.as_str(), "array_key_exists" | "key_exists") {
                     // `key_exists()` is a built-in alias of `array_key_exists()`
                     // with identical semantics.
                     narrow_array_key_exists_condition(ctx, call, is_true, db, file);
                 } else if matches!(
-                    bare.to_ascii_lowercase().as_str(),
+                    lower.as_str(),
                     "str_contains" | "str_starts_with" | "str_ends_with"
                 ) {
                     // str_contains($haystack, 'x') true → $haystack is non-empty-string
@@ -1925,7 +1921,7 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
-                } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
+                } else if apply_docblock_assertions(call, ctx, is_true, db, file, bare) {
                     // User-defined assertion applied.
                 } else if let Some(arg_value) =
                     call.args.first().and_then(|arg_expr| arg_expr.value())
@@ -2288,11 +2284,9 @@ fn narrow_from_false_comparable_call(
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return;
     };
-    let fn_name_opt = call.name.kind.name_bare();
-    let Some(fn_name) = fn_name_opt else {
+    let Some(bare) = call.name.kind.name_bare() else {
         return;
     };
-    let bare = fn_name.trim_start_matches('\\');
     if matches!(
         bare.to_ascii_lowercase().as_str(),
         "strpos"

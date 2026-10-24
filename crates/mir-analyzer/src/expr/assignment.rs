@@ -5,7 +5,6 @@ use super::helpers::{
     type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key, DefiniteKeyState,
 };
 use super::ExpressionAnalyzer;
-use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use crate::db::MirDatabase;
@@ -199,7 +198,7 @@ fn array_literal_key_taints(
     let mut keys = crate::flow_state::KeyTaint::default();
     let mut next_index: i64 = 0;
     for el in elements {
-        if el.unpack() || el.by_ref() {
+        if el.is_spread() || el.is_by_ref() {
             return None;
         }
         let key = match el.key.as_ref() {

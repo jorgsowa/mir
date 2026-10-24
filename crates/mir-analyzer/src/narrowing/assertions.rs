@@ -1,8 +1,8 @@
 //! `@psalm-assert-if-true`/`@psalm-assert-if-false` docblock-assertion
 //! narrowing: applies a callee's declared assertions to the calling flow
 //! state for free functions, methods, and static methods.
+use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::NameResolveExt as _;
-use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use php_ast::owned::ExprKind;
 
 use mir_codebase::definitions::AssertionKind;
@@ -638,7 +638,7 @@ fn expand_literal_spread_call_args(
     };
     let mut expanded = Vec::with_capacity(elements.len());
     for el in elements.iter() {
-        if el.key.is_some() || el.unpack() || el.by_ref() {
+        if el.key.is_some() || el.is_spread() || el.is_by_ref() {
             return None;
         }
         expanded.push(php_ast::owned::Arg::new(

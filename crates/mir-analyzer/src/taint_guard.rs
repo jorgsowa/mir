@@ -2,9 +2,9 @@
 //! `preg_match('/^[a-z0-9_]+$/', $x)`. A sink kind is safe once none of the
 //! characters it needs to break out can appear.
 
+use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::{ArgExt as _, ArrayElementExt as _};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Arg, Expr, ExprKind};
 
@@ -451,7 +451,7 @@ fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     if !strict
         || items
             .iter()
-            .any(|item| item.unpack() || item.by_ref() || !is_literal(item.value()))
+            .any(|item| item.is_spread() || item.is_by_ref() || !is_literal(item.value()))
     {
         return None;
     }

@@ -1,5 +1,4 @@
 use super::*;
-use crate::ast_ext::ArrayElementExt as _;
 use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
 
@@ -35,7 +34,7 @@ pub fn exact_key_names(
         ExprKind::Array(elements) => {
             let mut keys = Taint::NONE;
             for element in elements {
-                if element.unpack() {
+                if element.is_spread() {
                     return None;
                 }
                 if let Some(key) = &element.key {

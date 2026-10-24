@@ -1,32 +1,12 @@
-use php_ast::owned::{Arg, ArgKind, ArrayElement, ArrayElementKind};
+use php_ast::owned::{Arg, ArgKind};
 
 pub(crate) trait ArgExt {
     fn unpack(&self) -> bool;
-    fn by_ref(&self) -> bool;
 }
 
 impl ArgExt for Arg {
     fn unpack(&self) -> bool {
         matches!(self.kind, ArgKind::Spread(_) | ArgKind::SpreadPlaceholder)
-    }
-
-    fn by_ref(&self) -> bool {
-        matches!(self.kind, ArgKind::ByRef(_))
-    }
-}
-
-pub(crate) trait ArrayElementExt {
-    fn unpack(&self) -> bool;
-    fn by_ref(&self) -> bool;
-}
-
-impl ArrayElementExt for ArrayElement {
-    fn unpack(&self) -> bool {
-        matches!(self.kind, ArrayElementKind::Spread(_))
-    }
-
-    fn by_ref(&self) -> bool {
-        matches!(self.kind, ArrayElementKind::ByRef(_))
     }
 }
 
