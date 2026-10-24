@@ -1076,8 +1076,7 @@ impl<'a> DefinitionCollector<'a> {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
     }
 
-    /// Types a class-like's own constants up front, so references between them resolve in any
-    /// declaration order; returns the scope to restore once the class-like is collected.
+    /// Types own constants before members so `self::X` resolves in any order; returns the outer scope.
     fn enter_own_constants(
         &mut self,
         fqcn: &str,

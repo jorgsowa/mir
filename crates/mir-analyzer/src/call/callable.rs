@@ -10,8 +10,7 @@ use mir_types::{Atomic, Type};
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 
-/// The class a runtime `'Class::method'` string names: `self` / `static` / `parent` mean the
-/// calling class, any other name is fully qualified.
+/// Runtime `'Class::method'` strings are fully qualified; `self` / `static` / `parent` mean the caller.
 pub(crate) fn callable_string_class<'s>(
     ctx: &FlowState,
     class: &'s str,
