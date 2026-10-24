@@ -130,10 +130,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
         let namespace = self.db.file_namespace(self.file.as_ref());
         let in_namespace = |n: &str| namespace.as_ref().map(|ns| format!("{ns}\\{n}"));
-        // Fully qualified and relative names have no global fallback.
+        // Only unqualified names fall back to the global constant.
         let exact = match name.kind {
             NameKind::FullyQualified => Some(joined.to_string()),
             NameKind::Relative => Some(in_namespace(&joined).unwrap_or_else(|| joined.to_string())),
+            NameKind::Qualified => {
+                Some(crate::ast_ext::resolve_ast_name(name, self.db, &self.file))
+            }
             _ => None,
         };
         let name_str: &str = exact.as_deref().unwrap_or(&joined);
