@@ -799,7 +799,12 @@ impl Eq for TrackedParseResult {}
 #[salsa::tracked(lru = 256)]
 pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult {
     let text = file.text(db);
-    TrackedParseResult(Arc::new(crate::recursion::parse(text.as_ref())))
+    let version = db_php_version(db);
+    TrackedParseResult(Arc::new(crate::recursion::parse_for_file(
+        file.path(db),
+        text.as_ref(),
+        version,
+    )))
 }
 
 // collect_file_definitions tracked query (S1)
@@ -855,7 +860,7 @@ pub fn collect_file_definitions_uncached(
         crate::metrics::record_stub_cache_miss();
     }
 
-    let parsed = crate::recursion::parse_versioned(text, php_version.parser_version());
+    let parsed = crate::recursion::parse_for_file(path, text, php_version);
 
     let skip_cache = crate::parser::parse_errors_block_cache(&parsed.errors);
 

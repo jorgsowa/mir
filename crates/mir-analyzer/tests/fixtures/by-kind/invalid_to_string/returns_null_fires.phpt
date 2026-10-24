@@ -2,7 +2,7 @@
 __toString() with a null return type fires InvalidToString (null is not a string)
 ===config===
 <mir>
-  <phpVersion>8.0</phpVersion>
+  <phpVersion>8.2</phpVersion>
 </mir>
 ===file===
 <?php

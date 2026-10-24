@@ -265,7 +265,7 @@ impl AnalyzerDb {
         }
         crate::metrics::record_stub_cache_miss();
 
-        let parsed = crate::recursion::parse_versioned(source, php_version.parser_version());
+        let parsed = crate::recursion::parse_for_file(&file, source, php_version);
 
         let skip_cache = crate::parser::parse_errors_block_cache(&parsed.errors);
 

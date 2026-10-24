@@ -108,7 +108,8 @@ pub(crate) struct FileSourceFacts {
 pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<FileSourceFacts> {
     let path = Arc::clone(file.path(db));
     // Untracked: a memoized `parse_file` would pin a second AST of every callee file for the run.
-    let parsed = crate::recursion::parse(file.text(db).as_ref());
+    let version = crate::db::queries::db_php_version(db);
+    let parsed = crate::recursion::parse_for_file(&path, file.text(db).as_ref(), version);
     let mut facts = FileSourceFacts::default();
     crate::body_analysis::for_each_file_scope_decl(&parsed.program.stmts, &mut |stmt| {
         let _scope = crate::db::ns_scope::enter(db, &path, stmt.span.start);

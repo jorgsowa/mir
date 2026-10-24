@@ -28,13 +28,18 @@ impl PhpVersion {
         self.minor
     }
 
-    /// Parser target: 8.6 syntax is accepted only when targeting 8.6+; older
-    /// targets keep the parser's 8.5 default so syntax is not gated per version.
+    /// Parser target; versions below 7.4 parse as 7.4, the parser's oldest.
     pub fn parser_version(self) -> php_rs_parser::PhpVersion {
-        if self >= PhpVersion::new(8, 6) {
-            php_rs_parser::PhpVersion::Php86
-        } else {
-            php_rs_parser::PhpVersion::Php85
+        use php_rs_parser::PhpVersion as P;
+        match (self.major, self.minor) {
+            (..=7, _) => P::Php74,
+            (8, 0) => P::Php80,
+            (8, 1) => P::Php81,
+            (8, 2) => P::Php82,
+            (8, 3) => P::Php83,
+            (8, 4) => P::Php84,
+            (8, 5) => P::Php85,
+            _ => P::Php86,
         }
     }
 

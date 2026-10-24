@@ -63,6 +63,16 @@ pub fn parse_versioned(source: &str, version: php_rs_parser::PhpVersion) -> Guar
     })))
 }
 
+/// Parses `path` at `php_version`; embedded stubs gate symbols by `#[...]` attributes, so they parse at the latest version.
+pub fn parse_for_file(path: &str, source: &str, php_version: crate::PhpVersion) -> GuardedParse {
+    let version = if crate::stubs::is_stub_path(path) {
+        php_version.max(crate::PhpVersion::LATEST)
+    } else {
+        php_version
+    };
+    parse_versioned(source, version.parser_version())
+}
+
 /// Parses `source` with the default PHP version; see [`parse_versioned`].
 pub fn parse(source: &str) -> GuardedParse {
     GuardedParse(Some(ensure_phase_stack(|| php_rs_parser::parse(source))))
