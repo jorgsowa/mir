@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `UnreachableCode` after `return; ?>html` points at the HTML, not the `?>`, and a `?>` with no code after it is not reported. A stray `;` is still reported.
 - Function names resolve the same way everywhere: `\Foo\bar()` no longer goes through a `use Other\Foo;` class import, and a first-class callable of a `use function` import (`array_map(enum_value(...), $ids)`) has the function's signature and taint. A first-class callable of a fully qualified namespaced function (`\Foo\bar(...)`) carries taint.
 - A class import no longer names a constant: `MODE` with `use Lib\Sub\MODE;` resolved to the constant `Lib\Sub\MODE` instead of reporting `UndefinedConstant`.
 - String literals that are not valid UTF-8 keep their bytes in narrowing, `match` / `switch` checks and concatenation: `"\xff"` and `"\xfe"` were the same value (false `RedundantCondition`, `ParadoxicalCondition`, `UnhandledMatchCondition` and `ImpossibleIdenticalComparison`), and `"\xff" . "a" === "\xffa"` was reported as always false. Messages print such bytes as `\xNN`.

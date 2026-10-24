@@ -372,7 +372,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
         for (i, stmt) in stmts.iter().enumerate() {
-            if ctx.diverges {
+            if ctx.diverges && !self.is_close_tag_nop(stmt) {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                 let (line_end, col_end) = if stmt.span.start < stmt.span.end {
                     let (end_line, end_col) = self.offset_to_line_col(stmt.span.end);
@@ -419,6 +419,15 @@ impl<'a> StatementsAnalyzer<'a> {
                 None => self.analyze_stmt(stmt, ctx),
             }
         }
+    }
+
+    /// A `?>` that does not end a statement is a `Nop`, like a stray `;`, but is not code.
+    fn is_close_tag_nop(&self, stmt: &php_ast::owned::Stmt) -> bool {
+        matches!(stmt.kind, StmtKind::Nop)
+            && self
+                .source
+                .get(stmt.span.start as usize..)
+                .is_some_and(|rest| rest.starts_with("?>"))
     }
 
     pub fn analyze_stmt(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut FlowState) {
