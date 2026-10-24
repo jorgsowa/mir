@@ -202,7 +202,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
             let check_ty = self
                 .extract_var_annotations_from(
-                    doc.as_deref(),
+                    doc,
                     ctx.self_fqcn.as_deref(),
                     ctx.template_method().map(|m| &**m),
                     ctx.template_function().map(|f| &**f),

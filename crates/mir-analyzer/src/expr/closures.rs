@@ -457,8 +457,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.check_type_hint(hint);
         }
 
-        let mut leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
-            .map(|doc| crate::parser::DocblockParser::parse(&doc));
+        let mut leading_doc =
+            crate::parser::closure_docblock(self.source, expr_span.start, &c.attributes)
+                .map(crate::parser::DocblockParser::parse);
         if let Some(doc) = &mut leading_doc {
             self.expand_local_type_aliases_in_doc(doc, ctx);
         }
@@ -830,8 +831,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.check_type_hint(hint);
         }
 
-        let mut leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
-            .map(|doc| crate::parser::DocblockParser::parse(&doc));
+        let mut leading_doc =
+            crate::parser::closure_docblock(self.source, expr_span.start, &af.attributes)
+                .map(crate::parser::DocblockParser::parse);
         if let Some(doc) = &mut leading_doc {
             self.expand_local_type_aliases_in_doc(doc, ctx);
         }
@@ -973,7 +975,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if let Some(doc) =
             crate::parser::find_preceding_docblock(self.source, check_target.span.start)
         {
-            let checks = crate::parser::DocblockParser::parse(&doc).mir_checks;
+            let checks = crate::parser::DocblockParser::parse(doc).mir_checks;
             for (expr_text, expected_str) in checks {
                 let expected = crate::parser::docblock::parse_type_string(&expected_str);
                 let actual_raw = self.eval_check_expr(&expr_text, &arrow_ctx);

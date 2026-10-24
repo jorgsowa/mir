@@ -120,7 +120,7 @@ pub(crate) fn span_text(src: &str, span: Span) -> Option<String> {
 /// variable (php-lsp#235). The docblock is textually adjacent to the
 /// declaration in every sense that matters here — nothing but tag
 /// punctuation and inert markup sits between them.
-pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<String> {
+pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<&str> {
     let offset = (offset as usize).min(source.len());
     if offset == 0 {
         return None;
@@ -162,7 +162,28 @@ pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<Strin
     let start = trimmed[..end]
         .rfind("/**")
         .or_else(|| trimmed[..end].rfind("/*"))?;
-    Some(trimmed[start..end + 2].to_string())
+    Some(&trimmed[start..end + 2])
+}
+
+/// A closure's docblock: PHP takes the last one before `function` / `fn`, which may follow its attributes.
+pub(crate) fn closure_docblock<'s>(
+    source: &'s str,
+    span_start: u32,
+    attributes: &[php_ast::owned::Attribute],
+) -> Option<&'s str> {
+    attributes
+        .last()
+        .and_then(|attr| {
+            // The attribute span may stop before the group's `,` / `]`.
+            let rest = source.get(attr.span.end as usize..)?.trim_start();
+            let rest = rest.strip_prefix(',').unwrap_or(rest).trim_start();
+            let rest = rest.strip_prefix(']').unwrap_or(rest).trim_start();
+            if !rest.starts_with("/*") {
+                return None;
+            }
+            Some(&rest[..rest.find("*/")? + 2])
+        })
+        .or_else(|| find_preceding_docblock(source, span_start))
 }
 
 /// Strip a trailing PHP re-opening tag (`<?php`, `<?=`, or short-open `<?`),
@@ -328,7 +349,7 @@ mod docblock_lookup_tests {
         let offset = src.find("$x").unwrap() as u32;
         assert_eq!(
             find_preceding_docblock(src, offset),
-            Some("/** @var Post $model */".to_string())
+            Some("/** @var Post $model */")
         );
     }
 
@@ -339,7 +360,7 @@ mod docblock_lookup_tests {
         let offset = src.rfind("if (").unwrap() as u32;
         assert_eq!(
             find_preceding_docblock(src, offset),
-            Some("/** @var Post $model */".to_string())
+            Some("/** @var Post $model */")
         );
     }
 
@@ -349,7 +370,7 @@ mod docblock_lookup_tests {
         let offset = src.rfind("$model->title").unwrap() as u32;
         assert_eq!(
             find_preceding_docblock(src, offset),
-            Some("/** @var Post $model */".to_string())
+            Some("/** @var Post $model */")
         );
     }
 
@@ -379,9 +400,6 @@ mod docblock_lookup_tests {
         // skip loops compose without infinite-looping or misordering.
         let src = "<?php\n/** doc */\nfinal\n?>\n<?php\n";
         let offset = src.len() as u32;
-        assert_eq!(
-            find_preceding_docblock(src, offset),
-            Some("/** doc */".to_string())
-        );
+        assert_eq!(find_preceding_docblock(src, offset), Some("/** doc */"));
     }
 }

@@ -436,11 +436,11 @@ impl<'a> StatementsAnalyzer<'a> {
 
     fn analyze_stmt_inner(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut FlowState) {
         let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
-        let suppressions = self.extract_suppressions_from(doc.as_deref());
+        let suppressions = self.extract_suppressions_from(doc);
         let before = self.issues.issue_count();
 
         let var_annotations = self.extract_var_annotations_from(
-            doc.as_deref(),
+            doc,
             ctx.self_fqcn.as_deref(),
             ctx.template_method().map(|m| &**m),
             ctx.template_function().map(|f| &**f),
@@ -566,7 +566,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Check `@mir-check` directives
-        let mir_checks = self.extract_mir_checks_from(doc.as_deref());
+        let mir_checks = self.extract_mir_checks_from(doc);
         let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
         for (expr_text, expected_str) in mir_checks {
             let expected_raw = parse_type_string(&expected_str);
@@ -595,7 +595,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Emit `@trace $var` directives
-        if let Some(doc_str) = doc.as_deref() {
+        if let Some(doc_str) = doc {
             let trace_vars = crate::parser::DocblockParser::parse(doc_str).trace_vars;
             for var_name in trace_vars {
                 let ty = ctx.get_var(&var_name);
@@ -626,7 +626,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     php_ast::owned::ExprKind::Closure(_)
                         | php_ast::owned::ExprKind::ArrowFunction(_)
                 ) {
-                    if let Some(raw_doc) = doc.as_deref() {
+                    if let Some(raw_doc) = doc {
                         let parsed = crate::parser::DocblockParser::parse(raw_doc);
                         if let Some(&(tag_start, tag_end)) = parsed.template_spans.first() {
                             let doc_start = self.source[..stmt.span.start as usize]
