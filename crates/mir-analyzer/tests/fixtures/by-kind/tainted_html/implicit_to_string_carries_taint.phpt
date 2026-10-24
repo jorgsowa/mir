@@ -56,60 +56,72 @@ class Child extends Wrapper {
 
 function echoed() {
     echo new Wrapper($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function stored() {
     $w = new Wrapper($_GET['a']);
     echo $w;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function printed() {
     $w = new Wrapper($_GET['a']);
     print $w;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function concatenated() {
     $w = new Wrapper($_GET['a']);
     echo '<b>' . $w . '</b>';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function interpolated() {
     $w = new Wrapper($_GET['a']);
     echo "<b>$w</b>";
+//  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function cast() {
     $w = new Wrapper($_GET['a']);
     echo (string) $w;
+//  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function strvalCall() {
     $w = new Wrapper($_GET['a']);
     echo strval($w);
+//  ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function passThroughBuiltin() {
     $w = new Wrapper($_GET['a']);
     echo trim($w);
+//  ^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function setter() {
     $w = new Wrapper('literal');
     $w->setName($_GET['a']);
     echo $w;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function inherited() {
     echo new Child($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function readsSource() {
     echo new Request();
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function readsSourceStored() {
     $r = new Request();
     echo $r;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function cleanConstruction() {
@@ -137,18 +149,5 @@ function sanitizedAfterwards() {
 
 function unionOfObjects($c) {
     echo $c ? new Wrapper($_GET['a']) : new Wrapper('literal');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@40:4-40:33: Tainted HTML output — possible XSS
-TaintedHtml@45:4-45:12: Tainted HTML output — possible XSS
-TaintedHtml@50:4-50:12: Tainted HTML output — possible XSS
-TaintedHtml@55:4-55:29: Tainted HTML output — possible XSS
-TaintedHtml@60:4-60:21: Tainted HTML output — possible XSS
-TaintedHtml@65:4-65:21: Tainted HTML output — possible XSS
-TaintedHtml@70:4-70:20: Tainted HTML output — possible XSS
-TaintedHtml@75:4-75:18: Tainted HTML output — possible XSS
-TaintedHtml@81:4-81:12: Tainted HTML output — possible XSS
-TaintedHtml@85:4-85:31: Tainted HTML output — possible XSS
-TaintedHtml@89:4-89:23: Tainted HTML output — possible XSS
-TaintedHtml@94:4-94:12: Tainted HTML output — possible XSS
-TaintedHtml@121:4-121:63: Tainted HTML output — possible XSS

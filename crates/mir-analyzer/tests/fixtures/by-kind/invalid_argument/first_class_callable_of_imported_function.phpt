@@ -13,13 +13,12 @@ namespace App {
     function imported(): void {
         $f = bar(...);
         $f([]);
+//         ^^ InvalidArgument: Argument $s of {closure}() expects 'string', got 'array{}'
     }
 
     function fullyQualified(): void {
         $f = \Foo\bar(...);
         $f([]);
+//         ^^ InvalidArgument: Argument $s of {closure}() expects 'string', got 'array{}'
     }
 }
-===expect===
-InvalidArgument@11:11-11:13: Argument $s of {closure}() expects 'string', got 'array{}'
-InvalidArgument@16:11-16:13: Argument $s of {closure}() expects 'string', got 'array{}'

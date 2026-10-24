@@ -20,12 +20,11 @@ class Box {
 
 function f(): void {
     echo \App\Box::wrap($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo namespace\Box::wrap($_GET['b']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new \App\Box($_GET['c']))->get();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new namespace\Box($_GET['d']))->get();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@11:4-11:36: Tainted HTML output — possible XSS
-TaintedHtml@12:4-12:41: Tainted HTML output — possible XSS
-TaintedHtml@13:4-13:43: Tainted HTML output — possible XSS
-TaintedHtml@14:4-14:48: Tainted HTML output — possible XSS

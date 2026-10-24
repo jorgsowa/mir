@@ -50,6 +50,7 @@ class Child extends namespace\Base implements namespace\Shape {
 
     public function suit(): int {
         return self::SUIT;
+//      ^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'App\Suit' is not compatible with declared 'int'
     }
 }
 
@@ -60,5 +61,3 @@ function handle(): void {
         echo $e->code2();
     }
 }
-===expect===
-use.php: InvalidReturnType@26:8-26:26: Return type 'App\Suit' is not compatible with declared 'int'

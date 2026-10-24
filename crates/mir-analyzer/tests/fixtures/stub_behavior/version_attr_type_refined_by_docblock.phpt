@@ -18,6 +18,7 @@ function setValues(): void {
     $it = new ArrayIterator(['a' => 1]);
     $it['b'] = 2;
     $it->offsetSet('c', 'x');
+//                      ^^^ InvalidArgument: Argument $value of offsetSet() expects 'int', got '"x"'
 }
 
 function countsArrays(): int {
@@ -36,5 +37,3 @@ final class LocalDateTime extends DateTime {
         return false;
     }
 }
-===expect===
-InvalidArgument@5:24-5:27: Argument $value of offsetSet() expects 'int', got '"x"'

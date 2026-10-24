@@ -74,24 +74,35 @@ namespace App {
 
     function server(ServerRequestInterface $request): void {
         echo $request->getUri();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getRequestTarget();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getHeaderLine('X-Name');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getHeader('X-Name')[0];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getHeaders()['X-Name'][0];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getBody()->getContents();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getQueryParams()['q'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $request->getMethod();
     }
 
     function serverImplementations(ServerRequest $a, AppRequest $b, WrappedServerRequest $c): void {
         echo $a->getHeaderLine('X-Name');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $b->getBody()->getContents();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $c->getUri();
+//      ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 
     function narrowedToServer(RequestInterface $request): void {
         if ($request instanceof ServerRequestInterface) {
             echo $request->getHeaderLine('X-Name');
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         }
         echo $request->getHeaderLine('X-Name');
     }
@@ -107,18 +118,6 @@ namespace App {
     function throughHelpers(RequestInterface $client, ServerRequestInterface $server): void {
         echo clientTarget($client);
         echo serverTarget($server);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===
-TaintedHtml@56:8-56:32: Tainted HTML output — possible XSS
-TaintedHtml@57:8-57:42: Tainted HTML output — possible XSS
-TaintedHtml@58:8-58:47: Tainted HTML output — possible XSS
-TaintedHtml@59:8-59:46: Tainted HTML output — possible XSS
-TaintedHtml@60:8-60:49: Tainted HTML output — possible XSS
-TaintedHtml@61:8-61:48: Tainted HTML output — possible XSS
-TaintedHtml@62:8-62:45: Tainted HTML output — possible XSS
-TaintedHtml@67:8-67:41: Tainted HTML output — possible XSS
-TaintedHtml@68:8-68:42: Tainted HTML output — possible XSS
-TaintedHtml@69:8-69:26: Tainted HTML output — possible XSS
-TaintedHtml@74:12-74:51: Tainted HTML output — possible XSS
-TaintedHtml@89:8-89:35: Tainted HTML output — possible XSS

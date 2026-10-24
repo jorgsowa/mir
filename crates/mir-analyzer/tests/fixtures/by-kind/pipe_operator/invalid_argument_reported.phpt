@@ -14,11 +14,10 @@ final class Text {
 }
 
 $a = "str" |> double(...);
+//   ^^^^^ InvalidArgument: Argument $x of double() expects 'int', got '"str"'
 $b = [] |> (new Text())->length(...);
+//   ^^ InvalidArgument: Argument $s of length() expects 'string', got 'array{}'
 $c = "str" |> (fn(int $n): int => $n);
+//   ^^^^^ InvalidArgument: Argument $n of {closure}() expects 'int', got '"str"'
 $d = 1 |> double(...) |> strtoupper(...);
-===expect===
-InvalidArgument@7:5-7:10: Argument $x of double() expects 'int', got '"str"'
-InvalidArgument@8:5-8:7: Argument $s of length() expects 'string', got 'array{}'
-InvalidArgument@9:5-9:10: Argument $n of {closure}() expects 'int', got '"str"'
-ArgumentTypeCoercion@10:5-10:21: Argument $string of strtoupper() expects 'string', got 'int' — coercion may fail at runtime
+//   ^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $string of strtoupper() expects 'string', got 'int' — coercion may fail at runtime

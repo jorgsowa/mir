@@ -16,12 +16,11 @@ namespace App {
 
     function fullyQualified(): int {
         return \Foo\bar('a');
+//      ^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'string' is not compatible with declared 'int'
     }
 
     function qualified(): int {
         return Foo\bar(1);
+//      ^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'array' is not compatible with declared 'int'
     }
 }
-===expect===
-InvalidReturnType@14:8-14:29: Return type 'string' is not compatible with declared 'int'
-InvalidReturnType@18:8-18:26: Return type 'array' is not compatible with declared 'int'

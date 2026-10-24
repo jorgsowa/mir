@@ -11,7 +11,6 @@ function afterCall(?string $x): void {
 function withoutCall(?string $x): void {
     $f = function () use (&$x): void { $x = null; };
     if ($x !== null) { if ($x === null) {} }
+//                         ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'null' is always false — these types can never be identical
     $f();
 }
-===expect===
-ImpossibleIdenticalComparison@9:27-9:38: '===' between 'string' and 'null' is always false — these types can never be identical

@@ -20,22 +20,29 @@ class Calc {
     public function own(): void {
         $double = $this->mul(?, 2);
         $double("x");
+//              ^^^ InvalidArgument: Argument $a of {closure}() expects 'int', got '"x"'
         $half = self::div(?, 2);
         $half("y");
+//            ^^^ InvalidArgument: Argument $a of {closure}() expects 'int', got '"y"'
     }
 }
 
 function f(Calc $calc): void {
     $addFive = add(?, 5);
     $addFive("nope");
+//           ^^^^^^ InvalidArgument: Argument $a of {closure}() expects 'int', got '"nope"'
     $rest = label(1, ...);
     $rest([]);
+//        ^^ InvalidArgument: Argument $name of {closure}() expects 'string', got 'array{}'
     $named = label(name: ?, id: 1);
     $named([]);
+//         ^^ InvalidArgument: Argument $name of {closure}() expects 'string', got 'array{}'
     $first = sum(?, 2, 3);
     $first("z");
+//         ^^^ InvalidArgument: Argument $nums of {closure}() expects 'int', got '"z"'
     $triple = $calc->mul(?, 3);
     $triple("bad");
+//          ^^^^^ InvalidArgument: Argument $a of {closure}() expects 'int', got '"bad"'
     $both = add(?, ?);
     echo $both(1, 2);
     $result = $addFive(10);
@@ -46,20 +53,12 @@ function g(?Calc $calc): void {
     $fn = fn(int $x, string $y): int => $x;
     $bound = $fn(?, "s");
     $bound("bad");
+//         ^^^^^ InvalidArgument: Argument $x of {closure}() expects 'int', got '"bad"'
     $maybe = $calc?->mul(?, 2);
     $maybe("bad");
+//         ^^^^^ InvalidArgument: Argument $a of {closure}() expects 'int', got '"bad"'
     $addFive = add(?, 5);
     $again = $addFive(?);
     $again("bad");
+//         ^^^^^ InvalidArgument: Argument $a of {closure}() expects 'int', got '"bad"'
 }
-===expect===
-InvalidArgument@12:16-12:19: Argument $a of {closure}() expects 'int', got '"x"'
-InvalidArgument@14:14-14:17: Argument $a of {closure}() expects 'int', got '"y"'
-InvalidArgument@20:13-20:19: Argument $a of {closure}() expects 'int', got '"nope"'
-InvalidArgument@22:10-22:12: Argument $name of {closure}() expects 'string', got 'array{}'
-InvalidArgument@24:11-24:13: Argument $name of {closure}() expects 'string', got 'array{}'
-InvalidArgument@26:11-26:14: Argument $nums of {closure}() expects 'int', got '"z"'
-InvalidArgument@28:12-28:17: Argument $a of {closure}() expects 'int', got '"bad"'
-InvalidArgument@38:11-38:16: Argument $x of {closure}() expects 'int', got '"bad"'
-InvalidArgument@40:11-40:16: Argument $a of {closure}() expects 'int', got '"bad"'
-InvalidArgument@43:11-43:16: Argument $a of {closure}() expects 'int', got '"bad"'

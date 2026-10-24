@@ -29,12 +29,11 @@ function ok(K $k): void {
 
 function bad(K $k): void {
     takesString(add(1, ?));
+//              ^^^^^^^^^ InvalidArgument: Argument $s of takesString() expects 'string', got 'Closure(int): int'
     takesString($k->m(?));
+//              ^^^^^^^^ InvalidArgument: Argument $s of takesString() expects 'string', got 'Closure(int): string'
     takesString(K::s(?));
+//              ^^^^^^^ InvalidArgument: Argument $s of takesString() expects 'string', got 'Closure(int): int'
     takesInt(add(1, 2));
 }
 function takesInt(int $i): void { echo $i; }
-===expect===
-InvalidArgument@21:16-21:25: Argument $s of takesString() expects 'string', got 'Closure(int): int'
-InvalidArgument@22:16-22:24: Argument $s of takesString() expects 'string', got 'Closure(int): string'
-InvalidArgument@23:16-23:23: Argument $s of takesString() expects 'string', got 'Closure(int): int'

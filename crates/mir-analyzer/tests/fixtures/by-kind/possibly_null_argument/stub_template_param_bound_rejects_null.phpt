@@ -18,8 +18,11 @@ interface Container {
 
 function stubs(Container $c, ?string $class): void {
     new ReflectionClass($c->get('a'));
+//                      ^^^^^^^^^^^^ PossiblyNullArgument: Argument $objectOrClass of ReflectionClass::__construct() might be null
     new ReflectionClass($class);
+//                      ^^^^^^ PossiblyNullArgument: Argument $objectOrClass of ReflectionClass::__construct() might be null
     WeakReference::create($c->get('b'));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TIn' inferred as 'object|null' does not satisfy bound 'object'
     $o = $c->get('c');
     if ($o !== null) {
         new ReflectionClass($o);
@@ -35,9 +38,5 @@ final class Holder {
 
 function user(Container $c): void {
     new Holder($c->get('d'));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'object|null' does not satisfy bound 'object'
 }
-===expect===
-PossiblyNullArgument@7:24-7:36: Argument $objectOrClass of ReflectionClass::__construct() might be null
-PossiblyNullArgument@8:24-8:30: Argument $objectOrClass of ReflectionClass::__construct() might be null
-InvalidTemplateParam@9:4-9:39: Template type 'TIn' inferred as 'object|null' does not satisfy bound 'object'
-InvalidTemplateParam@24:4-24:28: Template type 'T' inferred as 'object|null' does not satisfy bound 'object'

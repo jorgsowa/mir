@@ -5,9 +5,8 @@ Distinct non-UTF-8 string literals are never identical, and the message shows th
 function f(): void {
     $a = "\xff";
     if ($a === "\xfe") {
+//      ^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"\xff"' and '"\xfe"' is always false — these types can never be identical
     }
     if ($a === "\xff") {
     }
 }
-===expect===
-ImpossibleIdenticalComparison@4:8-4:21: '===' between '"\xff"' and '"\xfe"' is always false — these types can never be identical

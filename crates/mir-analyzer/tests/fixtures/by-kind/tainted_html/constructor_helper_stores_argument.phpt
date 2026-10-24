@@ -124,16 +124,23 @@ final class FixedDefault {
 function reads(): void {
     $a = new ViaThis($_GET['a']);
     echo $a->n;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $b = new ViaSelf($_GET['a']);
     echo $b->n;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $c = new ViaStatic($_GET['a']);
     echo $c->n;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $d = new TwoHops($_GET['a']);
     echo $d->n;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $e = new Child($_GET['a']);
     echo $e->n;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new ViaThis($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     (new ViaThis($_GET['a']))->render();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function clean(): void {
@@ -149,29 +156,21 @@ function clean(): void {
 
 function pairs(): void {
     echo (new SecondParam($_GET['a'], 'ok'))->a;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new SecondParam($_GET['a'], 'ok'))->b;
     echo (new SecondParam('ok', $_GET['a']))->a;
     echo (new SecondParam('ok', $_GET['a']))->b;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new OtherProperty($_GET['a']))->other;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function flowy(): void {
     echo (new ConditionalHelper($_GET['a'], true))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new ConditionalHelper('clean', true))->n;
     echo (new Recursive($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Mutual($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@108:4-108:15: Tainted HTML output — possible XSS
-TaintedHtml@110:4-110:15: Tainted HTML output — possible XSS
-TaintedHtml@112:4-112:15: Tainted HTML output — possible XSS
-TaintedHtml@114:4-114:15: Tainted HTML output — possible XSS
-TaintedHtml@116:4-116:15: Tainted HTML output — possible XSS
-TaintedHtml@117:4-117:38: Tainted HTML output — possible XSS
-TaintedHtml@118:4-118:39: Tainted HTML output — possible XSS
-TaintedHtml@133:4-133:48: Tainted HTML output — possible XSS
-TaintedHtml@136:4-136:48: Tainted HTML output — possible XSS
-TaintedHtml@137:4-137:48: Tainted HTML output — possible XSS
-TaintedHtml@141:4-141:54: Tainted HTML output — possible XSS
-TaintedHtml@143:4-143:40: Tainted HTML output — possible XSS
-TaintedHtml@144:4-144:37: Tainted HTML output — possible XSS

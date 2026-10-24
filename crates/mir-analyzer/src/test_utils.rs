@@ -6,9 +6,8 @@
 //! ```text
 //! ===file===
 //! <?php
-//! ...
-//! ===expect===
-//! UndefinedMethod: Method Foo::bar() does not exist
+//! $foo->bar();
+//! //    ^^^ UndefinedMethod: Method Foo::bar() does not exist
 //! ```
 //!
 //! **Multi-file** (`===file:name===`, one or more):
@@ -19,8 +18,6 @@
 //! ===file:Child.php===
 //! <?php
 //! class Child extends Base { ... }
-//! ===expect===
-//! Child.php: UndefinedMethod: Method Child::bar() does not exist
 //! ```
 //!
 //! **With config** (optional `===config===` section, must appear before file sections;
@@ -38,8 +35,6 @@
 //! </mir>
 //! ===file===
 //! <?php
-//! ...
-//! ===expect===
 //! ...
 //! ```
 //!
@@ -59,8 +54,6 @@
 //! ===file:Child.php===
 //! <?php
 //! class Child extends \App\Base { ... }
-//! ===expect===
-//! Child.php: UndefinedMethod: Method Child::bar() does not exist
 //! ```
 //!
 //! **With description** (optional `===description===` section, must appear before file sections):
@@ -70,8 +63,6 @@
 //! ===file===
 //! <?php
 //! ...
-//! ===expect===
-//! ...
 //! ```
 //!
 //! **Skipped / WIP fixture** (`===ignore===`, must appear before file sections):
@@ -79,8 +70,6 @@
 //! ===ignore===
 //! ===file===
 //! <?php
-//! ...
-//! ===expect===
 //! ...
 //! ```
 //!
@@ -118,19 +107,19 @@
 //! the fixture root (stub declarations keep their `stubs/…` path). A failed
 //! lookup renders as `error: NotFound` or `error: NoSourceLocation`.
 //!
-//! **Annotations** (diagnostic fixtures): a `// ^^^ Kind: message` comment line
-//! under a source line expects that issue on the line above, starting at the
-//! first caret's column and spanning the carets. `//<^^^` starts at column 0.
-//! A `+N:C` token after the carets (`// ^ +2:1 Kind`, `N` ≥ 1) ends the span at
-//! column `C` of the source line `N` lines below (annotation lines don't count). A column 1 start needs `===expect===`.
-//! Annotations combine with `===expect===`; `UPDATE_FIXTURES=1` leaves matched
-//! ones out of the rewritten section.
+//! **Annotations**: a diagnostic fixture lists every expected issue as a
+//! `// ^^^ Kind: message` comment line under its source line, starting at the
+//! first caret's column and spanning the carets. `//<^^^` starts at column 0 and
+//! `//< ^^^` at column 1 (one column per space after `<`). A `+N:C` token after
+//! the carets (`// ^ +2:1 Kind`) ends the span at column `C` of the source line
+//! `N` lines below (annotation lines don't count); `+0:C` is only for spans
+//! carets can't draw (`C` ≤ start column). Annotation lines are blanked before
+//! analysis, so line numbers count them.
 //! ```text
 //! ===file===
 //! <?php
 //! function f(Missing $x): void {}
 //! //         ^^^^^^^ UndefinedClass: Class Missing does not exist
-//! ===expect===
 //! ```
 //!
 //! **Edits** (`===edit:name===`, after the file sections, multi-file only):
@@ -175,8 +164,8 @@
 //!   `UnusedProperty`) is the one exception — it is suppressed by default
 //!   (merged on top of any explicit handlers) so a fixture's bare top-level
 //!   functions don't emit unsolicited noise. That default is held back when the
-//!   fixture sets `<findUnusedCode>true</findUnusedCode>` or its `===expect===`
-//!   references one of those kinds.
+//!   fixture sets `<findUnusedCode>true</findUnusedCode>` or expects one of
+//!   those kinds.
 //! - `<fileExtensions><extension name="module"/>…` sets the extensions treated as PHP
 //!   source (default `php`); every fixture file with one is analyzed.
 //! - `<projectFiles><file name="a.module"/>` analyzes only that file plus what
@@ -189,21 +178,17 @@
 //!   and only together with a `<CURSOR>` marker; `suppress` is rejected there.
 //! - `===edit:name===` must follow every file section and name a declared,
 //!   analyzed project file; it can't be combined with `===cursor===`.
-//! - `===expect===` appears exactly once, and may be omitted in diagnostic
-//!   fixtures whose issues are all annotated. Edit fixtures have it twice,
+//! - Diagnostic fixtures have no `===expect===`; their issues are annotations.
+//!   `===cursor===` fixtures have it exactly once. Edit fixtures have it twice,
 //!   between the file and edit sections and after the edits; each lists issues
 //!   or holds `<<none>>` alone.
 //!
 //! # Expect format
 //!
-//! Single-file fixtures use `KindName@line:col: message`.
-//! Multi-file fixtures use `FileName.php: KindName@line:col: message`.
-//! `===cursor===` fixtures use the query output described above.
+//! Edit fixtures use `KindName@line:col-line_end:col_end: message`, prefixed
+//! with `FileName.php: `. `===cursor===` fixtures use the query output described above.
 //!
-//! Location assertions (`@line:col`) are **required**. Both line and column must be specified
-//! and must match for the issue to be considered a match.
-//!
-//! Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output (including locations).
+//! Set `UPDATE_FIXTURES=1` to rewrite annotations or the expect section from the actual output.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -337,19 +322,25 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
     let expect_count = count_occurrences(content, EXPECT_MARKER);
     let edit_fixture = content.contains(EDIT_PREFIX);
     let cursor_fixture = content.contains(CURSOR_MARKER);
-    let wanted = if edit_fixture { 2 } else { 1 };
-    let optional = !edit_fixture && !cursor_fixture;
-    assert!(
-        expect_count == wanted || (optional && expect_count == 0),
-        "fixture {path}: {EXPECT_MARKER} must appear {} (found {expect_count})",
-        if edit_fixture {
-            "twice: before the first ===edit:name=== and after the edits"
-        } else if optional {
-            "at most once"
-        } else {
-            "exactly once"
-        }
-    );
+    let diagnostic_fixture = !edit_fixture && !cursor_fixture;
+    if diagnostic_fixture {
+        // UPDATE_FIXTURES reads a leftover section to keep dead-code kinds reported while annotating.
+        assert!(
+            expect_count == 0 || update_requested(),
+            "fixture {path}: write expected issues as `// ^^^ Kind: message` annotations under their source line, not in {EXPECT_MARKER}; {UPDATE_HINT} converts it"
+        );
+    } else {
+        let wanted = if edit_fixture { 2 } else { 1 };
+        assert!(
+            expect_count == wanted,
+            "fixture {path}: {EXPECT_MARKER} must appear {} (found {expect_count})",
+            if edit_fixture {
+                "twice: before the first ===edit:name=== and after the edits"
+            } else {
+                "exactly once"
+            }
+        );
+    }
     let (header_region, expect_content) = match content.rfind(EXPECT_MARKER) {
         Some(pos) => (&content[..pos], content[pos + EXPECT_MARKER.len()..].trim()),
         None => (content, ""),
@@ -505,8 +496,22 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
 /// carets ends the span at column `C` of the source line `N` lines below
 /// (annotation lines don't count).
 fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> Vec<ExpectedIssue> {
+    files
+        .iter()
+        .flat_map(|(name, src)| file_annotations(name, src, is_multi, path))
+        .map(|(_, expected)| expected)
+        .collect()
+}
+
+/// `(0-based line index, expected issue)` for each annotation in one file.
+fn file_annotations(
+    name: &str,
+    src: &str,
+    is_multi: bool,
+    path: &str,
+) -> Vec<(usize, ExpectedIssue)> {
     let mut out = Vec::new();
-    for (name, src) in files {
+    {
         let lines: Vec<&str> = src.lines().collect();
         let mut target: Option<u32> = None;
         for (idx, &text) in lines.iter().enumerate() {
@@ -523,7 +528,7 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
             let (line_end, col_end, rest) = match parse_span_end(rest) {
                 Some((lines_below, end_col, rest)) => {
                     assert!(
-                        lines_below > 0,
+                        lines_below > 0 || end_col <= col,
                         "fixture {path}: annotation on line {} spans one line; use carets instead of `+0:C`",
                         idx + 1
                     );
@@ -544,22 +549,27 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                 "fixture {path}: annotation on line {} needs a Kind after the carets",
                 idx + 1
             );
-            out.push(ExpectedIssue {
-                file: is_multi.then(|| {
-                    Path::new(name)
-                        .file_name()
-                        .map_or_else(|| name.clone(), |n| n.to_string_lossy().into_owned())
-                }),
-                kind_name: kind.to_string(),
-                message: message.to_string(),
-                line: Some(line),
-                col_start: Some(col),
-                line_end: Some(line_end),
-                col_end: Some(col_end),
-            });
+            out.push((
+                idx,
+                ExpectedIssue {
+                    file: is_multi.then(|| basename(name)),
+                    kind_name: kind.to_string(),
+                    message: message.to_string(),
+                    line: Some(line),
+                    col_start: Some(col),
+                    line_end: Some(line_end),
+                    col_end: Some(col_end),
+                },
+            ));
         }
     }
     out
+}
+
+fn basename(path: &str) -> String {
+    Path::new(path)
+        .file_name()
+        .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
 
 fn blank_annotation_lines(src: &str) -> String {
@@ -603,7 +613,10 @@ fn parse_span_end(rest: &str) -> Option<(u32, u16, &str)> {
 fn split_annotation(text: &str) -> Option<(u16, u16, &str)> {
     let after_slashes = text.trim_start().strip_prefix("//")?;
     let (carets_at, col) = match after_slashes.strip_prefix('<') {
-        Some(rest) => (rest, 0),
+        Some(rest) => {
+            let carets_at = rest.trim_start_matches(' ');
+            (carets_at, (rest.len() - carets_at.len()) as u16)
+        }
         None => {
             let carets_at = after_slashes.trim_start();
             (
@@ -1054,17 +1067,7 @@ fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture)
     let actual = run_analyzer(&file_refs(&fixture), &fixture.config);
 
     if update_requested() {
-        let annotated = parse_annotations(&fixture.files, fixture.is_multi, path);
-        let unannotated: Vec<Issue> = actual
-            .into_iter()
-            .filter(|a| !annotated.iter().any(|e| issue_matches(a, e)))
-            .collect();
-        let lines = fmt_expect_lines(&unannotated, fixture.is_multi);
-        if lines.is_empty() {
-            drop_expect_section(path, content);
-        } else {
-            rewrite_expect_section(path, content, &lines);
-        }
+        rewrite_annotations(path, content, &fixture, &actual);
         return;
     }
 
@@ -1678,7 +1681,7 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
     let failures = issue_failures(&fixture.expected, actual, fixture.is_multi);
     if !failures.is_empty() {
         panic!(
-            "fixture {path} FAILED:{}\n{}\n\nTo fix: ensure all expected issues have @line:col-line_end:col_end locations, then run: {UPDATE_HINT}\n\nAll actual issues:\n{}",
+            "fixture {path} FAILED:{}\n{}\n\nTo fix, run: {UPDATE_HINT}\n\nAll actual issues:\n{}",
             fmt_description(fixture),
             failures.join("\n"),
             fmt_issues(actual, fixture.is_multi)
@@ -1786,11 +1789,125 @@ fn fmt_expect_lines(actual: &[Issue], is_multi: bool) -> Vec<String> {
         .collect()
 }
 
-/// Remove the `===expect===` section, leaving the file text before it.
-fn drop_expect_section(path: &str, content: &str) {
+/// Annotate `actual` under its source lines, drop stale annotations and any `===expect===` section.
+fn rewrite_annotations(path: &str, content: &str, fixture: &ParsedFixture, actual: &[Issue]) {
     let end = content.find(EXPECT_MARKER).unwrap_or(content.len());
-    let out = format!("{}\n", content[..end].trim_end());
+    let mut out = format!("{}\n", content[..end].trim_end());
+    let mut sections: Vec<(usize, &str, String)> = Vec::new();
+    for (name, src) in &fixture.files {
+        let marker = if fixture.is_multi {
+            format!("{FILE_PREFIX}{name}===")
+        } else {
+            BARE_FILE.to_string()
+        };
+        let after_marker = out.find(&marker).unwrap() + marker.len();
+        let start = after_marker + out[after_marker..].find(src.as_str()).unwrap();
+        let issues: Vec<&Issue> = actual
+            .iter()
+            .filter(|i| issue_file(path, fixture, i) == name.as_str())
+            .collect();
+        sections.push((
+            start,
+            src,
+            annotate_source(path, name, src, fixture.is_multi, &issues),
+        ));
+    }
+    sections.sort_by_key(|(start, ..)| std::cmp::Reverse(*start));
+    for (start, old, new) in sections {
+        out.replace_range(start..start + old.len(), &new);
+    }
     write_fixture(path, &out);
+}
+
+/// Name of the fixture file `issue` is reported in.
+fn issue_file<'a>(path: &str, fixture: &'a ParsedFixture, issue: &Issue) -> &'a str {
+    let reported = basename(issue.location.file.as_ref());
+    let mut matching = fixture
+        .files
+        .iter()
+        .filter(|(name, _)| !fixture.is_multi || basename(name) == reported);
+    match (matching.next(), matching.next()) {
+        (Some((name, _)), None) => name,
+        _ => panic!("fixture {path}: can't tell which file {reported} names; give fixture files distinct basenames"),
+    }
+}
+
+/// `src` with stale annotations removed and one added under its line for each unannotated issue.
+fn annotate_source(path: &str, name: &str, src: &str, is_multi: bool, issues: &[&Issue]) -> String {
+    let existing = file_annotations(name, src, is_multi, path);
+    let stale: HashSet<usize> = existing
+        .iter()
+        .filter(|(_, e)| !issues.iter().any(|a| issue_matches(a, e)))
+        .map(|(idx, _)| *idx)
+        .collect();
+    let mut missing: Vec<&Issue> = issues
+        .iter()
+        .copied()
+        .filter(|a| !existing.iter().any(|(_, e)| issue_matches(a, e)))
+        .collect();
+    missing.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
+
+    let lines: Vec<&str> = src.lines().collect();
+    for issue in &missing {
+        let line = issue.location.line as usize;
+        assert!(
+            (1..=lines.len()).contains(&line) && split_annotation(lines[line - 1]).is_none(),
+            "fixture {path}: {} is on no source line of {name}",
+            fmt_actual(issue, is_multi)
+        );
+    }
+    let mut out = String::with_capacity(src.len());
+    for (idx, text) in lines.iter().enumerate() {
+        if !stale.contains(&idx) {
+            out.push_str(text);
+            out.push('\n');
+        }
+        let block_ends = lines
+            .get(idx + 1)
+            .is_none_or(|next| split_annotation(next).is_none());
+        if !block_ends {
+            continue;
+        }
+        let target = lines[..=idx]
+            .iter()
+            .rposition(|l| split_annotation(l).is_none())
+            .map(|i| i + 1);
+        for issue in missing
+            .iter()
+            .filter(|i| Some(i.location.line as usize) == target)
+        {
+            out.push_str(&fmt_annotation(&lines, issue));
+            out.push('\n');
+        }
+    }
+    out.trim_end_matches('\n').to_string()
+}
+
+fn fmt_annotation(lines: &[&str], issue: &Issue) -> String {
+    let loc = &issue.location;
+    let mut out = match loc.col_start {
+        0 => "//<".to_string(),
+        1 => "//< ".to_string(),
+        col => format!("//{}", " ".repeat(col as usize - 2)),
+    };
+    if loc.line_end == loc.line && loc.col_end > loc.col_start {
+        out.push_str(&"^".repeat((loc.col_end - loc.col_start) as usize));
+    } else {
+        let span_end = (loc.line_end as usize).clamp(loc.line as usize, lines.len());
+        let lines_below = lines[loc.line as usize..span_end]
+            .iter()
+            .filter(|l| split_annotation(l).is_none())
+            .count();
+        out.push_str(&format!("^ +{lines_below}:{}", loc.col_end));
+    }
+    out.push(' ');
+    out.push_str(issue.kind.name());
+    let message = issue.kind.message();
+    if !message.is_empty() {
+        out.push_str(": ");
+        out.push_str(&message);
+    }
+    out
 }
 
 /// Rewrite only the `===expect===` section, preserving everything before it.
@@ -2033,7 +2150,7 @@ mod parser_validation {
 
     #[test]
     fn annotation_becomes_expected_issue() {
-        let f = p("===file===\n<?php\n\nfoo();\n//^^^ K: msg here\n// ^^ Other\n===expect===\n");
+        let f = p("===file===\n<?php\n\nfoo();\n//^^^ K: msg here\n// ^^ Other\n");
         assert_eq!(f.expected.len(), 2);
         let a = &f.expected[0];
         assert_eq!(
@@ -2054,8 +2171,7 @@ mod parser_validation {
 
     #[test]
     fn annotation_at_column_zero_and_multiline_end() {
-        let f =
-            p("===file===\n<?php\nfoo();\n//<^^^ K\nfoo(\n// ^ +1:2 M: multi\n);\n===expect===\n");
+        let f = p("===file===\n<?php\nfoo();\n//<^^^ K\nfoo(\n// ^ +1:2 M: multi\n);\n");
         let a = &f.expected[0];
         assert_eq!(
             (a.line, a.col_start, a.line_end, a.col_end),
@@ -2071,92 +2187,90 @@ mod parser_validation {
 
     #[test]
     fn annotation_in_multi_file_names_its_file() {
-        let f = p(
-            "===file:A.php===\n<?php\nfoo();\n// ^^^ K\n===file:B.php===\n<?php\n===expect===\n",
-        );
+        let f = p("===file:A.php===\n<?php\nfoo();\n// ^^^ K\n===file:B.php===\n<?php\n");
         assert_eq!(f.expected[0].file.as_deref(), Some("A.php"));
     }
 
     #[test]
     #[should_panic(expected = "has no source line above it")]
     fn annotation_without_source_line() {
-        p("===file===\n// ^^^ K\n===expect===\n");
+        p("===file===\n// ^^^ K\n");
     }
 
     #[test]
     #[should_panic(expected = "===file=== must appear at most once")]
     fn duplicate_bare_file_marker() {
-        p("===file===\n<?php\n===file===\n<?php\n===expect===\n");
+        p("===file===\n<?php\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "cannot mix ===file=== and ===file:name===")]
     fn mixed_bare_and_named_markers() {
-        p("===file===\n<?php\n===file:Other.php===\n<?php\n===expect===\n");
+        p("===file===\n<?php\n===file:Other.php===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "===config=== must appear at most once")]
     fn duplicate_config_section() {
-        p("===config===\n<mir/>\n===config===\n<mir/>\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir/>\n===config===\n<mir/>\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "unsupported <foo>")]
     fn unknown_config_key() {
-        p("===config===\n<mir><foo/></mir>\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir><foo/></mir>\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "invalid phpVersion")]
     fn invalid_php_version() {
-        p("===config===\n<mir><phpVersion>banana</phpVersion></mir>\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir><phpVersion>banana</phpVersion></mir>\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "===config=== must appear before the first ===file===")]
     fn config_after_file_marker() {
-        p("===file===\n<?php\n===config===\n<mir/>\n===expect===\n");
+        p("===file===\n<?php\n===config===\n<mir/>\n");
     }
 
     #[test]
     fn valid_config_is_accepted() {
-        p("===config===\n<mir><phpVersion>8.1</phpVersion><issueHandlers><Foo errorLevel=\"suppress\"/></issueHandlers></mir>\n===file===\n<?php\n===expect===\n");
+        p("===config===\n<mir><phpVersion>8.1</phpVersion><issueHandlers><Foo errorLevel=\"suppress\"/></issueHandlers></mir>\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "===description=== must appear at most once")]
     fn duplicate_description_section() {
-        p("===description===\nfoo\n===description===\nbar\n===file===\n<?php\n===expect===\n");
+        p("===description===\nfoo\n===description===\nbar\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "===description=== must appear before the first ===file===")]
     fn description_after_file_marker() {
-        p("===file===\n<?php\n===description===\nfoo\n===expect===\n");
+        p("===file===\n<?php\n===description===\nfoo\n");
     }
 
     #[test]
     fn valid_description_is_accepted() {
-        let f = p("===description===\nChecks null method call.\n===file===\n<?php\n===expect===\n");
+        let f = p("===description===\nChecks null method call.\n===file===\n<?php\n");
         assert_eq!(f.description.as_deref(), Some("Checks null method call."));
     }
 
     #[test]
     #[should_panic(expected = "===ignore=== must appear at most once")]
     fn duplicate_ignore_marker() {
-        p("===ignore===\n===ignore===\n===file===\n<?php\n===expect===\n");
+        p("===ignore===\n===ignore===\n===file===\n<?php\n");
     }
 
     #[test]
     #[should_panic(expected = "===ignore=== must appear before the first ===file===")]
     fn ignore_after_file_marker() {
-        p("===file===\n<?php\n===ignore===\n===expect===\n");
+        p("===file===\n<?php\n===ignore===\n");
     }
 
     #[test]
     fn valid_ignore_is_accepted() {
-        let f = p("===ignore===\n===file===\n<?php\n===expect===\n");
+        let f = p("===ignore===\n===file===\n<?php\n");
         assert!(f.description.is_none());
     }
 
@@ -2197,7 +2311,7 @@ mod parser_validation {
     #[test]
     #[should_panic(expected = "<CURSOR> marker needs a ===cursor=== section")]
     fn marker_without_cursor_section() {
-        p("===file===\n<?php f<CURSOR>();\n===expect===\n");
+        p("===file===\n<?php f<CURSOR>();\n");
     }
 
     #[test]
@@ -2304,14 +2418,26 @@ mod parser_validation {
     }
 
     #[test]
-    #[should_panic(expected = "===expect=== must appear at most once")]
-    fn two_expects_without_edits() {
-        p("===file:a.php===\n<?php\n===expect===\n===expect===\n");
+    #[should_panic(expected = "not in ===expect===")]
+    fn diagnostic_fixture_rejects_expect() {
+        p("===file===\n<?php\n===expect===\n");
     }
 
     #[test]
-    fn diagnostic_fixture_may_omit_expect() {
-        p("===file===\n<?php\n");
+    fn annotation_at_column_one_and_zero_width() {
+        let f = p("===file===\n<?php\n foo();\n//< ^^^ K\n//   ^ +0:5 Z\n");
+        let spans: Vec<_> = f
+            .expected
+            .iter()
+            .map(|e| (e.line, e.col_start, e.line_end, e.col_end))
+            .collect();
+        assert_eq!(
+            spans,
+            [
+                (Some(2), Some(1), Some(2), Some(4)),
+                (Some(2), Some(5), Some(2), Some(5))
+            ]
+        );
     }
 
     #[test]

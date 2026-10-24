@@ -25,12 +25,11 @@ namespace App {
     use const Consts\LIMIT;
 
     function a(): int { return v(); }
+//                      ^^^^^^^^^^^ InvalidReturnType: Return type 'string' is not compatible with declared 'int'
     function b(): string { return v; }
+//                         ^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared 'string'
     function c(): int { return LIMIT(); }
+//                             ^^^^^^^ UndefinedFunction: Function LIMIT() is not defined
     function d(): string { return helper; }
+//                                ^^^^^^ UndefinedConstant: Constant helper is not defined
 }
-===expect===
-InvalidReturnType@16:24-16:35: Return type 'string' is not compatible with declared 'int'
-InvalidReturnType@17:27-17:36: Return type '1' is not compatible with declared 'string'
-UndefinedFunction@18:31-18:38: Function LIMIT() is not defined
-UndefinedConstant@19:34-19:40: Constant helper is not defined

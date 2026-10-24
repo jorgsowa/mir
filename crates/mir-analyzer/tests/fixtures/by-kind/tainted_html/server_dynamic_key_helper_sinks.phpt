@@ -23,6 +23,7 @@ function sinks(): void {
     file_get_contents(env('HOME') . '/x');
     shell_exec('cd ' . env('PWD'));
     file_get_contents(env($_GET['k']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
 
 /** @param array<string, string> $env */
@@ -33,7 +34,5 @@ function keyOnlyArrays(array $env): void {
     shell_exec(implode(' ', $dropped));
     $values = array_intersect_key($_SERVER, $env);
     shell_exec(implode(' ', $values));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
-===expect===
-TaintedInput@9:4-9:38: Tainted input reaching sink 'file'
-TaintedShell@19:4-19:37: Tainted shell command — possible command injection

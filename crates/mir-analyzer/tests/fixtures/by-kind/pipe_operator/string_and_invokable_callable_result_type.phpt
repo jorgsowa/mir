@@ -11,8 +11,7 @@ final class Stringify {
 $a = 5 |> 'double';
 /** @trace $a */
 $b = 5 |> new Stringify();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $a is int
 /** @trace $b */
 echo $a, $b;
-===expect===
-Trace@9:0-9:26: Type of $a is int
-Trace@11:0-11:12: Type of $b is string
+//<^^^^^^^^^^^^ Trace: Type of $b is string

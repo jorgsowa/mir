@@ -71,29 +71,28 @@ function compoundOnTaintedLeft(): void {
 function arrayUnionKeepsTaint(): void {
     $merged = $_GET + ['page' => '1'];
     echo implode(',', $merged);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function mixedOperandsKeepTaint(mixed $defaults): void {
     $merged = $_GET['a'] + $defaults;
     echo $merged;
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function compoundArrayUnionKeepsTaint(array $defaults): void {
     $defaults += $_GET;
     echo implode(',', $defaults);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function concatKeepsTaint(): void {
     echo $_GET['a'] . 1;
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo 'n' . ($_GET['a'] + 1) . $_GET['b'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function bitwiseWithScalar(): void {
     echo $_GET['a'] & 0xff;
 }
-===expect===
-TaintedHtml@57:4-57:31: Tainted HTML output — possible XSS
-TaintedHtml@62:4-62:17: Tainted HTML output — possible XSS
-TaintedHtml@67:4-67:33: Tainted HTML output — possible XSS
-TaintedHtml@71:4-71:24: Tainted HTML output — possible XSS
-TaintedHtml@72:4-72:45: Tainted HTML output — possible XSS

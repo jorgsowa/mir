@@ -12,8 +12,7 @@ parameter is called with too few arguments.
 function add(int $a, int $b): int { return $a + $b; }
 
 $a = 1 |> add(...);
+//   ^^^^^^^^^^^^^ TooFewArguments: Too few arguments for add(): expected 2, got 1
 $b = 1 |> (fn(int $x, int $y): int => $x + $y);
+//   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for {closure}(): expected 2, got 1
 $c = 1 |> (fn(int $x, int $y = 2): int => $x + $y);
-===expect===
-TooFewArguments@4:5-4:18: Too few arguments for add(): expected 2, got 1
-TooFewArguments@5:5-5:46: Too few arguments for {closure}(): expected 2, got 1

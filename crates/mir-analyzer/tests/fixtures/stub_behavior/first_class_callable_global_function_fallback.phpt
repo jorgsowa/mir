@@ -40,6 +40,5 @@ function build(array $source): void {
     /** @mir-check $shadowed is array<int, int> */
 
     $missing = mapKeys(not_a_function(...), $source);
+//                     ^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function not_a_function() is not defined
 }
-===expect===
-UndefinedFunction@32:23-32:42: Function not_a_function() is not defined

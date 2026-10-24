@@ -109,8 +109,3 @@ function reboundToSanitizingClosure(): void {
     $f = fn ($x) => htmlspecialchars($x);
     echo $f($_GET['x']);
 }
-===expect===
-TaintedHtml@65:4-65:26: Tainted HTML output — possible XSS
-TaintedHtml@71:4-71:24: Tainted HTML output — possible XSS
-TaintedHtml@74:8-74:28: Tainted HTML output — possible XSS
-TaintedHtml@82:4-82:24: Tainted HTML output — possible XSS

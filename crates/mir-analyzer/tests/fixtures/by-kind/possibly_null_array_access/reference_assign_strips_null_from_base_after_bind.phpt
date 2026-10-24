@@ -36,6 +36,5 @@ function tracedType(?array $a): void {
     $r = &$a['k'];
     /** @trace $a */
     $a;
+//  ^^^ Trace: Type of $a is array
 }
-===expect===
-Trace@24:4-24:7: Type of $a is array

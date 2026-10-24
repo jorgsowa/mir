@@ -13,8 +13,10 @@ right clears it, any other callable passes it on.
 <?php
 function reported(): void {
     echo $_GET['x'] |> trim(...);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $upper = $_GET['x'] |> strtoupper(...);
     echo $upper;
+//  ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function notReported(): void {
@@ -23,6 +25,3 @@ function notReported(): void {
     echo $_GET['n'] |> intval(...);
     echo 'literal' |> strtoupper(...);
 }
-===expect===
-TaintedHtml@3:4-3:33: Tainted HTML output — possible XSS
-TaintedHtml@5:4-5:16: Tainted HTML output — possible XSS

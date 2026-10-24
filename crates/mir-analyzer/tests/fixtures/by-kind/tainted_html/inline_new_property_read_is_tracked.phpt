@@ -57,28 +57,27 @@ final class Second {
 
 function reads(): void {
     echo (new W($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 
     echo new W($_GET['a'])->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Promoted($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Escaping($_GET['a']))->n;
     echo (new W('clean'))->n;
     echo (new W($_GET['a']))->other;
     echo (new Second($_GET['a'], 'ok'))->b;
     echo (new Second($_GET['a'], 'ok'))->a;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Second('ok', $_GET['a']))->a;
 }
 
 function calls(): void {
     (new W($_GET['a']))->render();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     (new W('clean'))->render();
     (new Escaping($_GET['a']))->show();
     (new Second($_GET['a'], 'ok'))->showB();
     (new Second($_GET['a'], 'ok'))->showA();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@42:4-42:32: Tainted HTML output — possible XSS
-TaintedHtml@44:4-44:30: Tainted HTML output — possible XSS
-TaintedHtml@45:4-45:39: Tainted HTML output — possible XSS
-TaintedHtml@50:4-50:43: Tainted HTML output — possible XSS
-TaintedHtml@55:4-55:33: Tainted HTML output — possible XSS
-TaintedHtml@59:4-59:43: Tainted HTML output — possible XSS

@@ -38,9 +38,8 @@ class Page {
 }
 function page(): void {
     echo Text::upper((string) $_GET['x']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo Text::length((string) $_GET['x']);
     Text::show((string) $_GET['x']);
     echo Text::query();
 }
-===expect===
-Page.php: TaintedHtml@12:4-12:42: Tainted HTML output — possible XSS

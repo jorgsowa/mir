@@ -50,6 +50,7 @@ class Registry {
 }
 
 function readInto(&$out) { $out = $_GET['a']; }
+//                 ^^^^ MissingParamType: Parameter $out of readInto() has no type annotation
 
 class Child extends Registry {
     public static function viaChild(string $s): void {
@@ -61,11 +62,13 @@ class Child extends Registry {
 function direct() {
     Registry::put($_GET['x']);
     echo Registry::$w;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function late() {
     Registry::putLate($_GET['x']);
     echo Registry::$w;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function sanitizedArgument() {
@@ -98,46 +101,42 @@ function instanceMethod() {
     $r = new Registry();
     $r->remember($_GET['x']);
     echo Registry::$w;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function inheritedCall() {
     Child::put($_GET['x']);
     echo Child::$w;
+//  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function otherProperty2() {
     Registry::putOther($_GET['x']);
     echo Registry::$other;
+//  ^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function taintedLocal() {
     $q = $_GET['x'];
     Registry::put($q);
     echo Registry::$w;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function throughWrapper() {
     Registry::viaSelf($_GET['x']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo Registry::$w;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function byRefArgument() {
     readInto(Registry::$w);
     echo Registry::$w;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function byRefArgumentOtherProperty() {
     readInto(Registry::$w);
     echo Registry::$other;
 }
-===expect===
-MissingParamType@37:19-37:23: Parameter $out of readInto() has no type annotation
-TaintedHtml@48:4-48:22: Tainted HTML output — possible XSS
-TaintedHtml@53:4-53:22: Tainted HTML output — possible XSS
-TaintedHtml@85:4-85:22: Tainted HTML output — possible XSS
-TaintedHtml@90:4-90:19: Tainted HTML output — possible XSS
-TaintedHtml@95:4-95:26: Tainted HTML output — possible XSS
-TaintedHtml@101:4-101:22: Tainted HTML output — possible XSS
-TaintedHtml@105:4-105:33: Tainted HTML output — possible XSS
-TaintedHtml@106:4-106:22: Tainted HTML output — possible XSS
-TaintedHtml@111:4-111:22: Tainted HTML output — possible XSS

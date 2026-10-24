@@ -33,14 +33,18 @@ function spreadNamed(): void {
     showBody(...['title' => $t, 'body' => 'b']);
     showBody(...['body' => 'b', 'title' => $t]);
     showTitle(...['title' => $t, 'body' => 'b']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showBody(...['title' => 't', 'body' => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function spreadPositional(): void {
     $t = $_GET['t'];
     showBody(...[$t, 'b']);
     showBody(...['b', $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showTitle(...[$t, 'b']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showTitle(...['b', $t]);
 }
 
@@ -48,7 +52,9 @@ function spreadAfterPositional(): void {
     $t = $_GET['t'];
     showBody($t, ...['b']);
     showBody('a', ...[$t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showDefaulted('a', ...['c' => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showDefaulted($t, ...['c' => 'c']);
 }
 
@@ -57,8 +63,10 @@ function spreadInResult(): void {
     echo pickBody(...['title' => $t, 'body' => 'b']);
     echo pickBody(...[$t, 'b']);
     echo pickTitle(...[$t, 'b']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo pickTitle(...['body' => $t, 'title' => 't']);
     echo pickBody(...['body' => $t, 'title' => 't']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function spreadUnknownStaysConservative(array $args): void {
@@ -67,16 +75,22 @@ function spreadUnknownStaysConservative(array $args): void {
     showBody(...[$t, ...$args]);
     $spread = ['title' => $t, 'body' => 'b'];
     showBody(...$spread);
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showBody(...[$args['k'] => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showBody(...[...$args, $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     showTitle(...[...$args, $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function spreadIntoVariadic(): void {
     $t = $_GET['t'];
     echo joinAll(...['a', 'b']);
     echo joinAll('a', ...[$t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo joinAll(...['x' => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function closuresBindSpread(): void {
@@ -85,35 +99,45 @@ function closuresBindSpread(): void {
     $body(...['title' => $t, 'body' => 'b']);
     $body(...[$t, 'b']);
     $body(...['b', $t]);
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $pick = fn (string $a, string $b) => $b;
     echo $pick(...['a' => $t, 'b' => 'b']);
     echo $pick(...['b' => $t, 'a' => 'a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callUserFuncPositional(): void {
     $t = $_GET['t'];
     call_user_func('showBody', $t, 'x');
     call_user_func('showTitle', $t, 'x');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     call_user_func('showBody', 'x', $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func('pickBody', $t, 'x');
     echo call_user_func('pickTitle', $t, 'x');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func('pickBody', 'x', $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callUserFuncArrayList(): void {
     $t = $_GET['t'];
     call_user_func_array('showBody', [$t, 'x']);
     call_user_func_array('showBody', ['x', $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func_array('pickBody', [$t, 'x']);
     echo call_user_func_array('pickTitle', [$t, 'x']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callUserFuncArrayNamed(): void {
     $t = $_GET['t'];
     call_user_func_array('showBody', ['title' => $t, 'body' => 'x']);
     call_user_func_array('showBody', ['body' => $t, 'title' => 'x']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func_array('pickBody', ['body' => 'x', 'title' => $t]);
     echo call_user_func_array('pickTitle', ['body' => 'x', 'title' => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callUserFuncClosures(): void {
@@ -121,9 +145,12 @@ function callUserFuncClosures(): void {
     $show = function (string $a, string $b) { echo $b; };
     call_user_func($show, $t, 'x');
     call_user_func($show, 'x', $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     call_user_func_array($show, ['a' => $t, 'b' => 'x']);
     call_user_func_array($show, ['b' => $t, 'a' => 'x']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func(fn ($a, $b) => $a, $t, 'x');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func(fn ($a, $b) => $b, $t, 'x');
 }
 
@@ -131,12 +158,15 @@ function callUserFuncSanitizers(): void {
     $t = $_GET['t'];
     echo call_user_func('htmlspecialchars', $t);
     echo call_user_func('trim', $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callUserFuncVariadic(): void {
     $t = $_GET['t'];
     echo call_user_func('joinAll', 'a', $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func_array('joinAll', ['a', $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func('joinAll', 'a', 'b');
 }
 
@@ -144,51 +174,20 @@ function callUserFuncUnknownStaysConservative(array $args, string $name): void {
     $t = $_GET['t'];
     echo call_user_func_array('pickBody', $args);
     echo call_user_func_array('pickBody', [$t, ...$args]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func_array('pickBody', ['nope' => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func($name, $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo call_user_func_array([$name, 'run'], [$t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callUserFuncDefaults(): void {
     $t = $_GET['t'];
     call_user_func('showDefaulted', 'a', 'b', $t);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     call_user_func('showDefaulted', $t);
     call_user_func_array('showDefaulted', ['a', 'c' => $t]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@14:4-14:48: Tainted HTML output — possible XSS
-TaintedHtml@15:4-15:47: Tainted HTML output — possible XSS
-TaintedHtml@21:4-21:26: Tainted HTML output — possible XSS
-TaintedHtml@22:4-22:27: Tainted HTML output — possible XSS
-TaintedHtml@29:4-29:26: Tainted HTML output — possible XSS
-TaintedHtml@30:4-30:38: Tainted HTML output — possible XSS
-TaintedHtml@38:4-38:33: Tainted HTML output — possible XSS
-TaintedHtml@40:4-40:53: Tainted HTML output — possible XSS
-TaintedHtml@48:4-48:24: Tainted HTML output — possible XSS
-TaintedHtml@49:4-49:35: Tainted HTML output — possible XSS
-TaintedHtml@50:4-50:31: Tainted HTML output — possible XSS
-TaintedHtml@51:4-51:32: Tainted HTML output — possible XSS
-TaintedHtml@57:4-57:31: Tainted HTML output — possible XSS
-TaintedHtml@58:4-58:33: Tainted HTML output — possible XSS
-TaintedHtml@66:4-66:23: Tainted HTML output — possible XSS
-TaintedHtml@69:4-69:43: Tainted HTML output — possible XSS
-TaintedHtml@75:4-75:40: Tainted HTML output — possible XSS
-TaintedHtml@76:4-76:39: Tainted HTML output — possible XSS
-TaintedHtml@78:4-78:46: Tainted HTML output — possible XSS
-TaintedHtml@79:4-79:45: Tainted HTML output — possible XSS
-TaintedHtml@85:4-85:47: Tainted HTML output — possible XSS
-TaintedHtml@87:4-87:54: Tainted HTML output — possible XSS
-TaintedHtml@93:4-93:68: Tainted HTML output — possible XSS
-TaintedHtml@95:4-95:75: Tainted HTML output — possible XSS
-TaintedHtml@102:4-102:34: Tainted HTML output — possible XSS
-TaintedHtml@104:4-104:56: Tainted HTML output — possible XSS
-TaintedHtml@105:4-105:52: Tainted HTML output — possible XSS
-TaintedHtml@112:4-112:36: Tainted HTML output — possible XSS
-TaintedHtml@117:4-117:44: Tainted HTML output — possible XSS
-TaintedHtml@118:4-118:52: Tainted HTML output — possible XSS
-TaintedHtml@125:4-125:58: Tainted HTML output — possible XSS
-TaintedHtml@126:4-126:58: Tainted HTML output — possible XSS
-TaintedHtml@127:4-127:35: Tainted HTML output — possible XSS
-TaintedHtml@128:4-128:52: Tainted HTML output — possible XSS
-TaintedHtml@133:4-133:49: Tainted HTML output — possible XSS
-TaintedHtml@135:4-135:59: Tainted HTML output — possible XSS

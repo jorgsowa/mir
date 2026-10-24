@@ -58,13 +58,17 @@ namespace App {
 
     function dateArguments(): void {
         echo date_create('now')->format($_GET['f']);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo (new \DateTime())->format($_GET['f']);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 
     function otherClasses(): void {
         $label = new Label($_GET['t']);
         echo $label->format('x');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $label->store('dir');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 
     function uploads(): void {
@@ -74,11 +78,6 @@ namespace App {
         echo $u->getRealPath();
         echo $u->getPathname();
         echo $u->storeAs('dir', $_GET['n']);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===
-TaintedHtml@39:8-39:52: Tainted HTML output — possible XSS
-TaintedHtml@40:8-40:51: Tainted HTML output — possible XSS
-TaintedHtml@45:8-45:33: Tainted HTML output — possible XSS
-TaintedHtml@46:8-46:34: Tainted HTML output — possible XSS
-TaintedHtml@55:8-55:44: Tainted HTML output — possible XSS

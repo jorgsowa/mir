@@ -56,16 +56,15 @@ final class Arr {
 }
 function t(): void {
     echo (new UsesTrait($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Inherits($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Named($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Spread($_GET['a']))->n;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     (new Same)->run($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo (new Arr($_GET['a']))->n[0];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@41:4-41:40: Tainted HTML output — possible XSS
-TaintedHtml@42:4-42:39: Tainted HTML output — possible XSS
-TaintedHtml@43:4-43:36: Tainted HTML output — possible XSS
-TaintedHtml@44:4-44:37: Tainted HTML output — possible XSS
-TaintedHtml@45:4-45:31: Tainted HTML output — possible XSS
-TaintedHtml@46:4-46:37: Tainted HTML output — possible XSS

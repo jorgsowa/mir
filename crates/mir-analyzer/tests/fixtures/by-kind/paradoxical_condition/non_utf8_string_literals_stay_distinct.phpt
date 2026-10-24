@@ -12,6 +12,7 @@ function f(): void {
     $c = "\xff" . "a";
     if ($c === "\xffa") { echo 1; }
     $k = ["\xffa" => 1, "\xff" . "a" => 2];
+//                      ^^^^^^^^^^^^ DuplicateArrayKey: Array key '\xffa' is duplicated — the earlier entry is silently overwritten
     echo count($k);
 }
 function g(string $s): void {
@@ -19,5 +20,3 @@ function g(string $s): void {
         if ($s === "\xfe") { echo 1; }
     }
 }
-===expect===
-DuplicateArrayKey@9:24-9:36: Array key '\xffa' is duplicated — the earlier entry is silently overwritten

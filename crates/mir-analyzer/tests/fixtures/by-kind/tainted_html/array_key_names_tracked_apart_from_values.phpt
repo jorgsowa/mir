@@ -57,6 +57,7 @@ function valuesAreStillTainted(): void {
     }
     foreach ($s as $key => $value) {
         echo $value;
+//      ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -67,6 +68,7 @@ function unguardedKeyIsTainted(): void {
     }
     foreach ($s as $key => $_) {
         echo $key;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -79,6 +81,7 @@ function guardThatProvesNothingKeepsTheKey(): void {
     }
     foreach ($s as $key => $_) {
         echo $key;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -94,6 +97,7 @@ function keyReaders(): void {
     echo array_key_last($s);
     echo key($s);
     echo json_encode($s);
+//  ^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo json_encode(array_keys($s));
 }
 
@@ -108,6 +112,7 @@ function callerIteratesKeysOfReturnedArray(): void {
     echo implode(',', array_keys(collect()));
     foreach (collect() as $name => $value) {
         echo $value;
+//      ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -152,6 +157,7 @@ class Vault {
         }
         foreach ($this->keysFromRequest() as $name => $_) {
             echo $name;
+//          ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         }
     }
 }
@@ -165,6 +171,7 @@ function throughObjects(Vault $vault): void {
     }
     foreach ($vault->keysFromRequest() as $name => $_) {
         echo $name;
+//      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -202,6 +209,7 @@ function everyImplementationDecides(CleanStore $clean, Store $any): void {
     }
     foreach ($any->entries() as $name => $_) {
         echo $name;
+//      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -227,12 +235,15 @@ function returnsOneOfTwo(bool $c): array {
 function callsWithUnknownKeys(): void {
     foreach (returnsWhatItIsGiven($_GET) as $name => $_) {
         echo $name;
+//      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     foreach (returnsKeysOfItsArgument($_GET) as $name => $_) {
         echo $name;
+//      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     foreach (returnsOneOfTwo(true) as $name => $_) {
         echo $name;
+//      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -246,20 +257,24 @@ function otherWaysToAddKeys(array $extra): void {
     $a = array_merge($merged, $_GET);
     foreach ($a as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     $b = $merged;
     $b += $_GET;
     foreach ($b as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     $c = $merged;
     $c = $_GET;
     foreach ($c as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     $d = [...$_GET];
     foreach ($d as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     $e = [];
     $e[] = $_GET['x'];
@@ -274,6 +289,7 @@ function referencesCanAddKeys(): void {
     $s['fixed'] = $_GET['v'];
     $alias[$_GET['k']] = 1;
     echo implode(',', array_keys($s));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function closureByReferenceCanAddKeys(): void {
@@ -284,6 +300,7 @@ function closureByReferenceCanAddKeys(): void {
     };
     $add();
     echo implode(',', array_keys($s));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function noReferenceNoExtraKeys(): void {
@@ -297,6 +314,7 @@ function byReferenceArgumentCanAddKeys(): void {
     parse_str($_SERVER['QUERY_STRING'], $s);
     foreach ($s as $key => $_) {
         echo $key;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -309,6 +327,7 @@ function branchesMerge(bool $c): void {
     }
     foreach ($s as $key => $_) {
         echo $key;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     $t = [];
     if ($c) {
@@ -327,12 +346,14 @@ function literalArrays(): void {
     $t = [$_GET['k'] => 1];
     foreach ($t as $key => $_) {
         echo $key;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     $u = ['a' => $_GET];
     foreach ($u as $key => $nested) {
         echo $key;
         foreach ($nested as $inner => $_) {
             echo $inner;
+//          ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         }
     }
 }
@@ -347,6 +368,7 @@ function keysOfValueArraysStayTainted(): void {
     foreach ($s as $k => $nested) {
         foreach ($nested as $inner => $_) {
             echo $inner;
+//          ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         }
     }
 }
@@ -360,6 +382,7 @@ function loopsMerge(): void {
     }
     foreach ($s as $key => $_) {
         echo $key;
+//      ^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -370,27 +393,3 @@ function staticStateIsUnknown(): void {
     }
     $seen[$_GET['k']] = 1;
 }
-===expect===
-TaintedHtml@33:8-33:20: Tainted HTML output — possible XSS
-TaintedHtml@43:8-43:18: Tainted HTML output — possible XSS
-TaintedHtml@55:8-55:18: Tainted HTML output — possible XSS
-TaintedHtml@70:4-70:25: Tainted HTML output — possible XSS
-TaintedHtml@84:8-84:20: Tainted HTML output — possible XSS
-TaintedHtml@128:12-128:23: Tainted HTML output — possible XSS
-TaintedHtml@141:8-141:19: Tainted HTML output — possible XSS
-TaintedHtml@178:8-178:19: Tainted HTML output — possible XSS
-TaintedHtml@203:8-203:19: Tainted HTML output — possible XSS
-TaintedHtml@206:8-206:19: Tainted HTML output — possible XSS
-TaintedHtml@209:8-209:19: Tainted HTML output — possible XSS
-TaintedHtml@222:8-222:16: Tainted HTML output — possible XSS
-TaintedHtml@227:8-227:16: Tainted HTML output — possible XSS
-TaintedHtml@232:8-232:16: Tainted HTML output — possible XSS
-TaintedHtml@236:8-236:16: Tainted HTML output — possible XSS
-TaintedHtml@250:4-250:38: Tainted HTML output — possible XSS
-TaintedHtml@260:4-260:38: Tainted HTML output — possible XSS
-TaintedHtml@273:8-273:18: Tainted HTML output — possible XSS
-TaintedHtml@285:8-285:18: Tainted HTML output — possible XSS
-TaintedHtml@303:8-303:18: Tainted HTML output — possible XSS
-TaintedHtml@309:12-309:24: Tainted HTML output — possible XSS
-TaintedHtml@323:12-323:24: Tainted HTML output — possible XSS
-TaintedHtml@336:8-336:18: Tainted HTML output — possible XSS

@@ -39,11 +39,10 @@ function emptyConstructor(): void {
 
 function listKeysMismatch(): void {
     takesStringKeyed(new ArrayIterator([1, 2]));
+//                   ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $t of takesStringKeyed() expects 'Traversable<string, int>', got 'ArrayIterator<int, int>'
 }
 
 function valueMismatch(): void {
     takesStringKeyed(new ArrayIterator(['a' => 'x']));
+//                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $t of takesStringKeyed() expects 'Traversable<string, int>', got 'ArrayIterator<string, string>'
 }
-===expect===
-InvalidArgument@29:21-29:46: Argument $t of takesStringKeyed() expects 'Traversable<string, int>', got 'ArrayIterator<int, int>'
-InvalidArgument@33:21-33:52: Argument $t of takesStringKeyed() expects 'Traversable<string, int>', got 'ArrayIterator<string, string>'

@@ -20,15 +20,14 @@ class Reg {
 function f(): void {
     \App\Reg::$v = $_GET['a'];
     echo \App\Reg::$v;
+//  ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     namespace\Reg::$v = $_GET['b'];
     echo namespace\Reg::$v;
+//  ^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function g(): void {
     \App\Reg::put($_GET['c']);
     echo Reg::$v;
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@11:4-11:22: Tainted HTML output — possible XSS
-TaintedHtml@13:4-13:27: Tainted HTML output — possible XSS
-TaintedHtml@18:4-18:17: Tainted HTML output — possible XSS

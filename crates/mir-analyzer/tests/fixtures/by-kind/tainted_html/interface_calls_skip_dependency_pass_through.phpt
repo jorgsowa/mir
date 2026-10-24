@@ -70,11 +70,10 @@ function page(Store $store, Codec $codec, Escaper $escaper): void {
     echo $store->get((string) $_GET['k']);
     $array = new ArrayStore();
     echo $array->get((string) $_GET['k']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $codec->decode((string) $_GET['c']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $escaper->escape((string) $_GET['e']);
     shell_exec($escaper->escape((string) $_GET['e']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
-===expect===
-Page.php: TaintedHtml@10:4-10:42: Tainted HTML output — possible XSS
-Page.php: TaintedHtml@11:4-11:45: Tainted HTML output — possible XSS
-Page.php: TaintedShell@13:4-13:53: Tainted shell command — possible command injection

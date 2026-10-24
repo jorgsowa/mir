@@ -24,9 +24,8 @@ function f(array $o): void {
 /** @param array<string, mixed> $o */
 function g(array $o): void {
     foreach ($o as $v) {
+//                 ^^ MixedAssignment: Variable $v is assigned a mixed type
         takesString($v);
+//                  ^^ MixedArgument: Argument $s of takesString() is mixed
     }
 }
-===expect===
-MixedAssignment@16:19-16:21: Variable $v is assigned a mixed type
-MixedArgument@17:20-17:22: Argument $s of takesString() is mixed

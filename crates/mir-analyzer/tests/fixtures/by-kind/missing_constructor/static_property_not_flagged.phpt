@@ -10,8 +10,7 @@ class OnlyStatic {
 }
 
 class StaticAndInstance {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class StaticAndInstance has uninitialized properties but no constructor
     public static int $count;
     public int $id;
 }
-===expect===
-MissingConstructor@9:0-9:25: Class StaticAndInstance has uninitialized properties but no constructor

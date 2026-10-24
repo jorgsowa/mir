@@ -30,13 +30,12 @@ function inArray(): void {
 function noCall(): void {
     global $g;
     if ($g === 'a') { if ($g === 'z') {} }
+//                        ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"' and '"z"' is always false — these types can never be identical
 }
 
 function localNotGlobal(): void {
     $l = 'a';
     setGlobal();
     if ($l === 'z') {}
+//      ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"' and '"z"' is always false — these types can never be identical
 }
-===expect===
-ImpossibleIdenticalComparison@22:26-22:36: '===' between '"a"' and '"z"' is always false — these types can never be identical
-ImpossibleIdenticalComparison@28:8-28:18: '===' between '"a"' and '"z"' is always false — these types can never be identical

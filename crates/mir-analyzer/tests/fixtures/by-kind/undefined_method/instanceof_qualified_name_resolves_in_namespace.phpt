@@ -20,8 +20,7 @@ namespace App {
         if ($m instanceof Foo\Bar) {
             $m->appOnly();
             $m->globalOnly();
+//          ^^^^^^^^^^^^^^^^ UndefinedMethod: Method App\Foo\Bar::globalOnly() does not exist
         }
     }
 }
-===expect===
-UndefinedMethod@12:12-12:28: Method App\Foo\Bar::globalOnly() does not exist

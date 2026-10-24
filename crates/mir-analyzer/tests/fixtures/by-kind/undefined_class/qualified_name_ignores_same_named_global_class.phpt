@@ -18,11 +18,16 @@ namespace Foo {
 
 namespace App {
     final class C extends Foo\Bar {}
+//                        ^^^^^^^ UndefinedClass: Class App\Foo\Bar does not exist
 
     function f(Foo\Bar $b, mixed $m): void {
+//             ^^^^^^^ UndefinedClass: Class App\Foo\Bar does not exist
         $x = new Foo\Bar();
+//               ^^^^^^^ UndefinedClass: Class App\Foo\Bar does not exist
         if ($m instanceof Foo\Bar) {}
+//                        ^^^^^^^ UndefinedClass: Class App\Foo\Bar does not exist
         try {} catch (Foo\Err $e) {}
+//                    ^^^^^^^ UndefinedClass: Class App\Foo\Err does not exist
     }
 }
 
@@ -36,9 +41,3 @@ namespace Other {
         try {} catch (Foo\Err $e) {}
     }
 }
-===expect===
-UndefinedClass@8:26-8:33: Class App\Foo\Bar does not exist
-UndefinedClass@10:15-10:22: Class App\Foo\Bar does not exist
-UndefinedClass@11:17-11:24: Class App\Foo\Bar does not exist
-UndefinedClass@12:26-12:33: Class App\Foo\Bar does not exist
-UndefinedClass@13:22-13:29: Class App\Foo\Err does not exist

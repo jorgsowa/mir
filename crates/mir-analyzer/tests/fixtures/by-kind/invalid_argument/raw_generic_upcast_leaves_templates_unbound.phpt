@@ -39,6 +39,5 @@ function raw(ArrayIterator $it, Inner $inner, Bag $bag): void {
 /** @param Bag<int, SplFileInfo> $bag */
 function boundMismatchStillCaught(Bag $bag): void {
     takesBag($bag);
+//           ^^^^ InvalidArgument: Argument $t of takesBag() expects 'IteratorAggregate<string, SplFileInfo>', got 'Bag<int, SplFileInfo>'
 }
-===expect===
-InvalidArgument@29:13-29:17: Argument $t of takesBag() expects 'IteratorAggregate<string, SplFileInfo>', got 'Bag<int, SplFileInfo>'

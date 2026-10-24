@@ -54,12 +54,11 @@ function reflection(string $class, ?object $maybe, int $i): void {
     $lower = new ReflectionClass('stdClass');
     /** @mir-check $lower is ReflectionClass<stdClass> */
     $r2 = new ReflectionClass($maybe);
+//                            ^^^^^^ PossiblyNullArgument: Argument $objectOrClass of ReflectionClass::__construct() might be null
     $r2->getName();
 }
 
 function userClassStillReported(int $i): void {
     new Mirror($i);
+//  ^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'int' does not satisfy bound 'object'
 }
-===expect===
-PossiblyNullArgument@42:30-42:36: Argument $objectOrClass of ReflectionClass::__construct() might be null
-InvalidTemplateParam@47:4-47:18: Template type 'T' inferred as 'int' does not satisfy bound 'object'

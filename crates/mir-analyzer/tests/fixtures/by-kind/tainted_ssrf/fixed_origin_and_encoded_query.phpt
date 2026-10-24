@@ -75,18 +75,3 @@ function other_kinds_survive(PDO $db): void {
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     echo 'https://api.example.com/?q=' . http_build_query(['q' => $q]);
 }
-===expect===
-TaintedSsrf@25:4-25:48: Tainted URL — possible server-side request forgery
-TaintedSsrf@27:4-27:31: Tainted URL — possible server-side request forgery
-TaintedSsrf@29:4-29:38: Tainted URL — possible server-side request forgery
-TaintedSsrf@31:4-31:46: Tainted URL — possible server-side request forgery
-TaintedSsrf@33:4-33:47: Tainted URL — possible server-side request forgery
-TaintedSsrf@35:4-35:30: Tainted URL — possible server-side request forgery
-TaintedSsrf@37:4-37:25: Tainted URL — possible server-side request forgery
-TaintedSsrf@39:4-39:24: Tainted URL — possible server-side request forgery
-TaintedSsrf@41:4-41:42: Tainted URL — possible server-side request forgery
-TaintedInput@47:4-47:47: Tainted input reaching sink 'file'
-TaintedInput@49:4-49:52: Tainted input reaching sink 'file'
-TaintedInput@51:4-51:40: Tainted input reaching sink 'file'
-TaintedHtml@58:4-58:44: Tainted HTML output — possible XSS
-TaintedSql@60:4-60:50: Tainted SQL query — possible SQL injection

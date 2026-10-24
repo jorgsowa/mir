@@ -13,8 +13,7 @@ function listOf(mixed $value): array { return [$value]; }
 $a = 5 |> listOf(...);
 /** @trace $a */
 $b = "x" |> listOf(...);
+//<^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $a is list<5>
 /** @trace $b */
 echo count($a), count($b);
-===expect===
-Trace@11:0-11:24: Type of $a is list<5>
-Trace@13:0-13:26: Type of $b is list<"x">
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $b is list<"x">

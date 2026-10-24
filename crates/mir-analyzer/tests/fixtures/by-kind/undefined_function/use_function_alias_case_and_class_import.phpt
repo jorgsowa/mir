@@ -23,8 +23,7 @@ namespace App {
     use Lib\Sub\Tool;
 
     function a(): int { return fmt('x'); }
+//                      ^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'string' is not compatible with declared 'int'
     function b(): int { return Tool(); }
+//                             ^^^^^^ UndefinedFunction: Function Tool() is not defined
 }
-===expect===
-InvalidReturnType@14:24-14:40: Return type 'string' is not compatible with declared 'int'
-UndefinedFunction@15:31-15:37: Function Tool() is not defined

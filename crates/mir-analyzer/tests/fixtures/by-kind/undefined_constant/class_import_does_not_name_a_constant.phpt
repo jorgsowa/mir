@@ -22,10 +22,9 @@ namespace App {
     use Lib\Sub\MODE;
 
     function a(): int { return LIMIT; }
+//                      ^^^^^^^^^^^^^ InvalidReturnType: Return type '"x"' is not compatible with declared 'int'
     function b(): int { return MODE; }
+//                             ^^^^ UndefinedConstant: Constant MODE is not defined
     function c(): int { return limit; }
+//                             ^^^^^ UndefinedConstant: Constant limit is not defined
 }
-===expect===
-InvalidReturnType@13:24-13:37: Return type '"x"' is not compatible with declared 'int'
-UndefinedConstant@14:31-14:35: Constant MODE is not defined
-UndefinedConstant@15:31-15:36: Constant limit is not defined

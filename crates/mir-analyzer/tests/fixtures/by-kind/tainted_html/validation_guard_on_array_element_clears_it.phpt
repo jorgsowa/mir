@@ -29,6 +29,7 @@ function thenBranch(): void {
         echo $_POST['id'];
     } else {
         echo $_POST['id'];
+//      ^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -37,6 +38,7 @@ function otherKeyStaysTainted(): void {
         return;
     }
     echo $_GET['b'];
+//  ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function otherSuperglobalStaysTainted(): void {
@@ -44,6 +46,7 @@ function otherSuperglobalStaysTainted(): void {
         return;
     }
     echo $_POST['a'];
+//  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function unguardedPathMerges(bool $c): void {
@@ -53,6 +56,7 @@ function unguardedPathMerges(bool $c): void {
         }
     }
     echo $_GET['a'];
+//  ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function guardedOnBothPaths(bool $c): void {
@@ -74,6 +78,7 @@ function overwrittenAfterGuard(): void {
     }
     $_GET['a'] = $_GET['b'];
     echo $_GET['a'];
+//  ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function wholeArrayReassigned(array $input): void {
@@ -82,11 +87,13 @@ function wholeArrayReassigned(array $input): void {
     }
     $_GET = $input;
     echo $_GET['a'];
+//  ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function guardOnAnotherKeyDoesNotClear(): void {
     if (ctype_digit($_GET['a'])) {
         echo $_GET['b'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -115,6 +122,7 @@ function regexGuardDoesNotProveHeaderSafety(): void {
         return;
     }
     header('X-Name: ' . $_GET['name']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
 }
 
 function unanchoredRegexIsNoGuard(): void {
@@ -122,12 +130,14 @@ function unanchoredRegexIsNoGuard(): void {
         return;
     }
     echo $_GET['name'];
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function ternaryBranch(): void {
     echo ctype_digit($_GET['a']) ? $_GET['a'] : '';
     echo !ctype_digit($_GET['a']) ? '' : $_GET['a'];
     echo ctype_digit($_GET['a']) ? '' : $_GET['a'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function loopBody(): void {
@@ -146,6 +156,7 @@ function localArrayElement(): void {
     }
     echo $data['id'];
     echo $data['name'];
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function paramArrayElement(array $row): void {
@@ -195,15 +206,19 @@ function comparisonsWithMatchResult(): void {
 function comparisonsThatProveNothing(): void {
     if (preg_match('/^\d+$/D', $_GET['a']) !== 0) {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if (preg_match('/^\d+$/D', $_GET['b']) === 0) {
         echo $_GET['b'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if (preg_match('/^\d+$/D', $_GET['c']) !== 1) {
         echo $_GET['c'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if (preg_match('/^\d+$/D', $_GET['e']) >= 0) {
         echo $_GET['e'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -220,6 +235,7 @@ function ctypeComparedWithBool(): void {
     echo $_GET['c'];
     if (ctype_digit($_GET['d']) === false) {
         echo $_GET['d'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -230,20 +246,3 @@ function plainVariableComparison(): void {
     }
     echo $v;
 }
-===expect===
-TaintedHtml@13:8-13:26: Tainted HTML output — possible XSS
-TaintedHtml@21:4-21:20: Tainted HTML output — possible XSS
-TaintedHtml@28:4-28:21: Tainted HTML output — possible XSS
-TaintedHtml@37:4-37:20: Tainted HTML output — possible XSS
-TaintedHtml@58:4-58:20: Tainted HTML output — possible XSS
-TaintedHtml@66:4-66:20: Tainted HTML output — possible XSS
-TaintedHtml@71:8-71:24: Tainted HTML output — possible XSS
-TaintedHeader@99:4-99:38: Tainted HTTP header — possible header injection or open redirect
-TaintedHtml@106:4-106:23: Tainted HTML output — possible XSS
-TaintedHtml@112:4-112:51: Tainted HTML output — possible XSS
-TaintedHtml@130:4-130:23: Tainted HTML output — possible XSS
-TaintedHtml@179:8-179:24: Tainted HTML output — possible XSS
-TaintedHtml@182:8-182:24: Tainted HTML output — possible XSS
-TaintedHtml@185:8-185:24: Tainted HTML output — possible XSS
-TaintedHtml@188:8-188:24: Tainted HTML output — possible XSS
-TaintedHtml@204:8-204:24: Tainted HTML output — possible XSS

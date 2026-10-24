@@ -42,11 +42,13 @@ class Reader {
 function direct() {
     read($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function branching() {
     readIf($v, true);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function cleanWrite() {
@@ -67,22 +69,26 @@ function overwrittenWrite() {
 function earlyReturn() {
     readEarlyReturn($v, true);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function appended() {
     $v = 'a';
     readAppend($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function arrayValue() {
     readArray($v);
     echo $v['k'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function copiesTaintedArgument() {
     copyIn($_GET['a'], $v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function copiesCleanArgument() {
@@ -94,55 +100,48 @@ function secondOfTwo() {
     readSecond($a, $b);
     echo $a;
     echo $b;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function typed() {
     $s = '';
     readTyped($s);
     echo $s;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function namedArgument() {
     read(out: $v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function methodCall() {
     (new Reader)->read($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function staticCall() {
     Reader::sread($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function propertyOfTaintedObject() {
     (new Reader)->fromProp($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function methodCallsMethod() {
     (new Reader)->nested($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function staticCallsStatic() {
     Reader::snested($v);
     echo $v;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@26:4-26:12: Tainted HTML output — possible XSS
-TaintedHtml@31:4-31:12: Tainted HTML output — possible XSS
-TaintedHtml@51:4-51:12: Tainted HTML output — possible XSS
-TaintedHtml@57:4-57:12: Tainted HTML output — possible XSS
-TaintedHtml@62:4-62:17: Tainted HTML output — possible XSS
-TaintedHtml@67:4-67:12: Tainted HTML output — possible XSS
-TaintedHtml@78:4-78:12: Tainted HTML output — possible XSS
-TaintedHtml@84:4-84:12: Tainted HTML output — possible XSS
-TaintedHtml@89:4-89:12: Tainted HTML output — possible XSS
-TaintedHtml@94:4-94:12: Tainted HTML output — possible XSS
-TaintedHtml@99:4-99:12: Tainted HTML output — possible XSS
-TaintedHtml@104:4-104:12: Tainted HTML output — possible XSS
-TaintedHtml@109:4-109:12: Tainted HTML output — possible XSS
-TaintedHtml@114:4-114:12: Tainted HTML output — possible XSS

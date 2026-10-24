@@ -52,25 +52,24 @@ function mappedOverArray(): void {
 
 function stillTaintedForOtherKinds(): void {
     echo basename($_GET['q']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $mysqli = new mysqli();
     $mysqli->query('SELECT * FROM t WHERE n = ' . basename($_GET['q']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     system(basename($_GET['q']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
 
 function unrelatedFunctionKeepsTaint(): void {
     file_get_contents('/srv/' . dirname($_GET['q']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
     file_get_contents('/srv/' . pathinfo($_GET['q'], PATHINFO_DIRNAME));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
     file_get_contents('/srv/' . $_GET['q']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
 
 function onlyBasenameOfOneOperand(): void {
     file_get_contents(basename($_GET['a']) . $_GET['b']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
-===expect===
-TaintedHtml@40:4-40:30: Tainted HTML output — possible XSS
-TaintedSql@42:4-42:71: Tainted SQL query — possible SQL injection
-TaintedShell@43:4-43:32: Tainted shell command — possible command injection
-TaintedInput@47:4-47:52: Tainted input reaching sink 'file'
-TaintedInput@48:4-48:71: Tainted input reaching sink 'file'
-TaintedInput@49:4-49:43: Tainted input reaching sink 'file'
-TaintedInput@53:4-53:56: Tainted input reaching sink 'file'

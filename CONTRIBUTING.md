@@ -45,7 +45,8 @@ Tests include:
 ### Writing a fixture test
 
 Fixture files live under `crates/mir-analyzer/tests/fixtures/<category>/`.
-Each file is a `.phpt` that contains PHP source followed by expected issues:
+Each file is a `.phpt` whose PHP source marks every expected issue with a
+caret annotation under the offending line:
 
 ```
 ===file===
@@ -53,15 +54,15 @@ Each file is a `.phpt` that contains PHP source followed by expected issues:
 
 function foo(): int {
     return "oops";
+//  ^^^^^^^^^^^^^^ InvalidReturnType: Return type '"oops"' is not compatible with declared 'int'
 }
-===expect===
-InvalidReturnType@4:4-4:18: Return type '"oops"' is not compatible with declared 'int'
 ```
 
-The `===expect===` section lists expected issues, one per line, formatted as
-`IssueKind@line:col-line_end:col_end: message`. The test passes when the
-analyzer emits exactly those issues. An empty `===expect===` section asserts
-the snippet is clean.
+An annotation is a `// ^^^ IssueKind: message` comment; the carets mark the
+columns of the issue on the nearest source line above (`//<^^^` starts at
+column 0, `//< ^^^` at column 1). The test passes when the analyzer emits
+exactly the annotated issues, so a fixture without annotations asserts the
+snippet is clean. Diagnostic fixtures can't have an `===expect===` section.
 
 The resolution queries editors build on (symbol at a position, definition
 location, find-references) are tested the same way under
@@ -107,8 +108,8 @@ Use.php: InvalidReturnType@2:22-2:35: Return type 'string' is not compatible wit
 
 The full format is documented in `crates/mir-analyzer/src/test_utils.rs`.
 
-Run only the fixture tests, or regenerate one fixture's `===expect===` section
-from the current output (review the diff before committing it):
+Run only the fixture tests, or regenerate one fixture's annotations (or
+`===expect===` sections) from the current output (review the diff before committing it):
 
 ```bash
 cargo test -p mir-analyzer --test fixtures

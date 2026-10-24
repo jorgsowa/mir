@@ -67,8 +67,3 @@ function throughVariable(): void {
     echo $t;
 //  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@20:4-20:48: Tainted HTML output — possible XSS
-TaintedHtml@22:4-22:46: Tainted HTML output — possible XSS
-TaintedHtml@27:4-27:71: Tainted HTML output — possible XSS
-TaintedHtml@29:4-29:50: Tainted HTML output — possible XSS

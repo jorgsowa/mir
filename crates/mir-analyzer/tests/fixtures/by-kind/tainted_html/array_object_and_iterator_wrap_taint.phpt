@@ -30,12 +30,14 @@ class Own extends ArrayObject {
 function arrayObjectRead() {
     $o = new ArrayObject($_GET);
     echo $o['a'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function arrayObjectIterate() {
     $o = new ArrayObject($_GET);
     foreach ($o as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -43,6 +45,7 @@ function arrayObjectKey() {
     $o = new ArrayObject($_GET);
     foreach ($o as $k => $v) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -50,28 +53,33 @@ function arrayObjectCopy() {
     $o = new ArrayObject($_GET);
     foreach ($o->getArrayCopy() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function arrayObjectGet() {
     $o = new ArrayObject($_GET);
     echo $o->offsetGet('a');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function arrayIteratorCurrent() {
     $it = new ArrayIterator($_GET);
     echo $it->current();
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function arrayIteratorIterate() {
     foreach (new ArrayIterator($_GET) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function arrayIteratorToArray() {
     foreach (iterator_to_array(new ArrayIterator($_GET)) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -79,18 +87,21 @@ function nestedIterators() {
     $it = new RecursiveIteratorIterator(new RecursiveArrayIterator($_GET));
     foreach ($it as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function limitedIterator() {
     foreach (new LimitIterator(new ArrayIterator($_GET), 0, 2) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function subclass() {
     $o = new Bag($_GET);
     echo $o['a'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function appendedData() {
@@ -98,6 +109,7 @@ function appendedData() {
     $o->append($_GET['a']);
     foreach ($o as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -105,18 +117,21 @@ function exchangedData() {
     $o = new ArrayObject();
     $o->exchangeArray($_GET);
     echo $o['a'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function assignedOffset() {
     $o = new ArrayObject();
     $o['k'] = $_GET['a'];
     echo $o['k'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function fromTaintedVariable() {
     $items = $_GET['items'];
     $o = new ArrayObject($items);
     echo $o['a'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function fromParameter(array $items) {
@@ -126,6 +141,7 @@ function fromParameter(array $items) {
 function throughFunction() {
     $o = fromParameter($_GET);
     echo $o['a'];
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function cleanArray() {
@@ -164,20 +180,3 @@ function countOnly() {
     $o = new ArrayObject($_GET);
     echo count($o);
 }
-===expect===
-TaintedHtml@13:4-13:17: Tainted HTML output — possible XSS
-TaintedHtml@19:8-19:16: Tainted HTML output — possible XSS
-TaintedHtml@26:8-26:16: Tainted HTML output — possible XSS
-TaintedHtml@33:8-33:16: Tainted HTML output — possible XSS
-TaintedHtml@39:4-39:28: Tainted HTML output — possible XSS
-TaintedHtml@44:4-44:24: Tainted HTML output — possible XSS
-TaintedHtml@49:8-49:16: Tainted HTML output — possible XSS
-TaintedHtml@55:8-55:16: Tainted HTML output — possible XSS
-TaintedHtml@62:8-62:16: Tainted HTML output — possible XSS
-TaintedHtml@68:8-68:16: Tainted HTML output — possible XSS
-TaintedHtml@74:4-74:17: Tainted HTML output — possible XSS
-TaintedHtml@81:8-81:16: Tainted HTML output — possible XSS
-TaintedHtml@88:4-88:17: Tainted HTML output — possible XSS
-TaintedHtml@94:4-94:17: Tainted HTML output — possible XSS
-TaintedHtml@100:4-100:17: Tainted HTML output — possible XSS
-TaintedHtml@109:4-109:17: Tainted HTML output — possible XSS

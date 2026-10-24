@@ -20,23 +20,22 @@ class Child extends P {
     public function f(): void {
         $this->b = 6;
         $this->a = 7;
+//      ^^^^^^^^^^^^ InaccessibleProperty: Cannot access property P::$a
     }
 }
 
 function outside(P $p): int {
     $p->a = 5;
+//  ^^^^^^^^^ InaccessibleProperty: Cannot access property P::$a
     $p->b = 6;
+//  ^^^^^^^^^ InaccessibleProperty: Cannot access property P::$b
     $p->c = 7;
+//  ^^^^^^^^^ InaccessibleProperty: Cannot access property P::$c
     $p->a++;
+//  ^^^^^ InaccessibleProperty: Cannot access property P::$a
     $p->a += 2;
+//  ^^^^^^^^^^ InaccessibleProperty: Cannot access property P::$a
     $p->list[] = 2;
+//  ^^^^^^^^^^^^^^ InaccessibleProperty: Cannot access property P::$list
     return $p->a + $p->b + $p->c;
 }
-===expect===
-InaccessibleProperty@19:8-19:20: Cannot access property P::$a
-InaccessibleProperty@24:4-24:13: Cannot access property P::$a
-InaccessibleProperty@25:4-25:13: Cannot access property P::$b
-InaccessibleProperty@26:4-26:13: Cannot access property P::$c
-InaccessibleProperty@27:4-27:9: Cannot access property P::$a
-InaccessibleProperty@28:4-28:14: Cannot access property P::$a
-InaccessibleProperty@29:4-29:18: Cannot access property P::$list

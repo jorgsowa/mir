@@ -11,7 +11,6 @@ Use duplicate name
 $foo = "bar";
 
 $a = function (string $foo) use ($foo) : string {
+//                               ^^^^ CompileError: Compile error: Cannot use lexical variable $foo as a parameter name [closure-use-shadows-parameter]
   return $foo;
 };
-===expect===
-CompileError@4:33-4:37: Compile error: Cannot use lexical variable $foo as a parameter name [closure-use-shadows-parameter]

@@ -23,4 +23,3 @@ class Magic {
 
     public function __unset(string $name): void {}
 }
-===expect===

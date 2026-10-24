@@ -8,7 +8,6 @@ function fill(ArrayObject $bag): void {
 }
 
 function local(array $arr): void {
+//             ^^^^^^^^^^ UnusedParam: Parameter $arr is never used
     $arr['k'] = 1;
 }
-===expect===
-UnusedParam@7:15-7:25: Parameter $arr is never used

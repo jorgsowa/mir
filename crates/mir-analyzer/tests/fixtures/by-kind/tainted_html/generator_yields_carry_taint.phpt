@@ -86,12 +86,14 @@ class Source {
 function iterateValue() {
     foreach (fromGet() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateKey() {
     foreach (keyed() as $k => $v) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -116,6 +118,7 @@ function iterateEscaped() {
 function iterateWrapTainted() {
     foreach (wrap($_GET['a']) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -134,24 +137,28 @@ function iterateReturnOnly() {
 function iterateDeclared() {
     foreach (declared() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateDeclaredGeneric() {
     foreach (declaredGeneric() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateDelegatedArray() {
     foreach (delegatesToArray() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateDelegatedGenerator() {
     foreach (delegatesToGenerator() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -164,6 +171,7 @@ function iterateDelegatedClean() {
 function iterateMixed() {
     foreach (mixedYields(true) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -171,35 +179,41 @@ function iterateStored() {
     $g = fromGet();
     foreach ($g as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function currentValue() {
     $g = fromGet();
     echo $g->current();
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function toArray() {
     foreach (iterator_to_array(fromGet()) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateMethod() {
     foreach ((new Source)->items() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateStaticMethod() {
     foreach (Source::all() as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function iterateMethodArgument() {
     foreach ((new Source)->viaProperty($_GET['a']) as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -208,18 +222,3 @@ function iterateMethodCleanArgument() {
         echo $v;
     }
 }
-===expect===
-TaintedHtml@70:8-70:16: Tainted HTML output — possible XSS
-TaintedHtml@76:8-76:16: Tainted HTML output — possible XSS
-TaintedHtml@100:8-100:16: Tainted HTML output — possible XSS
-TaintedHtml@118:8-118:16: Tainted HTML output — possible XSS
-TaintedHtml@124:8-124:16: Tainted HTML output — possible XSS
-TaintedHtml@130:8-130:16: Tainted HTML output — possible XSS
-TaintedHtml@136:8-136:16: Tainted HTML output — possible XSS
-TaintedHtml@148:8-148:16: Tainted HTML output — possible XSS
-TaintedHtml@155:8-155:16: Tainted HTML output — possible XSS
-TaintedHtml@161:4-161:23: Tainted HTML output — possible XSS
-TaintedHtml@166:8-166:16: Tainted HTML output — possible XSS
-TaintedHtml@172:8-172:16: Tainted HTML output — possible XSS
-TaintedHtml@178:8-178:16: Tainted HTML output — possible XSS
-TaintedHtml@184:8-184:16: Tainted HTML output — possible XSS

@@ -22,17 +22,25 @@ class Sub extends S {
     public static function f(): void {
         self::$b = 7;
         parent::$a = 8;
+//      ^^^^^^^^^^^^^^ InaccessibleProperty: Cannot access property S::$a
     }
 }
 
 function outside(): int {
     S::$a = 5;
+//  ^^^^^^^^^ InaccessibleProperty: Cannot access property S::$a
     S::$b = 6;
+//  ^^^^^^^^^ InaccessibleProperty: Cannot access property S::$b
     S::$a++;
+//  ^^^^^ InaccessibleProperty: Cannot access property S::$a
     S::$a += 2;
+//  ^^^^^^^^^^ InaccessibleProperty: Cannot access property S::$a
     S::$list[] = 2;
+//  ^^^^^^^^^^^^^^ InaccessibleProperty: Cannot access property S::$list
     sort(S::$list);
+//       ^^^^^^^^ InaccessibleProperty: Cannot access property S::$list
     unset(S::$list[0]);
+//        ^^^^^^^^^^^ InaccessibleProperty: Cannot access property S::$list
     return S::$a + S::$b;
 }
 class Bag implements ArrayAccess {
@@ -51,12 +59,3 @@ function offset_on_object(): void {
     Holder::$bag['k'] = 2;
     unset(Holder::$bag['k']);
 }
-===expect===
-InaccessibleProperty@19:8-19:22: Cannot access property S::$a
-InaccessibleProperty@24:4-24:13: Cannot access property S::$a
-InaccessibleProperty@25:4-25:13: Cannot access property S::$b
-InaccessibleProperty@26:4-26:9: Cannot access property S::$a
-InaccessibleProperty@27:4-27:14: Cannot access property S::$a
-InaccessibleProperty@28:4-28:18: Cannot access property S::$list
-InaccessibleProperty@29:9-29:17: Cannot access property S::$list
-InaccessibleProperty@30:10-30:21: Cannot access property S::$list

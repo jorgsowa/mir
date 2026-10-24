@@ -13,11 +13,13 @@ in the index expression, or a plain (non-reference) read, is still reported.
 <?php
 function plain(?array $a): mixed {
     $v = $a['q'];
+//       ^^^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
     return $v;
 }
 
 function inIndex(array $a, ?array $b): void {
     $r = &$a[$b['k']];
+//           ^^^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
     $r = 1;
 }
 
@@ -26,6 +28,3 @@ function readAfterRef(?array $a): mixed {
     $r = 1;
     return $a['other'];
 }
-===expect===
-PossiblyNullArrayAccess@3:9-3:16: Cannot access array on possibly null value
-PossiblyNullArrayAccess@8:13-8:20: Cannot access array on possibly null value

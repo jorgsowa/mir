@@ -54,8 +54,11 @@ function queries(PDO $db): void {
     $db->query('LIMIT ' . castToInt($_GET['n']));
     $db->query('LIMIT ' . numeric($_GET['n']));
     $db->query('ORDER BY ' . unguarded($_GET['s']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     $db->query('ORDER BY ' . partlyGuarded($_GET['s'], true));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     $db->query('ORDER BY ' . elseBranchLeaks($_GET['s']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 
 class Page {
@@ -95,7 +98,9 @@ function pages(): void {
     $p = new Page($_GET['p'], $_GET['q']);
     $p->showPage();
     $p->showRaw();
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $p->showMixed();
+//  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $p->showCount();
 }
 
@@ -106,14 +111,18 @@ function ternaryGuards(PDO $db): void {
     $db->query('id = ' . (!ctype_digit($a) ? '1' : $a));
     $db->query('id = ' . (ctype_digit($a) && ctype_digit($b) ? $a . $b : '1'));
     $db->query('id = ' . (ctype_digit($a) ? $b : '1'));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     $db->query('id = ' . (ctype_digit($a) ? '1' : $a));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     $db->query('id = ' . (ctype_digit($a) || $b !== '' ? $a : '1'));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 
 function guardDoesNotOutliveTernary(PDO $db): void {
     $a = $_GET['a'];
     $db->query('id = ' . (ctype_digit($a) ? $a : '1'));
     $db->query('id = ' . $a);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 
 function digitsOrDefault(string $p): string {
@@ -128,13 +137,3 @@ function ternaryReturns(PDO $db): void {
     $db->query('id = ' . digitsOrDefault($_GET['p']));
     $db->query('id = ' . digitsFallThrough($_GET['p']));
 }
-===expect===
-TaintedSql@41:4-41:51: Tainted SQL query — possible SQL injection
-TaintedSql@42:4-42:61: Tainted SQL query — possible SQL injection
-TaintedSql@43:4-43:57: Tainted SQL query — possible SQL injection
-TaintedHtml@82:4-82:17: Tainted HTML output — possible XSS
-TaintedHtml@83:4-83:19: Tainted HTML output — possible XSS
-TaintedSql@93:4-93:54: Tainted SQL query — possible SQL injection
-TaintedSql@94:4-94:54: Tainted SQL query — possible SQL injection
-TaintedSql@95:4-95:67: Tainted SQL query — possible SQL injection
-TaintedSql@101:4-101:28: Tainted SQL query — possible SQL injection

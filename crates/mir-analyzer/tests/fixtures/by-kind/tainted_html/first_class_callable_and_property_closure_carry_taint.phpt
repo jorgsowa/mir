@@ -62,6 +62,7 @@ class Holder {
 function callableResult() {
     $f = id(...);
     echo $f($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callableClean() {
@@ -82,21 +83,25 @@ function callableSanitizer() {
 function callableOtherSanitizer() {
     $f = addslashes(...);
     echo $f($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callablePassThrough() {
     $f = strtoupper(...);
     echo $f($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callableSink() {
     $f = show(...);
     $f($_GET['a']);
+//  ^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callableBuiltinSink() {
     $f = system(...);
     $f($_GET['a']);
+//  ^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
 
 function callableBuiltinSinkClean() {
@@ -108,6 +113,7 @@ function callableCopied() {
     $f = id(...);
     $g = $f;
     echo $g($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callableRebound() {
@@ -119,12 +125,14 @@ function callableRebound() {
 function callableThroughCallUserFunc() {
     $f = id(...);
     echo call_user_func($f, $_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function propertyClosure() {
     $h = new Holder();
     $h->f = fn($x) => $x;
     echo ($h->f)($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function propertyClosureClean() {
@@ -139,6 +147,7 @@ function propertyClosureSink() {
         echo $x;
     };
     ($h->f)($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function propertyClosureRebound() {
@@ -165,31 +174,21 @@ function propertyCallable() {
     $h = new Holder();
     $h->f = id(...);
     echo ($h->f)($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function propertyThroughCallUserFunc() {
     $h = new Holder();
     $h->f = fn($x) => $x;
     echo call_user_func($h->f, $_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function methodsOfHolder() {
     $h = new Holder();
     echo $h->viaThis($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $h->viaThisSink($_GET['a']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $h->viaThisClean($_GET['a']);
 }
-===expect===
-TaintedHtml@42:4-42:24: Tainted HTML output — possible XSS
-TaintedHtml@62:4-62:24: Tainted HTML output — possible XSS
-TaintedHtml@67:4-67:24: Tainted HTML output — possible XSS
-TaintedHtml@72:4-72:18: Tainted HTML output — possible XSS
-TaintedShell@77:4-77:18: Tainted shell command — possible command injection
-TaintedHtml@88:4-88:24: Tainted HTML output — possible XSS
-TaintedHtml@99:4-99:40: Tainted HTML output — possible XSS
-TaintedHtml@105:4-105:29: Tainted HTML output — possible XSS
-TaintedHtml@119:4-119:23: Tainted HTML output — possible XSS
-TaintedHtml@145:4-145:29: Tainted HTML output — possible XSS
-TaintedHtml@151:4-151:43: Tainted HTML output — possible XSS
-TaintedHtml@156:4-156:33: Tainted HTML output — possible XSS
-TaintedHtml@157:4-157:31: Tainted HTML output — possible XSS

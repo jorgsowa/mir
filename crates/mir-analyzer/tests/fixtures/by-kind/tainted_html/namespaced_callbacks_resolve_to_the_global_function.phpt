@@ -36,12 +36,14 @@ function stringCallbackIsGlobal(): void {
     echo implode(',', array_map('intval', $_GET['l']));
     echo implode(',', array_map('htmlspecialchars', $_GET['l']));
     echo implode(',', array_map('strval', $_GET['l']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function firstClassCallableFallsBackToGlobal(): void {
     echo implode(',', array_map(intval(...), $_GET['l']));
     echo implode(',', array_map(htmlspecialchars(...), $_GET['l']));
     echo implode(',', array_map(trim(...), $_GET['l']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaExplode(): void {
@@ -61,11 +63,14 @@ function namespacedUserFunctions(): void {
     echo implode(',', array_map(escaped(...), $_GET['l']));
     echo implode(',', array_map('App\Http\escaped', $_GET['l']));
     echo implode(',', array_map(raw(...), $_GET['l']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function callbackSinkInNamespacedFunction(): void {
     array_map(show(...), $_GET['l']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     array_map('App\Http\show', $_GET['l']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function unrelatedCallbackWithCleanData(): void {
@@ -74,11 +79,5 @@ function unrelatedCallbackWithCleanData(): void {
 
 function filterWithCallback(): void {
     echo implode(',', array_filter($_GET['l'], 'strlen'));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@19:4-19:55: Tainted HTML output — possible XSS
-TaintedHtml@25:4-25:56: Tainted HTML output — possible XSS
-TaintedHtml@44:4-44:55: Tainted HTML output — possible XSS
-TaintedHtml@48:4-48:36: Tainted HTML output — possible XSS
-TaintedHtml@49:4-49:42: Tainted HTML output — possible XSS
-TaintedHtml@57:4-57:58: Tainted HTML output — possible XSS

@@ -21,6 +21,7 @@ function env(string $key): mixed {
 function callers(): void {
     echo env('HOME');
     echo env($_GET['k']);
+//  ^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 class Reader {
@@ -35,33 +36,31 @@ function literalKeyInVariable(): void {
     $request = 'HTTP_HOST';
     echo $_SERVER[$safe];
     echo $_SERVER[$request];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $either = $_GET['x'] ? 'REQUEST_URI' : 'APP_ENV';
     echo $_SERVER[$either];
+//  ^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function prefixedKeys(string $name): void {
     echo $_SERVER['HTTP_' . $name];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $_SERVER["HTTP_{$name}"];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $_SERVER[$name . '_HOME'];
 }
 
 function nestedAndNullCoalesce(string $key): void {
     echo $_SERVER[$key][0] ?? '';
     echo $_SERVER[$_GET['k']];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function wholeSuperglobalStillTainted(): void {
     foreach ($_SERVER as $name => $value) {
         echo $value;
+//      ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         echo $_SERVER[$name];
+//      ^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
-===expect===
-TaintedHtml@8:4-8:25: Tainted HTML output — possible XSS
-TaintedHtml@22:4-22:28: Tainted HTML output — possible XSS
-TaintedHtml@24:4-24:27: Tainted HTML output — possible XSS
-TaintedHtml@28:4-28:35: Tainted HTML output — possible XSS
-TaintedHtml@29:4-29:34: Tainted HTML output — possible XSS
-TaintedHtml@35:4-35:30: Tainted HTML output — possible XSS
-TaintedHtml@40:8-40:20: Tainted HTML output — possible XSS
-TaintedHtml@41:8-41:29: Tainted HTML output — possible XSS

@@ -15,8 +15,7 @@ function ok(): A {
 
 function bad(): void {
     new \App\A('x');
+//             ^^^ InvalidArgument: Argument $n of App\A::__construct() expects 'int', got '"x"'
     new namespace\A('y');
+//                  ^^^ InvalidArgument: Argument $n of App\A::__construct() expects 'int', got '"y"'
 }
-===expect===
-InvalidArgument@14:15-14:18: Argument $n of App\A::__construct() expects 'int', got '"x"'
-InvalidArgument@15:20-15:23: Argument $n of App\A::__construct() expects 'int', got '"y"'

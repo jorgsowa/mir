@@ -15,12 +15,11 @@ function test(): void {
     array_map('\App\mine', [1]);
     array_map('App\mine', [1]);
     array_map('\nope', [1]);
+//            ^^^^^^^ UndefinedFunction: Function nope() is not defined
     array_map('\App\nope', [1]);
+//            ^^^^^^^^^^^ UndefinedFunction: Function App\nope() is not defined
     usort($a, '\strcmp');
     call_user_func('\strlen', 'a');
     array_map('mine', [1]);
+//            ^^^^^^ UndefinedFunction: Function mine() is not defined
 }
-===expect===
-UndefinedFunction@12:14-12:21: Function nope() is not defined
-UndefinedFunction@13:14-13:25: Function App\nope() is not defined
-UndefinedFunction@16:14-16:20: Function mine() is not defined

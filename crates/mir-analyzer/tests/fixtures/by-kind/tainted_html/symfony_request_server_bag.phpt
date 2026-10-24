@@ -134,13 +134,3 @@ namespace App {
         }
     }
 }
-===expect===
-TaintedHtml@42:8-42:50: Tainted HTML output — possible XSS
-TaintedHtml@44:8-44:51: Tainted HTML output — possible XSS
-TaintedHtml@48:8-48:51: Tainted HTML output — possible XSS
-TaintedHtml@50:8-50:54: Tainted HTML output — possible XSS
-TaintedHtml@52:8-52:49: Tainted HTML output — possible XSS
-TaintedHtml@54:8-54:50: Tainted HTML output — possible XSS
-TaintedHtml@56:8-56:52: Tainted HTML output — possible XSS
-TaintedHtml@58:8-58:64: Tainted HTML output — possible XSS
-TaintedHtml@104:12-104:36: Tainted HTML output — possible XSS

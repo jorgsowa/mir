@@ -7,7 +7,6 @@ function f(): void {
     $bag['k'] = 1;
 
     $arr = [];
+//  ^^^^ UnusedVariable: Variable $arr is never read
     $arr['k'] = 1;
 }
-===expect===
-UnusedVariable@6:4-6:8: Variable $arr is never read

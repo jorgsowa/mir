@@ -37,7 +37,9 @@ namespace App {
         Factory::make('\Exception');
         Factory::make('Lib\Thing');
         Factory::make('Thing');
+//                    ^^^^^^^ UndefinedClass: Class Thing does not exist
         Factory::make('Missing');
+//                    ^^^^^^^^^ UndefinedClass: Class Missing does not exist
         Factory::contract('Countable');
         Factory::call('Exception::getMessage');
         if (!$maybe) {
@@ -45,6 +47,3 @@ namespace App {
         }
     }
 }
-===expect===
-UndefinedClass@26:22-26:29: Class Thing does not exist
-UndefinedClass@27:22-27:31: Class Missing does not exist

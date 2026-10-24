@@ -18,8 +18,7 @@ function ok(): int {
 
 function bad(): void {
     echo \App\A::NOPE;
+//       ^^^^^^^^^^^^ UndefinedConstant: Constant App\A::NOPE is not defined
     echo namespace\A::NOPE;
+//       ^^^^^^^^^^^^^^^^^ UndefinedConstant: Constant App\A::NOPE is not defined
 }
-===expect===
-UndefinedConstant@17:9-17:21: Constant App\A::NOPE is not defined
-UndefinedConstant@18:9-18:26: Constant App\A::NOPE is not defined

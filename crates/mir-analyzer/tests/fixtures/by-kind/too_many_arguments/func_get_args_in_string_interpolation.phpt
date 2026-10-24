@@ -12,4 +12,3 @@ function f() {
     return "got {${func_num_args()}}";
 }
 f(1, 2);
-===expect===

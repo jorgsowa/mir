@@ -85,6 +85,7 @@ function escaped(Escaper $e): void {
     echo $e->escapeUrl((string) $_GET['q']);
     echo '<a href="' . $e->escapeHtmlAttr((string) $_GET['q']) . '">x</a>';
     shell_exec($e->escapeHtml((string) $_GET['q']));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
 function rendered(Environment $twig): void {
     echo $twig->render('x.twig', ['q' => (string) $_GET['q']]);
@@ -99,12 +100,10 @@ function loaded(EntityManager $em): void {
 }
 function passedThrough(Text $text): void {
     echo $text->render((string) $_GET['q']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 function subclassAndLookalike(MyEscaper $mine, Homemade $own): void {
     echo $mine->escapeHtml((string) $_GET['q']);
     echo $own->escapeHtml((string) $_GET['q']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-Page.php: TaintedShell@14:4-14:51: Tainted shell command — possible command injection
-Page.php: TaintedHtml@28:4-28:44: Tainted HTML output — possible XSS
-Page.php: TaintedHtml@32:4-32:47: Tainted HTML output — possible XSS

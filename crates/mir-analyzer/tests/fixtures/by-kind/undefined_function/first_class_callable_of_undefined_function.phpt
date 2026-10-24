@@ -10,8 +10,11 @@ function known(): int { return 1; }
 
 function a(): void {
     $f = nope(...);
+//       ^^^^^^^^^ UndefinedFunction: Function nope() is not defined
     $g = namespace\gone(...);
+//       ^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function App\gone() is not defined
     $h = \Lib\missing(...);
+//       ^^^^^^^^^^^^^^^^^ UndefinedFunction: Function Lib\missing() is not defined
     $k = known(...);
     $l = strlen(...);
     $m = \strtoupper(...);
@@ -21,7 +24,3 @@ function a(): void {
     }
     $f(); $g(); $h(); $k(); $l('a'); $m('a');
 }
-===expect===
-UndefinedFunction@7:9-7:18: Function nope() is not defined
-UndefinedFunction@8:9-8:28: Function App\gone() is not defined
-UndefinedFunction@9:9-9:26: Function Lib\missing() is not defined

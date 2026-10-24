@@ -18,7 +18,6 @@ function f(object $o): int {
 
 function g(object $o): bool {
     return $o instanceof \App\Missing || $o instanceof namespace\Missing;
+//                       ^^^^^^^^^^^^ UndefinedClass: Class App\Missing does not exist
+//                                                     ^^^^^^^^^^^^^^^^^ UndefinedClass: Class App\Missing does not exist
 }
-===expect===
-UndefinedClass@17:25-17:37: Class App\Missing does not exist
-UndefinedClass@17:55-17:72: Class App\Missing does not exist

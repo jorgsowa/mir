@@ -28,6 +28,7 @@ function switchOnElement(): void {
             break;
         default:
             echo $_GET['a'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -45,6 +46,7 @@ function severalLabelsOneNonLiteral(string $other): void {
         case 'x':
         case $other:
             echo $_GET['a'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
             break;
     }
 }
@@ -55,6 +57,7 @@ function fallingThroughKeepsTaint(): void {
             $y = 1;
         case 'y':
             echo $_GET['a'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
             break;
     }
 }
@@ -65,6 +68,7 @@ function defaultFallingIntoCase(): void {
             $y = 1;
         case 'x':
             echo $_GET['a'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -83,6 +87,7 @@ function constantLabel(): void {
     switch ($_GET['a']) {
         case KIND:
             echo $_GET['a'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -91,6 +96,7 @@ function numericLabels(): void {
         case 1:
             echo $_GET['a'];
             header('X-Page: ' . $_GET['a']);
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
             break;
         case '2':
             echo $_GET['a'];
@@ -102,6 +108,7 @@ function otherElementUnaffected(): void {
     switch ($_GET['a']) {
         case 'x':
             echo $_GET['b'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -115,6 +122,7 @@ function switchTrueUnaffected(): void {
             break;
         case $_GET['c'] !== 'x':
             echo $_GET['c'];
+//          ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
             break;
     }
 }
@@ -125,6 +133,7 @@ function switchOnLocalArrayElement(): void {
         case 'a':
             echo $data['mode'];
             echo $data['name'];
+//          ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -136,6 +145,7 @@ function switchOnVariable(): void {
             break;
         default:
             echo $a;
+//          ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -157,25 +167,31 @@ function strictComparisonOtherBranch(): void {
         echo 'fine';
     } else {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if ($_GET['b'] !== 'x') {
         echo $_GET['b'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
 function looseComparison(): void {
     if ($_GET['a'] == 'x') {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if ($_GET['n'] == 10) {
         echo $_GET['n'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         header('X-N: ' . $_GET['n']);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
     }
 }
 
 function comparisonWithNonLiteral(string $expected): void {
     if ($_GET['a'] === $expected) {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -190,6 +206,7 @@ function comparisonAnd(): void {
         echo $_GET['a'];
         echo $_GET['b'];
         echo $_GET['c'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -206,19 +223,24 @@ function inArrayStrict(): void {
 function inArrayLoose(): void {
     if (in_array($_GET['a'], ['x', 'y'])) {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if (in_array($_GET['n'], [1, 2, 3])) {
         echo $_GET['n'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         header('X-N: ' . $_GET['n']);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
     }
 }
 
 function inArrayWithNonLiteralList(array $allowed, string $dynamic): void {
     if (in_array($_GET['a'], $allowed, true)) {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if (in_array($_GET['b'], ['x', $dynamic], true)) {
         echo $_GET['b'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -227,6 +249,7 @@ function inArrayElseBranch(): void {
         echo 'ok';
     } else {
         echo $_GET['a'];
+//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -234,29 +257,5 @@ function ternaries(): void {
     echo $_GET['a'] === 'x' ? $_GET['a'] : '';
     echo in_array($_GET['b'], ['x'], true) ? $_GET['b'] : '';
     echo $_GET['c'] === 'x' ? '' : $_GET['c'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
-===expect===
-TaintedHtml@10:12-10:28: Tainted HTML output — possible XSS
-TaintedHtml@27:12-27:28: Tainted HTML output — possible XSS
-TaintedHtml@37:12-37:28: Tainted HTML output — possible XSS
-TaintedHtml@47:12-47:28: Tainted HTML output — possible XSS
-TaintedHtml@65:12-65:28: Tainted HTML output — possible XSS
-TaintedHeader@73:12-73:43: Tainted HTTP header — possible header injection or open redirect
-TaintedHtml@84:12-84:28: Tainted HTML output — possible XSS
-TaintedHtml@97:12-97:28: Tainted HTML output — possible XSS
-TaintedHtml@107:12-107:31: Tainted HTML output — possible XSS
-TaintedHtml@118:12-118:20: Tainted HTML output — possible XSS
-TaintedHtml@139:8-139:24: Tainted HTML output — possible XSS
-TaintedHtml@142:8-142:24: Tainted HTML output — possible XSS
-TaintedHtml@148:8-148:24: Tainted HTML output — possible XSS
-TaintedHtml@151:8-151:24: Tainted HTML output — possible XSS
-TaintedHeader@152:8-152:36: Tainted HTTP header — possible header injection or open redirect
-TaintedHtml@158:8-158:24: Tainted HTML output — possible XSS
-TaintedHtml@172:8-172:24: Tainted HTML output — possible XSS
-TaintedHtml@188:8-188:24: Tainted HTML output — possible XSS
-TaintedHtml@191:8-191:24: Tainted HTML output — possible XSS
-TaintedHeader@192:8-192:36: Tainted HTTP header — possible header injection or open redirect
-TaintedHtml@198:8-198:24: Tainted HTML output — possible XSS
-TaintedHtml@201:8-201:24: Tainted HTML output — possible XSS
-TaintedHtml@209:8-209:24: Tainted HTML output — possible XSS
-TaintedHtml@216:4-216:46: Tainted HTML output — possible XSS

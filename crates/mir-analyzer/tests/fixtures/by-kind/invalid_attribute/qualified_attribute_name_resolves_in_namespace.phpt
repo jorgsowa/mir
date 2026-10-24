@@ -11,7 +11,6 @@ namespace App\Foo {
 }
 namespace App {
     #[Foo\Attr]
+//    ^^^^^^^^ InvalidAttribute: Class Attr does not have an #[Attribute] annotation
     final class K {}
 }
-===expect===
-InvalidAttribute@9:6-9:14: Class Attr does not have an #[Attribute] annotation

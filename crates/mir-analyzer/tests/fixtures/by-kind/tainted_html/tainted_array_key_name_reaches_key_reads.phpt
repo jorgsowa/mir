@@ -24,6 +24,7 @@ function keyOfForeach() {
     $a[$_GET['k']] = 1;
     foreach ($a as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -33,6 +34,7 @@ function keyFromVariable() {
     $a[$key] = 1;
     foreach ($a as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -55,6 +57,7 @@ function nestedWrite() {
     $a[$_GET['k']][] = 1;
     foreach ($a as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -64,6 +67,7 @@ function compoundWrite() {
     $a[$_GET['k']] += 1;
     foreach ($a as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -72,6 +76,7 @@ function keysFunction() {
     $a[$_GET['k']] = 1;
     foreach (array_keys($a) as $k) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -79,6 +84,7 @@ function firstKey() {
     $a = [];
     $a[$_GET['k']] = 1;
     echo array_key_first($a);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function flipped() {
@@ -86,6 +92,7 @@ function flipped() {
     $a[$_GET['k']] = 1;
     foreach (array_flip($a) as $k => $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -93,6 +100,7 @@ function serialized() {
     $a = [];
     $a[$_GET['k']] = 1;
     echo json_encode($a);
+//  ^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function copied() {
@@ -101,6 +109,7 @@ function copied() {
     $b = $a;
     foreach ($b as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -111,6 +120,7 @@ function viaBranch($c) {
     }
     foreach ($a as $k => $_) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 
@@ -154,14 +164,3 @@ function valuesOnly() {
         echo $v;
     }
 }
-===expect===
-TaintedHtml@6:8-6:16: Tainted HTML output — possible XSS
-TaintedHtml@15:8-15:16: Tainted HTML output — possible XSS
-TaintedHtml@37:8-37:16: Tainted HTML output — possible XSS
-TaintedHtml@46:8-46:16: Tainted HTML output — possible XSS
-TaintedHtml@54:8-54:16: Tainted HTML output — possible XSS
-TaintedHtml@61:4-61:29: Tainted HTML output — possible XSS
-TaintedHtml@68:8-68:16: Tainted HTML output — possible XSS
-TaintedHtml@75:4-75:25: Tainted HTML output — possible XSS
-TaintedHtml@83:8-83:16: Tainted HTML output — possible XSS
-TaintedHtml@93:8-93:16: Tainted HTML output — possible XSS
