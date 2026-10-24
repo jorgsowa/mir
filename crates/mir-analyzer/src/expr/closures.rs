@@ -510,7 +510,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.emit(
                 mir_issues::IssueKind::MissingClosureReturnType,
                 mir_issues::Severity::Info,
-                expr_span,
+                php_ast::Span::new(
+                    crate::parser::skip_leading_attributes(self.source, expr_span.start),
+                    expr_span.end,
+                ),
             );
         }
 

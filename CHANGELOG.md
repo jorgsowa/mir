@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A property declared in an enum is registered, so its `CompileError` is the only issue: reads of it were `UndefinedProperty` and `mixed`. Stub cache format 24 → 25.
 - A closure docblock written between the closure's attributes and `function` / `fn` (`#[Pure] /** @param int $x */ fn($x) => ...`) applies, as in PHP; it was ignored.
+- Issues on an attributed declaration (class, function, method, property, constant, parameter, closure) point at the declaration, not at its first `#[...]` line, so a `// @mir-ignore` above the attributes applies. `UnimplementedInterfaceMethod`, `MethodSignatureMismatch`, `InvalidOverride`, `Duplicate*`, `MissingPropertyType` and others were reported on the attribute with the attribute as snippet. Go-to-definition ranges start at the declaration's first modifier.
 - `UnreachableCode` after `return; ?>html` points at the HTML, not the `?>`, and a `?>` with no code after it is not reported. A stray `;` is still reported.
 - Function names resolve the same way everywhere: `\Foo\bar()` no longer goes through a `use Other\Foo;` class import, and a first-class callable of a `use function` import (`array_map(enum_value(...), $ids)`) has the function's signature and taint. A first-class callable of a fully qualified namespaced function (`\Foo\bar(...)`) carries taint.
 - A class import no longer names a constant: `MODE` with `use Lib\Sub\MODE;` resolved to the constant `Lib\Sub\MODE` instead of reporting `UndefinedConstant`.

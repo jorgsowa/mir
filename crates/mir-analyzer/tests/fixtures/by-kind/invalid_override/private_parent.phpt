@@ -12,6 +12,6 @@ class Base {
 
 class Child extends Base {
     #[Override]
-//  ^^^^^^^^^^^ InvalidOverride: Method Child::render() has #[Override] but parent method Base::render() is private
     public function render(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method Child::render() has #[Override] but parent method Base::render() is private
 }

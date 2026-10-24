@@ -8,4 +8,4 @@ definition
 final class Fo<CURSOR>o extends Bar {}
 class Bar {}
 ===expect===
-test.php@2:0-3:30
+test.php@3:0-3:30

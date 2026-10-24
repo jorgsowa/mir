@@ -7,4 +7,4 @@ definition
 final class AppError extends RuntimeException {}
 echo (new AppError())->getMes<CURSOR>sage();
 ===expect===
-stubs/Core/Core_c.php@345:4-346:49
+stubs/Core/Core_c.php@346:4-346:49

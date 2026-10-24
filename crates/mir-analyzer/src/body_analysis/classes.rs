@@ -377,8 +377,9 @@ impl<'a> BodyAnalyzer<'a> {
             });
             if self.mode == AnalysisMode::Full && !has_docblock_type {
                 let prop_name = prop.name.as_str().unwrap_or("").to_string();
+                let start = crate::parser::skip_leading_attributes(source, member_span.start);
                 let (line, col_start) =
-                    crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
+                    crate::diagnostics::offset_to_line_col(source, start, source_map);
                 let (line_end, col_end) =
                     crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
                 all_issues.push(mir_issues::Issue::new(
@@ -477,8 +478,8 @@ impl<'a> BodyAnalyzer<'a> {
         let Some(ty) = def.ty.as_deref() else {
             return;
         };
-        let (line, col_start) =
-            crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
+        let start = crate::parser::skip_leading_attributes(source, member_span.start);
+        let (line, col_start) = crate::diagnostics::offset_to_line_col(source, start, source_map);
         let (line_end, col_end) =
             crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
         for atomic in &ty.types {
@@ -1112,7 +1113,7 @@ impl<'a> BodyAnalyzer<'a> {
                     let prop_name = param.name.as_str().unwrap_or("").to_string();
                     let (line, col_start) = crate::diagnostics::offset_to_line_col(
                         source,
-                        param.span.start,
+                        crate::parser::skip_leading_attributes(source, param.span.start),
                         source_map,
                     );
                     let (line_end, col_end) =

@@ -555,8 +555,9 @@ pub(crate) fn check_duplicate_declarations(
             e.insert(());
         } else {
             // Emit on the second (and subsequent) occurrences.
+            let start = crate::parser::skip_leading_attributes(source, span.start);
             let (line, col_start) =
-                crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                crate::diagnostics::offset_to_line_col(source, start, source_map);
             let (line_end, col_end) =
                 crate::diagnostics::offset_to_line_col(source, span.end, source_map);
             let issue_kind = match kind {
@@ -973,8 +974,8 @@ fn seed_param_locations(
     for p in ast_params.iter() {
         let name_str = p.name.as_str().unwrap_or("");
         let name = name_str.trim_start_matches('$');
-        let (line, col_start) =
-            crate::diagnostics::offset_to_line_col(source, p.span.start, source_map);
+        let start = crate::parser::skip_leading_attributes(source, p.span.start);
+        let (line, col_start) = crate::diagnostics::offset_to_line_col(source, start, source_map);
         let (line_end, col_end) =
             crate::diagnostics::offset_to_line_col(source, p.span.end, source_map);
         ctx.record_var_location(name, line, col_start, line_end, col_end);

@@ -1636,6 +1636,7 @@ impl<'a> DefinitionCollector<'a> {
 
     fn location(&self, start: u32, end: u32) -> Location {
         let src = self.source;
+        let start = crate::parser::skip_leading_attributes(src, start);
         let start_off = start as usize;
         let line_start = src[..start_off].rfind('\n').map(|p| p + 1).unwrap_or(0);
         let line = self.source_map.offset_to_line_col(start).line + 1;

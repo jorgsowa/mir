@@ -8,6 +8,6 @@ InvalidOverride fires when #[Override] is used in a class with no parent class a
 <?php
 class Orphan {
     #[Override]
-//  ^^^^^^^^^^^ InvalidOverride: Method Orphan::render() has #[Override] but no parent method exists to override
     public function render(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method Orphan::render() has #[Override] but no parent method exists to override
 }

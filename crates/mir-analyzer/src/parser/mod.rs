@@ -102,6 +102,57 @@ pub(crate) fn span_text(src: &str, span: Span) -> Option<String> {
         .filter(|t| !t.is_empty())
 }
 
+/// Offset of the first token after the `#[...]` groups (and comments) that open a declaration span.
+pub(crate) fn skip_leading_attributes(src: &str, offset: u32) -> u32 {
+    let bytes = src.as_bytes();
+    let mut i = offset as usize;
+    if !src.get(i..).is_some_and(|s| s.starts_with("#[")) {
+        return offset;
+    }
+    loop {
+        while i < bytes.len() {
+            match bytes[i] {
+                b if b.is_ascii_whitespace() => i += 1,
+                b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                    i = src[i + 2..]
+                        .find("*/")
+                        .map_or(bytes.len(), |p| i + 2 + p + 2);
+                }
+                b'#' if bytes.get(i + 1) != Some(&b'[') => i = skip_line(bytes, i),
+                b'/' if bytes.get(i + 1) == Some(&b'/') => i = skip_line(bytes, i),
+                _ => break,
+            }
+        }
+        if !src[i..].starts_with("#[") {
+            return i as u32;
+        }
+        i += 2;
+        let mut depth = 1u32;
+        while i < bytes.len() && depth > 0 {
+            match bytes[i] {
+                b'[' => depth += 1,
+                b']' => depth -= 1,
+                quote @ (b'\'' | b'"') => {
+                    i += 1;
+                    while i < bytes.len() && bytes[i] != quote {
+                        i += if bytes[i] == b'\\' { 2 } else { 1 };
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        i = i.min(bytes.len());
+    }
+}
+
+fn skip_line(bytes: &[u8], i: usize) -> usize {
+    bytes[i..]
+        .iter()
+        .position(|&b| b == b'\n')
+        .map_or(bytes.len(), |p| i + p + 1)
+}
+
 // ---------------------------------------------------------------------------
 // Docblock extraction from source text
 // ---------------------------------------------------------------------------
@@ -401,5 +452,29 @@ mod docblock_lookup_tests {
         let src = "<?php\n/** doc */\nfinal\n?>\n<?php\n";
         let offset = src.len() as u32;
         assert_eq!(find_preceding_docblock(src, offset), Some("/** doc */"));
+    }
+}
+
+#[cfg(test)]
+mod skip_leading_attributes_tests {
+    use super::skip_leading_attributes;
+
+    fn after(src: &str) -> &str {
+        &src[skip_leading_attributes(src, 0) as usize..]
+    }
+
+    #[test]
+    fn skips_groups_comments_and_brackets_in_strings() {
+        assert_eq!(after("#[A] #[B(['x' => \"]\"])]\nclass C {}"), "class C {}");
+        assert_eq!(
+            after("#[A, B('\\']')] /** doc */ // c\n# c\nfinal class C {}"),
+            "final class C {}"
+        );
+        assert_eq!(after("public $x;"), "public $x;");
+    }
+
+    #[test]
+    fn stops_at_end_of_unterminated_attribute() {
+        assert_eq!(after("#[A('x"), "");
     }
 }

@@ -10,8 +10,8 @@ final class A {
     use B;
 
     #[Override]
-//  ^^^^^^^^^^^ MethodSignatureMismatch: Method A::run() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
     public function run(string $foo): string {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method A::run() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
         return $foo;
     }
 }
