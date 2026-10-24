@@ -168,7 +168,7 @@
 //!   `<stubs>` and `<projectFiles>`. Anything else fails the test.
 //! - `<phpVersion>` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
 //!   real CLI config); invalid values fail the test.
-//! - `<issueHandlers>` entries (`<IssueKind errorLevel="suppress"/>`) drop that [`IssueKind`]
+//! - `<issueHandlers>` entries (`<IssueKind errorLevel="suppress"/>`) drop that [`IssueKind`](mir_issues::IssueKind)
 //!   from the analyzer's output. Every other kind is asserted strictly: a
 //!   fixture must either expect each issue its example code produces or suppress
 //!   the kind here. The dead-code group (`UnusedFunction`/`UnusedMethod`/
