@@ -539,8 +539,7 @@ impl<'a> BodyAnalyzer<'a> {
             // Suppress UndefinedClass for a parent guarded by
             // `class_exists`/`interface_exists`/`trait_exists`, mirroring
             // `analyze_class_decl`'s extends/implements handling.
-            let parent_str = crate::parser::name_to_string_owned(parent);
-            let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
+            let parent_resolved = crate::ast_ext::resolve_ast_name(parent, self.db, file.as_ref());
             if guards.contains(parent_resolved.as_str()) {
                 continue;
             }

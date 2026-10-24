@@ -10,7 +10,6 @@ use mir_types::{Atomic, Name, Type};
 
 use super::loops::infer_foreach_types_with_db;
 use super::StatementsAnalyzer;
-use crate::db;
 use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
 use crate::narrowing::{established_guard, narrow_from_condition, promote_assignment_effects};
@@ -1063,8 +1062,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut caught: Vec<Arc<str>> = try_ctx.locally_caught_throws.to_vec();
             for catch in tc.catches.iter() {
                 for catch_ty in catch.types.iter() {
-                    let raw = parser::name_to_string_owned(catch_ty);
-                    let resolved = db::resolve_name(self.db, &self.file, &raw);
+                    let resolved = crate::ast_ext::resolve_ast_name(catch_ty, self.db, &self.file);
                     caught.push(Arc::from(resolved.as_str()));
                 }
             }
@@ -1092,8 +1090,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut this_clause_types: Vec<Arc<str>> = Vec::new();
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
-                let raw = parser::name_to_string_owned(catch_ty);
-                let resolved = db::resolve_name(self.db, &self.file, &raw);
+                let resolved = crate::ast_ext::resolve_ast_name(catch_ty, self.db, &self.file);
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                     let span = catch_ty.span;
                     let (line, col_start) = self.offset_to_line_col(span.start);
@@ -1126,9 +1123,10 @@ impl<'a> StatementsAnalyzer<'a> {
                         if crate::db::class_exists(self.db, &resolved) {
                             let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
                             if let Some(class) = crate::db::find_class_like(self.db, here) {
-                                if let Some((used, canonical_str)) =
-                                    crate::fqcn_case_mismatch(&raw, class.fqcn().as_ref())
-                                {
+                                if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                                    &parser::name_to_string_owned(catch_ty),
+                                    class.fqcn().as_ref(),
+                                ) {
                                     let (line_end, col_end2) = self.offset_to_line_col(span.end);
                                     self.issues.add(Issue::new(
                                         IssueKind::WrongCaseClass {
@@ -1207,8 +1205,8 @@ impl<'a> StatementsAnalyzer<'a> {
                 } else {
                     let mut u = Type::empty();
                     for catch_ty in catch.types.iter() {
-                        let raw = parser::name_to_string_owned(catch_ty);
-                        let resolved = db::resolve_name(self.db, &self.file, &raw);
+                        let resolved =
+                            crate::ast_ext::resolve_ast_name(catch_ty, self.db, &self.file);
                         u.add_type(Atomic::TNamedObject {
                             fqcn: resolved.into(),
                             type_params: mir_types::union::empty_type_params(),

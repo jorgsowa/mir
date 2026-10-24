@@ -1299,9 +1299,7 @@ pub(crate) fn check_use_decl_casing(
     use php_ast::ast::UseKind;
     for item in use_decl.uses.iter() {
         let effective_kind = item.kind.unwrap_or(use_decl.kind);
-        let full_name = crate::parser::name_to_string_owned(&item.name)
-            .trim_start_matches('\\')
-            .to_string();
+        let full_name = item.name.join_parts();
         if full_name.is_empty() {
             continue;
         }

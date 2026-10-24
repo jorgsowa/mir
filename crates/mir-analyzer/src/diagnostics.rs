@@ -1,7 +1,7 @@
 use crate::ast_ext::NameResolveExt as _;
 use std::sync::Arc;
 
-use crate::db::{class_exists, resolve_name, MirDatabase};
+use crate::db::{class_exists, MirDatabase};
 use crate::php_version::PhpVersion;
 use crate::symbol::{NavigationFact, ReferenceKind, ResolvedNavigationFact, ResolvedSymbol};
 
@@ -88,7 +88,7 @@ pub(crate) fn check_type_hint_classes(
             if is_pseudo_type(&name_str) {
                 return;
             }
-            let resolved = resolve_name(db, file.as_ref(), &name_str);
+            let resolved = crate::ast_ext::resolve_ast_name(name, db, file.as_ref());
             if !class_exists(db, &resolved) {
                 // Soft-fallback: build-time stub index recognises this class
                 // as a PHP built-in → assume lazy-stub timing rather than
@@ -222,7 +222,7 @@ fn collect_type_hint_class_refs_inner(
             if is_pseudo_type(&name_str) {
                 return;
             }
-            let resolved = resolve_name(db, file.as_ref(), &name_str);
+            let resolved = crate::ast_ext::resolve_ast_name(name, db, file.as_ref());
             out.push((Arc::from(resolved.as_str()), hint.span));
         }
         TypeHintKind::Nullable(inner) => {
@@ -312,8 +312,7 @@ fn check_name_class_with_context(
     navigation_facts: Option<&mut Vec<NavigationFact>>,
     resolved_navigation_facts: Option<&mut Vec<ResolvedNavigationFact>>,
 ) {
-    let name_str = crate::parser::name_to_string_owned(name);
-    let resolved = resolve_name(db, file.as_ref(), &name_str);
+    let resolved = crate::ast_ext::resolve_ast_name(name, db, file.as_ref());
     if !class_exists(db, &resolved) {
         // Soft-fallback: see call/function.rs for the rationale.
         // However, don't suppress if the class is version-filtered.

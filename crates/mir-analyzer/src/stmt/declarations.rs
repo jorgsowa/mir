@@ -270,9 +270,11 @@ impl<'a> StatementsAnalyzer<'a> {
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned())
         } else {
             decl.extends.as_ref().map(|parent_name| {
-                let parent_str = crate::parser::name_to_string_owned(parent_name);
-                let resolved_parent = crate::db::resolve_name(self.db, &self.file, &parent_str);
-                Arc::from(resolved_parent.as_str())
+                Arc::from(crate::ast_ext::resolve_ast_name(
+                    parent_name,
+                    self.db,
+                    &self.file,
+                ))
             })
         };
 
@@ -289,8 +291,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // resolved up front to honor `class_exists`/`interface_exists`/
         // `trait_exists` guards, matching the top-level check's behavior.
         if let Some(parent) = &decl.extends {
-            let parent_str = crate::parser::name_to_string_owned(parent);
-            let parent_resolved = crate::db::resolve_name(self.db, &self.file, &parent_str);
+            let parent_resolved = crate::ast_ext::resolve_ast_name(parent, self.db, &self.file);
             if !ctx.is_class_guarded(parent_resolved.as_str()) {
                 self.check_name_undefined_class(parent);
             }
@@ -298,8 +299,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.check_extends_final_class(&parent_resolved, &fqcn, parent.span);
         }
         for iface in decl.implements.iter() {
-            let iface_str = crate::parser::name_to_string_owned(iface);
-            let iface_resolved = crate::db::resolve_name(self.db, &self.file, &iface_str);
+            let iface_resolved = crate::ast_ext::resolve_ast_name(iface, self.db, &self.file);
             if !ctx.is_class_guarded(iface_resolved.as_str()) {
                 self.check_name_undefined_class(iface);
             }
@@ -308,8 +308,8 @@ impl<'a> StatementsAnalyzer<'a> {
         for member in decl.body.members.iter() {
             if let ClassMemberKind::TraitUse(tu) = &member.kind {
                 for trait_name in tu.traits.iter() {
-                    let trait_str = crate::parser::name_to_string_owned(trait_name);
-                    let trait_resolved = crate::db::resolve_name(self.db, &self.file, &trait_str);
+                    let trait_resolved =
+                        crate::ast_ext::resolve_ast_name(trait_name, self.db, &self.file);
                     if !ctx.is_class_guarded(trait_resolved.as_str()) {
                         self.check_name_undefined_trait(trait_name);
                     }

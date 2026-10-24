@@ -1555,8 +1555,7 @@ impl<'a> BodyAnalyzer<'a> {
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
         if let Some(parent) = &decl.extends {
-            let parent_str = crate::parser::name_to_string_owned(parent);
-            let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
+            let parent_resolved = crate::ast_ext::resolve_ast_name(parent, self.db, file.as_ref());
             if !guards.contains(parent_resolved.as_str()) {
                 let mut navigation_facts = self.navigation_facts.borrow_mut();
                 let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
@@ -1580,8 +1579,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
         for iface in decl.implements.iter() {
-            let iface_str = crate::parser::name_to_string_owned(iface);
-            let iface_resolved = resolve_name(self.db, file.as_ref(), &iface_str);
+            let iface_resolved = crate::ast_ext::resolve_ast_name(iface, self.db, file.as_ref());
             if !guards.contains(iface_resolved.as_str()) {
                 let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
                 check_name_class(
@@ -1737,8 +1735,11 @@ impl<'a> BodyAnalyzer<'a> {
                 .traits
                 .iter()
                 .map(|name| {
-                    let written = crate::parser::name_to_string_owned(name);
-                    Arc::from(resolve_name(self.db, file.as_ref(), &written).as_str())
+                    Arc::from(crate::ast_ext::resolve_ast_name(
+                        name,
+                        self.db,
+                        file.as_ref(),
+                    ))
                 })
                 .collect();
             for adaptation in tu.adaptations.iter() {
@@ -1751,10 +1752,11 @@ impl<'a> BodyAnalyzer<'a> {
                 let method_name = crate::parser::name_to_string_owned(method);
                 let method_lower = crate::util::php_ident_lowercase(&method_name);
                 let candidates: Vec<Arc<str>> = if let Some(trait_name) = trait_name {
-                    let written = crate::parser::name_to_string_owned(trait_name);
-                    vec![Arc::from(
-                        resolve_name(self.db, file.as_ref(), &written).as_str(),
-                    )]
+                    vec![Arc::from(crate::ast_ext::resolve_ast_name(
+                        trait_name,
+                        self.db,
+                        file.as_ref(),
+                    ))]
                 } else {
                     used_traits.clone()
                 };
@@ -1819,8 +1821,7 @@ impl<'a> BodyAnalyzer<'a> {
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
         if let Some(parent) = &decl.extends {
-            let parent_str = crate::parser::name_to_string_owned(parent);
-            let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
+            let parent_resolved = crate::ast_ext::resolve_ast_name(parent, self.db, file.as_ref());
             if !guards.contains(parent_resolved.as_str()) {
                 let mut navigation_facts = self.navigation_facts.borrow_mut();
                 let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
@@ -1842,8 +1843,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
         for iface in decl.implements.iter() {
-            let iface_str = crate::parser::name_to_string_owned(iface);
-            let iface_resolved = resolve_name(self.db, file.as_ref(), &iface_str);
+            let iface_resolved = crate::ast_ext::resolve_ast_name(iface, self.db, file.as_ref());
             if !guards.contains(iface_resolved.as_str()) {
                 let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
                 check_name_class(

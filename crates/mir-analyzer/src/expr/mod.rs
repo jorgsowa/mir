@@ -849,17 +849,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     start: kw_start,
                     end: kw_start + "class".len() as u32,
                 };
-                let mut anon_supers: Vec<String> = Vec::new();
-                if let Some(parent) = &anon.extends {
-                    anon_supers.push(crate::parser::name_to_string_owned(parent).into_owned());
-                }
-                for iface in anon.implements.iter() {
-                    anon_supers.push(crate::parser::name_to_string_owned(iface).into_owned());
-                }
-                for name in anon_supers {
-                    let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
-                    let lc = resolved.trim_start_matches('\\').to_ascii_lowercase();
-                    self.record_impl_ref(&lc, kw_span);
+                for name in anon.extends.iter().chain(anon.implements.iter()) {
+                    let resolved = crate::ast_ext::resolve_ast_name(name, self.db, &self.file);
+                    self.record_impl_ref(resolved.to_ascii_lowercase(), kw_span);
                 }
                 let mut sa = crate::stmt::StatementsAnalyzer::new(
                     self.db,
@@ -1853,7 +1845,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::util::is_native_type_name(&name_str) {
                     return;
                 }
-                let resolved = crate::db::resolve_name(self.db, &self.file, &name_str);
+                let resolved = crate::ast_ext::resolve_ast_name(name, self.db, &self.file);
                 if !crate::db::class_exists(self.db, &resolved) {
                     self.emit(
                         IssueKind::UndefinedClass { name: resolved },

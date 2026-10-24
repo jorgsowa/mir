@@ -1,5 +1,5 @@
 use super::DefinitionCollector;
-use crate::parser::{name_to_string_owned, type_from_hint_owned};
+use crate::parser::type_from_hint_owned;
 use mir_codebase::definitions::{
     wrap_template_bound, ConstantDef, PropertyDef, TemplateParam, TraitDef,
 };
@@ -300,7 +300,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        let fqcn: Arc<str> = self.resolve_name(&name_to_string_owned(t)).into();
+                        let fqcn: Arc<str> = self.resolve_ast_name(t).into();
                         let loc = self.location(t.span.start, t.span.end);
                         trait_use_locations.push((fqcn.clone(), loc));
                         trait_uses.push(fqcn);

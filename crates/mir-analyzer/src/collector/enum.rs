@@ -43,7 +43,7 @@ impl DefinitionCollector<'_> {
         let mut interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
-            .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
+            .map(|n| self.resolve_ast_name(n).into())
             .collect();
 
         // PHP automatically makes every enum implement UnitEnum (and backed enums
@@ -257,8 +257,7 @@ impl DefinitionCollector<'_> {
                 }
                 EnumMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        let trait_fqcn: Arc<str> =
-                            self.resolve_name(&name_to_string_owned(t)).into();
+                        let trait_fqcn: Arc<str> = self.resolve_ast_name(t).into();
                         trait_use_locations
                             .push((trait_fqcn.clone(), self.location(t.span.start, t.span.end)));
                         traits.push(trait_fqcn);

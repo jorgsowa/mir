@@ -40,11 +40,10 @@ fn collect_instanceof(
 ) -> bool {
     match &expr.kind {
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-            if let (Some(vn), Some(cn)) = (
+            if let (Some(vn), Some(resolved)) = (
                 extract_var_name(&b.left),
-                extract_class_name(&b.right, self_fqcn, parent_fqcn),
+                extract_class_name(&b.right, self_fqcn, parent_fqcn, db, file),
             ) {
-                let resolved = crate::db::resolve_name(db, file, &cn);
                 match var_name {
                     None => {
                         *var_name = Some(vn);
@@ -172,11 +171,10 @@ fn collect_prop_instanceof(
 ) -> bool {
     match &expr.kind {
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-            if let (Some((obj, prop)), Some(cn)) = (
+            if let (Some((obj, prop)), Some(resolved)) = (
                 extract_prop_access(&b.left),
-                extract_class_name(&b.right, self_fqcn, parent_fqcn),
+                extract_class_name(&b.right, self_fqcn, parent_fqcn, db, file),
             ) {
-                let resolved = crate::db::resolve_name(db, file, &cn);
                 match receiver {
                     None => {
                         *receiver = Some((obj, prop));
@@ -294,7 +292,7 @@ fn collect_static_prop_instanceof(
 ) -> bool {
     match &expr.kind {
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-            if let (Some((fqcn, prop)), Some(cn)) = (
+            if let (Some((fqcn, prop)), Some(resolved)) = (
                 extract_static_prop_access_parts(
                     &b.left,
                     db,
@@ -303,9 +301,8 @@ fn collect_static_prop_instanceof(
                     static_fqcn,
                     parent_fqcn,
                 ),
-                extract_class_name(&b.right, self_fqcn, parent_fqcn),
+                extract_class_name(&b.right, self_fqcn, parent_fqcn, db, file),
             ) {
-                let resolved = crate::db::resolve_name(db, file, &cn);
                 match receiver {
                     None => {
                         *receiver = Some((fqcn, prop));

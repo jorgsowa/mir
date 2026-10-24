@@ -112,21 +112,9 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         return prefix_file_namespace(db, file, &name[RELATIVE.len()..]);
     }
 
-    if name.contains('\\') {
-        if let Some((first, rest)) = name.split_once('\\') {
-            let imports = db.file_class_imports(file);
-            if let Some(base) = imports.get(&Name::new(first)) {
-                return format!("{}\\{rest}", base.as_str());
-            }
-            // Case-insensitive fallback: PHP resolves the leading segment of a
-            // qualified name against `use` imports case-insensitively, same as
-            // unqualified names below.
-            if let Some((_, base)) = imports
-                .iter()
-                .find(|(alias, _)| alias.as_str().eq_ignore_ascii_case(first))
-            {
-                return format!("{}\\{rest}", base.as_str());
-            }
+    if let Some((first, rest)) = name.split_once('\\') {
+        if let Some(imported) = import_qualified_name(db, file, first, rest) {
+            return imported;
         }
         // If the name is already a known FQCN (e.g. stored in TNamedObject by a prior
         // resolution step), return it unchanged to avoid double-prepending the namespace.
@@ -152,6 +140,36 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         return fqcn.as_str().to_string();
     }
     prefix_file_namespace(db, file, name)
+}
+
+/// A qualified name whose first segment is a class import of `file`; PHP matches it case-insensitively.
+fn import_qualified_name(
+    db: &dyn MirDatabase,
+    file: &str,
+    first: &str,
+    rest: &str,
+) -> Option<String> {
+    let imports = db.file_class_imports(file);
+    let base = imports.get(&Name::new(first)).or_else(|| {
+        imports
+            .iter()
+            .find(|(alias, _)| alias.as_str().eq_ignore_ascii_case(first))
+            .map(|(_, base)| base)
+    })?;
+    Some(format!("{}\\{rest}", base.as_str()))
+}
+
+/// A qualified name as written in source, which PHP never treats as already fully qualified.
+pub(crate) fn resolve_qualified_name(
+    db: &dyn MirDatabase,
+    file: &str,
+    first: &str,
+    rest: &str,
+) -> String {
+    import_qualified_name(db, file, first, rest).unwrap_or_else(|| match db.file_namespace(file) {
+        Some(ns) => format!("{ns}\\{first}\\{rest}"),
+        None => format!("{first}\\{rest}"),
+    })
 }
 
 /// `name` qualified with the namespace of `file`; unchanged in the global namespace.

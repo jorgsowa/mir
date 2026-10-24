@@ -267,7 +267,6 @@ pub use self::mirdb::MirDbStorage;
 pub use self::nodes::*;
 pub use self::path_interner::PathInterner;
 pub use self::per_function::{infer_function, FunctionInferenceResult};
-pub(crate) use self::queries::prefix_file_namespace;
 pub use self::queries::{
     class_constant_exists_in_chain, class_exists, class_is_immutable, class_kind,
     class_template_params, classes_implementing, collect_file_definitions,
@@ -280,6 +279,7 @@ pub use self::queries::{
     template_bindings_for_ancestor, trait_alias_original_name, ClassKind, InferredFileTypes,
     TrackedParseResult,
 };
+pub(crate) use self::queries::{prefix_file_namespace, resolve_qualified_name};
 pub use self::ref_index::{FileNo, RefIndex};
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};

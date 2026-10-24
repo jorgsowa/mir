@@ -470,8 +470,7 @@ pub(super) fn extract_enum_case(
         ExprKind::ClassConstAccess(cca) => cca,
         _ => return None,
     };
-    let enum_short_name = extract_class_name(&spa.class, self_fqcn, parent_fqcn)?;
-    let enum_fqcn = crate::db::resolve_name(db, file, &enum_short_name);
+    let enum_fqcn = extract_class_name(&spa.class, self_fqcn, parent_fqcn, db, file)?;
     let ExprKind::Identifier(case_name) = &spa.member.kind else {
         return None;
     };
@@ -496,6 +495,5 @@ pub(super) fn extract_class_const_fqcn(
     if !is_class {
         return None;
     }
-    let short = extract_class_name(&cca.class, self_fqcn, parent_fqcn)?;
-    Some(crate::db::resolve_name(db, file, &short))
+    extract_class_name(&cca.class, self_fqcn, parent_fqcn, db, file)
 }

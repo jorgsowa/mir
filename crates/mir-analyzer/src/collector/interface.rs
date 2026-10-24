@@ -1,5 +1,5 @@
 use super::DefinitionCollector;
-use crate::parser::{name_to_string_owned, type_from_hint_owned};
+use crate::parser::type_from_hint_owned;
 use mir_codebase::definitions::{
     wrap_template_bound, ConstantDef, InterfaceDef, PropertyDef, TemplateParam,
 };
@@ -86,7 +86,7 @@ impl<'a> DefinitionCollector<'a> {
         let extends: Vec<Arc<str>> = decl
             .extends
             .iter()
-            .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
+            .map(|n| self.resolve_ast_name(n).into())
             .collect();
 
         // Type args from `@extends BaseIface<T1, T2>` docblock lines — keyed by

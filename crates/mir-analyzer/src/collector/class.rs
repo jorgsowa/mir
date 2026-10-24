@@ -26,11 +26,11 @@ impl<'a> DefinitionCollector<'a> {
         let parent = decl
             .extends
             .as_ref()
-            .map(|n| self.resolve_name(&name_to_string_owned(n)).into());
+            .map(|n| self.resolve_ast_name(n).into());
         let interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
-            .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
+            .map(|n| self.resolve_ast_name(n).into())
             .collect();
 
         let mut own_methods = mir_codebase::definitions::MemberMap::default();
@@ -458,7 +458,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        let fqcn: Arc<str> = self.resolve_name(&name_to_string_owned(t)).into();
+                        let fqcn: Arc<str> = self.resolve_ast_name(t).into();
                         let loc = self.location(t.span.start, t.span.end);
                         trait_use_locations.push((fqcn.clone(), loc));
                         trait_uses.push(fqcn);
@@ -474,7 +474,7 @@ impl<'a> DefinitionCollector<'a> {
                                     name_to_string_owned(method).to_ascii_lowercase().into();
                                 for excluded in insteadof.iter() {
                                     let excluded_fqcn: Arc<str> =
-                                        self.resolve_name(&name_to_string_owned(excluded)).into();
+                                        self.resolve_ast_name(excluded).into();
                                     trait_insteadof
                                         .entry(method_lower.clone())
                                         .or_default()
@@ -503,9 +503,8 @@ impl<'a> DefinitionCollector<'a> {
                                 let new_lower: Arc<str> = alias_cased.to_ascii_lowercase().into();
                                 let orig_lower: Arc<str> =
                                     name_to_string_owned(method).to_ascii_lowercase().into();
-                                let trait_fqcn: Option<Arc<str>> = trait_name
-                                    .as_ref()
-                                    .map(|t| self.resolve_name(&name_to_string_owned(t)).into());
+                                let trait_fqcn: Option<Arc<str>> =
+                                    trait_name.as_ref().map(|t| self.resolve_ast_name(t).into());
                                 let vis_override =
                                     new_modifier.map(|v| Self::convert_visibility(Some(v)));
                                 if new_name.is_some() || vis_override.is_some() {

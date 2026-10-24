@@ -708,17 +708,14 @@ pub(super) fn peel_parens(expr: &php_ast::owned::Expr) -> &php_ast::owned::Expr 
     }
 }
 
-/// `self`/`static`/`parent` are bare keywords, not real class names —
-/// `db::resolve_name` deliberately returns them unresolved (it has no class
-/// context), so they must be resolved to a concrete FQCN here, where the
-/// surrounding class context (`self_fqcn`/`parent_fqcn`) is available.
-/// `static` resolves to `self_fqcn` too: it's late-static-binding, so the
-/// exact runtime class is unknown, but `self_fqcn` is its precise lower
-/// bound — the same approximation `Atomic::TStaticObject` uses elsewhere.
+/// The class an `instanceof` / `X::class` operand names, resolved; `static` is `self_fqcn`, its
+/// late-static-binding lower bound (as `Atomic::TStaticObject` approximates it elsewhere).
 pub(super) fn extract_class_name(
     expr: &php_ast::owned::Expr,
     self_fqcn: Option<&str>,
     parent_fqcn: Option<&str>,
+    db: &dyn MirDatabase,
+    file: &str,
 ) -> Option<String> {
     match &expr.kind {
         ExprKind::Name(n) => match (n.kind, &*n.parts) {
@@ -733,7 +730,7 @@ pub(super) fn extract_class_name(
                 parent_fqcn.map(|s| s.to_string())
             }
             (php_ast::ast::NameKind::Error, _) => None,
-            _ => Some(crate::parser::name_to_string_owned(n).into_owned()),
+            _ => Some(crate::ast_ext::resolve_ast_name(n, db, file)),
         },
         ExprKind::Variable(name) if &**name == "this" => self_fqcn.map(|s| s.to_string()),
         ExprKind::Variable(_) => None, // dynamic class — can't narrow

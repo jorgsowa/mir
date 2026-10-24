@@ -131,7 +131,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
                 let parent = decl
                     .extends
                     .as_ref()
-                    .map(|p| resolve(&crate::parser::name_to_string_owned(p)));
+                    .map(|p| Name::new(&crate::ast_ext::resolve_ast_name(p, db, &path)));
                 for member in decl.body.members.iter() {
                     if let ClassMemberKind::Method(m) = &member.kind {
                         scan_method(db, &path, fqcn, parent, m, &mut facts);

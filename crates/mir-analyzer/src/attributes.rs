@@ -26,7 +26,7 @@ use php_rs_parser::source_map::SourceMap;
 
 const ATTR_IS_REPEATABLE: i64 = 64;
 const ATTR_TARGET_ALL: i64 = 63;
-use crate::db::{find_class_like, resolve_name, Fqcn, MirDatabase};
+use crate::db::{find_class_like, Fqcn, MirDatabase};
 use crate::diagnostics::offset_to_line_col;
 
 // ---------------------------------------------------------------------------
@@ -196,21 +196,7 @@ fn is_attribute_class_annotation(attr: &Attribute) -> bool {
 
 /// Resolve the fully-qualified name of an attribute reference in `file` context.
 pub(crate) fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> String {
-    let raw = attr
-        .name
-        .parts
-        .iter()
-        .map(|p| p.as_ref())
-        .collect::<Vec<_>>()
-        .join("\\");
-    // `attr.name.parts` drops the leading backslash, so a fully-qualified
-    // attribute like `#[\Override]` would otherwise be re-resolved against the
-    // file namespace (→ `App\Console\Override`). Restore the leading `\` so
-    // `resolve_name` treats it as the global name it is.
-    if matches!(attr.name.kind, php_ast::ast::NameKind::FullyQualified) {
-        return resolve_name(db, file, &format!("\\{raw}"));
-    }
-    resolve_name(db, file, &raw)
+    crate::ast_ext::resolve_ast_name(&attr.name, db, file)
 }
 
 // ---------------------------------------------------------------------------

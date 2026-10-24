@@ -1023,8 +1023,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
     /// Emit `UndefinedClass` for a `Name` AST node if the resolved class does not exist.
     fn check_name_undefined_class(&mut self, name: &php_ast::owned::Name) {
-        let raw = crate::parser::name_to_string_owned(name);
-        let resolved = crate::db::resolve_name(self.db, &self.file, &raw);
+        let resolved = crate::ast_ext::resolve_ast_name(name, self.db, &self.file);
         if matches!(resolved.as_str(), "self" | "static" | "parent") {
             return;
         }
@@ -1077,8 +1076,7 @@ impl<'a> StatementsAnalyzer<'a> {
     /// into the codebase, so `check_trait_constraints`'s definition-based
     /// walk never sees them.
     pub(crate) fn check_name_undefined_trait(&mut self, name: &php_ast::owned::Name) {
-        let raw = crate::parser::name_to_string_owned(name);
-        let resolved = crate::db::resolve_name(self.db, &self.file, &raw);
+        let resolved = crate::ast_ext::resolve_ast_name(name, self.db, &self.file);
         if crate::db::class_exists(self.db, &resolved) {
             return;
         }

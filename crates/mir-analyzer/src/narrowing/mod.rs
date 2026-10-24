@@ -1360,13 +1360,13 @@ pub fn narrow_from_condition(
         // $x instanceof ClassName  /  $this->prop instanceof ClassName
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
             if let Some(var_name) = extract_var_name(&b.left) {
-                if let Some(raw_name) = extract_class_name(
+                if let Some(class_name) = extract_class_name(
                     &b.right,
                     ctx.self_fqcn.as_deref(),
                     ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
                 ) {
-                    // Resolve the short name to its FQCN using file imports
-                    let class_name = crate::db::resolve_name(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
                     let narrowed = if is_true {
                         narrow_instanceof_preserving_subtypes(
@@ -1381,12 +1381,13 @@ pub fn narrow_from_condition(
                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                 }
             } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
-                if let Some(raw_name) = extract_class_name(
+                if let Some(class_name) = extract_class_name(
                     &b.right,
                     ctx.self_fqcn.as_deref(),
                     ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
                 ) {
-                    let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
                     // `null instanceof X` is always false, so a true result also
                     // proves the receiver itself is non-null (see
@@ -1396,12 +1397,13 @@ pub fn narrow_from_condition(
                     }
                 }
             } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
-                if let Some(raw_name) = extract_class_name(
+                if let Some(class_name) = extract_class_name(
                     &b.right,
                     ctx.self_fqcn.as_deref(),
                     ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
                 ) {
-                    let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
                     // Same reasoning as the nullsafe arm above: `null instanceof X`
                     // is always false, so proving it true also proves `$obj` itself
@@ -1412,23 +1414,25 @@ pub fn narrow_from_condition(
                     }
                 }
             } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
-                if let Some(raw_name) = extract_class_name(
+                if let Some(class_name) = extract_class_name(
                     &b.right,
                     ctx.self_fqcn.as_deref(),
                     ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
                 ) {
-                    let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_static_prop_instanceof(ctx, &fqcn, &prop, &class_name, db, is_true);
                 }
-            } else if let Some(raw_name) = extract_class_name(
+            } else if let Some(class_name) = extract_class_name(
                 &b.right,
                 ctx.self_fqcn.as_deref(),
                 ctx.parent_fqcn.as_deref(),
+                db,
+                file,
             ) {
                 // `$arr['key'] instanceof ClassName` (G11) — literal-keyed
                 // array-offset receiver, same shape-path machinery as M24's
                 // null-check fallback.
-                let class_name = crate::db::resolve_name(db, file, &raw_name);
                 narrow_offset_instanceof_by_path(&b.left, ctx, db, file, &class_name, is_true);
             }
         }

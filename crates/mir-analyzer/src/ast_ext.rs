@@ -100,17 +100,31 @@ pub(crate) trait NameResolveExt {
 
 impl NameResolveExt for php_ast::owned::ExprKind {
     fn resolve_name_ref(&self, db: &dyn crate::db::MirDatabase, file: &str) -> Option<String> {
-        use php_ast::ast::NameKind;
-        let php_ast::owned::ExprKind::Name(n) = self else {
-            return None;
-        };
-        Some(match (n.kind, &*n.parts) {
-            (NameKind::Error, _) => return None,
-            (NameKind::FullyQualified, _) => n.join_parts(),
-            (NameKind::Relative, _) => crate::db::prefix_file_namespace(db, file, &n.join_parts()),
-            (_, [only]) => crate::db::resolve_name(db, file, only),
-            _ => crate::db::resolve_name(db, file, &n.join_parts()),
-        })
+        match self {
+            php_ast::owned::ExprKind::Name(n) if n.kind != php_ast::ast::NameKind::Error => {
+                Some(resolve_ast_name(n, db, file))
+            }
+            _ => None,
+        }
+    }
+}
+
+/// The fully qualified name a name in code resolves to; `self` / `static` / `parent` stay as written.
+pub(crate) fn resolve_ast_name(
+    n: &php_ast::owned::Name,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> String {
+    use php_ast::ast::NameKind;
+    match (n.kind, &*n.parts) {
+        (NameKind::Error, _) => String::new(),
+        (NameKind::FullyQualified, _) => n.join_parts(),
+        (NameKind::Relative, _) => crate::db::prefix_file_namespace(db, file, &n.join_parts()),
+        (_, [only]) => crate::db::resolve_name(db, file, only),
+        (_, [first, rest @ ..]) => {
+            crate::db::resolve_qualified_name(db, file, first, &rest.join("\\"))
+        }
+        (_, []) => String::new(),
     }
 }
 
@@ -193,10 +207,7 @@ impl FunctionRefExt for php_ast::owned::ExprKind {
                     None => (Cow::Borrowed(&**only), None),
                 },
             },
-            _ => (
-                Cow::Owned(crate::db::resolve_name(db, file, &n.join_parts())),
-                None,
-            ),
+            _ => (Cow::Owned(resolve_ast_name(n, db, file)), None),
         };
         Some(FunctionRef { qualified, global })
     }

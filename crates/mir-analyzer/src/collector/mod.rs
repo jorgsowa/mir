@@ -728,7 +728,7 @@ pub(super) fn infer_const_value(
                 {
                     own?.parent.clone()?
                 }
-                _ => collector.resolve_name(&crate::parser::name_to_string_owned(class_name)),
+                _ => collector.resolve_ast_name(class_name),
             };
             if let Some(own) = own.filter(|own| own.fqcn.eq_ignore_ascii_case(&resolved)) {
                 if own.cases.contains(const_name.as_ref()) {
@@ -1074,6 +1074,19 @@ impl<'a> DefinitionCollector<'a> {
 
     fn resolve_name(&self, name: &str) -> String {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
+    }
+
+    fn resolve_ast_name(&self, name: &php_ast::owned::Name) -> String {
+        use php_ast::ast::NameKind;
+        match (name.kind, &*name.parts) {
+            (NameKind::FullyQualified, _) => name.join_parts(),
+            (NameKind::Relative, _) => match &self.namespace {
+                Some(ns) => format!("{ns}\\{}", name.join_parts()),
+                None => name.join_parts(),
+            },
+            (_, [only]) => self.resolve_name(only),
+            _ => self.resolve_name(&name.join_parts()),
+        }
     }
 
     /// Types own constants before members so `self::X` resolves in any order; returns the outer scope.
@@ -2209,9 +2222,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                             self.location(item.span.start, item.span.end),
                         ));
                     }
-                    let full_name = name_to_string_owned(&item.name)
-                        .trim_start_matches('\\')
-                        .to_string();
+                    let full_name = item.name.join_parts();
                     let alias = item
                         .alias
                         .as_ref()
