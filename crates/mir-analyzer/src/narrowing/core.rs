@@ -3,7 +3,6 @@
 //! multiple narrowing arms.
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::FunctionRefExt as _;
-use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
@@ -722,14 +721,20 @@ pub(super) fn extract_class_name(
     parent_fqcn: Option<&str>,
 ) -> Option<String> {
     match &expr.kind {
-        ExprKind::Name(_) => {
-            let name = expr.kind.name_ref().unwrap_or_default();
-            match name.to_ascii_lowercase().as_str() {
-                "self" | "static" => self_fqcn.map(|s| s.to_string()),
-                "parent" => parent_fqcn.map(|s| s.to_string()),
-                _ => Some(name.to_string()),
+        ExprKind::Name(n) => match (n.kind, &*n.parts) {
+            (php_ast::ast::NameKind::Unqualified, [only])
+                if only.eq_ignore_ascii_case("self") || only.eq_ignore_ascii_case("static") =>
+            {
+                self_fqcn.map(|s| s.to_string())
             }
-        }
+            (php_ast::ast::NameKind::Unqualified, [only])
+                if only.eq_ignore_ascii_case("parent") =>
+            {
+                parent_fqcn.map(|s| s.to_string())
+            }
+            (php_ast::ast::NameKind::Error, _) => None,
+            _ => Some(crate::parser::name_to_string_owned(n).into_owned()),
+        },
         ExprKind::Variable(name) if &**name == "this" => self_fqcn.map(|s| s.to_string()),
         ExprKind::Variable(_) => None, // dynamic class — can't narrow
         _ => None,

@@ -6,7 +6,6 @@
 
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
-use crate::ast_ext::NameRefExt as _;
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
@@ -707,14 +706,16 @@ pub(super) fn infer_const_value(
         // `Foo::BAR` / `self::BAR` referencing an enum case or a plain class
         // constant of an already-collected same-file class-like.
         php_ast::owned::ExprKind::ClassConstAccess(cca) => {
-            let class_name = cca.class.kind.name_ref()?;
+            let php_ast::owned::ExprKind::Name(class_name) = &cca.class.kind else {
+                return None;
+            };
             let php_ast::owned::ExprKind::Identifier(const_name) = &cca.member.kind else {
                 return None;
             };
             if const_name.as_ref() == "class" {
                 return None;
             }
-            let resolved = collector.resolve_name(class_name.as_ref());
+            let resolved = collector.resolve_name(&crate::parser::name_to_string_owned(class_name));
             if let Some(enum_def) = collector
                 .slice
                 .enums

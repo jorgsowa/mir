@@ -7,7 +7,6 @@
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file analysis
 //! entry point that operates against a session.
 
-use crate::ast_ext::NameRefExt as _;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -650,33 +649,15 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
         }
 
         fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
-            match &expr.kind {
-                ExprKind::New(n) => {
-                    if let Some(name) = n.class.kind.name_ref() {
-                        self.names.insert(name.as_ref().to_string());
-                    }
-                }
-                ExprKind::StaticMethodCall(c) => {
-                    if let Some(name) = c.class.kind.name_ref() {
-                        self.names.insert(name.as_ref().to_string());
-                    }
-                }
-                ExprKind::StaticPropertyAccess(a) => {
-                    if let Some(name) = a.class.kind.name_ref() {
-                        self.names.insert(name.as_ref().to_string());
-                    }
-                }
-                ExprKind::ClassConstAccess(a) => {
-                    if let Some(name) = a.class.kind.name_ref() {
-                        self.names.insert(name.as_ref().to_string());
-                    }
-                }
-                ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-                    if let Some(name) = b.right.kind.name_ref() {
-                        self.names.insert(name.as_ref().to_string());
-                    }
-                }
-                _ => {}
+            let class = match &expr.kind {
+                ExprKind::New(n) => Some(&n.class),
+                ExprKind::StaticMethodCall(c) => Some(&c.class),
+                ExprKind::StaticPropertyAccess(a) | ExprKind::ClassConstAccess(a) => Some(&a.class),
+                ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => Some(&b.right),
+                _ => None,
+            };
+            if let Some(ExprKind::Name(name)) = class.map(|c| &c.kind) {
+                let _ = self.visit_name(name);
             }
             crate::recursion::walk_expr(self, expr)
         }

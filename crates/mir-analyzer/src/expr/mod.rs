@@ -1204,15 +1204,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                     return closure_ty;
                 }
-                if let Some(name) = name_expr.kind.name_ref() {
-                    let fn_name = name.strip_prefix('\\').unwrap_or(&name);
+                if let Some(fn_name) = name_expr.kind.name_text() {
                     let resolved = name_expr
                         .kind
                         .function_ref(self.db, &self.file)
                         .map(|r| r.qualified.into_owned())
                         .unwrap_or_default();
                     crate::call::report_undefined_function(
-                        self, fn_name, &resolved, ctx, outer_span, false,
+                        self, &fn_name, &resolved, ctx, outer_span, false,
                     );
                 }
                 Type::single(bare_closure())

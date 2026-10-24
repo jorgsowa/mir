@@ -42,25 +42,25 @@ impl ByteStringExt for php_ast::owned::ByteString {
 }
 
 pub(crate) trait NameRefExt {
-    /// The text of a function, class or constant reference as the parser wrote it
-    /// (`\Foo\bar` keeps its leading backslash).
-    fn name_ref(&self) -> Option<std::borrow::Cow<'_, str>>;
-    /// Whether `name_ref()` would be `Some`, without building the text.
+    /// A function, class or constant reference as written, without the leading
+    /// backslash of a fully qualified name (`namespace\` stays on a relative one).
+    fn name_text(&self) -> Option<std::borrow::Cow<'_, str>>;
+    /// Whether `name_text()` would be `Some`, without building the text.
     fn is_name_ref(&self) -> bool;
 }
 
 impl NameRefExt for php_ast::owned::ExprKind {
-    fn name_ref(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn name_text(&self) -> Option<std::borrow::Cow<'_, str>> {
         use php_ast::ast::NameKind;
         use php_ast::owned::ExprKind;
         match self {
             ExprKind::Name(n) => Some(match (n.kind, &*n.parts) {
-                (NameKind::Unqualified, [only]) => std::borrow::Cow::Borrowed(only),
                 (NameKind::Error, _) => return None,
                 (NameKind::Relative, _) => {
                     std::borrow::Cow::Owned(format!("namespace\\{}", n.join_parts()))
                 }
-                _ => std::borrow::Cow::Owned(n.to_string_repr()),
+                (_, [only]) => std::borrow::Cow::Borrowed(only),
+                _ => std::borrow::Cow::Owned(n.join_parts()),
             }),
             _ => None,
         }

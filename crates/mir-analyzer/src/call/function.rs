@@ -140,7 +140,7 @@ impl CallAnalyzer {
         ctx: &mut FlowState,
         span: Span,
     ) -> Type {
-        let fn_name = match call.name.kind.name_ref() {
+        let fn_name = match call.name.kind.name_text() {
             Some(name) => name,
             _ => {
                 crate::taint::check_callable_target(ea, &call.name, ctx, span);
@@ -452,16 +452,7 @@ impl CallAnalyzer {
             }
         };
 
-        let fn_name_cow: std::borrow::Cow<'_, str> = match fn_name {
-            std::borrow::Cow::Borrowed(s) => {
-                std::borrow::Cow::Borrowed(s.strip_prefix('\\').unwrap_or(s))
-            }
-            std::borrow::Cow::Owned(s) if s.starts_with('\\') => {
-                std::borrow::Cow::Owned(s[1..].to_string())
-            }
-            owned => owned,
-        };
-        let fn_name: &str = &fn_name_cow;
+        let fn_name: &str = &fn_name;
         if ea.db.is_forbidden_function(fn_name) {
             ea.emit(
                 IssueKind::ForbiddenCode {
@@ -1767,7 +1758,7 @@ fn literal_function_name(
             return None;
         }
     }
-    Some(format!("\\{name}"))
+    Some(name.to_string())
 }
 
 /// Function named by a single literal-string callee (`$fn = 'preg_match'; $fn(...)`).
