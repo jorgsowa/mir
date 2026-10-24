@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Parser crates updated to 0.25: faster parsing (~13% on a 96 MB corpus), a nesting limit of 512 instead of a lower one, byte-string literals, many more compile-time checks and parse errors that follow each PHP version from 7.4 to 8.6 more closely. The checks that mir reports itself (`InvalidToString`, `InvalidAttribute`, `InvalidReturnType`, ...) are not repeated as `ParseError`.
+- Parser crates updated to 0.26: error messages and recovery follow PHP more closely (`'break' not in the 'loop' or 'switch' context`, `Can't use function return value in write context`, control characters in code, fewer cascades in broken files), each item of a grouped property or constant keeps its own doc comment, a property in an enum is a `CompileError` instead of a `ParseError`, and an attributed class, function or constant declaration starts at its first attribute.
 - `ParseError` carries the parser's stable identifier: the message ends with it (`[version-too-low]`, `[duplicate-property]`, ...) and `--format json` has it as `code`.
 - Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
 

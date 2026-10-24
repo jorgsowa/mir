@@ -20,7 +20,6 @@ parameters that reach a sink or the return value carry the taint.
 </mir>
 ===file===
 <?php
-<?php
 function showBody(string $title, string $body): void { echo $body; }
 function showTitle(string $title, string $body): void { echo $title; }
 function pickBody(string $title, string $body): string { return $body; }

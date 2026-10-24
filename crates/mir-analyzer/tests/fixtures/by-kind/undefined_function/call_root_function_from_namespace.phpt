@@ -9,6 +9,5 @@ namespace {
     }
 }
 namespace A {
-    Aoo();
-//    ^^ ParseError: Parse error: expected ';' after expression [expected-after]
+    \foo();
 }

@@ -9,6 +9,6 @@ final class Greeter
 }
 $g = new Greeter();
 $g->greet(name: "a", 2);
-//                   ^ CompileError: Compile error: cannot use positional argument after named argument [positional-after-named-argument]
+//                   ^ CompileError: Compile error: Cannot use positional argument after named argument [positional-after-named-argument]
 Greeter::shout(name: "a", 2);
-//                        ^ CompileError: Compile error: cannot use positional argument after named argument [positional-after-named-argument]
+//                        ^ CompileError: Compile error: Cannot use positional argument after named argument [positional-after-named-argument]
