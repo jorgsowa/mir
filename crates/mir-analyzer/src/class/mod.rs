@@ -374,6 +374,7 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_magic_method_casing(&enum_fqcn, &mut issues);
             self.check_enum_magic_methods(&enum_def, &mut issues);
             self.check_enum_builtin_redeclarations(&enum_def, &mut issues);
+            self.check_abstract_methods_implemented(&enum_fqcn, location.as_ref(), &mut issues);
             self.check_constant_overrides(&enum_fqcn, &enum_def.own_constants, &mut issues);
 
             // Same generic-bound check as class `@implements`/`@extends` type

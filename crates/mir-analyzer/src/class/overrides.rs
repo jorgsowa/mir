@@ -172,8 +172,14 @@ impl<'a> ClassAnalyzer<'a> {
                             // `own_traits` above. An ABSTRACT trait method is
                             // still a real contract PHP enforces regardless
                             // (same as an interface method would be).
-                            if own_traits.contains(anc) && !m.is_abstract {
-                                return None;
+                            if own_traits.contains(anc) {
+                                if !m.is_abstract {
+                                    return None;
+                                }
+                                return Some((
+                                    anc.clone(),
+                                    Self::rebind_self_static_in_method(&m, fqcn),
+                                ));
                             }
                             return Some((anc.clone(), m));
                         }
