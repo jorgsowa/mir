@@ -477,10 +477,7 @@ impl ClassAnalyzer<'_> {
             }
             provided
         };
-        let mut applied: HashMap<
-            Arc<str>,
-            Option<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)>,
-        > = HashMap::default();
+        let mut applied = Provided::default();
         let mut reported = HashSet::default();
         for direct in &class.traits {
             let mut provided: Vec<_> = provided_by(direct).into_iter().collect();
