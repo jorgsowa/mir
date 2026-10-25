@@ -27,7 +27,7 @@ pub(crate) fn parse_error_to_issue(
     let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
     let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
 
-    let message = php_message(err, &parsed.program).unwrap_or_else(|| err.to_string());
+    let message = php_message(err, source, &parsed.program).unwrap_or_else(|| err.to_string());
     let code = err.code().to_owned();
     let rule = err.forbidden_rule();
     let kind = if rule == Some(ForbiddenRule::ParentWithoutParentClass) {
@@ -52,12 +52,88 @@ pub(crate) fn parse_error_to_issue(
 /// PHP's wording for parser diagnostics whose text differs from PHP's.
 fn php_message(
     err: &php_rs_parser::diagnostics::ParseError,
+    source: &str,
     program: &php_ast::owned::Program,
 ) -> Option<String> {
+    let parser_message = || err.to_string();
     let (target, message): (DeclTarget, fn(&str, &str) -> String) = match err.forbidden_rule()? {
         ForbiddenRule::ReadonlyPropertyHooks => {
             return Some("Hooked properties cannot be readonly".to_string())
         }
+        ForbiddenRule::AbstractFinalConflict => {
+            return match parser_message() {
+                m if m.starts_with("Cannot use") => None,
+                _ if find_decl(program, err.span().start, DeclTarget::Method).is_some() => {
+                    Some("Cannot use the final modifier on an abstract method".to_string())
+                }
+                _ => Some("Cannot use the final modifier on an abstract property".to_string()),
+            };
+        }
+        ForbiddenRule::InvalidConstantModifier => {
+            let message = parser_message();
+            let modifier = message.split('\'').nth(1)?;
+            return Some(format!(
+                "Cannot use the {modifier} modifier on a class constant"
+            ));
+        }
+        ForbiddenRule::AbstractPropertyWithoutAbstractHook => {
+            return (parser_message() == "properties cannot be abstract")
+                .then(|| "Only hooked properties may be declared abstract".to_string());
+        }
+        ForbiddenRule::DuplicateType => {
+            let message = parser_message();
+            let written = message.split('\'').nth(1)?;
+            // A relative class name would need the file's imports to print as PHP does.
+            let name = match written.strip_prefix('\\') {
+                Some(fully_qualified) => fully_qualified.to_string(),
+                None if BUILTIN_TYPE_NAMES.contains(&written.to_ascii_lowercase().as_str()) => {
+                    written.to_ascii_lowercase()
+                }
+                None => return None,
+            };
+            return Some(format!("Duplicate type {name} is redundant"));
+        }
+        ForbiddenRule::AppendOutsideWrite => {
+            let message = parser_message();
+            let mut chars = message.chars();
+            let first = chars.next()?;
+            return Some(first.to_uppercase().chain(chars).collect());
+        }
+        ForbiddenRule::DuplicateMatchDefault => {
+            return Some("Match expressions may only contain one default arm".to_string())
+        }
+        ForbiddenRule::RealCast => {
+            return Some("The (real) cast has been removed, use (float) instead".to_string())
+        }
+        ForbiddenRule::UnsetCast => {
+            return Some("The (unset) cast is no longer supported".to_string())
+        }
+        ForbiddenRule::YieldOutsideFunction => {
+            return Some("The \"yield\" expression can only be used inside a function".to_string())
+        }
+        ForbiddenRule::UnterminatedComment => {
+            let line = source[..source.len().min(err.span().start as usize)]
+                .matches('\n')
+                .count()
+                + 1;
+            return Some(format!("Unterminated comment starting line {line}"));
+        }
+        ForbiddenRule::GetHookParameters => (DeclTarget::Property, |class, prop| {
+            format!("get hook of property {class}::${prop} must not have a parameter list")
+        }),
+        ForbiddenRule::SetHookParameterCount => (DeclTarget::Property, |class, prop| {
+            format!("set hook of property {class}::${prop} must accept exactly one parameters")
+        }),
+        ForbiddenRule::SetVisibilityWiderThanVisibility => {
+            (DeclTarget::Property, |class, prop| {
+                format!("Visibility of property {class}::${prop} must not be weaker than set visibility")
+            })
+        }
+        ForbiddenRule::PrivateFinalConstant => (DeclTarget::ClassConst, |class, name| {
+            format!(
+                "Private constant {class}::{name} cannot be final as it is not visible to other classes"
+            )
+        }),
         ForbiddenRule::EnumCaseNamedClass => return Some(
             "A class constant must not be called 'class'; it is reserved for class name fetching"
                 .to_string(),
@@ -82,8 +158,18 @@ fn php_message(
         }),
         _ => return None,
     };
+    let (class, name) = find_decl(program, err.span().start, target)?;
+    Some(message(&class, &name))
+}
+
+/// The class-like and name of the `target` declared at `offset`.
+fn find_decl(
+    program: &php_ast::owned::Program,
+    offset: u32,
+    target: DeclTarget,
+) -> Option<(String, String)> {
     let mut finder = DeclAt {
-        offset: err.span().start,
+        offset,
         target,
         namespace: String::new(),
         classes: Vec::new(),
@@ -94,15 +180,21 @@ fn php_message(
             break;
         }
     }
-    let (class, name) = finder.found?;
-    Some(message(&class, &name))
+    finder.found
 }
+
+/// Type keywords PHP prints in lowercase in its messages.
+const BUILTIN_TYPE_NAMES: [&str; 17] = [
+    "int", "float", "string", "bool", "void", "never", "mixed", "object", "iterable", "callable",
+    "array", "null", "true", "false", "self", "parent", "static",
+];
 
 #[derive(PartialEq)]
 enum DeclTarget {
     /// A property or promoted parameter.
     Property,
     Method,
+    ClassConst,
     EnumCase,
     EnumBackingType,
 }
@@ -153,11 +245,7 @@ impl DeclAt {
             return fully_qualified.to_string();
         }
         let lower = written.to_ascii_lowercase();
-        const BUILTINS: [&str; 14] = [
-            "float", "bool", "void", "never", "mixed", "object", "iterable", "callable", "array",
-            "null", "true", "false", "int", "string",
-        ];
-        if BUILTINS.contains(&lower.as_str()) {
+        if BUILTIN_TYPE_NAMES.contains(&lower.as_str()) {
             lower
         } else {
             self.qualify(&written)
@@ -195,6 +283,9 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                 return self.in_class(name, stmt);
             }
             StmtKind::Trait(d) => return self.in_class(d.name.as_str().unwrap_or_default(), stmt),
+            StmtKind::Interface(d) => {
+                return self.in_class(d.name.as_str().unwrap_or_default(), stmt)
+            }
             StmtKind::Enum(d) => {
                 let name = d.name.as_str().unwrap_or_default();
                 if let Some(ty) = d.scalar_type.as_ref().filter(|ty| {
@@ -219,6 +310,9 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
             ClassMemberKind::Property(p) => {
                 self.found(DeclTarget::Property, member.span, &p.name)?
             }
+            ClassMemberKind::ClassConst(c) => {
+                self.found(DeclTarget::ClassConst, member.span, &c.name)?
+            }
             ClassMemberKind::Method(m) => {
                 self.found(DeclTarget::Method, member.span, &m.name)?;
                 for param in m.params.iter() {
@@ -238,6 +332,9 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
         match &member.kind {
             EnumMemberKind::Method(m) => self.found(DeclTarget::Method, member.span, &m.name)?,
             EnumMemberKind::Case(c) => self.found(DeclTarget::EnumCase, member.span, &c.name)?,
+            EnumMemberKind::ClassConst(c) => {
+                self.found(DeclTarget::ClassConst, member.span, &c.name)?
+            }
             _ => {}
         }
         php_ast::owned::visitor::walk_owned_enum_member(self, member)
