@@ -154,10 +154,9 @@ impl<'a> ClassAnalyzer<'a> {
             for iface_fqcn in class.interfaces() {
                 let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
                 if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
-                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
-                        iface_fqcn.as_ref(),
-                        iface.fqcn().as_ref(),
-                    ) {
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(iface_fqcn.as_ref(), iface.fqcn().as_ref())
+                    {
                         self.push_located_issue(
                             &mut issues,
                             IssueKind::WrongCaseClass {

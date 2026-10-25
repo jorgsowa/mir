@@ -522,7 +522,8 @@ pub(crate) fn check_extends_class_like_kind(
     issues: &mut Vec<mir_issues::Issue>,
 ) {
     let resolved = crate::ast_ext::resolve_ast_name(parent, db, file.as_ref());
-    let Some(parent_like) = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &resolved))
+    let Some(parent_like) =
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &resolved))
     else {
         return;
     };
@@ -535,7 +536,10 @@ pub(crate) fn check_extends_class_like_kind(
     };
     push_name_compile_error(
         parent,
-        format!("Class {child_fqcn} cannot extend {kind} {}", parent_like.fqcn()),
+        format!(
+            "Class {child_fqcn} cannot extend {kind} {}",
+            parent_like.fqcn()
+        ),
         code,
         file,
         source,
