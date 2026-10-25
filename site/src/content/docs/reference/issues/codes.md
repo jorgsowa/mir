@@ -208,6 +208,7 @@ issues keep their code.
 | MIR1510  | PropertyPossiblyUninitialized | [other/property-possibly-uninitialized](../other/property-possibly-uninitialized/) |
 | MIR1511  | UseStatementHasNoEffect       | [other/use-statement-has-no-effect](../other/use-statement-has-no-effect/) |
 | MIR1512  | PrivateFinalMethod            | [other/private-final-method](../other/private-final-method/) |
+| MIR1513  | NonPublicMagicMethod          | [other/non-public-magic-method](../other/non-public-magic-method/) |
 | MIR1600  | InvalidAttribute              | [attributes/invalid-attribute](../attributes/invalid-attribute/) |
 | MIR1601  | UndefinedAttributeClass       | [attributes/undefined-attribute-class](../attributes/undefined-attribute-class/) |
 | MIR1602  | DuplicateClass                | [attributes/duplicate-class](../attributes/duplicate-class/) |

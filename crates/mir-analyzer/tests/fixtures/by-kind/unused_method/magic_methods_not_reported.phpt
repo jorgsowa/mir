@@ -3,6 +3,9 @@ magic methods not reported
 ===config===
 <mir>
   <findUnusedCode>true</findUnusedCode>
+  <issueHandlers>
+    <NonPublicMagicMethod errorLevel="suppress"/>
+  </issueHandlers>
 </mir>
 ===file===
 <?php

@@ -231,6 +231,7 @@ All issue types mir can emit, grouped by category.
 | `MissingConstructor` | A class has non-nullable, uninitialized typed properties but no constructor to initialize them. |
 | `UseStatementHasNoEffect` | A single-segment name is imported without an alias outside any namespace. |
 | `PrivateFinalMethod` | A method other than the constructor is declared both `private` and `final`. |
+| `NonPublicMagicMethod` | A magic method PHP calls from outside the class (`__get`, `__call`, `__toString`, ...) is not public. |
 
 ## Attributes
 

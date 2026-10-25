@@ -885,6 +885,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/collector/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/private_final_method/`.
     PrivateFinalMethod { class: String, method: String },
+    /// A magic method PHP calls from outside the class (`__get`, `__call`,
+    /// `__toString`, ...) is not public — PHP warns.
+    /// Emitted by `mir-analyzer/src/collector/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/non_public_magic_method/`.
+    NonPublicMagicMethod { class: String, method: String },
 
     // --- Plugins --------------------------------------------------------------
     /// Raised by a registered plugin (mir-plugin). `name` is the plugin's own
@@ -1026,7 +1031,8 @@ impl IssueKind {
             | IssueKind::UndefinedThrowsDocblock { .. }
             | IssueKind::InvalidDocblockType { .. }
             | IssueKind::UseStatementHasNoEffect { .. }
-            | IssueKind::PrivateFinalMethod { .. } => Severity::Warning,
+            | IssueKind::PrivateFinalMethod { .. }
+            | IssueKind::NonPublicMagicMethod { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -1361,6 +1367,7 @@ impl IssueKind {
             IssueKind::ImplicitFloatToIntCast { .. } => "MIR1502",
             IssueKind::UseStatementHasNoEffect { .. } => "MIR1511",
             IssueKind::PrivateFinalMethod { .. } => "MIR1512",
+            IssueKind::NonPublicMagicMethod { .. } => "MIR1513",
         }
     }
 
@@ -1392,7 +1399,7 @@ impl IssueKind {
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501"
             | "MIR1502" | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705"
             | "MIR1706" | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511"
-            | "MIR1512" => Some(Severity::Warning),
+            | "MIR1512" | "MIR1513" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1604,6 +1611,7 @@ impl IssueKind {
             IssueKind::DuplicateFunction { .. } => "DuplicateFunction",
             IssueKind::UseStatementHasNoEffect { .. } => "UseStatementHasNoEffect",
             IssueKind::PrivateFinalMethod { .. } => "PrivateFinalMethod",
+            IssueKind::NonPublicMagicMethod { .. } => "NonPublicMagicMethod",
             IssueKind::PluginIssue { .. } => "PluginIssue",
         }
     }
@@ -2345,6 +2353,9 @@ impl IssueKind {
             IssueKind::PrivateFinalMethod { class, method } => {
                 format!("Private method {class}::{method}() cannot be final as it is never overridden by other classes")
             }
+            IssueKind::NonPublicMagicMethod { class, method } => {
+                format!("The magic method {class}::{method}() must have public visibility")
+            }
             IssueKind::PluginIssue { message, .. } => message.clone(),
         }
     }
@@ -3047,6 +3058,10 @@ mod code_tests {
                 class: s(),
                 method: s(),
             },
+            IssueKind::NonPublicMagicMethod {
+                class: s(),
+                method: s(),
+            },
         ]
     }
 
@@ -3104,6 +3119,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 174);
+        assert_eq!(one_of_each().len(), 175);
     }
 }

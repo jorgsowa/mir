@@ -170,6 +170,28 @@ pub(crate) fn is_get_only_hook(hooks: &[php_ast::owned::PropertyHook]) -> bool {
             .all(|h| matches!(h.kind, PropertyHookKind::Get))
 }
 
+/// Magic methods PHP calls from outside the class, so it warns unless they are public.
+fn is_public_magic_method(name: &str) -> bool {
+    [
+        "__get",
+        "__set",
+        "__isset",
+        "__unset",
+        "__call",
+        "__callStatic",
+        "__toString",
+        "__invoke",
+        "__debugInfo",
+        "__serialize",
+        "__unserialize",
+        "__sleep",
+        "__wakeup",
+        "__set_state",
+    ]
+    .iter()
+    .any(|magic| name.eq_ignore_ascii_case(magic))
+}
+
 /// [`PropertyDef::abstract_hooks`](mir_codebase::definitions::PropertyDef::abstract_hooks) bits.
 pub(crate) fn abstract_hooks(hooks: &[php_ast::owned::PropertyHook]) -> u8 {
     hooks
@@ -2402,6 +2424,24 @@ impl<'a> DefinitionCollector<'a> {
                 },
                 self.location(m.name.span.start, m.name.span.end),
             ));
+        }
+
+        // A bodiless non-abstract method is an interface's, which must be public anyway.
+        let interface_method = m.body.is_none() && !m.modifiers.is_abstract;
+        if !interface_method
+            && m.modifiers
+                .visibility
+                .is_some_and(|v| v != AstVisibility::Public)
+        {
+            if let Some(name) = m.name.as_str().filter(|n| is_public_magic_method(n)) {
+                self.issues.add(Issue::new(
+                    mir_issues::IssueKind::NonPublicMagicMethod {
+                        class: class_fqcn.to_string(),
+                        method: name.to_string(),
+                    },
+                    self.location(m.name.span.start, m.name.span.end),
+                ));
+            }
         }
 
         if !self.version_allows(&doc) || !self.version_attr_available(&m.attributes) {

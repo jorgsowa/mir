@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--no-taint` skips taint analysis: no `Tainted*` issues are reported and no taint summaries are built.
+- `NonPublicMagicMethod` (MIR1513, warning) for a protected or private magic method PHP calls from outside the class (`__get`, `__set`, `__isset`, `__unset`, `__call`, `__callStatic`, `__toString`, `__invoke`, `__debugInfo`, `__serialize`, `__unserialize`, `__sleep`, `__wakeup`, `__set_state`): `The magic method C::__get() must have public visibility`, as PHP warns.
 - `UseStatementHasNoEffect` (MIR1511, warning) for `use Foo;` outside any namespace and `PrivateFinalMethod` (MIR1512, warning) for a `final private` method other than the constructor. PHP warns about both; parser 0.24 no longer reports them.
 - A PHP 8.6 partial application (`add(?, 5)`, `$obj->m(1, ...)`, `Cls::m(?)`) has a typed `Closure` with the parameters its placeholders leave open, so calls through it are checked. It was a bare `Closure` and its calls returned `mixed`. Instance methods are typed when the receiver is a variable; a placeholder call of a typed closure variable (`$fn(?, 's')`) and a nullsafe call (`$obj?->m(?)`, nullable) are typed too.
 - `TraitInstantiation` (MIR0720, error) for `new` of a trait (`new Loggable()`), which PHP rejects with `Cannot instantiate trait`. `new self()` / `new static()` inside a trait are not reported.
