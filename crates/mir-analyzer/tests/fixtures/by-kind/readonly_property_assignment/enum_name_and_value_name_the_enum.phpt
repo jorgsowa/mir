@@ -12,5 +12,5 @@ function rename(Suit $s): void {
     $s->value = 'y';
 //  ^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Suit::$value outside of constructor
     unset($s->value);
-//        ^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Suit::$value outside of constructor
+//        ^^^^^^^^^ ReadonlyPropertyAssignment: Cannot unset readonly property Suit::$value
 }

@@ -460,6 +460,18 @@ fn php_message(
         ForbiddenRule::StaticReadonlyProperty => (DeclTarget::Property, |class, prop| {
             format!("Static property {class}::${prop} cannot be readonly")
         }),
+        // PHP checks the modifiers first; the span covers them.
+        ForbiddenRule::AbstractEnumMethod
+            if source
+                .get(err.span().start as usize..err.span().end as usize)
+                .is_some_and(|modifiers| {
+                    modifiers
+                        .split_whitespace()
+                        .any(|m| m.eq_ignore_ascii_case("final"))
+                }) =>
+        {
+            return Some("Cannot use the final modifier on an abstract method".to_string())
+        }
         ForbiddenRule::AbstractEnumMethod => (DeclTarget::Method, |enum_name, method| {
             format!("Enum method {enum_name}::{method}() must not be abstract")
         }),

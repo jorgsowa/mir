@@ -448,7 +448,11 @@ pub enum IssueKind {
     // --- Readonly -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/readonly_property_assignment/`.
-    ReadonlyPropertyAssignment { class: String, property: String },
+    ReadonlyPropertyAssignment {
+        class: String,
+        property: String,
+        unset: bool,
+    },
     /// A second write to a readonly property in a scope where writes are
     /// otherwise allowed (the declaring constructor, or any method for a
     /// native `readonly` property) — PHP throws `Error: Cannot modify
@@ -2118,7 +2122,14 @@ impl IssueKind {
             IssueKind::InvalidReadonlyPropertyDeclaration { class, property } => {
                 format!("Readonly property {class}::${property} cannot have default value")
             }
-            IssueKind::ReadonlyPropertyAssignment { class, property } => {
+            IssueKind::ReadonlyPropertyAssignment {
+                class,
+                property,
+                unset: true,
+            } => format!("Cannot unset readonly property {class}::${property}"),
+            IssueKind::ReadonlyPropertyAssignment {
+                class, property, ..
+            } => {
                 format!(
                     "Cannot assign to readonly property {class}::${property} outside of constructor"
                 )
@@ -2869,6 +2880,7 @@ mod code_tests {
             IssueKind::ReadonlyPropertyAssignment {
                 class: s(),
                 property: s(),
+                unset: false,
             },
             IssueKind::ReadonlyPropertyAlreadyInitialized {
                 class: s(),

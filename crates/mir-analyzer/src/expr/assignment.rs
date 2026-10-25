@@ -1084,12 +1084,31 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// though the property is readonly (PHP-verified live). A plain array
     /// value has no such indirection: indexing into it always mutates the
     /// property's own contents, so the check still applies there.
+    /// Before 8.6 writing a property of a constant's object is the parser's
+    /// `temporary-expression-write` compile error.
+    fn is_constant_write_compile_error(&self, object: &php_ast::owned::Expr) -> bool {
+        let mut object = object;
+        while let ExprKind::Parenthesized(inner) = &object.kind {
+            object = inner;
+        }
+        let constant = match &object.kind {
+            ExprKind::ClassConstAccess(access) => !matches!(
+                &access.member.kind,
+                ExprKind::Identifier(m) if m.eq_ignore_ascii_case("class")
+            ),
+            ExprKind::ClassConstAccessDynamic { .. } => true,
+            _ => false,
+        };
+        constant && crate::db::db_php_version(self.db) < crate::php_version::PhpVersion::new(8, 6)
+    }
+
     pub(crate) fn check_property_readonly_write(
         &mut self,
         pa: &php_ast::owned::PropertyAccessExpr,
         ctx: &FlowState,
         span: Span,
         is_offset_write: bool,
+        unset: bool,
     ) {
         let Some(prop_name) = extract_string_from_expr(&pa.property) else {
             return;
@@ -1129,11 +1148,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                             span,
                         );
                     }
-                    if prop_def.is_readonly && !dispatches_to_offset_method {
+                    // The declaring class may unset an uninitialized native readonly property.
+                    let unset_in_declaring_scope = unset
+                        && !is_offset_write
+                        && prop_def.has_native_readonly
+                        && ctx.self_fqcn.as_deref().is_some_and(|self_cls| {
+                            self_cls.eq_ignore_ascii_case(fqcn.as_ref())
+                                && crate::db::property_in_own_composition(
+                                    db,
+                                    crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                                    &prop_name,
+                                )
+                        });
+                    if prop_def.is_readonly
+                        && !dispatches_to_offset_method
+                        && !unset_in_declaring_scope
+                    {
                         self.emit(
                             IssueKind::ReadonlyPropertyAssignment {
                                 class: readonly_error_class(db, fqcn.as_ref(), &owner),
                                 property: prop_name.clone(),
+                                unset: unset && !is_offset_write,
                             },
                             Severity::Error,
                             span,
@@ -1202,7 +1237,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         match &base.kind {
             ExprKind::PropertyAccess(pa) => {
                 self.check_property_write_purity(pa, ctx, span);
-                self.check_property_readonly_write(pa, ctx, span, false);
+                self.check_property_readonly_write(pa, ctx, span, false, false);
             }
             // `array_push(self::$queue, $x)` — a static-property by-ref
             // argument mutates that property exactly as much as
@@ -1327,6 +1362,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     IssueKind::ReadonlyPropertyAssignment {
                         class: owner.to_string(),
                         property: prop_name.clone(),
+                        unset: false,
                     },
                     Severity::Error,
                     span,
@@ -1759,7 +1795,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 let in_allowed_readonly_scope = (has_native_readonly
                                     || ctx.inside_constructor)
                                     && in_declaring_scope;
-                                if is_readonly && !in_allowed_readonly_scope {
+                                if is_readonly
+                                    && !in_allowed_readonly_scope
+                                    && !self.is_constant_write_compile_error(&pa.object)
+                                {
                                     self.emit(
                                         IssueKind::ReadonlyPropertyAssignment {
                                             class: readonly_error_class(
@@ -1768,6 +1807,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 &prop_owner,
                                             ),
                                             property: prop_name.clone(),
+                                            unset: false,
                                         },
                                         Severity::Error,
                                         span,
@@ -2055,6 +2095,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     IssueKind::ReadonlyPropertyAssignment {
                                         class: owner_cls.to_string(),
                                         property: prop_name.clone(),
+                                        unset: false,
                                     },
                                     Severity::Error,
                                     span,
@@ -2528,7 +2569,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // through the same purity/immutability checks as
                             // a plain `$obj->items = …` assignment.
                             self.check_property_write_purity(pa, ctx, span);
-                            self.check_property_readonly_write(pa, ctx, span, true);
+                            self.check_property_readonly_write(pa, ctx, span, true, false);
                             let prop_ty = self.analyze(base, ctx);
                             if let (1, Some(Some(key))) =
                                 (key_chain.len(), literal_key_chain.first())
@@ -2579,6 +2620,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                             IssueKind::ReadonlyPropertyAssignment {
                                                 class: owner_cls.to_string(),
                                                 property: prop_name,
+                                                unset: false,
                                             },
                                             Severity::Error,
                                             span,

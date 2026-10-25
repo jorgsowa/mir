@@ -679,7 +679,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.expr_analyzer(ctx)
                         .check_property_write_purity(pa, ctx, var.span);
                     self.expr_analyzer(ctx)
-                        .check_property_readonly_write(pa, ctx, var.span, false);
+                        .check_property_readonly_write(pa, ctx, var.span, false, true);
                 } else if let php_ast::owned::ExprKind::ArrayAccess(aa) = &var.kind {
                     // `unset($this->arr['key'])` mutates the property's
                     // contents just as much as `unset($this->prop)` does --
@@ -693,7 +693,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 self.expr_analyzer(ctx)
                                     .check_property_write_purity(pa, ctx, var.span);
                                 self.expr_analyzer(ctx)
-                                    .check_property_readonly_write(pa, ctx, var.span, true);
+                                    .check_property_readonly_write(pa, ctx, var.span, true, true);
                                 if let (Some(obj_key), Some(prop)) = (
                                     crate::narrowing::chained_prop_receiver_key(&pa.object),
                                     crate::expr::helpers::extract_string_from_expr(&pa.property),
@@ -740,6 +740,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                                 IssueKind::ReadonlyPropertyAssignment {
                                                     class: owner_cls.to_string(),
                                                     property: prop_name,
+                                                    unset: false,
                                                 },
                                                 Severity::Error,
                                                 var.span,
