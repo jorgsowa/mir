@@ -16,5 +16,5 @@ class C {
 }
 class D extends C {
     public function f(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method D::f() cannot override final method from Inner
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method D::f() cannot override final method from C
 }

@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `FinalMethodOverridden` for a method made final by a trait names the class using the trait (`cannot override final method from A`), as PHP does, instead of the trait.
 - An enum using a trait with an abstract method it does not implement reports `UnimplementedAbstractMethod`, as a class does; it reported nothing. Implementing a trait's abstract `static`-returning method in an enum no longer reports `MethodSignatureMismatch` (`'static(E)' is not a subtype of parent 'static(T)'`).
 - `ReadonlyPropertyAssignment` on an enum's `name` or `value` names the enum (`Suit::$value`), as PHP does, instead of `UnitEnum` / `IntBackedEnum` / `StringBackedEnum`.
 - A constructor is checked against a `final`, abstract or interface constructor anywhere up the chain, as PHP does: `FinalMethodOverridden` for overriding a `final __construct`, `MethodSignatureMismatch` / `OverriddenMethodAccess` against an abstract or interface constructor. Constructors were never compared. An ordinary parent constructor still imposes nothing.

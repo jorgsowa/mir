@@ -347,11 +347,27 @@ impl<'a> ClassAnalyzer<'a> {
             if let Some((final_parent_fqcn, _)) =
                 all_parent_methods.iter().find(|(_, p)| p.is_final)
             {
+                // A trait's final method is final in the class using it, which PHP names:
+                // the nearest class before the trait in the ancestor walk.
+                let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+                let final_owner = ancestors
+                    .iter()
+                    .position(|a| a == final_parent_fqcn)
+                    .filter(|_| {
+                        crate::db::class_kind(self.db, final_parent_fqcn.as_ref())
+                            .is_some_and(|k| k.is_trait)
+                    })
+                    .and_then(|idx| {
+                        ancestors[..idx].iter().rev().find(|a| {
+                            crate::db::class_kind(self.db, a.as_ref()).is_some_and(|k| !k.is_trait)
+                        })
+                    })
+                    .unwrap_or(final_parent_fqcn);
                 let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
                         method: method_name_lower.to_string(),
-                        parent: final_parent_fqcn.to_string(),
+                        parent: final_owner.to_string(),
                     },
                     loc(),
                 );
