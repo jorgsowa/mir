@@ -128,6 +128,7 @@ All issue types mir can emit, grouped by category.
 | `InvalidOverride` | Method declared `#[Override]` does not actually override a parent method. |
 | `InterfaceInstantiation` | Instantiating an interface with `new`. |
 | `EnumInstantiation` | Instantiating an enum with `new`. |
+| `TraitInstantiation` | Instantiating a trait with `new`. |
 | `OverriddenPropertyAccess` | An overriding property reduces the visibility of the parent property. |
 | `AbstractMethodCall` | An abstract method is invoked where no concrete implementation exists. |
 | `DuplicateEnumCaseValue` | Two cases of a backed enum have the same value. |

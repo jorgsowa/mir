@@ -143,6 +143,7 @@ issues keep their code.
 | MIR0717  | InvalidReadonlyPropertyDeclaration | [inheritance/invalid-readonly-property-declaration](../inheritance/invalid-readonly-property-declaration/) |
 | MIR0718  | DuplicateEnumCaseValue        | [inheritance/duplicate-enum-case-value](../inheritance/duplicate-enum-case-value/) |
 | MIR0719  | EnumInstantiation             | [inheritance/enum-instantiation](../inheritance/enum-instantiation/) |
+| MIR0720  | TraitInstantiation            | [inheritance/trait-instantiation](../inheritance/trait-instantiation/) |
 | MIR0800  | TaintedInput                  | [security/tainted-input](../security/tainted-input/) |
 | MIR0801  | TaintedHtml                   | [security/tainted-html](../security/tainted-html/) |
 | MIR0802  | TaintedSql                    | [security/tainted-sql](../security/tainted-sql/) |

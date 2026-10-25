@@ -568,6 +568,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/enum_instantiation.phpt`.
     EnumInstantiation { class: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/trait_instantiation.phpt`.
+    TraitInstantiation { class: String },
     /// Emitted by `mir-analyzer/src/class/mod.rs` when `#[Override]` is declared
     /// but no overridable parent method exists.
     /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
@@ -944,6 +947,7 @@ impl IssueKind {
             | IssueKind::AbstractMethodCall { .. }
             | IssueKind::InterfaceInstantiation { .. }
             | IssueKind::EnumInstantiation { .. }
+            | IssueKind::TraitInstantiation { .. }
             | IssueKind::InvalidOverride { .. }
             | IssueKind::InvalidTemplateParam { .. }
             | IssueKind::ReadonlyPropertyAssignment { .. }
@@ -1272,6 +1276,7 @@ impl IssueKind {
             IssueKind::AbstractMethodCall { .. } => "MIR0711",
             IssueKind::InterfaceInstantiation { .. } => "MIR0709",
             IssueKind::EnumInstantiation { .. } => "MIR0719",
+            IssueKind::TraitInstantiation { .. } => "MIR0720",
             IssueKind::CircularInheritance { .. } => "MIR0707",
             IssueKind::InvalidOverride { .. } => "MIR0708",
 
@@ -1373,10 +1378,10 @@ impl IssueKind {
             | "MIR0217" | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702"
             | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711"
             | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718"
-            | "MIR0719" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803"
-            | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810"
-            | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500"
-            | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
+            | "MIR0719" | "MIR0720" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802"
+            | "MIR0803" | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809"
+            | "MIR0810" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401"
+            | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
                 Some(Severity::Error)
             }
 
@@ -1530,6 +1535,7 @@ impl IssueKind {
             IssueKind::AbstractMethodCall { .. } => "AbstractMethodCall",
             IssueKind::InterfaceInstantiation { .. } => "InterfaceInstantiation",
             IssueKind::EnumInstantiation { .. } => "EnumInstantiation",
+            IssueKind::TraitInstantiation { .. } => "TraitInstantiation",
             IssueKind::InvalidOverride { .. } => "InvalidOverride",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
             IssueKind::ReadonlyPropertyAlreadyInitialized { .. } => {
@@ -2116,6 +2122,7 @@ impl IssueKind {
                 format!("Cannot instantiate interface {class}")
             }
             IssueKind::EnumInstantiation { class } => format!("Cannot instantiate enum {class}"),
+            IssueKind::TraitInstantiation { class } => format!("Cannot instantiate trait {class}"),
             IssueKind::InvalidOverride {
                 class,
                 method,
@@ -2889,6 +2896,7 @@ mod code_tests {
             },
             IssueKind::InterfaceInstantiation { class: s() },
             IssueKind::EnumInstantiation { class: s() },
+            IssueKind::TraitInstantiation { class: s() },
             IssueKind::InvalidOverride {
                 class: s(),
                 method: s(),
@@ -3096,6 +3104,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 173);
+        assert_eq!(one_of_each().len(), 174);
     }
 }

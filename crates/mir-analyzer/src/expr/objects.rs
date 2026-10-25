@@ -499,6 +499,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 n.class.span,
                             );
                         }
+                        // Inside a trait, `self` names the using class.
+                        if class.is_trait()
+                            && !matches!(resolved.as_str(), "self" | "static" | "parent")
+                        {
+                            self.emit(
+                                IssueKind::TraitInstantiation {
+                                    class: fqcn.to_string(),
+                                },
+                                Severity::Error,
+                                n.class.span,
+                            );
+                        }
                         if class.is_enum() {
                             self.emit(
                                 IssueKind::EnumInstantiation {
