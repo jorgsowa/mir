@@ -23,9 +23,13 @@ use super::*;
 /// equality. These are lookup keys for [`MirDatabase::symbol_defining_file`].
 #[salsa::tracked]
 pub fn file_structural_symbols(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Name]> {
-    let defs = crate::db::collect_file_definitions(db, file);
+    structural_symbols_of_slice(&crate::db::collect_file_definitions(db, file).slice)
+}
+
+/// [`file_structural_symbols`] computed from an already-loaded slice.
+pub(crate) fn structural_symbols_of_slice(slice: &StubSlice) -> Arc<[Name]> {
     let mut symbols: FxHashSet<Name> = FxHashSet::default();
-    collect_structural_dep_symbols(&defs.slice, &mut |symbol| {
+    collect_structural_dep_symbols(slice, &mut |symbol| {
         symbols.insert(symbol);
     });
 

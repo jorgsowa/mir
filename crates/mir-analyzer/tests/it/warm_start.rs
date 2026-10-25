@@ -489,6 +489,44 @@ fn warm_start_seeds_workspace_symbol_index_without_tracked_walk() {
 }
 
 #[test]
+fn warm_start_with_structural_deps_runs_no_tracked_walk() {
+    let dir = create_temp_dir("warm_start_structural_no_walk");
+    let files = [
+        (
+            "base.php",
+            "<?php\nnamespace App;\nabstract class Base {}\n",
+        ),
+        ("iface.php", "<?php\nnamespace App;\ninterface Shape {}\n"),
+        (
+            "child.php",
+            "<?php\nnamespace App;\nclass Child extends Base implements Shape {}\n",
+        ),
+    ];
+    seed_disk_caches(dir.path(), &files);
+
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let warm: Vec<(Arc<str>, Arc<str>)> = files
+        .iter()
+        .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
+        .collect();
+    let walks_before = session.workspace_index_walks();
+    session.warm_start_files(&warm);
+    assert_eq!(
+        session.workspace_index_walks(),
+        walks_before,
+        "warm_start_files must resolve structural deps through the seeded index"
+    );
+    assert!(session.workspace_symbol_index_ready());
+
+    let graph = session.dependency_graph();
+    let deps = graph.dependencies_of("child.php");
+    assert!(
+        deps.iter().any(|f| f == "base.php") && deps.iter().any(|f| f == "iface.php"),
+        "{deps:?}"
+    );
+}
+
+#[test]
 fn warm_start_seed_skipped_when_slices_missing() {
     // Fresh cache dir: no slices on disk, so the coverage gap is the whole
     // workspace and seeding must be skipped (first-ever boot keeps the lazy

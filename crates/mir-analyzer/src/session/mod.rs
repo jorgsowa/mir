@@ -542,18 +542,10 @@ fn file_outgoing_dependencies(
     file: &str,
     include_body_ref_edges: bool,
 ) -> HashSet<String> {
-    let mut targets: HashSet<String> = HashSet::default();
-
-    if let Some(sf) = db.lookup_source_file(file) {
-        for symbol in crate::db::file_structural_symbols(db, sf).iter() {
-            let lookup = crate::defining_file_lookup_key(symbol);
-            if let Some(defining_file) = db.symbol_defining_file(lookup) {
-                if defining_file.as_ref() != file {
-                    targets.insert(defining_file.as_ref().to_string());
-                }
-            }
-        }
-    }
+    let mut targets = match db.lookup_source_file(file) {
+        Some(sf) => structural_targets(db, file, crate::db::file_structural_symbols(db, sf)),
+        None => HashSet::default(),
+    };
 
     if !include_body_ref_edges {
         return targets;
@@ -570,6 +562,24 @@ fn file_outgoing_dependencies(
         }
     }
 
+    targets
+}
+
+/// Files other than `file` that define any of its structural `symbols`.
+fn structural_targets(
+    db: &dyn MirDatabase,
+    file: &str,
+    symbols: &[mir_types::Name],
+) -> HashSet<String> {
+    let mut targets: HashSet<String> = HashSet::default();
+    for symbol in symbols {
+        let lookup = crate::defining_file_lookup_key(symbol);
+        if let Some(defining_file) = db.symbol_defining_file(lookup) {
+            if defining_file.as_ref() != file {
+                targets.insert(defining_file.as_ref().to_string());
+            }
+        }
+    }
     targets
 }
 

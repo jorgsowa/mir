@@ -241,6 +241,7 @@ pub(crate) fn durability_for_path(path: &str) -> salsa::Durability {
 pub use self::class_mention_index::{
     ClassMentionIndex, ClassMentionStats, FileScan, MentionQuery, MentionScanner,
 };
+pub(crate) use self::deps::structural_symbols_of_slice;
 pub use self::deps::{file_structural_deps, file_structural_symbols};
 pub(crate) use self::file_slab::FileSlab;
 pub use self::find_queries::{

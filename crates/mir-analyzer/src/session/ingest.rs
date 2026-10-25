@@ -9,10 +9,11 @@ struct WarmStartHit {
     stored_text: Arc<str>,
     /// `(reference locations, resolved)` from a cached `AnalysisCache` hit.
     refs: Option<(Vec<RefLoc>, bool)>,
-    /// `(subtype edges, declarations)` from a cached stub-slice hit.
+    /// `(subtype edges, declarations, structural symbols)` from a cached stub-slice hit.
     stub: Option<(
         Vec<crate::db::subtype_index::SubtypeEntry>,
         crate::db::FileDeclarations,
+        Arc<[mir_types::Name]>,
     )>,
 }
 
@@ -774,7 +775,9 @@ impl AnalysisSession {
                     let sf = db.lookup_source_file(file.as_ref())?;
                     let stored_text = sf.text(db).clone();
 
-                    let hex = crate::cache::hash_content(&stored_text);
+                    // Both caches key on the same BLAKE3 content digest.
+                    let hash = crate::stub_cache::hash_source(&stored_text);
+                    let hex = crate::cache::digest_hex(&hash);
                     let refs = cache.get(file, &hex).map(|(issues, ref_locs)| {
                         let locs: Vec<RefLoc> = ref_locs
                             .iter()
@@ -795,12 +798,12 @@ impl AnalysisSession {
                     });
 
                     let stub = stub_cache.as_ref().and_then(|stub_cache| {
-                        let hash = crate::stub_cache::hash_source(&stored_text);
                         let (mut slice, _issues) = stub_cache.get(file, &hash, php_v)?;
                         crate::stub_cache::prepare_for_ingest(&mut slice);
                         let entries = crate::db::subtype_index::entries_from_slice(&slice);
                         let decls = crate::db::decls_from_slice(&slice, sf);
-                        Some((entries, decls))
+                        let symbols = crate::db::structural_symbols_of_slice(&slice);
+                        Some((entries, decls, symbols))
                     });
 
                     Some(WarmStartHit {
@@ -820,7 +823,7 @@ impl AnalysisSession {
         let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
             Vec::with_capacity(hits.len());
         let mut unresolved: Vec<Arc<str>> = Vec::new();
-        let mut structural_target_files: Vec<Arc<str>> = Vec::new();
+        let mut structural_symbols: Vec<(Arc<str>, Arc<[mir_types::Name]>)> = Vec::new();
         let mut dependency_graph_changed = false;
         {
             let db = &self.db.salsa;
@@ -842,18 +845,20 @@ impl AnalysisSession {
                         unresolved.push(file.clone());
                     }
                 }
-                if let Some((entries, decls)) = stub {
+                if let Some((entries, decls, symbols)) = stub {
                     let file_no = db.intern_path(&file);
                     db.set_file_class_edges(file_no, entries);
                     self.index.mark_defs_committed(sf, &stored_text);
-                    structural_target_files.push(file.clone());
+                    structural_symbols.push((file.clone(), symbols));
                     dependency_graph_changed = true;
                     seed_decls.push((sf, decls));
                 }
             }
         }
-        for file in &structural_target_files {
-            let targets = file_outgoing_dependencies(&self.db.salsa, file.as_ref(), false);
+        // Seed first: an unseeded `symbol_defining_file` runs the tracked all-files walk.
+        self.seed_workspace_index_from_warm_start(seed_decls);
+        for (file, symbols) in &structural_symbols {
+            let targets = structural_targets(&self.db.salsa, file, symbols);
             self.last_structural_targets
                 .insert(file.as_ref().to_string(), targets);
         }
@@ -861,7 +866,6 @@ impl AnalysisSession {
             self.index.clear_dependency_graph_cache();
         }
 
-        self.seed_workspace_index_from_warm_start(seed_decls);
         unresolved
     }
 

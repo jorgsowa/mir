@@ -32,7 +32,12 @@ pub type CacheHit = (std::sync::Arc<[Issue]>, std::sync::Arc<[CachedRefLoc]>);
 
 /// Compute the BLAKE3 hex digest of `content`.
 pub fn hash_content(content: &str) -> String {
-    blake3::hash(content.as_bytes()).to_hex().to_string()
+    digest_hex(blake3::hash(content.as_bytes()).as_bytes())
+}
+
+/// Hex form of a BLAKE3 digest, e.g. one from [`crate::stub_cache::hash_source`].
+pub fn digest_hex(digest: &[u8; 32]) -> String {
+    blake3::Hash::from_bytes(*digest).to_hex().to_string()
 }
 
 /// BLAKE3 hex digest of `source` with the body of every **declared-return**
