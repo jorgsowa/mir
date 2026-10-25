@@ -4,6 +4,7 @@ Misplaced required param
 <mir>
   <issueHandlers>
     <UnusedParam errorLevel="suppress"/>
+    <ImplicitlyNullableParameter errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===

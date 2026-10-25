@@ -171,6 +171,7 @@ issues keep their code.
 | MIR1010  | WrongCaseMethod               | [other/wrong-case-method](../other/wrong-case-method/) |
 | MIR1011  | WrongCaseClass                | [other/wrong-case-class](../other/wrong-case-class/) |
 | MIR1012  | OptionalParameterBeforeRequired | [other/optional-parameter-before-required](../other/optional-parameter-before-required/) |
+| MIR1013  | ImplicitlyNullableParameter   | [other/implicitly-nullable-parameter](../other/implicitly-nullable-parameter/) |
 | MIR1100  | MissingReturnType             | [other/missing-return-type](../other/missing-return-type/) |
 | MIR1101  | MissingParamType              | [other/missing-param-type](../other/missing-param-type/) |
 | MIR1102  | MissingThrowsDocblock         | [other/missing-throws-docblock](../other/missing-throws-docblock/) |

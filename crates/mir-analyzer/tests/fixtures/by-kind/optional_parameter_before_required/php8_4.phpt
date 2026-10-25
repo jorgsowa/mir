@@ -20,6 +20,7 @@ function plain(int $a = 1, $b) {}
 function nullable(?int $a = null, $b) {}
 //                ^^^^^^^^^^^^^^ OptionalParameterBeforeRequired: App\nullable(): Optional parameter $a declared before required parameter $b is implicitly treated as a required parameter
 function implicit(int $a = null, $b) {}
+//                ^^^^^^^^^^^^^ ImplicitlyNullableParameter: App\implicit(): Implicitly marking parameter $a as nullable is deprecated, the explicit nullable type must be used instead
 function union(int|null $a = null, $b) {}
 //             ^^^^^^^^^^^^^^^^^^ OptionalParameterBeforeRequired: App\union(): Optional parameter $a declared before required parameter $b is implicitly treated as a required parameter
 function untyped($a = null, $b) {}

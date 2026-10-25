@@ -638,6 +638,37 @@ pub(crate) fn check_optional_before_required(
 
 const ANONYMOUS_CLASS: &str = "class@anonymous";
 
+/// Span, message, issue kind, and whether the message takes the 8.4 function-name prefix.
+type Finding = (
+    php_ast::Span,
+    String,
+    fn(String) -> mir_issues::IssueKind,
+    bool,
+);
+
+/// A typed parameter whose type has no `null` (`int $a = null`): nullable only through its default.
+fn implicitly_nullable(p: &php_ast::owned::Param) -> bool {
+    use php_ast::owned::{ExprKind, TypeHintKind};
+    let (Some(hint), Some(default)) = (&p.type_hint, &p.default) else {
+        return false;
+    };
+    let declares_null = |h: &php_ast::owned::TypeHint| {
+        matches!(
+            &h.kind,
+            TypeHintKind::Keyword(
+                php_ast::ast::BuiltinType::Null | php_ast::ast::BuiltinType::Mixed,
+                _
+            )
+        )
+    };
+    matches!(default.kind, ExprKind::Null)
+        && match &hint.kind {
+            TypeHintKind::Nullable(_) => false,
+            TypeHintKind::Union(parts) => !parts.iter().any(declares_null),
+            _ => !declares_null(hint),
+        }
+}
+
 struct ParamOrderVisitor<'a> {
     php_version: PhpVersion,
     namespace: String,
@@ -672,78 +703,106 @@ impl ParamOrderVisitor<'_> {
         if self.php_version < PhpVersion::new(8, 3) {
             return !matches!(hint.kind, TypeHintKind::Nullable(_));
         }
-        // From 8.3 only an implicitly nullable type (`int $a = null`) is exempt.
-        let declares_null = |h: &php_ast::owned::TypeHint| {
-            matches!(
-                &h.kind,
-                TypeHintKind::Keyword(
-                    php_ast::ast::BuiltinType::Null | php_ast::ast::BuiltinType::Mixed,
-                    _
-                )
-            )
-        };
-        match &hint.kind {
-            TypeHintKind::Nullable(_) => false,
-            TypeHintKind::Union(parts) => !parts.iter().any(declares_null),
-            _ => !declares_null(hint),
-        }
+        implicitly_nullable(p)
     }
 
     fn check(&mut self, params: &[php_ast::owned::Param], function: impl FnOnce() -> String) {
+        use mir_issues::IssueKind;
         let is_required = |p: &php_ast::owned::Param| p.default.is_none() && !p.variadic;
-        let Some(last_required) = params.iter().rposition(is_required) else {
-            return;
+        let is_promoted =
+            |p: &php_ast::owned::Param| p.modifiers.visibility.is_some() || p.modifiers.is_readonly;
+        let mut found: Vec<Finding> = Vec::new();
+        let compile_error = |message| IssueKind::CompileError {
+            message,
+            code: "promoted-implicit-nullable".to_string(),
         };
-        let mut found = Vec::new();
-        if self.php_version < PhpVersion::new(8, 1) {
-            for (idx, required) in params.iter().enumerate().filter(|(_, p)| is_required(p)) {
-                if let Some(optional) = params[..idx]
+        let deprecation_8_4 = self.php_version >= PhpVersion::new(8, 4);
+        for p in params.iter().filter(|p| implicitly_nullable(p)) {
+            let name = p.name.as_str().unwrap_or_default();
+            if is_promoted(p) {
+                let hint = p
+                    .type_hint
+                    .as_ref()
+                    .and_then(|h| crate::parser::span_text(self.source, h.span))
+                    .unwrap_or_default();
+                found.push((
+                    p.span,
+                    format!(
+                        "Cannot use null as default value for parameter ${name} of type {hint}"
+                    ),
+                    compile_error,
+                    false,
+                ));
+            } else if deprecation_8_4 {
+                found.push((
+                    p.span,
+                    format!(
+                        "Implicitly marking parameter ${name} as nullable is deprecated, the explicit nullable type must be used instead"
+                    ),
+                    |message| IssueKind::ImplicitlyNullableParameter { message },
+                    true,
+                ));
+            }
+        }
+        let order = |message| IssueKind::OptionalParameterBeforeRequired { message };
+        if let Some(last_required) = params.iter().rposition(is_required) {
+            if self.php_version < PhpVersion::new(8, 1) {
+                for (idx, required) in params.iter().enumerate().filter(|(_, p)| is_required(p)) {
+                    if let Some(optional) = params[..idx]
+                        .iter()
+                        .find(|p| p.default.is_some() && !self.exempt(p))
+                    {
+                        found.push((
+                            required.span,
+                            format!(
+                                "Required parameter ${} follows optional parameter ${}",
+                                required.name.as_str().unwrap_or_default(),
+                                optional.name.as_str().unwrap_or_default()
+                            ),
+                            order,
+                            true,
+                        ));
+                    }
+                }
+            } else {
+                let required = params[last_required].name.as_str().unwrap_or_default();
+                for optional in params[..last_required]
                     .iter()
-                    .find(|p| p.default.is_some() && !self.exempt(p))
+                    .filter(|p| p.default.is_some() && !self.exempt(p))
                 {
                     found.push((
-                        required.span,
+                        optional.span,
                         format!(
-                            "Required parameter ${} follows optional parameter ${}",
-                            required.name.as_str().unwrap_or_default(),
+                            "Optional parameter ${} declared before required parameter ${required} is implicitly treated as a required parameter",
                             optional.name.as_str().unwrap_or_default()
                         ),
+                        order,
+                        true,
                     ));
                 }
-            }
-        } else {
-            let required = params[last_required].name.as_str().unwrap_or_default();
-            for optional in params[..last_required]
-                .iter()
-                .filter(|p| p.default.is_some() && !self.exempt(p))
-            {
-                found.push((
-                    optional.span,
-                    format!(
-                        "Optional parameter ${} declared before required parameter ${required} is implicitly treated as a required parameter",
-                        optional.name.as_str().unwrap_or_default()
-                    ),
-                ));
             }
         }
         if found.is_empty() {
             return;
         }
-        let prefix = if self.php_version >= PhpVersion::new(8, 4) {
+        let prefix = if deprecation_8_4 {
             format!("{}(): ", function())
         } else {
             String::new()
         };
-        for (span, message) in found {
+        for (span, message, kind, prefixed) in found {
+            let message = if prefixed {
+                format!("{prefix}{message}")
+            } else {
+                message
+            };
             let (line, col_start) =
                 crate::diagnostics::offset_to_line_col(self.source, span.start, self.source_map);
             let (line_end, col_end) =
                 crate::diagnostics::offset_to_line_col(self.source, span.end, self.source_map);
             self.issues.push(
                 Issue::new(
-                    mir_issues::IssueKind::OptionalParameterBeforeRequired {
-                        message: format!("{prefix}{message}"),
-                    },
+                    kind(message),
                     mir_issues::Location {
                         file: self.file.clone(),
                         line,
