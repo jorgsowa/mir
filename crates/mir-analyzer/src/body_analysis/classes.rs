@@ -1616,6 +1616,18 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
             );
+            crate::diagnostics::check_trait_adaptations(
+                decl.body.members.iter().filter_map(|m| match &m.kind {
+                    php_ast::owned::ClassMemberKind::TraitUse(tu) => Some(tu),
+                    _ => None,
+                }),
+                fqcn,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
         }
 
         self.record_trait_alias_method_refs(decl, file, source, source_map);
@@ -1888,6 +1900,18 @@ impl<'a> BodyAnalyzer<'a> {
             crate::diagnostics::check_interface_list(
                 &decl.implements,
                 crate::diagnostics::InterfaceListOwner::Class,
+                fqcn,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+            crate::diagnostics::check_trait_adaptations(
+                decl.body.members.iter().filter_map(|m| match &m.kind {
+                    php_ast::owned::ClassMemberKind::TraitUse(tu) => Some(tu),
+                    _ => None,
+                }),
                 fqcn,
                 self.db,
                 file,
@@ -2254,6 +2278,16 @@ impl<'a> BodyAnalyzer<'a> {
             for (alias_lower, (trait_name_opt, orig_lower, _vis_override, _alias_cased)) in
                 c.trait_aliases.iter()
             {
+                // A missing, non-trait or unused named trait is reported by
+                // `check_trait_adaptations`.
+                if let Some(t) = trait_name_opt {
+                    let here = crate::db::Fqcn::from_str(self.db, t.as_ref());
+                    if !crate::db::find_class_like(self.db, here).is_some_and(|c| c.is_trait())
+                        || !trait_list.iter().any(|u| u.eq_ignore_ascii_case(t))
+                    {
+                        continue;
+                    }
+                }
                 let candidates: &[Arc<str>] = match trait_name_opt {
                     Some(t) => std::slice::from_ref(t),
                     None => &trait_list,

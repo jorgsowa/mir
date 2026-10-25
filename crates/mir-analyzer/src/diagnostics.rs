@@ -561,6 +561,166 @@ pub(crate) fn check_extends_class_like_kind(
     );
 }
 
+/// PHP's compile-time checks on `use T { ... }` adaptations, across all of a class-like's
+/// trait uses: each named trait exists, is a trait and is used; a precedence names a method
+/// of its trait and does not exclude that trait; an unqualified alias is not ambiguous.
+pub(crate) fn check_trait_adaptations<'u>(
+    trait_uses: impl IntoIterator<Item = &'u php_ast::owned::TraitUseDecl>,
+    owner_fqcn: &str,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    use php_ast::owned::TraitAdaptationKind;
+    let uses: Vec<_> = trait_uses.into_iter().collect();
+    if uses.iter().all(|tu| tu.adaptations.is_empty()) {
+        return;
+    }
+    let used: Vec<String> = uses
+        .iter()
+        .flat_map(|tu| tu.traits.iter())
+        .map(|name| crate::ast_ext::resolve_ast_name(name, db, file.as_ref()))
+        .collect();
+    let has_method = |trait_fqcn: &str, method_lower: &str| {
+        let here = crate::db::Fqcn::from_str(db, trait_fqcn);
+        crate::db::class_ancestors_by_fqcn(db, here)
+            .iter()
+            .any(|t| {
+                crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, t.as_ref()))
+                    .is_some_and(|c| c.own_methods().contains_key(method_lower))
+            })
+    };
+    // The trait's canonical name, or the first error PHP gives for naming it here.
+    let check_trait = |name: &php_ast::owned::Name| -> Result<String, mir_issues::IssueKind> {
+        let resolved = crate::ast_ext::resolve_ast_name(name, db, file.as_ref());
+        let Some(class_like) =
+            crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &resolved))
+        else {
+            return Err(mir_issues::IssueKind::UndefinedTrait { name: resolved });
+        };
+        let canonical = class_like.fqcn().to_string();
+        if !class_like.is_trait() {
+            return Err(mir_issues::IssueKind::CompileError {
+                message: format!(
+                    "Class {canonical} is not a trait, Only traits may be used in 'as' and 'insteadof' statements"
+                ),
+                code: "adaptation-non-trait".to_string(),
+            });
+        }
+        if !used.iter().any(|u| u.eq_ignore_ascii_case(&canonical)) {
+            return Err(mir_issues::IssueKind::CompileError {
+                message: format!("Required Trait {canonical} wasn't added to {owner_fqcn}"),
+                code: "trait-not-used".to_string(),
+            });
+        }
+        Ok(canonical)
+    };
+    let mut push = |span: php_ast::Span, kind: mir_issues::IssueKind| {
+        let (line, col_start) = offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
+        issues.push(
+            mir_issues::Issue::new(
+                kind,
+                mir_issues::Location {
+                    file: file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: clamp_col_end(line, line_end, col_start, col_end),
+                },
+            )
+            .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
+        );
+    };
+    let compile_error = |message: String, code: &str| mir_issues::IssueKind::CompileError {
+        message,
+        code: code.to_string(),
+    };
+    for adaptation in uses.iter().flat_map(|tu| tu.adaptations.iter()) {
+        match &adaptation.kind {
+            TraitAdaptationKind::Precedence {
+                trait_name,
+                method,
+                insteadof,
+            } => {
+                let winner = match check_trait(trait_name) {
+                    Ok(winner) => winner,
+                    Err(kind) => {
+                        push(trait_name.span, kind);
+                        continue;
+                    }
+                };
+                let method_name = crate::parser::name_to_string_owned(method);
+                let method_lower = crate::util::php_ident_lowercase(&method_name);
+                if !has_method(&winner, &method_lower) {
+                    push(
+                        adaptation.span,
+                        compile_error(
+                            format!(
+                                "A precedence rule was defined for {winner}::{method_name} but this method does not exist"
+                            ),
+                            "undefined-precedence-method",
+                        ),
+                    );
+                    continue;
+                }
+                for excluded in insteadof.iter() {
+                    match check_trait(excluded) {
+                        Err(kind) => push(excluded.span, kind),
+                        Ok(loser) if loser.eq_ignore_ascii_case(&winner) => push(
+                            excluded.span,
+                            compile_error(
+                                format!(
+                                    "Inconsistent insteadof definition. The method {method_name} is to be used from {winner}, but {winner} is also on the exclude list"
+                                ),
+                                "inconsistent-insteadof",
+                            ),
+                        ),
+                        Ok(_) => continue,
+                    }
+                    break;
+                }
+            }
+            TraitAdaptationKind::Alias {
+                trait_name: Some(trait_name),
+                ..
+            } => {
+                if let Err(kind) = check_trait(trait_name) {
+                    push(trait_name.span, kind);
+                }
+            }
+            TraitAdaptationKind::Alias {
+                trait_name: None,
+                method,
+                ..
+            } => {
+                let method_name = crate::parser::name_to_string_owned(method);
+                let method_lower = crate::util::php_ident_lowercase(&method_name);
+                let mut providers = used.iter().filter_map(|u| {
+                    let class_like =
+                        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, u))?;
+                    (class_like.is_trait() && has_method(u, &method_lower))
+                        .then(|| class_like.fqcn().to_string())
+                });
+                if let (Some(first), Some(second)) = (providers.next(), providers.next()) {
+                    push(
+                        adaptation.span,
+                        compile_error(
+                            format!(
+                                "An alias was defined for method {method_name}(), which exists in both {first} and {second}. Use {first}::{method_name} or {second}::{method_name} to resolve the ambiguity"
+                            ),
+                            "ambiguous-trait-alias",
+                        ),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn push_name_compile_error(
     name: &php_ast::owned::Name,
     message: String,

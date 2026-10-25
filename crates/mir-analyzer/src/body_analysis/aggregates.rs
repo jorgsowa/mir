@@ -38,6 +38,18 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        crate::diagnostics::check_trait_adaptations(
+            decl.body.members.iter().filter_map(|m| match &m.kind {
+                php_ast::owned::ClassMemberKind::TraitUse(tu) => Some(tu),
+                _ => None,
+            }),
+            fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         self.push_decl_name_fact(&decl.name, crate::Name::class(fqcn));
         self.check_class_generic_type_args(
             &decl.doc_comment,
@@ -163,6 +175,18 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        crate::diagnostics::check_trait_adaptations(
+            decl.body.members.iter().filter_map(|m| match &m.kind {
+                php_ast::owned::ClassMemberKind::TraitUse(tu) => Some(tu),
+                _ => None,
+            }),
+            fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         self.check_class_generic_type_args(
             &decl.doc_comment,
             fqcn,
@@ -349,6 +373,18 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
         );
+        crate::diagnostics::check_trait_adaptations(
+            decl.body.members.iter().filter_map(|m| match &m.kind {
+                php_ast::owned::EnumMemberKind::TraitUse(tu) => Some(tu),
+                _ => None,
+            }),
+            fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         self.push_decl_name_fact(&decl.name, crate::Name::class(fqcn));
 
         let scope_cx = MethodScopeCx {
@@ -464,6 +500,18 @@ impl<'a> BodyAnalyzer<'a> {
             crate::diagnostics::InterfaceListOwner::Enum {
                 backed: decl.scalar_type.is_some(),
             },
+            fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
+        crate::diagnostics::check_trait_adaptations(
+            decl.body.members.iter().filter_map(|m| match &m.kind {
+                php_ast::owned::EnumMemberKind::TraitUse(tu) => Some(tu),
+                _ => None,
+            }),
             fqcn,
             self.db,
             file,
