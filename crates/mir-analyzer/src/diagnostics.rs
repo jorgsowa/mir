@@ -419,6 +419,160 @@ fn check_name_class_with_context(
     }
 }
 
+/// What declares an `implements` (or interface `extends`) list, for PHP's checks on it.
+#[derive(Clone, Copy)]
+pub(crate) enum InterfaceListOwner {
+    Class,
+    Interface,
+    Enum { backed: bool },
+}
+
+/// PHP's compile-time checks on an interface list: no interface twice (an enum
+/// already implements `UnitEnum`, and `BackedEnum` when backed), `UnitEnum` /
+/// `BackedEnum` only on enums, `BackedEnum` only on backed ones.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn check_interface_list(
+    names: &[php_ast::owned::Name],
+    owner: InterfaceListOwner,
+    owner_fqcn: &str,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    let (word, implicit): (&str, &[&str]) = match owner {
+        InterfaceListOwner::Class => ("Class", &[]),
+        InterfaceListOwner::Interface => ("Interface", &[]),
+        InterfaceListOwner::Enum { backed: false } => ("Enum", &["UnitEnum"]),
+        InterfaceListOwner::Enum { backed: true } => ("Enum", &["UnitEnum", "BackedEnum"]),
+    };
+    let resolved: Vec<String> = names
+        .iter()
+        .map(|name| crate::ast_ext::resolve_ast_name(name, db, file.as_ref()))
+        .collect();
+    let canonical = |fqcn: &str| -> String {
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn))
+            .map_or_else(|| fqcn.to_string(), |c| c.fqcn().to_string())
+    };
+    let mut report = |name: &php_ast::owned::Name, message: String, code: &str| {
+        push_name_compile_error(name, message, code, file, source, source_map, issues);
+    };
+    // PHP stops at the first of these errors.
+    for (i, iface) in resolved.iter().enumerate() {
+        let repeated = resolved[..i].iter().any(|r| r.eq_ignore_ascii_case(iface))
+            || implicit.iter().any(|r| r.eq_ignore_ascii_case(iface));
+        if repeated {
+            report(
+                &names[i],
+                format!(
+                    "{word} {owner_fqcn} cannot implement previously implemented interface {}",
+                    canonical(iface)
+                ),
+                "duplicate-interface",
+            );
+            return;
+        }
+    }
+    for (i, iface) in resolved.iter().enumerate() {
+        match owner {
+            InterfaceListOwner::Class => {
+                let enum_iface = if iface.eq_ignore_ascii_case("UnitEnum")
+                    || iface.eq_ignore_ascii_case("BackedEnum")
+                {
+                    canonical(iface)
+                } else if crate::db::extends_or_implements(db, iface, "UnitEnum") {
+                    "UnitEnum".to_string()
+                } else {
+                    continue;
+                };
+                report(
+                    &names[i],
+                    format!("Non-enum class {owner_fqcn} cannot implement interface {enum_iface}"),
+                    "enum-interface-on-class",
+                );
+                return;
+            }
+            InterfaceListOwner::Enum { backed: false } => {
+                if crate::db::extends_or_implements(db, iface, "BackedEnum") {
+                    report(
+                        &names[i],
+                        format!(
+                            "Non-backed enum {owner_fqcn} cannot implement interface BackedEnum"
+                        ),
+                        "backed-enum-interface-on-pure-enum",
+                    );
+                    return;
+                }
+            }
+            _ => return,
+        }
+    }
+}
+
+/// `class C extends X` where `X` is an enum or a trait (an interface is `UndefinedClass`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn check_extends_class_like_kind(
+    parent: &php_ast::owned::Name,
+    child_fqcn: &str,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    let resolved = crate::ast_ext::resolve_ast_name(parent, db, file.as_ref());
+    let Some(parent_like) = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &resolved))
+    else {
+        return;
+    };
+    let (kind, code) = if parent_like.is_enum() {
+        ("enum", "extends-enum")
+    } else if parent_like.is_trait() {
+        ("trait", "extends-trait")
+    } else {
+        return;
+    };
+    push_name_compile_error(
+        parent,
+        format!("Class {child_fqcn} cannot extend {kind} {}", parent_like.fqcn()),
+        code,
+        file,
+        source,
+        source_map,
+        issues,
+    );
+}
+
+fn push_name_compile_error(
+    name: &php_ast::owned::Name,
+    message: String,
+    code: &str,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    let (line, col_start) = offset_to_line_col(source, name.span.start, source_map);
+    let (line_end, col_end) = offset_to_line_col(source, name.span.end, source_map);
+    issues.push(
+        mir_issues::Issue::new(
+            mir_issues::IssueKind::CompileError {
+                message,
+                code: code.to_string(),
+            },
+            mir_issues::Location {
+                file: file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end: clamp_col_end(line, line_end, col_start, col_end),
+            },
+        )
+        .with_snippet(crate::parser::span_text(source, name.span).unwrap_or_default()),
+    );
+}
+
 pub(crate) fn is_pseudo_type(name: &str) -> bool {
     crate::util::is_native_type_name(name)
 }

@@ -1578,6 +1578,11 @@ impl<'a> BodyAnalyzer<'a> {
                         .then_some(&mut *resolved_navigation_facts),
                 );
             }
+            if decl.name.is_some() {
+                crate::diagnostics::check_extends_class_like_kind(
+                    parent, fqcn, self.db, file, source, source_map, all_issues,
+                );
+            }
         }
         for iface in decl.implements.iter() {
             let iface_resolved = crate::ast_ext::resolve_ast_name(iface, self.db, file.as_ref());
@@ -1599,6 +1604,18 @@ impl<'a> BodyAnalyzer<'a> {
                         .then_some(&mut *resolved_navigation_facts),
                 );
             }
+        }
+        if decl.name.is_some() {
+            crate::diagnostics::check_interface_list(
+                &decl.implements,
+                crate::diagnostics::InterfaceListOwner::Class,
+                fqcn,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
         }
 
         self.record_trait_alias_method_refs(decl, file, source, source_map);
@@ -1842,6 +1859,11 @@ impl<'a> BodyAnalyzer<'a> {
                         .then_some(&mut *resolved_navigation_facts),
                 );
             }
+            if decl.name.is_some() {
+                crate::diagnostics::check_extends_class_like_kind(
+                    parent, fqcn, self.db, file, source, source_map, all_issues,
+                );
+            }
         }
         for iface in decl.implements.iter() {
             let iface_resolved = crate::ast_ext::resolve_ast_name(iface, self.db, file.as_ref());
@@ -1861,6 +1883,18 @@ impl<'a> BodyAnalyzer<'a> {
                         .then_some(&mut *resolved_navigation_facts),
                 );
             }
+        }
+        if decl.name.is_some() {
+            crate::diagnostics::check_interface_list(
+                &decl.implements,
+                crate::diagnostics::InterfaceListOwner::Class,
+                fqcn,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);

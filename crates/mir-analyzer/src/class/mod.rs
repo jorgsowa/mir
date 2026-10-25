@@ -100,6 +100,14 @@ impl<'a> ClassAnalyzer<'a> {
                         );
                     }
                 }
+                // The body pass reports extending an enum or trait as a compile error;
+                // the member checks below would only add cascades.
+                if parent_pulled
+                    .as_ref()
+                    .is_some_and(|p| p.is_enum() || p.is_trait())
+                {
+                    continue;
+                }
                 if parent_pulled.is_some() {
                     if parent_is_final {
                         self.push_located_issue(
@@ -224,6 +232,10 @@ impl<'a> ClassAnalyzer<'a> {
             // interface or trait (a polyfill behind a version check) would answer.
             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
             if !crate::db::find_class_like(self.db, here).is_some_and(|c| c.is_class()) {
+                continue;
+            }
+            // A compile error in the body pass; the enum contracts' members would cascade.
+            if crate::db::extends_or_implements(self.db, fqcn.as_ref(), "UnitEnum") {
                 continue;
             }
 

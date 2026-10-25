@@ -337,6 +337,18 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        crate::diagnostics::check_interface_list(
+            &decl.implements,
+            crate::diagnostics::InterfaceListOwner::Enum {
+                backed: decl.scalar_type.is_some(),
+            },
+            fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         self.push_decl_name_fact(&decl.name, crate::Name::class(fqcn));
 
         let scope_cx = MethodScopeCx {
@@ -447,6 +459,18 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        crate::diagnostics::check_interface_list(
+            &decl.implements,
+            crate::diagnostics::InterfaceListOwner::Enum {
+                backed: decl.scalar_type.is_some(),
+            },
+            fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -560,6 +584,16 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
+        crate::diagnostics::check_interface_list(
+            &decl.extends,
+            crate::diagnostics::InterfaceListOwner::Interface,
+            &iface_fqcn,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         self.push_decl_name_fact(&decl.name, crate::Name::class(iface_fqcn.as_str()));
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);
 
