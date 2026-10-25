@@ -892,7 +892,9 @@ fn self_constant_values(class_ref: &str, pattern: &str) -> Option<Vec<Atomic>> {
         // `class_ref` is raw docblock text, never namespace-resolved, so a bare
         // short name counts as a self-reference.
         let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn);
-        let is_self_ref = matches!(class_ref, "self" | "static" | "$this")
+        let is_self_ref = class_ref == "$this"
+            || class_ref.eq_ignore_ascii_case("self")
+            || class_ref.eq_ignore_ascii_case("static")
             || normalize_fqcn(class_ref).eq_ignore_ascii_case(fqcn)
             || (!class_ref.contains('\\') && class_ref.eq_ignore_ascii_case(short_name));
         if !is_self_ref {

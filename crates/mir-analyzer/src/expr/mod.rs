@@ -906,7 +906,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::StaticPropertyAccessDynamic { class, member } => {
                 if let Some(resolved) = class.kind.resolve_name_ref(self.db, self.file.as_ref()) {
                     let fqcn = match ctx.self_fqcn.as_deref() {
-                        Some(self_fqcn) if resolved.eq_ignore_ascii_case("self") => {
+                        Some(self_fqcn) if resolved == "self" => {
                             self_fqcn.to_string()
                         }
                         _ => resolved,

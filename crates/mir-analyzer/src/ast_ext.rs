@@ -109,7 +109,7 @@ impl NameResolveExt for php_ast::owned::ExprKind {
     }
 }
 
-/// The fully qualified name a name in code resolves to; `self` / `static` / `parent` stay as written.
+/// The fully qualified name a name in code resolves to; `self` / `static` / `parent` resolve to the lowercase keyword.
 pub(crate) fn resolve_ast_name(
     n: &php_ast::owned::Name,
     db: &dyn crate::db::MirDatabase,
