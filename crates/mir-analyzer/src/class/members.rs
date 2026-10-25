@@ -562,6 +562,7 @@ impl ClassAnalyzer<'_> {
 impl ClassAnalyzer<'_> {
     /// PHP rejects a used trait's property or constant that the class, or an earlier
     /// trait, declares differently.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn check_trait_member_compatibility(
         &self,
         fqcn: &Arc<str>,
