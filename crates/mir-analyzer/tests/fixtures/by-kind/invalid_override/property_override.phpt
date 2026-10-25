@@ -33,9 +33,9 @@ final class Child extends Base implements HasName {
 trait Tagged {
     #[Override]
     public string $tag = '';
-//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: UsesTrait::$tag has #[\Override] attribute, but no matching parent property exists
 }
 
 final class UsesTrait {
     use Tagged;
+//      ^^^^^^^ InvalidOverride: UsesTrait::$tag has #[\Override] attribute, but no matching parent property exists
 }

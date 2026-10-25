@@ -21,5 +21,5 @@ class Base {
 }
 class Child extends Base {
     protected function foo(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Child::foo() overrides with less visibility
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Access level to Child::foo() must be public (as in class Base)
 }

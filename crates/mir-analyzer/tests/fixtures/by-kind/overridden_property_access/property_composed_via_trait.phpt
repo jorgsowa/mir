@@ -17,8 +17,8 @@ class A {
 trait T {
     /** @var string|null */
     protected $foo;
-//  ^^^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$foo overrides with less visibility
 }
 class B extends A {
     use T;
+//      ^^ OverriddenPropertyAccess: Access level to B::$foo must be public (as in class A)
 }

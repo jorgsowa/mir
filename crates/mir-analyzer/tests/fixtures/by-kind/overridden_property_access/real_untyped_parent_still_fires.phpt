@@ -19,7 +19,7 @@ class A {
 
 class B extends A {
     private $foo;
-//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$foo overrides with less visibility
+//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Access level to B::$foo must be public (as in class A)
     private $bar;
-//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$bar overrides with less visibility
+//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Access level to B::$bar must be protected (as in class A) or weaker
 }

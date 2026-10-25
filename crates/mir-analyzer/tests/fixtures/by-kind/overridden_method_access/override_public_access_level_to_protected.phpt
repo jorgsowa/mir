@@ -8,5 +8,5 @@ class A {
 
 class B extends A {
     protected function fooFoo(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method B::foofoo() overrides with less visibility
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Access level to B::fooFoo() must be public (as in class A)
 }

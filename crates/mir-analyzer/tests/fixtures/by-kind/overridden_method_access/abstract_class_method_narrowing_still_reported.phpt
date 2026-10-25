@@ -9,5 +9,5 @@ abstract class Base {
 }
 class Impl extends Base {
     protected function foo(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Impl::foo() overrides with less visibility
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Access level to Impl::foo() must be public (as in class Base)
 }

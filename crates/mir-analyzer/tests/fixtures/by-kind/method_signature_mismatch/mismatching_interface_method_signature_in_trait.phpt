@@ -14,10 +14,10 @@ interface A {
 
 trait T {
     public function fooFoo(int $a): void {
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)
     }
 }
 
 class B implements A {
     use T;
+//      ^^ MethodSignatureMismatch: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)
 }

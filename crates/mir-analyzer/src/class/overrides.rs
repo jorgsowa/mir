@@ -53,6 +53,7 @@ impl<'a> ClassAnalyzer<'a> {
             own_methods.iter().map(|(k, _)| k.clone()).collect();
         let mut trait_composed_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> =
             Vec::new();
+        let mut trait_origins: HashMap<Arc<str>, Arc<str>> = HashMap::default();
         for anc in crate::db::class_ancestors_by_fqcn(self.db, here)
             .iter()
             .skip(1)
@@ -83,6 +84,7 @@ impl<'a> ClassAnalyzer<'a> {
                         // `static(Trait)` against the parent's `static(Parent)` and
                         // spuriously fails covariance.
                         let rebound = Self::rebind_self_static_in_method(&m, fqcn);
+                        trait_origins.insert(key.clone(), owner.clone());
                         trait_composed_methods.push((key, rebound));
                     }
                 }
@@ -130,7 +132,26 @@ impl<'a> ClassAnalyzer<'a> {
             }
         }
 
-        for (_, own) in own_methods {
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        // A trait's member belongs to the class using it, which PHP names: the nearest
+        // class before the trait in the ancestor walk.
+        let member_owner = |anc: &Arc<str>| -> Arc<str> {
+            if !crate::db::class_kind(self.db, anc.as_ref()).is_some_and(|k| k.is_trait) {
+                return anc.clone();
+            }
+            ancestors
+                .iter()
+                .position(|a| a == anc)
+                .and_then(|idx| {
+                    ancestors[..idx].iter().rev().find(|a| {
+                        crate::db::class_kind(self.db, a.as_ref()).is_some_and(|k| !k.is_trait)
+                    })
+                })
+                .unwrap_or(anc)
+                .clone()
+        };
+
+        for (key, own) in own_methods {
             // Reported as a redeclaration instead; PHP's own method replaces it.
             if let crate::db::ClassLike::Enum(e) = &class {
                 if super::members::enum_builtin_method(e, &own.name).is_some() {
@@ -244,18 +265,22 @@ impl<'a> ClassAnalyzer<'a> {
             let parent_method = all_parent_methods.first().cloned();
 
             let own_location = own.location.clone();
+            let report_location = match trait_origins.get(&key) {
+                Some(origin) => self.trait_use_location(&class, origin),
+                None => own_location.clone(),
+            };
             let loc_cell = std::cell::OnceCell::new();
             let loc = || {
                 loc_cell
                     .get_or_init(|| {
                         if own.is_virtual {
                             return crate::diagnostics::storage_loc_to_location(
-                                own_location.as_ref(),
+                                report_location.as_ref(),
                             );
                         }
                         issue_location(
-                            own_location.as_ref(),
-                            own_location
+                            report_location.as_ref(),
+                            report_location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
                         )
@@ -274,7 +299,8 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc(),
                         );
-                        if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources)
+                        if let Some(snippet) =
+                            extract_snippet(report_location.as_ref(), &self.sources)
                         {
                             issue = issue.with_snippet(snippet);
                         }
@@ -294,7 +320,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc(),
                 );
-                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -344,22 +370,7 @@ impl<'a> ClassAnalyzer<'a> {
             if let Some((final_parent_fqcn, _)) =
                 all_parent_methods.iter().find(|(_, p)| p.is_final)
             {
-                // A trait's final method is final in the class using it, which PHP names:
-                // the nearest class before the trait in the ancestor walk.
-                let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
-                let final_owner = ancestors
-                    .iter()
-                    .position(|a| a == final_parent_fqcn)
-                    .filter(|_| {
-                        crate::db::class_kind(self.db, final_parent_fqcn.as_ref())
-                            .is_some_and(|k| k.is_trait)
-                    })
-                    .and_then(|idx| {
-                        ancestors[..idx].iter().rev().find(|a| {
-                            crate::db::class_kind(self.db, a.as_ref()).is_some_and(|k| !k.is_trait)
-                        })
-                    })
-                    .unwrap_or(final_parent_fqcn);
+                let final_owner = member_owner(final_parent_fqcn);
                 let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
@@ -368,7 +379,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc(),
                 );
-                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -401,7 +412,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc(),
                 );
-                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -427,7 +438,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc(),
                 );
-                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -450,7 +461,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc(),
                 );
-                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -462,18 +473,20 @@ impl<'a> ClassAnalyzer<'a> {
             // with a `protected`/`private` method raises no error — unlike the
             // same abstract method declared on an interface or an abstract
             // class, which does enforce the normal never-narrower rule.
-            if all_parent_methods.iter().any(|(anc, p)| {
+            if let Some((parent_fqcn, parent)) = all_parent_methods.iter().find(|(anc, p)| {
                 !(p.is_abstract && own_traits.contains(anc))
                     && visibility_reduced(own.visibility, p.visibility)
             }) {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
-                        method: method_name_lower.to_string(),
+                        method: method_name.to_string(),
+                        parent: member_owner(parent_fqcn).to_string(),
+                        visibility: parent.visibility.to_string(),
                     },
                     loc(),
                 );
-                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -872,6 +885,7 @@ impl<'a> ClassAnalyzer<'a> {
             .unwrap_or_default();
         let mut seen_prop_keys: HashSet<Arc<str>> =
             own_properties.iter().map(|(k, _)| k.clone()).collect();
+        let mut prop_origins: HashMap<Arc<str>, Arc<str>> = HashMap::default();
         for anc in crate::db::class_ancestors_by_fqcn(self.db, here)
             .iter()
             .skip(1)
@@ -884,12 +898,17 @@ impl<'a> ClassAnalyzer<'a> {
             };
             for (key, prop) in t.own_properties.iter() {
                 if seen_prop_keys.insert(key.clone()) {
+                    prop_origins.insert(key.clone(), anc.clone());
                     own_properties.push((key.clone(), prop.clone()));
                 }
             }
         }
-        for (_, own_prop) in own_properties {
+        for (key, own_prop) in own_properties {
             let prop_name = own_prop.name.clone();
+            let report_location = match prop_origins.get(&key) {
+                Some(origin) => self.trait_use_location(&class, origin),
+                None => own_prop.location.clone(),
+            };
             // Look up the same property name in ancestors, skipping self (first
             // entry) AND this class's own composed-trait prefix — a trait that
             // contributes `own_prop` itself is not a "parent" to compare against,
@@ -923,14 +942,13 @@ impl<'a> ClassAnalyzer<'a> {
                         member: format!("${prop_name}"),
                     },
                     issue_location(
-                        own_prop.location.as_ref(),
-                        own_prop
-                            .location
+                        report_location.as_ref(),
+                        report_location
                             .as_ref()
                             .and_then(|l| self.sources.get(&l.file).copied()),
                     ),
                 );
-                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -945,9 +963,8 @@ impl<'a> ClassAnalyzer<'a> {
                 && visibility_reduced(own_prop.visibility, parent_prop.visibility)
             {
                 let loc = issue_location(
-                    own_prop.location.as_ref(),
-                    own_prop
-                        .location
+                    report_location.as_ref(),
+                    report_location
                         .as_ref()
                         .and_then(|l| self.sources.get(&l.file).copied()),
                 );
@@ -955,10 +972,12 @@ impl<'a> ClassAnalyzer<'a> {
                     IssueKind::OverriddenPropertyAccess {
                         class: fqcn.to_string(),
                         property: prop_name.to_string(),
+                        parent: member_owner(&parent_fqcn).to_string(),
+                        visibility: parent_prop.visibility.to_string(),
                     },
                     loc,
                 );
-                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -976,9 +995,8 @@ impl<'a> ClassAnalyzer<'a> {
                 && own_prop.has_native_readonly != parent_prop.has_native_readonly
             {
                 let loc = issue_location(
-                    own_prop.location.as_ref(),
-                    own_prop
-                        .location
+                    report_location.as_ref(),
+                    report_location
                         .as_ref()
                         .and_then(|l| self.sources.get(&l.file).copied()),
                 );
@@ -991,7 +1009,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc,
                 );
-                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -1008,9 +1026,8 @@ impl<'a> ClassAnalyzer<'a> {
                 && own_prop.is_static != parent_prop.is_static
             {
                 let loc = issue_location(
-                    own_prop.location.as_ref(),
-                    own_prop
-                        .location
+                    report_location.as_ref(),
+                    report_location
                         .as_ref()
                         .and_then(|l| self.sources.get(&l.file).copied()),
                 );
@@ -1023,7 +1040,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc,
                 );
-                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -1054,9 +1071,8 @@ impl<'a> ClassAnalyzer<'a> {
                         .unwrap_or_default()
                 };
                 let loc = issue_location(
-                    own_prop.location.as_ref(),
-                    own_prop
-                        .location
+                    report_location.as_ref(),
+                    report_location
                         .as_ref()
                         .and_then(|l| self.sources.get(&l.file).copied()),
                 );
@@ -1069,7 +1085,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc,
                 );
-                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(report_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -1087,9 +1103,8 @@ impl<'a> ClassAnalyzer<'a> {
                         && (parent_prop.get_only_hook || parent_t.is_subtype_structural(own_t));
                     if !same_type {
                         let loc = issue_location(
-                            own_prop.location.as_ref(),
-                            own_prop
-                                .location
+                            report_location.as_ref(),
+                            report_location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
                         );
@@ -1103,7 +1118,7 @@ impl<'a> ClassAnalyzer<'a> {
                             loc,
                         );
                         if let Some(snippet) =
-                            extract_snippet(own_prop.location.as_ref(), &self.sources)
+                            extract_snippet(report_location.as_ref(), &self.sources)
                         {
                             issue = issue.with_snippet(snippet);
                         }
@@ -1117,6 +1132,29 @@ impl<'a> ClassAnalyzer<'a> {
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    /// The `use` statement composing `trait_fqcn` into `class`, directly or through a nested trait.
+    fn trait_use_location(
+        &self,
+        class: &crate::db::ClassLike,
+        trait_fqcn: &str,
+    ) -> Option<Location> {
+        class
+            .trait_use_locations()
+            .iter()
+            .find(|(used, _)| {
+                used.eq_ignore_ascii_case(trait_fqcn)
+                    || crate::db::class_ancestors_by_fqcn(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, used.as_ref()),
+                    )
+                    .iter()
+                    .any(|a| a.eq_ignore_ascii_case(trait_fqcn))
+            })
+            .map(|(_, loc)| loc)
+            .or(class.location())
+            .cloned()
+    }
 
     /// Rebinds any `self`/`static` atomic in `ty` from wherever it was declared
     /// to `to_fqcn` — PHP resolves both to the class actually using a trait

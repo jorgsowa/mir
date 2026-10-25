@@ -16,5 +16,5 @@ class A {
 class B extends A {
     /** @var string|null */
     private $foo;
-//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$foo overrides with less visibility
+//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Access level to B::$foo must be protected (as in class A) or weaker
 }

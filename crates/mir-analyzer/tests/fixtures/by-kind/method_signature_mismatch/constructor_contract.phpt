@@ -25,7 +25,7 @@ abstract class Shape {
 
 class Square extends Shape {
     private function __construct(int $sides) {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Square::__construct() overrides with less visibility
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Access level to Square::__construct() must be protected (as in class Shape) or weaker
 }
 
 class Polygon extends Shape {

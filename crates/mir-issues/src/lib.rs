@@ -477,10 +477,20 @@ pub enum IssueKind {
     },
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_method_access/`.
-    OverriddenMethodAccess { class: String, method: String },
+    OverriddenMethodAccess {
+        class: String,
+        method: String,
+        parent: String,
+        visibility: String,
+    },
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_property_access/`.
-    OverriddenPropertyAccess { class: String, property: String },
+    OverriddenPropertyAccess {
+        class: String,
+        property: String,
+        parent: String,
+        visibility: String,
+    },
     /// Emitted by `mir-analyzer/src/class/overrides.rs`.
     /// Fixtures: `tests/fixtures/by-kind/property_type_redeclaration_mismatch/`.
     PropertyTypeRedeclarationMismatch {
@@ -955,6 +965,8 @@ impl IssueKind {
             | IssueKind::MethodSignatureMismatch { .. }
             | IssueKind::InvalidExtendClass { .. }
             | IssueKind::FinalMethodOverridden { .. }
+            | IssueKind::OverriddenMethodAccess { .. }
+            | IssueKind::OverriddenPropertyAccess { .. }
             | IssueKind::AbstractInstantiation { .. }
             | IssueKind::AbstractMethodCall { .. }
             | IssueKind::InterfaceInstantiation { .. }
@@ -1012,8 +1024,6 @@ impl IssueKind {
             | IssueKind::PossiblyInvalidArrayOffset { .. }
             | IssueKind::UndefinedProperty { .. }
             | IssueKind::InvalidOperand { .. }
-            | IssueKind::OverriddenMethodAccess { .. }
-            | IssueKind::OverriddenPropertyAccess { .. }
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. }
@@ -1394,23 +1404,23 @@ impl IssueKind {
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0200" | "MIR0201"
             | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216"
             | "MIR0217" | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702"
-            | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711"
-            | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718"
-            | "MIR0719" | "MIR0720" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802"
-            | "MIR0803" | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809"
-            | "MIR0810" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401"
-            | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
-                Some(Severity::Error)
-            }
+            | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709"
+            | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716"
+            | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228" | "MIR0229" | "MIR0800"
+            | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807"
+            | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300"
+            | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604"
+            | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0230" | "MIR0219" | "MIR0220"
             | "MIR0222" | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405"
-            | "MIR0408" | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501"
-            | "MIR1502" | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705"
-            | "MIR1706" | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511"
-            | "MIR1512" | "MIR1513" => Some(Severity::Warning),
+            | "MIR0408" | "MIR0500" | "MIR0506" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
+            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
+            | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513" => {
+                Some(Severity::Warning)
+            }
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -2006,11 +2016,31 @@ impl IssueKind {
             } => {
                 format!("Method {class}::{method}() signature mismatch: {detail}")
             }
-            IssueKind::OverriddenMethodAccess { class, method } => {
-                format!("Method {class}::{method}() overrides with less visibility")
+            IssueKind::OverriddenMethodAccess {
+                class,
+                method,
+                parent,
+                visibility,
+            } => {
+                let weaker = if visibility == "public" {
+                    ""
+                } else {
+                    " or weaker"
+                };
+                format!("Access level to {class}::{method}() must be {visibility} (as in class {parent}){weaker}")
             }
-            IssueKind::OverriddenPropertyAccess { class, property } => {
-                format!("Property {class}::${property} overrides with less visibility")
+            IssueKind::OverriddenPropertyAccess {
+                class,
+                property,
+                parent,
+                visibility,
+            } => {
+                let weaker = if visibility == "public" {
+                    ""
+                } else {
+                    " or weaker"
+                };
+                format!("Access level to {class}::${property} must be {visibility} (as in class {parent}){weaker}")
             }
             IssueKind::PropertyTypeRedeclarationMismatch {
                 class,
@@ -2861,10 +2891,14 @@ mod code_tests {
             IssueKind::OverriddenMethodAccess {
                 class: s(),
                 method: s(),
+                parent: s(),
+                visibility: s(),
             },
             IssueKind::OverriddenPropertyAccess {
                 class: s(),
                 property: s(),
+                parent: s(),
+                visibility: s(),
             },
             IssueKind::PropertyTypeRedeclarationMismatch {
                 class: s(),

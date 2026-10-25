@@ -7,5 +7,5 @@ class ParentClass {
 }
 class Child extends ParentClass {
     private function doStuff(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Child::dostuff() overrides with less visibility
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Access level to Child::doStuff() must be public (as in class ParentClass)
 }

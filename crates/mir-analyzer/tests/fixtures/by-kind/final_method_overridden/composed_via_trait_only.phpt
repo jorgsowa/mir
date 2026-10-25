@@ -9,8 +9,8 @@ class Base {
 }
 trait T {
     public function foo(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::foo() cannot override final method from Base
 }
 class Child extends Base {
     use T;
+//      ^^ FinalMethodOverridden: Method Child::foo() cannot override final method from Base
 }

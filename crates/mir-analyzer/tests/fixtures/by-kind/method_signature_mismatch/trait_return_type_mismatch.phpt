@@ -9,9 +9,9 @@ class A {
 
 trait T {
     abstract public function foo() : string;
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'string' is not a subtype of A::foo() 'void'
 }
 
 class B extends A {
     use T;
+//      ^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'string' is not a subtype of A::foo() 'void'
 }
