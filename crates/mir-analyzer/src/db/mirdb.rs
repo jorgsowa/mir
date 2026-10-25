@@ -1426,11 +1426,11 @@ impl MirDbStorage {
         file: &Arc<str>,
         text: &Arc<str>,
         epoch: u64,
-        names: Box<[Name]>,
+        scan: crate::db::FileScan,
     ) {
         let file_no = self.intern_path(file);
         self.class_mentions
-            .set_file(file_no, text.clone(), epoch, names);
+            .set_file(file_no, text.clone(), epoch, scan);
     }
 
     /// Drop `file`'s mention entry (file removed, or its text replaced —

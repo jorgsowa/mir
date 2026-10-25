@@ -553,7 +553,7 @@ pub(crate) struct AnalyzedFile {
     pub(crate) out: Arc<crate::db::AnalyzeOutput>,
     entries: Vec<crate::db::SubtypeEntry>,
     cache_put: Option<RefCachePut>,
-    mentions: Option<Box<[mir_types::Name]>>,
+    mentions: Option<crate::db::FileScan>,
 }
 
 /// A staged [`AnalysisCache`] write for one file's postings, prepared in the

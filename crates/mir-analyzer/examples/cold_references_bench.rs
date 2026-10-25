@@ -347,7 +347,7 @@ fn main() {
         stats.universe_names,
         stats.files_covered,
         stats.total_mentions,
-        (stats.total_mentions * 8 + stats.files_covered * 64) as f64 / 1e6,
+        (stats.total_mentions * 8 + stats.total_words * 4 + stats.files_covered * 80) as f64 / 1e6,
         stats.scanner_bytes as f64 / 1e6,
         stats.scans_recorded
     );

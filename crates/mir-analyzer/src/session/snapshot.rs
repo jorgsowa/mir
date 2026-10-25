@@ -95,7 +95,7 @@ struct WarmPass {
 
 /// A fallback mention scan `(file, text scanned, names found)`, recorded
 /// after the pass so later gate checks become set lookups.
-type MentionScanRecord = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
+type MentionScanRecord = (Arc<str>, Arc<str>, crate::db::FileScan);
 
 /// Below this many files the serial loop beats spawning workers.
 const MIN_PARALLEL_FILES: usize = 4;
@@ -420,9 +420,7 @@ impl AnalysisSnapshot {
                         Some(false) => continue,
                         None => {
                             let names = scanner.scan(text.as_ref());
-                            let hit = queries
-                                .iter()
-                                .any(|q2| names.binary_search(&q2.name).is_ok());
+                            let hit = queries.iter().any(|q2| names.contains(q2));
                             db.set_file_class_mentions(f, &text, scanner.epoch(), names);
                             return hit.then(|| f.clone());
                         }
@@ -573,8 +571,9 @@ impl AnalysisSnapshot {
     /// The whole gate answers from the persistent mention index: every
     /// needle is admitted, so a recorded mention set answers with lookups
     /// and only a never-scanned or since-edited file pays one scan against
-    /// the whole universe, recorded for every later consumer. A needle new
-    /// to the universe epoch-invalidates older recordings for itself only.
+    /// the whole universe, recorded for every later consumer. A recorded
+    /// word set answers even a needle new to the universe; only a new
+    /// non-word needle (raw token, non-ASCII name) forces a rescan.
     ///
     /// Intentionally serial: each request already runs on its caller
     /// thread, and putting every concurrent request back onto the shared
@@ -644,9 +643,7 @@ impl AnalysisSnapshot {
                             .as_ref()
                             .expect("gate_complete implies a scanner");
                         let names = scanner.scan(text);
-                        let hit = mention_queries
-                            .iter()
-                            .any(|q| names.binary_search(&q.name).is_ok());
+                        let hit = mention_queries.iter().any(|q| names.contains(q));
                         scanned.push((f.clone(), text.clone(), names));
                         if hit {
                             stale.push(f.clone());
@@ -1372,7 +1369,7 @@ impl AnalysisSnapshot {
                             // query and is recorded below.
                             let scanner = mention_scanner.as_ref().unwrap();
                             let names = scanner.scan(&text);
-                            let hit = queries.iter().any(|q| names.binary_search(&q.name).is_ok());
+                            let hit = queries.iter().any(|q| names.contains(q));
                             scan_rec = Some((path.clone(), text.clone(), names));
                             hit
                         }

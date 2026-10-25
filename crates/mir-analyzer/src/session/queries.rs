@@ -770,7 +770,7 @@ mod tests {
                 let expected = mentions_identifier(hay, needle);
                 let name = mir_types::Name::new(needle).ascii_lowercase();
                 assert_eq!(
-                    scanned.binary_search(&name).is_ok(),
+                    scanned.contains_name(&name),
                     expected,
                     "needle {needle:?} on {hay:?}"
                 );

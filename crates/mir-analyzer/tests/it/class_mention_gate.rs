@@ -221,8 +221,8 @@ fn class_declared_after_scan_falls_back_and_is_found() {
     );
     files.push(Arc::from("bar.php"));
 
-    // `late.php`'s entry is from the older epoch: the gate must fall back
-    // to a raw scan and still find the reference.
+    // `late.php`'s entry predates Bar's admission: the gate must still find
+    // the reference.
     let bar_refs = session
         .indexed_references_to(
             &Name::class("App\\Bar"),
@@ -480,8 +480,8 @@ fn subtype_gate_shares_mention_cache_with_references_gate() {
 
 /// Member-symbol gates (two needles: member name + owner short name) answer
 /// from the mention index: the member name is admitted at query time, the
-/// first query pays one rescan of covered files (epoch), and repeats run
-/// lookup-only. Results must be exact throughout.
+/// first query records each file once, and every later member needle —
+/// novel or not — runs lookup-only. Results must be exact throughout.
 #[test]
 fn member_gate_admits_needle_and_amortizes_to_lookups() {
     let declared = [(
@@ -549,8 +549,8 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
         "repeat member query must answer from the mention cache"
     );
 
-    // A different member name is novel to the universe: covered files rescan
-    // once (epoch), results stay exact, and its repeat is lookup-only again.
+    // A different member name is novel to the universe: covered files answer
+    // it from their recorded word sets, with no rescan.
     let resize = Name::method("App\\Widget", "resize");
     let refs2 = session
         .indexed_references_to(
@@ -563,9 +563,9 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
         .expect("not cancelled");
     assert_eq!(refs_files(&refs2), vec!["uses_resize.php"]);
     let scans_b = session.class_mention_stats().scans_recorded;
-    assert!(
-        scans_b > scans_a,
-        "a novel needle must force a fresh recording pass"
+    assert_eq!(
+        scans_b, scans_a,
+        "a novel word needle must answer from recorded word sets"
     );
     let repeat2 = session
         .indexed_references_to(

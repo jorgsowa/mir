@@ -207,9 +207,9 @@ fn measure_mention_index() {
     assert!(r1.is_empty() && r2.is_empty() && r3.is_empty() && r4.is_empty() && r5.is_empty());
 
     let stats = session.class_mention_stats();
-    // Entry cost model: Name is 8 bytes; FileMentions ≈ text Arc ptr (8) +
-    // epoch (8) + boxed slice (16) + map slot ≈ 64 B fixed per file.
-    let entry_bytes = stats.total_mentions * 8 + stats.files_covered * 64;
+    // Entry cost model: Name is 8 bytes, a word key 4; FileMentions ≈ text
+    // Arc ptr (8) + epoch (8) + two boxed slices (32) + map slot ≈ 80 B per file.
+    let entry_bytes = stats.total_mentions * 8 + stats.total_words * 4 + stats.files_covered * 80;
     eprintln!("--- gate pass timings (zero-reference probe classes) ---");
     eprintln!(
         "cold  (scan+record) : {cold:>10.2?}   allocs {:>10}  bytes {:>12}",

@@ -1,25 +1,33 @@
-//! Mention index: file → the universe names its raw text mentions. The
-//! universe holds declared class-like short names (seeded by indexing),
-//! literal needles admitted at query time (member/function names), and raw
-//! call tokens (`->__construct`), so it is the single implementation of the
+//! Mention index: file → the needles its raw text mentions. The universe
+//! holds declared class-like short names (seeded by indexing), literal
+//! needles admitted at query time (member/function names), and raw call
+//! tokens (`->__construct`), so it is the single implementation of the
 //! textual gates.
 //!
 //! The reference-query and subtype-BFS gates admit a never-committed file
 //! only when its text mentions a queried needle. This index memoizes that
-//! purely textual predicate: a file scanned once (against the whole
-//! universe) answers all later gates with an O(log n) set lookup instead of
-//! an O(text) scan.
+//! purely textual predicate: a file scanned once answers all later gates
+//! with an O(log n) set lookup instead of an O(text) scan.
+//!
+//! A scan records two things per file:
+//! - `words`: hashes of every maximal `[A-Za-z0-9_]` run, lowercased. A
+//!   bounded needle made only of those bytes ("word needle") is mentioned
+//!   exactly when it equals one of those runs, so this answers any word
+//!   needle — including one admitted after the scan — without rescanning.
+//!   A hash collision only admits an extra file (the conservative side).
+//! - `names`: hits of the Aho-Corasick automaton built from the remaining
+//!   "pattern" needles: raw ones, and bounded ones holding a non-word byte
+//!   (non-ASCII identifiers, `\`).
 //!
 //! Correctness model — the index can only ever say what a raw scan would:
 //! - An entry is keyed to its source text by `Arc` identity; an edit
 //!   self-invalidates it (the reader falls back to a raw scan).
-//! - The name universe is append-only within a session; each name records
-//!   the epoch it entered. An entry scanned at epoch E answers only needles
-//!   added at or before E — a name admitted later falls back to the raw
-//!   scan until the file is rescanned (which any later scan upgrades).
-//! - Bounded-needle scan semantics match `mentions_identifier` (the test
-//!   oracle in `session/queries.rs`): whole identifier,
-//!   ASCII-case-insensitive. Raw needles skip the boundary check.
+//! - The name universe is append-only within a session. Each pattern needle
+//!   records the epoch it entered; an entry scanned at epoch E answers only
+//!   pattern needles added at or before E. Word needles never move the epoch.
+//! - Bounded-needle semantics match `mentions_identifier` (the test oracle
+//!   in `session/queries.rs`): whole identifier, ASCII-case-insensitive.
+//!   Raw needles skip the boundary check.
 //!
 //! Concurrency: per-file entries live in a sharded `DashMap` (the gate loop
 //! reads one entry per candidate from many rayon workers at once — a single
@@ -35,11 +43,87 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use mir_types::Name;
 
-/// Compiled whole-universe scanner frozen at one epoch. Cheap to share
-/// across rayon workers; rebuilt lazily when the universe grows.
+fn is_word_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Whether a bounded `needle` is answered by a file's word set.
+fn is_word(needle: &str) -> bool {
+    !needle.is_empty() && needle.bytes().all(is_word_byte)
+}
+
+/// Whether `name` needs the automaton rather than the word set.
+fn is_pattern(name: &Name, raw: bool) -> bool {
+    raw || !is_word(name.as_str())
+}
+
+const FNV_OFFSET: u32 = 0x811c_9dc5;
+const FNV_PRIME: u32 = 0x0100_0193;
+
+fn word_key(word: &[u8]) -> u32 {
+    word.iter().fold(FNV_OFFSET, |h, &b| {
+        (h ^ u32::from(b.to_ascii_lowercase())).wrapping_mul(FNV_PRIME)
+    })
+}
+
+/// Sorted, deduplicated keys of every maximal `[A-Za-z0-9_]` run in `hay`.
+fn words_of(hay: &[u8]) -> Box<[u32]> {
+    let mut keys = Vec::new();
+    let mut h = FNV_OFFSET;
+    let mut in_word = false;
+    for &b in hay {
+        if is_word_byte(b) {
+            h = (h ^ u32::from(b.to_ascii_lowercase())).wrapping_mul(FNV_PRIME);
+            in_word = true;
+        } else if in_word {
+            keys.push(h);
+            h = FNV_OFFSET;
+            in_word = false;
+        }
+    }
+    if in_word {
+        keys.push(h);
+    }
+    keys.sort_unstable();
+    keys.dedup();
+    keys.into_boxed_slice()
+}
+
+/// One file's complete mention set for one text.
+#[derive(Debug, Clone, Default)]
+pub struct FileScan {
+    /// Pattern needles the text mentions, sorted.
+    names: Box<[Name]>,
+    /// Sorted [`word_key`]s of the text's identifier runs.
+    words: Box<[u32]>,
+}
+
+impl FileScan {
+    pub fn contains(&self, q: &MentionQuery) -> bool {
+        match q.word {
+            Some(key) => self.words.binary_search(&key).is_ok(),
+            None => self.names.binary_search(&q.name).is_ok(),
+        }
+    }
+
+    /// [`Self::contains`] for a lowercased bounded needle the scanner was built with.
+    pub fn contains_name(&self, name: &Name) -> bool {
+        if is_word(name.as_str()) {
+            self.words
+                .binary_search(&word_key(name.as_str().as_bytes()))
+                .is_ok()
+        } else {
+            self.names.binary_search(name).is_ok()
+        }
+    }
+}
+
+/// Compiled pattern-needle scanner frozen at one epoch. Cheap to share
+/// across rayon workers; rebuilt lazily when a pattern needle is added.
 pub struct MentionScanner {
     epoch: u64,
-    ac: aho_corasick::AhoCorasick,
+    /// `None` when the universe holds no pattern needles.
+    ac: Option<aho_corasick::AhoCorasick>,
     /// Pattern id → the (lowercased) name it matches.
     patterns: Vec<Name>,
     /// Pattern id → whether that pattern skips the boundary check (a raw
@@ -49,15 +133,22 @@ pub struct MentionScanner {
 }
 
 impl MentionScanner {
+    /// Word needles in `entries` are dropped: the word set answers them.
     pub(crate) fn build(epoch: u64, entries: Vec<(Name, bool)>) -> Option<Self> {
-        if entries.is_empty() {
-            return None;
-        }
-        let ac = aho_corasick::AhoCorasick::builder()
-            .ascii_case_insensitive(true)
-            .build(entries.iter().map(|(n, _)| n.as_str()))
-            .ok()?;
-        let (patterns, raw): (Vec<Name>, Vec<bool>) = entries.into_iter().unzip();
+        let (patterns, raw): (Vec<Name>, Vec<bool>) = entries
+            .into_iter()
+            .filter(|(n, raw)| is_pattern(n, *raw))
+            .unzip();
+        let ac = if patterns.is_empty() {
+            None
+        } else {
+            Some(
+                aho_corasick::AhoCorasick::builder()
+                    .ascii_case_insensitive(true)
+                    .build(patterns.iter().map(|n| n.as_str()))
+                    .ok()?,
+            )
+        };
         Some(Self {
             epoch,
             ac,
@@ -70,31 +161,34 @@ impl MentionScanner {
         self.epoch
     }
 
-    /// Every universe name `hay` mentions, sorted for binary search. A
-    /// bounded pattern must appear as a whole identifier (boundary rule
-    /// matches the `mentions_identifier` test oracle); a raw pattern (see
-    /// [`ClassMentionIndex::add_raw_names`]) matches as a plain substring,
-    /// no boundary check at all.
-    pub fn scan(&self, hay: &str) -> Box<[Name]> {
+    /// Everything `hay` mentions. A bounded pattern must appear as a whole
+    /// identifier (boundary rule matches the `mentions_identifier` test
+    /// oracle); a raw pattern (see [`ClassMentionIndex::add_raw_names`])
+    /// matches as a plain substring, no boundary check at all.
+    pub fn scan(&self, hay: &str) -> FileScan {
         let bytes = hay.as_bytes();
-        let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
-        let mut seen: FxHashSet<usize> = FxHashSet::default();
         let mut hits: Vec<Name> = Vec::new();
-        for m in self.ac.find_overlapping_iter(hay) {
-            let pid = m.pattern().as_usize();
-            if seen.contains(&pid) {
-                continue;
+        if let Some(ac) = &self.ac {
+            let mut seen: FxHashSet<usize> = FxHashSet::default();
+            for m in ac.find_overlapping_iter(hay) {
+                let pid = m.pattern().as_usize();
+                if seen.contains(&pid) {
+                    continue;
+                }
+                let bounded_ok = self.raw[pid]
+                    || ((m.start() == 0 || !is_word_byte(bytes[m.start() - 1]))
+                        && (m.end() == bytes.len() || !is_word_byte(bytes[m.end()])));
+                if bounded_ok {
+                    seen.insert(pid);
+                    hits.push(self.patterns[pid]);
+                }
             }
-            let bounded_ok = self.raw[pid]
-                || ((m.start() == 0 || !is_ident(bytes[m.start() - 1]))
-                    && (m.end() == bytes.len() || !is_ident(bytes[m.end()])));
-            if bounded_ok {
-                seen.insert(pid);
-                hits.push(self.patterns[pid]);
-            }
+            hits.sort_unstable();
         }
-        hits.sort_unstable();
-        hits.into_boxed_slice()
+        FileScan {
+            names: hits.into_boxed_slice(),
+            words: words_of(bytes),
+        }
     }
 }
 
@@ -102,10 +196,9 @@ impl MentionScanner {
 struct FileMentions {
     /// Text the scan ran against (`Arc` identity; an edit self-invalidates).
     text: Arc<str>,
-    /// Scanner epoch of the scan: definitive for names added at or before it.
+    /// Scanner epoch of the scan: definitive for pattern needles added at or before it.
     epoch: u64,
-    /// Sorted lowercased short names the text mentions.
-    names: Box<[Name]>,
+    scan: FileScan,
 }
 
 /// A prepared coverage key: the needle plus the epoch it entered the
@@ -114,6 +207,8 @@ struct FileMentions {
 pub struct MentionQuery {
     pub name: Name,
     added_epoch: u64,
+    /// The needle's [`word_key`] when the word set answers it.
+    word: Option<u32>,
 }
 
 /// Size/coverage counters for memory validation and host metrics.
@@ -121,7 +216,10 @@ pub struct MentionQuery {
 pub struct ClassMentionStats {
     pub universe_names: usize,
     pub files_covered: usize,
+    /// Pattern-needle hits recorded across files.
     pub total_mentions: usize,
+    /// Word keys recorded across files.
+    pub total_words: usize,
     /// Heap bytes of the cached scanner's automaton, if built.
     pub scanner_bytes: usize,
     /// Cumulative scan results recorded (each is one raw-text pass a later
@@ -143,14 +241,16 @@ struct NameEntry {
 /// Universe state: what names exist, since when, and the cached automaton.
 #[derive(Default)]
 struct Universe {
-    /// Bumped once per batch that adds at least one new name or upgrades an
-    /// existing one to `raw`.
+    /// Bumped once per batch that adds at least one new pattern needle or
+    /// upgrades an existing name to `raw`.
     epoch: u64,
     /// Lowercased needle → its coverage entry. Append-only: a name outliving
     /// its declaration only widens mention sets (the predicate is textual,
     /// so answers stay exact), and a bounded name is only ever upgraded to
     /// raw, never downgraded.
     names: FxHashMap<Name, NameEntry>,
+    /// How many of `names` are pattern needles.
+    pattern_count: usize,
     /// Cached scanner; valid while its epoch matches `epoch`.
     scanner: Option<Arc<MentionScanner>>,
 }
@@ -166,7 +266,7 @@ pub struct ClassMentionIndex {
 
 impl ClassMentionIndex {
     /// Insert lowercased short names, matched as whole identifiers.
-    /// Idempotent; bumps the epoch once if any is new.
+    /// Idempotent; bumps the epoch once if any new one is a pattern needle.
     pub fn add_names(&self, names: impl IntoIterator<Item = Name>) {
         self.add_names_impl(names, false);
     }
@@ -177,11 +277,10 @@ impl ClassMentionIndex {
     /// byte in real usage, e.g. `$obj->__construct()`, is itself an
     /// identifier character and would otherwise fail the boundary check
     /// that protects [`Self::add_names`]). Shares the same universe/scanner
-    /// and per-file cache — a file scanned for a bounded name answers a raw
-    /// one for free, and vice versa. Idempotent; upgrading an existing
-    /// bounded name to raw bumps the epoch (forces a rescan) since a
-    /// same-text entry scanned before the upgrade may have rejected a match
-    /// the boundary check would have caught.
+    /// and per-file cache. Idempotent; upgrading an existing bounded name to
+    /// raw bumps the epoch (forces a rescan) since a same-text entry scanned
+    /// before the upgrade may have rejected a match the boundary check would
+    /// have caught.
     pub fn add_raw_names(&self, names: impl IntoIterator<Item = Name>) {
         self.add_names_impl(names, true);
     }
@@ -189,30 +288,40 @@ impl ClassMentionIndex {
     fn add_names_impl(&self, names: impl IntoIterator<Item = Name>, raw: bool) {
         let mut u = self.universe.lock();
         let next = u.epoch + 1;
-        let mut added = false;
+        let mut added_pattern = false;
+        let mut new_patterns = 0;
         for n in names {
+            let pattern = is_pattern(&n, raw);
             match u.names.entry(n) {
                 std::collections::hash_map::Entry::Vacant(v) => {
                     v.insert(NameEntry { epoch: next, raw });
-                    added = true;
+                    if pattern {
+                        added_pattern = true;
+                        new_patterns += 1;
+                    }
                 }
                 std::collections::hash_map::Entry::Occupied(mut o) => {
                     if raw && !o.get().raw {
+                        let was_pattern = is_pattern(o.key(), false);
                         o.get_mut().raw = true;
                         o.get_mut().epoch = next;
-                        added = true;
+                        added_pattern = true;
+                        if !was_pattern {
+                            new_patterns += 1;
+                        }
                     }
                 }
             }
         }
-        if added {
+        u.pattern_count += new_patterns;
+        if added_pattern {
             u.epoch = next;
         }
     }
 
-    /// The whole-universe scanner for the current epoch, building it if the
-    /// universe grew. The automaton build runs outside the universe lock (a
-    /// concurrent builder may waste one build; installs are idempotent).
+    /// The pattern scanner for the current epoch, building it if a pattern
+    /// needle was added. The automaton build runs outside the universe lock
+    /// (a concurrent builder may waste one build; installs are idempotent).
     /// `None` while the universe is empty.
     pub fn scanner(&self) -> Option<Arc<MentionScanner>> {
         let (epoch, entries) = {
@@ -227,6 +336,7 @@ impl ClassMentionIndex {
                 u.epoch,
                 u.names
                     .iter()
+                    .filter(|(n, e)| is_pattern(n, e.raw))
                     .map(|(n, e)| (*n, e.raw))
                     .collect::<Vec<(Name, bool)>>(),
             )
@@ -240,12 +350,12 @@ impl ClassMentionIndex {
     }
 
     /// [`Self::scanner`], but keeps the cached automaton while the universe
-    /// has grown only slightly since it was built; a rebuild is O(universe).
+    /// has grown only slightly since it was built; a rebuild is O(patterns).
     pub fn scanner_reusing_cached(&self) -> Option<Arc<MentionScanner>> {
         {
             let u = self.universe.lock();
             if let Some(s) = u.scanner.as_ref() {
-                let grown = u.names.len().saturating_sub(s.patterns.len());
+                let grown = u.pattern_count.saturating_sub(s.patterns.len());
                 if s.epoch == u.epoch || grown <= (s.patterns.len() / 4).max(512) {
                     return Some(s.clone());
                 }
@@ -257,13 +367,19 @@ impl ClassMentionIndex {
     /// Resolve `needle` (any case, short name) against the universe.
     pub fn prepare_query(&self, needle: &str) -> Option<MentionQuery> {
         let name = Name::new(needle).ascii_lowercase();
-        let added_epoch = self.universe.lock().names.get(&name)?.epoch;
-        Some(MentionQuery { name, added_epoch })
+        let entry = *self.universe.lock().names.get(&name)?;
+        let word = (!is_pattern(&name, entry.raw)).then(|| word_key(name.as_str().as_bytes()));
+        Some(MentionQuery {
+            name,
+            added_epoch: entry.epoch,
+            word,
+        })
     }
 
     /// Whether `file`'s current text mentions the queried name. `None` when
-    /// the entry can't answer (missing, text changed, or scanned before the
-    /// name entered the universe) — the caller must fall back to a raw scan.
+    /// the entry can't answer (missing, text changed, or a pattern needle
+    /// scanned before it entered the universe) — the caller must fall back
+    /// to a raw scan.
     pub fn answer(
         &self,
         file: crate::db::FileNo,
@@ -271,10 +387,10 @@ impl ClassMentionIndex {
         current_text: &Arc<str>,
     ) -> Option<bool> {
         let e = self.by_file.get(&file)?;
-        if !Arc::ptr_eq(&e.text, current_text) || e.epoch < q.added_epoch {
+        if !Arc::ptr_eq(&e.text, current_text) || (q.word.is_none() && e.epoch < q.added_epoch) {
             return None;
         }
-        Some(e.names.binary_search(&q.name).is_ok())
+        Some(e.scan.contains(q))
     }
 
     /// Whether `file` already holds a scan of exactly `text` at `epoch` or
@@ -287,23 +403,17 @@ impl ClassMentionIndex {
 
     /// Record a scan result. Never downgrades a same-text entry from a newer
     /// epoch.
-    pub fn set_file(
-        &self,
-        file: crate::db::FileNo,
-        text: Arc<str>,
-        epoch: u64,
-        names: Box<[Name]>,
-    ) {
+    pub fn set_file(&self, file: crate::db::FileNo, text: Arc<str>, epoch: u64, scan: FileScan) {
         match self.by_file.entry(file) {
             dashmap::mapref::entry::Entry::Occupied(mut o) => {
                 let prev = o.get();
                 if Arc::ptr_eq(&prev.text, &text) && prev.epoch >= epoch {
                     return;
                 }
-                o.insert(FileMentions { text, epoch, names });
+                o.insert(FileMentions { text, epoch, scan });
             }
             dashmap::mapref::entry::Entry::Vacant(v) => {
-                v.insert(FileMentions { text, epoch, names });
+                v.insert(FileMentions { text, epoch, scan });
             }
         }
         self.scans_recorded.fetch_add(1, Ordering::Relaxed);
@@ -318,8 +428,14 @@ impl ClassMentionIndex {
         ClassMentionStats {
             universe_names: u.names.len(),
             files_covered: self.by_file.len(),
-            total_mentions: self.by_file.iter().map(|e| e.names.len()).sum(),
-            scanner_bytes: u.scanner.as_ref().map(|s| s.ac.memory_usage()).unwrap_or(0),
+            total_mentions: self.by_file.iter().map(|e| e.scan.names.len()).sum(),
+            total_words: self.by_file.iter().map(|e| e.scan.words.len()).sum(),
+            scanner_bytes: u
+                .scanner
+                .as_ref()
+                .and_then(|s| s.ac.as_ref())
+                .map(|ac| ac.memory_usage())
+                .unwrap_or(0),
             scans_recorded: self.scans_recorded.load(Ordering::Relaxed),
         }
     }
@@ -342,10 +458,12 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("Color"), lc("Save")]);
         let s = scanner_for(&idx);
-        assert_eq!(s.scan("new COLOR();").as_ref(), &[lc("Color")]);
-        assert!(s.scan("$this->saveAll();").is_empty());
+        let upper = s.scan("new COLOR();");
+        assert!(upper.contains_name(&lc("Color")));
+        assert!(!upper.contains_name(&lc("Save")));
+        assert!(!s.scan("$this->saveAll();").contains_name(&lc("Save")));
         let both = s.scan("Color::save()");
-        assert_eq!(both.len(), 2);
+        assert!(both.contains_name(&lc("Color")) && both.contains_name(&lc("Save")));
     }
 
     /// A raw needle (`add_raw_names`) matches as a plain substring even
@@ -358,12 +476,8 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_raw_names([lc("->__construct")]);
         let s = scanner_for(&idx);
-        assert_eq!(
-            s.scan("$obj->__construct();").as_ref(),
-            &[lc("->__construct")],
-            "the byte before the match ('j') is itself an identifier char, \
-             which a bounded needle's boundary check would reject"
-        );
+        let q = idx.prepare_query("->__construct").unwrap();
+        assert!(s.scan("$obj->__construct();").contains(&q));
     }
 
     /// A bounded needle sharing a scanner with a raw one still enforces its
@@ -372,22 +486,22 @@ mod tests {
     #[test]
     fn raw_and_bounded_needles_coexist_in_one_scanner() {
         let idx = ClassMentionIndex::default();
-        idx.add_names([lc("Color")]);
+        idx.add_names([lc("Color"), lc("Éclair")]);
         idx.add_raw_names([lc("->__construct")]);
         let s = scanner_for(&idx);
-        let hits = s.scan("$obj->__construct(); // recolor()");
-        assert_eq!(
-            hits.as_ref(),
-            &[lc("->__construct")],
-            "the bounded needle must not match inside 'recolor' with no boundary"
-        );
-        assert_eq!(s.scan("new Color();").as_ref(), &[lc("Color")]);
+        let raw = idx.prepare_query("->__construct").unwrap();
+        let hits = s.scan("$obj->__construct(); // recolor() xÉclair");
+        assert!(hits.contains(&raw));
+        assert!(!hits.contains_name(&lc("Color")));
+        assert!(!hits.contains_name(&lc("Éclair")));
+        let plain = s.scan("new Color(); new Éclair();");
+        assert!(plain.contains_name(&lc("Color")) && plain.contains_name(&lc("Éclair")));
+        assert!(!plain.contains(&raw));
     }
 
     /// Upgrading an existing bounded name to raw bumps the epoch, forcing a
     /// rescan of any file cached before the upgrade — otherwise a stale
-    /// entry could answer "no match" for a real raw-only occurrence it was
-    /// scanned before the needle could ever match as raw.
+    /// entry could answer "no match" for a real raw-only occurrence.
     #[test]
     fn upgrading_a_name_to_raw_invalidates_prior_scans() {
         let idx = ClassMentionIndex::default();
@@ -395,7 +509,6 @@ mod tests {
         let s1 = scanner_for(&idx);
         let text: Arc<str> = Arc::from("xtoken");
         let file: crate::db::FileNo = 0;
-        // Bounded: "xtoken" has no boundary before "token", so it's a miss.
         idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
         let q = idx.prepare_query("token").unwrap();
         assert_eq!(idx.answer(file, &q, &text), Some(false));
@@ -408,33 +521,50 @@ mod tests {
             "the pre-upgrade scan must no longer answer for this needle"
         );
         let s2 = scanner_for(&idx);
-        assert_eq!(
-            s2.scan(&text).as_ref(),
-            &[lc("token")],
+        assert!(
+            s2.scan(&text).contains(&q_after),
             "once raw, the same text now matches with no boundary"
         );
     }
 
     #[test]
-    fn epoch_gates_needles_added_after_the_scan() {
+    fn word_needles_added_after_the_scan_answer_without_rescan() {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("Alpha")]);
         let s1 = scanner_for(&idx);
-        let text: Arc<str> = Arc::from("uses Alpha and Beta");
+        let text: Arc<str> = Arc::from("uses Alpha and BETA, not gammaray");
         let file: crate::db::FileNo = 0;
         idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
 
-        let q_alpha = idx.prepare_query("Alpha").unwrap();
-        assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
-
-        // Beta enters the universe later: the old scan can't answer for it.
-        idx.add_names([lc("Beta")]);
+        idx.add_names([lc("Beta"), lc("Gamma")]);
+        assert_eq!(
+            scanner_for(&idx).epoch(),
+            s1.epoch(),
+            "word needles keep the epoch"
+        );
         let q_beta = idx.prepare_query("Beta").unwrap();
-        assert_eq!(idx.answer(file, &q_beta, &text), None);
-        // Old needles still answer.
+        let q_gamma = idx.prepare_query("Gamma").unwrap();
+        assert_eq!(idx.answer(file, &q_beta, &text), Some(true));
+        assert_eq!(idx.answer(file, &q_gamma, &text), Some(false));
+    }
+
+    #[test]
+    fn epoch_gates_pattern_needles_added_after_the_scan() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("Àlpha")]);
+        let s1 = scanner_for(&idx);
+        let text: Arc<str> = Arc::from("uses Àlpha and Ébeta");
+        let file: crate::db::FileNo = 0;
+        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
+
+        let q_alpha = idx.prepare_query("Àlpha").unwrap();
         assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
 
-        // A rescan at the new epoch covers Beta.
+        idx.add_names([lc("Ébeta")]);
+        let q_beta = idx.prepare_query("Ébeta").unwrap();
+        assert_eq!(idx.answer(file, &q_beta, &text), None);
+        assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
+
         let s2 = scanner_for(&idx);
         idx.set_file(file, text.clone(), s2.epoch(), s2.scan(&text));
         assert_eq!(idx.answer(file, &q_beta, &text), Some(true));
@@ -458,9 +588,9 @@ mod tests {
     #[test]
     fn small_universe_growth_reuses_the_cached_scanner() {
         let idx = ClassMentionIndex::default();
-        idx.add_names([lc("A")]);
+        idx.add_names([lc("Àa")]);
         let first = idx.scanner().unwrap();
-        idx.add_names([lc("B")]);
+        idx.add_names([lc("Àb")]);
         let reused = idx.scanner_reusing_cached().unwrap();
         assert!(Arc::ptr_eq(&first, &reused));
         assert_ne!(idx.scanner().unwrap().epoch(), first.epoch());
@@ -469,9 +599,9 @@ mod tests {
     #[test]
     fn large_universe_growth_rebuilds_the_scanner() {
         let idx = ClassMentionIndex::default();
-        idx.add_names([lc("A")]);
+        idx.add_names([lc("Àa")]);
         let first = idx.scanner().unwrap();
-        idx.add_names((0..2000).map(|i| lc(&format!("N{i}"))));
+        idx.add_names((0..2000).map(|i| lc(&format!("À{i}"))));
         let rebuilt = idx.scanner_reusing_cached().unwrap();
         assert!(!Arc::ptr_eq(&first, &rebuilt));
         assert_eq!(rebuilt.epoch(), idx.scanner().unwrap().epoch());
@@ -480,30 +610,38 @@ mod tests {
     #[test]
     fn name_added_after_a_reused_scan_falls_back_to_a_raw_scan() {
         let idx = ClassMentionIndex::default();
-        idx.add_names([lc("A")]);
+        idx.add_names([lc("Àa")]);
         idx.scanner().unwrap();
-        idx.add_names([lc("B")]);
+        idx.add_names([lc("Àb")]);
         let old = idx.scanner_reusing_cached().unwrap();
-        let text: Arc<str> = Arc::from("new A(); new B();");
+        let text: Arc<str> = Arc::from("new Àa(); new Àb();");
         let file: crate::db::FileNo = 0;
         idx.set_file(file, text.clone(), old.epoch(), old.scan(&text));
-        let q = idx.prepare_query("B").unwrap();
+        let q = idx.prepare_query("Àb").unwrap();
         assert_eq!(idx.answer(file, &q, &text), None);
-        let qa = idx.prepare_query("A").unwrap();
+        let qa = idx.prepare_query("Àa").unwrap();
         assert_eq!(idx.answer(file, &qa, &text), Some(true));
     }
 
     #[test]
-    fn re_adding_existing_names_does_not_bump_epoch() {
+    fn only_new_pattern_needles_bump_epoch() {
         let idx = ClassMentionIndex::default();
-        idx.add_names([lc("A"), lc("B")]);
+        idx.add_names([lc("A"), lc("Àb")]);
         let e1 = scanner_for(&idx).epoch();
-        idx.add_names([lc("A"), lc("B")]);
-        let e2 = scanner_for(&idx).epoch();
-        assert_eq!(e1, e2, "no new names → no epoch bump");
+        idx.add_names([lc("A"), lc("Àb")]);
+        assert_eq!(
+            scanner_for(&idx).epoch(),
+            e1,
+            "no new names → no epoch bump"
+        );
         idx.add_names([lc("C")]);
-        let e3 = scanner_for(&idx).epoch();
-        assert_eq!(e3, e2 + 1);
+        assert_eq!(
+            scanner_for(&idx).epoch(),
+            e1,
+            "a word needle → no epoch bump"
+        );
+        idx.add_names([lc("Àd")]);
+        assert_eq!(scanner_for(&idx).epoch(), e1 + 1);
     }
 
     #[test]
@@ -520,9 +658,9 @@ mod tests {
         idx.add_names([lc("A")]);
         let text: Arc<str> = Arc::from("A");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), 5, Box::new([lc("A")]));
+        idx.set_file(file, text.clone(), 5, scanner_for(&idx).scan(&text));
         // A stale (older-epoch) commit racing in must not downgrade coverage.
-        idx.set_file(file, text.clone(), 3, Box::new([]));
+        idx.set_file(file, text.clone(), 3, FileScan::default());
         let q = idx.prepare_query("A").unwrap();
         assert_eq!(idx.answer(file, &q, &text), Some(true));
     }
@@ -530,12 +668,28 @@ mod tests {
     #[test]
     fn scanner_is_cached_per_epoch() {
         let idx = ClassMentionIndex::default();
-        idx.add_names([lc("A")]);
+        idx.add_names([lc("Àa")]);
         let s1 = idx.scanner().unwrap();
         let s2 = idx.scanner().unwrap();
         assert!(Arc::ptr_eq(&s1, &s2), "same epoch → cached automaton");
-        idx.add_names([lc("B")]);
+        idx.add_names([lc("Àb")]);
         let s3 = idx.scanner().unwrap();
-        assert!(!Arc::ptr_eq(&s1, &s3), "universe grew → rebuilt automaton");
+        assert!(
+            !Arc::ptr_eq(&s1, &s3),
+            "pattern universe grew → rebuilt automaton"
+        );
+    }
+
+    #[test]
+    fn words_split_on_every_non_identifier_byte() {
+        let scan = MentionScanner::build(0, Vec::new())
+            .unwrap()
+            .scan("App\\Color::save('x'); /** @var Éclair */ $a_b1");
+        for w in ["app", "color", "save", "x", "var", "clair", "a_b1"] {
+            assert!(scan.contains_name(&lc(w)), "{w}");
+        }
+        for w in ["app\\color", "a", "b1", "colo"] {
+            assert!(!scan.contains_name(&lc(w)), "{w}");
+        }
     }
 }

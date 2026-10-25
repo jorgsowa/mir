@@ -239,7 +239,7 @@ pub(crate) fn durability_for_path(path: &str) -> salsa::Durability {
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
 pub use self::class_mention_index::{
-    ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
+    ClassMentionIndex, ClassMentionStats, FileScan, MentionQuery, MentionScanner,
 };
 pub use self::deps::{file_structural_deps, file_structural_symbols};
 pub(crate) use self::file_slab::FileSlab;
