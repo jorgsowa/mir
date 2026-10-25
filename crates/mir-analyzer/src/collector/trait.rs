@@ -206,7 +206,10 @@ impl<'a> DefinitionCollector<'a> {
                             is_readonly: p.modifiers.is_readonly,
                             has_native_readonly: p.modifiers.is_readonly,
                             default: mir_codebase::definitions::wrap_property_type(
-                                p.default.as_ref().map(|_| Type::mixed()),
+                                p.default.as_ref().map(|d| {
+                                    super::literal_types::literal_type(d)
+                                        .unwrap_or_else(Type::mixed)
+                                }),
                             ),
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(

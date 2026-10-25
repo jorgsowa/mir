@@ -1,4 +1,5 @@
 use super::*;
+use mir_codebase::definitions::{ConstantDef, PropertyDef};
 
 impl<'a> ClassAnalyzer<'a> {
     pub(super) fn check_abstract_methods_implemented(
@@ -556,4 +557,169 @@ impl ClassAnalyzer<'_> {
             }
         }
     }
+}
+
+impl ClassAnalyzer<'_> {
+    /// PHP rejects a used trait's property or constant that the class, or an earlier
+    /// trait, declares differently.
+    pub(super) fn check_trait_member_compatibility(
+        &self,
+        fqcn: &Arc<str>,
+        own_properties: Option<&mir_codebase::definitions::MemberMap<PropertyDef>>,
+        own_constants: &mir_codebase::definitions::MemberMap<ConstantDef>,
+        traits: &[Arc<str>],
+        trait_use_locations: &[(Arc<str>, Location)],
+        location: Option<&Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let mut properties: HashMap<Arc<str>, (Arc<str>, PropertyDef)> = HashMap::default();
+        for (name, prop) in own_properties.into_iter().flatten() {
+            if !prop.from_docblock {
+                properties.insert(name.clone(), (fqcn.clone(), prop.clone()));
+            }
+        }
+        let mut constants: HashMap<Arc<str>, (Arc<str>, ConstantDef)> = own_constants
+            .iter()
+            .map(|(name, c)| (name.clone(), (fqcn.clone(), c.clone())))
+            .collect();
+        for used in traits {
+            let here = crate::db::Fqcn::from_str(self.db, used.as_ref());
+            let Some(crate::db::ClassLike::Trait(t)) = crate::db::find_class_like(self.db, here)
+            else {
+                continue;
+            };
+            let location = trait_use_locations
+                .iter()
+                .find(|(u, _)| u.eq_ignore_ascii_case(used))
+                .map(|(_, loc)| loc)
+                .or(location);
+            let mut report = |kind: &str, member: &str, first: &str| {
+                self.push_located_issue(
+                    issues,
+                    IssueKind::CompileError {
+                        message: format!(
+                            "{first} and {} define the same {kind} ({member}) in the composition of {fqcn}. However, the definition differs and is considered incompatible. Class was composed",
+                            t.fqcn
+                        ),
+                        code: format!("trait-{kind}-conflict"),
+                    },
+                    location,
+                );
+            };
+            for (name, prop) in t.own_properties.iter() {
+                if prop.from_docblock {
+                    continue;
+                }
+                match properties.get(name) {
+                    Some((first, earlier)) => {
+                        if !trait_properties_compatible(earlier, prop) {
+                            report("property", &format!("${name}"), first);
+                        }
+                    }
+                    None => {
+                        properties.insert(name.clone(), (t.fqcn.clone(), prop.clone()));
+                    }
+                }
+            }
+            for (name, constant) in t.own_constants.iter() {
+                match constants.get(name) {
+                    Some((first, earlier)) => {
+                        if !trait_constants_compatible(earlier, constant) {
+                            report("constant", name, first);
+                        }
+                    }
+                    None => {
+                        constants.insert(name.clone(), (t.fqcn.clone(), constant.clone()));
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A value known exactly enough to compare with `===`; `None` when it is not.
+fn comparable_value(ty: &mir_types::Type) -> Option<&mir_types::Atomic> {
+    use mir_types::Atomic;
+    match ty.types.as_slice() {
+        [a @ (Atomic::TLiteralInt(_)
+        | Atomic::TLiteralString(_)
+        | Atomic::TLiteralFloat(..)
+        | Atomic::TTrue
+        | Atomic::TFalse
+        | Atomic::TNull)] => Some(a),
+        _ => None,
+    }
+}
+
+/// Property defaults are typed by kind only (`int`, not `1`).
+fn scalar_kind(ty: &mir_types::Type) -> Option<u8> {
+    use mir_types::Atomic;
+    match ty.types.as_slice() {
+        [Atomic::TInt | Atomic::TLiteralInt(_)] => Some(0),
+        [Atomic::TString | Atomic::TLiteralString(_)] => Some(1),
+        [Atomic::TFloat | Atomic::TLiteralFloat(..)] => Some(2),
+        [Atomic::TBool | Atomic::TTrue | Atomic::TFalse] => Some(3),
+        [Atomic::TNull] => Some(4),
+        _ => None,
+    }
+}
+
+fn values_differ(a: &mir_types::Type, b: &mir_types::Type) -> bool {
+    if let (Some(x), Some(y)) = (comparable_value(a), comparable_value(b)) {
+        return x != y;
+    }
+    matches!((scalar_kind(a), scalar_kind(b)), (Some(x), Some(y)) if x != y)
+}
+
+fn trait_properties_compatible(a: &PropertyDef, b: &PropertyDef) -> bool {
+    if a.visibility != b.visibility
+        || a.is_static != b.is_static
+        || a.has_native_readonly != b.has_native_readonly
+    {
+        return false;
+    }
+    match (a.native_ty.as_deref(), b.native_ty.as_deref()) {
+        (None, None) => {}
+        (Some(x), Some(y)) => {
+            let unresolved = |t: &mir_types::Type| {
+                t.types.iter().any(|at| {
+                    matches!(
+                        at,
+                        mir_types::Atomic::TSelf { .. }
+                            | mir_types::Atomic::TStaticObject { .. }
+                            | mir_types::Atomic::TParent { .. }
+                    )
+                })
+            };
+            if !unresolved(x)
+                && !unresolved(y)
+                && !(x.is_subtype_structural(y) && y.is_subtype_structural(x))
+            {
+                return false;
+            }
+        }
+        _ => return false,
+    }
+    // An untyped property without an initializer is `null`; a typed one is uninitialized.
+    let null = mir_types::Type::null();
+    let default = |p: &PropertyDef| match p.default.as_deref() {
+        Some(d) => Some(d.clone()),
+        None if p.native_ty.is_none() => Some(null.clone()),
+        None => None,
+    };
+    match (default(a), default(b)) {
+        // An initializer typed `mixed` is unknown, and a promoted property's is its parameter's.
+        (Some(x), _) | (_, Some(x)) if x.is_mixed() => true,
+        (Some(x), Some(y)) => !values_differ(&x, &y),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn trait_constants_compatible(a: &ConstantDef, b: &ConstantDef) -> bool {
+    let visibility = |c: &ConstantDef| c.visibility.unwrap_or(Visibility::Public);
+    let value = |c: &ConstantDef| c.literal_value.clone().unwrap_or_else(|| c.ty.clone());
+    visibility(a) == visibility(b)
+        && a.is_final == b.is_final
+        && !values_differ(&value(a), &value(b))
 }

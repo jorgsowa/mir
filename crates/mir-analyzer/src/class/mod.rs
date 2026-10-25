@@ -241,6 +241,18 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_constant_overrides(fqcn, class.own_constants(), &mut issues);
             if let crate::db::ClassLike::Class(def) = &class {
                 self.check_trait_method_collisions(def, &mut issues);
+                // A readonly class makes every property readonly, its traits' too.
+                if !def.is_readonly {
+                    self.check_trait_member_compatibility(
+                        fqcn,
+                        Some(&def.own_properties),
+                        &def.own_constants,
+                        &def.traits,
+                        &def.trait_use_locations,
+                        location.as_ref(),
+                        &mut issues,
+                    );
+                }
             }
 
             // Skip abstract classes for "must implement" checks
@@ -375,6 +387,15 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_enum_magic_methods(&enum_def, &mut issues);
             self.check_enum_builtin_redeclarations(&enum_def, &mut issues);
             self.check_abstract_methods_implemented(&enum_fqcn, location.as_ref(), &mut issues);
+            self.check_trait_member_compatibility(
+                &enum_fqcn,
+                None,
+                &enum_def.own_constants,
+                &enum_def.traits,
+                &enum_def.trait_use_locations,
+                location.as_ref(),
+                &mut issues,
+            );
             self.check_constant_overrides(&enum_fqcn, &enum_def.own_constants, &mut issues);
 
             // Same generic-bound check as class `@implements`/`@extends` type
