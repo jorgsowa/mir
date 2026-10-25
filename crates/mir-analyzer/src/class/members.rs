@@ -288,3 +288,60 @@ impl<'a> ClassAnalyzer<'a> {
         }
     }
 }
+
+impl ClassAnalyzer<'_> {
+    /// PHP rejects these magic methods on an enum, including ones a used trait brings in.
+    pub(super) fn check_enum_magic_methods(
+        &self,
+        enum_def: &mir_codebase::definitions::EnumDef,
+        issues: &mut Vec<Issue>,
+    ) {
+        let allows_debug_info =
+            crate::db::db_php_version(self.db) >= crate::php_version::PhpVersion::new(8, 6);
+        let is_forbidden = |name: &str| match canonical_magic_name(&name.to_ascii_lowercase()) {
+            None | Some("__call" | "__callStatic" | "__invoke") => None,
+            Some("__debugInfo") if allows_debug_info => None,
+            Some(canonical) => Some(canonical),
+        };
+        let mut report = |canonical: &str, location: Option<&Location>| {
+            self.push_located_issue(
+                issues,
+                IssueKind::CompileError {
+                    message: format!(
+                        "Enum {} cannot include magic method {canonical}",
+                        enum_def.fqcn
+                    ),
+                    code: "enum-magic-method".to_string(),
+                },
+                location,
+            );
+        };
+        // The enum's own definition, not a lookup by name: a polyfill may declare
+        // a class of the same name behind a version check.
+        for (_, method) in enum_def.own_methods.iter() {
+            if let Some(canonical) = is_forbidden(&method.name) {
+                report(canonical, method.location.as_ref());
+            }
+        }
+        let mut seen = HashSet::default();
+        for used in enum_def.traits.iter() {
+            let here = crate::db::Fqcn::from_str(self.db, used.as_ref());
+            for trait_fqcn in crate::db::class_ancestors_by_fqcn(self.db, here).iter() {
+                if !seen.insert(trait_fqcn.clone()) {
+                    continue;
+                }
+                let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                let Some(trait_like) =
+                    crate::db::find_class_like(self.db, trait_here).filter(|t| t.is_trait())
+                else {
+                    continue;
+                };
+                for (_, method) in trait_like.own_methods().iter() {
+                    if let Some(canonical) = is_forbidden(&method.name) {
+                        report(canonical, enum_def.location.as_ref());
+                    }
+                }
+            }
+        }
+    }
+}

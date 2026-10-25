@@ -18,6 +18,7 @@ enum Status {
     case Inactive;
 
     public function __get(string $name): string {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Compile error: Enum Status cannot include magic method __get [enum-magic-method]
         return $name === 'label' ? 'active-label' : '';
     }
 }

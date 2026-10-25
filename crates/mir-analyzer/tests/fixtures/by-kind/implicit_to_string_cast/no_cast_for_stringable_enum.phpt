@@ -1,5 +1,5 @@
 ===description===
-No ImplicitToStringCast when the enum implements Stringable.
+No ImplicitToStringCast when the enum implements Stringable. PHP rejects `__toString` on an enum, so the declaration is a compile error.
 ===config===
 <mir>
   <issueHandlers>
@@ -12,6 +12,7 @@ enum Suit implements Stringable {
     case Hearts;
 
     public function __toString(): string {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Compile error: Enum Suit cannot include magic method __toString [enum-magic-method]
         return 'Hearts';
     }
 }

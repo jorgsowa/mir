@@ -332,6 +332,7 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
             self.check_magic_method_casing(&enum_fqcn, &mut issues);
+            self.check_enum_magic_methods(&enum_def, &mut issues);
 
             // Same generic-bound check as class `@implements`/`@extends` type
             // args above (1c) — an enum's own `@implements Interface<Arg>`
