@@ -1989,9 +1989,17 @@ impl IssueKind {
                 expected,
                 actual,
             } => {
-                format!(
-                    "Type of {class}::${property} must be {expected} (as in parent class), {actual} given"
-                )
+                if expected.is_empty() {
+                    format!(
+                        "Type of {class}::${property} must be omitted to match the parent definition"
+                    )
+                } else if actual.is_empty() {
+                    format!("Type of {class}::${property} must be {expected} (as in parent class)")
+                } else {
+                    format!(
+                        "Type of {class}::${property} must be {expected} (as in parent class), {actual} given"
+                    )
+                }
             }
             IssueKind::ReadonlyPropertyRedeclarationMismatch {
                 parent_class,

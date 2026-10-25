@@ -345,3 +345,82 @@ impl ClassAnalyzer<'_> {
         }
     }
 }
+
+impl ClassAnalyzer<'_> {
+    /// PHP rejects a class constant that overrides a `final` one or narrows its visibility.
+    pub(super) fn check_constant_overrides(
+        &self,
+        fqcn: &Arc<str>,
+        own_constants: &mir_codebase::definitions::MemberMap<
+            mir_codebase::definitions::ConstantDef,
+        >,
+        issues: &mut Vec<Issue>,
+    ) {
+        use mir_codebase::definitions::Visibility;
+        if own_constants.is_empty() {
+            return;
+        }
+        let rank = |v: Visibility| match v {
+            Visibility::Public => 0,
+            Visibility::Protected => 1,
+            Visibility::Private => 2,
+        };
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        for (name, own) in own_constants.iter() {
+            for ancestor_fqcn in ancestors.iter().skip(1) {
+                let ancestor_here = crate::db::Fqcn::from_str(self.db, ancestor_fqcn.as_ref());
+                let Some(ancestor) =
+                    crate::db::find_class_like(self.db, ancestor_here).filter(|c| !c.is_trait())
+                else {
+                    continue;
+                };
+                let Some(inherited) = ancestor.own_constants().get(name) else {
+                    continue;
+                };
+                let inherited_vis = inherited.visibility.unwrap_or(Visibility::Public);
+                let own_vis = own.visibility.unwrap_or(Visibility::Public);
+                let ancestor_name = ancestor.fqcn();
+                let error = if inherited_vis == Visibility::Private {
+                    None
+                } else if inherited.is_final {
+                    Some((
+                        format!(
+                            "{fqcn}::{name} cannot override final constant {ancestor_name}::{name}"
+                        ),
+                        "final-constant-override",
+                    ))
+                } else if rank(own_vis) > rank(inherited_vis) {
+                    let kind = if ancestor.is_interface() {
+                        "interface"
+                    } else {
+                        "class"
+                    };
+                    let (required, weaker) = match inherited_vis {
+                        Visibility::Protected => ("protected", " or weaker"),
+                        _ => ("public", ""),
+                    };
+                    Some((
+                        format!(
+                            "Access level to {fqcn}::{name} must be {required} (as in {kind} {ancestor_name}){weaker}"
+                        ),
+                        "constant-access-level",
+                    ))
+                } else {
+                    None
+                };
+                if let Some((message, code)) = error {
+                    self.push_located_issue(
+                        issues,
+                        IssueKind::CompileError {
+                            message,
+                            code: code.to_string(),
+                        },
+                        own.location.as_ref(),
+                    );
+                }
+                break;
+            }
+        }
+    }
+}

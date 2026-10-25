@@ -976,6 +976,46 @@ impl<'a> ClassAnalyzer<'a> {
             // `@var` docblock refinement, which PHP's redeclaration rule never checks. A
             // private ancestor property isn't visible to the subclass, so it establishes no
             // type contract to redeclare.
+            // Typed on one side only: PHP requires the type on both or neither. Stubs
+            // leave some typed internal properties untyped (`Exception::$file`).
+            let parent_in_user_code = parent_prop
+                .location
+                .as_ref()
+                .is_some_and(|l| !crate::stubs::is_stub_path(l.file.as_ref()));
+            if parent_in_user_code
+                && parent_prop.visibility != Visibility::Private
+                && !own_prop.from_docblock
+                && !parent_prop.from_docblock
+                && !parent_prop.get_only_hook
+                && own_prop.has_native_type != parent_prop.has_native_type
+            {
+                let type_text = |p: &mir_codebase::definitions::PropertyDef| {
+                    p.native_ty
+                        .as_deref()
+                        .map(|t| t.to_string())
+                        .unwrap_or_default()
+                };
+                let loc = issue_location(
+                    own_prop.location.as_ref(),
+                    own_prop
+                        .location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                );
+                let mut issue = Issue::new(
+                    IssueKind::PropertyTypeRedeclarationMismatch {
+                        class: fqcn.to_string(),
+                        property: prop_name.to_string(),
+                        expected: type_text(&parent_prop),
+                        actual: type_text(&own_prop),
+                    },
+                    loc,
+                );
+                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
             if parent_prop.visibility != Visibility::Private
                 && own_prop.has_native_type
                 && parent_prop.has_native_type

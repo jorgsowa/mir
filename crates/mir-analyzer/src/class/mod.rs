@@ -238,6 +238,8 @@ impl<'a> ClassAnalyzer<'a> {
                 continue;
             }
 
+            self.check_constant_overrides(fqcn, class.own_constants(), &mut issues);
+
             // Skip abstract classes for "must implement" checks
             if is_abstract {
                 // Still check override compatibility for abstract classes
@@ -289,6 +291,7 @@ impl<'a> ClassAnalyzer<'a> {
         for (iface_fqcn, iface) in crate::db::analyzed_interface_defs(self.db, &self.analyzed_files)
         {
             self.check_overrides(&iface_fqcn, None, &mut issues);
+            self.check_constant_overrides(&iface_fqcn, &iface.own_constants, &mut issues);
             let location = iface.location.clone();
             for parent_iface_fqcn in iface.extends.iter() {
                 let here = crate::db::Fqcn::from_str(self.db, parent_iface_fqcn.as_ref());
@@ -367,6 +370,7 @@ impl<'a> ClassAnalyzer<'a> {
             }
             self.check_magic_method_casing(&enum_fqcn, &mut issues);
             self.check_enum_magic_methods(&enum_def, &mut issues);
+            self.check_constant_overrides(&enum_fqcn, &enum_def.own_constants, &mut issues);
 
             // Same generic-bound check as class `@implements`/`@extends` type
             // args above (1c) — an enum's own `@implements Interface<Arg>`

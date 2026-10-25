@@ -7,7 +7,7 @@ sidebar:
   order: 12
 ---
 
-A property type declaration in a child class is incompatible with the parent class declaration. Property types must be compatible across the inheritance hierarchy.
+A property type declaration in a child class is incompatible with the parent class declaration. A redeclared property keeps the parent's type, and is typed only if the parent's is: adding a type to an untyped parent property, or dropping the parent's type, is a fatal error too.
 
 ## Example
 
@@ -33,7 +33,7 @@ class Parent {
 }
 
 class Child extends Parent {
-    // Keep the same type or use a more specific subtype
+    // Keep the same type
     public string $name;
 }
 ```
