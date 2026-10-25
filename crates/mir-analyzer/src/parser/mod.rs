@@ -111,6 +111,18 @@ fn php_message(
         ForbiddenRule::YieldOutsideFunction => {
             return Some("The \"yield\" expression can only be used inside a function".to_string())
         }
+        ForbiddenRule::InvalidCodepointEscape => {
+            let message = parser_message();
+            return message
+                .strip_suffix(": empty code point")
+                .map(str::to_string);
+        }
+        ForbiddenRule::HeredocBodyIndentation => {
+            let indent = heredoc_closing_indent(source, err.span())?;
+            return Some(format!(
+                "Invalid body indentation level (expecting an indentation level of at least {indent})"
+            ));
+        }
         ForbiddenRule::UnterminatedComment => {
             let line = source[..source.len().min(err.span().start as usize)]
                 .matches('\n')
@@ -160,6 +172,22 @@ fn php_message(
     };
     let (class, name) = find_decl(program, err.span().start, target)?;
     Some(message(&class, &name))
+}
+
+/// Indentation of the closing marker of the heredoc whose body line is `line`.
+fn heredoc_closing_indent(source: &str, line: Span) -> Option<usize> {
+    let is_label_byte = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80;
+    let opening = source.get(..line.start as usize)?.rfind("<<<")? + 3;
+    let label = source[opening..].trim_start_matches([' ', '\t', '"', '\'']);
+    let label = &label[..label.bytes().take_while(|&b| is_label_byte(b)).count()];
+    if label.is_empty() {
+        return None;
+    }
+    source.get(line.end as usize..)?.lines().find_map(|text| {
+        let body = text.trim_start_matches([' ', '\t']);
+        let rest = body.strip_prefix(label)?;
+        (!rest.bytes().next().is_some_and(is_label_byte)).then(|| text.len() - body.len())
+    })
 }
 
 /// The class-like and name of the `target` declared at `offset`.
