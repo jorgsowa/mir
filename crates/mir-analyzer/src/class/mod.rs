@@ -143,63 +143,58 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- 1b. Deprecated interface / trait checks -----------------------
-            {
-                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                if let Some(cls) = crate::db::find_class_like(self.db, here) {
-                    for iface_fqcn in cls.interfaces() {
-                        let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
-                        if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
-                            if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
-                                iface_fqcn.as_ref(),
-                                iface.fqcn().as_ref(),
-                            ) {
-                                self.push_located_issue(
-                                    &mut issues,
-                                    IssueKind::WrongCaseClass {
-                                        used,
-                                        canonical: canonical_str,
-                                    },
-                                    location.as_ref(),
-                                );
-                            }
-                            if let Some(msg) = iface.deprecated() {
-                                self.push_located_issue(
-                                    &mut issues,
-                                    IssueKind::DeprecatedInterface {
-                                        name: iface_fqcn.to_string(),
-                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
-                                    },
-                                    location.as_ref(),
-                                );
-                            }
-                        }
+            for iface_fqcn in class.interfaces() {
+                let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+                if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
+                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                        iface_fqcn.as_ref(),
+                        iface.fqcn().as_ref(),
+                    ) {
+                        self.push_located_issue(
+                            &mut issues,
+                            IssueKind::WrongCaseClass {
+                                used,
+                                canonical: canonical_str,
+                            },
+                            location.as_ref(),
+                        );
                     }
-                    for trait_fqcn in cls.class_traits() {
-                        let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
-                        if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
-                            if let Some((used, canonical_str)) =
-                                crate::fqcn_case_mismatch(trait_fqcn.as_ref(), t.fqcn().as_ref())
-                            {
-                                self.push_located_issue(
-                                    &mut issues,
-                                    IssueKind::WrongCaseClass {
-                                        used,
-                                        canonical: canonical_str,
-                                    },
-                                    location.as_ref(),
-                                );
-                            }
-                            if let Some(msg) = t.deprecated() {
-                                self.push_located_issue(
-                                    &mut issues,
-                                    IssueKind::DeprecatedTrait {
-                                        name: trait_fqcn.to_string(),
-                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
-                                    },
-                                    location.as_ref(),
-                                );
-                            }
-                        }
+                    if let Some(msg) = iface.deprecated() {
+                        self.push_located_issue(
+                            &mut issues,
+                            IssueKind::DeprecatedInterface {
+                                name: iface_fqcn.to_string(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            location.as_ref(),
+                        );
+                    }
+                }
+            }
+            for trait_fqcn in class.class_traits() {
+                let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(trait_fqcn.as_ref(), t.fqcn().as_ref())
+                    {
+                        self.push_located_issue(
+                            &mut issues,
+                            IssueKind::WrongCaseClass {
+                                used,
+                                canonical: canonical_str,
+                            },
+                            location.as_ref(),
+                        );
+                    }
+                    if let Some(msg) = t.deprecated() {
+                        self.push_located_issue(
+                            &mut issues,
+                            IssueKind::DeprecatedTrait {
+                                name: trait_fqcn.to_string(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            location.as_ref(),
+                        );
                     }
                 }
             }
@@ -223,6 +218,13 @@ impl<'a> ClassAnalyzer<'a> {
                         &mut issues,
                     );
                 }
+            }
+
+            // The checks below look the class up by name; a same-named enum,
+            // interface or trait (a polyfill behind a version check) would answer.
+            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+            if !crate::db::find_class_like(self.db, here).is_some_and(|c| c.is_class()) {
+                continue;
             }
 
             // Skip abstract classes for "must implement" checks

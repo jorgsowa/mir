@@ -1,12 +1,5 @@
 ===description===
-A polyfill declaring a class of the enum's name behind a version check does not lend the enum its constructor.
-===config===
-<mir>
-  <issueHandlers>
-    <UnimplementedInterfaceMethod errorLevel="suppress"/>
-    <MissingConstructor errorLevel="suppress"/>
-  </issueHandlers>
-</mir>
+A polyfill declaring a class of the enum's name behind a version check does not lend the enum its constructor, nor the class the enum's interfaces.
 ===file===
 <?php
 if (\PHP_VERSION_ID < 80100) {

@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A class declared under the same name as an enum, interface or trait (a polyfill behind `PHP_VERSION_ID`) is no longer checked against the other declaration: `final class Mode` next to `enum Mode` reported `UnimplementedInterfaceMethod` for `UnitEnum::cases()`.
 - A property declared in an enum is registered, so its `CompileError` is the only issue: reads of it were `UndefinedProperty` and `mixed`. Stub cache format 24 → 25.
 - A closure docblock written between the closure's attributes and `function` / `fn` (`#[Pure] /** @param int $x */ fn($x) => ...`) applies, as in PHP; it was ignored.
 - A docblock written between a class member's or parameter's attributes and the member (`#[ORM\Column] /** @var string */ private $name;`) applies to it, as in PHP. It was ignored and given to the next member instead, so `$name` was untyped and the following property took its `@var`. Stub cache format 25 → 26.
