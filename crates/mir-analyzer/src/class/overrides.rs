@@ -11,6 +11,9 @@ impl<'a> ClassAnalyzer<'a> {
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
+        let version = crate::db::db_php_version(self.db);
+        let override_checked = version >= crate::php_version::PhpVersion::new(8, 3);
+        let property_override_checked = version >= crate::php_version::PhpVersion::new(8, 5);
         let own_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> = class
             .own_methods()
             .iter()
@@ -260,16 +263,14 @@ impl<'a> ClassAnalyzer<'a> {
                     .clone()
             };
 
-            let (parent_fqcn, parent) = match parent_method {
+            let (_, parent) = match parent_method {
                 Some(m) => m,
                 None => {
-                    // #[Override] declared but no parent method exists.
-                    if own.is_override {
+                    if own.is_override && override_checked {
                         let mut issue = Issue::new(
                             IssueKind::InvalidOverride {
                                 class: fqcn.to_string(),
-                                method: method_name_lower.to_string(),
-                                detail: "no parent method exists to override".to_string(),
+                                member: format!("{method_name}()"),
                             },
                             loc(),
                         );
@@ -285,15 +286,11 @@ impl<'a> ClassAnalyzer<'a> {
 
             // #[Override] with a private parent method — private methods are
             // not visible to subclasses and cannot be overridden.
-            if own.is_override && parent.visibility == Visibility::Private {
+            if own.is_override && override_checked && parent.visibility == Visibility::Private {
                 let mut issue = Issue::new(
                     IssueKind::InvalidOverride {
                         class: fqcn.to_string(),
-                        method: method_name_lower.to_string(),
-                        detail: format!(
-                            "parent method {}::{}() is private",
-                            parent_fqcn, method_name_lower
-                        ),
+                        member: format!("{method_name}()"),
                     },
                     loc(),
                 );
@@ -914,6 +911,30 @@ impl<'a> ClassAnalyzer<'a> {
                     crate::db::find_property_in_class(self.db, anc_here, prop_name.as_ref())
                         .map(|p| (anc.clone(), p))
                 });
+            if own_prop.is_override
+                && property_override_checked
+                && parent_prop
+                    .as_ref()
+                    .is_none_or(|(_, p)| p.from_docblock || p.visibility == Visibility::Private)
+            {
+                let mut issue = Issue::new(
+                    IssueKind::InvalidOverride {
+                        class: fqcn.to_string(),
+                        member: format!("${prop_name}"),
+                    },
+                    issue_location(
+                        own_prop.location.as_ref(),
+                        own_prop
+                            .location
+                            .as_ref()
+                            .and_then(|l| self.sources.get(&l.file).copied()),
+                    ),
+                );
+                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
             let Some((parent_fqcn, parent_prop)) = parent_prop else {
                 continue;
             };

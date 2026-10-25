@@ -571,14 +571,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/trait_instantiation.phpt`.
     TraitInstantiation { class: String },
-    /// Emitted by `mir-analyzer/src/class/mod.rs` when `#[Override]` is declared
-    /// but no overridable parent method exists.
-    /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
-    InvalidOverride {
-        class: String,
-        method: String,
-        detail: String,
-    },
+    /// Emitted by `mir-analyzer/src/class/overrides.rs` when `#[Override]` is declared
+    /// but no overridable parent method (or, from PHP 8.5, property) exists.
+    /// `member` is `name()` for a method, `$name` for a property.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_override/`.
+    InvalidOverride { class: String, member: String },
 
     // --- Security (taint) ---------------------------------------------------
     /// Not yet emitted (generic taint sink; specific sinks use `TaintedHtml`, `TaintedSql`, `TaintedShell`).
@@ -2149,12 +2146,15 @@ impl IssueKind {
             }
             IssueKind::EnumInstantiation { class } => format!("Cannot instantiate enum {class}"),
             IssueKind::TraitInstantiation { class } => format!("Cannot instantiate trait {class}"),
-            IssueKind::InvalidOverride {
-                class,
-                method,
-                detail,
-            } => {
-                format!("Method {class}::{method}() has #[Override] but {detail}")
+            IssueKind::InvalidOverride { class, member } => {
+                let kind = if member.starts_with('$') {
+                    "property"
+                } else {
+                    "method"
+                };
+                format!(
+                    "{class}::{member} has #[\\Override] attribute, but no matching parent {kind} exists"
+                )
             }
 
             IssueKind::TaintedInput { sink } => format!("Tainted input reaching sink '{sink}'"),
@@ -2930,8 +2930,7 @@ mod code_tests {
             IssueKind::TraitInstantiation { class: s() },
             IssueKind::InvalidOverride {
                 class: s(),
-                method: s(),
-                detail: s(),
+                member: s(),
             },
             IssueKind::CircularInheritance { class: s() },
             IssueKind::TaintedInput { sink: s() },

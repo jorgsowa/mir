@@ -125,7 +125,7 @@ All issue types mir can emit, grouped by category.
 | `FinalMethodOverridden` | A subclass overrides a method declared as final in the parent. |
 | `AbstractInstantiation` | An abstract class is being instantiated with `new`. |
 | `CircularInheritance` | A class participates in a circular `extends`/`implements`/`use` chain. |
-| `InvalidOverride` | Method declared `#[Override]` does not actually override a parent method. |
+| `InvalidOverride` | Method or property declared `#[Override]` does not actually override a parent one. |
 | `InterfaceInstantiation` | Instantiating an interface with `new`. |
 | `EnumInstantiation` | Instantiating an enum with `new`. |
 | `TraitInstantiation` | Instantiating a trait with `new`. |

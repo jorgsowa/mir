@@ -9,5 +9,5 @@ class C {
 class C2 extends C {
     #[Override]
     private function f(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method C2::f() has #[Override] but parent method C::f() is private
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: C2::f() has #[\Override] attribute, but no matching parent method exists
 }

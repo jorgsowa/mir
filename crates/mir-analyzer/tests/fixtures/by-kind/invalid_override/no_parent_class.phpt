@@ -9,5 +9,5 @@ InvalidOverride fires when #[Override] is used in a class with no parent class a
 class Orphan {
     #[Override]
     public function render(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method Orphan::render() has #[Override] but no parent method exists to override
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Orphan::render() has #[\Override] attribute, but no matching parent method exists
 }

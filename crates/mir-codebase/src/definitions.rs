@@ -640,6 +640,9 @@ pub struct PropertyDef {
     /// Distinguishes PHP-enforced read-only from advisory documentation.
     #[serde(default)]
     pub has_native_readonly: bool,
+    /// Declared with `#[Override]` (PHP 8.5 checks properties too).
+    #[serde(default)]
+    pub is_override: bool,
     /// The PHP native type hint alone, with any `@var` docblock refinement stripped —
     /// `None` when `has_native_type` is false. `ty` mixes in the docblock type when
     /// present, which makes it unsuitable for checking PHP's redeclared-property

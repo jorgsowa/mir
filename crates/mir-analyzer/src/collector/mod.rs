@@ -158,6 +158,15 @@ fn native_scalar_family(native: &Type) -> Option<fn(&mir_types::atomic::Atomic) 
     })
 }
 
+fn has_override_attribute(attributes: &[php_ast::owned::Attribute]) -> bool {
+    attributes.iter().any(|a| {
+        a.name
+            .parts
+            .last()
+            .is_some_and(|p| p.as_ref().eq_ignore_ascii_case("Override"))
+    })
+}
+
 /// True when `hooks` declares a `get` hook with no accompanying `set` hook —
 /// the property is then virtual (no backing storage, never assignable), so
 /// it can never be "left uninitialized" by a constructor. A `set` hook (with
@@ -1977,6 +1986,7 @@ impl<'a> DefinitionCollector<'a> {
                         .or_else(|| location.clone()),
                     deprecated: None,
                     has_native_readonly: false,
+                    is_override: false,
                     // Magic `@property` declarations carry no PHP native type.
                     has_native_type: false,
                     from_docblock: true,
@@ -2821,13 +2831,7 @@ impl<'a> DefinitionCollector<'a> {
         };
 
         let method_name = m.name.as_str().unwrap_or_default();
-        let is_override = m.attributes.iter().any(|a| {
-            a.name
-                .parts
-                .last()
-                .map(|p| p.as_ref().eq_ignore_ascii_case("Override"))
-                .unwrap_or(false)
-        });
+        let is_override = has_override_attribute(&m.attributes);
         // PHPUnit invokes `@dataProvider`/`#[DataProvider]` targets by name via
         // reflection, so they never get an ordinary call-site reference.
         let mut data_provider_targets: Vec<Arc<str>> = doc

@@ -11,5 +11,5 @@ class Base {}
 class Child extends Base {
     #[Override]
     public function render(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method Child::render() has #[Override] but no parent method exists to override
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Child::render() has #[\Override] attribute, but no matching parent method exists
 }

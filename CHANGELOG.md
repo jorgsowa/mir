@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `InvalidOverride` uses PHP's text with the declared method name (`C::myMethod() has #[\Override] attribute, but no matching parent method exists`; it lowercased the name), is reported from PHP 8.3 only, and from 8.5 also covers properties, promoted ones and those from traits included (`C::$p has #[\Override] attribute, but no matching parent property exists`). The issue's fields are `class` and `member` (`myMethod()` / `$p`). Stub cache format 29 → 30.
 - Built-in attributes on a target PHP rejects, or repeated, are `CompileError` with PHP's text from the version PHP checks them, instead of an info-level `InvalidAttribute` (or nothing, for `#[Deprecated]` on a class): `Attribute "Override" cannot target class (allowed targets: method) [attribute-target-mismatch]`, `Cannot apply #[\Attribute] to enum F [attribute-on-invalid-class]` (PHP 8.5+), `Cannot apply #[\Deprecated] to class A`. A trait's or interface's own attributes are now checked like a class's.
 - Readonly property errors use PHP's text: `Readonly property R::$a must have type`, `Static property R::$a cannot be readonly`, `Hooked properties cannot be readonly`, and `InvalidReadonlyPropertyDeclaration` reads `cannot have default value`. An untyped readonly property no longer also reports `MissingPropertyType`.
 - `MissingConstructor` no longer counts an interface's or abstract hooked property, nor a virtual one (no hook touches `$this->prop`), as uninitialized.

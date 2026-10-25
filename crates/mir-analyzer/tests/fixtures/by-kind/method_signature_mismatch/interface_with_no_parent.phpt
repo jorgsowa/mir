@@ -5,5 +5,5 @@ Interface with no parent
 interface I {
     #[Override]
     public function f(): void;
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method I::f() has #[Override] but no parent method exists to override
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: I::f() has #[\Override] attribute, but no matching parent method exists
 }

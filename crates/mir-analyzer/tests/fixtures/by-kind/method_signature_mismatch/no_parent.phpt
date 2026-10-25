@@ -5,5 +5,5 @@ No parent
 class C {
     #[Override]
     public function f(): void {}
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: Method C::f() has #[Override] but no parent method exists to override
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidOverride: C::f() has #[\Override] attribute, but no matching parent method exists
 }

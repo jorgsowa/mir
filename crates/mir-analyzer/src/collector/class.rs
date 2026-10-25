@@ -227,6 +227,7 @@ impl<'a> DefinitionCollector<'a> {
                                         || class_doc.is_readonly,
                                     has_native_readonly: decl.modifiers.is_readonly
                                         || p.modifiers.is_readonly,
+                                    is_override: super::has_override_attribute(&p.attributes),
                                     default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     ),
@@ -356,6 +357,7 @@ impl<'a> DefinitionCollector<'a> {
                             || prop_doc.is_readonly
                             || class_doc.is_readonly,
                         has_native_readonly: p.modifiers.is_readonly || decl.modifiers.is_readonly,
+                        is_override: super::has_override_attribute(&p.attributes),
                         default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
