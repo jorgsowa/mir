@@ -97,11 +97,11 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         return name.trim_start_matches('\\').to_string();
     }
 
-    if ["self", "static", "parent"]
-        .iter()
-        .any(|kw| name.eq_ignore_ascii_case(kw))
+    if let Some(kw) = ["self", "static", "parent"]
+        .into_iter()
+        .find(|kw| name.eq_ignore_ascii_case(kw))
     {
-        return name.to_string();
+        return kw.to_string();
     }
 
     const RELATIVE: &str = "namespace\\";
