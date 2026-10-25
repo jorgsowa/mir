@@ -11,4 +11,4 @@ final class Person
 }
 
 new Person(name: "", 0);
-//                   ^ CompileError: Compile error: Cannot use positional argument after named argument [positional-after-named-argument]
+//                   ^ CompileError: Cannot use positional argument after named argument [positional-after-named-argument]

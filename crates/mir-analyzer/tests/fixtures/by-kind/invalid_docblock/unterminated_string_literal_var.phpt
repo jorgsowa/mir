@@ -17,12 +17,12 @@ bounds even where it no longer parses as a literal).
 
 class Foo {
     /** @var ' */
-//      ^^^^^^ InvalidDocblock: Invalid docblock: @var has an unterminated string literal in `'`
+//      ^^^^^^ InvalidDocblock: @var has an unterminated string literal in `'`
     public $bar;
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$bar has no type annotation
 
     /** @var " */
-//      ^^^^^^ InvalidDocblock: Invalid docblock: @var has an unterminated string literal in `"`
+//      ^^^^^^ InvalidDocblock: @var has an unterminated string literal in `"`
     public $baz;
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$baz has no type annotation
 }

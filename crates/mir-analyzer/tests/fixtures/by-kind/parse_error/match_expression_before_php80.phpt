@@ -8,5 +8,5 @@ match requires PHP 8.0.
 <?php
 function f(int $x): string {
     return match ($x) { 1 => "a", default => "b" };
-//         ^^^^^ ParseError: Parse error: 'match expressions' requires PHP 8.0 or higher [version-too-low]
+//         ^^^^^ ParseError: 'match expressions' requires PHP 8.0 or higher [version-too-low]
 }

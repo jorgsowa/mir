@@ -6,7 +6,7 @@ decl docblock was, unlike class/interface/trait members.
 enum Suit {
     /**
      * @var array<>
-//     ^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @var has empty generic type parameter in `array<>`
+//     ^^^^^^^^^^^^ InvalidDocblock: @var has empty generic type parameter in `array<>`
      */
     case Hearts;
 }

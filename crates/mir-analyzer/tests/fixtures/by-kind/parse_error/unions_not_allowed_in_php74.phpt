@@ -11,7 +11,7 @@ interface A {
 interface B {
 }
 function foo (A|B $test): A&B {
-//             ^ ParseError: Parse error: 'union types' requires PHP 8.0 or higher [version-too-low]
-//                         ^ ParseError: Parse error: 'intersection types' requires PHP 8.1 or higher [version-too-low]
+//             ^ ParseError: 'union types' requires PHP 8.0 or higher [version-too-low]
+//                         ^ ParseError: 'intersection types' requires PHP 8.1 or higher [version-too-low]
     return $test;
 }

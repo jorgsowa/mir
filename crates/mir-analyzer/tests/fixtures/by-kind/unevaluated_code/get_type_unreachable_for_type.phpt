@@ -14,7 +14,7 @@ function scope(int $n): void {
         case "integer":
             break;
         case "string":
-//           ^^^^^^^^ UnevaluatedCode: Unevaluated code: gettype() of int never returns "string"
+//           ^^^^^^^^ UnevaluatedCode: gettype() of int never returns "string"
             break;
     }
 }

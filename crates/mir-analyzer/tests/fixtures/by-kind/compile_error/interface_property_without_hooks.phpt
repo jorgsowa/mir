@@ -4,5 +4,5 @@ Interface property without hooks
 <?php
 interface A {
     public string $value;
-//  ^^^^^^^^^^^^^^^^^^^^ CompileError: Compile error: Interfaces may only include hooked properties [interface-property-without-hooks]
+//  ^^^^^^^^^^^^^^^^^^^^ CompileError: Interfaces may only include hooked properties [interface-property-without-hooks]
 }

@@ -8,6 +8,6 @@ class Base {}
 /**
  * @template T
  * @extends Base<T
-// ^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @extends has unclosed generic type `Base<T`
+// ^^^^^^^^^^^^^^^ InvalidDocblock: @extends has unclosed generic type `Base<T`
  */
 class Derived extends Base {}

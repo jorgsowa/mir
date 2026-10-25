@@ -4,6 +4,6 @@ Lonely method
 <?php
 /**
  * @method
-// ^^^^^^^ InvalidDocblock: Invalid docblock: @method annotation is missing a method definition
+// ^^^^^^^ InvalidDocblock: @method annotation is missing a method definition
  */
 class C {}

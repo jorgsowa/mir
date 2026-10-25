@@ -13,7 +13,7 @@ reported the same way as the lone-quote case.
 
 /**
  * @param 'foo $x
-// ^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has an unterminated string literal in `'foo`
+// ^^^^^^^^^^^^^^ InvalidDocblock: @param has an unterminated string literal in `'foo`
  */
 function bar($x): void {}
 //           ^^ MissingParamType: Parameter $x of bar() has no type annotation

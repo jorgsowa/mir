@@ -4,7 +4,7 @@ reports unclosed generic param
 <?php
 /**
  * @param array< $items
-// ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has unclosed generic type `array< $items`
+// ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: @param has unclosed generic type `array< $items`
  */
 function foo(mixed $items): void {}
 //           ^^^^^^^^^^^^ UnusedParam: Parameter $items is never used

@@ -26,7 +26,7 @@ function needsStringIntMap($m): void {}
 function test_mismatched_first_type_arg_is_flagged(): void {
     /** @var TypedMap<int> $m */
     $m = new TypedMap();
-//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: TypedMap expects 2 template argument(s), got 1
     needsStringIntMap($m);
 //                    ^^ InvalidArgument: Argument $m of needsStringIntMap() expects 'TypedMap<string, int>', got 'TypedMap<int>'
 }
@@ -34,6 +34,6 @@ function test_mismatched_first_type_arg_is_flagged(): void {
 function test_matching_partial_type_arg_now_flagged_for_arity(): void {
     /** @var TypedMap<string> $m */
     $m = new TypedMap();
-//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: TypedMap expects 2 template argument(s), got 1
     needsStringIntMap($m);
 }

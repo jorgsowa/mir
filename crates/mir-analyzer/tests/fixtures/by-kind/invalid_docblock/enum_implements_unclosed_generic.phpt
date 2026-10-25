@@ -7,6 +7,6 @@ interface Container {}
 
 /**
  * @implements Container<int
-// ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @implements has unclosed generic type `Container<int`
+// ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: @implements has unclosed generic type `Container<int`
  */
 enum Status implements Container { case A; case B; }

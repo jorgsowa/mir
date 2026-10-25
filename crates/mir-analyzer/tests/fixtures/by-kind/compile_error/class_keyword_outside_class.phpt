@@ -13,9 +13,9 @@ errors; a closure is not checked, since it may be bound to a class later.
 <?php
 function f() {
     echo self::X;
-//       ^^^^ CompileError: Compile error: Cannot use "self" when no class scope is active [class-keyword-outside-class]
+//       ^^^^ CompileError: Cannot use "self" when no class scope is active [class-keyword-outside-class]
     return new static();
-//             ^^^^^^ CompileError: Compile error: Cannot use "static" when no class scope is active [class-keyword-outside-class]
+//             ^^^^^^ CompileError: Cannot use "static" when no class scope is active [class-keyword-outside-class]
 }
 
 $g = function () {

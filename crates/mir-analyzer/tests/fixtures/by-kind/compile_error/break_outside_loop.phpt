@@ -4,7 +4,7 @@ break and continue outside a loop or switch are compile errors.
 <?php
 function f(): void {
     break;
-//  ^^^^^ CompileError: Compile error: 'break' not in the 'loop' or 'switch' context [break-out-of-loop]
+//  ^^^^^ CompileError: 'break' not in the 'loop' or 'switch' context [break-out-of-loop]
 }
 /** @param list<int> $xs */
 function g(array $xs): void {

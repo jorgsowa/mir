@@ -40,4 +40,4 @@ function double(int $x): int {
 <?php
 
 $partial = process(?, 'double');
-//                 ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]
+//                 ^ ParseError: 'partial function application' requires PHP 8.6 or higher [version-too-low]

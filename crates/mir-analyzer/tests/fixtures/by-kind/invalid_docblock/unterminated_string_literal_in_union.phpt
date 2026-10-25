@@ -14,7 +14,7 @@ otherwise swallow the trailing member's unmatched quote silently.
 
 class Foo {
     /** @var 'a'|' */
-//      ^^^^^^^^^^ InvalidDocblock: Invalid docblock: @var has an unterminated string literal in `'a'|'`
+//      ^^^^^^^^^^ InvalidDocblock: @var has an unterminated string literal in `'a'|'`
     public $bar;
 //  ^^^^^^^^^^^ MissingPropertyType: Property Foo::$bar has no type annotation
 }

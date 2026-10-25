@@ -21,13 +21,13 @@ class TypedMap {}
 function test_too_few_type_args(): void {
     /** @var TypedMap<string> $m */
     $m = new TypedMap();
-//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: TypedMap expects 2 template argument(s), got 1
 }
 
 function test_too_many_type_args(): void {
     /** @var TypedMap<string, int, bool> $m */
     $m = new TypedMap();
-//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 3
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: TypedMap expects 2 template argument(s), got 3
 }
 
 function test_bare_generic_reference_stays_silent(): void {

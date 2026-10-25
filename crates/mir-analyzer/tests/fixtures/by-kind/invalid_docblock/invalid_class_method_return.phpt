@@ -5,7 +5,7 @@ Invalid class method return
 class C {
     /**
      * @return $thus
-//     ^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @return contains variable `$thus` in type position
+//     ^^^^^^^^^^^^^ InvalidDocblock: @return contains variable `$thus` in type position
      */
     public function barBar() {
         return $this;

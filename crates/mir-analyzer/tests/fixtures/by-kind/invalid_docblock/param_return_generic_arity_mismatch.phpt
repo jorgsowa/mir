@@ -18,11 +18,11 @@ class TypedMap {}
 
 /** @param TypedMap<string> $m */
 function tooFewParamArgs($m): void {}
-//       ^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
+//       ^^^^^^^^^^^^^^^ InvalidDocblock: TypedMap expects 2 template argument(s), got 1
 
 /** @return TypedMap<string, int, bool> */
 function tooManyReturnArgs(): TypedMap { return new TypedMap(); }
-//       ^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 3
+//       ^^^^^^^^^^^^^^^^^ InvalidDocblock: TypedMap expects 2 template argument(s), got 3
 
 /** @param TypedMap $m */
 function bareGenericReferenceStaysSilent($m): void {}

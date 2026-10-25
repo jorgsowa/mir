@@ -16,5 +16,5 @@ function add(int $a, int $b): int {
 }
 
 $partial = add(?, "not-an-int");
-//             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]
+//             ^ ParseError: 'partial function application' requires PHP 8.6 or higher [version-too-low]
 //                ^^^^^^^^^^^^ InvalidArgument: Argument $b of add() expects 'int', got '"not-an-int"'

@@ -7,5 +7,5 @@ Continue is not break
                             echo "two
 ";
                             continue 2;
-//                          ^^^^^^^^ CompileError: Compile error: Cannot 'continue' 2 levels [break-out-of-loop]
+//                          ^^^^^^^^ CompileError: Cannot 'continue' 2 levels [break-out-of-loop]
                     }

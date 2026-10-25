@@ -8,5 +8,5 @@ Interface property with hooks before php84
 <?php
 interface A {
     public string $value { get; }
-//                       ^ ParseError: Parse error: 'property hooks' requires PHP 8.4 or higher [version-too-low]
+//                       ^ ParseError: 'property hooks' requires PHP 8.4 or higher [version-too-low]
 }

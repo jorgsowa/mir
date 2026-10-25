@@ -5,7 +5,7 @@ reports on class method
 class Foo {
     /**
      * @return array<
-//     ^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @return has unclosed generic type `array<`
+//     ^^^^^^^^^^^^^^ InvalidDocblock: @return has unclosed generic type `array<`
      */
     public function bar(): mixed { return []; }
 //                  ^^^ UndefinedDocblockClass: Docblock type 'array<' does not exist

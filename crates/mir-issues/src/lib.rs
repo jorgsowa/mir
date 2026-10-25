@@ -1871,9 +1871,7 @@ impl IssueKind {
                 let result = if op == "==" { "false" } else { "true" };
                 format!("'{op}' between '{left}' and '{right}' is always {result} — these types can never be loosely equal")
             }
-            IssueKind::UnevaluatedCode { reason } => {
-                format!("Unevaluated code: {reason}")
-            }
+            IssueKind::UnevaluatedCode { reason } => reason.clone(),
             IssueKind::IfThisIsMismatch {
                 class,
                 method,
@@ -2208,17 +2206,15 @@ impl IssueKind {
             IssueKind::ImplicitFloatToIntCast { from } => {
                 format!("Implicit cast from {from} to int truncates the fractional part")
             }
-            IssueKind::ParseError { message, code } => format!("Parse error: {message} [{code}]"),
+            IssueKind::ParseError { message, code } => format!("{message} [{code}]"),
             IssueKind::CompileError { message, code } => {
-                format!("Compile error: {message} [{code}]")
+                format!("{message} [{code}]")
             }
-            IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),
+            IssueKind::InvalidDocblock { message } => message.clone(),
             IssueKind::UndefinedThrowsDocblock { name } => {
                 format!("@throws class '{name}' does not exist")
             }
-            IssueKind::InvalidDocblockType { message } => {
-                format!("Invalid docblock type: {message}")
-            }
+            IssueKind::InvalidDocblockType { message } => message.clone(),
             IssueKind::MixedArgument { param, fn_name } => {
                 format!("Argument ${param} of {fn_name}() is mixed")
             }

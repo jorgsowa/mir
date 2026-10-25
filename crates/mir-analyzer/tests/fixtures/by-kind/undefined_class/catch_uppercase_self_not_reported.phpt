@@ -7,7 +7,7 @@ class Foo {
     public function f(): void {
         try {
         } catch (SELF $e) {
-//               ^^^^ CompileError: Compile error: Bad class name in the catch statement [class-keyword-in-catch]
+//               ^^^^ CompileError: Bad class name in the catch statement [class-keyword-in-catch]
         }
     }
 }

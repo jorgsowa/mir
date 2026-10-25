@@ -3,7 +3,7 @@ A generator's declared return type must accept `Generator`.
 ===file===
 <?php
 function f(): int {
-//            ^^^ CompileError: Compile error: Generator return type must be a supertype of Generator, int given [generator-return-type]
+//            ^^^ CompileError: Generator return type must be a supertype of Generator, int given [generator-return-type]
     yield 1;
 }
 

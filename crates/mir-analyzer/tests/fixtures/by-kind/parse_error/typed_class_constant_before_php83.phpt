@@ -8,5 +8,5 @@ Typed class constants require PHP 8.3.
 <?php
 class A {
     const string NAME = "a";
-//        ^^^^^^ ParseError: Parse error: 'typed class constants' requires PHP 8.3 or higher [version-too-low]
+//        ^^^^^^ ParseError: 'typed class constants' requires PHP 8.3 or higher [version-too-low]
 }

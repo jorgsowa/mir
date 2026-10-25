@@ -7,6 +7,6 @@ readonly classes require PHP 8.2.
 ===file===
 <?php
 readonly class A {
-//<^^^^^^^^ ParseError: Parse error: 'readonly class' requires PHP 8.2 or higher [version-too-low]
+//<^^^^^^^^ ParseError: 'readonly class' requires PHP 8.2 or higher [version-too-low]
     public function __construct(public int $x) {}
 }

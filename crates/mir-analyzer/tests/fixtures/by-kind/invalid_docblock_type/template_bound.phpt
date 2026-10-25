@@ -10,7 +10,7 @@ Template bounds reject backslash-qualified keywords.
 <?php
 /**
  * @template T of \int
-//                ^^^^ InvalidDocblockType: Invalid docblock type: @template backslash-qualified non-class type '\int' is not a fully qualified name
+//                ^^^^ InvalidDocblockType: @template backslash-qualified non-class type '\int' is not a fully qualified name
  * @param T $a
  */
 function f($a): void {

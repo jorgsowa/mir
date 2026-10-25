@@ -10,7 +10,7 @@ Max specified as first
 <?php
 /**
  * @param int<max, 0> $a
-// ^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has invalid int range: `max` must be the second argument, not the first
+// ^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: @param has invalid int range: `max` must be the second argument, not the first
  */
 function scope(int $a){
     return $a;

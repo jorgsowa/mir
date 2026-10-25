@@ -4,5 +4,5 @@ Private interface property with hooks
 <?php
 interface A {
     private string $value { get; }
-//  ^^^^^^^^^^^^^^^^^^^^^ CompileError: Compile error: Property in interface cannot be protected or private [invalid-interface-property-modifier]
+//  ^^^^^^^^^^^^^^^^^^^^^ CompileError: Property in interface cannot be protected or private [invalid-interface-property-modifier]
 }

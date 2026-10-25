@@ -5,7 +5,7 @@ __construct() cannot declare any return type, not just void; int triggers the sa
 class A
 {
     public function __construct(): int
-//                                 ^^^ CompileError: Compile error: Method A::__construct() cannot declare a return type [magic-method-return-type]
+//                                 ^^^ CompileError: Method A::__construct() cannot declare a return type [magic-method-return-type]
     {
     }
 }

@@ -4,5 +4,5 @@ Static interface property with hooks
 <?php
 interface A {
     public static string $value { get; }
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Compile error: Cannot declare hooks for static property [static-property-hooks]
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot declare hooks for static property [static-property-hooks]
 }

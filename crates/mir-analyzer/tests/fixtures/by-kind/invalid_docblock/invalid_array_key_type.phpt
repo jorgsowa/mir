@@ -11,7 +11,7 @@ Invalid array key type
 <?php
 /**
  * @param array<float, string> $arg
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has invalid array key type `float`: must be a subtype of int|string
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: @param has invalid array key type `float`: must be a subtype of int|string
  * @return void
  */
 function foo($arg) {}

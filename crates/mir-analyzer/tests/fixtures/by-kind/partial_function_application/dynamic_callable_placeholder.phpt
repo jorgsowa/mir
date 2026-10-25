@@ -16,4 +16,4 @@ $fn = function (int $a, int $b): int {
     return $a + $b;
 };
 $partial = $fn(?, 5);
-//             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]
+//             ^ ParseError: 'partial function application' requires PHP 8.6 or higher [version-too-low]

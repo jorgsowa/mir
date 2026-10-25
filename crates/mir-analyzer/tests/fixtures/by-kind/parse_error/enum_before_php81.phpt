@@ -7,6 +7,6 @@ Enums require PHP 8.1.
 ===file===
 <?php
 enum Suit {
-//<^^^^ ParseError: Parse error: 'enums' requires PHP 8.1 or higher [version-too-low]
+//<^^^^ ParseError: 'enums' requires PHP 8.1 or higher [version-too-low]
     case Hearts;
 }

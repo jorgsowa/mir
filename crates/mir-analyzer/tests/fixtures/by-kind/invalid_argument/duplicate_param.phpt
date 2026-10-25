@@ -13,4 +13,4 @@ Duplicate param
  * @return void
  */
 function f($p, $p) {}
-//             ^^ CompileError: Compile error: Redefinition of parameter $p [duplicate-parameter]
+//             ^^ CompileError: Redefinition of parameter $p [duplicate-parameter]

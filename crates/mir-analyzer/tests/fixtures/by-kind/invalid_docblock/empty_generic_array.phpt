@@ -10,7 +10,7 @@ empty generic array parameter
 <?php
 /**
  * @param array<> $items
-// ^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @param has empty generic type parameter in `array<>`
+// ^^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: @param has empty generic type parameter in `array<>`
  */
 function process($items): void {
     echo $items;

@@ -5,7 +5,7 @@ __construct() cannot declare a self return type.
 class A
 {
     public function __construct(): self
-//                                 ^^^^ CompileError: Compile error: Method A::__construct() cannot declare a return type [magic-method-return-type]
+//                                 ^^^^ CompileError: Method A::__construct() cannot declare a return type [magic-method-return-type]
     {
     }
 }

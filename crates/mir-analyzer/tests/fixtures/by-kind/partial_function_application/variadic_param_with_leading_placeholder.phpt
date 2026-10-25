@@ -16,4 +16,4 @@ function sum(int ...$nums): int {
 }
 
 $partial = sum(?, 2, 3);
-//             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]
+//             ^ ParseError: 'partial function application' requires PHP 8.6 or higher [version-too-low]

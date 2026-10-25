@@ -5,7 +5,7 @@ Must omit return type
 class A
 {
     public function __construct(): void
-//                                 ^^^^ CompileError: Compile error: Method A::__construct() cannot declare a return type [magic-method-return-type]
+//                                 ^^^^ CompileError: Method A::__construct() cannot declare a return type [magic-method-return-type]
     {
     }
 }

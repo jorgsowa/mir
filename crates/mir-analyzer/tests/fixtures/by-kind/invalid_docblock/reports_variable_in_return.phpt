@@ -4,6 +4,6 @@ reports variable in return
 <?php
 /**
  * @return $bar
-// ^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: @return contains variable `$bar` in type position
+// ^^^^^^^^^^^^ InvalidDocblock: @return contains variable `$bar` in type position
  */
 function foo(): mixed { return null; }

@@ -12,7 +12,7 @@ enum Suit implements Stringable {
     case Hearts;
 
     public function __toString(): string {
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Compile error: Enum Suit cannot include magic method __toString [enum-magic-method]
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum Suit cannot include magic method __toString [enum-magic-method]
         return 'Hearts';
     }
 }

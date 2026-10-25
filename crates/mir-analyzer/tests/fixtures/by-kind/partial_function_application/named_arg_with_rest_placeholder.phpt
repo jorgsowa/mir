@@ -17,4 +17,4 @@ function add3(int $a, int $b, int $c): int {
 }
 
 $partial = add3(a: 1, ...);
-//                    ^^^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher [version-too-low]
+//                    ^^^ ParseError: 'partial function application' requires PHP 8.6 or higher [version-too-low]
