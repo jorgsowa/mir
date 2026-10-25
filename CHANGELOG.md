@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A constructor is checked against a `final`, abstract or interface constructor anywhere up the chain, as PHP does: `FinalMethodOverridden` for overriding a `final __construct`, `MethodSignatureMismatch` / `OverriddenMethodAccess` against an abstract or interface constructor. Constructors were never compared. An ordinary parent constructor still imposes nothing.
+- `MissingReturnType` no longer fires for an interface's `__construct` or `__destruct`, which cannot declare a return type.
 - `PropertyTypeRedeclarationMismatch` covers a property typed on one side only: `public int $x` over an untyped parent property, or an untyped redeclaration of a typed one, is fatal in PHP. Parent properties declared in stubs are not compared (some internal typed properties are untyped there).
 - `InvalidClone` covers `clone` of an enum (`Trying to clone an uncloneable object of class Suit`), which was not reported, and a private `__clone()` reads `Call to private method A::__clone() from global scope` (or `from scope B`) instead of `cannot clone non-object A`. The issue's JSON `kind` carries a `reason`.
 - A class declared under the same name as an enum, interface or trait (a polyfill behind `PHP_VERSION_ID`) is no longer checked against the other declaration: `final class Mode` next to `enum Mode` reported `UnimplementedInterfaceMethod` for `UnitEnum::cases()`.

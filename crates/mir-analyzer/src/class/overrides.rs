@@ -130,11 +130,6 @@ impl<'a> ClassAnalyzer<'a> {
         for (_, own) in own_methods {
             let method_name: Arc<str> = own.name.clone();
 
-            // PHP does not enforce constructor signature compatibility
-            if method_name.as_ref() == "__construct" {
-                continue;
-            }
-
             // Find parent definition (if any) — search ancestor chain
             let method_name_lower: Arc<str> = if method_name.bytes().any(|b| b.is_ascii_uppercase())
             {
@@ -213,6 +208,24 @@ impl<'a> ClassAnalyzer<'a> {
                         None
                     })
                     .collect();
+            // A constructor answers only to a final, abstract or interface constructor.
+            let all_parent_methods = if method_name_lower.as_ref() == "__construct" {
+                let contracts: Vec<_> = all_parent_methods
+                    .into_iter()
+                    .filter(|(anc, m)| {
+                        m.is_final
+                            || m.is_abstract
+                            || crate::db::class_kind(self.db, anc.as_ref())
+                                .is_some_and(|k| k.is_interface)
+                    })
+                    .collect();
+                if contracts.is_empty() {
+                    continue;
+                }
+                contracts
+            } else {
+                all_parent_methods
+            };
             let parent_method = all_parent_methods.first().cloned();
 
             let own_location = own.location.clone();
@@ -652,10 +665,8 @@ impl<'a> ClassAnalyzer<'a> {
                 // A child accepting fewer positional params cannot handle every
                 // call the parent could (an LSP violation PHP rejects). A
                 // trailing variadic absorbs the extras, so it is exempt.
-                // Constructors are exempt from signature compatibility in PHP,
-                // and private parent methods are not real overrides.
-                if method_name_lower.as_ref() != "__construct"
-                    && anc_parent.visibility != Visibility::Private
+                // Private parent methods are not real overrides.
+                if anc_parent.visibility != Visibility::Private
                     && own_params.len() < parent_params.len()
                     && !own_params.iter().any(|p| p.is_variadic)
                     && seen_fewer_params.insert((own_params.len(), parent_params.len()))
@@ -682,31 +693,29 @@ impl<'a> ClassAnalyzer<'a> {
                 // ---- d3. by-reference-ness of shared params must match ------
                 // A parameter that is by-value in the parent but by-reference
                 // in the child (or vice versa) changes the calling contract —
-                // PHP rejects the override. Constructors are exempt.
-                if method_name_lower.as_ref() != "__construct" {
-                    let shared = parent_params.len().min(own_params.len());
-                    if let Some(i) =
-                        (0..shared).find(|&i| parent_params[i].is_byref != own_params[i].is_byref)
-                    {
-                        if seen_byref_violation.insert((i, parent_params[i].is_byref)) {
-                            issues.push(
-                                Issue::new(
-                                    IssueKind::MethodSignatureMismatch {
-                                        class: fqcn.to_string(),
-                                        method: method_name_lower.to_string(),
-                                        detail: format!(
-                                            "parameter ${} must {}be passed by reference to match parent {}::{}()",
-                                            own_params[i].name.as_ref().trim_start_matches('$'),
-                                            if parent_params[i].is_byref { "" } else { "not " },
-                                            anc_fqcn,
-                                            method_name_lower
-                                        ),
-                                    },
-                                    loc(),
-                                )
-                                .with_snippet(method_name_lower.to_string()),
-                            );
-                        }
+                // PHP rejects the override.
+                let shared = parent_params.len().min(own_params.len());
+                if let Some(i) =
+                    (0..shared).find(|&i| parent_params[i].is_byref != own_params[i].is_byref)
+                {
+                    if seen_byref_violation.insert((i, parent_params[i].is_byref)) {
+                        issues.push(
+                            Issue::new(
+                                IssueKind::MethodSignatureMismatch {
+                                    class: fqcn.to_string(),
+                                    method: method_name_lower.to_string(),
+                                    detail: format!(
+                                        "parameter ${} must {}be passed by reference to match parent {}::{}()",
+                                        own_params[i].name.as_ref().trim_start_matches('$'),
+                                        if parent_params[i].is_byref { "" } else { "not " },
+                                        anc_fqcn,
+                                        method_name_lower
+                                    ),
+                                },
+                                loc(),
+                            )
+                            .with_snippet(method_name_lower.to_string()),
+                        );
                     }
                 }
 

@@ -15,4 +15,5 @@ interface Foo {
 
 class Bar implements Foo {
     public function __construct(bool $foo) {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Bar::__construct() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
 }

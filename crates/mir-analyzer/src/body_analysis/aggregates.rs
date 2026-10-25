@@ -665,7 +665,13 @@ impl<'a> BodyAnalyzer<'a> {
 
             if self.mode == AnalysisMode::Full {
                 let stored_return = stored.as_ref().and_then(|m| m.return_type.as_deref());
-                if method.return_type.is_none() && stored_return.is_none() {
+                // PHP forbids a return type on these.
+                let no_return_type_allowed = method_name.eq_ignore_ascii_case("__construct")
+                    || method_name.eq_ignore_ascii_case("__destruct");
+                if method.return_type.is_none()
+                    && stored_return.is_none()
+                    && !no_return_type_allowed
+                {
                     let fn_name = format!("{iface_fqcn}::{method_name}");
                     let (line, col_start) = crate::diagnostics::offset_to_line_col(
                         source,
