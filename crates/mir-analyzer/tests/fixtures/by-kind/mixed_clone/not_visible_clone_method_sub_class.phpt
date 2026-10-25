@@ -8,4 +8,4 @@ class a {
 class b extends a {}
 
 clone new b;
-//<^^^^^^^^^^^ InvalidClone: cannot clone non-object b
+//<^^^^^^^^^^^ InvalidClone: Call to private method a::__clone() from global scope

@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `InvalidClone` covers `clone` of an enum (`Trying to clone an uncloneable object of class Suit`), which was not reported, and a private `__clone()` reads `Call to private method A::__clone() from global scope` (or `from scope B`) instead of `cannot clone non-object A`. The issue's JSON `kind` carries a `reason`.
 - A class declared under the same name as an enum, interface or trait (a polyfill behind `PHP_VERSION_ID`) is no longer checked against the other declaration: `final class Mode` next to `enum Mode` reported `UnimplementedInterfaceMethod` for `UnitEnum::cases()`.
 - A property declared in an enum is registered, so its `CompileError` is the only issue: reads of it were `UndefinedProperty` and `mixed`. Stub cache format 24 → 25.
 - A closure docblock written between the closure's attributes and `function` / `fn` (`#[Pure] /** @param int $x */ fn($x) => ...`) applies, as in PHP; it was ignored.

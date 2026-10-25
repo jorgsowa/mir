@@ -41,6 +41,18 @@ pub use mir_types::Location;
 // IssueKind
 // ---------------------------------------------------------------------------
 
+/// Why `clone` fails for [`IssueKind::InvalidClone`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CloneFailure {
+    NonObject,
+    Enum,
+    /// `scope` is the calling class, `None` outside any class.
+    PrivateMethod {
+        owner: String,
+        scope: Option<String>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum IssueKind {
@@ -796,10 +808,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
     MixedClone,
-    /// `clone` of a value that is definitely not an object (e.g. `int`, `string`).
+    /// `clone` of a value that is definitely not an object (e.g. `int`, `string`),
+    /// of an enum, or of an object whose private `__clone()` is out of scope.
     /// Emitted by `mir-analyzer/src/expr/mod.rs`.
-    /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
-    InvalidClone { ty: String },
+    /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`, `tests/fixtures/by-kind/invalid_clone/`.
+    InvalidClone { ty: String, reason: CloneFailure },
     /// `clone` of a union where some members are not objects (e.g. `int|Exception`).
     /// Emitted by `mir-analyzer/src/expr/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
@@ -2254,7 +2267,18 @@ impl IssueKind {
             IssueKind::MixedArrayAccess => "Array access on mixed type".to_string(),
             IssueKind::MixedArrayOffset => "Mixed type used as array offset".to_string(),
             IssueKind::MixedClone => "cannot clone mixed".to_string(),
-            IssueKind::InvalidClone { ty } => format!("cannot clone non-object {ty}"),
+            IssueKind::InvalidClone { ty, reason } => match reason {
+                CloneFailure::NonObject => format!("cannot clone non-object {ty}"),
+                CloneFailure::Enum => {
+                    format!("Trying to clone an uncloneable object of class {ty}")
+                }
+                CloneFailure::PrivateMethod { owner, scope } => match scope {
+                    Some(scope) => {
+                        format!("Call to private method {owner}::__clone() from scope {scope}")
+                    }
+                    None => format!("Call to private method {owner}::__clone() from global scope"),
+                },
+            },
             IssueKind::PossiblyInvalidClone { ty } => {
                 format!("cannot clone possibly non-object {ty}")
             }
@@ -2955,7 +2979,10 @@ mod code_tests {
             IssueKind::MixedArrayAccess,
             IssueKind::MixedArrayOffset,
             IssueKind::MixedClone,
-            IssueKind::InvalidClone { ty: s() },
+            IssueKind::InvalidClone {
+                ty: s(),
+                reason: CloneFailure::NonObject,
+            },
             IssueKind::PossiblyInvalidClone { ty: s() },
             IssueKind::InvalidToString { class: s() },
             IssueKind::InvalidTraitUse {

@@ -193,7 +193,7 @@ All issue types mir can emit, grouped by category.
 | `MixedMethodCall` | A method is called on a value of type `mixed`. |
 | `MixedPropertyFetch` | A property is fetched from a value of type `mixed`. |
 | `MixedClone` | `clone` is applied to a value of type `mixed`. |
-| `InvalidClone` | Cloning a non-object type. |
+| `InvalidClone` | Cloning a non-object, an enum, or an object with an inaccessible private `__clone()`. |
 | `PossiblyInvalidClone` | Cloning a value whose type might not be an object. |
 | `InvalidToString` | Using an object in a string context without a `__toString` method. |
 | `MixedPropertyAssignment` | A `mixed` value is assigned to a property, hiding its concrete type. |

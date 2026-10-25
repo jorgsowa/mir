@@ -2135,7 +2135,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         match ty.clone_validity() {
             CloneValidity::Invalid => self.emit(
-                IssueKind::InvalidClone { ty: ty.to_string() },
+                IssueKind::InvalidClone {
+                    ty: ty.to_string(),
+                    reason: mir_issues::CloneFailure::NonObject,
+                },
                 Severity::Error,
                 span,
             ),
@@ -2192,6 +2195,30 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => {}
         }
         for atomic in &ty.types {
+            let enum_fqcn = match atomic {
+                Atomic::TLiteralEnumCase { enum_fqcn, .. } => Some(enum_fqcn.as_ref()),
+                Atomic::TNamedObject { fqcn, .. }
+                    if crate::db::find_class_like(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                    )
+                    .is_some_and(|c| c.is_enum()) =>
+                {
+                    Some(fqcn.as_ref())
+                }
+                _ => None,
+            };
+            if let Some(enum_fqcn) = enum_fqcn {
+                self.emit(
+                    IssueKind::InvalidClone {
+                        ty: enum_fqcn.to_string(),
+                        reason: mir_issues::CloneFailure::Enum,
+                    },
+                    Severity::Error,
+                    span,
+                );
+                continue;
+            }
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let fqcn_str = fqcn.as_ref();
                 if let Some((owner_fqcn, method)) = crate::db::find_method_in_chain(
@@ -2208,6 +2235,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self.emit(
                                 IssueKind::InvalidClone {
                                     ty: fqcn_str.to_string(),
+                                    reason: mir_issues::CloneFailure::PrivateMethod {
+                                        owner: owner_fqcn.to_string(),
+                                        scope: caller_fqcn.map(str::to_string),
+                                    },
                                 },
                                 Severity::Error,
                                 span,
