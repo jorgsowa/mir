@@ -1,10 +1,12 @@
+use std::collections::hash_map::Entry;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use mir_codebase::definitions::{ConstantDef, EnumCaseDef, PropertyDef};
 use mir_issues::{Issue, IssueKind};
-use mir_types::Type;
+use mir_types::{Atomic, Type};
 use php_ast::owned::EnumMemberKind;
+use rustc_hash::FxHashMap;
 
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
@@ -105,6 +107,7 @@ impl DefinitionCollector<'_> {
         let type_aliases = self.build_type_aliases_deferring_imports(&enum_doc);
 
         let mut declared_properties = Vec::new();
+        let mut case_values: FxHashMap<EnumCaseValue, &str> = FxHashMap::default();
         for member in decl.body.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
@@ -159,6 +162,29 @@ impl DefinitionCollector<'_> {
                                 },
                                 self.location(value_span.start, value_span.end),
                             ));
+                        }
+                    }
+
+                    if let Some(value_key) = value_ty
+                        .as_ref()
+                        .filter(|_| scalar_type.is_some())
+                        .and_then(enum_case_value_key)
+                    {
+                        match case_values.entry(value_key) {
+                            Entry::Occupied(first) => {
+                                let value_span = c.value.as_ref().map_or(member.span, |e| e.span);
+                                self.issues.add(Issue::new(
+                                    IssueKind::DuplicateEnumCaseValue {
+                                        enum_name: fqcn.clone(),
+                                        first_case: first.get().to_string(),
+                                        case_name: case_name.to_string(),
+                                    },
+                                    self.location(value_span.start, value_span.end),
+                                ));
+                            }
+                            Entry::Vacant(slot) => {
+                                slot.insert(case_name);
+                            }
                         }
                     }
 
@@ -417,5 +443,19 @@ impl DefinitionCollector<'_> {
             }));
         self.own_constants = prev_own_constants;
         ControlFlow::Continue(())
+    }
+}
+
+#[derive(PartialEq, Eq, Hash)]
+enum EnumCaseValue {
+    Int(i64),
+    String(Arc<str>),
+}
+
+fn enum_case_value_key(ty: &Type) -> Option<EnumCaseValue> {
+    match ty.types.as_slice() {
+        [Atomic::TLiteralInt(i)] => Some(EnumCaseValue::Int(*i)),
+        [Atomic::TLiteralString(s)] => Some(EnumCaseValue::String(s.clone())),
+        _ => None,
     }
 }

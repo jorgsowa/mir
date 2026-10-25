@@ -141,6 +141,7 @@ issues keep their code.
 | MIR0715  | StaticPropertyRedeclarationMismatch | [inheritance/static-property-redeclaration-mismatch](../inheritance/static-property-redeclaration-mismatch/) |
 | MIR0716  | ReadonlyClassExtendsMismatch  | [inheritance/readonly-class-extends-mismatch](../inheritance/readonly-class-extends-mismatch/) |
 | MIR0717  | InvalidReadonlyPropertyDeclaration | [inheritance/invalid-readonly-property-declaration](../inheritance/invalid-readonly-property-declaration/) |
+| MIR0718  | DuplicateEnumCaseValue        | [inheritance/duplicate-enum-case-value](../inheritance/duplicate-enum-case-value/) |
 | MIR0800  | TaintedInput                  | [security/tainted-input](../security/tainted-input/) |
 | MIR0801  | TaintedHtml                   | [security/tainted-html](../security/tainted-html/) |
 | MIR0802  | TaintedSql                    | [security/tainted-sql](../security/tainted-sql/) |
