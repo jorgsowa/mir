@@ -16,5 +16,5 @@ enum B {
 enum C: int {
     case X = 1;
     case Y = '1';
-//           ^^^ BackedEnumCaseTypeMismatch: Backed enum case C::Y has value of type "1", but backing type is int
+//           ^^^ BackedEnumCaseTypeMismatch: Enum case type string does not match enum backing type int
 }

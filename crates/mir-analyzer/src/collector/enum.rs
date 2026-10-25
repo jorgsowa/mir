@@ -41,6 +41,11 @@ impl DefinitionCollector<'_> {
             .scalar_type
             .as_ref()
             .map(|n| crate::parser::docblock::parse_type_string(&name_to_string_owned(n)));
+        // Any other backing type is the parser's `invalid-enum-backing-type`.
+        let checked_backing_type = decl.scalar_type.as_ref().is_some_and(|n| {
+            let name = name_to_string_owned(n);
+            name.eq_ignore_ascii_case("int") || name.eq_ignore_ascii_case("string")
+        });
 
         let mut interfaces: Vec<Arc<str>> = decl
             .implements
@@ -150,7 +155,9 @@ impl DefinitionCollector<'_> {
                         .and_then(|expr| super::infer_const_value(self, &expr.kind));
 
                     // Validate the case value's type against the backing scalar type.
-                    if let (Some(backing), Some(case_val_ty)) = (&scalar_type, &value_ty) {
+                    if let (Some(backing), Some(case_val_ty), true) =
+                        (&scalar_type, &value_ty, checked_backing_type)
+                    {
                         if !case_val_ty.is_subtype_structural(backing) {
                             let value_span = c.value.as_ref().map_or(member.span, |e| e.span);
                             self.issues.add(Issue::new(
@@ -158,7 +165,8 @@ impl DefinitionCollector<'_> {
                                     enum_name: fqcn.clone(),
                                     case_name: case_name.to_string(),
                                     expected: backing.to_string(),
-                                    actual: case_val_ty.to_string(),
+                                    actual: php_value_type_name(case_val_ty)
+                                        .map_or_else(|| case_val_ty.to_string(), str::to_string),
                                 },
                                 self.location(value_span.start, value_span.end),
                             ));
@@ -462,4 +470,21 @@ fn enum_case_value_key(ty: &Type) -> Option<EnumCaseValue> {
         [Atomic::TLiteralString(s)] => Some(EnumCaseValue::String(s.clone())),
         _ => None,
     }
+}
+
+/// The type name PHP's `zend_zval_type_name` gives a constant case value.
+fn php_value_type_name(ty: &mir_types::Type) -> Option<&'static str> {
+    use mir_types::Atomic;
+    let [atomic] = ty.types.as_slice() else {
+        return None;
+    };
+    Some(match atomic {
+        Atomic::TInt | Atomic::TLiteralInt(_) => "int",
+        Atomic::TString | Atomic::TLiteralString(_) => "string",
+        Atomic::TFloat | Atomic::TLiteralFloat(..) => "float",
+        Atomic::TBool | Atomic::TTrue | Atomic::TFalse => "bool",
+        Atomic::TNull => "null",
+        Atomic::TArray { .. } | Atomic::TKeyedArray { .. } | Atomic::TList { .. } => "array",
+        _ => return None,
+    })
 }

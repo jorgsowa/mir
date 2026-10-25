@@ -5,6 +5,6 @@ The correctly-typed case (High = 1) must NOT produce an error.
 <?php
 enum Priority: int {
     case Low = 'low';
-//             ^^^^^ BackedEnumCaseTypeMismatch: Backed enum case Priority::Low has value of type "low", but backing type is int
+//             ^^^^^ BackedEnumCaseTypeMismatch: Enum case type string does not match enum backing type int
     case High = 1;
 }

@@ -49,25 +49,42 @@ pub(crate) fn parse_error_to_issue(
     )
 }
 
-/// PHP's wording for parser diagnostics whose text lacks the property PHP names.
+/// PHP's wording for parser diagnostics whose text differs from PHP's.
 fn php_message(
     err: &php_rs_parser::diagnostics::ParseError,
     program: &php_ast::owned::Program,
 ) -> Option<String> {
-    let message: fn(&str, &str) -> String = match err.forbidden_rule()? {
-        ForbiddenRule::UntypedReadonlyProperty => {
-            |class, prop| format!("Readonly property {class}::${prop} must have type")
-        }
-        ForbiddenRule::StaticReadonlyProperty => {
-            |class, prop| format!("Static property {class}::${prop} cannot be readonly")
-        }
+    let (target, message): (DeclTarget, fn(&str, &str) -> String) = match err.forbidden_rule()? {
         ForbiddenRule::ReadonlyPropertyHooks => {
             return Some("Hooked properties cannot be readonly".to_string())
         }
+        ForbiddenRule::EnumCaseNamedClass => return Some(
+            "A class constant must not be called 'class'; it is reserved for class name fetching"
+                .to_string(),
+        ),
+        ForbiddenRule::PureEnumCaseValue => (DeclTarget::EnumCase, |enum_name, case| {
+            format!("Case {case} of non-backed enum {enum_name} must not have a value")
+        }),
+        ForbiddenRule::MissingEnumCaseValue => (DeclTarget::EnumCase, |enum_name, case| {
+            format!("Case {case} of backed enum {enum_name} must have a value")
+        }),
+        ForbiddenRule::UntypedReadonlyProperty => (DeclTarget::Property, |class, prop| {
+            format!("Readonly property {class}::${prop} must have type")
+        }),
+        ForbiddenRule::StaticReadonlyProperty => (DeclTarget::Property, |class, prop| {
+            format!("Static property {class}::${prop} cannot be readonly")
+        }),
+        ForbiddenRule::AbstractEnumMethod => (DeclTarget::Method, |enum_name, method| {
+            format!("Enum method {enum_name}::{method}() must not be abstract")
+        }),
+        ForbiddenRule::InvalidEnumBackingType => (DeclTarget::EnumBackingType, |_, ty| {
+            format!("Enum backing type must be int or string, {ty} given")
+        }),
         _ => return None,
     };
-    let mut finder = PropertyAt {
+    let mut finder = DeclAt {
         offset: err.span().start,
+        target,
         namespace: String::new(),
         classes: Vec::new(),
         found: None,
@@ -77,42 +94,78 @@ fn php_message(
             break;
         }
     }
-    let (class, property) = finder.found?;
-    Some(message(&class, &property))
+    let (class, name) = finder.found?;
+    Some(message(&class, &name))
 }
 
-/// Finds the class-like and name of the property or promoted parameter that starts at `offset`.
-struct PropertyAt {
+#[derive(PartialEq)]
+enum DeclTarget {
+    /// A property or promoted parameter.
+    Property,
+    Method,
+    EnumCase,
+    EnumBackingType,
+}
+
+/// Finds the class-like enclosing the `target` declared at `offset`, and the target's name.
+struct DeclAt {
     offset: u32,
+    target: DeclTarget,
     namespace: String,
     classes: Vec<String>,
     found: Option<(String, String)>,
 }
 
-impl PropertyAt {
-    fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
-        let name = if self.namespace.is_empty() {
+impl DeclAt {
+    fn qualify(&self, name: &str) -> String {
+        if self.namespace.is_empty() {
             name.to_string()
         } else {
             format!("{}\\{name}", self.namespace)
-        };
-        self.classes.push(name);
+        }
+    }
+
+    fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        self.classes.push(self.qualify(name));
         let flow = crate::recursion::walk_stmt(self, stmt);
         self.classes.pop();
         flow
     }
 
-    fn found(&mut self, span: Span, name: &php_ast::owned::Ident) -> std::ops::ControlFlow<()> {
-        if span.start > self.offset || self.offset >= span.end {
+    fn found(
+        &mut self,
+        target: DeclTarget,
+        span: Span,
+        name: &php_ast::owned::Ident,
+    ) -> std::ops::ControlFlow<()> {
+        if target != self.target || span.start > self.offset || self.offset >= span.end {
             return std::ops::ControlFlow::Continue(());
         }
         let class = self.classes.last().cloned().unwrap_or_default();
         self.found = Some((class, name.as_str().unwrap_or_default().to_string()));
         std::ops::ControlFlow::Break(())
     }
+
+    /// The backing type as PHP names it: a builtin lowercased, a class name qualified.
+    fn backing_type_name(&self, name: &php_ast::owned::Name) -> String {
+        let written = name_to_string_owned(name);
+        if let Some(fully_qualified) = written.strip_prefix('\\') {
+            return fully_qualified.to_string();
+        }
+        let lower = written.to_ascii_lowercase();
+        const BUILTINS: [&str; 14] = [
+            "float", "bool", "void", "never", "mixed", "object", "iterable", "callable", "array",
+            "null", "true", "false", "int", "string",
+        ];
+        if BUILTINS.contains(&lower.as_str()) {
+            lower
+        } else {
+            self.qualify(&written)
+        }
+    }
 }
 
-impl php_ast::owned::visitor::OwnedVisitor for PropertyAt {
+impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
     type Break = ();
 
     fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
@@ -142,6 +195,16 @@ impl php_ast::owned::visitor::OwnedVisitor for PropertyAt {
                 return self.in_class(name, stmt);
             }
             StmtKind::Trait(d) => return self.in_class(d.name.as_str().unwrap_or_default(), stmt),
+            StmtKind::Enum(d) => {
+                let name = d.name.as_str().unwrap_or_default();
+                if let Some(ty) = d.scalar_type.as_ref().filter(|ty| {
+                    self.target == DeclTarget::EnumBackingType && ty.span().start == self.offset
+                }) {
+                    self.found = Some((self.qualify(name), self.backing_type_name(ty)));
+                    return std::ops::ControlFlow::Break(());
+                }
+                return self.in_class(name, stmt);
+            }
             _ => {}
         }
         crate::recursion::walk_stmt(self, stmt)
@@ -153,15 +216,31 @@ impl php_ast::owned::visitor::OwnedVisitor for PropertyAt {
     ) -> std::ops::ControlFlow<()> {
         use php_ast::owned::ClassMemberKind;
         match &member.kind {
-            ClassMemberKind::Property(p) => self.found(member.span, &p.name)?,
+            ClassMemberKind::Property(p) => {
+                self.found(DeclTarget::Property, member.span, &p.name)?
+            }
             ClassMemberKind::Method(m) => {
+                self.found(DeclTarget::Method, member.span, &m.name)?;
                 for param in m.params.iter() {
-                    self.found(param.span, &param.name)?;
+                    self.found(DeclTarget::Property, param.span, &param.name)?;
                 }
             }
             _ => {}
         }
         php_ast::owned::visitor::walk_owned_class_member(self, member)
+    }
+
+    fn visit_enum_member(
+        &mut self,
+        member: &php_ast::owned::EnumMember,
+    ) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::EnumMemberKind;
+        match &member.kind {
+            EnumMemberKind::Method(m) => self.found(DeclTarget::Method, member.span, &m.name)?,
+            EnumMemberKind::Case(c) => self.found(DeclTarget::EnumCase, member.span, &c.name)?,
+            _ => {}
+        }
+        php_ast::owned::visitor::walk_owned_enum_member(self, member)
     }
 
     fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {

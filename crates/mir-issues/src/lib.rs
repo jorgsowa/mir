@@ -2063,15 +2063,8 @@ impl IssueKind {
                 }
             }
             IssueKind::BackedEnumCaseTypeMismatch {
-                enum_name,
-                case_name,
-                expected,
-                actual,
-            } => {
-                format!(
-                    "Backed enum case {enum_name}::{case_name} has value of type {actual}, but backing type is {expected}"
-                )
-            }
+                expected, actual, ..
+            } => format!("Enum case type {actual} does not match enum backing type {expected}"),
             IssueKind::DuplicateEnumCaseValue {
                 enum_name,
                 first_case,
