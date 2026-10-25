@@ -128,6 +128,12 @@ impl<'a> ClassAnalyzer<'a> {
         }
 
         for (_, own) in own_methods {
+            // Reported as a redeclaration instead; PHP's own method replaces it.
+            if let crate::db::ClassLike::Enum(e) = &class {
+                if super::members::enum_builtin_method(e, &own.name).is_some() {
+                    continue;
+                }
+            }
             let method_name: Arc<str> = own.name.clone();
 
             // Find parent definition (if any) — search ancestor chain

@@ -346,6 +346,41 @@ impl ClassAnalyzer<'_> {
     }
 }
 
+/// The method name PHP declares on every enum (`cases`) or backed enum (`from`, `tryFrom`).
+pub(super) fn enum_builtin_method(
+    enum_def: &mir_codebase::definitions::EnumDef,
+    method_name: &str,
+) -> Option<&'static str> {
+    match method_name.to_ascii_lowercase().as_str() {
+        "cases" => Some("cases"),
+        "from" if enum_def.scalar_type.is_some() => Some("from"),
+        "tryfrom" if enum_def.scalar_type.is_some() => Some("tryfrom"),
+        _ => None,
+    }
+}
+
+impl ClassAnalyzer<'_> {
+    /// PHP rejects an enum method named like one it declares itself; a trait's copy is shadowed.
+    pub(super) fn check_enum_builtin_redeclarations(
+        &self,
+        enum_def: &mir_codebase::definitions::EnumDef,
+        issues: &mut Vec<Issue>,
+    ) {
+        for (_, method) in enum_def.own_methods.iter() {
+            if let Some(builtin) = enum_builtin_method(enum_def, &method.name) {
+                self.push_located_issue(
+                    issues,
+                    IssueKind::CompileError {
+                        message: format!("Cannot redeclare {}::{builtin}()", enum_def.fqcn),
+                        code: "duplicate-method".to_string(),
+                    },
+                    method.location.as_ref(),
+                );
+            }
+        }
+    }
+}
+
 impl ClassAnalyzer<'_> {
     /// PHP rejects a class constant that overrides a `final` one or narrows its visibility.
     pub(super) fn check_constant_overrides(
