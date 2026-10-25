@@ -890,11 +890,15 @@ impl ClassAnalyzer<'_> {
         let count = missing.len();
         let plural = if count == 1 { "" } else { "s" };
         let list = missing.join(", ");
+        // PHP 8.4's texts: a plural "remaining methods", and "private" for enums.
+        let php84 = crate::db::db_php_version(self.db) < crate::php_version::PhpVersion::new(8, 5);
         let message = if is_enum {
-            format!("Enum {fqcn} must implement {count} abstract method{plural} ({list})")
+            let private = if php84 { "private " } else { "" };
+            format!("Enum {fqcn} must implement {count} abstract {private}method{plural} ({list})")
         } else {
+            let remaining = if php84 { "s" } else { plural };
             format!(
-                "Class {fqcn} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining method{plural} ({list})"
+                "Class {fqcn} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining method{remaining} ({list})"
             )
         };
         self.push_located_issue(

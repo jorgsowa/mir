@@ -82,19 +82,12 @@ impl AnalysisSession {
             .map(|parsed| {
                 let content_hash = hash_source(parsed.source());
                 let skip_cache = crate::parser::parse_errors_block_cache(parsed.errors());
-                let mut all_issues: Vec<Issue> = parsed
-                    .errors()
-                    .iter()
-                    .filter(|err| !crate::parser::is_redundant_parse_error(err))
-                    .map(|err| {
-                        crate::parser::parse_error_to_issue(
-                            err,
-                            &parsed.file,
-                            parsed.source(),
-                            &parsed.parsed,
-                        )
-                    })
-                    .collect();
+                let mut all_issues: Vec<Issue> = crate::parser::parse_error_issues(
+                    &parsed.file,
+                    parsed.source(),
+                    &parsed.parsed,
+                    php_version,
+                );
                 let collector = crate::collector::DefinitionCollector::new_for_slice(
                     parsed.file.clone(),
                     parsed.source(),

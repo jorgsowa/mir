@@ -23,4 +23,4 @@ class Point {
 
 $p = new Point(?, 2);
 //             ^ ParseError: 'partial function application' requires PHP 8.6 or higher [version-too-low]
-//             ^ ParseError: Cannot use partial function application in new expression [partial-application-in-new]
+//             ^ CompileError: Cannot create Closure for new expression [partial-application-in-new]

@@ -125,20 +125,13 @@ pub(crate) fn issues_have_unresolved_names(issues: &[Issue]) -> bool {
 #[salsa::tracked(lru = 16384)]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
     let prepared = super::queries::prepare_analysis_file(db, file);
-    let mut issues: Vec<Issue> = Vec::new();
     let parsed = prepared.parse_result();
-
-    for err in &parsed.errors {
-        if crate::parser::is_redundant_parse_error(err) {
-            continue;
-        }
-        issues.push(crate::parser::parse_error_to_issue(
-            err,
-            prepared.path,
-            prepared.text,
-            parsed,
-        ));
-    }
+    let mut issues: Vec<Issue> = crate::parser::parse_error_issues(
+        prepared.path,
+        prepared.text,
+        parsed,
+        crate::db::db_php_version(db),
+    );
 
     // Run full analysis unless there are hard parse errors.
     let mut ref_locs: Vec<RefLoc> = Vec::new();

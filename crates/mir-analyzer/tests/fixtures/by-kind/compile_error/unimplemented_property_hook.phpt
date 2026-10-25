@@ -22,10 +22,10 @@ class Missing implements HasId, Named {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Missing contains 3 abstract methods and must therefore be declared abstract or implement the remaining methods (HasId::$id::get, Named::$name::get, Named::$name::set) [unimplemented-property-hook]
 
 class Square extends Shape {}
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Square contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Shape::$area::get) [unimplemented-property-hook]
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Square contains 1 abstract method and must therefore be declared abstract or implement the remaining methods (Shape::$area::get) [unimplemented-property-hook]
 
 enum Status implements HasId {
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum Status must implement 1 abstract method (HasId::$id::get) [unimplemented-property-hook]
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum Status must implement 1 abstract private method (HasId::$id::get) [unimplemented-property-hook]
     case Active;
 }
 
@@ -34,7 +34,7 @@ class Backed implements Named {
 }
 
 class Virtual implements Named {
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Virtual contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Named::$name::set) [unimplemented-property-hook]
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Virtual contains 1 abstract method and must therefore be declared abstract or implement the remaining methods (Named::$name::set) [unimplemented-property-hook]
     public string $name { get => 'fixed'; }
 }
 

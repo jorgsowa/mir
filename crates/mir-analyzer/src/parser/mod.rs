@@ -7,6 +7,8 @@ use std::sync::Arc;
 use php_ast::Span;
 use php_rs_parser::diagnostics::{ForbiddenRule, Phase};
 
+use crate::php_version::PhpVersion;
+
 pub use docblock::{DocblockParser, ParsedDocblock};
 pub use type_from_hint::{type_from_hint, type_from_hint_owned};
 
@@ -14,25 +16,45 @@ pub use type_from_hint::{type_from_hint, type_from_hint_owned};
 // Parse-error → Issue conversion
 // ---------------------------------------------------------------------------
 
+/// The issues for `parsed`'s diagnostics at the target `version`, without the ones
+/// the analyzer reports itself or PHP does not raise at `version`.
+pub(crate) fn parse_error_issues(
+    file: &Arc<str>,
+    source: &str,
+    parsed: &php_rs_parser::ParseResult,
+    version: PhpVersion,
+) -> Vec<mir_issues::Issue> {
+    parsed
+        .errors
+        .iter()
+        .filter(|err| {
+            !is_redundant_parse_error(err) && raised_at(err, source, &parsed.program, version)
+        })
+        .map(|err| parse_error_to_issue(err, file, source, parsed, version))
+        .collect()
+}
+
 /// Convert a parser diagnostic to a [`mir_issues::Issue`], using the source
 /// and source map to derive a precise location.
-pub(crate) fn parse_error_to_issue(
+fn parse_error_to_issue(
     err: &php_rs_parser::diagnostics::ParseError,
     file: &Arc<str>,
     source: &str,
     parsed: &php_rs_parser::ParseResult,
+    version: PhpVersion,
 ) -> mir_issues::Issue {
     let span = err.span();
     let source_map = &parsed.source_map;
     let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
     let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
 
-    let message = php_message(err, source, &parsed.program).unwrap_or_else(|| err.to_string());
+    let message =
+        php_message(err, source, &parsed.program, version).unwrap_or_else(|| err.to_string());
     let code = err.code().to_owned();
     let rule = err.forbidden_rule();
     let kind = if rule == Some(ForbiddenRule::ParentWithoutParentClass) {
         mir_issues::IssueKind::ParentNotFound
-    } else if rule.map(ForbiddenRule::phase) == Some(Phase::Compile) {
+    } else if is_compile_error(err, source, version) {
         mir_issues::IssueKind::CompileError { message, code }
     } else {
         mir_issues::IssueKind::ParseError { message, code }
@@ -49,36 +71,312 @@ pub(crate) fn parse_error_to_issue(
     )
 }
 
-/// PHP's wording for parser diagnostics whose text differs from PHP's.
+/// Whether PHP rejects the parser's diagnostic at compile time (`php -l` prints `Fatal error`).
+fn is_compile_error(
+    err: &php_rs_parser::diagnostics::ParseError,
+    source: &str,
+    version: PhpVersion,
+) -> bool {
+    let Some(rule) = err.forbidden_rule() else {
+        return false;
+    };
+    match rule {
+        ForbiddenRule::MultipleVisibilityModifiers
+        | ForbiddenRule::MultipleSetVisibilityModifiers
+        | ForbiddenRule::DuplicateModifier
+        | ForbiddenRule::AbstractFinalConflict
+        | ForbiddenRule::InvalidConstantModifier
+        | ForbiddenRule::OutermostScopeOnly
+        | ForbiddenRule::PartialApplicationInNew => true,
+        // A parameter modifier is a syntax error before 8.3, `readonly` before 8.1.
+        ForbiddenRule::ModifierNotAllowed => {
+            version >= PhpVersion::new(8, 3)
+                || version >= PhpVersion::new(8, 1) && err.to_string().ends_with(" on a method")
+        }
+        ForbiddenRule::InvalidCurlyInterpolation => false,
+        ForbiddenRule::CurlyOffsetAccess => version < PhpVersion::new(8, 4),
+        ForbiddenRule::ReservedClassName | ForbiddenRule::KeywordAsDeclarationName => {
+            reserved_declaration_name(err, source).is_some()
+        }
+        // `$x = &1` is a syntax error; `[&$a] = 1` a compile error.
+        ForbiddenRule::ReferenceToNonReferenceable => !preceded_by(source, err.span(), '&'),
+        _ => rule.phase() == Phase::Compile,
+    }
+}
+
+/// Whether PHP raises the parser's diagnostic at `version`.
+fn raised_at(
+    err: &php_rs_parser::diagnostics::ParseError,
+    source: &str,
+    program: &php_ast::owned::Program,
+    version: PhpVersion,
+) -> bool {
+    match err.forbidden_rule() {
+        // Before 8.0 PHP checks only that these three declare no return type.
+        Some(ForbiddenRule::MagicMethodReturnType) if version < PhpVersion::new(8, 0) => {
+            let message = err.to_string();
+            message.ends_with("cannot declare a return type")
+                || message.to_ascii_lowercase().contains("::__clone(): ")
+        }
+        Some(ForbiddenRule::MagicMethodParameterType) => version >= PhpVersion::new(8, 0),
+        // Before property hooks `parent::$x::get()` calls `get()` on the class `parent::$x` names.
+        Some(ForbiddenRule::InvalidParentHookCall) => version >= PhpVersion::new(8, 4),
+        // PHP 8.0 lets a nullsafe chain be destructured by reference.
+        Some(ForbiddenRule::ReferenceToNullsafe) if version < PhpVersion::new(8, 1) => {
+            !preceded_by(source, err.span(), '=')
+        }
+        // Before 8.0 the `dynamic-class-fetch` error covers it.
+        Some(ForbiddenRule::ClassFetchOnLiteral) => version >= PhpVersion::new(8, 0),
+        // Reported next to the modifier error for `readonly static function`.
+        Some(ForbiddenRule::StaticReadonlyProperty) => {
+            find_decl(program, err.span().start, DeclTarget::Method).is_none()
+        }
+        _ => true,
+    }
+}
+
+/// Whether the first non-blank character before `span` is `expected`.
+fn preceded_by(source: &str, span: Span, expected: char) -> bool {
+    source
+        .get(..span.start as usize)
+        .and_then(|before| before.trim_end().chars().next_back())
+        == Some(expected)
+}
+
+/// Reserved type names PHP rejects as class-like names at compile time; keywords are syntax errors.
+const RESERVED_CLASS_NAMES: [&str; 14] = [
+    "bool", "false", "float", "int", "null", "parent", "self", "string", "true", "void", "never",
+    "iterable", "object", "mixed",
+];
+
+/// The name and declaration kind (`class`, `interface`, `trait`, `enum`) of a class-like
+/// declared with a reserved type name.
+fn reserved_declaration_name<'a>(
+    err: &php_rs_parser::diagnostics::ParseError,
+    source: &'a str,
+) -> Option<(&'a str, &'static str)> {
+    let span = err.span();
+    let name = source.get(span.start as usize..span.end as usize)?;
+    if !RESERVED_CLASS_NAMES.contains(&name.to_ascii_lowercase().as_str()) {
+        return None;
+    }
+    let message = err.to_string();
+    ["class", "interface", "trait", "enum"]
+        .into_iter()
+        .find(|kind| {
+            message.contains(&format!(" as {kind} name"))
+                || message.contains(&format!(" as a {kind} name"))
+                || message.contains(&format!(" as an {kind} name"))
+        })
+        .map(|kind| (name, kind))
+}
+
+/// PHP's wording for parser diagnostics whose text differs from PHP's at `version`.
 fn php_message(
     err: &php_rs_parser::diagnostics::ParseError,
     source: &str,
     program: &php_ast::owned::Program,
+    version: PhpVersion,
 ) -> Option<String> {
     let parser_message = || err.to_string();
+    let before = |major, minor| version < PhpVersion::new(major, minor);
     let (target, message): (DeclTarget, fn(&str, &str) -> String) = match err.forbidden_rule()? {
         ForbiddenRule::ReadonlyPropertyHooks => {
             return Some("Hooked properties cannot be readonly".to_string())
         }
         ForbiddenRule::AbstractFinalConflict => {
-            return match parser_message() {
-                m if m.starts_with("Cannot use") => None,
+            let message = match parser_message() {
+                m if m.starts_with("Cannot use") => m,
                 _ if find_decl(program, err.span().start, DeclTarget::Method).is_some() => {
-                    Some("Cannot use the final modifier on an abstract method".to_string())
+                    "Cannot use the final modifier on an abstract method".to_string()
                 }
-                _ => Some("Cannot use the final modifier on an abstract property".to_string()),
+                _ => "Cannot use the final modifier on an abstract property".to_string(),
             };
+            if before(8, 3) && message.ends_with("an abstract method") {
+                return Some(
+                    "Cannot use the final modifier on an abstract class member".to_string(),
+                );
+            }
+            return Some(message);
         }
         ForbiddenRule::InvalidConstantModifier => {
             let message = parser_message();
             let modifier = message.split('\'').nth(1)?;
+            return Some(if before(8, 3) {
+                format!("Cannot use '{modifier}' as constant modifier")
+            } else {
+                format!("Cannot use the {modifier} modifier on a class constant")
+            });
+        }
+        ForbiddenRule::InvalidInterfaceMethodModifier if before(8, 1) => {
+            let (interface, method) = find_decl(program, err.span().start, DeclTarget::Method)?;
             return Some(format!(
-                "Cannot use the {modifier} modifier on a class constant"
+                "Access type for interface method {interface}::{method}() must be omitted"
             ));
         }
+        ForbiddenRule::ModifierNotAllowed if before(8, 3) => {
+            let message = parser_message();
+            let modifier = message
+                .strip_prefix("Cannot use the ")?
+                .strip_suffix(" modifier on a method")?;
+            return Some(format!("Cannot use '{modifier}' as method modifier"));
+        }
+        ForbiddenRule::InvalidTraitAliasModifier if before(8, 3) => {
+            let message = parser_message();
+            let modifier = message.split('"').nth(1)?;
+            return Some(format!("Cannot use '{modifier}' as method modifier"));
+        }
         ForbiddenRule::AbstractPropertyWithoutAbstractHook => {
-            return (parser_message() == "properties cannot be abstract")
-                .then(|| "Only hooked properties may be declared abstract".to_string());
+            return (parser_message() == "properties cannot be abstract").then(|| {
+                if before(8, 3) {
+                    "Properties cannot be declared abstract"
+                } else if before(8, 4) {
+                    "Cannot use the abstract modifier on a property"
+                } else {
+                    "Only hooked properties may be declared abstract"
+                }
+                .to_string()
+            });
+        }
+        ForbiddenRule::InterfacePropertyWithoutHooks if before(8, 4) => {
+            return Some(if before(8, 1) {
+                "Interfaces may not include member variables".to_string()
+            } else {
+                "Interfaces may not include properties".to_string()
+            });
+        }
+        ForbiddenRule::ReservedClassName
+        | ForbiddenRule::KeywordAsDeclarationName
+        | ForbiddenRule::ReservedEnumName => {
+            let (name, kind) = reserved_declaration_name(err, source)?;
+            return Some(if before(8, 4) {
+                format!("Cannot use '{name}' as class name as it is reserved")
+            } else {
+                let article = if kind.starts_with(['a', 'e', 'i']) {
+                    "an"
+                } else {
+                    "a"
+                };
+                format!("Cannot use \"{name}\" as {article} {kind} name as it is reserved")
+            });
+        }
+        ForbiddenRule::ReservedClassReference if before(8, 4) => {
+            let message = parser_message().replace('"', "'");
+            return Some(if before(8, 0) {
+                message.replace(", as it", " as it")
+            } else {
+                message
+            });
+        }
+        ForbiddenRule::ReservedTypeName if before(8, 4) => {
+            let message = parser_message();
+            let name = message.split('"').nth(1)?;
+            return Some(format!(
+                "Cannot use '{name}' as class name as it is reserved"
+            ));
+        }
+        ForbiddenRule::PartialApplicationInNew => {
+            return Some("Cannot create Closure for new expression".to_string())
+        }
+        ForbiddenRule::ReferenceToNonReferenceable if before(8, 1) => {
+            return Some("Cannot assign reference to non referencable value".to_string())
+        }
+        ForbiddenRule::MagicMethodReturnType if before(8, 0) => {
+            let message = parser_message();
+            let lower = message.to_ascii_lowercase();
+            let method = message
+                .split(' ')
+                .find(|word| word.contains("::"))?
+                .trim_end_matches(':');
+            let label = if lower.contains("::__construct()") {
+                "Constructor"
+            } else if lower.contains("::__destruct()") {
+                "Destructor"
+            } else {
+                "Clone method"
+            };
+            return Some(format!("{label} {method} cannot declare a return type"));
+        }
+        ForbiddenRule::GeneratorReturnType if before(8, 0) => {
+            let message = parser_message();
+            let ty = message.rsplit(", ").next()?.strip_suffix(" given")?;
+            return Some(format!(
+                "Generators may only declare a return type of Generator, Iterator, Traversable, or iterable, {ty} is not permitted"
+            ));
+        }
+        ForbiddenRule::DeprecatedOnInvalidTarget if version == PhpVersion::new(8, 4) => {
+            return Some(format!(
+                "Attribute \"Deprecated\" cannot target class (allowed targets: {DEPRECATED_TARGETS_84})"
+            ));
+        }
+        ForbiddenRule::AttributeTargetMismatch if version == PhpVersion::new(8, 4) => {
+            let message = parser_message();
+            let target = message
+                .strip_prefix("Attribute \"Deprecated\" cannot target ")?
+                .split(" (")
+                .next()?;
+            return Some(format!(
+                "Attribute \"Deprecated\" cannot target {target} (allowed targets: {DEPRECATED_TARGETS_84})"
+            ));
+        }
+        ForbiddenRule::AllowDynamicPropertiesOnInvalidClass if before(8, 5) => {
+            let message = parser_message().replace("#[\\", "#[");
+            if before(8, 4) && !message.contains(" readonly class ") {
+                return Some(message.rsplit_once(' ')?.0.to_string());
+            }
+            return Some(message);
+        }
+        ForbiddenRule::AbstractMemberInConcreteClass if before(8, 5) => {
+            return Some(
+                parser_message().replace("the remaining method (", "the remaining methods ("),
+            );
+        }
+        ForbiddenRule::VirtualPropertyAsymmetricVisibility if !before(8, 6) => {
+            let message = parser_message();
+            return Some(match message.strip_prefix("Read-only ") {
+                Some(rest) => format!("get-only {rest}"),
+                None => message,
+            });
+        }
+        ForbiddenRule::InvalidNullableType if before(8, 2) => {
+            let message = parser_message();
+            return Some(if message.starts_with("null ") {
+                "Null can not be used as a standalone type".to_string()
+            } else {
+                message
+            });
+        }
+        ForbiddenRule::StandaloneTypeInComposite if before(8, 0) => {
+            let message = parser_message();
+            if !message.starts_with("Void ") {
+                return Some(message);
+            }
+            let after = source.get(err.span().end as usize..).unwrap_or_default();
+            return Some(if after.trim_start().starts_with(['$', '&', '.']) {
+                "void cannot be used as a parameter type".to_string()
+            } else {
+                "Void type cannot be nullable".to_string()
+            });
+        }
+        ForbiddenRule::RedundantType if before(8, 4) => {
+            return Some(parser_message().replace(
+                ", bool must be used instead",
+                ", bool should be used instead",
+            ));
+        }
+        ForbiddenRule::ClassFetchOnLiteral if before(8, 3) => {
+            return Some(
+                parser_message().replace("\"::class\" on ", "\"::class\" on value of type "),
+            );
+        }
+        ForbiddenRule::PureEnumCaseValue if version == PhpVersion::new(8, 1) => {
+            let (enum_name, case) = find_decl(program, err.span().start, DeclTarget::EnumCase)?;
+            let mut message =
+                format!("Case {case} of non-backed enum {enum_name} must not have a value");
+            if let Some(ty) = literal_case_value_type(source, err.span()) {
+                message.push_str(&format!(", try adding \": {ty}\" to the enum declaration"));
+            }
+            return Some(message);
         }
         ForbiddenRule::DuplicateType => {
             let message = parser_message();
@@ -172,6 +470,24 @@ fn php_message(
     };
     let (class, name) = find_decl(program, err.span().start, target)?;
     Some(message(&class, &name))
+}
+
+/// `#[\Deprecated]`'s targets in PHP 8.4; 8.5 adds classes and constants.
+const DEPRECATED_TARGETS_84: &str = "function, method, class constant";
+
+/// `int` or `string` for a literal enum case value after the `=` at `eq`.
+fn literal_case_value_type(source: &str, eq: Span) -> Option<&'static str> {
+    let value = source.get(eq.end as usize..)?.split(';').next()?.trim();
+    if value.starts_with(['\'', '"']) {
+        return Some("string");
+    }
+    let digits = value.strip_prefix('-').unwrap_or(value);
+    let is_int = digits.starts_with(|c: char| c.is_ascii_digit())
+        && digits
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && (digits.starts_with("0x") || digits.starts_with("0X") || !digits.contains(['e', 'E']));
+    is_int.then_some("int")
 }
 
 /// Indentation of the closing marker of the heredoc whose body line is `line`.
@@ -396,7 +712,7 @@ fn is_analyzer_covered_error(err: &php_rs_parser::diagnostics::ParseError) -> bo
 
 /// Parser diagnostics that are dropped from the issue stream and never block
 /// analysis: the ones the analyzer reports itself.
-pub(crate) fn is_redundant_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
+fn is_redundant_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
     is_analyzer_covered_error(err)
 }
 

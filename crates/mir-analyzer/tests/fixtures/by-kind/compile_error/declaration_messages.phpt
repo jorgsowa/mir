@@ -10,14 +10,14 @@ namespace App;
 
 abstract class Shape {
     final abstract public function area(): float;
-//  ^^^^^^^^^^^^^^^^^^^^^ ParseError: Cannot use the final modifier on an abstract method [abstract-final-conflict]
+//  ^^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract method [abstract-final-conflict]
 
     abstract public $name;
 //  ^^^^^^^^^^^^^^^^^^^^^ CompileError: Only hooked properties may be declared abstract [abstract-property-without-abstract-hook]
 //  ^^^^^^^^^^^^^^^^^^^^^ MissingPropertyType: Property App\Shape::$name has no type annotation
 
     static const SIDES = 0;
-//         ^^^^^ ParseError: Cannot use the static modifier on a class constant [invalid-constant-modifier]
+//         ^^^^^ CompileError: Cannot use the static modifier on a class constant [invalid-constant-modifier]
 
     final private const SECRET = 1;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Private constant App\Shape::SECRET cannot be final as it is not visible to other classes [private-final-constant]

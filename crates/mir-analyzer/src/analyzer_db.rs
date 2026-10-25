@@ -269,12 +269,8 @@ impl AnalyzerDb {
 
         let skip_cache = crate::parser::parse_errors_block_cache(&parsed.errors);
 
-        let mut all_issues: Vec<Issue> = parsed
-            .errors
-            .iter()
-            .filter(|err| !crate::parser::is_redundant_parse_error(err))
-            .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed))
-            .collect();
+        let mut all_issues: Vec<Issue> =
+            crate::parser::parse_error_issues(&file, source, &parsed, php_version);
 
         let collector = crate::collector::DefinitionCollector::new_for_slice(
             file.clone(),

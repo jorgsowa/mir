@@ -395,12 +395,8 @@ pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> Analysi
     // `mixed` via the `ast_derived_fn_params` fallback.
     db.upsert_source_file(file.clone(), Arc::from(source));
     let parsed = crate::recursion::parse_for_file(&file, source, php_version);
-    let mut collected_issues: Vec<Issue> = parsed
-        .errors
-        .iter()
-        .filter(|err| !crate::parser::is_redundant_parse_error(err))
-        .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed))
-        .collect();
+    let mut collected_issues: Vec<Issue> =
+        crate::parser::parse_error_issues(&file, source, &parsed, php_version);
     let collector = crate::collector::DefinitionCollector::new_for_slice(
         file.clone(),
         source,
