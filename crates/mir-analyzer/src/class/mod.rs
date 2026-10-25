@@ -240,6 +240,15 @@ impl<'a> ClassAnalyzer<'a> {
 
             self.check_constant_overrides(fqcn, class.own_constants(), &mut issues);
             if let crate::db::ClassLike::Class(def) = &class {
+                self.check_ambiguous_constants(
+                    fqcn,
+                    "Class",
+                    &def.own_constants,
+                    def.parent.as_ref(),
+                    &def.interfaces,
+                    location.as_ref(),
+                    &mut issues,
+                );
                 self.check_trait_method_collisions(def, &mut issues);
                 // A readonly class makes every property readonly, its traits' too.
                 if !def.is_readonly {
@@ -308,6 +317,15 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_overrides(&iface_fqcn, None, &mut issues);
             self.check_constant_overrides(&iface_fqcn, &iface.own_constants, &mut issues);
             let location = iface.location.clone();
+            self.check_ambiguous_constants(
+                &iface_fqcn,
+                "Interface",
+                &iface.own_constants,
+                None,
+                &iface.extends,
+                location.as_ref(),
+                &mut issues,
+            );
             for parent_iface_fqcn in iface.extends.iter() {
                 let here = crate::db::Fqcn::from_str(self.db, parent_iface_fqcn.as_ref());
                 if let Some(canonical) = crate::db::find_class_like(self.db, here) {
@@ -397,6 +415,15 @@ impl<'a> ClassAnalyzer<'a> {
                 &mut issues,
             );
             self.check_constant_overrides(&enum_fqcn, &enum_def.own_constants, &mut issues);
+            self.check_ambiguous_constants(
+                &enum_fqcn,
+                "Enum",
+                &enum_def.own_constants,
+                None,
+                &enum_def.interfaces,
+                location.as_ref(),
+                &mut issues,
+            );
 
             // Same generic-bound check as class `@implements`/`@extends` type
             // args above (1c) — an enum's own `@implements Interface<Arg>`

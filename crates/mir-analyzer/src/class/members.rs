@@ -724,3 +724,104 @@ fn trait_constants_compatible(a: &ConstantDef, b: &ConstantDef) -> bool {
         && a.is_final == b.is_final
         && !values_differ(&value(a), &value(b))
 }
+
+impl ClassAnalyzer<'_> {
+    /// The non-private constants `source` makes visible, each with the class-like declaring it.
+    fn visible_constants(&self, source: &str) -> Vec<(Arc<str>, Arc<str>)> {
+        let here = crate::db::Fqcn::from_str(self.db, source);
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        let mut seen = HashSet::default();
+        let mut visible = Vec::new();
+        for (idx, anc) in ancestors.iter().enumerate() {
+            let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+            let Some(class_like) = crate::db::find_class_like(self.db, anc_here) else {
+                continue;
+            };
+            // A trait's constants belong to the class using it, which precedes it here.
+            let declaring = if class_like.is_trait() {
+                ancestors[..idx]
+                    .iter()
+                    .rev()
+                    .find(|a| {
+                        crate::db::class_kind(self.db, a.as_ref()).is_some_and(|k| !k.is_trait)
+                    })
+                    .cloned()
+                    .unwrap_or_else(|| class_like.fqcn().clone())
+            } else {
+                class_like.fqcn().clone()
+            };
+            for (name, constant) in class_like.own_constants().iter() {
+                if constant.visibility == Some(Visibility::Private) || !seen.insert(name.clone()) {
+                    continue;
+                }
+                visible.push((name.clone(), declaring.clone()));
+            }
+        }
+        visible
+    }
+
+    /// PHP rejects a constant inherited from two class-likes that declare it separately
+    /// (before 8.1 also an own constant overriding an interface's).
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn check_ambiguous_constants(
+        &self,
+        fqcn: &Arc<str>,
+        kind: &str,
+        own_constants: &mir_codebase::definitions::MemberMap<ConstantDef>,
+        parent: Option<&Arc<str>>,
+        interfaces: &[Arc<str>],
+        location: Option<&Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let version = crate::db::db_php_version(self.db);
+        let before_81 = version < crate::php_version::PhpVersion::new(8, 1);
+        let kind = if version < crate::php_version::PhpVersion::new(8, 2) {
+            "Class"
+        } else {
+            kind
+        };
+        let mut inherited: HashMap<Arc<str>, Arc<str>> = HashMap::default();
+        let mut reported = HashSet::default();
+        let sources = parent
+            .into_iter()
+            .map(|p| (p, false))
+            .chain(interfaces.iter().map(|i| (i, true)));
+        for (source, is_interface) in sources {
+            for (name, declaring) in self.visible_constants(source) {
+                let message = if own_constants.contains_key(&name) {
+                    if !(before_81 && is_interface) {
+                        continue;
+                    }
+                    format!(
+                        "Cannot inherit previously-inherited or override constant {name} from interface {declaring}"
+                    )
+                } else {
+                    match inherited.get(&name) {
+                        None => {
+                            inherited.insert(name, declaring);
+                            continue;
+                        }
+                        Some(first) if first.eq_ignore_ascii_case(&declaring) => continue,
+                        Some(_) if before_81 => format!(
+                            "Cannot inherit previously-inherited or override constant {name} from interface {declaring}"
+                        ),
+                        Some(first) => format!(
+                            "{kind} {fqcn} inherits both {first}::{name} and {declaring}::{name}, which is ambiguous"
+                        ),
+                    }
+                };
+                if !reported.insert(name.clone()) {
+                    continue;
+                }
+                self.push_located_issue(
+                    issues,
+                    IssueKind::CompileError {
+                        message,
+                        code: "ambiguous-constant".to_string(),
+                    },
+                    location,
+                );
+            }
+        }
+    }
+}
