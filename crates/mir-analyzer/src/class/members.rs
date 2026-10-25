@@ -825,3 +825,85 @@ impl ClassAnalyzer<'_> {
         }
     }
 }
+
+impl ClassAnalyzer<'_> {
+    /// PHP requires a concrete class or enum to implement every abstract property hook
+    /// it inherits, as it does abstract methods.
+    pub(super) fn check_abstract_property_hooks(
+        &self,
+        fqcn: &Arc<str>,
+        is_enum: bool,
+        location: Option<&Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        let class_likes: Vec<_> = ancestors
+            .iter()
+            .filter_map(|a| {
+                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, a.as_ref()))
+            })
+            .collect();
+        let mut missing = Vec::new();
+        let mut seen = HashSet::default();
+        for declaring in class_likes.iter().skip(1) {
+            let Some(props) = declaring.own_properties() else {
+                continue;
+            };
+            for (name, prop) in props.iter() {
+                if prop.abstract_hooks == 0 || prop.from_docblock || !seen.insert(name.clone()) {
+                    continue;
+                }
+                let implementation = class_likes
+                    .iter()
+                    .filter_map(|c| c.own_properties()?.get(name))
+                    .find(|p| !p.from_docblock);
+                let provided = match implementation {
+                    // A virtual property has only the hooks it declares; a backed one both.
+                    Some(p) if p.abstract_hooks == 0 && p.virtual_hooks != 0 => p.virtual_hooks,
+                    Some(p) if p.abstract_hooks == 0 => 3,
+                    _ => 0,
+                };
+                let required = class_likes
+                    .iter()
+                    .filter_map(|c| c.own_properties()?.get(name))
+                    .fold(0, |acc, p| acc | p.abstract_hooks);
+                for (bit, hook) in [(1, "get"), (2, "set")] {
+                    if required & bit != 0 && provided & bit == 0 {
+                        let owner = class_likes
+                            .iter()
+                            .find(|c| {
+                                c.own_properties()
+                                    .and_then(|ps| ps.get(name))
+                                    .is_some_and(|p| p.abstract_hooks & bit != 0)
+                            })
+                            .map(|c| c.fqcn().clone())
+                            .unwrap_or_else(|| declaring.fqcn().clone());
+                        missing.push(format!("{owner}::${name}::{hook}"));
+                    }
+                }
+            }
+        }
+        if missing.is_empty() {
+            return;
+        }
+        let count = missing.len();
+        let plural = if count == 1 { "" } else { "s" };
+        let list = missing.join(", ");
+        let message = if is_enum {
+            format!("Enum {fqcn} must implement {count} abstract method{plural} ({list})")
+        } else {
+            format!(
+                "Class {fqcn} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining method{plural} ({list})"
+            )
+        };
+        self.push_located_issue(
+            issues,
+            IssueKind::CompileError {
+                message,
+                code: "unimplemented-property-hook".to_string(),
+            },
+            location,
+        );
+    }
+}

@@ -133,6 +133,11 @@ impl<'a> DefinitionCollector<'a> {
                                     deprecated: None,
                                     has_native_type: p.type_hint.is_some(),
                                     get_only_hook: super::is_get_only_hook(&p.hooks),
+                                    abstract_hooks: super::abstract_hooks(&p.hooks),
+                                    virtual_hooks: self.virtual_hooks(
+                                        &p.hooks,
+                                        p.name.as_str().unwrap_or_default(),
+                                    ),
                                     from_docblock: false,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
@@ -231,6 +236,9 @@ impl<'a> DefinitionCollector<'a> {
                             ),
                             has_native_type: p.type_hint.is_some(),
                             get_only_hook: super::is_get_only_hook(&p.hooks),
+                            abstract_hooks: super::abstract_hooks(&p.hooks),
+                            virtual_hooks: self
+                                .virtual_hooks(&p.hooks, p.name.as_str().unwrap_or_default()),
                             from_docblock: false,
                         },
                     );

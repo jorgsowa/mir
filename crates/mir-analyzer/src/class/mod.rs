@@ -295,6 +295,7 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- 2. Abstract parent methods must be implemented ----------------
             self.check_abstract_methods_implemented(fqcn, location.as_ref(), &mut issues);
+            self.check_abstract_property_hooks(fqcn, false, location.as_ref(), &mut issues);
 
             // ---- 3. Interface methods must be implemented ----------------------
             self.check_interface_methods_implemented(fqcn, location.as_ref(), &mut issues);
@@ -405,6 +406,7 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_enum_magic_methods(&enum_def, &mut issues);
             self.check_enum_builtin_redeclarations(&enum_def, &mut issues);
             self.check_abstract_methods_implemented(&enum_fqcn, location.as_ref(), &mut issues);
+            self.check_abstract_property_hooks(&enum_fqcn, true, location.as_ref(), &mut issues);
             self.check_trait_member_compatibility(
                 &enum_fqcn,
                 None,

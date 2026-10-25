@@ -170,6 +170,24 @@ pub(crate) fn is_get_only_hook(hooks: &[php_ast::owned::PropertyHook]) -> bool {
             .all(|h| matches!(h.kind, PropertyHookKind::Get))
 }
 
+/// [`PropertyDef::abstract_hooks`](mir_codebase::definitions::PropertyDef::abstract_hooks) bits.
+pub(crate) fn abstract_hooks(hooks: &[php_ast::owned::PropertyHook]) -> u8 {
+    hooks
+        .iter()
+        .filter(|h| matches!(h.body, php_ast::owned::PropertyHookBody::Abstract))
+        .map(|h| hook_bit(h.kind))
+        .fold(0, |acc, bit| acc | bit)
+}
+
+fn hook_bit(kind: php_ast::ast::PropertyHookKind) -> u8 {
+    use php_ast::ast::PropertyHookKind;
+    match kind {
+        PropertyHookKind::Get => 1,
+        PropertyHookKind::Set => 2,
+        _ => 0,
+    }
+}
+
 pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
     if doc.types.is_empty() {
         return false;
@@ -908,6 +926,27 @@ pub(super) struct OwnConstants {
 }
 
 impl<'a> DefinitionCollector<'a> {
+    fn virtual_hooks(&self, hooks: &[php_ast::owned::PropertyHook], name: &str) -> u8 {
+        let backing = format!("$this->{name}");
+        let uses_backing = hooks.iter().any(|h| {
+            let body = self
+                .source
+                .get(h.span.start as usize..h.span.end as usize)
+                .unwrap_or_default();
+            body.match_indices(&backing).any(|(at, _)| {
+                !body[at + backing.len()..]
+                    .starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_' || !c.is_ascii())
+            })
+        });
+        if uses_backing {
+            return 0;
+        }
+        hooks
+            .iter()
+            .map(|h| hook_bit(h.kind))
+            .fold(0, |acc, bit| acc | bit)
+    }
+
     pub fn new_for_slice(
         file: Arc<str>,
         source: &'a str,
@@ -1920,6 +1959,8 @@ impl<'a> DefinitionCollector<'a> {
                     has_native_type: false,
                     from_docblock: true,
                     get_only_hook: false,
+                    abstract_hooks: 0,
+                    virtual_hooks: 0,
                 },
             );
         }

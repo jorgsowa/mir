@@ -628,6 +628,13 @@ pub struct PropertyDef {
     /// left uninitialized, so it does not count here.
     #[serde(default)]
     pub get_only_hook: bool,
+    /// Hooks declared without a body (interface or `abstract` property): bit 0 `get`, bit 1 `set`.
+    #[serde(default)]
+    pub abstract_hooks: u8,
+    /// For a virtual property (hooks, none touching `$this->name`), its declared hooks as in
+    /// `abstract_hooks`; 0 for a backed one.
+    #[serde(default)]
+    pub virtual_hooks: u8,
     /// True when `readonly` comes from a native PHP keyword (`readonly` modifier or
     /// `readonly class`). False when only a `@readonly` docblock annotation is present.
     /// Distinguishes PHP-enforced read-only from advisory documentation.
