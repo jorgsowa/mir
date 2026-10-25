@@ -246,6 +246,27 @@ impl<'a> ClassAnalyzer<'a> {
                 continue;
             }
 
+            // A parent that brings `Traversable` is internal (it iterates) or reported itself.
+            let parent_traversable = parent_fqcn.as_ref().is_some_and(|p| {
+                crate::db::extends_or_implements(self.db, p.as_ref(), "Traversable")
+            });
+            if !parent_traversable
+                && crate::db::extends_or_implements(self.db, fqcn.as_ref(), "Traversable")
+                && !crate::db::extends_or_implements(self.db, fqcn.as_ref(), "Iterator")
+                && !crate::db::extends_or_implements(self.db, fqcn.as_ref(), "IteratorAggregate")
+            {
+                self.push_located_issue(
+                    &mut issues,
+                    IssueKind::CompileError {
+                        message: format!(
+                            "Class {fqcn} must implement interface Traversable as part of either Iterator or IteratorAggregate"
+                        ),
+                        code: "traversable-without-iterator".to_string(),
+                    },
+                    location.as_ref(),
+                );
+            }
+
             // ---- 2. Abstract parent methods must be implemented ----------------
             self.check_abstract_methods_implemented(fqcn, location.as_ref(), &mut issues);
 

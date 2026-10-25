@@ -5,3 +5,4 @@ Prevent implementing class
 class Foo {}
 
 class Bar implements Foo {}
+//                   ^^^ CompileError: Bar cannot implement Foo - it is not an interface [implements-non-interface]

@@ -427,7 +427,7 @@ pub(crate) enum InterfaceListOwner {
     Enum { backed: bool },
 }
 
-/// PHP's compile-time checks on an interface list: no interface twice (an enum
+/// PHP's compile-time checks on an interface list: only interfaces, none twice (an enum
 /// already implements `UnitEnum`, and `BackedEnum` when backed), `UnitEnum` /
 /// `BackedEnum` only on enums, `BackedEnum` only on backed ones.
 #[allow(clippy::too_many_arguments)]
@@ -460,6 +460,19 @@ pub(crate) fn check_interface_list(
     };
     // PHP stops at the first of these errors.
     for (i, iface) in resolved.iter().enumerate() {
+        if let Some(target) = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, iface))
+            .filter(|c| !c.is_interface())
+        {
+            report(
+                &names[i],
+                format!(
+                    "{owner_fqcn} cannot implement {} - it is not an interface",
+                    target.fqcn()
+                ),
+                "implements-non-interface",
+            );
+            return;
+        }
         let repeated = resolved[..i].iter().any(|r| r.eq_ignore_ascii_case(iface))
             || implicit.iter().any(|r| r.eq_ignore_ascii_case(iface));
         if repeated {
