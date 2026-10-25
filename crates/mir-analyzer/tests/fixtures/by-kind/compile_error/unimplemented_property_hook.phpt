@@ -20,7 +20,6 @@ abstract class Shape {
 
 class Missing implements HasId, Named {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Missing contains 3 abstract methods and must therefore be declared abstract or implement the remaining methods (HasId::$id::get, Named::$name::get, Named::$name::set) [unimplemented-property-hook]
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Missing has uninitialized properties but no constructor
 
 class Square extends Shape {}
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Square contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Shape::$area::get) [unimplemented-property-hook]
@@ -31,13 +30,11 @@ enum Status implements HasId {
 }
 
 class Backed implements Named {
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Backed has uninitialized properties but no constructor
     public string $name { get => ucfirst($this->name); }
 }
 
 class Virtual implements Named {
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class Virtual contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Named::$name::set) [unimplemented-property-hook]
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Virtual has uninitialized properties but no constructor
     public string $name { get => 'fixed'; }
 }
 

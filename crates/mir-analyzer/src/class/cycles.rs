@@ -343,9 +343,12 @@ impl<'a> ClassAnalyzer<'a> {
                         // A get-only hooked property is virtual (no backing
                         // storage, computed on access), so it never forces a
                         // constructor. A `set`-hooked property is backed and
-                        // still can.
+                        // still can. An abstract one is a contract the class's
+                        // own declaration fulfils.
                         !p.is_static
                             && !p.get_only_hook
+                            && p.virtual_hooks == 0
+                            && p.abstract_hooks == 0
                             && p.has_native_type
                             && p.default.is_none()
                             && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable())
