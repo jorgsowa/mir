@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PropertyTypeRedeclarationMismatch` reads PHP's text and names the declaring class (`Type of B::$x must be int (as in class A)`, `must be subtype of int` against a get-only hook, `must be omitted to match the parent definition in class A`); nullable single types print as `?int`.
 - A references query for a member or function name no earlier query used answers its text gate from each file's recorded identifier set instead of rescanning every never-analyzed file (about 4.5 s → 5 ms per new name on a 96 MB vendor tree).
 - Branch forks no longer deep-clone per-variable taint state, and request-source and SQL-sink checks look at the method name before walking class hierarchies (about 4% less CPU on Symfony).
+- `FileAnalysis::symbol_at` builds a position index on first use instead of scanning every symbol per call: about 100x faster for a few hundred lookups on a large file (44 ms to 0.13 ms on 7,400 symbols). `FileAnalysis` gains a private field, so it is built with `FileAnalysis::new(issues, symbols)`.
 
 ### Fixed
 

@@ -19,10 +19,7 @@ impl AnalysisSession {
             let view = self.db_view();
             let db = view.db();
             let Some(sf) = db.lookup_source_file(file.as_ref()) else {
-                return crate::FileAnalysis {
-                    issues: Vec::new(),
-                    symbols: Vec::new(),
-                };
+                return crate::FileAnalysis::new(Vec::new(), Vec::new());
             };
             let defs = crate::db::collect_file_definitions(db, sf);
             let prepared = crate::db::prepare_analysis_file(db, sf);
@@ -42,10 +39,7 @@ impl AnalysisSession {
         }
 
         self.apply_suppressions_and_emit_unused(&mut issues, std::slice::from_ref(&file));
-        crate::FileAnalysis {
-            issues,
-            symbols: Vec::new(),
-        }
+        crate::FileAnalysis::new(issues, Vec::new())
     }
 
     /// Resolve the codebase-level symbol name at `byte_offset` in `file`.

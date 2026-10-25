@@ -11,7 +11,7 @@
 //! ([`AnalysisSession::reanalyze_files_cancellable`]) — memoized and
 //! cancellable — or the CLI batch pipeline.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use mir_issues::Issue;
 use php_ast::owned::{Program, Stmt, StmtKind};
@@ -28,9 +28,18 @@ use crate::symbol::{NavigationFact, ResolvedNavigationFact, ResolvedSymbol};
 pub struct FileAnalysis {
     pub issues: Vec<Issue>,
     pub symbols: Vec<ResolvedSymbol>,
+    symbol_index: OnceLock<SymbolIndex>,
 }
 
 impl FileAnalysis {
+    pub fn new(issues: Vec<Issue>, symbols: Vec<ResolvedSymbol>) -> Self {
+        Self {
+            issues,
+            symbols,
+            symbol_index: OnceLock::new(),
+        }
+    }
+
     /// Return the innermost resolved symbol whose span contains `byte_offset`,
     /// or `None` if no symbol was recorded at that position.
     ///
@@ -38,8 +47,116 @@ impl FileAnalysis {
     /// (line, column) → byte offset → resolved symbol, then look up the
     /// symbol's definition via [`crate::AnalysisSession::definition_of`] or
     /// type info via [`ResolvedSymbol::resolved_type`].
+    ///
+    /// Indexed on first call; in-place edits to `symbols` after that are not seen.
     pub fn symbol_at(&self, byte_offset: u32) -> Option<&ResolvedSymbol> {
-        symbol_at(&self.symbols, byte_offset)
+        let index = self
+            .symbol_index
+            .get_or_init(|| SymbolIndex::new(&self.symbols));
+        if !index.matches(&self.symbols) {
+            return symbol_at(&self.symbols, byte_offset);
+        }
+        index
+            .best_at(byte_offset)
+            .map(|idx| &self.symbols[idx as usize])
+    }
+}
+
+/// Longer spans are rare, so they skip the sorted index and are scanned linearly.
+const SHORT_SPAN: u32 = 64;
+
+/// `(start, end, symbol index)` entries supporting innermost-containing lookup.
+struct ContainingIndex {
+    short_by_start: Vec<(u32, u32, u32)>,
+    long: Vec<(u32, u32, u32)>,
+}
+
+impl ContainingIndex {
+    fn new(spans: impl Iterator<Item = (Span, u32)>) -> Self {
+        let mut short_by_start = Vec::new();
+        let mut long = Vec::new();
+        for (span, idx) in spans {
+            if span.end <= span.start {
+                continue;
+            }
+            let entry = (span.start, span.end, idx);
+            if span_len(span) <= SHORT_SPAN {
+                short_by_start.push(entry);
+            } else {
+                long.push(entry);
+            }
+        }
+        short_by_start.sort_unstable();
+        short_by_start.shrink_to_fit();
+        long.shrink_to_fit();
+        Self {
+            short_by_start,
+            long,
+        }
+    }
+
+    /// Shortest span containing `byte_offset`; lowest index on ties, as `min_by_key` picks.
+    fn innermost(&self, byte_offset: u32) -> Option<u32> {
+        let upper = self
+            .short_by_start
+            .partition_point(|&(start, _, _)| start <= byte_offset);
+        let lowest_start = byte_offset.saturating_sub(SHORT_SPAN);
+        self.short_by_start[..upper]
+            .iter()
+            .rev()
+            .take_while(|&&(start, _, _)| start >= lowest_start)
+            .chain(self.long.iter())
+            .filter(|&&(start, end, _)| start <= byte_offset && byte_offset < end)
+            .map(|&(start, end, idx)| (end - start, idx))
+            .min()
+            .map(|(_, idx)| idx)
+    }
+}
+
+/// Position index over a [`FileAnalysis`]'s symbols with [`best_at`]'s precedence.
+struct SymbolIndex {
+    /// Identity of the `symbols` buffer the index was built from.
+    symbols_addr: usize,
+    symbols_len: usize,
+    by_span: ContainingIndex,
+    /// `(end, len, symbol index)`, sorted.
+    by_end: Vec<(u32, u32, u32)>,
+    by_expr_span: ContainingIndex,
+}
+
+impl SymbolIndex {
+    fn new(symbols: &[ResolvedSymbol]) -> Self {
+        let indexed = || symbols.iter().zip(0u32..);
+        let mut by_end: Vec<_> = indexed()
+            .map(|(s, idx)| (s.span.end, span_len(s.span), idx))
+            .collect();
+        by_end.sort_unstable();
+        Self {
+            symbols_addr: symbols.as_ptr() as usize,
+            symbols_len: symbols.len(),
+            by_span: ContainingIndex::new(indexed().map(|(s, idx)| (s.span, idx))),
+            by_end,
+            by_expr_span: ContainingIndex::new(
+                indexed().filter_map(|(s, idx)| s.expr_span.map(|es| (es, idx))),
+            ),
+        }
+    }
+
+    fn matches(&self, symbols: &[ResolvedSymbol]) -> bool {
+        self.symbols_addr == symbols.as_ptr() as usize && self.symbols_len == symbols.len()
+    }
+
+    fn best_at(&self, byte_offset: u32) -> Option<u32> {
+        self.by_span.innermost(byte_offset).or_else(|| {
+            let first = self
+                .by_end
+                .partition_point(|&(end, _, _)| end < byte_offset);
+            self.by_end
+                .get(first)
+                .filter(|&&(end, _, _)| end == byte_offset)
+                .map(|&(_, _, idx)| idx)
+                .or_else(|| self.by_expr_span.innermost(byte_offset))
+        })
     }
 }
 
@@ -542,7 +659,7 @@ impl AnalysisSnapshot {
             driver.collect_symbols = collect_symbols;
             let (issues, symbols) =
                 driver.analyze_bodies(program, file.clone(), source, source_map);
-            (FileAnalysis { issues, symbols }, db, text)
+            (FileAnalysis::new(issues, symbols), db, text)
         }))?;
         // Replace (not append): this pass produced the file's complete
         // reference set.
@@ -1214,6 +1331,120 @@ mod tests {
             analysis.symbols.is_empty(),
             "diagnostics-only analysis should not retain whole-file symbols"
         );
+    }
+
+    fn assert_index_matches_linear(analysis: &super::FileAnalysis, max_offset: u32) {
+        for offset in 0..=max_offset {
+            let indexed = analysis
+                .symbol_at(offset)
+                .map(|s| s as *const ResolvedSymbol);
+            let linear =
+                super::symbol_at(&analysis.symbols, offset).map(|s| s as *const ResolvedSymbol);
+            assert_eq!(
+                indexed, linear,
+                "symbol_at({offset}) diverges from linear scan"
+            );
+        }
+    }
+
+    #[test]
+    fn symbol_index_matches_linear_scan_on_every_offset() {
+        let source = r#"<?php
+namespace App;
+
+use ArrayObject;
+use App\Support\{Helper, Other as Alias};
+
+final class Repo extends \ArrayObject implements \Countable
+{
+    public const LIMIT = 10;
+    private static ?Repo $instance = null;
+
+    public function __construct(private array $rows = []) { parent::__construct($rows); }
+
+    public static function make(): static { return self::$instance ??= new static([]); }
+
+    public function filter(callable $fn): self
+    {
+        $out = new self(array_values(array_filter($this->rows, $fn)));
+        $out->rows[] = strtoupper((string) self::LIMIT) . count($this->rows);
+        return $out->filter(fn ($row) => $row !== null && strlen((string) $row) > 3)
+            ->filter(function ($r) use ($fn) {
+                $tmp = array_map(static fn ($x) => [$x, $fn($x), Helper::wrap($x)], (array) $r);
+                return Alias::check($tmp, PHP_EOL, \strlen('abc'), new ArrayObject($tmp));
+            })
+            ->filter('is_string');
+    }
+
+    public function count(): int { return \count($this->rows) + static::LIMIT; }
+}
+
+$repo = Repo::make();
+$n = $repo  ->  filter(  'trim'  )  ->  count(  );
+echo $repo->getArrayCopy()[0] ?? $n, \App\Repo::LIMIT;
+"#;
+        let (mut session, file) = session_for_source("/symbol_index.php", source);
+        let parsed = php_rs_parser::parse(source);
+        let analysis = FileAnalyzer::new(&mut session).analyze(
+            file,
+            source,
+            &parsed.program,
+            &parsed.source_map,
+        );
+        assert!(analysis.symbols.len() > 50, "{}", analysis.symbols.len());
+        assert!(
+            analysis.symbols.iter().any(|s| s
+                .expr_span
+                .is_some_and(|es| es.end - es.start > super::SHORT_SPAN)),
+            "fixture should exercise long expression spans"
+        );
+        assert_index_matches_linear(&analysis, source.len() as u32 + 1);
+    }
+
+    #[test]
+    fn symbol_index_matches_linear_scan_on_ties_and_odd_spans() {
+        let span = |start, end| php_ast::Span { start, end };
+        let symbol = |name: &str, s: php_ast::Span, expr: Option<php_ast::Span>| ResolvedSymbol {
+            file: Arc::from("/t.php"),
+            span: s,
+            expr_span: expr,
+            kind: ReferenceKind::Variable(Arc::from(name)),
+            resolved_type: mir_types::Type::mixed(),
+        };
+        let symbols = vec![
+            symbol("dup_b", span(20, 30), None),
+            symbol("dup_a", span(20, 30), None),
+            symbol("overlap_late", span(25, 35), None),
+            symbol("overlap_early", span(15, 25), None),
+            symbol("empty", span(40, 40), Some(span(38, 45))),
+            symbol("inverted", span(50, 44), None),
+            symbol("long", span(0, 200), Some(span(0, 300))),
+            symbol("long_twin", span(100, 300), None),
+            symbol("ends_here", span(60, 70), Some(span(55, 90))),
+            symbol("ends_here_short", span(66, 70), Some(span(55, 90))),
+            symbol("expr_only", span(400, 405), Some(span(310, 500))),
+            symbol("expr_inner", span(420, 425), Some(span(415, 430))),
+            symbol("expr_tie", span(426, 427), Some(span(415, 430))),
+        ];
+        let analysis = super::FileAnalysis::new(Vec::new(), symbols);
+        assert_index_matches_linear(&analysis, 520);
+    }
+
+    #[test]
+    fn symbol_at_falls_back_when_symbols_are_replaced() {
+        let span = |start, end| php_ast::Span { start, end };
+        let symbol = |s| ResolvedSymbol {
+            file: Arc::from("/t.php"),
+            span: s,
+            expr_span: None,
+            kind: ReferenceKind::Variable(Arc::from("x")),
+            resolved_type: mir_types::Type::mixed(),
+        };
+        let mut analysis = super::FileAnalysis::new(Vec::new(), vec![symbol(span(0, 5))]);
+        assert!(analysis.symbol_at(2).is_some());
+        analysis.symbols = vec![symbol(span(10, 15))];
+        assert!(analysis.symbol_at(2).is_none());
+        assert!(analysis.symbol_at(12).is_some());
     }
 
     fn median(samples: &mut [Duration]) -> Duration {

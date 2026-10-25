@@ -707,10 +707,7 @@ impl AnalysisSnapshot {
                 .map(|a| {
                     (
                         a.file,
-                        crate::FileAnalysis {
-                            issues: a.out.issues.to_vec(),
-                            symbols: Vec::new(),
-                        },
+                        crate::FileAnalysis::new(a.out.issues.to_vec(), Vec::new()),
                     )
                 })
                 .collect()
