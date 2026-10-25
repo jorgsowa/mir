@@ -13,6 +13,7 @@ class A{
      * @var ?int
      */
     #[Deprecated]
+//    ^^^^^^^^^^ CompileError: Attribute "Deprecated" cannot target property (allowed targets: class, function, method, class constant, constant) [attribute-target-mismatch]
     public $foo;
 }
 echo (new A)->foo;

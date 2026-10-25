@@ -11,6 +11,9 @@ An attribute is applied to a target (class, method, property, parameter, etc.) t
 attribute does not allow, or the arguments passed to the attribute do not match its constructor
 signature. PHP validates attribute targets at runtime; mir reports these violations statically.
 
+Built-in attributes (`#[Attribute]`, `#[Override]`, `#[Deprecated]`, ...) on a target PHP rejects at
+compile time are reported as `CompileError` with PHP's message instead.
+
 ## Example
 
 ```php

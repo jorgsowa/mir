@@ -3,5 +3,5 @@ Interface cannot be attribute class
 ===file===
 <?php
 #[Attribute]
-//^^^^^^^^^ InvalidAttribute: Interfaces cannot be attribute classes
+//^^^^^^^^^ CompileError: Cannot apply #[\Attribute] to interface Foo [attribute-on-invalid-class]
 interface Foo {}

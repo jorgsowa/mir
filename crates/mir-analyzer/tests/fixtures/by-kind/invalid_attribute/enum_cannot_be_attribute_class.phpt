@@ -3,7 +3,7 @@ Enum cannot be attribute class
 ===file===
 <?php
 #[Attribute]
-//^^^^^^^^^ InvalidAttribute: Enums cannot be attribute classes
+//^^^^^^^^^ CompileError: Cannot apply #[\Attribute] to enum Foo [attribute-on-invalid-class]
 enum Foo {
     case Bar;
 }

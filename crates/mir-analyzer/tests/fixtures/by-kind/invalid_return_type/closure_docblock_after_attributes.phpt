@@ -8,8 +8,8 @@ function t(): array {
 //                                                                   ^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
     $b = #[\Deprecated] /** @param int $x */ function ($x): string { return $x; };
 //                                                                   ^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
-    $c = #[\Deprecated, \SensitiveParameter,] /** @param int $x */ static function ($x): string { return $x; };
-//                                                                                                ^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
+    $c = #[\Deprecated, \NoDiscard,] /** @param int $x */ static function ($x): string { return $x; };
+//                                                                                       ^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
     $d = #[\Deprecated] #[\Pure] /** @param int $x */ fn($x): string => $x;
 //                                                                      ^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
     $e = /** @param string $x */ #[\Deprecated] /** @param int $x */ fn($x): string => $x;

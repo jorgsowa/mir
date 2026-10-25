@@ -9,6 +9,7 @@ Deprecated class with new attr
 ===file===
 <?php
 #[\Deprecated]
+//^^^^^^^^^^^ CompileError: Cannot apply #[\Deprecated] to class Foo [deprecated-on-invalid-target]
 class Foo { }
 
 $a = new Foo();

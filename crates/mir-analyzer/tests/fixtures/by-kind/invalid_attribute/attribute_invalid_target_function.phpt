@@ -3,5 +3,5 @@ Attribute invalid target function
 ===file===
 <?php
 #[Attribute]
-//^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not functions
+//^^^^^^^^^ CompileError: Attribute "Attribute" cannot target function (allowed targets: class) [attribute-target-mismatch]
 function foo(): void {}

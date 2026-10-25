@@ -3,5 +3,5 @@ Trait cannot be attribute class
 ===file===
 <?php
 #[Attribute]
-//^^^^^^^^^ InvalidAttribute: Traits cannot be attribute classes
+//^^^^^^^^^ CompileError: Cannot apply #[\Attribute] to trait Foo [attribute-on-invalid-class]
 trait Foo {}

@@ -4,6 +4,6 @@ SKIPPED-attributeInvalidTargetClassConst
 <?php
 class Foo {
     #[Attribute]
-//    ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not constants
+//    ^^^^^^^^^ CompileError: Attribute "Attribute" cannot target class constant (allowed targets: class) [attribute-target-mismatch]
     public const BAR = "baz";
 }

@@ -4,6 +4,6 @@ Attribute invalid target method
 <?php
 class Foo {
     #[Attribute]
-//    ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not methods
+//    ^^^^^^^^^ CompileError: Attribute "Attribute" cannot target method (allowed targets: class) [attribute-target-mismatch]
     public function bar(): void {}
 }

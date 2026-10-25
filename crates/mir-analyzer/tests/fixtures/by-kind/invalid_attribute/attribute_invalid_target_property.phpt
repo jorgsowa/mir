@@ -4,6 +4,6 @@ Attribute invalid target property
 <?php
 class Foo {
     #[Attribute]
-//    ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not properties
+//    ^^^^^^^^^ CompileError: Attribute "Attribute" cannot target property (allowed targets: class) [attribute-target-mismatch]
     public string $bar = "baz";
 }

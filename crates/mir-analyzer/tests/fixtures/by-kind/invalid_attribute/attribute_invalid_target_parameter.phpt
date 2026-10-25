@@ -9,4 +9,4 @@ Attribute invalid target parameter
 ===file===
 <?php
 function foo(#[Attribute] string $_bar): void {}
-//             ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not parameters
+//             ^^^^^^^^^ CompileError: Attribute "Attribute" cannot target parameter (allowed targets: class) [attribute-target-mismatch]

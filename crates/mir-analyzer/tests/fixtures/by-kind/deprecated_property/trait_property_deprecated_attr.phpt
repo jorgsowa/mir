@@ -11,6 +11,7 @@ unlike class properties — only the @deprecated docblock tag worked.
 <?php
 trait HasServer {
     #[Deprecated]
+//    ^^^^^^^^^^ CompileError: Attribute "Deprecated" cannot target property (allowed targets: class, function, method, class constant, constant) [attribute-target-mismatch]
     public $server = "localhost";
 }
 

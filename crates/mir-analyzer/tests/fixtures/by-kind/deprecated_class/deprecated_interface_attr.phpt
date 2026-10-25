@@ -4,6 +4,7 @@ docblock tag, missing the #[Deprecated] attribute fallback class.rs has.
 ===file===
 <?php
 #[\Deprecated]
+//^^^^^^^^^^^ CompileError: Cannot apply #[\Deprecated] to interface Container [deprecated-on-invalid-target]
 interface Container {}
 
 class A implements Container {}

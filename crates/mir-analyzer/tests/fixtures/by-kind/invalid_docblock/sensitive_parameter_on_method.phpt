@@ -15,7 +15,7 @@ use SensitiveParameter;
 
 class HelloWorld {
     #[SensitiveParameter]
-//    ^^^^^^^^^^^^^^^^^^ InvalidAttribute: Attribute SensitiveParameter cannot be used on this target
+//    ^^^^^^^^^^^^^^^^^^ CompileError: Attribute "SensitiveParameter" cannot target method (allowed targets: parameter) [attribute-target-mismatch]
     public function __construct(
         string $password
     ) {}

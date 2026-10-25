@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Built-in attributes on a target PHP rejects, or repeated, are `CompileError` with PHP's text from the version PHP checks them, instead of an info-level `InvalidAttribute` (or nothing, for `#[Deprecated]` on a class): `Attribute "Override" cannot target class (allowed targets: method) [attribute-target-mismatch]`, `Cannot apply #[\Attribute] to enum F [attribute-on-invalid-class]` (PHP 8.5+), `Cannot apply #[\Deprecated] to class A`. A trait's or interface's own attributes are now checked like a class's.
 - Readonly property errors use PHP's text: `Readonly property R::$a must have type`, `Static property R::$a cannot be readonly`, `Hooked properties cannot be readonly`, and `InvalidReadonlyPropertyDeclaration` reads `cannot have default value`. An untyped readonly property no longer also reports `MissingPropertyType`.
 - `MissingConstructor` no longer counts an interface's or abstract hooked property, nor a virtual one (no hook touches `$this->prop`), as uninitialized.
 - `FinalMethodOverridden` for a method made final by a trait names the class using the trait (`cannot override final method from A`), as PHP does, instead of the trait.

@@ -179,9 +179,6 @@ impl php_ast::owned::visitor::OwnedVisitor for PropertyAt {
 /// dedicated issue kind; the parser's diagnostic is dropped as a duplicate.
 const ANALYZER_COVERED_RULES: &[ForbiddenRule] = &[
     ForbiddenRule::ToStringReturnType,
-    ForbiddenRule::AttributeOnInvalidClass,
-    ForbiddenRule::DeprecatedOnInvalidTarget,
-    ForbiddenRule::AttributeTargetMismatch,
     ForbiddenRule::MissingReturnValue,
     ForbiddenRule::VoidReturnValue,
     ForbiddenRule::NeverReturn,
@@ -594,9 +591,6 @@ mod analyzer_covered_tests {
     /// One source per rule in `ANALYZER_COVERED_RULES`, in the same order.
     const SOURCES: &[&str] = &[
         "<?php\nclass A { function __toString(): int { return 1; } }\n",
-        "<?php\n#[Attribute] trait T {}\n",
-        "<?php\n#[Deprecated] class A {}\n",
-        "<?php\n#[Override] class A {}\n",
         "<?php\nfunction f(): int { return; }\n",
         "<?php\nfunction f(): void { return 1; }\n",
         "<?php\nfunction f(): never { return; }\n",
@@ -624,6 +618,9 @@ mod analyzer_covered_tests {
             "<?php\nfunction f() { self::g(); }\n",
             "<?php\nfunction f(): int { yield 1; }\n",
             "<?php\nfunction f($a, $a) {}\n",
+            "<?php\n#[Attribute] trait T {}\n",
+            "<?php\n#[Deprecated] class A {}\n",
+            "<?php\n#[Override] class A {}\n",
             "<?php\nfunction f() { $this = 1; }\n",
         ] {
             let parsed = php_rs_parser::parse(src);

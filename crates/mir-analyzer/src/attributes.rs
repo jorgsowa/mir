@@ -2,11 +2,11 @@
 //!
 //! ## Checks performed
 //!
+//! Built-in attributes (`#[Attribute]`, `#[Override]`, ...) on a wrong target or repeated are
+//! the parser's compile errors from the version PHP checks them; below it mir reports them here.
+//!
 //! ### Structural checks (AST only)
-//! - `#[Attribute]` used on function / method / property / parameter → `InvalidAttribute`
-//! - Class decorated with `#[Attribute]` is abstract → `InvalidAttribute`
-//! - Interface decorated with `#[Attribute]` → `InvalidAttribute`
-//! - Trait decorated with `#[Attribute]` → `InvalidAttribute`
+//! - Abstract class, interface, trait or enum decorated with `#[Attribute]` (before 8.5) → `InvalidAttribute`
 //! - Attribute class has a private constructor → `InvalidAttribute`
 //!
 //! ### Cross-file checks (requires database)
@@ -28,6 +28,7 @@ const ATTR_IS_REPEATABLE: i64 = 64;
 const ATTR_TARGET_ALL: i64 = 63;
 use crate::db::{find_class_like, Fqcn, MirDatabase};
 use crate::diagnostics::offset_to_line_col;
+use crate::php_version::PhpVersion;
 
 // ---------------------------------------------------------------------------
 // Target bitmask constants (mirror PHP's Attribute class)
@@ -194,6 +195,31 @@ fn is_attribute_class_annotation(attr: &Attribute) -> bool {
         .unwrap_or(false)
 }
 
+/// Built-in attributes whose targets and repetition the parser checks, from the version PHP added each.
+const PARSER_CHECKED_ATTRIBUTES: [(&str, PhpVersion); 8] = [
+    ("attribute", PhpVersion::new(8, 0)),
+    ("returntypewillchange", PhpVersion::new(8, 1)),
+    ("allowdynamicproperties", PhpVersion::new(8, 2)),
+    ("sensitiveparameter", PhpVersion::new(8, 2)),
+    ("override", PhpVersion::new(8, 3)),
+    ("deprecated", PhpVersion::new(8, 4)),
+    ("nodiscard", PhpVersion::new(8, 5)),
+    ("delayedtargetvalidation", PhpVersion::new(8, 5)),
+];
+
+fn checked_by_parser(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let name = fqcn.trim_start_matches('\\');
+    let version = crate::db::db_php_version(db);
+    PARSER_CHECKED_ATTRIBUTES
+        .iter()
+        .any(|(lower, since)| version >= *since && name.eq_ignore_ascii_case(lower))
+}
+
+/// From 8.5 PHP rejects `#[Attribute]` on an abstract class, interface, trait or enum, which the parser reports.
+fn parser_checks_attribute_target(db: &dyn MirDatabase) -> bool {
+    crate::db::db_php_version(db) >= PhpVersion::new(8, 5)
+}
+
 /// Resolve the fully-qualified name of an attribute reference in `file` context.
 pub(crate) fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> String {
     crate::ast_ext::resolve_ast_name(&attr.name, db, file)
@@ -216,16 +242,6 @@ pub(crate) fn check_function_attributes(
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
     mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
-    for attr in decl.attributes.iter() {
-        if !is_attribute_class_annotation(attr) {
-            continue;
-        }
-        let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
-        issues.push(invalid_attr(
-            "#[Attribute] can only be applied to classes, not functions",
-            loc,
-        ));
-    }
     check_attribute_list(
         &decl.attributes,
         TARGET_FUNCTION,
@@ -239,17 +255,6 @@ pub(crate) fn check_function_attributes(
         resolved_navigation_facts.as_deref_mut(),
     );
     for param in decl.params.iter() {
-        // `#[Attribute]` on a function parameter is invalid
-        for attr in param.attributes.iter() {
-            if is_attribute_class_annotation(attr) {
-                let loc =
-                    span_to_location(file, source, source_map, attr.span.start, attr.span.end);
-                issues.push(invalid_attr(
-                    "#[Attribute] can only be applied to classes, not parameters",
-                    loc,
-                ));
-            }
-        }
         check_attribute_list(
             &param.attributes,
             TARGET_PARAMETER,
@@ -283,7 +288,7 @@ pub(crate) fn check_class_attributes(
     mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     // Check 1: `#[Attribute]` on abstract class
-    if decl.modifiers.is_abstract {
+    if decl.modifiers.is_abstract && !parser_checks_attribute_target(db) {
         for attr in decl.attributes.iter() {
             if !is_attribute_class_annotation(attr) {
                 continue;
@@ -364,38 +369,6 @@ pub(crate) fn check_class_attributes(
                         all_symbols.as_deref_mut(),
                         resolved_navigation_facts.as_deref_mut(),
                     );
-                    // `#[Attribute]` on a method parameter is invalid
-                    for attr in param.attributes.iter() {
-                        if is_attribute_class_annotation(attr) {
-                            let loc = span_to_location(
-                                file,
-                                source,
-                                source_map,
-                                attr.span.start,
-                                attr.span.end,
-                            );
-                            issues.push(invalid_attr(
-                                "#[Attribute] can only be applied to classes, not parameters",
-                                loc,
-                            ));
-                        }
-                    }
-                }
-                // `#[Attribute]` on a method is invalid
-                for attr in method.attributes.iter() {
-                    if is_attribute_class_annotation(attr) {
-                        let loc = span_to_location(
-                            file,
-                            source,
-                            source_map,
-                            attr.span.start,
-                            attr.span.end,
-                        );
-                        issues.push(invalid_attr(
-                            "#[Attribute] can only be applied to classes, not methods",
-                            loc,
-                        ));
-                    }
                 }
             }
             ClassMemberKind::Property(prop) => {
@@ -422,22 +395,6 @@ pub(crate) fn check_class_attributes(
                     all_symbols.as_deref_mut(),
                     resolved_navigation_facts.as_deref_mut(),
                 );
-                // `#[Attribute]` on a property is invalid
-                for attr in prop.attributes.iter() {
-                    if is_attribute_class_annotation(attr) {
-                        let loc = span_to_location(
-                            file,
-                            source,
-                            source_map,
-                            attr.span.start,
-                            attr.span.end,
-                        );
-                        issues.push(invalid_attr(
-                            "#[Attribute] can only be applied to classes, not properties",
-                            loc,
-                        ));
-                    }
-                }
             }
             ClassMemberKind::ClassConst(c) => {
                 check_attribute_list(
@@ -452,22 +409,6 @@ pub(crate) fn check_class_attributes(
                     all_symbols.as_deref_mut(),
                     resolved_navigation_facts.as_deref_mut(),
                 );
-                // `#[Attribute]` on a class constant is invalid
-                for attr in c.attributes.iter() {
-                    if is_attribute_class_annotation(attr) {
-                        let loc = span_to_location(
-                            file,
-                            source,
-                            source_map,
-                            attr.span.start,
-                            attr.span.end,
-                        );
-                        issues.push(invalid_attr(
-                            "#[Attribute] can only be applied to classes, not constants",
-                            loc,
-                        ));
-                    }
-                }
             }
             _ => {}
         }
@@ -488,12 +429,24 @@ pub(crate) fn check_interface_attributes(
     mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
-        if !is_attribute_class_annotation(attr) {
+        if !is_attribute_class_annotation(attr) || parser_checks_attribute_target(db) {
             continue;
         }
         let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
         issues.push(invalid_attr("Interfaces cannot be attribute classes", loc));
     }
+    check_attribute_list(
+        &decl.attributes,
+        TARGET_CLASS,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+        record_refs,
+        all_symbols.as_deref_mut(),
+        resolved_navigation_facts.as_deref_mut(),
+    );
     // Also check method, method-parameter, and constant attributes inside the interface.
     for member in decl.body.members.iter() {
         match &member.kind {
@@ -558,12 +511,24 @@ pub(crate) fn check_trait_attributes(
     mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
-        if !is_attribute_class_annotation(attr) {
+        if !is_attribute_class_annotation(attr) || parser_checks_attribute_target(db) {
             continue;
         }
         let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
         issues.push(invalid_attr("Traits cannot be attribute classes", loc));
     }
+    check_attribute_list(
+        &decl.attributes,
+        TARGET_CLASS,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+        record_refs,
+        all_symbols.as_deref_mut(),
+        resolved_navigation_facts.as_deref_mut(),
+    );
     // Also validate attributes on trait members
     for member in decl.body.members.iter() {
         match &member.kind {
@@ -642,7 +607,7 @@ pub(crate) fn check_enum_attributes(
     mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
-        if !is_attribute_class_annotation(attr) {
+        if !is_attribute_class_annotation(attr) || parser_checks_attribute_target(db) {
             continue;
         }
         let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
@@ -884,6 +849,11 @@ fn check_attribute_list(
                         IssueKind::WrongCaseClass { used, canonical },
                         loc.clone(),
                     ));
+                }
+
+                if checked_by_parser(db, &fqcn) {
+                    seen_fqcns.push((fqcn, attr.span.start, attr.span.end));
+                    continue;
                 }
 
                 // Only plain `Class` entities can be attribute classes.

@@ -107,8 +107,8 @@ fn issue_kind_accessible_via_mir_analyzer() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn analyze_source_flags_attribute_on_function() {
-    let src = "<?php\n#[Attribute]\nfunction foo(): void {}\n";
+fn analyze_source_flags_non_attribute_class_on_function() {
+    let src = "<?php\nclass Plain {}\n#[Plain]\nfunction foo(): void {}\n";
     let result = mir_analyzer::analyze_source_with_options(
         src,
         &mir_analyzer::BatchOptions::new().without_symbols(),
@@ -118,7 +118,7 @@ fn analyze_source_flags_attribute_on_function() {
             .issues
             .iter()
             .any(|i| i.kind.name() == "InvalidAttribute"),
-        "expected InvalidAttribute for #[Attribute] on a function, got: {:?}",
+        "expected InvalidAttribute for a non-attribute class on a function, got: {:?}",
         result
             .issues
             .iter()
@@ -128,8 +128,8 @@ fn analyze_source_flags_attribute_on_function() {
 }
 
 #[test]
-fn analyze_source_flags_attribute_on_abstract_class() {
-    let src = "<?php\n#[Attribute]\nabstract class Foo {}\n";
+fn analyze_source_flags_private_attribute_constructor() {
+    let src = "<?php\n#[Attribute]\nclass Foo { private function __construct() {} }\n";
     let result = mir_analyzer::analyze_source_with_options(
         src,
         &mir_analyzer::BatchOptions::new().without_symbols(),
@@ -139,7 +139,7 @@ fn analyze_source_flags_attribute_on_abstract_class() {
             .issues
             .iter()
             .any(|i| i.kind.name() == "InvalidAttribute"),
-        "expected InvalidAttribute for #[Attribute] on an abstract class, got: {:?}",
+        "expected InvalidAttribute for an attribute class with a private constructor, got: {:?}",
         result
             .issues
             .iter()
@@ -149,8 +149,8 @@ fn analyze_source_flags_attribute_on_abstract_class() {
 }
 
 #[test]
-fn analyze_source_flags_attribute_on_trait() {
-    let src = "<?php\n#[Attribute]\ntrait Foo {}\n";
+fn analyze_source_flags_non_attribute_class_on_trait() {
+    let src = "<?php\nclass Plain {}\n#[Plain]\ntrait Foo {}\n";
     let result = mir_analyzer::analyze_source_with_options(
         src,
         &mir_analyzer::BatchOptions::new().without_symbols(),
@@ -160,7 +160,7 @@ fn analyze_source_flags_attribute_on_trait() {
             .issues
             .iter()
             .any(|i| i.kind.name() == "InvalidAttribute"),
-        "expected InvalidAttribute for #[Attribute] on a trait, got: {:?}",
+        "expected InvalidAttribute for a non-attribute class on a trait, got: {:?}",
         result
             .issues
             .iter()
