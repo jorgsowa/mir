@@ -375,7 +375,19 @@ impl<'a> BodyAnalyzer<'a> {
                 let parsed = crate::parser::DocblockParser::parse(&c.text);
                 parsed.var_type.is_some() && parsed.invalid_annotations.is_empty()
             });
-            if self.mode == AnalysisMode::Full && !has_docblock_type {
+            // An untyped readonly property is already the parser's `untyped-readonly-property`.
+            let natively_readonly = || {
+                prop.modifiers.is_readonly
+                    || prop.name.as_str().is_some_and(|n| {
+                        crate::db::find_property_in_class(
+                            self.db,
+                            crate::db::Fqcn::from_str(self.db, fqcn),
+                            n,
+                        )
+                        .is_some_and(|def| def.has_native_readonly)
+                    })
+            };
+            if self.mode == AnalysisMode::Full && !has_docblock_type && !natively_readonly() {
                 let prop_name = prop.name.as_str().unwrap_or("").to_string();
                 let start = crate::parser::skip_leading_attributes(source, member_span.start);
                 let (line, col_start) =
@@ -1091,10 +1103,8 @@ impl<'a> BodyAnalyzer<'a> {
         if method_name == "__construct" && self.mode == AnalysisMode::Full {
             for param in method.params.iter() {
                 if param.modifiers.visibility.is_some() && param.type_hint.is_none() {
-                    // A `@param` docblock on the constructor can already give this
-                    // promoted property a resolved type even with no native hint —
-                    // same reasoning as the plain-property check above.
-                    let has_docblock_type = param
+                    // Typed by `@param`, or readonly (the parser's `untyped-readonly-property`).
+                    let typed_or_readonly = param
                         .name
                         .as_str()
                         .filter(|n| !n.is_empty())
@@ -1105,9 +1115,8 @@ impl<'a> BodyAnalyzer<'a> {
                                 n,
                             )
                         })
-                        .and_then(|def| def.ty)
-                        .is_some();
-                    if has_docblock_type {
+                        .is_some_and(|def| def.ty.is_some() || def.has_native_readonly);
+                    if typed_or_readonly || param.modifiers.is_readonly {
                         continue;
                     }
                     let prop_name = param.name.as_str().unwrap_or("").to_string();

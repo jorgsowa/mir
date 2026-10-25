@@ -20,13 +20,14 @@ pub(crate) fn parse_error_to_issue(
     err: &php_rs_parser::diagnostics::ParseError,
     file: &Arc<str>,
     source: &str,
-    source_map: &php_rs_parser::source_map::SourceMap,
+    parsed: &php_rs_parser::ParseResult,
 ) -> mir_issues::Issue {
     let span = err.span();
+    let source_map = &parsed.source_map;
     let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
     let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
 
-    let message = err.to_string();
+    let message = php_message(err, &parsed.program).unwrap_or_else(|| err.to_string());
     let code = err.code().to_owned();
     let rule = err.forbidden_rule();
     let kind = if rule == Some(ForbiddenRule::ParentWithoutParentClass) {
@@ -46,6 +47,132 @@ pub(crate) fn parse_error_to_issue(
             col_end,
         },
     )
+}
+
+/// PHP's wording for parser diagnostics whose text lacks the property PHP names.
+fn php_message(
+    err: &php_rs_parser::diagnostics::ParseError,
+    program: &php_ast::owned::Program,
+) -> Option<String> {
+    let message: fn(&str, &str) -> String = match err.forbidden_rule()? {
+        ForbiddenRule::UntypedReadonlyProperty => {
+            |class, prop| format!("Readonly property {class}::${prop} must have type")
+        }
+        ForbiddenRule::StaticReadonlyProperty => {
+            |class, prop| format!("Static property {class}::${prop} cannot be readonly")
+        }
+        ForbiddenRule::ReadonlyPropertyHooks => {
+            return Some("Hooked properties cannot be readonly".to_string())
+        }
+        _ => return None,
+    };
+    let mut finder = PropertyAt {
+        offset: err.span().start,
+        namespace: String::new(),
+        classes: Vec::new(),
+        found: None,
+    };
+    for stmt in &program.stmts {
+        if php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut finder, stmt).is_break() {
+            break;
+        }
+    }
+    let (class, property) = finder.found?;
+    Some(message(&class, &property))
+}
+
+/// Finds the class-like and name of the property or promoted parameter that starts at `offset`.
+struct PropertyAt {
+    offset: u32,
+    namespace: String,
+    classes: Vec<String>,
+    found: Option<(String, String)>,
+}
+
+impl PropertyAt {
+    fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        let name = if self.namespace.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}\\{name}", self.namespace)
+        };
+        self.classes.push(name);
+        let flow = crate::recursion::walk_stmt(self, stmt);
+        self.classes.pop();
+        flow
+    }
+
+    fn found(&mut self, span: Span, name: &php_ast::owned::Ident) -> std::ops::ControlFlow<()> {
+        if span.start > self.offset || self.offset >= span.end {
+            return std::ops::ControlFlow::Continue(());
+        }
+        let class = self.classes.last().cloned().unwrap_or_default();
+        self.found = Some((class, name.as_str().unwrap_or_default().to_string()));
+        std::ops::ControlFlow::Break(())
+    }
+}
+
+impl php_ast::owned::visitor::OwnedVisitor for PropertyAt {
+    type Break = ();
+
+    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::{NamespaceBody, StmtKind};
+        // An unbraced `namespace X;` ends before the code it applies to.
+        let unbraced_namespace = matches!(&stmt.kind, StmtKind::Namespace(ns) if !matches!(ns.body, NamespaceBody::Braced(_)));
+        if stmt.span.end <= self.offset && !unbraced_namespace {
+            return std::ops::ControlFlow::Continue(());
+        }
+        match &stmt.kind {
+            StmtKind::Namespace(ns) => {
+                let name = ns
+                    .name
+                    .as_ref()
+                    .map(|n| name_to_string_owned(n).into_owned())
+                    .unwrap_or_default();
+                if let NamespaceBody::Braced(_) = &ns.body {
+                    let outer = std::mem::replace(&mut self.namespace, name);
+                    let flow = crate::recursion::walk_stmt(self, stmt);
+                    self.namespace = outer;
+                    return flow;
+                }
+                self.namespace = name;
+            }
+            StmtKind::Class(c) => {
+                let name = c.name.as_ref().and_then(|n| n.as_str()).unwrap_or_default();
+                return self.in_class(name, stmt);
+            }
+            StmtKind::Trait(d) => return self.in_class(d.name.as_str().unwrap_or_default(), stmt),
+            _ => {}
+        }
+        crate::recursion::walk_stmt(self, stmt)
+    }
+
+    fn visit_class_member(
+        &mut self,
+        member: &php_ast::owned::ClassMember,
+    ) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::ClassMemberKind;
+        match &member.kind {
+            ClassMemberKind::Property(p) => self.found(member.span, &p.name)?,
+            ClassMemberKind::Method(m) => {
+                for param in m.params.iter() {
+                    self.found(param.span, &param.name)?;
+                }
+            }
+            _ => {}
+        }
+        php_ast::owned::visitor::walk_owned_class_member(self, member)
+    }
+
+    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
+        if let php_ast::owned::ExprKind::AnonymousClass(_) = &expr.kind {
+            self.classes.push("class@anonymous".to_string());
+            let flow = crate::recursion::walk_expr(self, expr);
+            self.classes.pop();
+            return flow;
+        }
+        crate::recursion::walk_expr(self, expr)
+    }
 }
 
 /// Compile-time rules the parser checks that the analyzer reports itself with a

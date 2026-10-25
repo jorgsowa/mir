@@ -273,7 +273,7 @@ impl AnalyzerDb {
             .errors
             .iter()
             .filter(|err| !crate::parser::is_redundant_parse_error(err))
-            .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed.source_map))
+            .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed))
             .collect();
 
         let collector = crate::collector::DefinitionCollector::new_for_slice(

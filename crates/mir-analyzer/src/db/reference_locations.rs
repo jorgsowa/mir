@@ -136,7 +136,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
             err,
             prepared.path,
             prepared.text,
-            &parsed.source_map,
+            parsed,
         ));
     }
 

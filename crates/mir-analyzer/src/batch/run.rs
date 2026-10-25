@@ -91,7 +91,7 @@ impl AnalysisSession {
                             err,
                             &parsed.file,
                             parsed.source(),
-                            parsed.source_map(),
+                            &parsed.parsed,
                         )
                     })
                     .collect();

@@ -868,7 +868,7 @@ pub fn collect_file_definitions_uncached(
         .errors
         .iter()
         .filter(|err| !crate::parser::is_redundant_parse_error(err))
-        .map(|err| crate::parser::parse_error_to_issue(err, path, text, &parsed.source_map))
+        .map(|err| crate::parser::parse_error_to_issue(err, path, text, &parsed))
         .collect();
 
     let collector = crate::collector::DefinitionCollector::new_for_slice(

@@ -2096,7 +2096,7 @@ impl IssueKind {
                 }
             }
             IssueKind::InvalidReadonlyPropertyDeclaration { class, property } => {
-                format!("Readonly property {class}::${property} cannot have a default value")
+                format!("Readonly property {class}::${property} cannot have default value")
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
                 format!(
