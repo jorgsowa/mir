@@ -1132,7 +1132,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if prop_def.is_readonly && !dispatches_to_offset_method {
                         self.emit(
                             IssueKind::ReadonlyPropertyAssignment {
-                                class: owner.to_string(),
+                                class: readonly_error_class(db, fqcn.as_ref(), &owner),
                                 property: prop_name.clone(),
                             },
                             Severity::Error,
@@ -1762,7 +1762,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 if is_readonly && !in_allowed_readonly_scope {
                                     self.emit(
                                         IssueKind::ReadonlyPropertyAssignment {
-                                            class: prop_owner.to_string(),
+                                            class: readonly_error_class(
+                                                self.db,
+                                                fqcn.as_ref(),
+                                                &prop_owner,
+                                            ),
                                             property: prop_name.clone(),
                                         },
                                         Severity::Error,
@@ -2648,4 +2652,14 @@ fn property_refinement(
     }
     let fits = declared.is_none_or(|d| crate::subtype::is_subtype(db, &assigned.remove_null(), d));
     fits.then(|| assigned.clone())
+}
+
+/// The declaring class PHP names, except that an enum's `name` / `value` (declared on the
+/// stub interfaces) belong to the enum itself.
+fn readonly_error_class(db: &dyn MirDatabase, accessed: &str, owner: &str) -> String {
+    if crate::db::class_kind(db, owner).is_some_and(|k| k.is_interface) {
+        accessed.to_string()
+    } else {
+        owner.to_string()
+    }
 }

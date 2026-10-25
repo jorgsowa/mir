@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ReadonlyPropertyAssignment` on an enum's `name` or `value` names the enum (`Suit::$value`), as PHP does, instead of `UnitEnum` / `IntBackedEnum` / `StringBackedEnum`.
 - A constructor is checked against a `final`, abstract or interface constructor anywhere up the chain, as PHP does: `FinalMethodOverridden` for overriding a `final __construct`, `MethodSignatureMismatch` / `OverriddenMethodAccess` against an abstract or interface constructor. Constructors were never compared. An ordinary parent constructor still imposes nothing.
 - `MissingReturnType` no longer fires for an interface's `__construct` or `__destruct`, which cannot declare a return type.
 - `PropertyTypeRedeclarationMismatch` covers a property typed on one side only: `public int $x` over an untyped parent property, or an untyped redeclaration of a typed one, is fatal in PHP. Parent properties declared in stubs are not compared (some internal typed properties are untyped there).
