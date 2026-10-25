@@ -424,3 +424,104 @@ impl ClassAnalyzer<'_> {
         }
     }
 }
+
+impl ClassAnalyzer<'_> {
+    /// PHP rejects two used traits that bring different bodies for one method the
+    /// class neither declares nor resolves with `insteadof`.
+    pub(super) fn check_trait_method_collisions(
+        &self,
+        class: &mir_codebase::definitions::ClassDef,
+        issues: &mut Vec<Issue>,
+    ) {
+        if class.traits.len() < 2 {
+            return;
+        }
+        // method key → (origin trait, method) per direct trait; `None` when the
+        // trait's own nested uses make the origin ambiguous.
+        type Provided =
+            HashMap<Arc<str>, Option<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)>>;
+        let provided_by = |direct: &Arc<str>| -> Provided {
+            let mut provided = Provided::default();
+            let mut seen = HashSet::default();
+            let mut stack = vec![(direct.clone(), true)];
+            while let Some((trait_fqcn, is_direct)) = stack.pop() {
+                if !seen.insert(trait_fqcn.to_ascii_lowercase()) {
+                    continue;
+                }
+                let here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                let Some(crate::db::ClassLike::Trait(t)) =
+                    crate::db::find_class_like(self.db, here)
+                else {
+                    continue;
+                };
+                for (key, method) in t.own_methods.iter() {
+                    if method.is_abstract {
+                        continue;
+                    }
+                    let origin = Some((t.fqcn.clone(), method.clone()));
+                    match provided.get(key) {
+                        None => {
+                            provided.insert(key.clone(), origin);
+                        }
+                        // The direct trait's own method wins over nested ones.
+                        Some(_) if is_direct => {
+                            provided.insert(key.clone(), origin);
+                        }
+                        Some(Some((other, _))) if !other.eq_ignore_ascii_case(&t.fqcn) => {
+                            provided.insert(key.clone(), None);
+                        }
+                        Some(_) => {}
+                    }
+                }
+                stack.extend(t.traits.iter().map(|n| (n.clone(), false)));
+            }
+            provided
+        };
+        let mut applied: HashMap<
+            Arc<str>,
+            Option<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)>,
+        > = HashMap::default();
+        let mut reported = HashSet::default();
+        for direct in &class.traits {
+            let mut provided: Vec<_> = provided_by(direct).into_iter().collect();
+            provided.sort_by(|a, b| a.0.cmp(&b.0));
+            for (key, origin) in provided {
+                if class.own_methods.contains_key(&key)
+                    || class.trait_insteadof.get(&key).is_some_and(|excluded| {
+                        excluded.iter().any(|e| e.eq_ignore_ascii_case(direct))
+                    })
+                {
+                    continue;
+                }
+                let Some(earlier) = applied.get(&key) else {
+                    applied.insert(key, origin);
+                    continue;
+                };
+                let (Some((first_trait, first)), Some((trait_fqcn, method))) = (earlier, &origin)
+                else {
+                    continue;
+                };
+                if first_trait.eq_ignore_ascii_case(trait_fqcn) || !reported.insert(key.clone()) {
+                    continue;
+                }
+                let location = class
+                    .trait_use_locations
+                    .iter()
+                    .find(|(used, _)| used.eq_ignore_ascii_case(direct))
+                    .map(|(_, loc)| loc)
+                    .or(class.location.as_ref());
+                self.push_located_issue(
+                    issues,
+                    IssueKind::CompileError {
+                        message: format!(
+                            "Trait method {trait_fqcn}::{} has not been applied as {}::{}, because of collision with {first_trait}::{}",
+                            method.name, class.fqcn, method.name, first.name
+                        ),
+                        code: "trait-method-collision".to_string(),
+                    },
+                    location,
+                );
+            }
+        }
+    }
+}

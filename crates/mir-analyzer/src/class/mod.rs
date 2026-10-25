@@ -239,6 +239,9 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             self.check_constant_overrides(fqcn, class.own_constants(), &mut issues);
+            if let crate::db::ClassLike::Class(def) = &class {
+                self.check_trait_method_collisions(def, &mut issues);
+            }
 
             // Skip abstract classes for "must implement" checks
             if is_abstract {
