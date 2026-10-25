@@ -609,6 +609,280 @@ pub(crate) struct MethodScopeCx {
 /// Returns `true` if `source` contains a top-level `declare(strict_types=1)`.
 /// PHP mandates the directive appear before any other code, so scanning the
 /// first 1 KiB is sufficient and reliable for well-formed files.
+/// PHP's deprecation of an optional parameter before a required one (8.0+), with each
+/// version's message and exemptions; reported for every function, method and closure.
+pub(crate) fn check_optional_before_required(
+    stmts: &[php_ast::owned::Stmt],
+    php_version: PhpVersion,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    if php_version < PhpVersion::new(8, 0) {
+        return;
+    }
+    let mut visitor = ParamOrderVisitor {
+        php_version,
+        namespace: String::new(),
+        classes: Vec::new(),
+        file,
+        source,
+        source_map,
+        issues,
+    };
+    for stmt in stmts {
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut visitor, stmt);
+    }
+}
+
+const ANONYMOUS_CLASS: &str = "class@anonymous";
+
+struct ParamOrderVisitor<'a> {
+    php_version: PhpVersion,
+    namespace: String,
+    classes: Vec<String>,
+    file: &'a Arc<str>,
+    source: &'a str,
+    source_map: &'a php_rs_parser::source_map::SourceMap,
+    issues: &'a mut Vec<Issue>,
+}
+
+impl ParamOrderVisitor<'_> {
+    fn qualify(&self, name: &str) -> String {
+        if self.namespace.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}\\{name}", self.namespace)
+        }
+    }
+
+    /// `null` default on a typed parameter, which PHP exempts depending on the version.
+    fn exempt(&self, p: &php_ast::owned::Param) -> bool {
+        use php_ast::owned::{ExprKind, TypeHintKind};
+        let (Some(hint), Some(default)) = (&p.type_hint, &p.default) else {
+            return false;
+        };
+        if !matches!(default.kind, ExprKind::Null) {
+            return false;
+        }
+        if self.php_version < PhpVersion::new(8, 1) {
+            return true;
+        }
+        if self.php_version < PhpVersion::new(8, 3) {
+            return !matches!(hint.kind, TypeHintKind::Nullable(_));
+        }
+        // From 8.3 only an implicitly nullable type (`int $a = null`) is exempt.
+        let declares_null = |h: &php_ast::owned::TypeHint| {
+            matches!(
+                &h.kind,
+                TypeHintKind::Keyword(
+                    php_ast::ast::BuiltinType::Null | php_ast::ast::BuiltinType::Mixed,
+                    _
+                )
+            )
+        };
+        match &hint.kind {
+            TypeHintKind::Nullable(_) => false,
+            TypeHintKind::Union(parts) => !parts.iter().any(declares_null),
+            _ => !declares_null(hint),
+        }
+    }
+
+    fn check(&mut self, params: &[php_ast::owned::Param], function: impl FnOnce() -> String) {
+        let is_required = |p: &php_ast::owned::Param| p.default.is_none() && !p.variadic;
+        let Some(last_required) = params.iter().rposition(is_required) else {
+            return;
+        };
+        let mut found = Vec::new();
+        if self.php_version < PhpVersion::new(8, 1) {
+            for (idx, required) in params.iter().enumerate().filter(|(_, p)| is_required(p)) {
+                if let Some(optional) = params[..idx]
+                    .iter()
+                    .find(|p| p.default.is_some() && !self.exempt(p))
+                {
+                    found.push((
+                        required.span,
+                        format!(
+                            "Required parameter ${} follows optional parameter ${}",
+                            required.name.as_str().unwrap_or_default(),
+                            optional.name.as_str().unwrap_or_default()
+                        ),
+                    ));
+                }
+            }
+        } else {
+            let required = params[last_required].name.as_str().unwrap_or_default();
+            for optional in params[..last_required]
+                .iter()
+                .filter(|p| p.default.is_some() && !self.exempt(p))
+            {
+                found.push((
+                    optional.span,
+                    format!(
+                        "Optional parameter ${} declared before required parameter ${required} is implicitly treated as a required parameter",
+                        optional.name.as_str().unwrap_or_default()
+                    ),
+                ));
+            }
+        }
+        if found.is_empty() {
+            return;
+        }
+        let prefix = if self.php_version >= PhpVersion::new(8, 4) {
+            format!("{}(): ", function())
+        } else {
+            String::new()
+        };
+        for (span, message) in found {
+            let (line, col_start) =
+                crate::diagnostics::offset_to_line_col(self.source, span.start, self.source_map);
+            let (line_end, col_end) =
+                crate::diagnostics::offset_to_line_col(self.source, span.end, self.source_map);
+            self.issues.push(
+                Issue::new(
+                    mir_issues::IssueKind::OptionalParameterBeforeRequired {
+                        message: format!("{prefix}{message}"),
+                    },
+                    mir_issues::Location {
+                        file: self.file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    },
+                )
+                .with_snippet(crate::parser::span_text(self.source, span).unwrap_or_default()),
+            );
+        }
+    }
+
+    fn with_class(&mut self, name: String, members: impl FnOnce(&mut Self)) {
+        self.classes.push(name);
+        members(self);
+        self.classes.pop();
+    }
+
+    fn method(&mut self, m: &php_ast::owned::MethodDecl) {
+        let class = self.classes.last().cloned().unwrap_or_default();
+        let name = m.name.as_str().unwrap_or_default().to_string();
+        // PHP's anonymous class name holds a NUL byte, so its message stops before `::m`.
+        if class == ANONYMOUS_CLASS {
+            self.check(&m.params, || class);
+        } else {
+            self.check(&m.params, || format!("{class}::{name}"));
+        }
+    }
+}
+
+impl php_ast::owned::visitor::OwnedVisitor for ParamOrderVisitor<'_> {
+    type Break = ();
+
+    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::{NamespaceBody, StmtKind};
+        match &stmt.kind {
+            StmtKind::Namespace(ns) => {
+                let name = ns
+                    .name
+                    .as_ref()
+                    .map(|n| crate::parser::name_to_string_owned(n).into_owned())
+                    .unwrap_or_default();
+                if let NamespaceBody::Braced(_) = &ns.body {
+                    let outer = std::mem::replace(&mut self.namespace, name);
+                    let flow = crate::recursion::walk_stmt(self, stmt);
+                    self.namespace = outer;
+                    return flow;
+                }
+                self.namespace = name;
+            }
+            StmtKind::Function(f) => {
+                let name = self.qualify(f.name.as_str().unwrap_or_default());
+                self.check(&f.params, || name);
+            }
+            StmtKind::Class(c) => {
+                let name =
+                    self.qualify(c.name.as_ref().and_then(|n| n.as_str()).unwrap_or_default());
+                let mut flow = std::ops::ControlFlow::Continue(());
+                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                return flow;
+            }
+            StmtKind::Interface(d) => {
+                let name = self.qualify(d.name.as_str().unwrap_or_default());
+                let mut flow = std::ops::ControlFlow::Continue(());
+                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                return flow;
+            }
+            StmtKind::Trait(d) => {
+                let name = self.qualify(d.name.as_str().unwrap_or_default());
+                let mut flow = std::ops::ControlFlow::Continue(());
+                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                return flow;
+            }
+            StmtKind::Enum(d) => {
+                let name = self.qualify(d.name.as_str().unwrap_or_default());
+                let mut flow = std::ops::ControlFlow::Continue(());
+                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                return flow;
+            }
+            _ => {}
+        }
+        crate::recursion::walk_stmt(self, stmt)
+    }
+
+    fn visit_class_member(
+        &mut self,
+        member: &php_ast::owned::ClassMember,
+    ) -> std::ops::ControlFlow<()> {
+        if let php_ast::owned::ClassMemberKind::Method(m) = &member.kind {
+            self.method(m);
+        }
+        php_ast::owned::visitor::walk_owned_class_member(self, member)
+    }
+
+    fn visit_enum_member(
+        &mut self,
+        member: &php_ast::owned::EnumMember,
+    ) -> std::ops::ControlFlow<()> {
+        if let php_ast::owned::EnumMemberKind::Method(m) = &member.kind {
+            self.method(m);
+        }
+        php_ast::owned::visitor::walk_owned_enum_member(self, member)
+    }
+
+    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::ExprKind;
+        let closure_name = || {
+            let (line, _) = crate::diagnostics::offset_to_line_col(
+                self.source,
+                expr.span.start,
+                self.source_map,
+            );
+            format!("{{closure:{}:{line}}}", self.file)
+        };
+        match &expr.kind {
+            ExprKind::Closure(c) => {
+                let name = closure_name();
+                self.check(&c.params, || name);
+            }
+            ExprKind::ArrowFunction(f) => {
+                let name = closure_name();
+                self.check(&f.params, || name);
+            }
+            ExprKind::AnonymousClass(_) => {
+                let mut flow = std::ops::ControlFlow::Continue(());
+                self.with_class(ANONYMOUS_CLASS.to_string(), |v| {
+                    flow = crate::recursion::walk_expr(v, expr)
+                });
+                return flow;
+            }
+            _ => {}
+        }
+        crate::recursion::walk_expr(self, expr)
+    }
+}
+
 pub(crate) fn is_strict_types_file(source: &str) -> bool {
     let end = source.floor_char_boundary(source.len().min(1024));
     let prefix = &source[..end];

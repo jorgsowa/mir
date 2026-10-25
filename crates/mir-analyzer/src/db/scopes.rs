@@ -329,6 +329,14 @@ fn analyze_scope(
                 &parsed.source_map,
                 issues,
             );
+            crate::body_analysis::check_optional_before_required(
+                &parsed.program.stmts,
+                prepared.php_version,
+                path,
+                text.as_ref(),
+                &parsed.source_map,
+                issues,
+            );
             check_use_decls(
                 &parsed.program.stmts,
                 db,

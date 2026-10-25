@@ -170,6 +170,7 @@ All issue types mir can emit, grouped by category.
 | `DeprecatedInterface` | Implementing a `@deprecated` interface. |
 | `DeprecatedTrait` | Using a `@deprecated` trait. |
 | `DeprecatedConstant` | Reference to a `@deprecated` constant. |
+| `OptionalParameterBeforeRequired` | An optional parameter comes before a required one (deprecated from PHP 8.0). |
 | `WrongCaseFunction` | Function name casing does not match its declaration. |
 | `WrongCaseMethod` | Method name casing does not match its declaration. |
 | `WrongCaseClass` | Class, interface, or enum name casing does not match its declaration. |

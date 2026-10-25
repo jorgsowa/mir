@@ -659,6 +659,11 @@ pub enum IssueKind {
         constant: String,
         message: Option<Arc<str>>,
     },
+    /// An optional parameter before a required one, which PHP deprecates from 8.0; the
+    /// message follows the target version.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/optional_parameter_before_required/`.
+    OptionalParameterBeforeRequired { message: String },
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_interface/`.
     DeprecatedInterface {
@@ -1073,6 +1078,7 @@ impl IssueKind {
             | IssueKind::DeprecatedCall { .. }
             | IssueKind::DeprecatedProperty { .. }
             | IssueKind::DeprecatedConstant { .. }
+            | IssueKind::OptionalParameterBeforeRequired { .. }
             | IssueKind::DeprecatedInterface { .. }
             | IssueKind::DeprecatedTrait { .. }
             | IssueKind::DeprecatedMethodCall { .. }
@@ -1317,6 +1323,7 @@ impl IssueKind {
             IssueKind::DeprecatedMethod { .. } => "MIR1002",
             IssueKind::DeprecatedClass { .. } => "MIR1003",
             IssueKind::InternalMethod { .. } => "MIR1004",
+            IssueKind::OptionalParameterBeforeRequired { .. } => "MIR1012",
 
             // Missing types / docblocks (1100-1199)
             IssueKind::MissingReturnType { .. } => "MIR1100",
@@ -1407,11 +1414,11 @@ impl IssueKind {
             | "MIR0401" | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504"
             | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002"
             | "MIR1003" | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009"
-            | "MIR1010" | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104"
-            | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
-            | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
-            | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
-            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
+            | "MIR1010" | "MIR1011" | "MIR1012" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103"
+            | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204"
+            | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504"
+            | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226"
+            | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1570,6 +1577,7 @@ impl IssueKind {
             IssueKind::DeprecatedMethod { .. } => "DeprecatedMethod",
             IssueKind::DeprecatedClass { .. } => "DeprecatedClass",
             IssueKind::InternalMethod { .. } => "InternalMethod",
+            IssueKind::OptionalParameterBeforeRequired { .. } => "OptionalParameterBeforeRequired",
             IssueKind::MissingReturnType { .. } => "MissingReturnType",
             IssueKind::MissingClosureReturnType => "MissingClosureReturnType",
             IssueKind::MissingParamType { .. } => "MissingParamType",
@@ -2181,6 +2189,7 @@ impl IssueKind {
                 let base = format!("Constant {class}::{constant} is deprecated");
                 append_deprecation_message(base, message)
             }
+            IssueKind::OptionalParameterBeforeRequired { message } => message.clone(),
             IssueKind::DeprecatedInterface { name, message } => {
                 let base = format!("Interface {name} is deprecated");
                 append_deprecation_message(base, message)
@@ -2945,6 +2954,7 @@ mod code_tests {
                 constant: s(),
                 message: None,
             },
+            IssueKind::OptionalParameterBeforeRequired { message: s() },
             IssueKind::DeprecatedInterface {
                 name: s(),
                 message: None,
@@ -3119,6 +3129,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 175);
+        assert_eq!(one_of_each().len(), 176);
     }
 }
