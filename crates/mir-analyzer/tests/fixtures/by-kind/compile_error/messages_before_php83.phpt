@@ -56,3 +56,16 @@ enum F {
     final abstract function f();
 //  ^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract class member [abstract-enum-method]
 }
+enum G {
+    abstract function a();
+//  ^^^^^^^^ CompileError: Enum G must implement 2 abstract private methods (G::a, G::b) [abstract-enum-method]
+    abstract protected function b();
+}
+$h = new class {
+//<^^ UnusedVariable: Variable $h is never read
+    abstract function a();
+//  ^^^^^^^^^^^^^^^^^^^^^^ CompileError: Class class@anonymous contains 4 abstract methods and must therefore be declared abstract or implement the remaining methods (class@anonymous::a, class@anonymous::b, class@anonymous::c, ...) [abstract-anonymous-class-method]
+    abstract function b();
+    abstract function c();
+    abstract function d();
+};

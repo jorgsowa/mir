@@ -22,3 +22,7 @@ enum Status {
     public function __get($name) {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum may not include __get [enum-magic-method]
 }
+enum Pending {
+    abstract function label();
+//  ^^^^^^^^ CompileError: Class Pending contains 1 abstract method and must therefore be declared abstract or implement the remaining methods (Pending::label) [abstract-enum-method]
+}

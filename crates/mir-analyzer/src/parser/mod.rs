@@ -24,14 +24,120 @@ pub(crate) fn parse_error_issues(
     parsed: &php_rs_parser::ParseResult,
     version: PhpVersion,
 ) -> Vec<mir_issues::Issue> {
+    let abstract_methods = abstract_methods_by_class(source, parsed, version);
     parsed
         .errors
         .iter()
         .filter(|err| {
             !is_redundant_parse_error(err) && raised_at(err, source, &parsed.program, version)
         })
-        .map(|err| parse_error_to_issue(err, file, source, parsed, version))
+        .filter_map(|err| {
+            let mut issue = parse_error_to_issue(err, file, source, parsed, version);
+            let grouped = matches!(
+                err.forbidden_rule(),
+                Some(
+                    ForbiddenRule::AbstractEnumMethod | ForbiddenRule::AbstractAnonymousClassMethod
+                )
+            );
+            if let Some(class) = abstract_methods
+                .iter()
+                .find(|c| grouped && c.offsets.contains(&err.span().start))
+            {
+                if class.offsets[0] != err.span().start {
+                    return None;
+                }
+                if let mir_issues::IssueKind::CompileError { message, .. } = &mut issue.kind {
+                    *message = class.message(version);
+                }
+            }
+            Some(issue)
+        })
         .collect()
+}
+
+/// A class-like's abstract methods that PHP reports together, before 8.5.
+struct AbstractMethods {
+    class: String,
+    is_enum: bool,
+    methods: Vec<String>,
+    /// Offsets of the parser's per-method diagnostics.
+    offsets: Vec<u32>,
+}
+
+impl AbstractMethods {
+    fn message(&self, version: PhpVersion) -> String {
+        let count = self.methods.len();
+        let plural = if count == 1 { "" } else { "s" };
+        let mut list: Vec<String> = self
+            .methods
+            .iter()
+            .take(3)
+            .map(|m| format!("{}::{m}", self.class))
+            .collect();
+        if count > 3 {
+            list.push("...".to_string());
+        }
+        let list = list.join(", ");
+        if self.is_enum && version >= PhpVersion::new(8, 2) {
+            format!(
+                "Enum {} must implement {count} abstract private method{plural} ({list})",
+                self.class
+            )
+        } else {
+            format!(
+                "Class {} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining methods ({list})",
+                self.class
+            )
+        }
+    }
+}
+
+/// Before 8.5 PHP aggregates the abstract methods of an enum or anonymous class into one error.
+fn abstract_methods_by_class(
+    source: &str,
+    parsed: &php_rs_parser::ParseResult,
+    version: PhpVersion,
+) -> Vec<AbstractMethods> {
+    let mut classes: Vec<(u32, AbstractMethods)> = Vec::new();
+    if version >= PhpVersion::new(8, 5) {
+        return Vec::new();
+    }
+    for err in &parsed.errors {
+        let is_enum = match err.forbidden_rule() {
+            Some(ForbiddenRule::AbstractEnumMethod) => true,
+            Some(ForbiddenRule::AbstractAnonymousClassMethod) => false,
+            _ => continue,
+        };
+        // `final abstract` is PHP's modifier error, reported on its own.
+        if is_enum
+            && php_message(err, source, &parsed.program, version)
+                .is_some_and(|m| m.contains("final modifier"))
+        {
+            continue;
+        }
+        let start = err.span().start;
+        let Some((class, method, scope)) =
+            find_decl_in_scope(&parsed.program, start, DeclTarget::Method)
+        else {
+            continue;
+        };
+        match classes.iter_mut().find(|(s, _)| *s == scope) {
+            Some((_, group)) => {
+                group.methods.push(method);
+                group.offsets.push(start);
+            }
+            None => classes.push((
+                scope,
+                AbstractMethods {
+                    class,
+                    is_enum,
+                    methods: vec![method],
+                    offsets: vec![start],
+                },
+            )),
+        }
+    }
+    classes.into_iter().map(|(_, group)| group).collect()
 }
 
 /// Convert a parser diagnostic to a [`mir_issues::Issue`], using the source
@@ -528,6 +634,15 @@ fn find_decl(
     offset: u32,
     target: DeclTarget,
 ) -> Option<(String, String)> {
+    find_decl_in_scope(program, offset, target).map(|(class, name, _)| (class, name))
+}
+
+/// [`find_decl`] plus the start offset of the enclosing class-like.
+fn find_decl_in_scope(
+    program: &php_ast::owned::Program,
+    offset: u32,
+    target: DeclTarget,
+) -> Option<(String, String, u32)> {
     let mut finder = DeclAt {
         offset,
         target,
@@ -564,8 +679,9 @@ struct DeclAt {
     offset: u32,
     target: DeclTarget,
     namespace: String,
-    classes: Vec<String>,
-    found: Option<(String, String)>,
+    /// Enclosing class-likes and their start offsets.
+    classes: Vec<(String, u32)>,
+    found: Option<(String, String, u32)>,
 }
 
 impl DeclAt {
@@ -578,7 +694,7 @@ impl DeclAt {
     }
 
     fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
-        self.classes.push(self.qualify(name));
+        self.classes.push((self.qualify(name), stmt.span.start));
         let flow = crate::recursion::walk_stmt(self, stmt);
         self.classes.pop();
         flow
@@ -593,8 +709,8 @@ impl DeclAt {
         if target != self.target || span.start > self.offset || self.offset >= span.end {
             return std::ops::ControlFlow::Continue(());
         }
-        let class = self.classes.last().cloned().unwrap_or_default();
-        self.found = Some((class, name.as_str().unwrap_or_default().to_string()));
+        let (class, scope) = self.classes.last().cloned().unwrap_or_default();
+        self.found = Some((class, name.as_str().unwrap_or_default().to_string(), scope));
         std::ops::ControlFlow::Break(())
     }
 
@@ -651,7 +767,11 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                 if let Some(ty) = d.scalar_type.as_ref().filter(|ty| {
                     self.target == DeclTarget::EnumBackingType && ty.span().start == self.offset
                 }) {
-                    self.found = Some((self.qualify(name), self.backing_type_name(ty)));
+                    self.found = Some((
+                        self.qualify(name),
+                        self.backing_type_name(ty),
+                        stmt.span.start,
+                    ));
                     return std::ops::ControlFlow::Break(());
                 }
                 return self.in_class(name, stmt);
@@ -702,7 +822,8 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
 
     fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
         if let php_ast::owned::ExprKind::AnonymousClass(_) = &expr.kind {
-            self.classes.push("class@anonymous".to_string());
+            self.classes
+                .push(("class@anonymous".to_string(), expr.span.start));
             let flow = crate::recursion::walk_expr(self, expr);
             self.classes.pop();
             return flow;
