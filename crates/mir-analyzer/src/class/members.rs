@@ -297,8 +297,9 @@ impl ClassAnalyzer<'_> {
         enum_def: &mir_codebase::definitions::EnumDef,
         issues: &mut Vec<Issue>,
     ) {
-        let allows_debug_info =
-            crate::db::db_php_version(self.db) >= crate::php_version::PhpVersion::new(8, 6);
+        let version = crate::db::db_php_version(self.db);
+        let allows_debug_info = version >= crate::php_version::PhpVersion::new(8, 6);
+        let php81 = version < crate::php_version::PhpVersion::new(8, 2);
         let is_forbidden = |name: &str| match canonical_magic_name(&name.to_ascii_lowercase()) {
             None | Some("__call" | "__callStatic" | "__invoke") => None,
             Some("__debugInfo") if allows_debug_info => None,
@@ -308,10 +309,14 @@ impl ClassAnalyzer<'_> {
             self.push_located_issue(
                 issues,
                 IssueKind::CompileError {
-                    message: format!(
-                        "Enum {} cannot include magic method {canonical}",
-                        enum_def.fqcn
-                    ),
+                    message: if php81 {
+                        format!("Enum may not include {canonical}")
+                    } else {
+                        format!(
+                            "Enum {} cannot include magic method {canonical}",
+                            enum_def.fqcn
+                        )
+                    },
                     code: "enum-magic-method".to_string(),
                 },
                 location,
@@ -546,10 +551,19 @@ impl ClassAnalyzer<'_> {
                 self.push_located_issue(
                     issues,
                     IssueKind::CompileError {
-                        message: format!(
-                            "Trait method {trait_fqcn}::{} has not been applied as {}::{}, because of collision with {first_trait}::{}",
-                            method.name, class.fqcn, method.name, first.name
-                        ),
+                        message: if crate::db::db_php_version(self.db)
+                            < crate::php_version::PhpVersion::new(8, 0)
+                        {
+                            format!(
+                                "Trait method {} has not been applied, because there are collisions with other trait methods on {}",
+                                method.name, class.fqcn
+                            )
+                        } else {
+                            format!(
+                                "Trait method {trait_fqcn}::{} has not been applied as {}::{}, because of collision with {first_trait}::{}",
+                                method.name, class.fqcn, method.name, first.name
+                            )
+                        },
                         code: "trait-method-collision".to_string(),
                     },
                     location,
@@ -567,6 +581,7 @@ impl ClassAnalyzer<'_> {
         &self,
         fqcn: &Arc<str>,
         own_properties: Option<&mir_codebase::definitions::MemberMap<PropertyDef>>,
+        parent: Option<&str>,
         own_constants: &mir_codebase::definitions::MemberMap<ConstantDef>,
         traits: &[Arc<str>],
         trait_use_locations: &[(Arc<str>, Location)],
@@ -583,6 +598,10 @@ impl ClassAnalyzer<'_> {
             .iter()
             .map(|(name, c)| (name.clone(), (fqcn.clone(), c.clone())))
             .collect();
+        // Before 8.5 PHP also compares a trait's property with the one the class inherits.
+        let parent = parent.filter(|_| {
+            crate::db::db_php_version(self.db) < crate::php_version::PhpVersion::new(8, 5)
+        });
         for used in traits {
             let here = crate::db::Fqcn::from_str(self.db, used.as_ref());
             let Some(crate::db::ClassLike::Trait(t)) = crate::db::find_class_like(self.db, here)
@@ -618,6 +637,13 @@ impl ClassAnalyzer<'_> {
                         }
                     }
                     None => {
+                        if let Some((owner, inherited)) =
+                            parent.and_then(|parent| self.inherited_property(parent, name))
+                        {
+                            if !trait_properties_compatible(&inherited, prop) {
+                                report("property", &format!("${name}"), &owner);
+                            }
+                        }
                         properties.insert(name.clone(), (t.fqcn.clone(), prop.clone()));
                     }
                 }
@@ -634,6 +660,33 @@ impl ClassAnalyzer<'_> {
                     }
                 }
             }
+        }
+    }
+}
+
+impl ClassAnalyzer<'_> {
+    /// The real non-private property `name` inherited from `parent`, and the class composing it.
+    pub(super) fn inherited_property(
+        &self,
+        parent: &str,
+        name: &str,
+    ) -> Option<(Arc<str>, PropertyDef)> {
+        let db = self.db;
+        let (_, prop) =
+            crate::db::find_property_in_chain(db, crate::db::Fqcn::from_str(db, parent), name)?;
+        if prop.from_docblock || prop.visibility == mir_codebase::definitions::Visibility::Private {
+            return None;
+        }
+        let mut class: Arc<str> = Arc::from(parent);
+        loop {
+            let here = crate::db::Fqcn::from_str(db, class.as_ref());
+            if crate::db::property_in_own_composition(db, here, name) {
+                return Some((class, prop));
+            }
+            let Some(crate::db::ClassLike::Class(c)) = crate::db::find_class_like(db, here) else {
+                return None;
+            };
+            class = c.parent.clone()?;
         }
     }
 }
@@ -672,7 +725,7 @@ fn values_differ(a: &mir_types::Type, b: &mir_types::Type) -> bool {
     matches!((scalar_kind(a), scalar_kind(b)), (Some(x), Some(y)) if x != y)
 }
 
-fn trait_properties_compatible(a: &PropertyDef, b: &PropertyDef) -> bool {
+pub(super) fn trait_properties_compatible(a: &PropertyDef, b: &PropertyDef) -> bool {
     if a.visibility != b.visibility
         || a.is_static != b.is_static
         || a.has_native_readonly != b.has_native_readonly

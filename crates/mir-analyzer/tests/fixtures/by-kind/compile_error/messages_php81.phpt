@@ -18,3 +18,7 @@ class A {
     readonly function f() {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use 'readonly' as method modifier [modifier-not-allowed]
 }
+enum Status {
+    public function __get($name) {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum may not include __get [enum-magic-method]
+}

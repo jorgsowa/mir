@@ -52,3 +52,7 @@ enum E {}
 class D { public static $x; }
 //        ^^^^^^^^^^^^^^^^ MissingPropertyType: Property D::$x has no type annotation
 class C extends D { function f() { parent::$x::get(); } }
+enum F {
+    final abstract function f();
+//  ^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract class member [abstract-enum-method]
+}

@@ -255,6 +255,7 @@ impl<'a> ClassAnalyzer<'a> {
                     self.check_trait_member_compatibility(
                         fqcn,
                         Some(&def.own_properties),
+                        def.parent.as_deref(),
                         &def.own_constants,
                         &def.traits,
                         &def.trait_use_locations,
@@ -409,6 +410,7 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_abstract_property_hooks(&enum_fqcn, true, location.as_ref(), &mut issues);
             self.check_trait_member_compatibility(
                 &enum_fqcn,
+                None,
                 None,
                 &enum_def.own_constants,
                 &enum_def.traits,

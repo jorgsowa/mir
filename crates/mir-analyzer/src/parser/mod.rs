@@ -470,7 +470,11 @@ fn php_message(
                         .any(|m| m.eq_ignore_ascii_case("final"))
                 }) =>
         {
-            return Some("Cannot use the final modifier on an abstract method".to_string())
+            return Some(if before(8, 3) {
+                "Cannot use the final modifier on an abstract class member".to_string()
+            } else {
+                "Cannot use the final modifier on an abstract method".to_string()
+            });
         }
         ForbiddenRule::AbstractEnumMethod => (DeclTarget::Method, |enum_name, method| {
             format!("Enum method {enum_name}::{method}() must not be abstract")

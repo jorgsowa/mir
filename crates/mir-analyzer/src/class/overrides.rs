@@ -956,6 +956,15 @@ impl<'a> ClassAnalyzer<'a> {
             let Some((parent_fqcn, parent_prop)) = parent_prop else {
                 continue;
             };
+            // Reported as `trait-property-conflict` before 8.5.
+            if prop_origins.contains_key(&key)
+                && !property_override_checked
+                && !parent_prop.from_docblock
+                && parent_prop.visibility != Visibility::Private
+                && !super::members::trait_properties_compatible(&parent_prop, &own_prop)
+            {
+                continue;
+            }
             // Only enforce visibility rules against real PHP properties.
             // Magic @property/@property-read/@property-write entries (from_docblock=true)
             // are not runtime properties and establish no visibility contract.

@@ -36,3 +36,9 @@ function k() {
 class B extends self {}
 //              ^^^^ CompileError: Cannot use 'self' as class name as it is reserved [reserved-class-reference]
 //              ^^^^ UndefinedClass: Class self does not exist
+trait Waves { function hello() {} }
+trait Greets { function hello() {} }
+class Collides {
+    use Waves, Greets;
+//             ^^^^^^^ CompileError: Trait method hello has not been applied, because there are collisions with other trait methods on Collides [trait-method-collision]
+}
