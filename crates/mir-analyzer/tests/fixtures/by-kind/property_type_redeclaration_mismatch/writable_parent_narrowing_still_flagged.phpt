@@ -8,5 +8,5 @@ abstract class Id {
 
 final class NarrowId extends Id {
     public string $value = 'a';
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of NarrowId::$value must be int|string (as in parent class), string given
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of NarrowId::$value must be int|string (as in class Id)
 }

@@ -14,5 +14,5 @@ class A {
 
 class B extends A {
     public int $x = 2;
-//  ^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of B::$x must be omitted to match the parent definition
+//  ^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of B::$x must be omitted to match the parent definition in class A
 }

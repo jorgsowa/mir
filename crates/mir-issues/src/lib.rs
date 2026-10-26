@@ -500,8 +500,10 @@ pub enum IssueKind {
     PropertyTypeRedeclarationMismatch {
         class: String,
         property: String,
+        parent: String,
         expected: String,
-        actual: String,
+        /// The parent is a get-only hook, so a subtype is enough.
+        covariant: bool,
     },
     /// Emitted by `mir-analyzer/src/class/overrides.rs`.
     /// Fixtures: `tests/fixtures/by-kind/readonly_property_redeclaration_mismatch/`.
@@ -2049,18 +2051,18 @@ impl IssueKind {
             IssueKind::PropertyTypeRedeclarationMismatch {
                 class,
                 property,
+                parent,
                 expected,
-                actual,
+                covariant,
             } => {
                 if expected.is_empty() {
                     format!(
-                        "Type of {class}::${property} must be omitted to match the parent definition"
+                        "Type of {class}::${property} must be omitted to match the parent definition in class {parent}"
                     )
-                } else if actual.is_empty() {
-                    format!("Type of {class}::${property} must be {expected} (as in parent class)")
                 } else {
+                    let subtype = if *covariant { "subtype of " } else { "" };
                     format!(
-                        "Type of {class}::${property} must be {expected} (as in parent class), {actual} given"
+                        "Type of {class}::${property} must be {subtype}{expected} (as in class {parent})"
                     )
                 }
             }
@@ -2915,8 +2917,9 @@ mod code_tests {
             IssueKind::PropertyTypeRedeclarationMismatch {
                 class: s(),
                 property: s(),
+                parent: s(),
                 expected: s(),
-                actual: s(),
+                covariant: false,
             },
             IssueKind::ReadonlyPropertyRedeclarationMismatch {
                 parent_class: s(),

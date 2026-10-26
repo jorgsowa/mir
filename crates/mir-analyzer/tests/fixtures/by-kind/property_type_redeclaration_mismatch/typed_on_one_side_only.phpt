@@ -14,14 +14,14 @@ class Base {
 class Child extends Base {
     public $count = 0;
 //  ^^^^^^^^^^^^^^^^^ MissingPropertyType: Property Child::$count has no type annotation
-//  ^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Child::$count must be int (as in parent class)
+//  ^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Child::$count must be int (as in class Base)
     protected string $name = '';
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Child::$name must be omitted to match the parent definition
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Child::$name must be omitted to match the parent definition in class Base
     public $secret;
 //  ^^^^^^^^^^^^^^ MissingPropertyType: Property Child::$secret has no type annotation
     public $id;
 //  ^^^^^^^^^^ MissingPropertyType: Property Child::$id has no type annotation
-//  ^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Child::$id must be int (as in parent class)
+//  ^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Child::$id must be int (as in class Base)
 }
 
 class Failure extends Exception {

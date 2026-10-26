@@ -8,5 +8,5 @@ class A {
 
 class B extends A {
     public string $x = 'hello';
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of B::$x must be int (as in parent class), string given
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of B::$x must be int (as in class A)
 }

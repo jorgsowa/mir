@@ -12,5 +12,5 @@ abstract class Id {
 
 final class BadId extends Id {
     public float $value = 1.0;
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of BadId::$value must be int|string (as in parent class), float given
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of BadId::$value must be subtype of int|string (as in class Id)
 }

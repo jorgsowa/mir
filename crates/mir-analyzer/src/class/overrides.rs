@@ -1076,7 +1076,7 @@ impl<'a> ClassAnalyzer<'a> {
                 let type_text = |p: &mir_codebase::definitions::PropertyDef| {
                     p.native_ty
                         .as_deref()
-                        .map(|t| t.to_string())
+                        .map(php_type_text)
                         .unwrap_or_default()
                 };
                 let loc = issue_location(
@@ -1089,8 +1089,9 @@ impl<'a> ClassAnalyzer<'a> {
                     IssueKind::PropertyTypeRedeclarationMismatch {
                         class: fqcn.to_string(),
                         property: prop_name.to_string(),
+                        parent: member_owner(&parent_fqcn).to_string(),
                         expected: type_text(&parent_prop),
-                        actual: type_text(&own_prop),
+                        covariant: false,
                     },
                     loc,
                 );
@@ -1121,8 +1122,9 @@ impl<'a> ClassAnalyzer<'a> {
                             IssueKind::PropertyTypeRedeclarationMismatch {
                                 class: fqcn.to_string(),
                                 property: prop_name.to_string(),
-                                expected: format!("{}", parent_t),
-                                actual: format!("{}", own_t),
+                                parent: member_owner(&parent_fqcn).to_string(),
+                                expected: php_type_text(parent_t),
+                                covariant: parent_prop.get_only_hook,
                             },
                             loc,
                         );
@@ -1359,4 +1361,14 @@ impl<'a> ClassAnalyzer<'a> {
 
     // -----------------------------------------------------------------------
     // Check: circular class inheritance (class A extends B extends A)
+}
+
+/// A type as PHP prints it: a single type and `null` as `?T`.
+fn php_type_text(ty: &mir_types::Type) -> String {
+    match ty.types.as_slice() {
+        [mir_types::Atomic::TNull, other] | [other, mir_types::Atomic::TNull] => {
+            format!("?{}", mir_types::Type::single(other.clone()))
+        }
+        _ => ty.to_string(),
+    }
 }

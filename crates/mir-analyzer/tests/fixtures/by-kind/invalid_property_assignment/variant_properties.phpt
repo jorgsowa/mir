@@ -10,5 +10,5 @@ class ParentClass
 class ChildClass extends ParentClass
 {
     protected string $mightExist = "";
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of ChildClass::$mightExist must be string|null (as in parent class), string given
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of ChildClass::$mightExist must be ?string (as in class ParentClass)
 }

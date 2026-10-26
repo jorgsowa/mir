@@ -8,5 +8,5 @@ class A {
 
 class B extends A {
     public ?int $count = null;
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of B::$count must be int (as in parent class), int|null given
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of B::$count must be int (as in class A)
 }
