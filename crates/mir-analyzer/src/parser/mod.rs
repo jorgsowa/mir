@@ -52,7 +52,206 @@ pub(crate) fn parse_error_issues(
             }
             Some(issue)
         })
+        .chain(unreported_compile_errors(file, source, parsed, version))
         .collect()
+}
+
+/// Errors PHP raises at `version` that the parser does not report.
+fn unreported_compile_errors(
+    file: &Arc<str>,
+    source: &str,
+    parsed: &php_rs_parser::ParseResult,
+    version: PhpVersion,
+) -> Vec<mir_issues::Issue> {
+    let issue_at = |kind, span: Span| {
+        let source_map = &parsed.source_map;
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+        mir_issues::Issue::new(
+            kind,
+            mir_issues::Location {
+                file: file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end,
+            },
+        )
+    };
+    let compile_error = |message: String, code: &str| mir_issues::IssueKind::CompileError {
+        message,
+        code: code.to_string(),
+    };
+    let mut finder = UnreportedDecls::default();
+    for stmt in &parsed.program.stmts {
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut finder, stmt);
+    }
+    let mut issues = Vec::new();
+    for (name, span) in finder.trait_names {
+        let lower = name.to_ascii_lowercase();
+        let reserved = match lower.as_str() {
+            "mixed" => version >= PhpVersion::new(8, 0),
+            "never" => version >= PhpVersion::new(8, 1),
+            other => RESERVED_CLASS_NAMES.contains(&other),
+        };
+        if !reserved {
+            continue;
+        }
+        let message = if version < PhpVersion::new(8, 4) {
+            format!("Cannot use '{name}' as class name as it is reserved")
+        } else {
+            format!("Cannot use \"{name}\" as a trait name as it is reserved")
+        };
+        issues.push(issue_at(
+            compile_error(message, "keyword-as-declaration-name"),
+            span,
+        ));
+    }
+    // From 8.0 `__clone()` may declare `void`, which the parser accepts on every version.
+    if version < PhpVersion::new(8, 0) {
+        for (method_start, return_span) in finder.clone_return_types {
+            let Some((class, method)) =
+                find_decl(&parsed.program, method_start, DeclTarget::Method)
+            else {
+                continue;
+            };
+            issues.push(issue_at(
+                compile_error(
+                    format!("Clone method {class}::{method}() cannot declare a return type"),
+                    "magic-method-return-type",
+                ),
+                return_span,
+            ));
+        }
+    }
+    // Before property hooks `parent::$x::get()` is a static call on `parent::$x`.
+    if version < PhpVersion::new(8, 4) {
+        for err in &parsed.errors {
+            if err.forbidden_rule() != Some(ForbiddenRule::InvalidParentHookCall) {
+                continue;
+            }
+            let start = err.span().start;
+            let mut scope = EnclosingClass {
+                offset: start,
+                has_parent: None,
+            };
+            for stmt in &parsed.program.stmts {
+                let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut scope, stmt);
+            }
+            if scope.has_parent == Some(false) {
+                let end = start + "parent".len() as u32;
+                issues.push(issue_at(
+                    mir_issues::IssueKind::ParentNotFound,
+                    Span::new(start, end.min(err.span().end)),
+                ));
+            }
+        }
+    }
+    issues
+}
+
+/// Trait names, and the return types of `__clone()` methods, for checks the parser skips.
+#[derive(Default)]
+struct UnreportedDecls {
+    trait_names: Vec<(String, Span)>,
+    /// Method start and return type span; PHP 7.4 skips interface methods.
+    clone_return_types: Vec<(u32, Span)>,
+    in_interface: bool,
+}
+
+impl php_ast::owned::visitor::OwnedVisitor for UnreportedDecls {
+    type Break = ();
+
+    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::StmtKind;
+        if let StmtKind::Trait(t) = &stmt.kind {
+            if let Some(name) = t.name.as_str() {
+                self.trait_names.push((name.to_string(), t.name.span));
+            }
+        }
+        let outer = self.in_interface;
+        match &stmt.kind {
+            StmtKind::Interface(_) => self.in_interface = true,
+            StmtKind::Class(_) | StmtKind::Trait(_) | StmtKind::Enum(_) => {
+                self.in_interface = false
+            }
+            _ => {}
+        }
+        let flow = crate::recursion::walk_stmt(self, stmt);
+        self.in_interface = outer;
+        flow
+    }
+
+    fn visit_class_member(
+        &mut self,
+        member: &php_ast::owned::ClassMember,
+    ) -> std::ops::ControlFlow<()> {
+        if let php_ast::owned::ClassMemberKind::Method(m) = &member.kind {
+            if let (Some(rt), false, true) = (
+                &m.return_type,
+                self.in_interface,
+                m.name
+                    .as_str()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("__clone")),
+            ) {
+                self.clone_return_types.push((member.span.start, rt.span));
+            }
+        }
+        php_ast::owned::visitor::walk_owned_class_member(self, member)
+    }
+
+    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
+        let outer = self.in_interface;
+        if let php_ast::owned::ExprKind::AnonymousClass(_) = &expr.kind {
+            self.in_interface = false;
+        }
+        let flow = crate::recursion::walk_expr(self, expr);
+        self.in_interface = outer;
+        flow
+    }
+}
+
+/// Whether the innermost class-like around `offset` is a class with a parent (`None`: not a class).
+struct EnclosingClass {
+    offset: u32,
+    has_parent: Option<bool>,
+}
+
+impl EnclosingClass {
+    fn contains(&self, span: Span) -> bool {
+        span.start <= self.offset && self.offset < span.end
+    }
+}
+
+impl php_ast::owned::visitor::OwnedVisitor for EnclosingClass {
+    type Break = ();
+
+    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::StmtKind;
+        if !self.contains(stmt.span) {
+            return std::ops::ControlFlow::Continue(());
+        }
+        match &stmt.kind {
+            StmtKind::Class(c) => self.has_parent = Some(c.extends.is_some()),
+            StmtKind::Trait(_) | StmtKind::Interface(_) | StmtKind::Enum(_) => {
+                self.has_parent = None
+            }
+            _ => {}
+        }
+        crate::recursion::walk_stmt(self, stmt)
+    }
+
+    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
+        if !self.contains(expr.span) {
+            return std::ops::ControlFlow::Continue(());
+        }
+        if let php_ast::owned::ExprKind::AnonymousClass(c) = &expr.kind {
+            self.has_parent = Some(c.extends.is_some());
+        }
+        crate::recursion::walk_expr(self, expr)
+    }
 }
 
 /// A class-like's abstract methods that PHP reports together, before 8.5.
