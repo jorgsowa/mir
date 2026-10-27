@@ -359,7 +359,7 @@ fn parse_error_to_issue(
     let rule = err.forbidden_rule();
     let kind = if rule == Some(ForbiddenRule::ParentWithoutParentClass) {
         mir_issues::IssueKind::ParentNotFound
-    } else if is_compile_error(err, source, version) {
+    } else if is_compile_error(err, source, &parsed.program, version) {
         mir_issues::IssueKind::CompileError { message, code }
     } else {
         mir_issues::IssueKind::ParseError { message, code }
@@ -380,12 +380,18 @@ fn parse_error_to_issue(
 fn is_compile_error(
     err: &php_rs_parser::diagnostics::ParseError,
     source: &str,
+    program: &php_ast::owned::Program,
     version: PhpVersion,
 ) -> bool {
     let Some(rule) = err.forbidden_rule() else {
         return false;
     };
     match rule {
+        ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier
+            if version < PhpVersion::new(8, 1) =>
+        {
+            promoted_param_modifier(err, source, program).is_none()
+        }
         ForbiddenRule::MultipleVisibilityModifiers
         | ForbiddenRule::MultipleSetVisibilityModifiers
         | ForbiddenRule::DuplicateModifier
@@ -430,6 +436,15 @@ fn raised_at(
         Some(ForbiddenRule::ReferenceToNullsafe) if version < PhpVersion::new(8, 1) => {
             !preceded_by(source, err.span(), '=')
         }
+        // Promotion before 8.0 and `readonly` before 8.1 are already `version-too-low`.
+        Some(ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier)
+            if version < PhpVersion::new(8, 1)
+                && promoted_param_modifier(err, source, program).is_some() =>
+        {
+            version >= PhpVersion::new(8, 0)
+                && promoted_param_modifier(err, source, program)
+                    .is_some_and(|m| !m.eq_ignore_ascii_case("readonly"))
+        }
         // Before 8.0 the `dynamic-class-fetch` error covers it.
         Some(ForbiddenRule::ClassFetchOnLiteral) => version >= PhpVersion::new(8, 0),
         // Reported next to the modifier error for `readonly static function`.
@@ -438,6 +453,26 @@ fn raised_at(
         }
         _ => true,
     }
+}
+
+/// The repeated modifier of a promoted parameter the parser rejects, which
+/// PHP 8.0's grammar reads as a syntax error (8.1 compiles modifiers as a list).
+fn promoted_param_modifier<'a>(
+    err: &php_rs_parser::diagnostics::ParseError,
+    source: &'a str,
+    program: &php_ast::owned::Program,
+) -> Option<&'a str> {
+    let span = err.span();
+    find_decl(program, span.start, DeclTarget::Param)?;
+    // `duplicate-modifier` marks the repeat, `multiple-visibility-modifiers` the first.
+    if err.forbidden_rule() == Some(ForbiddenRule::DuplicateModifier) {
+        return source.get(span.start as usize..span.end as usize);
+    }
+    let after = source.get(span.end as usize..)?.trim_start();
+    let len = after
+        .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .unwrap_or(after.len());
+    Some(&after[..len]).filter(|word| !word.is_empty())
 }
 
 /// Whether the first non-blank character before `span` is `expected`.
@@ -583,6 +618,15 @@ fn php_message(
         ForbiddenRule::PartialApplicationInNew => {
             return Some("Cannot create Closure for new expression".to_string())
         }
+        ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier
+            if before(8, 1) =>
+        {
+            let token = promoted_param_modifier(err, source, program)?;
+            return Some(format!(
+                "syntax error, unexpected token \"{}\", expecting variable",
+                token.to_ascii_lowercase()
+            ));
+        }
         ForbiddenRule::ReferenceToNonReferenceable if before(8, 1) => {
             return Some("Cannot assign reference to non referencable value".to_string())
         }
@@ -645,6 +689,13 @@ fn php_message(
         }
         ForbiddenRule::InvalidNullableType if before(8, 2) => {
             let message = parser_message();
+            // `null` is not a type before 8.0.
+            if before(8, 0) && message.starts_with("null ") {
+                let name = source.get(err.span().start as usize..err.span().end as usize)?;
+                return Some(format!(
+                    "Cannot use '{name}' as class name as it is reserved"
+                ));
+            }
             return Some(if message.starts_with("null ") {
                 "Null can not be used as a standalone type".to_string()
             } else {
@@ -867,6 +918,8 @@ const BUILTIN_TYPE_NAMES: [&str; 17] = [
 enum DeclTarget {
     /// A property or promoted parameter.
     Property,
+    /// A method parameter.
+    Param,
     Method,
     ClassConst,
     EnumCase,
@@ -996,6 +1049,7 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                 self.found(DeclTarget::Method, member.span, &m.name)?;
                 for param in m.params.iter() {
                     self.found(DeclTarget::Property, param.span, &param.name)?;
+                    self.found(DeclTarget::Param, param.span, &param.name)?;
                 }
             }
             _ => {}
