@@ -29,6 +29,7 @@ use mir_types::{union::atomic_subtype, Atomic, Location, Name, Type};
 mod annotation;
 mod class;
 mod r#enum;
+pub(crate) use r#enum::{enum_case_value_key, php_value_type_name};
 mod function;
 mod interface;
 mod literal_types;

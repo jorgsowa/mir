@@ -289,17 +289,115 @@ impl<'a> BodyAnalyzer<'a> {
         let mut ctx = FlowState::new();
         ctx.self_fqcn = Some(Arc::from(fqcn));
         ctx.static_fqcn = Some(Arc::from(fqcn));
+        let mut values = Vec::new();
         for member in decl.body.members.iter() {
             if let EnumMemberKind::Case(case) = &member.kind {
                 if let Some(value) = &case.value {
                     let mut ea = sa.expr_analyzer(&ctx);
-                    let _ = ea.analyze(value, &mut ctx);
+                    let ty = ea.analyze(value, &mut ctx);
+                    if let Some(name) = case.name.as_str() {
+                        values.push((name, ty, value.span));
+                    }
                 }
             }
         }
         drop(sa);
         if self.mode == AnalysisMode::Full {
             all_issues.extend(buf.into_all_issues());
+            self.check_resolved_enum_case_values(
+                decl, fqcn, &values, file, source, source_map, all_issues,
+            );
+        }
+    }
+
+    /// Type and duplicate checks for case values the collector could not evaluate
+    /// (`case A = X;`, a constant from another file), which PHP checks on first use.
+    #[allow(clippy::too_many_arguments)]
+    fn check_resolved_enum_case_values(
+        &self,
+        decl: &php_ast::owned::EnumDecl,
+        fqcn: &str,
+        values: &[(&str, Type, php_ast::Span)],
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        use crate::collector::{enum_case_value_key, php_value_type_name};
+        let Some(backing_name) = decl.scalar_type.as_ref() else {
+            return;
+        };
+        let backing_name = crate::parser::name_to_string_owned(backing_name);
+        let backing = if backing_name.eq_ignore_ascii_case("int") {
+            Type::single(mir_types::Atomic::TInt)
+        } else if backing_name.eq_ignore_ascii_case("string") {
+            Type::single(mir_types::Atomic::TString)
+        } else {
+            return;
+        };
+        // The enum's own definition: a polyfill may declare a class of the same name.
+        let Some(crate::db::ClassLike::Enum(enum_def)) =
+            crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+        else {
+            return;
+        };
+        let location = |span: php_ast::Span| {
+            let (line, col_start) =
+                crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+            let (line_end, col_end) =
+                crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+            mir_issues::Location {
+                file: file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+            }
+        };
+        let mut seen = FxHashMap::default();
+        for (name, analyzed, span) in values {
+            let Some(collected) = enum_def.cases.get(*name).and_then(|c| c.value.as_ref()) else {
+                continue;
+            };
+            // The collector already checked the types it inferred and the literals it evaluated.
+            if collected.is_mixed() && !analyzed.is_subtype_structural(&backing) {
+                if let Some(actual) = php_value_type_name(analyzed) {
+                    all_issues.push(Issue::new(
+                        mir_issues::IssueKind::BackedEnumCaseTypeMismatch {
+                            enum_name: enum_def.fqcn.to_string(),
+                            case_name: name.to_string(),
+                            expected: backing.to_string(),
+                            actual: actual.to_string(),
+                        },
+                        location(*span),
+                    ));
+                }
+            }
+            let (key, collector_checked) = match enum_case_value_key(collected) {
+                Some(key) => (key, true),
+                None => match enum_case_value_key(analyzed) {
+                    Some(key) => (key, false),
+                    None => continue,
+                },
+            };
+            match seen.entry(key) {
+                std::collections::hash_map::Entry::Occupied(first) => {
+                    let (first_case, first_checked): &(&str, bool) = first.get();
+                    if !(collector_checked && *first_checked) {
+                        all_issues.push(Issue::new(
+                            mir_issues::IssueKind::DuplicateEnumCaseValue {
+                                enum_name: enum_def.fqcn.to_string(),
+                                first_case: first_case.to_string(),
+                                case_name: name.to_string(),
+                            },
+                            location(*span),
+                        ));
+                    }
+                }
+                std::collections::hash_map::Entry::Vacant(slot) => {
+                    slot.insert((*name, collector_checked));
+                }
+            }
         }
     }
 

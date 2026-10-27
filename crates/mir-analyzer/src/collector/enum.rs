@@ -459,12 +459,12 @@ impl DefinitionCollector<'_> {
 }
 
 #[derive(PartialEq, Eq, Hash)]
-enum EnumCaseValue {
+pub(crate) enum EnumCaseValue {
     Int(i64),
     String(Arc<str>),
 }
 
-fn enum_case_value_key(ty: &Type) -> Option<EnumCaseValue> {
+pub(crate) fn enum_case_value_key(ty: &Type) -> Option<EnumCaseValue> {
     match ty.types.as_slice() {
         [Atomic::TLiteralInt(i)] => Some(EnumCaseValue::Int(*i)),
         [Atomic::TLiteralString(s)] => Some(EnumCaseValue::String(s.clone())),
@@ -473,18 +473,36 @@ fn enum_case_value_key(ty: &Type) -> Option<EnumCaseValue> {
 }
 
 /// The type name PHP's `zend_zval_type_name` gives a constant case value.
-fn php_value_type_name(ty: &mir_types::Type) -> Option<&'static str> {
+pub(crate) fn php_value_type_name(ty: &mir_types::Type) -> Option<&'static str> {
     use mir_types::Atomic;
     let [atomic] = ty.types.as_slice() else {
         return None;
     };
     Some(match atomic {
-        Atomic::TInt | Atomic::TLiteralInt(_) => "int",
-        Atomic::TString | Atomic::TLiteralString(_) => "string",
-        Atomic::TFloat | Atomic::TLiteralFloat(..) => "float",
+        Atomic::TInt
+        | Atomic::TLiteralInt(_)
+        | Atomic::TIntRange { .. }
+        | Atomic::TPositiveInt
+        | Atomic::TNegativeInt
+        | Atomic::TNonNegativeInt => "int",
+        Atomic::TString
+        | Atomic::TLiteralString(_)
+        | Atomic::TNonEmptyString
+        | Atomic::TNumericString
+        | Atomic::TCallableString
+        | Atomic::TClassString(_)
+        | Atomic::TInterfaceString(_)
+        | Atomic::TEnumString
+        | Atomic::TTraitString => "string",
+        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => "float",
         Atomic::TBool | Atomic::TTrue | Atomic::TFalse => "bool",
         Atomic::TNull => "null",
         Atomic::TArray { .. } | Atomic::TKeyedArray { .. } | Atomic::TList { .. } => "array",
+        Atomic::TObject
+        | Atomic::TNamedObject { .. }
+        | Atomic::TLiteralEnumCase { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TStaticObject { .. } => "object",
         _ => return None,
     })
 }
