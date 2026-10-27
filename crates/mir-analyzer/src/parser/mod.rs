@@ -25,11 +25,16 @@ pub(crate) fn parse_error_issues(
     version: PhpVersion,
 ) -> Vec<mir_issues::Issue> {
     let abstract_methods = abstract_methods_by_class(source, parsed, version);
+    let backing_types = unparsed_backing_types(source, parsed, version);
     parsed
         .errors
         .iter()
         .filter(|err| {
-            !is_redundant_parse_error(err) && raised_at(err, source, &parsed.program, version)
+            !is_redundant_parse_error(err)
+                && raised_at(err, source, &parsed.program, version)
+                && !backing_types
+                    .iter()
+                    .any(|b| b.header.contains(&err.span().start))
         })
         .filter_map(|err| {
             let mut issue = parse_error_to_issue(err, file, source, parsed, version);
@@ -52,8 +57,133 @@ pub(crate) fn parse_error_issues(
             }
             Some(issue)
         })
-        .chain(unreported_compile_errors(file, source, parsed, version))
+        .chain(unreported_compile_errors(
+            file,
+            source,
+            parsed,
+            version,
+            &backing_types,
+        ))
         .collect()
+}
+
+/// An enum backing type the parser stops at (`?int`, `int|string`), which PHP parses
+/// and rejects at compile time.
+struct UnparsedBackingType {
+    span: Span,
+    /// From the enum name to the end of the type; the parser's errors there are replaced.
+    header: std::ops::Range<u32>,
+    message: String,
+}
+
+fn unparsed_backing_types(
+    source: &str,
+    parsed: &php_rs_parser::ParseResult,
+    version: PhpVersion,
+) -> Vec<UnparsedBackingType> {
+    let mut found: Vec<UnparsedBackingType> = Vec::new();
+    if version < PhpVersion::new(8, 1) {
+        return found;
+    }
+    for err in &parsed.errors {
+        let offset = err.span().start;
+        if err.forbidden_rule().is_some() || found.iter().any(|b| b.header.contains(&offset)) {
+            continue;
+        }
+        let Some((enum_name, _, name_end)) =
+            find_decl_in_scope(&parsed.program, offset, DeclTarget::EnumHeader)
+        else {
+            continue;
+        };
+        let Some(after_name) = source.get(name_end as usize..) else {
+            continue;
+        };
+        let Some(after_colon) = after_name.trim_start().strip_prefix(':') else {
+            continue;
+        };
+        let type_start = source.len() - after_colon.trim_start().len();
+        let mut written = after_colon.trim_start();
+        written = &written[..written.find('{').unwrap_or(written.len())];
+        if let Some(implements) = written.to_ascii_lowercase().find("implements") {
+            written = &written[..implements];
+        }
+        let written = written.trim_end();
+        let type_end = type_start + written.len();
+        if !written.contains(['?', '|']) || !(type_start..=type_end).contains(&(offset as usize)) {
+            continue;
+        }
+        let Some(ty) = backing_type_text(written, &enum_name, version) else {
+            continue;
+        };
+        found.push(UnparsedBackingType {
+            span: Span::new(type_start as u32, type_end as u32),
+            header: name_end..type_end as u32 + 1,
+            message: format!("Enum backing type must be int or string, {ty} given"),
+        });
+    }
+    found
+}
+
+/// A written `?T` or union type as PHP prints it; class names are qualified with the enum's
+/// namespace (imports are not applied).
+fn backing_type_text(written: &str, enum_name: &str, version: PhpVersion) -> Option<String> {
+    use mir_types::{Atomic, Type};
+    let (nullable, union) = match written.strip_prefix('?') {
+        Some(rest) => (true, rest.trim_start()),
+        None => (false, written),
+    };
+    let namespace = enum_name.rsplit_once('\\').map_or("", |(ns, _)| ns);
+    let named = |fqcn: &str| Atomic::TNamedObject {
+        fqcn: mir_types::Name::from(fqcn),
+        type_params: Default::default(),
+    };
+    let array = || Atomic::TArray {
+        key: Box::new(Type::array_key()),
+        value: Box::new(Type::mixed()),
+    };
+    let mut atomics = Vec::new();
+    for part in union.split('|').map(str::trim) {
+        let is_name = !part.is_empty()
+            && part
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '\\' || !c.is_ascii());
+        if !is_name {
+            return None;
+        }
+        let atomic = match part.to_ascii_lowercase().as_str() {
+            "int" => Atomic::TInt,
+            "string" => Atomic::TString,
+            "float" => Atomic::TFloat,
+            "bool" => Atomic::TBool,
+            "false" => Atomic::TFalse,
+            "true" => Atomic::TTrue,
+            "null" => Atomic::TNull,
+            "array" => array(),
+            "object" => Atomic::TObject,
+            "mixed" => Atomic::TMixed,
+            "void" => Atomic::TVoid,
+            "never" => Atomic::TNever,
+            "iterable" => {
+                atomics.push(array());
+                named("Traversable")
+            }
+            "self" => named(enum_name),
+            "callable" | "static" | "parent" => return None,
+            _ => match part.strip_prefix('\\') {
+                Some(fully_qualified) => named(fully_qualified),
+                None if namespace.is_empty() => named(part),
+                None => named(&format!("{namespace}\\{part}")),
+            },
+        };
+        atomics.push(atomic);
+    }
+    if nullable {
+        atomics.push(Atomic::TNull);
+    }
+    Some(crate::util::php_type_text(
+        &Type::from_vec(atomics),
+        version,
+    ))
 }
 
 /// Errors PHP raises at `version` that the parser does not report.
@@ -62,6 +192,7 @@ fn unreported_compile_errors(
     source: &str,
     parsed: &php_rs_parser::ParseResult,
     version: PhpVersion,
+    backing_types: &[UnparsedBackingType],
 ) -> Vec<mir_issues::Issue> {
     let issue_at = |kind, span: Span| {
         let source_map = &parsed.source_map;
@@ -88,7 +219,15 @@ fn unreported_compile_errors(
     for stmt in &parsed.program.stmts {
         let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut finder, stmt);
     }
-    let mut issues = Vec::new();
+    let mut issues: Vec<_> = backing_types
+        .iter()
+        .map(|b| {
+            issue_at(
+                compile_error(b.message.clone(), "invalid-enum-backing-type"),
+                b.span,
+            )
+        })
+        .collect();
     for (name, span) in finder.trait_names {
         let lower = name.to_ascii_lowercase();
         let reserved = match lower.as_str() {
@@ -924,6 +1063,8 @@ enum DeclTarget {
     ClassConst,
     EnumCase,
     EnumBackingType,
+    /// An enum declaration; found with the end of its name in place of the enum's start.
+    EnumHeader,
 }
 
 /// Finds the class-like enclosing the `target` declared at `offset`, and the target's name.
@@ -1024,6 +1165,10 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                         self.backing_type_name(ty),
                         stmt.span.start,
                     ));
+                    return std::ops::ControlFlow::Break(());
+                }
+                if self.target == DeclTarget::EnumHeader && stmt.span.start <= self.offset {
+                    self.found = Some((self.qualify(name), String::new(), d.name.span.end));
                     return std::ops::ControlFlow::Break(());
                 }
                 return self.in_class(name, stmt);

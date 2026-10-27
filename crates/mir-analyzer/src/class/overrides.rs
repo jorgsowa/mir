@@ -1076,7 +1076,7 @@ impl<'a> ClassAnalyzer<'a> {
                 let type_text = |p: &mir_codebase::definitions::PropertyDef| {
                     p.native_ty
                         .as_deref()
-                        .map(|t| php_type_text(t, version))
+                        .map(|t| crate::util::php_type_text(t, version))
                         .unwrap_or_default()
                 };
                 let loc = issue_location(
@@ -1123,7 +1123,7 @@ impl<'a> ClassAnalyzer<'a> {
                                 class: fqcn.to_string(),
                                 property: prop_name.to_string(),
                                 parent: member_owner(&parent_fqcn).to_string(),
-                                expected: php_type_text(parent_t, version),
+                                expected: crate::util::php_type_text(parent_t, version),
                                 covariant: parent_prop.get_only_hook,
                             },
                             loc,
@@ -1361,91 +1361,4 @@ impl<'a> ClassAnalyzer<'a> {
 
     // -----------------------------------------------------------------------
     // Check: circular class inheritance (class A extends B extends A)
-}
-
-/// A native type as PHP's `zend_type_to_string` prints it.
-fn php_type_text(ty: &mir_types::Type, version: crate::php_version::PhpVersion) -> String {
-    use mir_types::Atomic;
-    let is_traversable = |a: &Atomic| {
-        matches!(a, Atomic::TNamedObject { fqcn, type_params }
-            if type_params.is_empty() && fqcn.as_ref().trim_start_matches('\\') == "Traversable")
-    };
-    // Below 8.2 `iterable` is its own type; mir expands it to `array` followed by `Traversable`.
-    let keeps_iterable = version < crate::php_version::PhpVersion::new(8, 2);
-    let mut intersections = Vec::new();
-    let mut classes = Vec::new();
-    let mut builtins = [false; 15];
-    let mut i = 0;
-    while i < ty.types.len() {
-        let atomic = &ty.types[i];
-        i += 1;
-        let slot = match atomic {
-            Atomic::TIntersection { parts } => {
-                let parts: Vec<String> = parts.iter().map(|p| php_type_text(p, version)).collect();
-                intersections.push(parts.join("&"));
-                continue;
-            }
-            Atomic::TNamedObject { fqcn, .. }
-            | Atomic::TSelf { fqcn }
-            | Atomic::TParent { fqcn } => {
-                classes.push(fqcn.as_ref().trim_start_matches('\\').to_string());
-                continue;
-            }
-            Atomic::TMixed => 0,
-            Atomic::TStaticObject { .. } => 1,
-            Atomic::TCallable { .. } => 2,
-            Atomic::TArray { .. }
-                if keeps_iterable && ty.types.get(i).is_some_and(is_traversable) =>
-            {
-                i += 1;
-                3
-            }
-            Atomic::TObject => 4,
-            Atomic::TArray { .. } => 5,
-            Atomic::TString => 6,
-            Atomic::TInt => 7,
-            Atomic::TFloat => 8,
-            Atomic::TBool => 9,
-            Atomic::TFalse => 10,
-            Atomic::TTrue => 11,
-            Atomic::TVoid => 12,
-            Atomic::TNever => 13,
-            Atomic::TNull => 14,
-            _ => return ty.to_string(),
-        };
-        builtins[slot] = true;
-    }
-    if builtins[9] {
-        builtins[10] = false;
-        builtins[11] = false;
-    }
-    const NAMES: [&str; 14] = [
-        "mixed", "static", "callable", "iterable", "object", "array", "string", "int", "float",
-        "bool", "false", "true", "void", "never",
-    ];
-    let wrap = intersections.len() + classes.len() + builtins.iter().filter(|b| **b).count() > 1;
-    let mut parts: Vec<String> = intersections
-        .into_iter()
-        .map(|p| if wrap { format!("({p})") } else { p })
-        .collect();
-    parts.extend(classes);
-    parts.extend(
-        NAMES
-            .iter()
-            .zip(builtins)
-            .filter(|(_, set)| *set)
-            .map(|(name, _)| name.to_string()),
-    );
-    let text = parts.join("|");
-    if !builtins[14] {
-        return text;
-    }
-    if text.is_empty() || text.contains(['|', '&']) {
-        return if text.is_empty() {
-            "null".to_string()
-        } else {
-            format!("{text}|null")
-        };
-    }
-    format!("?{text}")
 }
