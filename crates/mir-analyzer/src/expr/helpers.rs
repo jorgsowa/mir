@@ -1020,15 +1020,18 @@ pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Op
             BinaryOp::Sub => l.checked_sub(r),
             BinaryOp::Mul => l.checked_mul(r),
             // Integer division only when divisor is nonzero and result is exact.
-            BinaryOp::Div if r != 0 && l % r == 0 => Some(l / r),
-            BinaryOp::Mod if r != 0 => Some(l % r),
+            BinaryOp::Div if r != 0 && l.checked_rem(r) == Some(0) => l.checked_div(r),
+            // `PHP_INT_MIN % -1` is 0 in PHP.
+            BinaryOp::Mod if r != 0 => Some(l.checked_rem(r).unwrap_or(0)),
             _ => None,
         };
         if let Some(n) = result {
             return Some(Type::single(Atomic::TLiteralInt(n)));
         }
-        // Non-exact literal integer division (e.g. 5 / 2 = 2.5) → float.
-        if op == BinaryOp::Div && r != 0 {
+        // Overflow and non-exact literal integer division (e.g. 5 / 2 = 2.5) → float.
+        if matches!(op, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul)
+            || op == BinaryOp::Div && r != 0
+        {
             return Some(Type::single(Atomic::TFloat));
         }
     }

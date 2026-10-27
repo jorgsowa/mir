@@ -210,7 +210,7 @@ define('SUHOSIN_PATCH', 1);
 define('SUHOSIN_PATCH_VERSION', "0.9.10");
 define('PHP_MAXPATHLEN', 4096);
 define('PHP_INT_MAX', 9223372036854775807);
-define('PHP_INT_MIN', -9223372036854775808);
+define('PHP_INT_MIN', -9223372036854775807 - 1);
 define('PHP_INT_SIZE', 8);
 /**
  * Number of decimal digits that can be rounded into a float and back without precision loss. Available as of PHP 7.2.0.

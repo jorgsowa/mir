@@ -244,12 +244,8 @@ fn negate_type(ty: &Type) -> Type {
     for a in &ty.types {
         let atom = match a {
             Atomic::TLiteralInt(n) => {
-                if let Some(neg) = n.checked_neg() {
-                    Atomic::TLiteralInt(neg)
-                } else {
-                    // i64::MIN — falls back to bare int.
-                    Atomic::TInt
-                }
+                // `-PHP_INT_MIN` overflows to a float.
+                n.checked_neg().map_or(Atomic::TFloat, Atomic::TLiteralInt)
             }
             Atomic::TPositiveInt => Atomic::TNegativeInt,
             Atomic::TNegativeInt => Atomic::TPositiveInt,

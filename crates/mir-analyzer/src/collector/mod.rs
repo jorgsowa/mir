@@ -638,13 +638,11 @@ pub(super) fn infer_const_value(
         php_ast::owned::ExprKind::Null => Some(Type::single(Atomic::TNull)),
         // For unary expressions like -1, try to evaluate them
         php_ast::owned::ExprKind::UnaryPrefix(u) => match u.op {
-            UnaryPrefixOp::Negate => {
-                if let php_ast::owned::ExprKind::Int(i) = &u.operand.kind {
-                    Some(Type::single(Atomic::TLiteralInt(-i)))
-                } else {
-                    None
-                }
-            }
+            UnaryPrefixOp::Negate => match &u.operand.kind {
+                php_ast::owned::ExprKind::Int(i) => Some(Type::single(Atomic::TLiteralInt(-i))),
+                php_ast::owned::ExprKind::Float(_) => Some(Type::single(Atomic::TFloat)),
+                _ => None,
+            },
             UnaryPrefixOp::Plus => {
                 if let php_ast::owned::ExprKind::Int(i) = &u.operand.kind {
                     Some(Type::single(Atomic::TLiteralInt(*i)))
@@ -743,17 +741,20 @@ pub(super) fn infer_const_value(
             let l = as_int(infer_const_value(collector, &b.left.kind)?)?;
             let r = as_int(infer_const_value(collector, &b.right.kind)?)?;
             let result = match b.op {
-                BinaryOp::BitwiseOr => l | r,
-                BinaryOp::BitwiseAnd => l & r,
-                BinaryOp::BitwiseXor => l ^ r,
-                BinaryOp::ShiftLeft => l.checked_shl(u32::try_from(r).ok()?)?,
-                BinaryOp::ShiftRight => l.checked_shr(u32::try_from(r).ok()?)?,
-                BinaryOp::Add => l.checked_add(r)?,
-                BinaryOp::Sub => l.checked_sub(r)?,
-                BinaryOp::Mul => l.checked_mul(r)?,
+                BinaryOp::BitwiseOr => Some(l | r),
+                BinaryOp::BitwiseAnd => Some(l & r),
+                BinaryOp::BitwiseXor => Some(l ^ r),
+                BinaryOp::ShiftLeft => Some(l.checked_shl(u32::try_from(r).ok()?)?),
+                BinaryOp::ShiftRight => Some(l.checked_shr(u32::try_from(r).ok()?)?),
+                BinaryOp::Add => l.checked_add(r),
+                BinaryOp::Sub => l.checked_sub(r),
+                BinaryOp::Mul => l.checked_mul(r),
                 _ => return None,
             };
-            Some(Type::single(Atomic::TLiteralInt(result)))
+            // PHP turns an overflowing integer result into a float.
+            Some(Type::single(
+                result.map_or(Atomic::TFloat, Atomic::TLiteralInt),
+            ))
         }
         // `Foo::BAR` / `self::BAR` referencing an enum case or a plain class
         // constant of an already-collected same-file class-like.
