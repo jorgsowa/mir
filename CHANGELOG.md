@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `enum Self {}` / `enum parent: int {}` is PHP's `CompileError` (`Cannot use "Self" as an enum name as it is reserved`, `Cannot use 'Self' as class name as it is reserved` before 8.4) instead of four cascading `ParseError`s.
 - A nullable or union enum backing type (`enum E: ?int`, `enum E: int|string`) is PHP's `CompileError` (`Enum backing type must be int or string, string|int given`) instead of a `ParseError` (`expected '{', found '|'`) or a message with an empty type.
 - Integer arithmetic that overflows is a `float`, as in PHP: `PHP_INT_MAX + 1`, `PHP_INT_MIN - 1`, `-PHP_INT_MIN`, `PHP_INT_MIN / -1`, also as an enum case value (`Enum case type float does not match enum backing type int`). `PHP_INT_MIN` is an `int` (it was mixed), and `PHP_INT_MIN % -1` is `0` instead of crashing the analyzer. Stub cache format 30 → 31.
 - `PropertyTypeRedeclarationMismatch` prints the parent's type as PHP does: classes before builtins in PHP's fixed order (`string|int|null`, `array|float|bool`), `self` as the class name, `(I&J)|null` for a DNF type, and `iterable` as `Traversable|array` from PHP 8.2.

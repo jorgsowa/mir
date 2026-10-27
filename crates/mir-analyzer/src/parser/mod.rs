@@ -26,6 +26,8 @@ pub(crate) fn parse_error_issues(
 ) -> Vec<mir_issues::Issue> {
     let abstract_methods = abstract_methods_by_class(source, parsed, version);
     let backing_types = unparsed_backing_types(source, parsed, version);
+    let keyword_enum = keyword_enum_name(source, parsed, version);
+    let keyword_enum_start = keyword_enum.as_ref().map(|k| k.enum_start);
     parsed
         .errors
         .iter()
@@ -35,6 +37,7 @@ pub(crate) fn parse_error_issues(
                 && !backing_types
                     .iter()
                     .any(|b| b.header.contains(&err.span().start))
+                && keyword_enum_start.is_none_or(|start| err.span().start < start)
         })
         .filter_map(|err| {
             let mut issue = parse_error_to_issue(err, file, source, parsed, version);
@@ -64,7 +67,84 @@ pub(crate) fn parse_error_issues(
             version,
             &backing_types,
         ))
+        .chain(keyword_enum.map(|k| k.issue(file, source, parsed, version)))
         .collect()
+}
+
+/// `enum self` / `enum parent`, which the parser reads as the constant `enum` followed by a
+/// keyword; PHP declares the enum and rejects its reserved name.
+struct KeywordEnumName {
+    /// The `enum` keyword; the parser's errors from here on are its recovery.
+    enum_start: u32,
+    name: Span,
+}
+
+impl KeywordEnumName {
+    fn issue(
+        &self,
+        file: &Arc<str>,
+        source: &str,
+        parsed: &php_rs_parser::ParseResult,
+        version: PhpVersion,
+    ) -> mir_issues::Issue {
+        let name = &source[self.name.start as usize..self.name.end as usize];
+        let message = if version < PhpVersion::new(8, 4) {
+            format!("Cannot use '{name}' as class name as it is reserved")
+        } else {
+            format!("Cannot use \"{name}\" as an enum name as it is reserved")
+        };
+        let source_map = &parsed.source_map;
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, self.name.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, self.name.end, source_map);
+        mir_issues::Issue::new(
+            mir_issues::IssueKind::CompileError {
+                message,
+                code: "reserved-enum-name".to_string(),
+            },
+            mir_issues::Location {
+                file: file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end,
+            },
+        )
+    }
+}
+
+fn keyword_enum_name(
+    source: &str,
+    parsed: &php_rs_parser::ParseResult,
+    version: PhpVersion,
+) -> Option<KeywordEnumName> {
+    if version < PhpVersion::new(8, 1) {
+        return None;
+    }
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_' || !c.is_ascii();
+    parsed.errors.iter().find_map(|err| {
+        let start = err.span().start as usize;
+        let after = source.get(start..)?;
+        let len = after.find(|c: char| !is_ident(c)).unwrap_or(after.len());
+        let name = &after[..len];
+        if !name.eq_ignore_ascii_case("self") && !name.eq_ignore_ascii_case("parent") {
+            return None;
+        }
+        let rest = after[len..].trim_start();
+        let declares = rest.starts_with(['{', ':'])
+            || rest
+                .get(..10)
+                .is_some_and(|w| w.eq_ignore_ascii_case("implements"));
+        let before = source[..start].trim_end();
+        let keyword = before.get(before.len().checked_sub(4)?..)?;
+        let enum_start = before.len() - 4;
+        let at_boundary = !before[..enum_start].ends_with(|c: char| is_ident(c) || c == '$');
+        (declares && keyword.eq_ignore_ascii_case("enum") && at_boundary).then(|| KeywordEnumName {
+            enum_start: enum_start as u32,
+            name: Span::new(start as u32, (start + len) as u32),
+        })
+    })
 }
 
 /// An enum backing type the parser stops at (`?int`, `int|string`), which PHP parses
