@@ -664,6 +664,16 @@ fn raised_at(
                 && promoted_param_modifier(err, source, program)
                     .is_some_and(|m| !m.eq_ignore_ascii_case("readonly"))
         }
+        // Before 8.1 `enum` is a syntax error; the enum's `version-too-low` covers it.
+        Some(
+            ForbiddenRule::AbstractEnumMethod
+            | ForbiddenRule::EnumCaseNamedClass
+            | ForbiddenRule::EnumProperty
+            | ForbiddenRule::InvalidEnumBackingType
+            | ForbiddenRule::MissingEnumCaseValue
+            | ForbiddenRule::PureEnumCaseValue
+            | ForbiddenRule::ReservedEnumName,
+        ) => version >= PhpVersion::new(8, 1),
         // Before 8.0 the `dynamic-class-fetch` error covers it.
         Some(ForbiddenRule::ClassFetchOnLiteral) => version >= PhpVersion::new(8, 0),
         // Reported next to the modifier error for `readonly static function`.

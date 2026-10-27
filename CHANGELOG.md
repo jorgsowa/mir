@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Below PHP 8.1 an enum is reported only as `version-too-low`; the parser's enum declaration errors (`pure-enum-case-value`, `enum-property`, `invalid-enum-backing-type`, ...) no longer fire next to it, as PHP stops at the `enum` keyword.
 - `enum Self {}` / `enum parent: int {}` is PHP's `CompileError` (`Cannot use "Self" as an enum name as it is reserved`, `Cannot use 'Self' as class name as it is reserved` before 8.4) instead of four cascading `ParseError`s.
 - A nullable or union enum backing type (`enum E: ?int`, `enum E: int|string`) is PHP's `CompileError` (`Enum backing type must be int or string, string|int given`) instead of a `ParseError` (`expected '{', found '|'`) or a message with an empty type.
 - Integer arithmetic that overflows is a `float`, as in PHP: `PHP_INT_MAX + 1`, `PHP_INT_MIN - 1`, `-PHP_INT_MIN`, `PHP_INT_MIN / -1`, also as an enum case value (`Enum case type float does not match enum backing type int`). `PHP_INT_MIN` is an `int` (it was mixed), and `PHP_INT_MIN % -1` is `0` instead of crashing the analyzer. Stub cache format 30 → 31.
