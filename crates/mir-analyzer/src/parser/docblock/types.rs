@@ -1110,13 +1110,17 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
                 }
                 None => ty_str,
             };
+            let (ty_str, is_byref) = match ty_str.strip_suffix('&') {
+                Some(rest) => (rest.trim_end(), true),
+                None => (ty_str, false),
+            };
             mir_types::atomic::FnParam {
                 name: name.into(),
                 ty: Some(mir_types::SimpleType::from_union(parse_type_string(ty_str))),
                 out_ty: None,
                 default: None,
                 is_variadic,
-                is_byref: false,
+                is_byref,
                 is_optional: is_optional || is_variadic,
             }
         })
