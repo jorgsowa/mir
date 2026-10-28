@@ -273,14 +273,18 @@ pub(crate) fn named_object_return_compatible(
                 return true;
             }
 
-            // Inheritance check
-            let inherits = extends_or_implements(db, actual_fqcn.as_ref(), &resolved_declared)
-                || extends_or_implements(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
-                || extends_or_implements(db, &resolved_actual, &resolved_declared)
-                || extends_or_implements(db, &resolved_actual, declared_fqcn.as_ref());
-            if !inherits {
+            // `file` may not be where the declared type was written (an inherited
+            // docblock), so keep whichever spelling of each name is the related class.
+            let Some((related_actual, related_declared)) = [
+                (actual_fqcn.as_ref(), resolved_declared.as_str()),
+                (actual_fqcn.as_ref(), declared_fqcn.as_ref()),
+                (resolved_actual.as_str(), resolved_declared.as_str()),
+                (resolved_actual.as_str(), declared_fqcn.as_ref()),
+            ]
+            .into_iter()
+            .find(|(a, d)| extends_or_implements(db, a, d)) else {
                 return false;
-            }
+            };
 
             // A different-but-related generic class (e.g. an override returning
             // `Box<Cat>` against a declared `Box<Animal>` where SubBox extends
@@ -301,11 +305,11 @@ pub(crate) fn named_object_return_compatible(
                 return true;
             }
             let actual_single = Type::single(Atomic::TNamedObject {
-                fqcn: Name::from(resolved_actual),
+                fqcn: Name::from(related_actual),
                 type_params: actual_type_params.to_vec().into(),
             });
             let declared_single = Type::single(Atomic::TNamedObject {
-                fqcn: Name::from(resolved_declared),
+                fqcn: Name::from(related_declared),
                 type_params: declared_type_params.to_vec().into(),
             });
             crate::subtype::is_subtype(db, &actual_single, &declared_single)
