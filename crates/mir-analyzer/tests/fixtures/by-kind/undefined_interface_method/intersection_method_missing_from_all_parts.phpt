@@ -1,8 +1,8 @@
 ===description===
-A method missing from every part of an intersection type is UndefinedMethod.
+A method missing from every part of an intersection type with a concrete class part is UndefinedMethod.
 ===file===
 <?php
-interface A {}
+class A {}
 interface B {}
 
 /** @param B&A $p */

@@ -956,7 +956,9 @@ impl CallAnalyzer {
                     }
                     if found_method {
                         result.merge_with(&intersection_result);
-                    } else if union_has_call_magic {
+                    } else if union_has_call_magic
+                        || !intersection_lacks_method(ea, ctx, call, &parts[..], method_name)
+                    {
                         result.add_type(mir_types::Atomic::TMixed);
                     } else {
                         ea.emit(
@@ -2131,4 +2133,29 @@ fn is_this_reinitialization(call: &MethodCallExpr, ctx: &FlowState) -> bool {
                 || m.eq_ignore_ascii_case("__unserialize")
                 || m.eq_ignore_ascii_case("unserialize")
         })
+}
+
+/// An `A&B` value is an instance of every part, so a method is missing when any
+/// part alone would report it: a concrete class lacking it, with no `method_exists()` guard.
+fn intersection_lacks_method(
+    ea: &ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    call: &MethodCallExpr,
+    parts: &[Type],
+    method_name: &str,
+) -> bool {
+    let method_lc = crate::util::php_ident_lowercase(method_name);
+    let guard_key = extract_expr_guard_key(&call.object, ctx, ea.db, &ea.file);
+    parts.iter().flat_map(|p| p.types.iter()).any(|part| {
+        let Atomic::TNamedObject { fqcn, .. } = part else {
+            return false;
+        };
+        let fqcn = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
+        crate::db::class_exists(ea.db, &fqcn)
+            && !crate::db::has_unknown_ancestor(ea.db, &fqcn)
+            && crate::db::class_kind(ea.db, &fqcn)
+                .is_some_and(|k| !k.is_interface && !k.is_abstract && !k.is_trait)
+            && !crate::db::has_method_in_chain(ea.db, &fqcn, "__call")
+            && !ctx.is_method_guarded(guard_key.clone(), &fqcn, &method_lc)
+    })
 }

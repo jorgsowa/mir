@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A call on an intersection-typed receiver (`A&B`) is `UndefinedMethod` only when a concrete class part lacks the method, as for a single receiver: interface and abstract parts, unknown classes and `method_exists()` guards no longer report it (Symfony `Translator`, `ContextListener`, Laravel `BeanstalkdQueue`).
 - A namespaced class overriding a generic stub method (`IteratorAggregate::getIterator()` returning `ArrayIterator<string, mixed>`) is compared with the stub's `Traversable`, not a `Traversable` in its own namespace; it was a false `MethodSignatureMismatch` (Symfony `ParameterBag`, `Finder`, `Crawler`, `RouteCollection`, ...).
 - `self` / `static` inside a `callable(...)` / `Closure(...)` docblock signature (`@param \Closure(self): string $f`, `@var array<string, \Closure(self): string>`), and inside intersections, are the declaring class. They stayed unbound, so passing `$this` was `InvalidArgument` (`expects 'self()'`; Laravel `Collection`, `Container`, Symfony `TypeInfo`, `Tui`).
 - `@param self::*_TYPE` and `self::A_*_B` match class constants by suffix and infix, as `self::PREFIX_*` did by prefix (also in `int-mask-of<...>`). They were an unknown class, so every argument was `InvalidArgument` (Symfony `Token`, `AbstractOperation`).

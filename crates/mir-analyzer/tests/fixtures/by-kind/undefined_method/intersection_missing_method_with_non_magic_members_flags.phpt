@@ -10,7 +10,7 @@ UndefinedMethod still fires, including inside a union with an intersection.
 ===file===
 <?php
 interface A { public function a(): int; }
-interface B { public function b(): string; }
+class B { public function b(): string { return ''; } }
 
 function f(A&B $x): void {
     $x->nope();
