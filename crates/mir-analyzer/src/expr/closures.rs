@@ -527,6 +527,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             c.is_static,
         );
+        closure_ctx.is_generator = crate::body_analysis::body_has_yield(&c.body.stmts);
         // A non-static closure declared outside any class body doesn't get `$this`
         // injected by `for_function` (no `self_fqcn`), but it's still valid PHP for
         // it to reference `$this` if the closure is later rebound to an object via
@@ -996,7 +997,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
+        let outer_yields = self.yielded_types.len();
         let inferred_return = self.analyze(&af.body, &mut arrow_ctx);
+        // The body shares the enclosing analyzer, so its yields belong to the arrow function.
+        let arrow_yields: Vec<_> = self.yielded_types.drain(outer_yields..).collect();
+        let inferred_return = if arrow_yields.is_empty() {
+            inferred_return
+        } else {
+            crate::body_analysis::build_generator_return_type(&arrow_yields, inferred_return)
+        };
         // Arrow functions capture the whole outer scope by value: any variable
         // the body reads is a read (and consumed write) in the outer context.
         for name in &arrow_ctx.read_vars {
@@ -1007,7 +1016,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // The `=> expr` body is exactly one implicit `return expr;` — check it
         // against the declared return type the same way analyze_return_stmt does
         // for a regular closure/function body.
-        if let Some(declared) = &return_ty_hint {
+        if let Some(declared) = return_ty_hint.as_ref().filter(|_| arrow_yields.is_empty()) {
             let has_invalid = !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                 && ((declared.is_void()
                     && !inferred_return.is_void()

@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A bare `return;` in a generator closure (`function (): Generator { if ($x) { return; } yield 1; }`) is no longer `InvalidReturnType`, as in a generator function. An arrow function containing `yield` is a generator itself; its yields made the enclosing function's inferred return type a `Generator`, and `fn(): Generator => yield 1` was `MixedReturnStatement`.
 - `getChildren()` of `RecursiveDirectoryIterator`, `RecursiveArrayIterator`, `RecursiveRegexIterator` and `RecursiveCallbackFilterIterator` returns `static`, as PHP creates the calling class; `parent::getChildren()` in a subclass was the base class (false `UndefinedMethod` / `DynamicPropertyCreation` in psysh).
 - `parent::m()` returning `static` (also nested, `Builder<static>`) is typed as the calling class, as PHP's late static binding does; it was the parent class, which gave false `UndefinedProperty` / `InvalidReturnType` on the result (Laravel `MorphPivot::setKeysForSaveQuery()`).
 - Below PHP 8.1 an enum is reported only as `version-too-low`; the parser's enum declaration errors (`pure-enum-case-value`, `enum-property`, `invalid-enum-backing-type`, ...) no longer fire next to it, as PHP stops at the `enum` keyword.
