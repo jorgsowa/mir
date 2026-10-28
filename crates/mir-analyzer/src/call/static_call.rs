@@ -23,7 +23,7 @@ use crate::symbol::ReferenceKind;
 use super::args::{
     check_args, check_method_visibility_with_magic, distinct_spans_for_expansion,
     expand_sole_spread_arg, expr_can_be_passed_by_reference_owned, spread_element_type,
-    substitute_static_in_return, CheckArgsParams,
+    substitute_late_static_in_return, substitute_static_in_return, CheckArgsParams,
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
@@ -417,6 +417,12 @@ impl CallAnalyzer {
         }
 
         let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+        let late_static_fqcn: Arc<str> =
+            if matches!(bound_receiver_fqcn.as_str(), "self" | "static" | "parent") {
+                fqcn_arc.clone()
+            } else {
+                Arc::from(bound_receiver_fqcn.as_str())
+            };
         let method_name_lower = crate::util::php_ident_lowercase(method_name);
 
         // Pre-mark by-reference argument variables as defined before evaluating
@@ -1041,8 +1047,13 @@ impl CallAnalyzer {
                 })
                 .collect();
 
-            let ret_substituted =
-                substitute_static_in_return(ea.db, ret_raw, &fqcn_arc, &own_type_params);
+            let ret_substituted = substitute_late_static_in_return(
+                ea.db,
+                ret_raw,
+                &fqcn_arc,
+                &late_static_fqcn,
+                &own_type_params,
+            );
             let ret_substituted = if return_class_bindings.is_empty() {
                 ret_substituted
             } else {

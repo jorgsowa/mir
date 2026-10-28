@@ -243,13 +243,14 @@ fn substitute_static_in_type(
     db: &dyn MirDatabase,
     t: Type,
     receiver_fqcn: &Arc<str>,
+    static_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
 ) -> Type {
     let from_docblock = t.from_docblock;
     let types: Vec<Atomic> = t
         .types
         .into_iter()
-        .map(|a| substitute_static_atom(db, a, receiver_fqcn, receiver_type_params))
+        .map(|a| substitute_static_atom(db, a, receiver_fqcn, static_fqcn, receiver_type_params))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
@@ -260,6 +261,7 @@ fn substitute_static_atom(
     db: &dyn MirDatabase,
     a: Atomic,
     fqcn: &Arc<str>,
+    static_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
 ) -> Atomic {
     match a {
@@ -282,6 +284,11 @@ fn substitute_static_atom(
         // `: static`-returning method loses generic tracking for the rest of
         // the call chain (`$box->withValue($v)->get()` would return `mixed`
         // instead of the receiver's actual template binding).
+        // `parent::m()` keeps the caller's late static binding; the parent's type args don't apply.
+        Atomic::TStaticObject { .. } if static_fqcn != fqcn => Atomic::TNamedObject {
+            fqcn: Name::from(static_fqcn.as_ref()),
+            type_params: mir_types::union::vec_to_type_params(Vec::new()),
+        },
         Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
             fqcn: Name::from(fqcn.as_ref()),
             type_params: mir_types::union::vec_to_type_params(receiver_type_params.to_vec()),
@@ -291,6 +298,7 @@ fn substitute_static_atom(
                 db,
                 *value,
                 fqcn,
+                static_fqcn,
                 receiver_type_params,
             )),
         },
@@ -299,6 +307,7 @@ fn substitute_static_atom(
                 db,
                 *value,
                 fqcn,
+                static_fqcn,
                 receiver_type_params,
             )),
         },
@@ -307,12 +316,14 @@ fn substitute_static_atom(
                 db,
                 *key,
                 fqcn,
+                static_fqcn,
                 receiver_type_params,
             )),
             value: Box::new(substitute_static_in_type(
                 db,
                 *value,
                 fqcn,
+                static_fqcn,
                 receiver_type_params,
             )),
         },
@@ -321,12 +332,14 @@ fn substitute_static_atom(
                 db,
                 *key,
                 fqcn,
+                static_fqcn,
                 receiver_type_params,
             )),
             value: Box::new(substitute_static_in_type(
                 db,
                 *value,
                 fqcn,
+                static_fqcn,
                 receiver_type_params,
             )),
         },
@@ -344,7 +357,15 @@ fn substitute_static_atom(
         } if matches!(obj_fqcn.as_ref(), "self" | "static" | "parent" | "$this") => {
             let substituted: Vec<Type> = type_params
                 .iter()
-                .map(|t| substitute_static_in_type(db, t.clone(), fqcn, receiver_type_params))
+                .map(|t| {
+                    substitute_static_in_type(
+                        db,
+                        t.clone(),
+                        fqcn,
+                        static_fqcn,
+                        receiver_type_params,
+                    )
+                })
                 .collect();
             Atomic::TNamedObject {
                 fqcn: Name::from(fqcn.as_ref()),
@@ -360,7 +381,15 @@ fn substitute_static_atom(
         } if !type_params.is_empty() => {
             let substituted: Vec<Type> = type_params
                 .iter()
-                .map(|t| substitute_static_in_type(db, t.clone(), fqcn, receiver_type_params))
+                .map(|t| {
+                    substitute_static_in_type(
+                        db,
+                        t.clone(),
+                        fqcn,
+                        static_fqcn,
+                        receiver_type_params,
+                    )
+                })
                 .collect();
             Atomic::TNamedObject {
                 fqcn: obj_fqcn,
@@ -382,7 +411,19 @@ pub(crate) fn substitute_static_in_return(
     receiver_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
 ) -> Type {
-    substitute_static_in_type(db, ret, receiver_fqcn, receiver_type_params)
+    substitute_static_in_type(db, ret, receiver_fqcn, receiver_fqcn, receiver_type_params)
+}
+
+/// [`substitute_static_in_return`] where `static` is bound to `static_fqcn` (the late
+/// static binding of a `self::` / `static::` / `parent::` call), `self` to the receiver.
+pub(crate) fn substitute_late_static_in_return(
+    db: &dyn MirDatabase,
+    ret: Type,
+    receiver_fqcn: &Arc<str>,
+    static_fqcn: &Arc<str>,
+    receiver_type_params: &[Type],
+) -> Type {
+    substitute_static_in_type(db, ret, receiver_fqcn, static_fqcn, receiver_type_params)
 }
 
 pub(crate) fn check_method_visibility(

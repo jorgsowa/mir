@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `parent::m()` returning `static` (also nested, `Builder<static>`) is typed as the calling class, as PHP's late static binding does; it was the parent class, which gave false `UndefinedProperty` / `InvalidReturnType` on the result (Laravel `MorphPivot::setKeysForSaveQuery()`).
 - Below PHP 8.1 an enum is reported only as `version-too-low`; the parser's enum declaration errors (`pure-enum-case-value`, `enum-property`, `invalid-enum-backing-type`, ...) no longer fire next to it, as PHP stops at the `enum` keyword.
 - `enum Self {}` / `enum parent: int {}` is PHP's `CompileError` (`Cannot use "Self" as an enum name as it is reserved`, `Cannot use 'Self' as class name as it is reserved` before 8.4) instead of four cascading `ParseError`s.
 - A nullable or union enum backing type (`enum E: ?int`, `enum E: int|string`) is PHP's `CompileError` (`Enum backing type must be int or string, string|int given`) instead of a `ParseError` (`expected '{', found '|'`) or a message with an empty type.
