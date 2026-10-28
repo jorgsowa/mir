@@ -202,7 +202,7 @@ class RecursiveCallbackFilterIterator extends CallbackFilterIterator implements 
     /**
      * Returns an iterator for the current entry.
      * @link https://php.net/manual/en/recursivecallbackfilteriterator.haschildren.php
-     * @return RecursiveCallbackFilterIterator containing the children.
+     * @return static containing the children.
      */
     #[TentativeType]
     public function getChildren(): RecursiveCallbackFilterIterator {}
@@ -1377,7 +1377,7 @@ class RecursiveRegexIterator extends RegexIterator implements RecursiveIterator
     /**
      * Returns an iterator for the current entry.
      * @link https://php.net/manual/en/recursiveregexiterator.getchildren.php
-     * @return RecursiveRegexIterator An iterator for the current entry, if it can be iterated over by the inner iterator.
+     * @return static An iterator for the current entry, if it can be iterated over by the inner iterator.
      * @throws \InvalidArgumentException An InvalidArgumentException will be thrown if the current
      * entry does not contain a value that can be iterated over by the inner iterator.
      */
@@ -2166,7 +2166,7 @@ class RecursiveArrayIterator extends ArrayIterator implements RecursiveIterator
     /**
      * Returns an iterator for the current entry if it is an array or an object.
      * @link https://php.net/manual/en/recursivearrayiterator.getchildren.php
-     * @return RecursiveArrayIterator|null An iterator for the current entry, if it is an array or object.
+     * @return static|null An iterator for the current entry, if it is an array or object.
      * @throws \InvalidArgumentException An InvalidArgumentException will be thrown if the current
      * entry does not contain an array or an object.
      */

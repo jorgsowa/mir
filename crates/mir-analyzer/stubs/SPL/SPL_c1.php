@@ -531,7 +531,7 @@ class RecursiveDirectoryIterator extends FilesystemIterator implements Recursive
     /**
      * Returns an iterator for the current entry if it is a directory
      * @link https://php.net/manual/en/recursivedirectoryiterator.getchildren.php
-     * @return RecursiveDirectoryIterator An iterator for the current entry, if it is a directory.
+     * @return static An iterator for the current entry, if it is a directory.
      */
     #[TentativeType]
     public function getChildren(): RecursiveDirectoryIterator {}
