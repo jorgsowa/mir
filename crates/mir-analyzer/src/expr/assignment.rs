@@ -1102,6 +1102,82 @@ impl<'a> ExpressionAnalyzer<'a> {
         constant && crate::db::db_php_version(self.db) < crate::php_version::PhpVersion::new(8, 6)
     }
 
+    /// A write to a property `fqcn` does not declare: deprecated from 8.2, an `Error` on
+    /// enums and readonly classes.
+    fn check_dynamic_property_creation(
+        &mut self,
+        fqcn: &str,
+        prop_name: &str,
+        object: &Expr,
+        ctx: &mut FlowState,
+        span: Span,
+    ) {
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        let fatal = match crate::db::find_class_like(self.db, here) {
+            Some(crate::db::ClassLike::Enum(_)) => true,
+            Some(crate::db::ClassLike::Class(c)) => c.is_readonly,
+            _ => return,
+        };
+        if crate::db::find_method_in_chain(self.db, here, "__set").is_some()
+            || crate::db::has_unknown_ancestor(self.db, fqcn)
+            || self.class_property_from_plugin(fqcn, prop_name).is_some()
+        {
+            return;
+        }
+        // A created property exists from then on, for reads and later writes alike.
+        if let Some(key) =
+            crate::narrowing::extract_expr_guard_key(object, ctx, self.db, &self.file)
+        {
+            if !ctx
+                .property_exists_guards
+                .insert((key, std::sync::Arc::from(prop_name)))
+            {
+                return;
+            }
+        }
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        let ancestor_classes = || {
+            ancestors.iter().filter_map(|ancestor| {
+                match crate::db::find_class_like(
+                    self.db,
+                    crate::db::Fqcn::from_str(self.db, ancestor),
+                ) {
+                    Some(crate::db::ClassLike::Class(c)) => Some(c),
+                    _ => None,
+                }
+            })
+        };
+        // A `@mixin` class forwards members through magic the collector cannot see.
+        if ancestor_classes().any(|c| !c.mixins.is_empty()) {
+            return;
+        }
+        let allows_dynamic = || {
+            ancestors.iter().any(|ancestor| {
+                ancestor.eq_ignore_ascii_case("stdClass")
+                    || ancestor.eq_ignore_ascii_case("__PHP_Incomplete_Class")
+            }) || ancestor_classes().any(|c| c.allows_dynamic_properties)
+        };
+        if !fatal
+            && (self.php_version < crate::php_version::PhpVersion::new(8, 2) || allows_dynamic())
+        {
+            return;
+        }
+        let (class, property) = (fqcn.to_string(), prop_name.to_string());
+        if fatal {
+            self.emit(
+                IssueKind::InvalidDynamicProperty { class, property },
+                Severity::Error,
+                span,
+            );
+        } else {
+            self.emit(
+                IssueKind::DynamicPropertyCreation { class, property },
+                Severity::Info,
+                span,
+            );
+        }
+    }
+
     pub(crate) fn check_property_readonly_write(
         &mut self,
         pa: &php_ast::owned::PropertyAccessExpr,
@@ -1676,6 +1752,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 } else if let Some(prop_name) = prop_name_opt {
+                    // `A|B` where only `B` declares the property is not a known creation.
+                    let declared_on_some_atom = obj_ty.types.len() > 1
+                        && obj_ty.types.iter().any(|atomic| {
+                            matches!(atomic, Atomic::TNamedObject { fqcn, .. }
+                                if crate::db::find_property_in_chain(
+                                    self.db,
+                                    crate::db::Fqcn::interned(self.db, *fqcn),
+                                    &prop_name,
+                                )
+                                .is_some())
+                        });
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, type_params } = atomic {
                             // NoInterfaceProperties fires on any undeclared property
@@ -1746,6 +1833,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         span,
                                     );
                                 }
+                            }
+                            if prop_def.is_none()
+                                && !declared_on_some_atom
+                                && !self.is_constant_write_compile_error(&pa.object)
+                            {
+                                self.check_dynamic_property_creation(
+                                    fqcn, &prop_name, &pa.object, ctx, span,
+                                );
                             }
                             if let Some(p) = &prop_def {
                                 if self.set_visibility_violated(p, &prop_owner, &prop_name, ctx) {

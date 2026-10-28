@@ -57,6 +57,7 @@ issues keep their code.
 | MIR0013  | UndefinedTraitAliasMethod     | [undefined/undefined-trait-alias-method](../undefined/undefined-trait-alias-method/) |
 | MIR0014  | InaccessibleProperty          | [undefined/inaccessible-property](../undefined/inaccessible-property/) |
 | MIR0015  | PossiblyUndefinedMethod       | [undefined/possibly-undefined-method](../undefined/possibly-undefined-method/) |
+| MIR0016  | InvalidDynamicProperty        | [undefined/invalid-dynamic-property](../undefined/invalid-dynamic-property/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](../nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](../nullability/null-property-fetch/) |
 | MIR0102  | NullMethodCall                | [nullability/null-method-call](../nullability/null-method-call/) |
@@ -172,6 +173,7 @@ issues keep their code.
 | MIR1011  | WrongCaseClass                | [other/wrong-case-class](../other/wrong-case-class/) |
 | MIR1012  | OptionalParameterBeforeRequired | [other/optional-parameter-before-required](../other/optional-parameter-before-required/) |
 | MIR1013  | ImplicitlyNullableParameter   | [other/implicitly-nullable-parameter](../other/implicitly-nullable-parameter/) |
+| MIR1014  | DynamicPropertyCreation       | [other/dynamic-property-creation](../other/dynamic-property-creation/) |
 | MIR1100  | MissingReturnType             | [other/missing-return-type](../other/missing-return-type/) |
 | MIR1101  | MissingParamType              | [other/missing-param-type](../other/missing-param-type/) |
 | MIR1102  | MissingThrowsDocblock         | [other/missing-throws-docblock](../other/missing-throws-docblock/) |

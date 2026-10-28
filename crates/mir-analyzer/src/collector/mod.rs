@@ -160,11 +160,15 @@ fn native_scalar_family(native: &Type) -> Option<fn(&mir_types::atomic::Atomic) 
 }
 
 fn has_override_attribute(attributes: &[php_ast::owned::Attribute]) -> bool {
+    has_attribute(attributes, "Override")
+}
+
+fn has_attribute(attributes: &[php_ast::owned::Attribute], name: &str) -> bool {
     attributes.iter().any(|a| {
         a.name
             .parts
             .last()
-            .is_some_and(|p| p.as_ref().eq_ignore_ascii_case("Override"))
+            .is_some_and(|p| p.as_ref().eq_ignore_ascii_case(name))
     })
 }
 

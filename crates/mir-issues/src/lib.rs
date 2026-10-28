@@ -587,6 +587,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/trait_instantiation.phpt`.
     TraitInstantiation { class: String },
+    /// A write creates an undeclared property on an enum or readonly class, which throws.
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/dynamic_property_creation/`.
+    InvalidDynamicProperty { class: String, property: String },
     /// Emitted by `mir-analyzer/src/class/overrides.rs` when `#[Override]` is declared
     /// but no overridable parent method (or, from PHP 8.5, property) exists.
     /// `member` is `name()` for a method, `$name` for a property.
@@ -682,6 +686,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/implicitly_nullable_parameter/`.
     ImplicitlyNullableParameter { message: String },
+    /// A write creates an undeclared property, which PHP deprecates from 8.2.
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/dynamic_property_creation/`.
+    DynamicPropertyCreation { class: String, property: String },
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_interface/`.
     DeprecatedInterface {
@@ -978,6 +986,7 @@ impl IssueKind {
             | IssueKind::InterfaceInstantiation { .. }
             | IssueKind::EnumInstantiation { .. }
             | IssueKind::TraitInstantiation { .. }
+            | IssueKind::InvalidDynamicProperty { .. }
             | IssueKind::InvalidOverride { .. }
             | IssueKind::InvalidTemplateParam { .. }
             | IssueKind::ReadonlyPropertyAssignment { .. }
@@ -1098,6 +1107,7 @@ impl IssueKind {
             | IssueKind::DeprecatedConstant { .. }
             | IssueKind::OptionalParameterBeforeRequired { .. }
             | IssueKind::ImplicitlyNullableParameter { .. }
+            | IssueKind::DynamicPropertyCreation { .. }
             | IssueKind::DeprecatedInterface { .. }
             | IssueKind::DeprecatedTrait { .. }
             | IssueKind::DeprecatedMethodCall { .. }
@@ -1183,6 +1193,7 @@ impl IssueKind {
             IssueKind::UndefinedFunction { .. } => "MIR0003",
             IssueKind::UndefinedMethod { .. } => "MIR0004",
             IssueKind::PossiblyUndefinedMethod { .. } => "MIR0015",
+            IssueKind::InvalidDynamicProperty { .. } => "MIR0016",
             IssueKind::UndefinedClass { .. } => "MIR0005",
             IssueKind::UndefinedProperty { .. } => "MIR0006",
             IssueKind::UndefinedConstant { .. } => "MIR0007",
@@ -1344,6 +1355,7 @@ impl IssueKind {
             IssueKind::InternalMethod { .. } => "MIR1004",
             IssueKind::OptionalParameterBeforeRequired { .. } => "MIR1012",
             IssueKind::ImplicitlyNullableParameter { .. } => "MIR1013",
+            IssueKind::DynamicPropertyCreation { .. } => "MIR1014",
 
             // Missing types / docblocks (1100-1199)
             IssueKind::MissingReturnType { .. } => "MIR1100",
@@ -1407,16 +1419,16 @@ impl IssueKind {
         match code {
             // Errors
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
-            | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0200" | "MIR0201"
-            | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216"
-            | "MIR0217" | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702"
-            | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709"
-            | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716"
-            | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228" | "MIR0229" | "MIR0800"
-            | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807"
-            | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300"
-            | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604"
-            | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0016" | "MIR0200"
+            | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215"
+            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701"
+            | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708"
+            | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715"
+            | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228" | "MIR0229"
+            | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805" | "MIR0806"
+            | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205" | "MIR1207"
+            | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
+            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1434,11 +1446,11 @@ impl IssueKind {
             | "MIR0401" | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504"
             | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002"
             | "MIR1003" | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009"
-            | "MIR1010" | "MIR1011" | "MIR1012" | "MIR1013" | "MIR1100" | "MIR1101" | "MIR1102"
-            | "MIR1103" | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203"
-            | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212"
-            | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225"
-            | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => {
+            | "MIR1010" | "MIR1011" | "MIR1012" | "MIR1013" | "MIR1014" | "MIR1100" | "MIR1101"
+            | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202"
+            | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211"
+            | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601"
+            | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => {
                 Some(Severity::Info)
             }
 
@@ -1572,6 +1584,7 @@ impl IssueKind {
             IssueKind::InterfaceInstantiation { .. } => "InterfaceInstantiation",
             IssueKind::EnumInstantiation { .. } => "EnumInstantiation",
             IssueKind::TraitInstantiation { .. } => "TraitInstantiation",
+            IssueKind::InvalidDynamicProperty { .. } => "InvalidDynamicProperty",
             IssueKind::InvalidOverride { .. } => "InvalidOverride",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
             IssueKind::ReadonlyPropertyAlreadyInitialized { .. } => {
@@ -1601,6 +1614,7 @@ impl IssueKind {
             IssueKind::InternalMethod { .. } => "InternalMethod",
             IssueKind::OptionalParameterBeforeRequired { .. } => "OptionalParameterBeforeRequired",
             IssueKind::ImplicitlyNullableParameter { .. } => "ImplicitlyNullableParameter",
+            IssueKind::DynamicPropertyCreation { .. } => "DynamicPropertyCreation",
             IssueKind::MissingReturnType { .. } => "MissingReturnType",
             IssueKind::MissingClosureReturnType => "MissingClosureReturnType",
             IssueKind::MissingParamType { .. } => "MissingParamType",
@@ -2182,6 +2196,12 @@ impl IssueKind {
             }
             IssueKind::EnumInstantiation { class } => format!("Cannot instantiate enum {class}"),
             IssueKind::TraitInstantiation { class } => format!("Cannot instantiate trait {class}"),
+            IssueKind::InvalidDynamicProperty { class, property } => {
+                format!("Cannot create dynamic property {class}::${property}")
+            }
+            IssueKind::DynamicPropertyCreation { class, property } => {
+                format!("Creation of dynamic property {class}::${property} is deprecated")
+            }
             IssueKind::InvalidOverride { class, member } => {
                 let kind = if member.starts_with('$') {
                     "property"
@@ -2970,6 +2990,14 @@ mod code_tests {
             IssueKind::InterfaceInstantiation { class: s() },
             IssueKind::EnumInstantiation { class: s() },
             IssueKind::TraitInstantiation { class: s() },
+            IssueKind::InvalidDynamicProperty {
+                class: s(),
+                property: s(),
+            },
+            IssueKind::DynamicPropertyCreation {
+                class: s(),
+                property: s(),
+            },
             IssueKind::InvalidOverride {
                 class: s(),
                 member: s(),
@@ -3182,6 +3210,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 177);
+        assert_eq!(one_of_each().len(), 179);
     }
 }

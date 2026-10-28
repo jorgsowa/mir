@@ -5,5 +5,6 @@ Undefined this property assignment
 class A {
     public function fooFoo(): void {
         $this->foo = "cool";
+//      ^^^^^^^^^^^^^^^^^^^ DynamicPropertyCreation: Creation of dynamic property A::$foo is deprecated
     }
 }

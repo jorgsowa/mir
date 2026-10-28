@@ -720,6 +720,9 @@ pub struct ClassDef {
     /// `Attribute::TARGET_*` constants (e.g. `Attribute::TARGET_CLASS = 1`).
     #[serde(default)]
     pub attribute_flags: Option<i64>,
+    /// Declared with `#[AllowDynamicProperties]`; subclasses inherit it.
+    #[serde(default)]
+    pub allows_dynamic_properties: bool,
     pub location: Option<Location>,
     /// Per-`use` statement locations for each used trait: `(fqcn, location)` in
     /// declaration order, parallel to `traits`.  Absent from older serialized

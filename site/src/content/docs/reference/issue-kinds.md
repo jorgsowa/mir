@@ -16,6 +16,7 @@ All issue types mir can emit, grouped by category.
 | `PossiblyUndefinedMethod` | A method is called on a union where only some members declare it. |
 | `UndefinedClass` | A reference is made to a class or interface that does not exist. |
 | `UndefinedProperty` | A property is accessed that is not declared on the class. |
+| `InvalidDynamicProperty` | A write creates an undeclared property on an enum or readonly class, which throws. |
 | `UndefinedConstant` | A reference is made to a constant that has not been defined. |
 | `PossiblyUndefinedVariable` | A variable is only assigned in some branches and may be unset on other paths. |
 | `UndefinedTrait` | A trait is used that does not exist in the codebase or stubs. |
@@ -172,6 +173,7 @@ All issue types mir can emit, grouped by category.
 | `DeprecatedConstant` | Reference to a `@deprecated` constant. |
 | `OptionalParameterBeforeRequired` | An optional parameter comes before a required one (deprecated from PHP 8.0). |
 | `ImplicitlyNullableParameter` | A typed parameter is nullable only through its `null` default (deprecated from PHP 8.4). |
+| `DynamicPropertyCreation` | A write creates an undeclared property (deprecated from PHP 8.2). |
 | `WrongCaseFunction` | Function name casing does not match its declaration. |
 | `WrongCaseMethod` | Method name casing does not match its declaration. |
 | `WrongCaseClass` | Class, interface, or enum name casing does not match its declaration. |
