@@ -392,11 +392,59 @@ pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
                 is_open,
                 is_list,
             },
+            Atomic::TIntersection { parts } => Atomic::TIntersection {
+                parts: vec_to_type_params(
+                    parts
+                        .iter()
+                        .map(|p| fill_self_static_parent(p.clone(), class_fqcn))
+                        .collect(),
+                ),
+            },
+            Atomic::TCallable {
+                params,
+                return_type,
+                is_pure,
+            } => Atomic::TCallable {
+                params: params.map(|ps| fill_fn_params(&ps, class_fqcn).into()),
+                return_type: return_type
+                    .map(|rt| Box::new(fill_self_static_parent(*rt, class_fqcn))),
+                is_pure,
+            },
+            Atomic::TClosure { data } => Atomic::TClosure {
+                data: Box::new(mir_types::atomic::ClosureData {
+                    params: fill_fn_params(&data.params, class_fqcn).into_boxed_slice(),
+                    return_type: fill_self_static_parent(data.return_type, class_fqcn),
+                    this_type: data
+                        .this_type
+                        .map(|t| fill_self_static_parent(t, class_fqcn)),
+                    ..*data
+                }),
+            },
             other => other,
         };
         result.types.push(filled);
     }
     result
+}
+
+fn fill_fn_params(
+    params: &[mir_types::atomic::FnParam],
+    class_fqcn: &str,
+) -> Vec<mir_types::atomic::FnParam> {
+    let fill = |t: &mir_types::compact::SimpleType| {
+        mir_types::compact::SimpleType::from_union(fill_self_static_parent(
+            t.to_union(),
+            class_fqcn,
+        ))
+    };
+    params
+        .iter()
+        .map(|p| mir_types::atomic::FnParam {
+            ty: p.ty.as_ref().map(fill),
+            out_ty: p.out_ty.as_ref().map(fill),
+            ..p.clone()
+        })
+        .collect()
 }
 
 pub(super) fn resolve_union(

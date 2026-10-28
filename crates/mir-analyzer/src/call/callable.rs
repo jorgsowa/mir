@@ -1019,7 +1019,8 @@ fn atomic_contains_unresolvable_named_type(
                     .iter()
                     .any(|tp| contains_unresolvable_named_type(tp, ea, template_names))
         }
-        Atomic::TTemplateParam { .. } => true,
+        // Late-bound to the call's receiver, which this check does not substitute.
+        Atomic::TTemplateParam { .. } | Atomic::TStaticObject { .. } => true,
         Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
             contains_unresolvable_named_type(key, ea, template_names)
                 || contains_unresolvable_named_type(value, ea, template_names)
