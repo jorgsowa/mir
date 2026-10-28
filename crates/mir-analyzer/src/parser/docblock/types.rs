@@ -882,7 +882,7 @@ impl Drop for SelfIntConstantsGuard {
 }
 
 /// Literal values of the active class's constants matching `pattern` (`NAME` or
-/// `PREFIX*`), when `class_ref` is `self`/`static`/the class's own name.
+/// a glob such as `PREFIX*`), when `class_ref` is `self`/`static`/the class's own name.
 fn self_constant_values(class_ref: &str, pattern: &str) -> Option<Vec<Atomic>> {
     let class_ref = class_ref.trim();
     let pattern = pattern.trim();
@@ -903,14 +903,34 @@ fn self_constant_values(class_ref: &str, pattern: &str) -> Option<Vec<Atomic>> {
         Some(
             constants
                 .iter()
-                .filter(|(name, _)| match pattern.strip_suffix('*') {
-                    Some(prefix) => name.starts_with(prefix),
-                    None => name.as_ref() == pattern,
-                })
+                .filter(|(name, _)| constant_glob_matches(pattern, name))
                 .map(|(_, v)| v.clone())
                 .collect(),
         )
     })
+}
+
+/// `*` matches any run of characters: `PREFIX_*`, `*_SUFFIX`, `A_*_B`, `*`.
+fn constant_glob_matches(pattern: &str, name: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = name.strip_prefix(first) else {
+        return false;
+    };
+    let mut parts = parts.peekable();
+    if parts.peek().is_none() {
+        return rest.is_empty();
+    }
+    while let Some(part) = parts.next() {
+        if parts.peek().is_none() {
+            return rest.ends_with(part);
+        }
+        match rest.find(part) {
+            Some(i) => rest = &rest[i + part.len()..],
+            None => return false,
+        }
+    }
+    true
 }
 
 /// Resolve `int-mask-of<T::CONST_PREFIX*>` (or bare `T::*`) using the ambient
@@ -919,7 +939,9 @@ fn self_constant_values(class_ref: &str, pattern: &str) -> Option<Vec<Atomic>> {
 /// prefix, or the match set can't be expanded (see `expand_int_mask_members`).
 pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
     let (class_ref, pattern) = inner.trim().split_once("::")?;
-    pattern.trim().strip_suffix('*')?;
+    if !pattern.contains('*') {
+        return None;
+    }
     let mut members: Vec<i64> = self_constant_values(class_ref, pattern)?
         .into_iter()
         .filter_map(|a| match a {
