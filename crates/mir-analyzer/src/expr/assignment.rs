@@ -1176,7 +1176,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let fatal = match crate::db::find_class_like(self.db, here) {
             Some(crate::db::ClassLike::Enum(_)) => true,
-            Some(crate::db::ClassLike::Class(c)) => c.is_readonly,
+            // A subclass of a strict built-in class only gets the deprecation.
+            Some(crate::db::ClassLike::Class(c)) => {
+                c.is_readonly
+                    || (c.is_final
+                        && NO_DYNAMIC_PROPERTIES
+                            .iter()
+                            .any(|strict| strict.eq_ignore_ascii_case(fqcn)))
+            }
             _ => return,
         };
         if crate::db::find_method_in_chain(self.db, here, "__set").is_some()
@@ -2834,6 +2841,107 @@ fn property_refinement(
     let fits = declared.is_none_or(|d| crate::subtype::is_subtype(db, &assigned.remove_null(), d));
     fits.then(|| assigned.clone())
 }
+
+/// Built-in classes PHP declares `@strict-properties` (`ZEND_ACC_NO_DYNAMIC_PROPERTIES`):
+/// creating a property on one throws. `Directory` joins them only in 8.5.
+const NO_DYNAMIC_PROPERTIES: &[&str] = &[
+    "AddressInfo",
+    "BcMath\\Number",
+    "Closure",
+    "CurlHandle",
+    "CurlMultiHandle",
+    "CurlShareHandle",
+    "CurlSharePersistentHandle",
+    "DateError",
+    "DateException",
+    "DateInvalidOperationException",
+    "DateInvalidTimeZoneException",
+    "DateMalformedIntervalStringException",
+    "DateMalformedPeriodStringException",
+    "DateMalformedStringException",
+    "DateObjectError",
+    "DateRangeError",
+    "Dba\\Connection",
+    "DeflateContext",
+    "DelayedTargetValidation",
+    "Deprecated",
+    "Dom\\Implementation",
+    "Dom\\NamespaceInfo",
+    "Dom\\Node",
+    "Dom\\TokenList",
+    "EnchantBroker",
+    "EnchantDictionary",
+    "Fiber",
+    "FTP\\Connection",
+    "GdFont",
+    "GdImage",
+    "Generator",
+    "InflateContext",
+    "IntlListFormatter",
+    "IntlNumberFormatter",
+    "IntlNumberRangeFormatter",
+    "IntlRelativeDateTimeFormatter",
+    "Io\\Poll\\Context",
+    "Io\\Poll\\StreamPollHandle",
+    "Io\\Poll\\Watcher",
+    "LDAP\\Connection",
+    "LDAP\\Result",
+    "LDAP\\ResultEntry",
+    "NoDiscard",
+    "Odbc\\Connection",
+    "Odbc\\Result",
+    "Openssl\\OpenSSLAsymmetricKey",
+    "Openssl\\OpenSSLCertificate",
+    "Openssl\\OpenSSLCertificateSigningRequest",
+    "Openssl\\Psk",
+    "Openssl\\Session",
+    "Override",
+    "Pdo\\Dblib",
+    "Pdo\\Firebird",
+    "Pdo\\Mysql",
+    "Pdo\\Odbc",
+    "Pdo\\Pgsql",
+    "Pdo\\Sqlite",
+    "PgSql\\Connection",
+    "PgSql\\Lob",
+    "PgSql\\Result",
+    "Random\\BrokenRandomEngineError",
+    "Random\\Engine\\Mt19937",
+    "Random\\Engine\\PcgOneseq128XslRr64",
+    "Random\\Engine\\Secure",
+    "Random\\Engine\\Xoshiro256StarStar",
+    "Random\\RandomError",
+    "Random\\RandomException",
+    "Random\\Randomizer",
+    "ReflectionConstant",
+    "SensitiveParameter",
+    "SensitiveParameterValue",
+    "Shmop",
+    "Soap\\Sdl",
+    "Soap\\Url",
+    "Socket",
+    "SodiumCryptoXofShake128State",
+    "SodiumCryptoXofShake256State",
+    "SodiumCryptoXofTurboshake128State",
+    "SodiumCryptoXofTurboshake256State",
+    "SQLite3Exception",
+    "SysvMessageQueue",
+    "SysvSemaphore",
+    "SysvSharedMemory",
+    "Time\\Duration",
+    "Time\\TimeException",
+    "Uri\\InvalidUriException",
+    "Uri\\Rfc3986\\Uri",
+    "Uri\\Rfc3986\\UriBuilder",
+    "Uri\\UriError",
+    "Uri\\UriException",
+    "Uri\\WhatWg\\InvalidUrlException",
+    "Uri\\WhatWg\\Url",
+    "Uri\\WhatWg\\UrlValidationError",
+    "WeakMap",
+    "WeakReference",
+    "XMLParser",
+];
 
 /// The declaring class PHP names, except that an enum's `name` / `value` (declared on the
 /// stub interfaces) belong to the enum itself.
