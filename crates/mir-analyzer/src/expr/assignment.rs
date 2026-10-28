@@ -462,6 +462,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         if self.vivifying_reference {
             super::helpers::vivify_reference_base(&a.value, ctx);
         }
+        if let (true, ExprKind::PropertyAccess(pa)) = (a.by_ref, &a.value.kind) {
+            self.check_dynamic_property_write_base(pa, ctx, expr_span);
+        }
         let rhs_ty = self.analyze(&a.value, ctx);
         self.vivifying_reference = false;
         ctx.self_ref_closure_hint = prev_self_ref_hint;
@@ -1100,6 +1103,64 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => false,
         };
         constant && crate::db::db_php_version(self.db) < crate::php_version::PhpVersion::new(8, 6)
+    }
+
+    /// `$var->prop[] = …` / `&$var->prop` create the property before reading it.
+    fn check_dynamic_property_write_base(
+        &mut self,
+        pa: &php_ast::owned::PropertyAccessExpr,
+        ctx: &mut FlowState,
+        span: Span,
+    ) {
+        let ExprKind::Variable(var) = &pa.object.kind else {
+            return;
+        };
+        let Some(prop_name) = extract_string_from_expr(&pa.property) else {
+            return;
+        };
+        let obj_ty =
+            crate::expr::objects::rebind_self_static_parent_atom_only(ctx.get_var(var.as_ref()));
+        self.check_dynamic_property_write(&obj_ty, &prop_name, &pa.object, ctx, span);
+    }
+
+    fn check_dynamic_property_write(
+        &mut self,
+        obj_ty: &Type,
+        prop_name: &str,
+        object: &Expr,
+        ctx: &mut FlowState,
+        span: Span,
+    ) {
+        if obj_ty.is_mixed() || self.is_constant_write_compile_error(object) {
+            return;
+        }
+        let named: Vec<mir_types::Name> = obj_ty
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
+                _ => None,
+            })
+            .collect();
+        let undeclared: Vec<mir_types::Name> = named
+            .iter()
+            .copied()
+            .filter(|fqcn| {
+                crate::db::find_property_in_chain(
+                    self.db,
+                    crate::db::Fqcn::interned(self.db, *fqcn),
+                    prop_name,
+                )
+                .is_none()
+            })
+            .collect();
+        // `A|B` where only `B` declares the property is not a known creation.
+        if undeclared.len() < named.len() {
+            return;
+        }
+        for fqcn in undeclared {
+            self.check_dynamic_property_creation(fqcn.as_ref(), prop_name, object, ctx, span);
+        }
     }
 
     /// A write to a property `fqcn` does not declare: deprecated from 8.2, an `Error` on
@@ -1752,17 +1813,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 } else if let Some(prop_name) = prop_name_opt {
-                    // `A|B` where only `B` declares the property is not a known creation.
-                    let declared_on_some_atom = obj_ty.types.len() > 1
-                        && obj_ty.types.iter().any(|atomic| {
-                            matches!(atomic, Atomic::TNamedObject { fqcn, .. }
-                                if crate::db::find_property_in_chain(
-                                    self.db,
-                                    crate::db::Fqcn::interned(self.db, *fqcn),
-                                    &prop_name,
-                                )
-                                .is_some())
-                        });
+                    self.check_dynamic_property_write(&obj_ty, &prop_name, &pa.object, ctx, span);
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, type_params } = atomic {
                             // NoInterfaceProperties fires on any undeclared property
@@ -1833,14 +1884,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         span,
                                     );
                                 }
-                            }
-                            if prop_def.is_none()
-                                && !declared_on_some_atom
-                                && !self.is_constant_write_compile_error(&pa.object)
-                            {
-                                self.check_dynamic_property_creation(
-                                    fqcn, &prop_name, &pa.object, ctx, span,
-                                );
                             }
                             if let Some(p) = &prop_def {
                                 if self.set_visibility_violated(p, &prop_owner, &prop_name, ctx) {
@@ -2665,6 +2708,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // a plain `$obj->items = …` assignment.
                             self.check_property_write_purity(pa, ctx, span);
                             self.check_property_readonly_write(pa, ctx, span, true, false);
+                            self.check_dynamic_property_write_base(pa, ctx, span);
                             let prop_ty = self.analyze(base, ctx);
                             if let (1, Some(Some(key))) =
                                 (key_chain.len(), literal_key_chain.first())

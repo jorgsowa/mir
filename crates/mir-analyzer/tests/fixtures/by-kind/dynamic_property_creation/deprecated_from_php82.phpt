@@ -1,5 +1,5 @@
 ===description===
-Writing an undeclared property is deprecated from PHP 8.2, in every write form, unless the class has `__set` or `#[AllowDynamicProperties]` (inherited).
+Writing an undeclared property is deprecated from PHP 8.2, in every write form (also `[]=` and `&`, which read the property first), unless the class has `__set` or `#[AllowDynamicProperties]` (inherited).
 ===config===
 <mir>
   <phpVersion>8.2</phpVersion>
@@ -41,4 +41,14 @@ class InMethod {
         $this->later = 1;
 //      ^^^^^^^^^^^^^^^^ DynamicPropertyCreation: Creation of dynamic property InMethod::$later is deprecated
     }
+}
+
+function writesThroughRead(Plain $a): void {
+    $a->list[] = 1;
+//  ^^^^^^^^^^^^^^ DynamicPropertyCreation: Creation of dynamic property Plain::$list is deprecated
+    $a->list[] = 2;
+    $a->map['k'] = 1;
+//  ^^^^^^^^^^^^^^^^ DynamicPropertyCreation: Creation of dynamic property Plain::$map is deprecated
+    $ref = &$a->z;
+//  ^^^^^^^^^^^^^ DynamicPropertyCreation: Creation of dynamic property Plain::$z is deprecated
 }
