@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A value typed `object` (an anonymous class) returned where an intersection is declared (`: \Traversable&\Stringable`) is a less specific return, as for a single class, instead of `InvalidReturnType` (Symfony `JsonStreamWriter`, Laravel `EloquentUserProvider`).
 - `array &$options` in a `callable(...)` / `Closure(...)` docblock is a by-reference `array` parameter; the `&` was part of a class name (`App\array &`), which gave false `InvalidArgument` / `UndefinedVariable` (Symfony `FollowRedirectsTrait`, `Validation::createCallable()`).
 - A call on an intersection-typed receiver (`A&B`) is `UndefinedMethod` only when a concrete class part lacks the method, as for a single receiver: interface and abstract parts, unknown classes and `method_exists()` guards no longer report it (Symfony `Translator`, `ContextListener`, Laravel `BeanstalkdQueue`).
 - A namespaced class overriding a generic stub method (`IteratorAggregate::getIterator()` returning `ArrayIterator<string, mixed>`) is compared with the stub's `Traversable`, not a `Traversable` in its own namespace; it was a false `MethodSignatureMismatch` (Symfony `ParameterBag`, `Finder`, `Crawler`, `RouteCollection`, ...).

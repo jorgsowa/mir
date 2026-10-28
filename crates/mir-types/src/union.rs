@@ -2280,6 +2280,9 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 .iter()
                 .any(|sub_part| sub_part.is_subtype_structural(sup_part))
         }),
+        (Atomic::TIntersection { parts }, Atomic::TObject) => parts
+            .iter()
+            .any(|part| part.is_subtype_structural(&Type::single(Atomic::TObject))),
 
         // List <: array  (list key is always int; int must satisfy the array's key type)
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
