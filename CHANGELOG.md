@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An array of intersection elements (`array<int, Focusable&Widget>`) satisfies an array of one of the parts (`Focusable[]`, `list<Widget>`) instead of `InvalidReturnType` (Symfony `FocusManager`).
 - A value typed `object` (an anonymous class) returned where an intersection is declared (`: \Traversable&\Stringable`) is a less specific return, as for a single class, instead of `InvalidReturnType` (Symfony `JsonStreamWriter`, Laravel `EloquentUserProvider`).
 - `array &$options` in a `callable(...)` / `Closure(...)` docblock is a by-reference `array` parameter; the `&` was part of a class name (`App\array &`), which gave false `InvalidArgument` / `UndefinedVariable` (Symfony `FollowRedirectsTrait`, `Validation::createCallable()`).
 - A call on an intersection-typed receiver (`A&B`) is `UndefinedMethod` only when a concrete class part lacks the method, as for a single receiver: interface and abstract parts, unknown classes and `method_exists()` guards no longer report it (Symfony `Translator`, `ContextListener`, Laravel `BeanstalkdQueue`).

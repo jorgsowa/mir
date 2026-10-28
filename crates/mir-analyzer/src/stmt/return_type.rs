@@ -1033,6 +1033,14 @@ pub(crate) fn return_arrays_compatible(
             act_val.types.iter().all(|av| {
                 match av {
                     Atomic::TNever => return true,
+                    Atomic::TIntersection { .. } => {
+                        return named_object_return_compatible(
+                            &Type::single(av.clone()),
+                            dec_val,
+                            db,
+                            file,
+                        )
+                    }
                     Atomic::TClassString(Some(av_cls)) => {
                         return dec_val.types.iter().any(|dv| match dv {
                             Atomic::TClassString(None) | Atomic::TString => true,
