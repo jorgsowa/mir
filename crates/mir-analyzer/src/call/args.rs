@@ -109,13 +109,19 @@ pub(crate) fn unpacked_arg_type(ea: &mut ExpressionAnalyzer<'_>, ty: &Type, span
     if names.is_empty() {
         return spread_element_type(ea.db, ty);
     }
-    ea.emit(
-        IssueKind::InvalidUnpack {
-            ty: names.join("|"),
-        },
-        Severity::Error,
-        span,
-    );
+    let version = ea.php_version;
+    // PHP names the type from 8.4, and only warns before 8.0.
+    let ty = if version >= crate::php_version::PhpVersion::new(8, 4) {
+        names.join("|")
+    } else {
+        String::new()
+    };
+    let severity = if version >= crate::php_version::PhpVersion::new(8, 0) {
+        Severity::Error
+    } else {
+        Severity::Warning
+    };
+    ea.emit(IssueKind::InvalidUnpack { ty }, severity, span);
     Type::never()
 }
 

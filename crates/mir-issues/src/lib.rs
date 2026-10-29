@@ -217,7 +217,10 @@ pub enum IssueKind {
     InvalidMethodCall { method: String, ty: String },
     /// Emitted by `mir-analyzer/src/call/args.rs` for `f(...$x)` with a scalar or `null`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_unpack/`.
-    InvalidUnpack { ty: String },
+    InvalidUnpack {
+        /// Empty before PHP 8.4, which does not name the type.
+        ty: String,
+    },
     /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_array_access/`.
     InvalidArrayAccess { ty: String },
@@ -1832,6 +1835,9 @@ impl IssueKind {
             }
             IssueKind::InvalidMethodCall { method, ty } => {
                 format!("Cannot call method {method}() on non-object type '{ty}'")
+            }
+            IssueKind::InvalidUnpack { ty } if ty.is_empty() => {
+                "Only arrays and Traversables can be unpacked".to_string()
             }
             IssueKind::InvalidUnpack { ty } => {
                 format!("Only arrays and Traversables can be unpacked, {ty} given")
