@@ -85,7 +85,9 @@ pub(crate) fn check_type_hint_classes(
     match &hint.kind {
         TypeHintKind::Named(name) => {
             let name_str = crate::parser::name_to_string_owned(name);
-            if is_pseudo_type(&name_str) {
+            let mixed_class =
+                php_version < PhpVersion::new(8, 0) && name_str.eq_ignore_ascii_case("mixed");
+            if is_pseudo_type(&name_str) && !mixed_class {
                 return;
             }
             let resolved = crate::ast_ext::resolve_ast_name(name, db, file.as_ref());

@@ -113,6 +113,9 @@ fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Type {
         class_relative(|fqcn| Atomic::TParent { fqcn })
     } else if name.eq_ignore_ascii_case("static") {
         class_relative(|fqcn| Atomic::TStaticObject { fqcn })
+    } else if name.eq_ignore_ascii_case("mixed") {
+        // A class name before 8.0; `UndefinedClass` reports it, so the hint must not cascade.
+        Type::mixed()
     } else if name.eq_ignore_ascii_case("resource") {
         // `resource` is a legacy native type name, not a class. mir does not
         // model resources precisely yet, so keep it as `mixed` rather than
