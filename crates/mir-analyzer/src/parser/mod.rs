@@ -27,7 +27,7 @@ pub(crate) fn parse_error_issues(
     let abstract_methods = abstract_methods_by_class(parsed, version);
     let backing_types = unparsed_backing_types(source, parsed, version);
     let keyword_enum = keyword_enum_name(source, parsed, version);
-    let keyword_enum_start = keyword_enum.as_ref().map(|k| k.enum_start);
+    let keyword_enum_recovery = keyword_enum.as_ref().map(|k| k.recovery.clone());
     parsed
         .errors
         .iter()
@@ -37,7 +37,9 @@ pub(crate) fn parse_error_issues(
                 && !backing_types
                     .iter()
                     .any(|b| b.header.contains(&err.span().start))
-                && keyword_enum_start.is_none_or(|start| err.span().start < start)
+                && !keyword_enum_recovery
+                    .as_ref()
+                    .is_some_and(|r| r.contains(&err.span().start))
                 && !shadowed_by_final_abstract(err, &parsed.errors)
         })
         .filter_map(|err| {
@@ -64,8 +66,8 @@ pub(crate) fn parse_error_issues(
 /// `enum self` / `enum parent`, which the parser reads as the constant `enum` followed by a
 /// keyword; PHP declares the enum and rejects its reserved name.
 struct KeywordEnumName {
-    /// The `enum` keyword; the parser's errors from here on are its recovery.
-    enum_start: u32,
+    /// From the `enum` keyword to the end of its body; the parser's errors there are its recovery.
+    recovery: std::ops::Range<u32>,
     name: Span,
 }
 
@@ -131,10 +133,27 @@ fn keyword_enum_name(
         let enum_start = before.len() - 4;
         let at_boundary = !before[..enum_start].ends_with(|c: char| is_ident(c) || c == '$');
         (declares && keyword.eq_ignore_ascii_case("enum") && at_boundary).then(|| KeywordEnumName {
-            enum_start: enum_start as u32,
+            recovery: enum_start as u32..body_end(source, (start + len) as u32),
             name: Span::new(start as u32, (start + len) as u32),
         })
     })
+}
+
+/// The offset after the `}` closing the first body opened at or after `from`, or the end of
+/// `source` when it is unterminated.
+fn body_end(source: &str, from: u32) -> u32 {
+    use php_lexer::TokenKind;
+    let (tokens, _) = php_lexer::lex_all(source);
+    let mut depth = 0u32;
+    for token in tokens.iter().filter(|t| t.span.start >= from) {
+        match token.kind {
+            TokenKind::LeftBrace => depth += 1,
+            TokenKind::RightBrace if depth == 1 => return token.span.end,
+            TokenKind::RightBrace => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    source.len() as u32
 }
 
 /// An enum backing type the parser stops at (`?int`, `int|string`), which PHP parses
