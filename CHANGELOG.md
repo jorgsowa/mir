@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `A or die()`, `A || throw ...` and `A and exit()` narrow the code after them as `if (!A) die();` does: `is_string($s) or die(); return $s;` reported `NullableReturnStatement`, and `ctype_digit($_GET['id']) || exit(); echo $_GET['id'];` reported `TaintedHtml`.
 - A docblock intersection of scalar types is its narrowest part (`non-empty-string&lowercase-string` is `non-empty-string`, `positive-int&int<1, 10>` is `int<1, 10>`): it was an intersection no string or int fit, so Laravel `Str::lower()` results reported `InvalidReturnType` and always-false `ImpossibleIdenticalComparison`.
 - `catch` and `finally` see what a `try` body ending in `return` or `throw` assigned (a by-reference argument included) as possibly defined: `try { return $this->raw($meta); } catch (\Throwable $e) { $this->finish($meta); }` reported `UndefinedVariable` (Symfony `HttpKernel`), and a variable assigned there was always-false `RedundantCondition` in `finally` / `catch` (Laravel `DatabaseQueue`).
 - `!is_callable($c)` drops the `[class, method]` array that `is_array()` narrows a `callable` to, so `is_array($by) && !is_callable($by)` leaves only the non-callable array (Laravel `Collection::sortBy()` `PossiblyInvalidArgument`).

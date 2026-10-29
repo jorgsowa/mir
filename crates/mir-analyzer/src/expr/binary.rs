@@ -123,14 +123,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.db,
                 &self.file,
             );
-            if !right_ctx.diverges {
-                let _right_ty = self.analyze(&b.right, &mut right_ctx);
+            if !right_ctx.diverges && self.analyze(&b.right, &mut right_ctx).is_never() {
+                right_ctx.diverges = true;
             }
             // Reads consumed only in the RHS (`A && $x['key']`) must reach the
             // parent, or the pending write survives into a catch block.
             ctx.absorb_branch_reads(&right_ctx);
+            let mut skipped = ctx.clone();
+            // `A or die()`: code after the expression runs only where the RHS was skipped.
+            if right_ctx.diverges {
+                crate::narrowing::narrow_from_condition(
+                    &b.left,
+                    &mut skipped,
+                    !is_and,
+                    self.db,
+                    &self.file,
+                );
+            }
             // The RHS runs on some paths only: join its writes with the skipped state.
-            *ctx = FlowState::merge_branches(ctx, ctx.clone(), Some(right_ctx));
+            *ctx = FlowState::merge_branches(ctx, skipped, Some(right_ctx));
             return Type::single(Atomic::TBool);
         }
 
