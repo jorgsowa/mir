@@ -207,9 +207,8 @@ fn unparsed_backing_types(
         if err.forbidden_rule().is_some() || found.iter().any(|b| b.header.contains(&offset)) {
             continue;
         }
-        let Some((enum_name, _, name_end)) =
-            find_decl_in_scope(&parsed.program, offset, DeclTarget::EnumHeader)
-        else {
+        let scope = decl_at(&parsed.program, offset, DeclTarget::EnumHeader);
+        let Some((enum_name, _, name_end)) = scope.found.clone() else {
             continue;
         };
         let Some(after_name) = source.get(name_end as usize..) else {
@@ -229,7 +228,11 @@ fn unparsed_backing_types(
         if !written.contains(['?', '|']) || !(type_start..=type_end).contains(&(offset as usize)) {
             continue;
         }
-        let Some(ty) = backing_type_text(written, &enum_name, version) else {
+        let resolve = |name: &str| {
+            let namespace = (!scope.namespace.is_empty()).then(|| scope.namespace.clone());
+            crate::collector::resolution::resolve_name(name, &namespace, &scope.imports)
+        };
+        let Some(ty) = backing_type_text(written, &enum_name, &resolve, version) else {
             continue;
         };
         found.push(UnparsedBackingType {
@@ -241,15 +244,18 @@ fn unparsed_backing_types(
     found
 }
 
-/// A written `?T` or union type as PHP prints it; class names are qualified with the enum's
-/// namespace (imports are not applied).
-fn backing_type_text(written: &str, enum_name: &str, version: PhpVersion) -> Option<String> {
+/// A written `?T` or union type as PHP prints it, with class names resolved by `resolve`.
+fn backing_type_text(
+    written: &str,
+    enum_name: &str,
+    resolve: &dyn Fn(&str) -> String,
+    version: PhpVersion,
+) -> Option<String> {
     use mir_types::{Atomic, Type};
     let (nullable, union) = match written.strip_prefix('?') {
         Some(rest) => (true, rest.trim_start()),
         None => (false, written),
     };
-    let namespace = enum_name.rsplit_once('\\').map_or("", |(ns, _)| ns);
     let named = |fqcn: &str| Atomic::TNamedObject {
         fqcn: mir_types::Name::from(fqcn),
         type_params: Default::default(),
@@ -286,11 +292,7 @@ fn backing_type_text(written: &str, enum_name: &str, version: PhpVersion) -> Opt
             }
             "self" => named(enum_name),
             "callable" | "static" | "parent" => return None,
-            _ => match part.strip_prefix('\\') {
-                Some(fully_qualified) => named(fully_qualified),
-                None if namespace.is_empty() => named(part),
-                None => named(&format!("{namespace}\\{part}")),
-            },
+            _ => named(&resolve(part)),
         };
         atomics.push(atomic);
     }
@@ -856,10 +858,16 @@ fn find_decl_in_scope(
     offset: u32,
     target: DeclTarget,
 ) -> Option<(String, String, u32)> {
+    decl_at(program, offset, target).found
+}
+
+/// The finder stopped at the `target` declared at `offset`, in that declaration's scope.
+fn decl_at(program: &php_ast::owned::Program, offset: u32, target: DeclTarget) -> DeclAt {
     let mut finder = DeclAt {
         offset,
         target,
         namespace: String::new(),
+        imports: rustc_hash::FxHashMap::default(),
         classes: Vec::new(),
         found: None,
     };
@@ -868,7 +876,7 @@ fn find_decl_in_scope(
             break;
         }
     }
-    finder.found
+    finder
 }
 
 /// Type keywords PHP prints in lowercase in its messages.
@@ -896,6 +904,8 @@ struct DeclAt {
     offset: u32,
     target: DeclTarget,
     namespace: String,
+    /// Class `use` imports in the current namespace, by alias.
+    imports: rustc_hash::FxHashMap<String, String>,
     /// Enclosing class-likes and their start offsets.
     classes: Vec<(String, u32)>,
     found: Option<(String, String, u32)>,
@@ -908,6 +918,15 @@ impl DeclAt {
         } else {
             format!("{}\\{name}", self.namespace)
         }
+    }
+
+    fn resolve(&self, name: &php_ast::owned::Name) -> String {
+        let namespace = (!self.namespace.is_empty()).then(|| self.namespace.clone());
+        crate::collector::resolution::resolve_name(
+            &name_to_string_owned(name),
+            &namespace,
+            &self.imports,
+        )
     }
 
     fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
@@ -931,17 +950,14 @@ impl DeclAt {
         std::ops::ControlFlow::Break(())
     }
 
-    /// The backing type as PHP names it: a builtin lowercased, a class name qualified.
+    /// The backing type as PHP names it: a builtin lowercased, a class name resolved.
     fn backing_type_name(&self, name: &php_ast::owned::Name) -> String {
         let written = name_to_string_owned(name);
-        if let Some(fully_qualified) = written.strip_prefix('\\') {
-            return fully_qualified.to_string();
-        }
         let lower = written.to_ascii_lowercase();
         if BUILTIN_TYPE_NAMES.contains(&lower.as_str()) {
             lower
         } else {
-            self.qualify(&written)
+            self.resolve(name)
         }
     }
 }
@@ -953,7 +969,8 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
         use php_ast::owned::{NamespaceBody, StmtKind};
         // An unbraced `namespace X;` ends before the code it applies to.
         let unbraced_namespace = matches!(&stmt.kind, StmtKind::Namespace(ns) if !matches!(ns.body, NamespaceBody::Braced(_)));
-        if stmt.span.end <= self.offset && !unbraced_namespace {
+        let import = matches!(&stmt.kind, StmtKind::Use(_));
+        if stmt.span.end <= self.offset && !unbraced_namespace && !import {
             return std::ops::ControlFlow::Continue(());
         }
         match &stmt.kind {
@@ -965,11 +982,27 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                     .unwrap_or_default();
                 if let NamespaceBody::Braced(_) = &ns.body {
                     let outer = std::mem::replace(&mut self.namespace, name);
+                    let outer_imports = std::mem::take(&mut self.imports);
                     let flow = crate::recursion::walk_stmt(self, stmt);
                     self.namespace = outer;
+                    self.imports = outer_imports;
                     return flow;
                 }
                 self.namespace = name;
+                self.imports.clear();
+            }
+            StmtKind::Use(decl) => {
+                for item in decl.uses.iter() {
+                    if item.kind.unwrap_or(decl.kind) == php_ast::ast::UseKind::Normal {
+                        let full = item.name.join_parts();
+                        let alias = item
+                            .alias
+                            .as_ref()
+                            .and_then(|a| a.as_str())
+                            .unwrap_or_else(|| full.rsplit('\\').next().unwrap_or(&full));
+                        self.imports.insert(alias.to_string(), full.clone());
+                    }
+                }
             }
             StmtKind::Class(c) => {
                 let name = c.name.as_ref().and_then(|n| n.as_str()).unwrap_or_default();
@@ -984,11 +1017,11 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                 if let Some(ty) = d.scalar_type.as_ref().filter(|ty| {
                     self.target == DeclTarget::EnumBackingType && ty.span().start == self.offset
                 }) {
-                    self.found = Some((
-                        self.qualify(name),
-                        self.backing_type_name(ty),
-                        stmt.span.start,
-                    ));
+                    let mut backing = self.backing_type_name(ty);
+                    if backing == "self" {
+                        backing = self.qualify(name);
+                    }
+                    self.found = Some((self.qualify(name), backing, stmt.span.start));
                     return std::ops::ControlFlow::Break(());
                 }
                 if self.target == DeclTarget::EnumHeader && stmt.span.start <= self.offset {

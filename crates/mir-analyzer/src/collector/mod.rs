@@ -34,7 +34,7 @@ mod function;
 mod interface;
 mod literal_types;
 mod mutation_free;
-mod resolution;
+pub(crate) mod resolution;
 mod r#trait;
 mod version_attrs;
 

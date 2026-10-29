@@ -26,7 +26,7 @@ fn strip_relative(name: &str) -> Option<&str> {
         .map(|_| &name[RELATIVE.len()..])
 }
 
-pub(super) fn resolve_name(
+pub(crate) fn resolve_name(
     name: &str,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
