@@ -507,6 +507,8 @@ pub enum IssueKind {
         expected: String,
         /// The parent is a get-only hook, so a subtype is enough.
         covariant: bool,
+        /// PHP before 8.5 words an untyped parent as "must not be defined".
+        before_php85: bool,
     },
     /// Emitted by `mir-analyzer/src/class/overrides.rs`.
     /// Fixtures: `tests/fixtures/by-kind/readonly_property_redeclaration_mismatch/`.
@@ -2077,8 +2079,13 @@ impl IssueKind {
                 parent,
                 expected,
                 covariant,
+                before_php85,
             } => {
-                if expected.is_empty() {
+                if expected.is_empty() && *before_php85 {
+                    format!(
+                        "Type of {class}::${property} must not be defined (as in class {parent})"
+                    )
+                } else if expected.is_empty() {
                     format!(
                         "Type of {class}::${property} must be omitted to match the parent definition in class {parent}"
                     )
@@ -2950,6 +2957,7 @@ mod code_tests {
                 parent: s(),
                 expected: s(),
                 covariant: false,
+                before_php85: false,
             },
             IssueKind::ReadonlyPropertyRedeclarationMismatch {
                 parent_class: s(),

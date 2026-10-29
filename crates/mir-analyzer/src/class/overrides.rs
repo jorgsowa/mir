@@ -1092,6 +1092,7 @@ impl<'a> ClassAnalyzer<'a> {
                         parent: member_owner(&parent_fqcn).to_string(),
                         expected: type_text(&parent_prop),
                         covariant: false,
+                        before_php85: version < crate::php_version::PhpVersion::new(8, 5),
                     },
                     loc,
                 );
@@ -1125,6 +1126,7 @@ impl<'a> ClassAnalyzer<'a> {
                                 parent: member_owner(&parent_fqcn).to_string(),
                                 expected: crate::util::php_type_text(parent_t, version),
                                 covariant: parent_prop.get_only_hook,
+                                before_php85: version < crate::php_version::PhpVersion::new(8, 5),
                             },
                             loc,
                         );
