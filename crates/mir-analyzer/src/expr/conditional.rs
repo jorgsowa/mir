@@ -24,7 +24,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.db,
                     &self.file,
                 );
-                let then_ty = self.analyze(then_expr, &mut then_ctx);
+                // A branch the condition rules out never runs, as for `&&`'s right side.
+                let then_ty = if then_ctx.diverges {
+                    Type::empty()
+                } else {
+                    self.analyze(then_expr, &mut then_ctx)
+                };
 
                 let mut else_ctx = ctx.branch();
                 crate::narrowing::narrow_from_condition(
@@ -34,7 +39,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.db,
                     &self.file,
                 );
-                let else_ty = self.analyze(&t.else_expr, &mut else_ctx);
+                let else_ty = if else_ctx.diverges {
+                    Type::empty()
+                } else {
+                    self.analyze(&t.else_expr, &mut else_ctx)
+                };
 
                 // A variable assigned inside a branch expression (e.g. `$c ? ($z =
                 // "yes") : ($z = "no")`) is a real, permanent assignment on

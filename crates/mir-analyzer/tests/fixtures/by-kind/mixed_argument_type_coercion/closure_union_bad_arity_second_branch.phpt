@@ -18,10 +18,11 @@ function process(callable $c): void {
     $c("hello");
 }
 
-$flag = true;
-$cb = $flag
-    ? function (string $a): void {}
-    : function (string $a, string $b): void {};
+function pick(bool $flag): void {
+    $cb = $flag
+        ? function (string $a): void {}
+        : function (string $a, string $b): void {};
 
-process($cb);
-//      ^^^ InvalidArgument: Argument $c of process() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'
+    process($cb);
+//          ^^^ InvalidArgument: Argument $c of process() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'
+}
