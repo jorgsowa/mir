@@ -52,7 +52,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 value = b.to_string();
             }
         }
-        let message = if value == "null" {
+        let message = if let Some(message) = (value != "null"
+            && self.php_version < crate::php_version::PhpVersion::new(8, 0))
+        .then(|| default_type_message_74(prop.type_hint.as_ref()?))
+        .flatten()
+        {
+            message
+        } else if value == "null" {
             let nullable = if rejected.declared.types.len() == 1 {
                 format!("?{type_text}")
             } else {
@@ -276,6 +282,39 @@ pub(crate) fn refers_to_constant(expr: &Expr) -> bool {
         }),
         _ => false,
     }
+}
+
+/// PHP 7.4's text for a property default its type `hint` rejects, other than `null`.
+fn default_type_message_74(hint: &TypeHint) -> Option<String> {
+    use php_ast::ast::BuiltinType;
+    use php_ast::owned::TypeHintKind;
+    let hint = match &hint.kind {
+        TypeHintKind::Nullable(inner) => inner,
+        _ => hint,
+    };
+    let (type_name, allowed) = match &hint.kind {
+        TypeHintKind::Named(name) => (name.join_parts(), None),
+        TypeHintKind::Keyword(builtin, _) => {
+            let allowed = match builtin {
+                BuiltinType::Self_ | BuiltinType::Parent_ => None,
+                BuiltinType::Int => Some("int"),
+                BuiltinType::Float => Some("float or int"),
+                BuiltinType::String => Some("string"),
+                BuiltinType::Bool => Some("bool"),
+                BuiltinType::Array | BuiltinType::Iterable => Some("an array"),
+                BuiltinType::Object => Some("object"),
+                _ => return None,
+            };
+            (builtin.as_str().to_string(), allowed)
+        }
+        _ => return None,
+    };
+    Some(match allowed {
+        Some(allowed) => {
+            format!("Default value for property of type {type_name} can only be {allowed}")
+        }
+        None => format!("Property of type {type_name} may not have default value"),
+    })
 }
 
 /// PHP's name for the type of every value `ty` holds, when they all share one.
