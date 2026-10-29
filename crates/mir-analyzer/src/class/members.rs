@@ -309,7 +309,10 @@ impl ClassAnalyzer<'_> {
             self.push_located_issue(
                 issues,
                 IssueKind::CompileError {
-                    message: if php81 {
+                    message: if php81 && matches!(canonical, "__sleep" | "__wakeup" | "__set_state")
+                    {
+                        format!("Enum may not include magic method {canonical}")
+                    } else if php81 {
                         format!("Enum may not include {canonical}")
                     } else {
                         format!(

@@ -21,6 +21,8 @@ class A {
 enum Status {
     public function __get($name) {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum may not include __get [enum-magic-method]
+    public function __sleep() {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Enum may not include magic method __sleep [enum-magic-method]
 }
 enum Pending {
     abstract function label();
