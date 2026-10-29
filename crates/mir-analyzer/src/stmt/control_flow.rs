@@ -1078,7 +1078,10 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         self.analyze_stmts(&tc.body.stmts, &mut try_ctx);
 
-        let catch_base = FlowState::merge_branches(&pre_ctx, try_ctx.clone(), None);
+        // A body ending in `return`/`throw` may still throw after its assignments ran.
+        let mut try_reached = try_ctx.clone();
+        try_reached.diverges = false;
+        let catch_base = FlowState::merge_branches(&pre_ctx, try_reached, None);
 
         let mut all_catches: Vec<FlowState> = vec![];
         // Resolved types caught by any EARLIER catch clause on this try — used to
