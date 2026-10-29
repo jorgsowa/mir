@@ -311,16 +311,16 @@ fn substitute_static_atom(
                 type_params: mir_types::union::vec_to_type_params(Vec::new()),
             }
         }
-        // Preserve the receiver's own inferred type params (e.g. `Box<int>`)
-        // rather than erasing them to a bare `Box` — otherwise a fluent
-        // `: static`-returning method loses generic tracking for the rest of
-        // the call chain (`$box->withValue($v)->get()` would return `mixed`
-        // instead of the receiver's actual template binding).
         // `parent::m()` keeps the caller's late static binding; the parent's type args don't apply.
         Atomic::TStaticObject { .. } if static_fqcn != fqcn => Atomic::TNamedObject {
             fqcn: Name::from(static_fqcn.as_ref()),
             type_params: mir_types::union::vec_to_type_params(Vec::new()),
         },
+        // Preserve the receiver's own inferred type params (e.g. `Box<int>`)
+        // rather than erasing them to a bare `Box` — otherwise a fluent
+        // `: static`-returning method loses generic tracking for the rest of
+        // the call chain (`$box->withValue($v)->get()` would return `mixed`
+        // instead of the receiver's actual template binding).
         Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
             fqcn: Name::from(fqcn.as_ref()),
             type_params: mir_types::union::vec_to_type_params(receiver_type_params.to_vec()),

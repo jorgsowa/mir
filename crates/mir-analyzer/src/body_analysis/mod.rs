@@ -606,9 +606,6 @@ pub(crate) struct MethodScopeCx {
     pub strict_types: bool,
 }
 
-/// Returns `true` if `source` contains a top-level `declare(strict_types=1)`.
-/// PHP mandates the directive appear before any other code, so scanning the
-/// first 1 KiB is sufficient and reliable for well-formed files.
 /// PHP's deprecation of an optional parameter before a required one (8.0+), with each
 /// version's message and exemptions; reported for every function, method and closure.
 pub(crate) fn check_optional_before_required(
@@ -932,6 +929,9 @@ impl php_ast::owned::visitor::OwnedVisitor for ParamOrderVisitor<'_> {
     }
 }
 
+/// Returns `true` if `source` contains a top-level `declare(strict_types=1)`.
+/// PHP mandates the directive appear before any other code, so scanning the
+/// first 1 KiB is sufficient and reliable for well-formed files.
 pub(crate) fn is_strict_types_file(source: &str) -> bool {
     let end = source.floor_char_boundary(source.len().min(1024));
     let prefix = &source[..end];

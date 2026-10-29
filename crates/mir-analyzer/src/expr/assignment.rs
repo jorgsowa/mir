@@ -1058,35 +1058,6 @@ impl<'a> ExpressionAnalyzer<'a> {
             .is_some_and(|vis| self.property_inaccessible(vis, owner, prop_name, ctx))
     }
 
-    /// Like `check_property_write_purity`, but takes the receiver/property as
-    /// plain strings instead of requiring a real `PropertyAccessExpr` AST
-    /// node — lets a write reached through a local variable ref-aliased to
-    /// a property (`$x =& $this->prop; $x = 5;`) reuse the same gate without
-    /// synthesizing a fake node.
-    /// `++`/`--`, `unset()`, and an array-index write through a property
-    /// base (`$this->items[] = x`) never go through `assign_to_target`'s own
-    /// `PropertyAccess` arm, which is the ONLY place a plain `=`/compound-op
-    /// write's readonly violation is caught, so they enforce `@readonly`
-    /// here. Walks a chained receiver
-    /// (`$this->cache->v`) via `resolve_chained_receiver_type`, mirroring
-    /// `check_property_write_purity`'s own chain-walk — a fresh
-    /// `self.analyze(&pa.object, ...)` here would re-run (and double-report)
-    /// whatever reference/diagnostic recording already happened when the
-    /// surrounding read of the operand ran.
-    /// None of these three write shapes can legally be a property's first
-    /// (initializing) write — they all read the current value first (an
-    /// implicit read for `++`/array-append, an explicit one for a keyed
-    /// array write/unset) — so unlike the plain-assignment case, there's no
-    /// "allowed in the declaring scope" exception to thread through here.
-    /// `is_offset_write` marks an array-index write/unset THROUGH the
-    /// property (`$this->prop[$k] = v`, `unset($this->prop[$k])`) rather than
-    /// a write to the property itself. When the property holds an
-    /// `ArrayAccess`-implementing object, that shape dispatches to
-    /// `offsetSet`/`offsetUnset` on the already-held object — a method call,
-    /// not a reassignment of the property binding — so it's legal even
-    /// though the property is readonly (PHP-verified live). A plain array
-    /// value has no such indirection: indexing into it always mutates the
-    /// property's own contents, so the check still applies there.
     /// Before 8.6 writing a property of a constant's object is the parser's
     /// `temporary-expression-write` compile error.
     fn is_constant_write_compile_error(&self, object: &php_ast::owned::Expr) -> bool {
@@ -1242,6 +1213,35 @@ impl<'a> ExpressionAnalyzer<'a> {
         true
     }
 
+    /// Like `check_property_write_purity`, but takes the receiver/property as
+    /// plain strings instead of requiring a real `PropertyAccessExpr` AST
+    /// node — lets a write reached through a local variable ref-aliased to
+    /// a property (`$x =& $this->prop; $x = 5;`) reuse the same gate without
+    /// synthesizing a fake node.
+    /// `++`/`--`, `unset()`, and an array-index write through a property
+    /// base (`$this->items[] = x`) never go through `assign_to_target`'s own
+    /// `PropertyAccess` arm, which is the ONLY place a plain `=`/compound-op
+    /// write's readonly violation is caught, so they enforce `@readonly`
+    /// here. Walks a chained receiver
+    /// (`$this->cache->v`) via `resolve_chained_receiver_type`, mirroring
+    /// `check_property_write_purity`'s own chain-walk — a fresh
+    /// `self.analyze(&pa.object, ...)` here would re-run (and double-report)
+    /// whatever reference/diagnostic recording already happened when the
+    /// surrounding read of the operand ran.
+    /// None of these three write shapes can legally be a property's first
+    /// (initializing) write — they all read the current value first (an
+    /// implicit read for `++`/array-append, an explicit one for a keyed
+    /// array write/unset) — so unlike the plain-assignment case, only `unset()`
+    /// of an uninitialized property is allowed in the declaring scope.
+    /// `is_offset_write` marks an array-index write/unset THROUGH the
+    /// property (`$this->prop[$k] = v`, `unset($this->prop[$k])`) rather than
+    /// a write to the property itself. When the property holds an
+    /// `ArrayAccess`-implementing object, that shape dispatches to
+    /// `offsetSet`/`offsetUnset` on the already-held object — a method call,
+    /// not a reassignment of the property binding — so it's legal even
+    /// though the property is readonly (PHP-verified live). A plain array
+    /// value has no such indirection: indexing into it always mutates the
+    /// property's own contents, so the check still applies there.
     pub(crate) fn check_property_readonly_write(
         &mut self,
         pa: &php_ast::owned::PropertyAccessExpr,

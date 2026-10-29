@@ -415,10 +415,6 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
-    /// Record a class constant's declaration under a name-only `cnstdecl:`
-    /// key, mirroring `methdecl:`/`propdecl:` — so find-references with an
-    /// unknown owner (`Foo::BAR` on an unresolvable `Foo`) can still surface
-    /// the declaration. Shared by class/trait/interface/enum member loops.
     /// Reports a typed class constant whose constant-expression value its type rejects.
     #[allow(clippy::too_many_arguments)]
     fn check_class_const_value_type(
@@ -480,6 +476,10 @@ impl<'a> BodyAnalyzer<'a> {
         ));
     }
 
+    /// Record a class constant's declaration under a name-only `cnstdecl:`
+    /// key, mirroring `methdecl:`/`propdecl:` — so find-references with an
+    /// unknown owner (`Foo::BAR` on an unresolvable `Foo`) can still surface
+    /// the declaration. Shared by class/trait/interface/enum member loops.
     pub(super) fn record_class_const_decl(
         &self,
         constant: &php_ast::owned::ClassConstDecl,
