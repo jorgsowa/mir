@@ -43,8 +43,15 @@ impl<'a> StatementsAnalyzer<'a> {
             });
         }
         let RejectedValue {
-            value, type_text, ..
+            mut value,
+            type_text,
+            ..
         } = rejected;
+        if self.php_version >= crate::php_version::PhpVersion::new(8, 3) {
+            if let Some(b) = self.folded_bool(default, fqcn, members, 0) {
+                value = b.to_string();
+            }
+        }
         let message = if value == "null" {
             let nullable = if rejected.declared.types.len() == 1 {
                 format!("?{type_text}")
@@ -115,6 +122,37 @@ impl<'a> StatementsAnalyzer<'a> {
             declared,
             at_compile_time: !is_enum_case && self.folds_at_compile_time(expr, fqcn, members, 0),
         })
+    }
+
+    /// The boolean `expr` folds to from literals, `!` and the class's own earlier constants.
+    fn folded_bool(
+        &self,
+        expr: &Expr,
+        fqcn: &str,
+        members: &[ClassMember],
+        depth: u8,
+    ) -> Option<bool> {
+        match &expr.kind {
+            ExprKind::Bool(b) => Some(*b),
+            ExprKind::Parenthesized(inner) => self.folded_bool(inner, fqcn, members, depth),
+            ExprKind::UnaryPrefix(u) if u.op == php_ast::ast::UnaryPrefixOp::BooleanNot => self
+                .folded_bool(&u.operand, fqcn, members, depth)
+                .map(|b| !b),
+            ExprKind::ClassConstAccess(access) if depth < MAX_CONST_DEPTH => {
+                let (ExprKind::Name(class), ExprKind::Identifier(member)) =
+                    (&access.class.kind, &access.member.kind)
+                else {
+                    return None;
+                };
+                let class = crate::ast_ext::resolve_ast_name(class, self.db, &self.file);
+                if class != "self" && !class.eq_ignore_ascii_case(fqcn) {
+                    return None;
+                }
+                let value = own_constant_before(members, member, expr.span.start)?;
+                self.folded_bool(value, fqcn, members, depth + 1)
+            }
+            _ => None,
+        }
     }
 
     /// Whether PHP evaluates `expr` while compiling the class: literals, builtin constants
