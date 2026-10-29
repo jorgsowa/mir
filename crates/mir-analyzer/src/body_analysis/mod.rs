@@ -621,8 +621,9 @@ pub(crate) fn check_optional_before_required(
     }
     let mut visitor = ParamOrderVisitor {
         php_version,
-        namespace: String::new(),
+        scope: crate::parser::NameScope::default(),
         classes: Vec::new(),
+        functions: Vec::new(),
         file,
         source,
         source_map,
@@ -632,8 +633,6 @@ pub(crate) fn check_optional_before_required(
         let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut visitor, stmt);
     }
 }
-
-const ANONYMOUS_CLASS: &str = "class@anonymous";
 
 /// Span, message, issue kind, and whether the message takes the 8.4 function-name prefix.
 type Finding = (
@@ -668,8 +667,12 @@ fn implicitly_nullable(p: &php_ast::owned::Param) -> bool {
 
 struct ParamOrderVisitor<'a> {
     php_version: PhpVersion,
-    namespace: String,
-    classes: Vec<String>,
+    scope: crate::parser::NameScope,
+    /// Enclosing class-likes, and whether each is anonymous.
+    classes: Vec<(String, bool)>,
+    /// Enclosing functions as PHP names a closure's scope, and whether PHP's NUL byte in an
+    /// anonymous class name cuts it short.
+    functions: Vec<(String, bool)>,
     file: &'a Arc<str>,
     source: &'a str,
     source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -678,11 +681,18 @@ struct ParamOrderVisitor<'a> {
 
 impl ParamOrderVisitor<'_> {
     fn qualify(&self, name: &str) -> String {
-        if self.namespace.is_empty() {
-            name.to_string()
-        } else {
-            format!("{}\\{name}", self.namespace)
-        }
+        self.scope.qualify(name)
+    }
+
+    fn in_function(
+        &mut self,
+        scope: (String, bool),
+        body: impl FnOnce(&mut Self) -> std::ops::ControlFlow<()>,
+    ) -> std::ops::ControlFlow<()> {
+        self.functions.push(scope);
+        let flow = body(self);
+        self.functions.pop();
+        flow
     }
 
     /// `null` default on a typed parameter, which PHP exempts depending on the version.
@@ -805,20 +815,24 @@ impl ParamOrderVisitor<'_> {
         }
     }
 
-    fn with_class(&mut self, name: String, members: impl FnOnce(&mut Self)) {
-        self.classes.push(name);
+    fn with_class(&mut self, name: String, anonymous: bool, members: impl FnOnce(&mut Self)) {
+        self.classes.push((name, anonymous));
         members(self);
         self.classes.pop();
     }
 
-    fn method(&mut self, m: &php_ast::owned::MethodDecl) {
-        let class = self.classes.last().cloned().unwrap_or_default();
+    /// Checks the method and returns its scope for closures inside it.
+    fn method(&mut self, m: &php_ast::owned::MethodDecl) -> (String, bool) {
+        let (class, anonymous) = self.classes.last().cloned().unwrap_or_default();
         let name = m.name.as_str().unwrap_or_default().to_string();
         // PHP's anonymous class name holds a NUL byte, so its message stops before `::m`.
-        if class == ANONYMOUS_CLASS {
-            self.check(&m.params, || class);
+        if anonymous {
+            self.check(&m.params, || class.clone());
+            (class, true)
         } else {
-            self.check(&m.params, || format!("{class}::{name}"));
+            let function = format!("{class}::{name}");
+            self.check(&m.params, || function.clone());
+            (format!("{function}()"), false)
         }
     }
 }
@@ -827,49 +841,45 @@ impl php_ast::owned::visitor::OwnedVisitor for ParamOrderVisitor<'_> {
     type Break = ();
 
     fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
-        use php_ast::owned::{NamespaceBody, StmtKind};
+        use php_ast::owned::StmtKind;
         match &stmt.kind {
-            StmtKind::Namespace(ns) => {
-                let name = ns
-                    .name
-                    .as_ref()
-                    .map(|n| crate::parser::name_to_string_owned(n).into_owned())
-                    .unwrap_or_default();
-                if let NamespaceBody::Braced(_) = &ns.body {
-                    let outer = std::mem::replace(&mut self.namespace, name);
+            StmtKind::Namespace(_) | StmtKind::Use(_) => {
+                if let Some(outer) = self.scope.enter(stmt) {
                     let flow = crate::recursion::walk_stmt(self, stmt);
-                    self.namespace = outer;
+                    self.scope = outer;
                     return flow;
                 }
-                self.namespace = name;
             }
             StmtKind::Function(f) => {
                 let name = self.qualify(f.name.as_str().unwrap_or_default());
-                self.check(&f.params, || name);
+                self.check(&f.params, || name.clone());
+                return self.in_function((format!("{name}()"), false), |v| {
+                    crate::recursion::walk_stmt(v, stmt)
+                });
             }
             StmtKind::Class(c) => {
                 let name =
                     self.qualify(c.name.as_ref().and_then(|n| n.as_str()).unwrap_or_default());
                 let mut flow = std::ops::ControlFlow::Continue(());
-                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                self.with_class(name, false, |v| flow = crate::recursion::walk_stmt(v, stmt));
                 return flow;
             }
             StmtKind::Interface(d) => {
                 let name = self.qualify(d.name.as_str().unwrap_or_default());
                 let mut flow = std::ops::ControlFlow::Continue(());
-                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                self.with_class(name, false, |v| flow = crate::recursion::walk_stmt(v, stmt));
                 return flow;
             }
             StmtKind::Trait(d) => {
                 let name = self.qualify(d.name.as_str().unwrap_or_default());
                 let mut flow = std::ops::ControlFlow::Continue(());
-                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                self.with_class(name, false, |v| flow = crate::recursion::walk_stmt(v, stmt));
                 return flow;
             }
             StmtKind::Enum(d) => {
                 let name = self.qualify(d.name.as_str().unwrap_or_default());
                 let mut flow = std::ops::ControlFlow::Continue(());
-                self.with_class(name, |v| flow = crate::recursion::walk_stmt(v, stmt));
+                self.with_class(name, false, |v| flow = crate::recursion::walk_stmt(v, stmt));
                 return flow;
             }
             _ => {}
@@ -882,7 +892,10 @@ impl php_ast::owned::visitor::OwnedVisitor for ParamOrderVisitor<'_> {
         member: &php_ast::owned::ClassMember,
     ) -> std::ops::ControlFlow<()> {
         if let php_ast::owned::ClassMemberKind::Method(m) = &member.kind {
-            self.method(m);
+            let scope = self.method(m);
+            return self.in_function(scope, |v| {
+                php_ast::owned::visitor::walk_owned_class_member(v, member)
+            });
         }
         php_ast::owned::visitor::walk_owned_class_member(self, member)
     }
@@ -892,40 +905,37 @@ impl php_ast::owned::visitor::OwnedVisitor for ParamOrderVisitor<'_> {
         member: &php_ast::owned::EnumMember,
     ) -> std::ops::ControlFlow<()> {
         if let php_ast::owned::EnumMemberKind::Method(m) = &member.kind {
-            self.method(m);
+            let scope = self.method(m);
+            return self.in_function(scope, |v| {
+                php_ast::owned::visitor::walk_owned_enum_member(v, member)
+            });
         }
         php_ast::owned::visitor::walk_owned_enum_member(self, member)
     }
 
     fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
         use php_ast::owned::ExprKind;
-        let closure_name = || {
-            let (line, _) = crate::diagnostics::offset_to_line_col(
-                self.source,
-                expr.span.start,
-                self.source_map,
-            );
-            format!("{{closure:{}:{line}}}", self.file)
-        };
-        match &expr.kind {
-            ExprKind::Closure(c) => {
-                let name = closure_name();
-                self.check(&c.params, || name);
-            }
-            ExprKind::ArrowFunction(f) => {
-                let name = closure_name();
-                self.check(&f.params, || name);
-            }
-            ExprKind::AnonymousClass(_) => {
+        let params = match &expr.kind {
+            ExprKind::Closure(c) => &c.params,
+            ExprKind::ArrowFunction(f) => &f.params,
+            ExprKind::AnonymousClass(class) => {
+                let name = self.scope.anonymous_class_name(class, self.php_version);
                 let mut flow = std::ops::ControlFlow::Continue(());
-                self.with_class(ANONYMOUS_CLASS.to_string(), |v| {
-                    flow = crate::recursion::walk_expr(v, expr)
-                });
+                self.with_class(name, true, |v| flow = crate::recursion::walk_expr(v, expr));
                 return flow;
             }
-            _ => {}
-        }
-        crate::recursion::walk_expr(self, expr)
+            _ => return crate::recursion::walk_expr(self, expr),
+        };
+        let (line, _) =
+            crate::diagnostics::offset_to_line_col(self.source, expr.span.start, self.source_map);
+        let scope = match self.functions.last() {
+            Some((enclosing, true)) => (format!("{{closure:{enclosing}"), true),
+            Some((enclosing, false)) => (format!("{{closure:{enclosing}:{line}}}"), false),
+            None => (format!("{{closure:{}:{line}}}", self.file), false),
+        };
+        let name = scope.0.clone();
+        self.check(params, || name);
+        self.in_function(scope, |v| crate::recursion::walk_expr(v, expr))
     }
 }
 

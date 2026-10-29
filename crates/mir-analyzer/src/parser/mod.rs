@@ -207,7 +207,7 @@ fn unparsed_backing_types(
         if err.forbidden_rule().is_some() || found.iter().any(|b| b.header.contains(&offset)) {
             continue;
         }
-        let scope = decl_at(&parsed.program, offset, DeclTarget::EnumHeader);
+        let scope = decl_at(&parsed.program, offset, DeclTarget::EnumHeader, version);
         let Some((enum_name, _, name_end)) = scope.found.clone() else {
             continue;
         };
@@ -228,10 +228,7 @@ fn unparsed_backing_types(
         if !written.contains(['?', '|']) || !(type_start..=type_end).contains(&(offset as usize)) {
             continue;
         }
-        let resolve = |name: &str| {
-            let namespace = (!scope.namespace.is_empty()).then(|| scope.namespace.clone());
-            crate::collector::resolution::resolve_name(name, &namespace, &scope.imports)
-        };
+        let resolve = |name: &str| scope.scope.resolve_str(name);
         let Some(ty) = backing_type_text(written, &enum_name, &resolve, version) else {
             continue;
         };
@@ -350,7 +347,7 @@ fn abstract_methods_by_class(
         }
         let start = err.span().start;
         let Some((class, method, scope)) =
-            find_decl_in_scope(&parsed.program, start, DeclTarget::Method)
+            find_decl_in_scope(&parsed.program, start, DeclTarget::Method, version)
         else {
             continue;
         };
@@ -500,7 +497,7 @@ fn raised_at(
         Some(ForbiddenRule::ClassFetchOnLiteral) => version >= PhpVersion::new(8, 0),
         // Reported next to the modifier error for `readonly static function`.
         Some(ForbiddenRule::StaticReadonlyProperty) => {
-            find_decl(program, err.span().start, DeclTarget::Method).is_none()
+            find_decl(program, err.span().start, DeclTarget::Method, version).is_none()
         }
         _ => true,
     }
@@ -508,13 +505,15 @@ fn raised_at(
 
 /// Whether the method declared at `offset` belongs to an interface, which PHP 7.4 does not check.
 fn declared_in_interface(source: &str, program: &php_ast::owned::Program, offset: u32) -> bool {
-    find_decl_in_scope(program, offset, DeclTarget::Method).is_some_and(|(_, _, scope)| {
-        let start = skip_leading_attributes(source, scope) as usize;
-        source.get(start..).is_some_and(|rest| {
-            rest.get(..9)
-                .is_some_and(|word| word.eq_ignore_ascii_case("interface"))
-        })
-    })
+    find_decl_in_scope(program, offset, DeclTarget::Method, PhpVersion::LATEST).is_some_and(
+        |(_, _, scope)| {
+            let start = skip_leading_attributes(source, scope) as usize;
+            source.get(start..).is_some_and(|rest| {
+                rest.get(..9)
+                    .is_some_and(|word| word.eq_ignore_ascii_case("interface"))
+            })
+        },
+    )
 }
 
 /// The repeated modifier of a promoted parameter the parser rejects, which
@@ -525,7 +524,7 @@ fn promoted_param_modifier<'a>(
     program: &php_ast::owned::Program,
 ) -> Option<&'a str> {
     let span = err.span();
-    find_decl(program, span.start, DeclTarget::Param)?;
+    find_decl(program, span.start, DeclTarget::Param, PhpVersion::LATEST)?;
     // `duplicate-modifier` marks the repeat, `multiple-visibility-modifiers` the first.
     if err.forbidden_rule() == Some(ForbiddenRule::DuplicateModifier) {
         return source.get(span.start as usize..span.end as usize);
@@ -587,7 +586,8 @@ fn php_message(
             return Some("Hooked properties cannot be readonly".to_string())
         }
         ForbiddenRule::InvalidInterfaceMethodModifier if before(8, 1) => {
-            let (interface, method) = find_decl(program, err.span().start, DeclTarget::Method)?;
+            let (interface, method) =
+                find_decl(program, err.span().start, DeclTarget::Method, version)?;
             return Some(format!(
                 "Access type for interface method {interface}::{method}() must be omitted"
             ));
@@ -724,7 +724,8 @@ fn php_message(
             );
         }
         ForbiddenRule::PureEnumCaseValue if version == PhpVersion::new(8, 1) => {
-            let (enum_name, case) = find_decl(program, err.span().start, DeclTarget::EnumCase)?;
+            let (enum_name, case) =
+                find_decl(program, err.span().start, DeclTarget::EnumCase, version)?;
             let mut message =
                 format!("Case {case} of non-backed enum {enum_name} must not have a value");
             if let Some(ty) = literal_case_value_type(source, err.span()) {
@@ -808,7 +809,7 @@ fn php_message(
         }),
         _ => return None,
     };
-    let (class, name) = find_decl(program, err.span().start, target)?;
+    let (class, name) = find_decl(program, err.span().start, target, version)?;
     Some(message(&class, &name))
 }
 
@@ -848,8 +849,9 @@ fn find_decl(
     program: &php_ast::owned::Program,
     offset: u32,
     target: DeclTarget,
+    version: PhpVersion,
 ) -> Option<(String, String)> {
-    find_decl_in_scope(program, offset, target).map(|(class, name, _)| (class, name))
+    find_decl_in_scope(program, offset, target, version).map(|(class, name, _)| (class, name))
 }
 
 /// [`find_decl`] plus the start offset of the enclosing class-like.
@@ -857,17 +859,23 @@ fn find_decl_in_scope(
     program: &php_ast::owned::Program,
     offset: u32,
     target: DeclTarget,
+    version: PhpVersion,
 ) -> Option<(String, String, u32)> {
-    decl_at(program, offset, target).found
+    decl_at(program, offset, target, version).found
 }
 
 /// The finder stopped at the `target` declared at `offset`, in that declaration's scope.
-fn decl_at(program: &php_ast::owned::Program, offset: u32, target: DeclTarget) -> DeclAt {
+fn decl_at(
+    program: &php_ast::owned::Program,
+    offset: u32,
+    target: DeclTarget,
+    version: PhpVersion,
+) -> DeclAt {
     let mut finder = DeclAt {
         offset,
         target,
-        namespace: String::new(),
-        imports: rustc_hash::FxHashMap::default(),
+        version,
+        scope: NameScope::default(),
         classes: Vec::new(),
         found: None,
     };
@@ -903,16 +911,23 @@ enum DeclTarget {
 struct DeclAt {
     offset: u32,
     target: DeclTarget,
-    namespace: String,
-    /// Class `use` imports in the current namespace, by alias.
-    imports: rustc_hash::FxHashMap<String, String>,
+    version: PhpVersion,
+    scope: NameScope,
     /// Enclosing class-likes and their start offsets.
     classes: Vec<(String, u32)>,
     found: Option<(String, String, u32)>,
 }
 
-impl DeclAt {
-    fn qualify(&self, name: &str) -> String {
+/// The namespace and class imports in effect while walking a file's statements.
+#[derive(Default)]
+pub(crate) struct NameScope {
+    namespace: String,
+    /// Class `use` imports, by alias.
+    imports: rustc_hash::FxHashMap<String, String>,
+}
+
+impl NameScope {
+    pub(crate) fn qualify(&self, name: &str) -> String {
         if self.namespace.is_empty() {
             name.to_string()
         } else {
@@ -920,13 +935,73 @@ impl DeclAt {
         }
     }
 
-    fn resolve(&self, name: &php_ast::owned::Name) -> String {
+    pub(crate) fn resolve_str(&self, name: &str) -> String {
         let namespace = (!self.namespace.is_empty()).then(|| self.namespace.clone());
-        crate::collector::resolution::resolve_name(
-            &name_to_string_owned(name),
-            &namespace,
-            &self.imports,
-        )
+        crate::collector::resolution::resolve_name(name, &namespace, &self.imports)
+    }
+
+    pub(crate) fn resolve(&self, name: &php_ast::owned::Name) -> String {
+        self.resolve_str(&name_to_string_owned(name))
+    }
+
+    /// Applies a `namespace` or `use` statement; for a braced namespace, returns the outer
+    /// scope to restore once its body is walked.
+    pub(crate) fn enter(&mut self, stmt: &php_ast::owned::Stmt) -> Option<NameScope> {
+        use php_ast::owned::{NamespaceBody, StmtKind};
+        match &stmt.kind {
+            StmtKind::Namespace(ns) => {
+                let inner = NameScope {
+                    namespace: ns
+                        .name
+                        .as_ref()
+                        .map(|n| name_to_string_owned(n).into_owned())
+                        .unwrap_or_default(),
+                    imports: Default::default(),
+                };
+                let outer = std::mem::replace(self, inner);
+                matches!(ns.body, NamespaceBody::Braced(_)).then_some(outer)
+            }
+            StmtKind::Use(decl) => {
+                for item in decl.uses.iter() {
+                    if item.kind.unwrap_or(decl.kind) == php_ast::ast::UseKind::Normal {
+                        let full = item.name.join_parts();
+                        let alias = item
+                            .alias
+                            .as_ref()
+                            .and_then(|a| a.as_str())
+                            .unwrap_or_else(|| full.rsplit('\\').next().unwrap_or(&full));
+                        self.imports.insert(alias.to_string(), full.clone());
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// PHP's name for an anonymous class: from 8.0 its parent's or first interface's.
+    pub(crate) fn anonymous_class_name(
+        &self,
+        class: &php_ast::owned::ClassDecl,
+        version: PhpVersion,
+    ) -> String {
+        let base = class.extends.as_ref().or(class.implements.first());
+        match base {
+            Some(base) if version >= PhpVersion::new(8, 0) => {
+                format!("{}@anonymous", self.resolve(base))
+            }
+            _ => "class@anonymous".to_string(),
+        }
+    }
+}
+
+impl DeclAt {
+    fn qualify(&self, name: &str) -> String {
+        self.scope.qualify(name)
+    }
+
+    fn resolve(&self, name: &php_ast::owned::Name) -> String {
+        self.scope.resolve(name)
     }
 
     fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
@@ -974,34 +1049,11 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
             return std::ops::ControlFlow::Continue(());
         }
         match &stmt.kind {
-            StmtKind::Namespace(ns) => {
-                let name = ns
-                    .name
-                    .as_ref()
-                    .map(|n| name_to_string_owned(n).into_owned())
-                    .unwrap_or_default();
-                if let NamespaceBody::Braced(_) = &ns.body {
-                    let outer = std::mem::replace(&mut self.namespace, name);
-                    let outer_imports = std::mem::take(&mut self.imports);
+            StmtKind::Namespace(_) | StmtKind::Use(_) => {
+                if let Some(outer) = self.scope.enter(stmt) {
                     let flow = crate::recursion::walk_stmt(self, stmt);
-                    self.namespace = outer;
-                    self.imports = outer_imports;
+                    self.scope = outer;
                     return flow;
-                }
-                self.namespace = name;
-                self.imports.clear();
-            }
-            StmtKind::Use(decl) => {
-                for item in decl.uses.iter() {
-                    if item.kind.unwrap_or(decl.kind) == php_ast::ast::UseKind::Normal {
-                        let full = item.name.join_parts();
-                        let alias = item
-                            .alias
-                            .as_ref()
-                            .and_then(|a| a.as_str())
-                            .unwrap_or_else(|| full.rsplit('\\').next().unwrap_or(&full));
-                        self.imports.insert(alias.to_string(), full.clone());
-                    }
                 }
             }
             StmtKind::Class(c) => {
@@ -1076,9 +1128,9 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
     }
 
     fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
-        if let php_ast::owned::ExprKind::AnonymousClass(_) = &expr.kind {
-            self.classes
-                .push(("class@anonymous".to_string(), expr.span.start));
+        if let php_ast::owned::ExprKind::AnonymousClass(class) = &expr.kind {
+            let name = self.scope.anonymous_class_name(class, self.version);
+            self.classes.push((name, expr.span.start));
             let flow = crate::recursion::walk_expr(self, expr);
             self.classes.pop();
             return flow;
