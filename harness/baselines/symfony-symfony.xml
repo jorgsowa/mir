@@ -2185,11 +2185,6 @@
       <code><![CDATA[return $config['log_level'];]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/EventListener/ValidateRequestListener.php">
-    <TaintedCallable>
-      <code><![CDATA[$request::getTrustedProxies()]]></code>
-    </TaintedCallable>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/HttpCache/HttpCache.php">
     <InvalidArgument>
       <code><![CDATA[$ignoreErrors]]></code>

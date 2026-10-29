@@ -285,7 +285,15 @@ impl CallAnalyzer {
         ctx: &mut FlowState,
         span: Span,
     ) -> Type {
-        if !call.class.kind.is_name_ref() {
+        // `$obj::m()` dispatches on the object's class, which input cannot name.
+        let object_receiver = match &call.class.kind {
+            ExprKind::Variable(var) => {
+                let ty = ctx.get_var(var.as_ref());
+                !ty.types.is_empty() && ty.types.iter().all(|a| a.is_object())
+            }
+            _ => false,
+        };
+        if !call.class.kind.is_name_ref() && !object_receiver {
             crate::taint::check_callable_target(ea, &call.class, ctx, span);
         }
         let method_name = match &call.method.kind {
