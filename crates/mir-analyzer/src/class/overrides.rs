@@ -1070,7 +1070,6 @@ impl<'a> ClassAnalyzer<'a> {
                 && parent_prop.visibility != Visibility::Private
                 && !own_prop.from_docblock
                 && !parent_prop.from_docblock
-                && !parent_prop.get_only_hook
                 && own_prop.has_native_type != parent_prop.has_native_type
             {
                 let type_text = |p: &mir_codebase::definitions::PropertyDef| {
@@ -1091,7 +1090,7 @@ impl<'a> ClassAnalyzer<'a> {
                         property: prop_name.to_string(),
                         parent: member_owner(&parent_fqcn).to_string(),
                         expected: type_text(&parent_prop),
-                        covariant: false,
+                        covariant: parent_prop.get_only_hook,
                         before_php85: version < crate::php_version::PhpVersion::new(8, 5),
                     },
                     loc,
