@@ -43,6 +43,11 @@ impl PhpVersion {
         }
     }
 
+    /// The `PHP_VERSION_ID` of this version's first release (`8.4` is `80400`).
+    pub const fn version_id(self) -> u32 {
+        self.major as u32 * 10_000 + self.minor as u32 * 100
+    }
+
     /// Encode the version into the single byte the [`crate::stub_cache`]
     /// header carries. Layout: `(major << 4) | (minor & 0x0F)`. PHP minor
     /// versions stay well below 16 so they fit unambiguously in the low

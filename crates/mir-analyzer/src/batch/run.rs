@@ -197,6 +197,14 @@ impl AnalysisSession {
             }
         }
 
+        // PHP never compiles a file whose every include is gated above the target
+        // version, so the syntax it gates (a polyfill's `bootstrap85.php`) isn't an error.
+        let loaded_only_above = crate::include_graph::files_loaded_only_above(
+            parsed_files
+                .iter()
+                .map(|parsed| (&parsed.file, parsed.source(), parsed.owned())),
+            php_version.version_id(),
+        );
         let mut files_with_incomplete_ast: HashSet<Arc<str>> = HashSet::default();
         {
             // Commit subtype-index class edges alongside issue collection —
@@ -211,7 +219,11 @@ impl AnalysisSession {
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
                 let file_no = db.intern_path(&parsed.file);
                 db.set_file_class_edges(file_no, entries);
-                all_issues.extend(Arc::unwrap_or_clone(defs.issues));
+                let mut issues = Arc::unwrap_or_clone(defs.issues);
+                if loaded_only_above.contains(&parsed.file) {
+                    issues.retain(|issue| !is_version_too_low(issue));
+                }
+                all_issues.extend(issues);
             }
         }
         let _t_ingest = _t0.elapsed();

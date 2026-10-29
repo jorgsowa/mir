@@ -450,6 +450,15 @@ pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> Analysi
 /// Mark issues silenced by a single file's [`SuppressionMap`]. Shared by the
 /// in-memory [`analyze_source`] entry point, which has the source in hand and
 /// does not go through the db-backed batch post-filter.
+fn is_version_too_low(issue: &Issue) -> bool {
+    matches!(
+        &issue.kind,
+        mir_issues::IssueKind::ParseError { code, .. }
+            | mir_issues::IssueKind::CompileError { code, .. }
+            if code == "version-too-low"
+    )
+}
+
 fn mark_suppressed(issues: &mut [Issue], suppressions: &crate::suppression::SuppressionMap) {
     if suppressions.is_empty() {
         return;

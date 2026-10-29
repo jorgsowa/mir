@@ -5,7 +5,7 @@ use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::{BinaryOp, MagicConstKind};
 use php_ast::owned::visitor::OwnedVisitor;
-use php_ast::owned::{Expr, ExprKind};
+use php_ast::owned::{Expr, ExprKind, Stmt, StmtKind};
 use std::ops::ControlFlow;
 use std::path::{Component, Path, PathBuf};
 
@@ -77,25 +77,74 @@ pub(crate) fn may_include(text: &str) -> bool {
 /// Paths the statically resolvable `require`/`include` targets in `program`
 /// name, a relative one taken from `file`'s directory.
 pub(crate) fn static_include_paths(program: &php_ast::owned::Program, file: &Path) -> Vec<PathBuf> {
+    guarded_include_paths(program, file)
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect()
+}
+
+/// [`static_include_paths`], each with the lowest `PHP_VERSION_ID` the `if`
+/// conditions around the include guarantee (0 when none do).
+pub(crate) fn guarded_include_paths(
+    program: &php_ast::owned::Program,
+    file: &Path,
+) -> Vec<(PathBuf, u32)> {
     let Some(dir) = file.parent() else {
         return Vec::new();
     };
     let mut scanner = IncludeTargetScanner {
         file,
+        min_version_id: 0,
         targets: Vec::new(),
     };
     let _ = scanner.visit_program(program);
     scanner
         .targets
         .into_iter()
-        .map(|target| {
+        .map(|(target, min_version_id)| {
             let resolved = if Path::new(&target).is_absolute() {
                 PathBuf::from(target)
             } else {
                 dir.join(target)
             };
-            lexically_normalize(&resolved)
+            (lexically_normalize(&resolved), min_version_id)
         })
+        .collect()
+}
+
+/// The analyzed files PHP never loads at `version_id`: every include of them
+/// among `files` sits under a `PHP_VERSION_ID` check above it.
+pub(crate) fn files_loaded_only_above<'f>(
+    files: impl Iterator<
+        Item = (
+            &'f std::sync::Arc<str>,
+            &'f str,
+            &'f php_ast::owned::Program,
+        ),
+    >,
+    version_id: u32,
+) -> rustc_hash::FxHashSet<std::sync::Arc<str>> {
+    let files: Vec<_> = files.collect();
+    let by_path: rustc_hash::FxHashMap<PathBuf, &std::sync::Arc<str>> = files
+        .iter()
+        .map(|(file, _, _)| (lexically_normalize(Path::new(file.as_ref())), *file))
+        .collect();
+    let mut loaded_only_above: rustc_hash::FxHashMap<&std::sync::Arc<str>, bool> =
+        Default::default();
+    for (file, source, program) in &files {
+        if !may_include(source) {
+            continue;
+        }
+        for (path, min_version_id) in guarded_include_paths(program, Path::new(file.as_ref())) {
+            if let Some(target) = by_path.get(&path) {
+                *loaded_only_above.entry(target).or_insert(true) &= min_version_id > version_id;
+            }
+        }
+    }
+    loaded_only_above
+        .into_iter()
+        .filter(|(_, only_above)| *only_above)
+        .map(|(file, _)| file.clone())
         .collect()
 }
 
@@ -129,19 +178,130 @@ fn lexically_normalize(path: &Path) -> PathBuf {
 
 struct IncludeTargetScanner<'a> {
     file: &'a Path,
-    targets: Vec<String>,
+    /// The lowest `PHP_VERSION_ID` the enclosing `if` branches guarantee.
+    min_version_id: u32,
+    targets: Vec<(String, u32)>,
+}
+
+impl IncludeTargetScanner<'_> {
+    fn guarded(
+        &mut self,
+        min_version_id: u32,
+        visit: impl FnOnce(&mut Self) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
+        let outer = self.min_version_id;
+        self.min_version_id = outer.max(min_version_id);
+        let flow = visit(self);
+        self.min_version_id = outer;
+        flow
+    }
 }
 
 impl OwnedVisitor for IncludeTargetScanner<'_> {
     type Break = ();
 
+    fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
+        let StmtKind::If(if_stmt) = &stmt.kind else {
+            return crate::recursion::walk_stmt(self, stmt);
+        };
+        self.visit_expr(&if_stmt.condition)?;
+        self.guarded(implied_min_version_id(&if_stmt.condition, true), |s| {
+            s.visit_stmt(&if_stmt.then_branch)
+        })?;
+        // Each later branch runs only once every earlier condition was false.
+        let mut all_false = implied_min_version_id(&if_stmt.condition, false);
+        for branch in if_stmt.elseif_branches.iter() {
+            let then = all_false.max(implied_min_version_id(&branch.condition, true));
+            self.guarded(all_false, |s| s.visit_expr(&branch.condition))?;
+            self.guarded(then, |s| s.visit_stmt(&branch.body))?;
+            all_false = all_false.max(implied_min_version_id(&branch.condition, false));
+        }
+        match &if_stmt.else_branch {
+            Some(else_branch) => self.guarded(all_false, |s| s.visit_stmt(else_branch)),
+            None => ControlFlow::Continue(()),
+        }
+    }
+
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::Include(_, inner) = &expr.kind {
             if let Some(target) = resolve_static_include_target(inner, self.file) {
-                self.targets.push(target);
+                self.targets.push((target, self.min_version_id));
             }
         }
         crate::recursion::walk_expr(self, expr)
+    }
+}
+
+/// The lowest `PHP_VERSION_ID` that `condition` evaluating to `is_true`
+/// guarantees, from comparisons of `PHP_VERSION_ID` with an integer; 0 for none.
+fn implied_min_version_id(condition: &Expr, is_true: bool) -> u32 {
+    use php_ast::ast::UnaryPrefixOp;
+    match &condition.kind {
+        ExprKind::Parenthesized(inner) => implied_min_version_id(inner, is_true),
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
+            implied_min_version_id(&u.operand, !is_true)
+        }
+        ExprKind::Binary(b) => {
+            let both = || {
+                (
+                    implied_min_version_id(&b.left, is_true),
+                    implied_min_version_id(&b.right, is_true),
+                )
+            };
+            match b.op {
+                BinaryOp::BooleanAnd | BinaryOp::LogicalAnd if is_true => {
+                    let (l, r) = both();
+                    l.max(r)
+                }
+                BinaryOp::BooleanAnd | BinaryOp::LogicalAnd => {
+                    let (l, r) = both();
+                    l.min(r)
+                }
+                BinaryOp::BooleanOr | BinaryOp::LogicalOr if is_true => {
+                    let (l, r) = both();
+                    l.min(r)
+                }
+                BinaryOp::BooleanOr | BinaryOp::LogicalOr => {
+                    let (l, r) = both();
+                    l.max(r)
+                }
+                _ => version_comparison_min(b.op, &b.left, &b.right, is_true).unwrap_or(0),
+            }
+        }
+        _ => 0,
+    }
+}
+
+/// [`implied_min_version_id`] of `left op right` comparing `PHP_VERSION_ID` with an integer.
+fn version_comparison_min(op: BinaryOp, left: &Expr, right: &Expr, is_true: bool) -> Option<u32> {
+    let is_version_id = |e: &Expr| {
+        e.kind
+            .name_bare()
+            .is_some_and(|name| name == "PHP_VERSION_ID")
+    };
+    let int = |e: &Expr| match e.kind {
+        ExprKind::Int(n) => u32::try_from(n).ok(),
+        _ => None,
+    };
+    // Normalized to `PHP_VERSION_ID op n`.
+    let (op, n) = if is_version_id(left) {
+        (op, int(right)?)
+    } else if is_version_id(right) {
+        let flipped = match op {
+            BinaryOp::Less => BinaryOp::Greater,
+            BinaryOp::LessOrEqual => BinaryOp::GreaterOrEqual,
+            BinaryOp::Greater => BinaryOp::Less,
+            BinaryOp::GreaterOrEqual => BinaryOp::LessOrEqual,
+            other => other,
+        };
+        (flipped, int(left)?)
+    } else {
+        return None;
+    };
+    match (op, is_true) {
+        (BinaryOp::GreaterOrEqual, true) | (BinaryOp::Less, false) => Some(n),
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => n.checked_add(1),
+        _ => None,
     }
 }
 
