@@ -196,7 +196,7 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.summarize_taint);
-        crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts);
+        crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts, self.db, file);
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
@@ -974,7 +974,7 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         crate::taint::seed_param_labels(&mut ctx, &params, self.summarize_taint);
-        crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts);
+        crate::taint::seed_object_guards(&mut ctx, &params, &[], &decl.body.stmts, self.db, file);
         record_param_symbols(
             Some(all_symbols),
             file,

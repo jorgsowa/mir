@@ -91,6 +91,8 @@ pub fn seed_object_guards(
     params: &[mir_codebase::DeclaredParam],
     prop_labels: &[(usize, mir_types::Name)],
     body: &[php_ast::owned::Stmt],
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) {
     if !ctx.summarizing_taint {
         return;
@@ -102,7 +104,7 @@ pub fn seed_object_guards(
         .collect();
     // Callees' guards claim slots as they come; parameters this body tests
     // itself get theirs first.
-    let tested = tested_variables(body);
+    let tested = tested_variables(body, ctx, db, file);
     let assigned = (0..tracked)
         .filter(|i| {
             tested
@@ -118,14 +120,68 @@ pub fn seed_object_guards(
     )));
 }
 
-/// Variables tested with `instanceof`, and those whose values reach them by
-/// assignment or iteration.
-pub(super) fn tested_variables(body: &[php_ast::owned::Stmt]) -> Vec<mir_types::Name> {
+/// How many of the tracked parameters the body proves objects.
+pub(super) fn tested_param_count(
+    params: &[mir_codebase::DeclaredParam],
+    body: &[php_ast::owned::Stmt],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> usize {
+    let tested = tested_variables(body, ctx, db, file);
+    params
+        .iter()
+        .take(MAX_TRACKED_PARAMS)
+        .filter(|p| tested.iter().any(|v| v.as_str() == p.name.as_ref()))
+        .count()
+}
+
+/// Variables tested with `instanceof` or passed where a callee's assertion
+/// proves them objects, and those whose values reach them by assignment or iteration.
+pub(super) fn tested_variables(
+    body: &[php_ast::owned::Stmt],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<mir_types::Name> {
     let mut scan = ObjectTests::default();
     for stmt in body {
         let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut scan, stmt);
     }
     let mut tested = scan.subjects;
+    for (callee, args) in &scan.calls {
+        let found = match callee {
+            TestingCallee::Own(method) => ctx.self_fqcn.as_deref().and_then(|class| {
+                crate::db::find_method_respecting_precedence(
+                    db,
+                    crate::db::Fqcn::from_str(db, class),
+                    method,
+                )
+                .map(|(_, m)| (m.params.clone(), m.assertions.clone()))
+            }),
+            TestingCallee::Function(name) => name.kind.function_ref(db, file).and_then(|name| {
+                name.find(db, file)
+                    .map(|(_, f)| (f.params.clone(), f.assertions.clone()))
+            }),
+        };
+        let Some((params, assertions)) = found else {
+            continue;
+        };
+        for assertion in assertions.iter().filter(|a| {
+            !a.negated
+                && a.param_key.is_empty()
+                && !a.ty.types.is_empty()
+                && a.ty.types.iter().all(mir_types::Atomic::is_object)
+        }) {
+            let var = params
+                .iter()
+                .position(|p| p.name.as_ref() == assertion.param.as_ref())
+                .and_then(|index| args.get(index).copied().flatten());
+            if let Some(var) = var.filter(|v| !tested.contains(v)) {
+                tested.push(var);
+            }
+        }
+    }
     let mut index = 0;
     while let Some(var) = tested.get(index).copied() {
         for (target, sources) in &scan.copies {
@@ -147,9 +203,34 @@ pub(super) struct ObjectTests {
     subjects: Vec<mir_types::Name>,
     /// Each assigned variable and the variables its value is built from.
     copies: Vec<(mir_types::Name, Vec<mir_types::Name>)>,
+    /// Calls whose assertions may prove an argument an object, with the
+    /// variable passed at each leading positional argument.
+    calls: Vec<(TestingCallee, Vec<Option<mir_types::Name>>)>,
+}
+
+pub(super) enum TestingCallee {
+    /// A method of the analyzed class, lowercased.
+    Own(String),
+    Function(Expr),
 }
 
 impl ObjectTests {
+    fn call(&mut self, callee: TestingCallee, args: &[php_ast::owned::Arg]) {
+        let vars: Vec<Option<mir_types::Name>> = args
+            .iter()
+            .take_while(|a| a.name.is_none() && !a.unpack())
+            .map(|a| match a.value().map(|v| &unwrap_parens(v).kind) {
+                Some(ExprKind::Variable(v)) => {
+                    Some(mir_types::Name::from(v.trim_start_matches('$')))
+                }
+                _ => None,
+            })
+            .collect();
+        if vars.iter().any(Option::is_some) {
+            self.calls.push((callee, vars));
+        }
+    }
+
     fn copy(&mut self, target: &Expr, value: &Expr) {
         let mut sources = VariableReads(Vec::new());
         let _ = php_ast::owned::visitor::OwnedVisitor::visit_expr(&mut sources, value);
@@ -182,6 +263,27 @@ impl php_ast::owned::visitor::OwnedVisitor for ObjectTests {
                 }
             }
             ExprKind::Assign(a) => self.copy(&a.target, &a.value),
+            ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) if is_this(&mc.object) => {
+                if let ExprKind::Identifier(method) = &mc.method.kind {
+                    let method = crate::util::php_ident_lowercase(method);
+                    self.call(TestingCallee::Own(method), &mc.args);
+                }
+            }
+            ExprKind::StaticMethodCall(smc)
+                if smc.class.kind.name_bare().is_some_and(|class| {
+                    ["self", "static"]
+                        .iter()
+                        .any(|k| class.eq_ignore_ascii_case(k))
+                }) =>
+            {
+                if let ExprKind::Identifier(method) = &smc.method.kind {
+                    let method = crate::util::php_ident_lowercase(method);
+                    self.call(TestingCallee::Own(method), &smc.args);
+                }
+            }
+            ExprKind::FunctionCall(fc) if matches!(fc.name.kind, ExprKind::Name(_)) => {
+                self.call(TestingCallee::Function((*fc.name).clone()), &fc.args);
+            }
             _ => {}
         }
         crate::recursion::walk_expr(self, expr)

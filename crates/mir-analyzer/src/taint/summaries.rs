@@ -571,15 +571,17 @@ pub fn named_params(params: &[mir_codebase::DeclaredParam]) -> &[mir_codebase::D
 }
 
 /// Label the properties of `$this` a method body reads, itself or through the
-/// methods it calls on `$this`, with the slots its parameters leave free, so
-/// its summary can tell which of them flow where.
+/// methods it calls on `$this`, with the slots its parameters and their object
+/// guards leave free, so its summary can tell which of them flow where.
 pub fn seed_prop_labels(
     ctx: &mut FlowState,
-    param_count: usize,
+    params: &[mir_codebase::DeclaredParam],
     body: &[php_ast::owned::Stmt],
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Vec<(usize, mir_types::Name)> {
+    let params = named_params(params);
+    let param_count = params.len();
     if !ctx.summarizing_taint || param_count >= MAX_TRACKED_PARAMS {
         return Vec::new();
     }
@@ -588,8 +590,11 @@ pub fn seed_prop_labels(
         let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut reads, stmt);
     }
     let mut props = std::mem::take(&mut reads.props);
+    // Parameters the body proves objects keep their guard slots ahead of properties.
+    let limit = (MAX_TRACKED_PARAMS - param_count)
+        .saturating_sub(tested_param_count(params, body, ctx, db, file));
     for (receiver, method) in &reads.calls {
-        if props.len() >= MAX_TRACKED_PARAMS - param_count {
+        if props.len() >= limit {
             break;
         }
         let class = match receiver {
@@ -605,6 +610,7 @@ pub fn seed_prop_labels(
             }
         }
     }
+    props.truncate(limit);
     let labels: Vec<(usize, mir_types::Name)> =
         (param_count..MAX_TRACKED_PARAMS).zip(props).collect();
     for (slot, prop) in &labels {

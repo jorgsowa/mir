@@ -1331,10 +1331,16 @@ impl<'a> BodyAnalyzer<'a> {
         let prop_labels = if method.modifiers.is_static {
             Vec::new()
         } else {
-            let named = crate::taint::named_params(&params).len();
-            crate::taint::seed_prop_labels(&mut ctx, named, &body.stmts, self.db, file)
+            crate::taint::seed_prop_labels(&mut ctx, &params, &body.stmts, self.db, file)
         };
-        crate::taint::seed_object_guards(&mut ctx, &params, &prop_labels, &body.stmts);
+        crate::taint::seed_object_guards(
+            &mut ctx,
+            &params,
+            &prop_labels,
+            &body.stmts,
+            self.db,
+            file,
+        );
         record_param_symbols(
             all_symbols.as_deref_mut(),
             file,
