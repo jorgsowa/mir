@@ -56,12 +56,10 @@ impl Drop for GuardedParse {
 /// Parses `source`, guaranteeing enough stack for deeply nested input.
 pub fn parse_versioned(source: &str, version: php_ast::PhpVersion) -> GuardedParse {
     GuardedParse(Some(ensure_phase_stack(|| {
-        let mut parsed = php_rs_parser::parse_with(
+        php_rs_parser::parse_with(
             source,
             &php_rs_parser::ParseOptions::default().version(version),
-        );
-        crate::parser::attach_docblocks_after_attributes(&mut parsed);
-        parsed
+        )
     })))
 }
 
@@ -77,11 +75,7 @@ pub fn parse_for_file(path: &str, source: &str, php_version: crate::PhpVersion) 
 
 /// Parses `source` with the default PHP version; see [`parse_versioned`].
 pub fn parse(source: &str) -> GuardedParse {
-    GuardedParse(Some(ensure_phase_stack(|| {
-        let mut parsed = php_rs_parser::parse(source);
-        crate::parser::attach_docblocks_after_attributes(&mut parsed);
-        parsed
-    })))
+    GuardedParse(Some(ensure_phase_stack(|| php_rs_parser::parse(source))))
 }
 
 #[cfg(not(target_arch = "wasm32"))]

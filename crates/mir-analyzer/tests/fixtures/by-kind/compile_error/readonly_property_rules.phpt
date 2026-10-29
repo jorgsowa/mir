@@ -42,3 +42,8 @@ final class Hooked {
     public readonly int $h { get => 1; }
 //                           ^^^^^^^^^ CompileError: Hooked properties cannot be readonly [readonly-property-hooks]
 }
+
+final class StaticMethod {
+    readonly static function f(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use the readonly modifier on a method [modifier-not-allowed]
+}

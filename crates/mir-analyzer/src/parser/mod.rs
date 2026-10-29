@@ -56,13 +56,7 @@ pub(crate) fn parse_error_issues(
             }
             Some(issue)
         })
-        .chain(unreported_compile_errors(
-            file,
-            source,
-            parsed,
-            version,
-            &backing_types,
-        ))
+        .chain(backing_types.iter().map(|b| b.issue(file, source, parsed)))
         .chain(keyword_enum.map(|k| k.issue(file, source, parsed, version)))
         .collect()
 }
@@ -150,6 +144,34 @@ struct UnparsedBackingType {
     /// From the enum name to the end of the type; the parser's errors there are replaced.
     header: std::ops::Range<u32>,
     message: String,
+}
+
+impl UnparsedBackingType {
+    fn issue(
+        &self,
+        file: &Arc<str>,
+        source: &str,
+        parsed: &php_rs_parser::ParseResult,
+    ) -> mir_issues::Issue {
+        let source_map = &parsed.source_map;
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, self.span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, self.span.end, source_map);
+        mir_issues::Issue::new(
+            mir_issues::IssueKind::CompileError {
+                message: self.message.clone(),
+                code: "invalid-enum-backing-type".to_string(),
+            },
+            mir_issues::Location {
+                file: file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end,
+            },
+        )
+    }
 }
 
 fn unparsed_backing_types(
@@ -260,111 +282,6 @@ fn backing_type_text(written: &str, enum_name: &str, version: PhpVersion) -> Opt
         &Type::from_vec(atomics),
         version,
     ))
-}
-
-/// Errors PHP raises at `version` that the parser does not report.
-fn unreported_compile_errors(
-    file: &Arc<str>,
-    source: &str,
-    parsed: &php_rs_parser::ParseResult,
-    version: PhpVersion,
-    backing_types: &[UnparsedBackingType],
-) -> Vec<mir_issues::Issue> {
-    let issue_at = |kind, span: Span| {
-        let source_map = &parsed.source_map;
-        let (line, col_start) =
-            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
-        let (line_end, col_end) =
-            crate::diagnostics::offset_to_line_col(source, span.end, source_map);
-        mir_issues::Issue::new(
-            kind,
-            mir_issues::Location {
-                file: file.clone(),
-                line,
-                line_end,
-                col_start,
-                col_end,
-            },
-        )
-    };
-    let compile_error = |message: String, code: &str| mir_issues::IssueKind::CompileError {
-        message,
-        code: code.to_string(),
-    };
-    let mut issues: Vec<_> = backing_types
-        .iter()
-        .map(|b| {
-            issue_at(
-                compile_error(b.message.clone(), "invalid-enum-backing-type"),
-                b.span,
-            )
-        })
-        .collect();
-    // Before property hooks `parent::$x::get()` is a static call on `parent::$x`.
-    if version < PhpVersion::new(8, 4) {
-        for err in &parsed.errors {
-            if err.forbidden_rule() != Some(ForbiddenRule::InvalidParentHookCall) {
-                continue;
-            }
-            let start = err.span().start;
-            let mut scope = EnclosingClass {
-                offset: start,
-                has_parent: None,
-            };
-            for stmt in &parsed.program.stmts {
-                let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut scope, stmt);
-            }
-            if scope.has_parent == Some(false) {
-                let end = start + "parent".len() as u32;
-                issues.push(issue_at(
-                    mir_issues::IssueKind::ParentNotFound,
-                    Span::new(start, end.min(err.span().end)),
-                ));
-            }
-        }
-    }
-    issues
-}
-
-/// Whether the innermost class-like around `offset` is a class with a parent (`None`: not a class).
-struct EnclosingClass {
-    offset: u32,
-    has_parent: Option<bool>,
-}
-
-impl EnclosingClass {
-    fn contains(&self, span: Span) -> bool {
-        span.start <= self.offset && self.offset < span.end
-    }
-}
-
-impl php_ast::owned::visitor::OwnedVisitor for EnclosingClass {
-    type Break = ();
-
-    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
-        use php_ast::owned::StmtKind;
-        if !self.contains(stmt.span) {
-            return std::ops::ControlFlow::Continue(());
-        }
-        match &stmt.kind {
-            StmtKind::Class(c) => self.has_parent = Some(c.extends.is_some()),
-            StmtKind::Trait(_) | StmtKind::Interface(_) | StmtKind::Enum(_) => {
-                self.has_parent = None
-            }
-            _ => {}
-        }
-        crate::recursion::walk_stmt(self, stmt)
-    }
-
-    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
-        if !self.contains(expr.span) {
-            return std::ops::ControlFlow::Continue(());
-        }
-        if let php_ast::owned::ExprKind::AnonymousClass(c) = &expr.kind {
-            self.has_parent = Some(c.extends.is_some());
-        }
-        crate::recursion::walk_expr(self, expr)
-    }
 }
 
 /// An anonymous class's abstract methods that PHP reports together, before 8.5.
@@ -490,38 +407,37 @@ fn is_compile_error(
     program: &php_ast::owned::Program,
     version: PhpVersion,
 ) -> bool {
-    let Some(rule) = err.forbidden_rule() else {
-        return false;
-    };
-    match rule {
-        ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier
+    match err.forbidden_rule() {
+        Some(ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier)
             if version < PhpVersion::new(8, 1) =>
         {
             promoted_param_modifier(err, source, program).is_none()
         }
-        ForbiddenRule::MultipleVisibilityModifiers
-        | ForbiddenRule::MultipleSetVisibilityModifiers
-        | ForbiddenRule::DuplicateModifier
-        | ForbiddenRule::AbstractFinalConflict
-        | ForbiddenRule::InvalidConstantModifier
-        | ForbiddenRule::OutermostScopeOnly
-        | ForbiddenRule::PartialApplicationInNew => true,
+        Some(
+            ForbiddenRule::MultipleVisibilityModifiers
+            | ForbiddenRule::MultipleSetVisibilityModifiers
+            | ForbiddenRule::DuplicateModifier
+            | ForbiddenRule::AbstractFinalConflict
+            | ForbiddenRule::InvalidConstantModifier
+            | ForbiddenRule::OutermostScopeOnly
+            | ForbiddenRule::PartialApplicationInNew,
+        ) => true,
         // A parameter modifier is a syntax error before 8.3, `readonly` before 8.1.
-        ForbiddenRule::ModifierNotAllowed => {
+        Some(ForbiddenRule::ModifierNotAllowed) => {
             version >= PhpVersion::new(8, 3)
                 || version >= PhpVersion::new(8, 1) && {
                     let message = err.to_string();
                     message.ends_with(" on a method") || message.ends_with(" as method modifier")
                 }
         }
-        ForbiddenRule::InvalidCurlyInterpolation => false,
-        ForbiddenRule::CurlyOffsetAccess => version < PhpVersion::new(8, 4),
-        ForbiddenRule::ReservedClassName | ForbiddenRule::KeywordAsDeclarationName => {
+        Some(ForbiddenRule::InvalidCurlyInterpolation) => false,
+        Some(ForbiddenRule::CurlyOffsetAccess) => version < PhpVersion::new(8, 4),
+        Some(ForbiddenRule::ReservedClassName | ForbiddenRule::KeywordAsDeclarationName) => {
             reserved_declaration_name(err, source).is_some()
         }
         // `$x = &1` is a syntax error; `[&$a] = 1` a compile error.
-        ForbiddenRule::ReferenceToNonReferenceable => !preceded_by(source, err.span(), '&'),
-        _ => rule.phase() == Phase::Compile,
+        Some(ForbiddenRule::ReferenceToNonReferenceable) => !preceded_by(source, err.span(), '&'),
+        _ => err.phase() == Phase::Compile,
     }
 }
 
@@ -539,13 +455,6 @@ fn raised_at(
             (message.ends_with("cannot declare a return type")
                 || message.to_ascii_lowercase().contains("::__clone(): "))
                 && !declared_in_interface(source, program, err.span().start)
-        }
-        Some(ForbiddenRule::MagicMethodParameterType) => version >= PhpVersion::new(8, 0),
-        // Before property hooks `parent::$x::get()` calls `get()` on the class `parent::$x` names.
-        Some(ForbiddenRule::InvalidParentHookCall) => version >= PhpVersion::new(8, 4),
-        // PHP 8.0 lets a nullsafe chain be destructured by reference.
-        Some(ForbiddenRule::ReferenceToNullsafe) if version < PhpVersion::new(8, 1) => {
-            !preceded_by(source, err.span(), '=')
         }
         // Promotion before 8.0 and `readonly` before 8.1 are already `version-too-low`.
         Some(ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier)
@@ -656,42 +565,11 @@ fn php_message(
         ForbiddenRule::ReadonlyPropertyHooks => {
             return Some("Hooked properties cannot be readonly".to_string())
         }
-        ForbiddenRule::AbstractFinalConflict => {
-            let message = match parser_message() {
-                m if m.starts_with("Cannot use") => m,
-                _ if find_decl(program, err.span().start, DeclTarget::Method).is_some() => {
-                    "Cannot use the final modifier on an abstract method".to_string()
-                }
-                _ => "Cannot use the final modifier on an abstract property".to_string(),
-            };
-            if before(8, 3) && message.ends_with("an abstract method") {
-                return Some(
-                    "Cannot use the final modifier on an abstract class member".to_string(),
-                );
-            }
-            return Some(message);
-        }
-        ForbiddenRule::InvalidConstantModifier => {
-            let message = parser_message();
-            let modifier = message.split('\'').nth(1)?;
-            return Some(if before(8, 3) {
-                format!("Cannot use '{modifier}' as constant modifier")
-            } else {
-                format!("Cannot use the {modifier} modifier on a class constant")
-            });
-        }
         ForbiddenRule::InvalidInterfaceMethodModifier if before(8, 1) => {
             let (interface, method) = find_decl(program, err.span().start, DeclTarget::Method)?;
             return Some(format!(
                 "Access type for interface method {interface}::{method}() must be omitted"
             ));
-        }
-        ForbiddenRule::ModifierNotAllowed if before(8, 3) => {
-            let message = parser_message();
-            let modifier = message
-                .strip_prefix("Cannot use the ")?
-                .strip_suffix(" modifier on a method")?;
-            return Some(format!("Cannot use '{modifier}' as method modifier"));
         }
         ForbiddenRule::InvalidTraitAliasModifier if before(8, 3) => {
             let message = parser_message();
@@ -747,9 +625,6 @@ fn php_message(
                 "Cannot use '{name}' as class name as it is reserved"
             ));
         }
-        ForbiddenRule::PartialApplicationInNew => {
-            return Some("Cannot create Closure for new expression".to_string())
-        }
         ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier
             if before(8, 1) =>
         {
@@ -762,42 +637,11 @@ fn php_message(
         ForbiddenRule::ReferenceToNonReferenceable if before(8, 1) => {
             return Some("Cannot assign reference to non referencable value".to_string())
         }
-        ForbiddenRule::MagicMethodReturnType if before(8, 0) => {
-            let message = parser_message();
-            let lower = message.to_ascii_lowercase();
-            let method = message
-                .split(' ')
-                .find(|word| word.contains("::"))?
-                .trim_end_matches(':');
-            let label = if lower.contains("::__construct()") {
-                "Constructor"
-            } else if lower.contains("::__destruct()") {
-                "Destructor"
-            } else {
-                "Clone method"
-            };
-            return Some(format!("{label} {method} cannot declare a return type"));
-        }
         ForbiddenRule::GeneratorReturnType if before(8, 0) => {
             let message = parser_message();
             let ty = message.rsplit(", ").next()?.strip_suffix(" given")?;
             return Some(format!(
                 "Generators may only declare a return type of Generator, Iterator, Traversable, or iterable, {ty} is not permitted"
-            ));
-        }
-        ForbiddenRule::DeprecatedOnInvalidTarget if version == PhpVersion::new(8, 4) => {
-            return Some(format!(
-                "Attribute \"Deprecated\" cannot target class (allowed targets: {DEPRECATED_TARGETS_84})"
-            ));
-        }
-        ForbiddenRule::AttributeTargetMismatch if version == PhpVersion::new(8, 4) => {
-            let message = parser_message();
-            let target = message
-                .strip_prefix("Attribute \"Deprecated\" cannot target ")?
-                .split(" (")
-                .next()?;
-            return Some(format!(
-                "Attribute \"Deprecated\" cannot target {target} (allowed targets: {DEPRECATED_TARGETS_84})"
             ));
         }
         ForbiddenRule::AllowDynamicPropertiesOnInvalidClass if before(8, 5) => {
@@ -811,13 +655,6 @@ fn php_message(
             return Some(
                 parser_message().replace("the remaining method (", "the remaining methods ("),
             );
-        }
-        ForbiddenRule::VirtualPropertyAsymmetricVisibility if !before(8, 6) => {
-            let message = parser_message();
-            return Some(match message.strip_prefix("Read-only ") {
-                Some(rest) => format!("get-only {rest}"),
-                None => message,
-            });
         }
         ForbiddenRule::InvalidNullableType if before(8, 2) => {
             let message = parser_message();
@@ -927,21 +764,10 @@ fn php_message(
                 format!("Visibility of property {class}::${prop} must not be weaker than set visibility")
             })
         }
-        ForbiddenRule::PrivateFinalConstant => (DeclTarget::ClassConst, |class, name| {
-            format!(
-                "Private constant {class}::{name} cannot be final as it is not visible to other classes"
-            )
-        }),
         ForbiddenRule::EnumCaseNamedClass => return Some(
             "A class constant must not be called 'class'; it is reserved for class name fetching"
                 .to_string(),
         ),
-        ForbiddenRule::PureEnumCaseValue => (DeclTarget::EnumCase, |enum_name, case| {
-            format!("Case {case} of non-backed enum {enum_name} must not have a value")
-        }),
-        ForbiddenRule::MissingEnumCaseValue => (DeclTarget::EnumCase, |enum_name, case| {
-            format!("Case {case} of backed enum {enum_name} must have a value")
-        }),
         ForbiddenRule::UntypedReadonlyProperty => (DeclTarget::Property, |class, prop| {
             format!("Readonly property {class}::${prop} must have type")
         }),
@@ -956,9 +782,6 @@ fn php_message(
     let (class, name) = find_decl(program, err.span().start, target)?;
     Some(message(&class, &name))
 }
-
-/// `#[\Deprecated]`'s targets in PHP 8.4; 8.5 adds classes and constants.
-const DEPRECATED_TARGETS_84: &str = "function, method, class constant";
 
 /// `int` or `string` for a literal enum case value after the `=` at `eq`.
 fn literal_case_value_type(source: &str, eq: Span) -> Option<&'static str> {
@@ -1404,125 +1227,6 @@ fn strip_trailing_reopen_tag(s: &str) -> Option<&str> {
     None
 }
 
-/// Gives each class member and parameter the docblock PHP reads for it. The parser looks for it
-/// only before the first `#[`, so one written after the attributes went to the next member.
-pub(crate) fn attach_docblocks_after_attributes(parsed: &mut php_rs_parser::ParseResult) {
-    use php_ast::owned::fold::{
-        fold_owned_class_member, fold_owned_enum_member, fold_owned_param, OwnedFold,
-    };
-    use php_ast::owned::{
-        Attribute, ClassMember, ClassMemberKind, Comment, EnumMember, EnumMemberKind, Param,
-        Program,
-    };
-
-    struct Attach<'s> {
-        source: &'s str,
-        prev_end: u32,
-    }
-
-    impl Attach<'_> {
-        fn fix(&self, floor: u32, doc: &mut Option<Comment>, attrs: &[Attribute], name_start: u32) {
-            if doc.as_ref().is_some_and(|d| d.span.start < floor) {
-                *doc = None;
-            }
-            let Some(last_attr) = attrs.last() else {
-                return;
-            };
-            let from = last_attr.span.end as usize;
-            let Some(between) = self.source.get(from..name_start as usize) else {
-                return;
-            };
-            let Some(open) = between.rfind("/**") else {
-                return;
-            };
-            let Some(len) = between[open..].find("*/") else {
-                return;
-            };
-            let start = (from + open) as u32;
-            let text = &between[open..open + len + 2];
-            *doc = Some(Comment {
-                kind: php_ast::ast::CommentKind::Doc,
-                text: text.into(),
-                span: Span::new(start, start + text.len() as u32),
-            });
-        }
-    }
-
-    impl OwnedFold for Attach<'_> {
-        fn fold_class_member(&mut self, member: ClassMember) -> ClassMember {
-            let floor = self.prev_end;
-            let mut member = fold_owned_class_member(self, member);
-            match &mut member.kind {
-                ClassMemberKind::Property(p) => {
-                    self.fix(floor, &mut p.doc_comment, &p.attributes, p.name.span.start)
-                }
-                ClassMemberKind::Method(m) => {
-                    self.fix(floor, &mut m.doc_comment, &m.attributes, m.name.span.start)
-                }
-                ClassMemberKind::ClassConst(c) => {
-                    self.fix(floor, &mut c.doc_comment, &c.attributes, c.name.span.start)
-                }
-                _ => {}
-            }
-            self.prev_end = member.span.end;
-            member
-        }
-
-        fn fold_enum_member(&mut self, member: EnumMember) -> EnumMember {
-            let floor = self.prev_end;
-            let mut member = fold_owned_enum_member(self, member);
-            match &mut member.kind {
-                EnumMemberKind::Case(c) => {
-                    self.fix(floor, &mut c.doc_comment, &c.attributes, c.name.span.start)
-                }
-                EnumMemberKind::Property(p) => {
-                    self.fix(floor, &mut p.doc_comment, &p.attributes, p.name.span.start)
-                }
-                EnumMemberKind::Method(m) => {
-                    self.fix(floor, &mut m.doc_comment, &m.attributes, m.name.span.start)
-                }
-                EnumMemberKind::ClassConst(c) => {
-                    self.fix(floor, &mut c.doc_comment, &c.attributes, c.name.span.start)
-                }
-                _ => {}
-            }
-            self.prev_end = member.span.end;
-            member
-        }
-
-        fn fold_param(&mut self, param: Param) -> Param {
-            let floor = self.prev_end;
-            let mut param = fold_owned_param(self, param);
-            self.fix(
-                floor,
-                &mut param.doc_comment,
-                &param.attributes,
-                param.name.span.start,
-            );
-            self.prev_end = param.span.end;
-            param
-        }
-    }
-
-    let source = parsed.source.as_str();
-    let docblock_after_attribute = source
-        .match_indices("/**")
-        .any(|(i, _)| source[..i].trim_end().ends_with(']'));
-    if !docblock_after_attribute {
-        return;
-    }
-    let empty = Program {
-        stmts: Box::new([]),
-        span: parsed.program.span,
-    };
-    let program = std::mem::replace(&mut parsed.program, empty);
-    parsed.program = Attach {
-        source: &parsed.source,
-        prev_end: 0,
-    }
-    .fold_program(program);
-}
-
 // ---------------------------------------------------------------------------
 // Name resolution helper — join Name parts to a string
 // ---------------------------------------------------------------------------
@@ -1759,14 +1463,13 @@ mod skip_leading_attributes_tests {
 }
 
 #[cfg(test)]
-mod attach_docblocks_tests {
+mod docblocks_after_attributes_tests {
     use php_ast::owned::{ClassMemberKind, EnumMemberKind, StmtKind};
 
     #[test]
     fn member_and_param_docblocks_after_attributes() {
         let src = "<?php\nclass C {\n    #[A]\n    /** p */\n    public $p;\n    public $plain;\n    #[A]\n    /** c */\n    const X = 1;\n    #[A] /** m */\n    public function m(#[A] /** q */ $q) {}\n}\nenum E {\n    #[A]\n    /** e */\n    case K;\n}\n";
-        let mut parsed = php_rs_parser::parse(src);
-        super::attach_docblocks_after_attributes(&mut parsed);
+        let parsed = php_rs_parser::parse(src);
         let mut docs = Vec::new();
         for stmt in parsed.program.stmts.iter() {
             match &stmt.kind {

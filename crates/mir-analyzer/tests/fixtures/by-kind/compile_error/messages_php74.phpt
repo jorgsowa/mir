@@ -42,3 +42,5 @@ class Collides {
     use Waves, Greets;
 //             ^^^^^^^ CompileError: Trait method hello has not been applied, because there are collisions with other trait methods on Collides [trait-method-collision]
 }
+function class_fetch_on_array(): string { return [1]::class; }
+//                                               ^^^ CompileError: Cannot use ::class with dynamic class name [dynamic-class-fetch]
