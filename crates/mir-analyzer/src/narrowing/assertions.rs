@@ -330,6 +330,12 @@ pub(crate) fn apply_one_assertion(
                     .unwrap_or_else(|| positive_assertion_type(&current, ty, db))
             };
             ctx.narrow_var(&var_name, ty);
+            if !assertion.negated
+                && !assertion.ty.types.is_empty()
+                && assertion.ty.types.iter().all(Atomic::is_object)
+            {
+                crate::taint::guard_object(ctx, &var_name);
+            }
             applied = true;
         } else if let Some((obj, prop)) = extract_chained_prop_access(arg_value) {
             let ty = match template_bindings {
