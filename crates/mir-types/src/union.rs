@@ -2176,6 +2176,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
 
         // PHP callables: string and array are valid callable values
         (Atomic::TString, Atomic::TCallable { .. }) => true,
+        (Atomic::TCallableString, Atomic::TCallable { .. }) => true,
         (Atomic::TNonEmptyString, Atomic::TCallable { .. }) => true,
         (Atomic::TLiteralString(_), Atomic::TCallable { .. }) => true,
         (Atomic::TArray { .. }, Atomic::TCallable { .. }) => true,
