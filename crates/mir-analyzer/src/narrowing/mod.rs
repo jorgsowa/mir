@@ -17,6 +17,7 @@ mod assertions;
 mod class_const_compare;
 mod class_introspection;
 mod core;
+mod dom;
 mod enum_class;
 mod instanceof_core;
 mod instanceof_disjuncts;
@@ -215,6 +216,7 @@ pub fn narrow_from_condition(
             // `count($arr) === N` / `strlen($str) !== N`, etc. — independent of
             // the rest of this arm, mirrors the `<`/`<=`/`>`/`>=` handling below.
             narrow_count_or_strlen_equality(ctx, db, file, &b.left, &b.right, b.op, is_true);
+            dom::narrow_dom_node_type(ctx, &b.left, &b.right, effective_true);
 
             // `($x ?? FALLBACK) === FALLBACK` — on the false branch, $x was defined
             // Must be checked before literal comparisons because `b.right` matching a literal
@@ -928,6 +930,7 @@ pub fn narrow_from_condition(
 
             // `count($arr) == N` / `strlen($str) != N`, etc.
             narrow_count_or_strlen_equality(ctx, db, file, &b.left, &b.right, b.op, is_true);
+            dom::narrow_dom_node_type(ctx, &b.left, &b.right, effective_true);
 
             // `($x ?? FALLBACK) == FALLBACK` / `!= FALLBACK` — same reasoning as the
             // strict `===`/`!==` arm: `same_literal` requires an identical literal

@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `$node->nodeType === XML_ELEMENT_NODE` (also `==`, either side, `!==` before an exit, or the integer value) narrows a `DOMNode` variable to `DOMElement`, and likewise `DOMText`, `DOMComment`, `DOMDocument`, ... for the other `XML_*_NODE` constants, so `$node->getAttribute()` after the check is no longer `UndefinedMethod` (Symfony `XliffFileLoader`).
 - A parameter an assertion proves is an object (an inferred `instanceof` predicate or a declared `@psalm-assert-if-true Closure $v`) guards its taint as an inline `instanceof` does, so request data a caller passes is no longer `TaintedCallable` there (Laravel `Builder::where()`'s `isQueryable($value)` before `whereSub()`).
 - `instanceof` no longer narrows an intersection to a class one of its parts can never also be (two unrelated classes, or a final class); the branch is unreachable instead of carrying `A&ClassX&ClassY`.
 - A plain `Closure` argument fills a `Closure(...): T` or `callable(): T` alternative of a template parameter instead of binding `T` (Laravel `value($view)` on `Closure|string` returns `string`, not `Closure|string`).
