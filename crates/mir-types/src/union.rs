@@ -737,6 +737,7 @@ impl Type {
             |t| matches!(t, Atomic::TMixed | Atomic::TScalar),
             Atomic::TString,
         )
+        .with_callable_form(self, Atomic::TCallableString)
     }
 
     /// Narrow as if `is_int($x)` is true.
@@ -798,6 +799,7 @@ impl Type {
                 value: Box::new(Type::mixed()),
             },
         )
+        .with_callable_form(self, callable_array())
     }
 
     /// Keeps the outer collection kind but turns every nested `non-empty-list`/`non-empty-array`
@@ -982,9 +984,23 @@ impl Type {
         }
         if out.types.is_empty() {
             self.filter(|t| t.is_object())
+                .with_callable_form(self, Atomic::TObject)
         } else {
-            out
+            out.with_callable_form(self, Atomic::TObject)
         }
+    }
+
+    /// Adds `form` when `source` has a plain `callable`, which may be a function-name string,
+    /// a `[class, method]` array or an invokable object.
+    fn with_callable_form(mut self, source: &Type, form: Atomic) -> Type {
+        if source
+            .types
+            .iter()
+            .any(|t| matches!(t, Atomic::TCallable { .. }))
+        {
+            self.add_type(form);
+        }
+        self
     }
 
     /// Narrow as if `is_callable($x)` is true.
@@ -2708,6 +2724,30 @@ impl UnionBuilder {
 
     pub fn build(self) -> Type {
         self.ty
+    }
+}
+
+/// `list{class-string|object, non-empty-string}`: the `[class, method]` form of a callable.
+fn callable_array() -> Atomic {
+    let mut properties = IndexMap::with_capacity(2);
+    properties.insert(
+        ArrayKey::Int(0),
+        KeyedProperty {
+            ty: Type::from_vec(vec![Atomic::TClassString(None), Atomic::TObject]),
+            optional: false,
+        },
+    );
+    properties.insert(
+        ArrayKey::Int(1),
+        KeyedProperty {
+            ty: Type::single(Atomic::TNonEmptyString),
+            optional: false,
+        },
+    );
+    Atomic::TKeyedArray {
+        properties: Box::new(properties),
+        is_open: false,
+        is_list: true,
     }
 }
 

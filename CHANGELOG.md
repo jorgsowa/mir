@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `is_string()`, `is_array()` and `is_object()` on a `callable` narrow it to `callable-string`, `array` and `object` instead of reporting an always-false `RedundantCondition` (Symfony `ErrorHandler`'s `is_array($handler)` on `get_error_handler()`).
 - A `callable-string` argument satisfies a `callable` parameter, as a plain `string` already did, instead of `InvalidArgument` (`expects 'callable', got 'callable-string'`).
 - A set hook with several bad parameters reports only the first error PHP raises (count, then by-reference, variadic, default value, type) instead of each one; an untyped property's typed set parameter no longer reports the type error twice.
 - `$this->prop` inside a deprecated property's own `get` / `set` hook (its backing value) is no longer `DeprecatedProperty` (Symfony `ViewEvent::$controllerArgumentsEvent`).
