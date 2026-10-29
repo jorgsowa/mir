@@ -146,49 +146,23 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Look up the function in the database to get resolved parameter types
         let fn_name = decl.name.as_str().unwrap_or("").to_string();
+        // Another file may declare the same name (a polyfill behind `function_exists()`),
+        // so a declaration whose parameters differ from this one's isn't used.
         let resolve_fn =
             |fqn: &str| -> Option<(Vec<mir_codebase::DeclaredParam>, Option<mir_types::Type>)> {
                 let db = self.db;
                 let here = crate::db::Fqcn::from_str(db, fqn);
-                crate::db::find_function(db, here).map(|f| {
-                    (
-                        f.params.to_vec(),
-                        f.return_type.as_ref().map(|t| (**t).clone()),
-                    )
-                })
-            };
-        let (params, return_ty, resolved_fqn) = if let Some(ns) = self.db.file_namespace(&self.file)
-        {
-            let fqn = format!("{}\\{}", ns, fn_name);
-            if let Some(found) = resolve_fn(&fqn) {
-                (found.0, found.1, Some(fqn))
-            } else if let Some(found) = resolve_fn(&fn_name) {
-                (found.0, found.1, Some(fn_name.clone()))
-            } else {
-                let ast_params: Vec<mir_codebase::DeclaredParam> = decl
-                    .params
-                    .iter()
-                    .map(|p| mir_codebase::DeclaredParam {
-                        closure_this: None,
-                        name: Name::new(p.name.as_str().unwrap_or("").trim_start_matches('$')),
-                        ty: None,
-                        out_ty: None,
-                        doc_type_raw: None,
-                        doc_type_file: None,
-                        has_default: p.default.is_some(),
-                        default_text: None,
-                        is_variadic: p.variadic,
-                        is_byref: p.by_ref,
-                        is_optional: p.default.is_some() || p.variadic,
+                crate::db::find_function_from(db, &self.file, here)
+                    .filter(|f| crate::util::declared_params_match(&f.params, &decl.params))
+                    .map(|f| {
+                        (
+                            f.params.to_vec(),
+                            f.return_type.as_ref().map(|t| (**t).clone()),
+                        )
                     })
-                    .collect();
-                (ast_params, None, None)
-            }
-        } else if let Some(found) = resolve_fn(&fn_name) {
-            (found.0, found.1, Some(fn_name.clone()))
-        } else {
-            let ast_params: Vec<mir_codebase::DeclaredParam> = decl
-                .params
+            };
+        let ast_params = || -> Vec<mir_codebase::DeclaredParam> {
+            decl.params
                 .iter()
                 .map(|p| mir_codebase::DeclaredParam {
                     closure_this: None,
@@ -203,8 +177,22 @@ impl<'a> StatementsAnalyzer<'a> {
                     is_byref: p.by_ref,
                     is_optional: p.default.is_some() || p.variadic,
                 })
-                .collect();
-            (ast_params, None, None)
+                .collect()
+        };
+        let (params, return_ty, resolved_fqn) = if let Some(ns) = self.db.file_namespace(&self.file)
+        {
+            let fqn = format!("{}\\{}", ns, fn_name);
+            if let Some(found) = resolve_fn(&fqn) {
+                (found.0, found.1, Some(fqn))
+            } else if let Some(found) = resolve_fn(&fn_name) {
+                (found.0, found.1, Some(fn_name.clone()))
+            } else {
+                (ast_params(), None, None)
+            }
+        } else if let Some(found) = resolve_fn(&fn_name) {
+            (found.0, found.1, Some(fn_name.clone()))
+        } else {
+            (ast_params(), None, None)
         };
 
         let mut fn_ctx = FlowState::for_function(
