@@ -124,7 +124,7 @@ impl<'a> DefinitionCollector<'a> {
                                     is_static: false,
                                     is_readonly: p.modifiers.is_readonly,
                                     has_native_readonly: p.modifiers.is_readonly,
-                                    is_override: super::has_override_attribute(&p.attributes),
+                                    is_override: self.has_override_attribute(&p.attributes),
                                     default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| Type::mixed()),
                                     ),
@@ -211,7 +211,7 @@ impl<'a> DefinitionCollector<'a> {
                             is_static: p.modifiers.is_static,
                             is_readonly: p.modifiers.is_readonly,
                             has_native_readonly: p.modifiers.is_readonly,
-                            is_override: super::has_override_attribute(&p.attributes),
+                            is_override: self.has_override_attribute(&p.attributes),
                             default: mir_codebase::definitions::wrap_property_type(
                                 p.default.as_ref().map(|d| {
                                     super::literal_types::literal_type(d)

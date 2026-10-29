@@ -159,19 +159,6 @@ fn native_scalar_family(native: &Type) -> Option<fn(&mir_types::atomic::Atomic) 
     })
 }
 
-fn has_override_attribute(attributes: &[php_ast::owned::Attribute]) -> bool {
-    has_attribute(attributes, "Override")
-}
-
-fn has_attribute(attributes: &[php_ast::owned::Attribute], name: &str) -> bool {
-    attributes.iter().any(|a| {
-        a.name
-            .parts
-            .last()
-            .is_some_and(|p| p.as_ref().eq_ignore_ascii_case(name))
-    })
-}
-
 /// True when `hooks` declares a `get` hook with no accompanying `set` hook —
 /// the property is then virtual (no backing storage, never assignable), so
 /// it can never be "left uninitialized" by a constructor. A `set` hook (with
@@ -1151,6 +1138,19 @@ impl<'a> DefinitionCollector<'a> {
 
     fn resolve_name(&self, name: &str) -> String {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
+    }
+
+    fn has_override_attribute(&self, attributes: &[php_ast::owned::Attribute]) -> bool {
+        self.has_attribute(attributes, "Override")
+    }
+
+    /// Whether one of `attributes` names the global class `name`.
+    fn has_attribute(&self, attributes: &[php_ast::owned::Attribute], name: &str) -> bool {
+        attributes.iter().any(|a| {
+            self.resolve_ast_name(&a.name)
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case(name)
+        })
     }
 
     fn resolve_ast_name(&self, name: &php_ast::owned::Name) -> String {
@@ -2837,7 +2837,7 @@ impl<'a> DefinitionCollector<'a> {
         };
 
         let method_name = m.name.as_str().unwrap_or_default();
-        let is_override = has_override_attribute(&m.attributes);
+        let is_override = self.has_override_attribute(&m.attributes);
         // PHPUnit invokes `@dataProvider`/`#[DataProvider]` targets by name via
         // reflection, so they never get an ordinary call-site reference.
         let mut data_provider_targets: Vec<Arc<str>> = doc

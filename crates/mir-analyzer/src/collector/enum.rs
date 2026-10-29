@@ -320,7 +320,7 @@ impl DefinitionCollector<'_> {
                         is_static: p.modifiers.is_static,
                         is_readonly: p.modifiers.is_readonly || prop_doc.is_readonly,
                         has_native_readonly: p.modifiers.is_readonly,
-                        is_override: super::has_override_attribute(&p.attributes),
+                        is_override: self.has_override_attribute(&p.attributes),
                         default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: Self::deprecated_from_doc_or_attrs(

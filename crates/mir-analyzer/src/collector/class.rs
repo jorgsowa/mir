@@ -227,7 +227,7 @@ impl<'a> DefinitionCollector<'a> {
                                         || class_doc.is_readonly,
                                     has_native_readonly: decl.modifiers.is_readonly
                                         || p.modifiers.is_readonly,
-                                    is_override: super::has_override_attribute(&p.attributes),
+                                    is_override: self.has_override_attribute(&p.attributes),
                                     default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     ),
@@ -357,7 +357,7 @@ impl<'a> DefinitionCollector<'a> {
                             || prop_doc.is_readonly
                             || class_doc.is_readonly,
                         has_native_readonly: p.modifiers.is_readonly || decl.modifiers.is_readonly,
-                        is_override: super::has_override_attribute(&p.attributes),
+                        is_override: self.has_override_attribute(&p.attributes),
                         default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
@@ -696,10 +696,8 @@ impl<'a> DefinitionCollector<'a> {
             is_internal: class_doc.is_internal,
             is_immutable: class_doc.is_immutable,
             attribute_flags: parse_attribute_flags(&decl.attributes),
-            allows_dynamic_properties: super::has_attribute(
-                &decl.attributes,
-                "AllowDynamicProperties",
-            ),
+            allows_dynamic_properties: self
+                .has_attribute(&decl.attributes, "AllowDynamicProperties"),
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             type_aliases: Self::stored_type_aliases(&type_aliases),
             pending_import_types: class_doc

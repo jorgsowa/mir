@@ -287,7 +287,7 @@ impl<'a> DefinitionCollector<'a> {
                             is_static: p.modifiers.is_static,
                             is_readonly: p.modifiers.is_readonly,
                             has_native_readonly: p.modifiers.is_readonly,
-                            is_override: super::has_override_attribute(&p.attributes),
+                            is_override: self.has_override_attribute(&p.attributes),
                             default: None,
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(
