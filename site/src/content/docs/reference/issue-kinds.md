@@ -63,6 +63,7 @@ All issue types mir can emit, grouped by category.
 | `DirectConstructorCall` | Direct call to `__construct()` outside of a constructor chain. |
 | `InvalidPropertyFetch` | Property access on a non-object type. |
 | `InvalidMethodCall` | Method call on a non-object type. |
+| `InvalidUnpack` | A scalar or `null` unpacked into a call with `...`. |
 | `InvalidArrayAccess` | Array-style access on a non-array, non-string, non-`ArrayAccess` type. |
 | `InvalidArrayAssignment` | Array-style assignment on a non-array type. |
 | `Trace` | Internal/debug output of the `@trace` annotation, showing the inferred type of an expression. Not a project diagnostic. |

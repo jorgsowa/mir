@@ -8,11 +8,11 @@ pub(crate) mod method;
 mod opaque_callback;
 mod static_call;
 
-pub(crate) use args::substitute_static_in_return;
 pub use args::{
     check_constructor_args, distinct_spans_for_expansion, expand_sole_spread_arg,
     spread_element_type, CheckArgsParams,
 };
+pub(crate) use args::{substitute_static_in_return, unpacked_arg_type};
 pub(crate) use callable::callable_string_token_span;
 pub(crate) use function::{extract_class_docblock, report_undefined_function};
 pub(crate) use static_call::{

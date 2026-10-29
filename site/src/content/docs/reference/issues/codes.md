@@ -99,6 +99,7 @@ issues keep their code.
 | MIR0228  | NotAnInterface                | [type-mismatches/not-an-interface](../type-mismatches/not-an-interface/) |
 | MIR0229  | DivisionByZero                | [type-mismatches/division-by-zero](../type-mismatches/division-by-zero/) |
 | MIR0230  | InvalidMethodCall             | [type-mismatches/invalid-method-call](../type-mismatches/invalid-method-call/) |
+| MIR0231  | InvalidUnpack                 | [type-mismatches/invalid-unpack](../type-mismatches/invalid-unpack/) |
 | MIR0300  | InvalidArrayOffset            | [array/invalid-array-offset](../array/invalid-array-offset/) |
 | MIR0301  | NonExistentArrayOffset        | [array/non-existent-array-offset](../array/non-existent-array-offset/) |
 | MIR0302  | PossiblyInvalidArrayOffset    | [array/possibly-invalid-array-offset](../array/possibly-invalid-array-offset/) |

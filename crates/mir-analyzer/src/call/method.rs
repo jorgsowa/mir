@@ -21,8 +21,7 @@ use crate::symbol::ReferenceKind;
 
 use super::args::{
     check_args, check_method_visibility, distinct_spans_for_expansion, expand_sole_spread_arg,
-    expr_can_be_passed_by_reference_owned, spread_element_type, substitute_static_in_return,
-    CheckArgsParams,
+    expr_can_be_passed_by_reference_owned, substitute_static_in_return, CheckArgsParams,
 };
 use super::CallAnalyzer;
 
@@ -652,7 +651,7 @@ impl CallAnalyzer {
                 sole_spread_ty = Some(ty.clone());
             }
             arg_types.push(if arg.unpack() {
-                spread_element_type(ea.db, &ty)
+                super::unpacked_arg_type(ea, &ty, arg.span)
             } else {
                 ty
             });

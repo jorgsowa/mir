@@ -87,6 +87,38 @@ pub fn check_constructor_args(
     );
 }
 
+/// The argument type `f(...$x)` passes for each element; reports an `$x` that holds only
+/// scalars or `null`, which PHP throws on, and passes `never` so the call reports nothing more.
+pub(crate) fn unpacked_arg_type(ea: &mut ExpressionAnalyzer<'_>, ty: &Type, span: Span) -> Type {
+    let mut names: Vec<&str> = Vec::new();
+    for atomic in ty.types.iter() {
+        let name = match atomic {
+            Atomic::TNull => "null",
+            Atomic::TBool => "bool",
+            Atomic::TTrue => "true",
+            Atomic::TFalse => "false",
+            Atomic::TFloat | Atomic::TLiteralFloat(..) | Atomic::TIntegralFloat => "float",
+            a if a.is_int() => "int",
+            a if a.is_string() => "string",
+            _ => return spread_element_type(ea.db, ty),
+        };
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    if names.is_empty() {
+        return spread_element_type(ea.db, ty);
+    }
+    ea.emit(
+        IssueKind::InvalidUnpack {
+            ty: names.join("|"),
+        },
+        Severity::Error,
+        span,
+    );
+    Type::never()
+}
+
 /// For a spread (`...`) argument, return the union of value types across all array atomics.
 /// E.g. `array<int, int>` → `int`, `list<string>` → `string`, `mixed` → `mixed`.
 pub fn spread_element_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {

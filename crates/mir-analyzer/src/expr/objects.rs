@@ -401,7 +401,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if n.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
                 }
-                arg_types.push(crate::call::spread_element_type(self.db, &ty));
+                arg_types.push(crate::call::unpacked_arg_type(self, &ty, a.span));
             } else {
                 arg_types.push(ty);
             }

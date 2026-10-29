@@ -215,6 +215,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_method_call/`.
     InvalidMethodCall { method: String, ty: String },
+    /// Emitted by `mir-analyzer/src/call/args.rs` for `f(...$x)` with a scalar or `null`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_unpack/`.
+    InvalidUnpack { ty: String },
     /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_array_access/`.
     InvalidArrayAccess { ty: String },
@@ -966,6 +969,7 @@ impl IssueKind {
             | IssueKind::InaccessibleProperty { .. }
             | IssueKind::InvalidReturnType { .. }
             | IssueKind::InvalidArgument { .. }
+            | IssueKind::InvalidUnpack { .. }
             | IssueKind::TooFewArguments { .. }
             | IssueKind::TooManyArguments { .. }
             | IssueKind::InvalidNamedArgument { .. }
@@ -1237,6 +1241,7 @@ impl IssueKind {
             IssueKind::PossiblyNullOperand { .. } => "MIR0214",
             IssueKind::DivisionByZero { .. } => "MIR0229",
             IssueKind::InvalidMethodCall { .. } => "MIR0230",
+            IssueKind::InvalidUnpack { .. } => "MIR0231",
             IssueKind::RawObjectIteration { .. } => "MIR0222",
             IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
@@ -1421,14 +1426,14 @@ impl IssueKind {
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0016" | "MIR0200"
             | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215"
-            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701"
-            | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708"
-            | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715"
-            | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228" | "MIR0229"
-            | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805" | "MIR0806"
-            | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205" | "MIR1207"
-            | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
-            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0600" | "MIR0601" | "MIR0700"
+            | "MIR0701" | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
+            | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714"
+            | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228"
+            | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805"
+            | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205"
+            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602"
+            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1499,6 +1504,7 @@ impl IssueKind {
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
             IssueKind::InvalidMethodCall { .. } => "InvalidMethodCall",
+            IssueKind::InvalidUnpack { .. } => "InvalidUnpack",
             IssueKind::InvalidArrayAccess { .. } => "InvalidArrayAccess",
             IssueKind::PossiblyInvalidArrayAccess { .. } => "PossiblyInvalidArrayAccess",
             IssueKind::InvalidArrayAssignment { .. } => "InvalidArrayAssignment",
@@ -1824,6 +1830,9 @@ impl IssueKind {
             }
             IssueKind::InvalidMethodCall { method, ty } => {
                 format!("Cannot call method {method}() on non-object type '{ty}'")
+            }
+            IssueKind::InvalidUnpack { ty } => {
+                format!("Only arrays and Traversables can be unpacked, {ty} given")
             }
             IssueKind::InvalidArrayAccess { ty } => {
                 format!("Cannot use [] operator on non-array type '{ty}'")
@@ -2789,6 +2798,7 @@ mod code_tests {
                 method: s(),
                 ty: s(),
             },
+            IssueKind::InvalidUnpack { ty: s() },
             IssueKind::InvalidArrayAccess { ty: s() },
             IssueKind::PossiblyInvalidArrayAccess { ty: s() },
             IssueKind::InvalidArrayAssignment { ty: s() },
@@ -3210,6 +3220,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 179);
+        assert_eq!(one_of_each().len(), 180);
     }
 }

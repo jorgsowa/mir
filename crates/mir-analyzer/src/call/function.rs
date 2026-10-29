@@ -20,7 +20,7 @@ use crate::taint::{reaches_sink, SinkKind};
 
 use super::args::{
     check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
-    expr_can_be_passed_by_reference_owned, spread_element_type, CheckArgsParams,
+    expr_can_be_passed_by_reference_owned, CheckArgsParams,
 };
 use super::builtin_purity::{
     arg_dependent_builtin_purity, callback_builtin_call_is_pure, invoked_type_is_impure,
@@ -231,7 +231,7 @@ impl CallAnalyzer {
                                 if call.args.len() == 1 {
                                     sole_spread_ty = Some(ty.clone());
                                 }
-                                inner_arg_types.push(spread_element_type(ea.db, &ty));
+                                inner_arg_types.push(super::unpacked_arg_type(ea, &ty, arg.span));
                             } else {
                                 inner_arg_types.push(ty);
                             }
@@ -573,7 +573,7 @@ impl CallAnalyzer {
                 if call.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
                 }
-                arg_types.push(spread_element_type(ea.db, &ty));
+                arg_types.push(super::unpacked_arg_type(ea, &ty, arg.span));
             } else {
                 arg_types.push(ty);
             }
