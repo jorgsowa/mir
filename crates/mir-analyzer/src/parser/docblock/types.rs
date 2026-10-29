@@ -271,6 +271,16 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         let parts = split_intersection(s);
         if parts.len() > 1 {
             let parts: Vec<Type> = parts.iter().map(|p| parse_type_string(p.trim())).collect();
+            // `non-empty-string&lowercase-string` is the narrowest of its scalar parts.
+            let is_scalar = |part: &Type| part.types.iter().all(|a| a.is_string() || a.is_int());
+            if parts.iter().all(is_scalar) {
+                if let Some(narrowest) = parts
+                    .iter()
+                    .find(|part| parts.iter().all(|other| part.is_subtype_structural(other)))
+                {
+                    return narrowest.clone();
+                }
+            }
             return Type::single(Atomic::TIntersection {
                 parts: mir_types::union::vec_to_type_params(parts),
             });

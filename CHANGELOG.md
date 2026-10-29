@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A docblock intersection of scalar types is its narrowest part (`non-empty-string&lowercase-string` is `non-empty-string`, `positive-int&int<1, 10>` is `int<1, 10>`): it was an intersection no string or int fit, so Laravel `Str::lower()` results reported `InvalidReturnType` and always-false `ImpossibleIdenticalComparison`.
 - `catch` and `finally` see what a `try` body ending in `return` or `throw` assigned (a by-reference argument included) as possibly defined: `try { return $this->raw($meta); } catch (\Throwable $e) { $this->finish($meta); }` reported `UndefinedVariable` (Symfony `HttpKernel`), and a variable assigned there was always-false `RedundantCondition` in `finally` / `catch` (Laravel `DatabaseQueue`).
 - `!is_callable($c)` drops the `[class, method]` array that `is_array()` narrows a `callable` to, so `is_array($by) && !is_callable($by)` leaves only the non-callable array (Laravel `Collection::sortBy()` `PossiblyInvalidArgument`).
 - A function declared inside an `if` (a polyfill behind `function_exists()`) is checked with its own parameters and return type when another file declares the same name: symfony/polyfill-intl-grapheme reported `UndefinedVariable` for its parameters and polyfill-uuid `InvalidReturnType` against another file's signature.
