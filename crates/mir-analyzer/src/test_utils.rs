@@ -1713,12 +1713,22 @@ fn issue_failures(expected: &[ExpectedIssue], actual: &[Issue], is_multi: bool) 
         }
     }
 
-    for act in actual {
+    for (i, act) in actual.iter().enumerate() {
         if !expected.iter().any(|e| issue_matches(act, e)) {
             failures.push(format!("  UNEXPECTED {}", fmt_actual(act, is_multi)));
         }
+        // Expected issues are matched as a set, so a repeat would pass unseen.
+        if actual[..i].iter().any(|earlier| same_issue(earlier, act)) {
+            failures.push(format!("  DUPLICATE {}", fmt_actual(act, is_multi)));
+        }
     }
     failures
+}
+
+fn same_issue(a: &Issue, b: &Issue) -> bool {
+    a.location == b.location
+        && a.kind.name() == b.kind.name()
+        && a.kind.message() == b.kind.message()
 }
 
 fn issue_matches(actual: &Issue, expected: &ExpectedIssue) -> bool {
@@ -2183,6 +2193,28 @@ mod parser_validation {
             (Some(4), Some(3), Some(6), Some(2))
         );
         assert_eq!((b.kind_name.as_str(), b.message.as_str()), ("M", "multi"));
+    }
+
+    #[test]
+    fn repeated_actual_issue_is_a_duplicate() {
+        let f = p(
+            "===file===\n<?php\nfoo();\n//<^^^ UndefinedFunction: Function foo() is not defined\n",
+        );
+        let issue = mir_issues::Issue::new(
+            mir_issues::IssueKind::UndefinedFunction {
+                name: "foo".to_string(),
+            },
+            mir_issues::Location {
+                file: std::sync::Arc::from("a.php"),
+                line: 2,
+                line_end: 2,
+                col_start: 0,
+                col_end: 3,
+            },
+        );
+        let failures = super::issue_failures(&f.expected, &[issue.clone(), issue], false);
+        assert_eq!(failures.len(), 1, "{failures:?}");
+        assert!(failures[0].starts_with("  DUPLICATE "), "{failures:?}");
     }
 
     #[test]
