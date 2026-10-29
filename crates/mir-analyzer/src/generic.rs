@@ -768,6 +768,12 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
             (Atomic::TNamedObject { fqcn: cf, .. }, Atomic::TNamedObject { fqcn: af, .. })
                 if cf == af
         )
+        // A plain `Closure` argument fills a `Closure(...)`/`callable` alternative.
+        || matches!(
+            (concrete, arg),
+            (Atomic::TClosure { .. } | Atomic::TCallable { .. }, Atomic::TNamedObject { fqcn, .. })
+                if fqcn.eq_ignore_ascii_case("Closure")
+        )
 }
 
 fn has_callable_atomic(ty: &Type) -> bool {
