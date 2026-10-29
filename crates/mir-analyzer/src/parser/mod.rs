@@ -28,6 +28,7 @@ pub(crate) fn parse_error_issues(
     let backing_types = unparsed_backing_types(source, parsed, version);
     let keyword_enum = keyword_enum_name(source, parsed, version);
     let keyword_enum_recovery = keyword_enum.as_ref().map(|k| k.recovery.clone());
+    let shadowed_set_hook = shadowed_set_hook_errors(parsed);
     parsed
         .errors
         .iter()
@@ -41,6 +42,7 @@ pub(crate) fn parse_error_issues(
                     .as_ref()
                     .is_some_and(|r| r.contains(&err.span().start))
                 && !shadowed_by_final_abstract(err, &parsed.errors)
+                && !shadowed_set_hook.contains(&(err.span().start, err.forbidden_rule()))
         })
         .filter_map(|err| {
             let mut issue = parse_error_to_issue(err, file, source, parsed, version);
@@ -379,6 +381,81 @@ fn shadowed_by_final_abstract(
             other.forbidden_rule() == Some(ForbiddenRule::AbstractFinalConflict)
                 && other.span().start == err.span().start
         })
+}
+
+/// PHP's order among a set hook's parameter errors; it reports only the first.
+fn set_hook_error_rank(rule: Option<ForbiddenRule>) -> Option<u8> {
+    match rule? {
+        ForbiddenRule::SetHookParameterCount => Some(0),
+        ForbiddenRule::SetHookParameterByReference => Some(1),
+        ForbiddenRule::SetHookParameterVariadic => Some(2),
+        ForbiddenRule::SetHookParameterDefault => Some(3),
+        ForbiddenRule::SetHookParameterType => Some(4),
+        _ => None,
+    }
+}
+
+/// The set-hook parameter errors after the first one PHP reports for the same hook.
+fn shadowed_set_hook_errors(
+    parsed: &php_rs_parser::ParseResult,
+) -> Vec<(u32, Option<ForbiddenRule>)> {
+    let errors: Vec<_> = parsed
+        .errors
+        .iter()
+        .filter_map(|err| Some((set_hook_error_rank(err.forbidden_rule())?, err)))
+        .collect();
+    if errors.len() < 2 {
+        return Vec::new();
+    }
+    let mut hooks = SetHookSpans(Vec::new());
+    for stmt in &parsed.program.stmts {
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut hooks, stmt);
+    }
+    // A nested hook comes after the hook containing it, so the last match is the innermost.
+    let hook_of = |err: &php_rs_parser::diagnostics::ParseError| {
+        let offset = err.span().start;
+        hooks
+            .0
+            .iter()
+            .rposition(|s| s.start <= offset && offset < s.end)
+    };
+    // Per hook: (hook, rank, index into `errors`) of the error PHP reports.
+    let mut reported: Vec<(usize, u8, usize)> = Vec::new();
+    for (i, (rank, err)) in errors.iter().enumerate() {
+        let Some(hook) = hook_of(err) else {
+            continue;
+        };
+        match reported.iter_mut().find(|(h, _, _)| *h == hook) {
+            Some(first) if *rank < first.1 => *first = (hook, *rank, i),
+            Some(_) => {}
+            None => reported.push((hook, *rank, i)),
+        }
+    }
+    errors
+        .iter()
+        .enumerate()
+        .filter(|(i, (_, err))| {
+            hook_of(err).is_some() && !reported.iter().any(|(_, _, kept)| kept == i)
+        })
+        .map(|(_, (_, err))| (err.span().start, err.forbidden_rule()))
+        .collect()
+}
+
+/// Spans of `set` hooks, in source order.
+struct SetHookSpans(Vec<Span>);
+
+impl php_ast::owned::visitor::OwnedVisitor for SetHookSpans {
+    type Break = ();
+
+    fn visit_property_hook(
+        &mut self,
+        hook: &php_ast::owned::PropertyHook,
+    ) -> std::ops::ControlFlow<Self::Break> {
+        if hook.kind == php_ast::ast::PropertyHookKind::Set {
+            self.0.push(hook.span);
+        }
+        php_ast::owned::visitor::walk_owned_property_hook(self, hook)
+    }
 }
 
 /// Convert a parser diagnostic to a [`mir_issues::Issue`], using the source
