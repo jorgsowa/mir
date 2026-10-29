@@ -1869,8 +1869,10 @@ pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
         fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
             match &expr.kind {
                 ExprKind::Yield(_) => ControlFlow::Break(()),
-                // Closures and arrow functions are separate function scopes.
-                ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => ControlFlow::Continue(()),
+                // Closures, arrow functions and anonymous class methods are separate function scopes.
+                ExprKind::Closure(_) | ExprKind::ArrowFunction(_) | ExprKind::AnonymousClass(_) => {
+                    ControlFlow::Continue(())
+                }
                 _ => crate::recursion::walk_expr(self, expr),
             }
         }
