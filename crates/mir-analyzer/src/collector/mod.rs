@@ -1153,6 +1153,34 @@ impl<'a> DefinitionCollector<'a> {
         })
     }
 
+    /// The class an `instanceof` operand names; `None` for `static`, `parent` or a dynamic one.
+    fn instanceof_class_name(
+        &self,
+        expr: &php_ast::owned::Expr,
+        class_fqcn: Option<&str>,
+    ) -> Option<String> {
+        use php_ast::ast::NameKind;
+        let php_ast::owned::ExprKind::Name(name) = &expr.kind else {
+            return None;
+        };
+        match (name.kind, &*name.parts) {
+            (NameKind::Error, _) => None,
+            (NameKind::Unqualified, [only]) if only.eq_ignore_ascii_case("self") => {
+                class_fqcn.map(str::to_string)
+            }
+            (NameKind::Unqualified, [only])
+                if only.eq_ignore_ascii_case("static") || only.eq_ignore_ascii_case("parent") =>
+            {
+                None
+            }
+            _ => Some(
+                self.resolve_ast_name(name)
+                    .trim_start_matches('\\')
+                    .to_string(),
+            ),
+        }
+    }
+
     fn resolve_ast_name(&self, name: &php_ast::owned::Name) -> String {
         use php_ast::ast::NameKind;
         match (name.kind, &*name.parts) {
@@ -2829,10 +2857,18 @@ impl<'a> DefinitionCollector<'a> {
                 template_params_for_resolve,
                 class_fqcn,
             );
-            if explicit.is_empty() {
-                annotation::synthesize_predicate_assertions(m)
-            } else {
+            if !explicit.is_empty() {
                 explicit
+            } else {
+                let predicate = annotation::synthesize_predicate_assertions(m);
+                match &m.body {
+                    Some(body) if predicate.is_empty() => {
+                        annotation::synthesize_instanceof_assertions(&m.params, &body.stmts, |e| {
+                            self.instanceof_class_name(e, Some(class_fqcn))
+                        })
+                    }
+                    _ => predicate,
+                }
             }
         };
 

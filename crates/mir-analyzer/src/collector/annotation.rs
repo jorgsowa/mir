@@ -104,6 +104,86 @@ pub(super) fn synthesize_predicate_assertions(m: &php_ast::owned::MethodDecl) ->
     ]
 }
 
+/// Infers `@psalm-assert-if-true A|B $p` (and its if-false negation) for a body that is only
+/// `return $p instanceof A || $p instanceof B;` over one of `params`, as Psalm does.
+/// `class_name` resolves an `instanceof` operand and returns `None` for one it can't name.
+pub(super) fn synthesize_instanceof_assertions(
+    params: &[php_ast::owned::Param],
+    body: &[php_ast::owned::Stmt],
+    class_name: impl Fn(&php_ast::owned::Expr) -> Option<String>,
+) -> Vec<Assertion> {
+    use php_ast::owned::StmtKind;
+
+    let [stmt] = body else {
+        return Vec::new();
+    };
+    let StmtKind::Return(Some(expr)) = &stmt.kind else {
+        return Vec::new();
+    };
+    let mut classes = Vec::new();
+    let Some(var) = instanceof_chain(expr, &class_name, &mut classes) else {
+        return Vec::new();
+    };
+    if !params
+        .iter()
+        .any(|p| p.name.as_str() == Some(var) && !p.variadic)
+    {
+        return Vec::new();
+    }
+    let ty = Type::from_vec(
+        classes
+            .into_iter()
+            .map(|fqcn| mir_types::Atomic::TNamedObject {
+                fqcn: fqcn.as_str().into(),
+                type_params: Vec::new().into(),
+            })
+            .collect(),
+    );
+    let param: Arc<str> = Arc::from(var);
+    vec![
+        Assertion {
+            kind: AssertionKind::AssertIfTrue,
+            param: param.clone(),
+            param_key: Vec::new(),
+            ty: ty.clone(),
+            negated: false,
+        },
+        Assertion {
+            kind: AssertionKind::AssertIfFalse,
+            param,
+            param_key: Vec::new(),
+            ty,
+            negated: true,
+        },
+    ]
+}
+
+/// The variable `expr` tests with `instanceof` (alone or `||`-joined), pushing each class.
+fn instanceof_chain<'a>(
+    expr: &'a php_ast::owned::Expr,
+    class_name: &impl Fn(&php_ast::owned::Expr) -> Option<String>,
+    classes: &mut Vec<String>,
+) -> Option<&'a str> {
+    use php_ast::ast::BinaryOp;
+    use php_ast::owned::ExprKind;
+
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) => instanceof_chain(inner, class_name, classes),
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+            let ExprKind::Variable(var) = &b.left.kind else {
+                return None;
+            };
+            classes.push(class_name(&b.right)?);
+            Some(&**var)
+        }
+        ExprKind::Binary(b) if matches!(b.op, BinaryOp::BooleanOr | BinaryOp::LogicalOr) => {
+            let left = instanceof_chain(&b.left, class_name, classes)?;
+            (instanceof_chain(&b.right, class_name, classes)? == left).then_some(left)
+        }
+        _ => None,
+    }
+}
+
 /// Gives an assertion-less method the `@psalm-assert $this->prop` assertions of a
 /// same-class method it calls as a top-level `$this->callee();` statement,
 /// unless a later top-level statement reassigns that property.

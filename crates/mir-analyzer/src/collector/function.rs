@@ -331,13 +331,20 @@ impl DefinitionCollector<'_> {
             Some(Arc::from(doc.description.as_str()))
         };
 
-        let assertions = self.build_assertions(
+        let mut assertions = self.build_assertions(
             &doc,
             Some(&type_aliases),
             &template_names,
             &template_params,
             fqn.as_str(),
         );
+        if assertions.is_empty() {
+            assertions = super::annotation::synthesize_instanceof_assertions(
+                &decl.params,
+                &decl.body.stmts,
+                |e| self.instanceof_class_name(e, None),
+            );
+        }
 
         let storage = FunctionDef {
             fqn: fqn.clone().into(),

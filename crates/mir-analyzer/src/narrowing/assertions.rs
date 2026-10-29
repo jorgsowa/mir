@@ -326,7 +326,8 @@ pub(crate) fn apply_one_assertion(
             let ty = if assertion.negated {
                 negate_assertion_type(&current, &ty, db)
             } else {
-                positive_assertion_type(&current, ty, db)
+                instanceof_assertion_type(&current, &ty, db, &ctx.template_param_names)
+                    .unwrap_or_else(|| positive_assertion_type(&current, ty, db))
             };
             ctx.narrow_var(&var_name, ty);
             applied = true;
@@ -339,7 +340,8 @@ pub(crate) fn apply_one_assertion(
             let ty = if assertion.negated {
                 negate_assertion_type(&current, &ty, db)
             } else {
-                positive_assertion_type(&current, ty, db)
+                instanceof_assertion_type(&current, &ty, db, &ctx.template_param_names)
+                    .unwrap_or_else(|| positive_assertion_type(&current, ty, db))
             };
             // `$obj->prop` on a null `$obj` reads as null, so proving
             // the property itself is non-nullable also proves `$obj`
@@ -530,6 +532,7 @@ pub(super) fn resolve_static_call_class_fqcn(
 /// asserted `array<string>` still takes the assertion, as does any `current`
 /// holding more `mixed` components than `asserted`.
 fn positive_assertion_type(current: &Type, asserted: Type, db: &dyn MirDatabase) -> Type {
+    let asserted = without_unknown_classes(asserted, db);
     if !current.types.is_empty()
         && !current.is_mixed()
         && crate::subtype::is_subtype(db, current, &asserted)
@@ -540,6 +543,52 @@ fn positive_assertion_type(current: &Type, asserted: Type, db: &dyn MirDatabase)
     } else {
         asserted
     }
+}
+
+/// `current` narrowed as `instanceof` each of `asserted`'s classes would, keeping what's known
+/// about it; `None` unless `asserted` is only plain classes and some of `current` matches.
+fn instanceof_assertion_type(
+    current: &Type,
+    asserted: &Type,
+    db: &dyn MirDatabase,
+    template_param_names: &rustc_hash::FxHashSet<mir_types::Name>,
+) -> Option<Type> {
+    let asserted = without_unknown_classes(asserted.clone(), db);
+    let classes: Vec<&str> = asserted
+        .types
+        .iter()
+        .map(|a| match a {
+            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
+                Some(fqcn.as_ref())
+            }
+            _ => None,
+        })
+        .collect::<Option<_>>()?;
+    let mut narrowed = Type::empty();
+    for class in classes {
+        let part = super::instanceof_core::narrow_instanceof_preserving_subtypes(
+            current,
+            class,
+            db,
+            template_param_names,
+        );
+        for atomic in part.types {
+            narrowed.add_type(atomic);
+        }
+    }
+    (!narrowed.types.is_empty()).then_some(narrowed)
+}
+
+/// `asserted` without classes that don't exist, which no value can be an instance of;
+/// unchanged when nothing else would remain.
+fn without_unknown_classes(asserted: Type, db: &dyn MirDatabase) -> Type {
+    let unknown = |a: &Atomic| matches!(a, Atomic::TNamedObject { fqcn, .. } if !crate::db::class_exists(db, fqcn));
+    if !asserted.types.iter().any(unknown) || asserted.types.iter().all(unknown) {
+        return asserted;
+    }
+    let mut known = asserted.clone();
+    known.types.retain(|a| !unknown(a));
+    known
 }
 
 fn mixed_component_count(ty: &Type) -> usize {
