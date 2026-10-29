@@ -511,12 +511,14 @@ pub(super) fn narrow_or_instanceof_union(
 
 /// Whether a value could simultaneously be (a subtype of) both `a` and `b` —
 /// true when either is an interface (a class can implement any number of
-/// interfaces), false when both are concrete classes, which PHP's single
+/// interfaces) and the other isn't a final class, false when both are concrete classes, which PHP's single
 /// inheritance makes mutually exclusive unless one already extends the other
 /// (checked separately by the caller via `named_object_matches_instanceof`).
 fn classes_can_coexist(a: &str, b: &str, db: &dyn MirDatabase) -> bool {
-    crate::db::class_kind(db, a).is_some_and(|k| k.is_interface)
-        || crate::db::class_kind(db, b).is_some_and(|k| k.is_interface)
+    let is_interface = |c: &str| crate::db::class_kind(db, c).is_some_and(|k| k.is_interface);
+    // A final class that isn't already the other type never will be.
+    let is_sealed = |c: &str| !is_interface(c) && crate::db::is_final(db, c);
+    (is_interface(a) && !is_sealed(b)) || (is_interface(b) && !is_sealed(a))
 }
 
 pub(super) fn filter_out_instanceof_match(

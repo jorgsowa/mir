@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A plain `Closure` argument fills a `Closure(...): T` or `callable(): T` alternative of a template parameter instead of binding `T` (Laravel `value($view)` on `Closure|string` returns `string`, not `Closure|string`).
+- `$x instanceof SomeInterface` no longer keeps a final class or enum that doesn't implement it as `Final&SomeInterface`; it is dropped, so `Shape|Box` checked `instanceof` a final unrelated class is an always-false `RedundantCondition`.
 - A ternary branch its condition rules out (`$s instanceof Htmlable ? $s->toHtml() : $s` on a `string`) is no longer analyzed, as the right side of `&&` already isn't, so it reports no `InvalidMethodCall`.
 - `is_string()`, `is_array()` and `is_object()` on a `callable` narrow it to `callable-string`, `array` and `object` instead of reporting an always-false `RedundantCondition` (Symfony `ErrorHandler`'s `is_array($handler)` on `get_error_handler()`).
 - A `callable-string` argument satisfies a `callable` parameter, as a plain `string` already did, instead of `InvalidArgument` (`expects 'callable', got 'callable-string'`).
