@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `$this->prop` inside a deprecated property's own `get` / `set` hook (its backing value) is no longer `DeprecatedProperty` (Symfony `ViewEvent::$controllerArgumentsEvent`).
 - Before PHP 8.0 a `mixed` hint is reported once as `UndefinedClass` (`Class App\mixed does not exist`) and typed `mixed`, instead of being silently treated as a class that every argument, return and assignment failed against.
 - An array of intersection elements (`array<int, Focusable&Widget>`) satisfies an array of one of the parts (`Focusable[]`, `list<Widget>`) instead of `InvalidReturnType` (Symfony `FocusManager`).
 - A value typed `object` (an anonymous class) returned where an intersection is declared (`: \Traversable&\Stringable`) is a less specific return, as for a single class, instead of `InvalidReturnType` (Symfony `JsonStreamWriter`, Laravel `EloquentUserProvider`).

@@ -13,6 +13,7 @@ impl<'a> StatementsAnalyzer<'a> {
     fn analyze_property_hooks_stmt(
         &mut self,
         hooks: &[PropertyHook],
+        property_name: &str,
         property_ty: Option<mir_types::Type>,
         fqcn: &Arc<str>,
         parent_fqcn: &Option<Arc<str>>,
@@ -87,6 +88,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 PropertyHookKind::Set => "__property_set",
                 _ => "__property_hook",
             }));
+            hook_ctx.hooked_property = Some(Arc::from(property_name));
             for p in hook.params.iter() {
                 if let Some(default) = &p.default {
                     let mut default_ctx = hook_ctx.clone();
@@ -342,6 +344,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     });
                     self.analyze_property_hooks_stmt(
                         &prop.hooks,
+                        prop.name.as_str().unwrap_or(""),
                         property_ty,
                         &fqcn,
                         &parent_fqcn,
@@ -391,6 +394,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     });
                     self.analyze_property_hooks_stmt(
                         &p.hooks,
+                        property_name,
                         property_ty,
                         &fqcn,
                         &parent_fqcn,

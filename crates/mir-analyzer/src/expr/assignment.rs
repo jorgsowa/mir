@@ -1880,7 +1880,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                             // Emit DeprecatedProperty if the property is deprecated
                             if let Some(ref p) = prop_def {
-                                if let Some(msg) = &p.deprecated {
+                                if let Some(msg) = p
+                                    .deprecated
+                                    .as_ref()
+                                    .filter(|_| !ctx.in_own_hook(&prop_owner, &prop_name))
+                                {
                                     self.emit(
                                         IssueKind::DeprecatedProperty {
                                             class: fqcn.to_string(),

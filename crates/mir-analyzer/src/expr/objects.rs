@@ -2074,7 +2074,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         prop_name,
                     );
                     if let Some((owner, p)) = prop_result {
-                        if let Some(msg) = &p.deprecated {
+                        if let Some(msg) = p
+                            .deprecated
+                            .as_ref()
+                            .filter(|_| !ctx.in_own_hook(owner.as_ref(), prop_name))
+                        {
                             self.emit(
                                 IssueKind::DeprecatedProperty {
                                     class: fqcn.to_string(),
@@ -2365,7 +2369,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         prop_name,
                     );
                     if let Some((owner, p)) = prop_result {
-                        if let Some(msg) = &p.deprecated {
+                        if let Some(msg) = p
+                            .deprecated
+                            .as_ref()
+                            .filter(|_| !ctx.in_own_hook(owner.as_ref(), prop_name))
+                        {
                             self.emit(
                                 IssueKind::DeprecatedProperty {
                                     class: fqcn.to_string(),

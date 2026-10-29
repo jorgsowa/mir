@@ -195,6 +195,9 @@ pub struct FlowState {
     /// `None` for free functions and closures.
     pub current_method_name: Option<Arc<str>>,
 
+    /// The property whose hook is being analyzed; `$this->prop` there is its backing value.
+    pub hooked_property: Option<Arc<str>>,
+
     /// The FQN of the free function currently being analyzed, if any.
     /// `None` for methods (use `self_fqcn` + `current_method_name` instead)
     /// and for closures. Lets a callee identify "which function am I in" so
@@ -640,6 +643,15 @@ impl FlowState {
         })
     }
 
+    /// Whether this is a hook of `owner::$prop`, where reading or writing it touches the backing value.
+    pub(crate) fn in_own_hook(&self, owner: &str, prop: &str) -> bool {
+        self.hooked_property.as_deref() == Some(prop)
+            && self
+                .self_fqcn
+                .as_deref()
+                .is_some_and(|fqcn| fqcn.eq_ignore_ascii_case(owner))
+    }
+
     pub(crate) fn set_unknown_this(&mut self) {
         let this = Name::from("this");
         Arc::make_mut(&mut self.vars).insert(
@@ -686,6 +698,7 @@ impl FlowState {
             is_generator: false,
             inside_constructor: false,
             current_method_name: None,
+            hooked_property: None,
             current_function_fqn: None,
             template_scope_method: None,
             template_scope_function: None,

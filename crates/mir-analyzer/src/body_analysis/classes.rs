@@ -108,6 +108,7 @@ impl<'a> BodyAnalyzer<'a> {
     fn analyze_property_hooks(
         &self,
         hooks: &[php_ast::owned::PropertyHook],
+        property_name: &str,
         property_ty: Option<mir_types::Type>,
         fqcn: &str,
         parent_fqcn: Option<Arc<str>>,
@@ -243,6 +244,7 @@ impl<'a> BodyAnalyzer<'a> {
                 php_ast::ast::PropertyHookKind::Set => "__property_set",
                 _ => "__property_hook",
             }));
+            ctx.hooked_property = Some(Arc::from(property_name));
 
             seed_param_locations(&mut ctx, &hook.params, source, source_map);
             record_param_symbols(
@@ -1166,6 +1168,7 @@ impl<'a> BodyAnalyzer<'a> {
                 });
                 self.analyze_property_hooks(
                     &param.hooks,
+                    property_name,
                     property_ty,
                     fqcn,
                     cx.parent_fqcn.clone(),
@@ -1722,6 +1725,7 @@ impl<'a> BodyAnalyzer<'a> {
                     });
                     self.analyze_property_hooks(
                         &prop.hooks,
+                        prop.name.as_str().unwrap_or(""),
                         property_ty,
                         fqcn,
                         parent_fqcn.clone(),
@@ -1974,6 +1978,7 @@ impl<'a> BodyAnalyzer<'a> {
                     });
                     self.analyze_property_hooks(
                         &prop.hooks,
+                        prop.name.as_str().unwrap_or(""),
                         property_ty,
                         fqcn,
                         parent_fqcn.clone(),
