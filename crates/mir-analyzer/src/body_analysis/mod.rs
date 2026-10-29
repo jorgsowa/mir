@@ -712,32 +712,18 @@ impl ParamOrderVisitor<'_> {
         let is_promoted =
             |p: &php_ast::owned::Param| p.modifiers.visibility.is_some() || p.modifiers.is_readonly;
         let mut found: Vec<Finding> = Vec::new();
-        let compile_error = |message| IssueKind::CompileError {
-            message,
-            code: "promoted-implicit-nullable".to_string(),
-        };
         let deprecation_8_4 = self.php_version >= PhpVersion::new(8, 4);
-        for p in params.iter().filter(|p| implicitly_nullable(p)) {
-            let name = p.name.as_str().unwrap_or_default();
-            if is_promoted(p) {
-                let hint = p
-                    .type_hint
-                    .as_ref()
-                    .and_then(|h| crate::parser::span_text(self.source, h.span))
-                    .unwrap_or_default();
+        // A promoted one is the parser's `default-value-type` compile error.
+        if deprecation_8_4 {
+            for p in params
+                .iter()
+                .filter(|p| implicitly_nullable(p) && !is_promoted(p))
+            {
                 found.push((
                     p.span,
                     format!(
-                        "Cannot use null as default value for parameter ${name} of type {hint}"
-                    ),
-                    compile_error,
-                    false,
-                ));
-            } else if deprecation_8_4 {
-                found.push((
-                    p.span,
-                    format!(
-                        "Implicitly marking parameter ${name} as nullable is deprecated, the explicit nullable type must be used instead"
+                        "Implicitly marking parameter ${} as nullable is deprecated, the explicit nullable type must be used instead",
+                        p.name.as_str().unwrap_or_default()
                     ),
                     |message| IssueKind::ImplicitlyNullableParameter { message },
                     true,

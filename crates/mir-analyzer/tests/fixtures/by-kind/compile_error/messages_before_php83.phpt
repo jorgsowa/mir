@@ -54,7 +54,7 @@ class D { public static $x; }
 class C extends D { function f() { parent::$x::get(); } }
 enum F {
     final abstract function f();
-//  ^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract class member [abstract-enum-method]
+//  ^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract class member [abstract-final-conflict]
 }
 enum G {
     abstract function a();

@@ -9,7 +9,7 @@ A promoted constructor parameter cannot be made nullable by a `null` default; it
 final class Point {
     public function __construct(
         public int $x = null,
-//      ^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use null as default value for parameter $x of type int [promoted-implicit-nullable]
+//                      ^^^^ CompileError: Cannot use null as default value for parameter $x of type int [default-value-type]
         private readonly ?int $y = null,
         protected int|null $z = null,
         int $plain = null,

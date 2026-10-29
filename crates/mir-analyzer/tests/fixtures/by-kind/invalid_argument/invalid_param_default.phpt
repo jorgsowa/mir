@@ -10,3 +10,4 @@ Invalid param default
 ===file===
 <?php
 function f(int $p = false) {}
+//                  ^^^^^ CompileError: Cannot use bool as default value for parameter $p of type int [default-value-type]

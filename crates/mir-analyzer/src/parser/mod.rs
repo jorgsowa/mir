@@ -24,7 +24,7 @@ pub(crate) fn parse_error_issues(
     parsed: &php_rs_parser::ParseResult,
     version: PhpVersion,
 ) -> Vec<mir_issues::Issue> {
-    let abstract_methods = abstract_methods_by_class(source, parsed, version);
+    let abstract_methods = abstract_methods_by_class(parsed, version);
     let backing_types = unparsed_backing_types(source, parsed, version);
     let keyword_enum = keyword_enum_name(source, parsed, version);
     let keyword_enum_start = keyword_enum.as_ref().map(|k| k.enum_start);
@@ -38,15 +38,11 @@ pub(crate) fn parse_error_issues(
                     .iter()
                     .any(|b| b.header.contains(&err.span().start))
                 && keyword_enum_start.is_none_or(|start| err.span().start < start)
+                && !shadowed_by_final_abstract(err, &parsed.errors)
         })
         .filter_map(|err| {
             let mut issue = parse_error_to_issue(err, file, source, parsed, version);
-            let grouped = matches!(
-                err.forbidden_rule(),
-                Some(
-                    ForbiddenRule::AbstractEnumMethod | ForbiddenRule::AbstractAnonymousClassMethod
-                )
-            );
+            let grouped = err.forbidden_rule() == Some(ForbiddenRule::AbstractAnonymousClassMethod);
             if let Some(class) = abstract_methods
                 .iter()
                 .find(|c| grouped && c.offsets.contains(&err.span().start))
@@ -55,7 +51,7 @@ pub(crate) fn parse_error_issues(
                     return None;
                 }
                 if let mir_issues::IssueKind::CompileError { message, .. } = &mut issue.kind {
-                    *message = class.message(version);
+                    *message = class.message();
                 }
             }
             Some(issue)
@@ -295,10 +291,6 @@ fn unreported_compile_errors(
         message,
         code: code.to_string(),
     };
-    let mut finder = UnreportedDecls::default();
-    for stmt in &parsed.program.stmts {
-        let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut finder, stmt);
-    }
     let mut issues: Vec<_> = backing_types
         .iter()
         .map(|b| {
@@ -308,43 +300,6 @@ fn unreported_compile_errors(
             )
         })
         .collect();
-    for (name, span) in finder.trait_names {
-        let lower = name.to_ascii_lowercase();
-        let reserved = match lower.as_str() {
-            "mixed" => version >= PhpVersion::new(8, 0),
-            "never" => version >= PhpVersion::new(8, 1),
-            other => RESERVED_CLASS_NAMES.contains(&other),
-        };
-        if !reserved {
-            continue;
-        }
-        let message = if version < PhpVersion::new(8, 4) {
-            format!("Cannot use '{name}' as class name as it is reserved")
-        } else {
-            format!("Cannot use \"{name}\" as a trait name as it is reserved")
-        };
-        issues.push(issue_at(
-            compile_error(message, "keyword-as-declaration-name"),
-            span,
-        ));
-    }
-    // From 8.0 `__clone()` may declare `void`, which the parser accepts on every version.
-    if version < PhpVersion::new(8, 0) {
-        for (method_start, return_span) in finder.clone_return_types {
-            let Some((class, method)) =
-                find_decl(&parsed.program, method_start, DeclTarget::Method)
-            else {
-                continue;
-            };
-            issues.push(issue_at(
-                compile_error(
-                    format!("Clone method {class}::{method}() cannot declare a return type"),
-                    "magic-method-return-type",
-                ),
-                return_span,
-            ));
-        }
-    }
     // Before property hooks `parent::$x::get()` is a static call on `parent::$x`.
     if version < PhpVersion::new(8, 4) {
         for err in &parsed.errors {
@@ -369,67 +324,6 @@ fn unreported_compile_errors(
         }
     }
     issues
-}
-
-/// Trait names, and the return types of `__clone()` methods, for checks the parser skips.
-#[derive(Default)]
-struct UnreportedDecls {
-    trait_names: Vec<(String, Span)>,
-    /// Method start and return type span; PHP 7.4 skips interface methods.
-    clone_return_types: Vec<(u32, Span)>,
-    in_interface: bool,
-}
-
-impl php_ast::owned::visitor::OwnedVisitor for UnreportedDecls {
-    type Break = ();
-
-    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
-        use php_ast::owned::StmtKind;
-        if let StmtKind::Trait(t) = &stmt.kind {
-            if let Some(name) = t.name.as_str() {
-                self.trait_names.push((name.to_string(), t.name.span));
-            }
-        }
-        let outer = self.in_interface;
-        match &stmt.kind {
-            StmtKind::Interface(_) => self.in_interface = true,
-            StmtKind::Class(_) | StmtKind::Trait(_) | StmtKind::Enum(_) => {
-                self.in_interface = false
-            }
-            _ => {}
-        }
-        let flow = crate::recursion::walk_stmt(self, stmt);
-        self.in_interface = outer;
-        flow
-    }
-
-    fn visit_class_member(
-        &mut self,
-        member: &php_ast::owned::ClassMember,
-    ) -> std::ops::ControlFlow<()> {
-        if let php_ast::owned::ClassMemberKind::Method(m) = &member.kind {
-            if let (Some(rt), false, true) = (
-                &m.return_type,
-                self.in_interface,
-                m.name
-                    .as_str()
-                    .is_some_and(|n| n.eq_ignore_ascii_case("__clone")),
-            ) {
-                self.clone_return_types.push((member.span.start, rt.span));
-            }
-        }
-        php_ast::owned::visitor::walk_owned_class_member(self, member)
-    }
-
-    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
-        let outer = self.in_interface;
-        if let php_ast::owned::ExprKind::AnonymousClass(_) = &expr.kind {
-            self.in_interface = false;
-        }
-        let flow = crate::recursion::walk_expr(self, expr);
-        self.in_interface = outer;
-        flow
-    }
 }
 
 /// Whether the innermost class-like around `offset` is a class with a parent (`None`: not a class).
@@ -473,17 +367,16 @@ impl php_ast::owned::visitor::OwnedVisitor for EnclosingClass {
     }
 }
 
-/// A class-like's abstract methods that PHP reports together, before 8.5.
+/// An anonymous class's abstract methods that PHP reports together, before 8.5.
 struct AbstractMethods {
     class: String,
-    is_enum: bool,
     methods: Vec<String>,
     /// Offsets of the parser's per-method diagnostics.
     offsets: Vec<u32>,
 }
 
 impl AbstractMethods {
-    fn message(&self, version: PhpVersion) -> String {
+    fn message(&self) -> String {
         let count = self.methods.len();
         let plural = if count == 1 { "" } else { "s" };
         let mut list: Vec<String> = self
@@ -496,23 +389,16 @@ impl AbstractMethods {
             list.push("...".to_string());
         }
         let list = list.join(", ");
-        if self.is_enum && version >= PhpVersion::new(8, 2) {
-            format!(
-                "Enum {} must implement {count} abstract private method{plural} ({list})",
-                self.class
-            )
-        } else {
-            format!(
-                "Class {} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining methods ({list})",
-                self.class
-            )
-        }
+        format!(
+            "Class {} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining methods ({list})",
+            self.class
+        )
     }
 }
 
-/// Before 8.5 PHP aggregates the abstract methods of an enum or anonymous class into one error.
+/// Before 8.5 PHP aggregates the abstract methods of an anonymous class into one error;
+/// the parser already aggregates an enum's.
 fn abstract_methods_by_class(
-    source: &str,
     parsed: &php_rs_parser::ParseResult,
     version: PhpVersion,
 ) -> Vec<AbstractMethods> {
@@ -521,16 +407,7 @@ fn abstract_methods_by_class(
         return Vec::new();
     }
     for err in &parsed.errors {
-        let is_enum = match err.forbidden_rule() {
-            Some(ForbiddenRule::AbstractEnumMethod) => true,
-            Some(ForbiddenRule::AbstractAnonymousClassMethod) => false,
-            _ => continue,
-        };
-        // `final abstract` is PHP's modifier error, reported on its own.
-        if is_enum
-            && php_message(err, source, &parsed.program, version)
-                .is_some_and(|m| m.contains("final modifier"))
-        {
+        if err.forbidden_rule() != Some(ForbiddenRule::AbstractAnonymousClassMethod) {
             continue;
         }
         let start = err.span().start;
@@ -548,7 +425,6 @@ fn abstract_methods_by_class(
                 scope,
                 AbstractMethods {
                     class,
-                    is_enum,
                     methods: vec![method],
                     offsets: vec![start],
                 },
@@ -556,6 +432,18 @@ fn abstract_methods_by_class(
         }
     }
     classes.into_iter().map(|(_, group)| group).collect()
+}
+
+/// An enum's abstract-method error on a `final abstract` method, where PHP stops at the modifier error.
+fn shadowed_by_final_abstract(
+    err: &php_rs_parser::diagnostics::ParseError,
+    errors: &[php_rs_parser::diagnostics::ParseError],
+) -> bool {
+    err.forbidden_rule() == Some(ForbiddenRule::AbstractEnumMethod)
+        && errors.iter().any(|other| {
+            other.forbidden_rule() == Some(ForbiddenRule::AbstractFinalConflict)
+                && other.span().start == err.span().start
+        })
 }
 
 /// Convert a parser diagnostic to a [`mir_issues::Issue`], using the source
@@ -621,7 +509,10 @@ fn is_compile_error(
         // A parameter modifier is a syntax error before 8.3, `readonly` before 8.1.
         ForbiddenRule::ModifierNotAllowed => {
             version >= PhpVersion::new(8, 3)
-                || version >= PhpVersion::new(8, 1) && err.to_string().ends_with(" on a method")
+                || version >= PhpVersion::new(8, 1) && {
+                    let message = err.to_string();
+                    message.ends_with(" on a method") || message.ends_with(" as method modifier")
+                }
         }
         ForbiddenRule::InvalidCurlyInterpolation => false,
         ForbiddenRule::CurlyOffsetAccess => version < PhpVersion::new(8, 4),
@@ -645,8 +536,9 @@ fn raised_at(
         // Before 8.0 PHP checks only that these three declare no return type.
         Some(ForbiddenRule::MagicMethodReturnType) if version < PhpVersion::new(8, 0) => {
             let message = err.to_string();
-            message.ends_with("cannot declare a return type")
-                || message.to_ascii_lowercase().contains("::__clone(): ")
+            (message.ends_with("cannot declare a return type")
+                || message.to_ascii_lowercase().contains("::__clone(): "))
+                && !declared_in_interface(source, program, err.span().start)
         }
         Some(ForbiddenRule::MagicMethodParameterType) => version >= PhpVersion::new(8, 0),
         // Before property hooks `parent::$x::get()` calls `get()` on the class `parent::$x` names.
@@ -682,6 +574,17 @@ fn raised_at(
         }
         _ => true,
     }
+}
+
+/// Whether the method declared at `offset` belongs to an interface, which PHP 7.4 does not check.
+fn declared_in_interface(source: &str, program: &php_ast::owned::Program, offset: u32) -> bool {
+    find_decl_in_scope(program, offset, DeclTarget::Method).is_some_and(|(_, _, scope)| {
+        let start = skip_leading_attributes(source, scope) as usize;
+        source.get(start..).is_some_and(|rest| {
+            rest.get(..9)
+                .is_some_and(|word| word.eq_ignore_ascii_case("interface"))
+        })
+    })
 }
 
 /// The repeated modifier of a promoted parameter the parser rejects, which
@@ -1045,25 +948,6 @@ fn php_message(
         ForbiddenRule::StaticReadonlyProperty => (DeclTarget::Property, |class, prop| {
             format!("Static property {class}::${prop} cannot be readonly")
         }),
-        // PHP checks the modifiers first; the span covers them.
-        ForbiddenRule::AbstractEnumMethod
-            if source
-                .get(err.span().start as usize..err.span().end as usize)
-                .is_some_and(|modifiers| {
-                    modifiers
-                        .split_whitespace()
-                        .any(|m| m.eq_ignore_ascii_case("final"))
-                }) =>
-        {
-            return Some(if before(8, 3) {
-                "Cannot use the final modifier on an abstract class member".to_string()
-            } else {
-                "Cannot use the final modifier on an abstract method".to_string()
-            });
-        }
-        ForbiddenRule::AbstractEnumMethod => (DeclTarget::Method, |enum_name, method| {
-            format!("Enum method {enum_name}::{method}() must not be abstract")
-        }),
         ForbiddenRule::InvalidEnumBackingType => (DeclTarget::EnumBackingType, |_, ty| {
             format!("Enum backing type must be int or string, {ty} given")
         }),
@@ -1328,6 +1212,8 @@ const ANALYZER_COVERED_RULES: &[ForbiddenRule] = &[
     ForbiddenRule::VoidReturnValue,
     ForbiddenRule::NeverReturn,
     ForbiddenRule::ReadonlyPropertyDefault,
+    ForbiddenRule::EnumCaseValueType,
+    ForbiddenRule::DuplicateEnumCaseValue,
 ];
 
 fn is_analyzer_covered_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
@@ -1740,13 +1626,18 @@ mod analyzer_covered_tests {
         "<?php\nfunction f(): void { return 1; }\n",
         "<?php\nfunction f(): never { return; }\n",
         "<?php\nclass A { public readonly int $x = 1; }\n",
+        "<?php\nenum E: int { case A = 'a'; }\n",
+        "<?php\nenum E: int { case A = 1; case B = 1; }\n",
     ];
 
     #[test]
     fn every_covered_rule_matches_its_parser_diagnostic() {
         assert_eq!(SOURCES.len(), ANALYZER_COVERED_RULES.len());
+        // The enum case rules are PHP 8.1's only.
+        let options =
+            php_rs_parser::ParseOptions::default().version(php_rs_parser::PhpVersion::Php81);
         for (src, rule) in SOURCES.iter().zip(ANALYZER_COVERED_RULES) {
-            let parsed = php_rs_parser::parse(src);
+            let parsed = php_rs_parser::parse_with(src, &options);
             let rules: Vec<_> = parsed.errors.iter().map(|e| e.forbidden_rule()).collect();
             assert_eq!(rules, [Some(*rule)], "{src:?}: {:?}", parsed.errors);
             assert!(parsed.errors.iter().all(is_redundant_parse_error));

@@ -7,7 +7,7 @@ PHP 8.4's texts: #[\Deprecated] targets and the plural "remaining methods".
 ===file===
 <?php
 #[Deprecated]
-//^^^^^^^^^^ CompileError: Attribute "Deprecated" cannot target class (allowed targets: function, method, class constant) [deprecated-on-invalid-target]
+//^^^^^^^^^^ CompileError: Attribute "Deprecated" cannot target class (allowed targets: function, method, class constant) [attribute-target-mismatch]
 class A {
     #[Deprecated]
 //    ^^^^^^^^^^ CompileError: Attribute "Deprecated" cannot target property (allowed targets: function, method, class constant) [attribute-target-mismatch]

@@ -10,4 +10,5 @@ Incorrect callable param default
 <?php
 class A {
     public function foo(callable $_a = "strlen"): void {}
+//                                     ^^^^^^^^ CompileError: Cannot use string as default value for parameter $_a of type callable [default-value-type]
 }

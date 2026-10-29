@@ -10,7 +10,7 @@ enum Suit: string {
     case Hearts = 'h';
 
     final abstract public function label(): string;
-//  ^^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract method [abstract-enum-method]
+//  ^^^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use the final modifier on an abstract method [abstract-final-conflict]
 }
 Suit::Hearts->value = 'x';
 //<^^^^^^^^^^^^^^^^^^^ CompileError: Cannot use temporary expression in write context [temporary-expression-write]
