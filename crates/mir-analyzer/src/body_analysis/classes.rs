@@ -690,7 +690,7 @@ impl<'a> BodyAnalyzer<'a> {
         // raw docblock, as functions.rs does) means `@template`/`@psalm-type`
         // are already resolved exactly like the `@return` check above, with no
         // need to re-derive alias/template awareness by hand.
-        if method.params.len() == params.len() {
+        if crate::util::declared_params_match(&params, &method.params) {
             let header_span = method.name.span;
             let (header_line, header_col_start) =
                 crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);

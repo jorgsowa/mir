@@ -98,13 +98,7 @@ impl<'a> BodyAnalyzer<'a> {
             Arc<[Arc<str>]>,
         ) = match &resolved {
             Some((_, storage)) => {
-                if storage.params.len() == decl.params.len()
-                    && storage
-                        .params
-                        .iter()
-                        .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.as_str().unwrap_or("") == cp.name.as_ref())
-                {
+                if crate::util::declared_params_match(&storage.params, &decl.params) {
                     (
                         Arc::clone(&storage.params),
                         storage.return_type.as_deref().cloned(),
@@ -290,7 +284,8 @@ impl<'a> BodyAnalyzer<'a> {
         issues: &mut Vec<Issue>,
     ) {
         let fn_name = decl.name.as_str().unwrap_or("");
-        let stored_params_match = stored.is_some_and(|s| s.params.len() == decl.params.len());
+        let stored_params_match =
+            stored.is_some_and(|s| crate::util::declared_params_match(&s.params, &decl.params));
         if decl.return_type.is_none()
             && stored.is_none_or(|s| s.return_type.is_none())
             && !fn_name.is_empty()
@@ -713,12 +708,7 @@ impl<'a> BodyAnalyzer<'a> {
             Arc<[Arc<str>]>,
         ) = match &resolved {
             Some((_, storage))
-                if storage.params.len() == decl.params.len()
-                    && storage
-                        .params
-                        .iter()
-                        .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.as_str().unwrap_or("") == cp.name.as_ref()) =>
+                if crate::util::declared_params_match(&storage.params, &decl.params) =>
             {
                 (
                     Arc::clone(&storage.params),
@@ -908,13 +898,7 @@ impl<'a> BodyAnalyzer<'a> {
             Arc<[Arc<str>]>,
         ) = match &resolved {
             Some((_, storage)) => {
-                if storage.params.len() == decl.params.len()
-                    && storage
-                        .params
-                        .iter()
-                        .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.as_str().unwrap_or("") == cp.name.as_ref())
-                {
+                if crate::util::declared_params_match(&storage.params, &decl.params) {
                     (
                         Arc::clone(&storage.params),
                         storage.return_type.as_deref().cloned(),

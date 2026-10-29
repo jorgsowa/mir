@@ -186,6 +186,22 @@ fn reconcile_builtin_shadow_name(
     }
 }
 
+/// Whether the collector's `declared` params are `params` one to one, ignoring the
+/// untyped variadic it adds for a body that calls `func_get_args()`.
+pub(crate) fn declared_params_match(
+    declared: &[mir_codebase::DeclaredParam],
+    params: &[php_ast::owned::Param],
+) -> bool {
+    let declared = match declared.split_last() {
+        Some((last, rest)) if last.name.as_ref() == "..." => rest,
+        _ => declared,
+    };
+    declared.len() == params.len()
+        && declared.iter().zip(params).all(|(declared, param)| {
+            param.name.as_str().unwrap_or("").trim_start_matches('$') == declared.name.as_ref()
+        })
+}
+
 /// Param-list counterpart of [`reconcile_docblock_builtin_shadow`] — applied
 /// to a function/method's stored `DeclaredParam` list right before it seeds
 /// body-analysis flow state, so a docblock-shadowed builtin param type
