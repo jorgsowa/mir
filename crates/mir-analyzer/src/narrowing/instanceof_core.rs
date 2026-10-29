@@ -179,6 +179,7 @@ pub(super) fn narrow_instanceof_preserving_subtypes(
             Atomic::TObject | Atomic::TMixed | Atomic::TCallable { .. } => {
                 result.add_type(narrowed_ty.clone())
             }
+            Atomic::TIntersection { parts } if intersection_excludes(parts, class_name, db) => {}
             // `$x instanceof C` on an `A&B`-typed value adds C to the
             // intersection rather than replacing it — the value is still
             // guaranteed to be an A and a B, so dropping them here would
@@ -384,7 +385,12 @@ pub(super) fn narrow_or_instanceof_union(
             }
             Atomic::TIntersection { parts } => {
                 let mut remaining = Type::empty();
+                let mut possible = false;
                 for cn in class_names {
+                    if intersection_excludes(parts, cn, db) {
+                        continue;
+                    }
+                    possible = true;
                     let already_covered = parts.iter().any(|p| {
                         p.types.iter().any(|a| {
                             matches!(a, Atomic::TNamedObject { fqcn, .. }
@@ -417,6 +423,10 @@ pub(super) fn narrow_or_instanceof_union(
                         });
                         remaining.add_type(projected_atom.unwrap_or_else(|| class_atom(cn)));
                     }
+                }
+                if !possible {
+                    // No disjunct can coexist with the intersection.
+                    continue;
                 }
                 if remaining.is_empty() {
                     result.add_type(atomic.clone());
@@ -507,6 +517,18 @@ pub(super) fn narrow_or_instanceof_union(
     // flag the branch as unreachable instead of silently widening a
     // provably-impossible `instanceof` chain to `A|B`.
     result
+}
+
+/// Whether a part of the intersection `parts` can never also be a `class_name`.
+fn intersection_excludes(parts: &[Type], class_name: &str, db: &dyn MirDatabase) -> bool {
+    parts.iter().any(|p| {
+        p.types.iter().any(|a| {
+            matches!(a, Atomic::TNamedObject { fqcn, .. }
+                if !named_object_matches_instanceof(fqcn, class_name, db)
+                    && !named_object_matches_instanceof(class_name, fqcn, db)
+                    && !classes_can_coexist(fqcn, class_name, db))
+        })
+    })
 }
 
 /// Whether a value could simultaneously be (a subtype of) both `a` and `b` —

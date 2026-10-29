@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `instanceof` no longer narrows an intersection to a class one of its parts can never also be (two unrelated classes, or a final class); the branch is unreachable instead of carrying `A&ClassX&ClassY`.
 - A plain `Closure` argument fills a `Closure(...): T` or `callable(): T` alternative of a template parameter instead of binding `T` (Laravel `value($view)` on `Closure|string` returns `string`, not `Closure|string`).
 - `$x instanceof SomeInterface` no longer keeps a final class or enum that doesn't implement it as `Final&SomeInterface`; it is dropped, so `Shape|Box` checked `instanceof` a final unrelated class is an always-false `RedundantCondition`.
 - A ternary branch its condition rules out (`$s instanceof Htmlable ? $s->toHtml() : $s` on a `string`) is no longer analyzed, as the right side of `&&` already isn't, so it reports no `InvalidMethodCall`.
