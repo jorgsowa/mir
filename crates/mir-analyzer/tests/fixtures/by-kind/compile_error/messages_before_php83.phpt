@@ -28,6 +28,8 @@ class B extends self {
     use T { f as static h; }
 //               ^^^^^^ CompileError: Cannot use 'static' as method modifier [invalid-trait-alias-modifier]
 }
+class AliasReadonly { use T { f as readonly g; } }
+//                                 ^^^^^^^^ CompileError: Cannot use 'readonly' as method modifier [modifier-not-allowed]
 class int {}
 //    ^^^ CompileError: Cannot use 'int' as class name as it is reserved [reserved-class-name]
 enum string {}

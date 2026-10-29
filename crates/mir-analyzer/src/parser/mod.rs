@@ -590,6 +590,14 @@ fn php_message(
                 "Access type for interface method {interface}::{method}() must be omitted"
             ));
         }
+        // The parser words a trait alias's `readonly` in 8.3's text on every version.
+        ForbiddenRule::ModifierNotAllowed if before(8, 3) => {
+            let message = parser_message();
+            let modifier = message
+                .strip_prefix("Cannot use the ")?
+                .strip_suffix(" modifier on a method")?;
+            return Some(format!("Cannot use '{modifier}' as method modifier"));
+        }
         ForbiddenRule::InvalidTraitAliasModifier if before(8, 3) => {
             let message = parser_message();
             let modifier = message.split('"').nth(1)?;
