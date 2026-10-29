@@ -119,7 +119,7 @@ fn main() {
         let result =
             analyzer.analyze_diagnostics_only(file, &source, &parsed.program, &parsed.source_map);
         total_issues += result.issues.len();
-        total_symbols += result.symbols.len();
+        total_symbols += result.symbols().len();
     }
     let elapsed = t2.elapsed();
     eprintln!(

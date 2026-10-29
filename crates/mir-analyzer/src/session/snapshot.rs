@@ -1862,7 +1862,7 @@ mod tests {
                 .iter()
                 .map(|i| format!("{:?}", i.kind))
                 .collect(),
-            symbols: analysis.symbols.len(),
+            symbols: analysis.symbols().len(),
             vendor_class_loaded: {
                 let view = session.db_view();
                 let db = view.db();

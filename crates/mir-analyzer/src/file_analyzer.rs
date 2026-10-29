@@ -27,7 +27,7 @@ use crate::symbol::{NavigationFact, ResolvedNavigationFact, ResolvedSymbol};
 /// Result of a single-file analysis.
 pub struct FileAnalysis {
     pub issues: Vec<Issue>,
-    pub symbols: Vec<ResolvedSymbol>,
+    symbols: Vec<ResolvedSymbol>,
     symbol_index: OnceLock<SymbolIndex>,
 }
 
@@ -47,18 +47,25 @@ impl FileAnalysis {
     /// (line, column) → byte offset → resolved symbol, then look up the
     /// symbol's definition via [`crate::AnalysisSession::definition_of`] or
     /// type info via [`ResolvedSymbol::resolved_type`].
-    ///
-    /// Indexed on first call; in-place edits to `symbols` after that are not seen.
     pub fn symbol_at(&self, byte_offset: u32) -> Option<&ResolvedSymbol> {
-        let index = self
-            .symbol_index
-            .get_or_init(|| SymbolIndex::new(&self.symbols));
-        if !index.matches(&self.symbols) {
-            return symbol_at(&self.symbols, byte_offset);
-        }
-        index
+        self.symbol_index
+            .get_or_init(|| SymbolIndex::new(&self.symbols))
             .best_at(byte_offset)
             .map(|idx| &self.symbols[idx as usize])
+    }
+
+    /// Every resolved symbol recorded in the file.
+    pub fn symbols(&self) -> &[ResolvedSymbol] {
+        &self.symbols
+    }
+
+    pub fn set_symbols(&mut self, symbols: Vec<ResolvedSymbol>) {
+        self.symbols = symbols;
+        self.symbol_index = OnceLock::new();
+    }
+
+    pub fn into_symbols(self) -> Vec<ResolvedSymbol> {
+        self.symbols
     }
 }
 
@@ -115,9 +122,6 @@ impl ContainingIndex {
 
 /// Position index over a [`FileAnalysis`]'s symbols with [`best_at`]'s precedence.
 struct SymbolIndex {
-    /// Identity of the `symbols` buffer the index was built from.
-    symbols_addr: usize,
-    symbols_len: usize,
     by_span: ContainingIndex,
     /// `(end, len, symbol index)`, sorted.
     by_end: Vec<(u32, u32, u32)>,
@@ -132,18 +136,12 @@ impl SymbolIndex {
             .collect();
         by_end.sort_unstable();
         Self {
-            symbols_addr: symbols.as_ptr() as usize,
-            symbols_len: symbols.len(),
             by_span: ContainingIndex::new(indexed().map(|(s, idx)| (s.span, idx))),
             by_end,
             by_expr_span: ContainingIndex::new(
                 indexed().filter_map(|(s, idx)| s.expr_span.map(|es| (es, idx))),
             ),
         }
-    }
-
-    fn matches(&self, symbols: &[ResolvedSymbol]) -> bool {
-        self.symbols_addr == symbols.as_ptr() as usize && self.symbols_len == symbols.len()
     }
 
     fn best_at(&self, byte_offset: u32) -> Option<u32> {
@@ -1442,7 +1440,7 @@ echo $repo->getArrayCopy()[0] ?? $n, \App\Repo::LIMIT;
         };
         let mut analysis = super::FileAnalysis::new(Vec::new(), vec![symbol(span(0, 5))]);
         assert!(analysis.symbol_at(2).is_some());
-        analysis.symbols = vec![symbol(span(10, 15))];
+        analysis.set_symbols(vec![symbol(span(10, 15))]);
         assert!(analysis.symbol_at(2).is_none());
         assert!(analysis.symbol_at(12).is_some());
     }

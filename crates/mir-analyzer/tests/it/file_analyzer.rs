@@ -142,11 +142,11 @@ function demo(): void {
     );
 
     assert!(
-        !full.symbols.is_empty(),
+        !full.symbols().is_empty(),
         "full open-file analysis should still collect navigation symbols"
     );
     assert!(
-        diag_only.symbols.is_empty(),
+        diag_only.symbols().is_empty(),
         "diagnostics-only analysis should skip whole-file symbol retention"
     );
     assert_eq!(
@@ -169,7 +169,7 @@ function demo(): void {
     let analysis = session.analyze_file_diagnostics("/proj/helper.php", src);
 
     assert!(
-        analysis.symbols.is_empty(),
+        analysis.symbols().is_empty(),
         "session diagnostics helper should not retain whole-file symbols"
     );
     assert!(
@@ -190,7 +190,7 @@ function broken( {
     let analysis = session.analyze_file_diagnostics("/proj/broken.php", src);
 
     assert!(
-        analysis.symbols.is_empty(),
+        analysis.symbols().is_empty(),
         "parse-error diagnostics helper path should not retain symbols"
     );
     assert!(

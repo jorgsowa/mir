@@ -715,7 +715,7 @@ function run(Dep $dep): int {
                     &parsed.source_map,
                 );
                 assert!(
-                    analysis.symbols.is_empty(),
+                    analysis.symbols().is_empty(),
                     "diagnostics path should not retain whole-file symbols"
                 );
                 assert!(
@@ -740,7 +740,7 @@ function run(Dep $dep): int {
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(first.symbols.is_empty());
+    assert!(first.symbols().is_empty());
     let first_issue_kinds: Vec<_> = first.issues.iter().map(|issue| issue.kind.name()).collect();
 
     let mut warm_group = c.benchmark_group("diagnostics_only_warm");
@@ -754,7 +754,7 @@ function run(Dep $dep): int {
                 &parsed.program,
                 &parsed.source_map,
             );
-            assert!(analysis.symbols.is_empty());
+            assert!(analysis.symbols().is_empty());
             let issue_kinds: Vec<_> = analysis
                 .issues
                 .iter()
@@ -794,7 +794,7 @@ function caller(): int { return helper(41); }
                     &parsed.source_map,
                 );
                 assert!(
-                    analysis.symbols.is_empty(),
+                    analysis.symbols().is_empty(),
                     "diagnostics path should not retain whole-file symbols"
                 );
                 session
@@ -819,7 +819,7 @@ function caller(): int { return helper(41); }
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(analysis.symbols.is_empty());
+    assert!(analysis.symbols().is_empty());
 
     let mut warm_group = c.benchmark_group("name_at_repeat");
     warm_group.sample_size(100);
@@ -860,7 +860,7 @@ function caller(): int { return helper(41); }
                     &parsed.source_map,
                 );
                 assert!(
-                    analysis.symbols.is_empty(),
+                    analysis.symbols().is_empty(),
                     "diagnostics path should not retain whole-file symbols"
                 );
                 session
@@ -884,7 +884,7 @@ function caller(): int { return helper(41); }
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(analysis.symbols.is_empty());
+    assert!(analysis.symbols().is_empty());
 
     let mut warm_group = c.benchmark_group("symbol_at_repeat");
     warm_group.sample_size(100);
@@ -924,7 +924,7 @@ function caller(): int { return helper(41); }
                     &parsed.source_map,
                 );
                 assert!(
-                    analysis.symbols.is_empty(),
+                    analysis.symbols().is_empty(),
                     "diagnostics path should not retain whole-file symbols"
                 );
                 session
@@ -952,7 +952,7 @@ function caller(): int { return helper(41); }
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(analysis.symbols.is_empty());
+    assert!(analysis.symbols().is_empty());
 
     let mut warm_group = c.benchmark_group("definition_at_repeat");
     warm_group.sample_size(100);
@@ -994,7 +994,7 @@ function helper(int $value): int { return $value + 1; }
                     &parsed.program,
                     &parsed.source_map,
                 );
-                assert!(analysis.symbols.is_empty());
+                assert!(analysis.symbols().is_empty());
                 session
             },
             |mut session| {
@@ -1020,7 +1020,7 @@ function helper(int $value): int { return $value + 1; }
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(analysis.symbols.is_empty());
+    assert!(analysis.symbols().is_empty());
 
     let mut warm_group = c.benchmark_group("symbol_at_variable_repeat");
     warm_group.sample_size(100);
@@ -1063,7 +1063,7 @@ function read(Box $box): void { $box->value; }
                     &parsed.program,
                     &parsed.source_map,
                 );
-                assert!(analysis.symbols.is_empty());
+                assert!(analysis.symbols().is_empty());
                 session
             },
             |mut session| {
@@ -1086,7 +1086,7 @@ function read(Box $box): void { $box->value; }
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(analysis.symbols.is_empty());
+    assert!(analysis.symbols().is_empty());
 
     let mut warm_group = c.benchmark_group("symbol_at_receiver_gap_repeat");
     warm_group.sample_size(100);
@@ -1128,7 +1128,7 @@ function caller(): int { return helper(41); }
                     &parsed.source_map,
                 );
                 assert!(
-                    analysis.symbols.is_empty(),
+                    analysis.symbols().is_empty(),
                     "diagnostics path should not retain whole-file symbols"
                 );
                 session
@@ -1165,7 +1165,7 @@ function caller(): int { return helper(41); }
         &parsed.program,
         &parsed.source_map,
     );
-    assert!(analysis.symbols.is_empty());
+    assert!(analysis.symbols().is_empty());
 
     let mut warm_group = c.benchmark_group("references_at_repeat");
     warm_group.sample_size(100);
