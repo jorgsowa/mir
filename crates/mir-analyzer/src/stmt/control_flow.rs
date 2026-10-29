@@ -410,6 +410,8 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut entry = ctx.branch();
         let key_taint =
             crate::taint::iteration_key_taint(&fe.expr, iterable_taint, ctx, self.db, &self.file);
+        // An array's keys are ints or strings, unlike a Traversable's.
+        let key_is_plain = !arr_ty.types.is_empty() && arr_ty.types.iter().all(Atomic::is_array);
 
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
@@ -419,6 +421,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 // param NAMES).
                 entry.clear_prop_taints(&var_name);
                 entry.taint_var(&var_name, key_taint);
+                if key_is_plain {
+                    entry.mark_plain(&var_name);
+                }
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
             }
@@ -520,6 +525,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         iter.set_var(&var_name, key_ty.clone());
                         iter.clear_prop_taints(&var_name);
                         iter.taint_var(&var_name, key_taint);
+                        if key_is_plain {
+                            iter.mark_plain(&var_name);
+                        }
                     }
                 }
                 if let Some(ref vname) = value_var {

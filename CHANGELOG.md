@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The key of an iterated array is known never to be an object, so request data in it no longer passes a callee's `instanceof Closure` guard as `TaintedCallable` (Laravel `EloquentUserProvider::retrieveByCredentials()` passing `$key` to `Builder::where()`).
 - `$node->nodeType === XML_ELEMENT_NODE` (also `==`, either side, `!==` before an exit, or the integer value) narrows a `DOMNode` variable to `DOMElement`, and likewise `DOMText`, `DOMComment`, `DOMDocument`, ... for the other `XML_*_NODE` constants, so `$node->getAttribute()` after the check is no longer `UndefinedMethod` (Symfony `XliffFileLoader`).
 - A parameter an assertion proves is an object (an inferred `instanceof` predicate or a declared `@psalm-assert-if-true Closure $v`) guards its taint as an inline `instanceof` does, so request data a caller passes is no longer `TaintedCallable` there (Laravel `Builder::where()`'s `isQueryable($value)` before `whereSub()`).
 - `instanceof` no longer narrows an intersection to a class one of its parts can never also be (two unrelated classes, or a final class); the branch is unreachable instead of carrying `A&ClassX&ClassY`.
