@@ -2062,6 +2062,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.property_exists_guards
                 .contains(&(key.clone(), Arc::from(prop_name)))
         });
+        let on_this = guard_key.is_some_and(|key| key.as_ref() == "this");
         for atomic in &obj_ty.types {
             match atomic {
                 Atomic::TNamedObject { fqcn, type_params }
@@ -2077,7 +2078,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some(msg) = p
                             .deprecated
                             .as_ref()
-                            .filter(|_| !ctx.in_own_hook(owner.as_ref(), prop_name))
+                            .filter(|_| !ctx.in_own_hook(on_this, owner.as_ref(), prop_name))
                         {
                             self.emit(
                                 IssueKind::DeprecatedProperty {
@@ -2372,7 +2373,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some(msg) = p
                             .deprecated
                             .as_ref()
-                            .filter(|_| !ctx.in_own_hook(owner.as_ref(), prop_name))
+                            .filter(|_| !ctx.in_own_hook(on_this, owner.as_ref(), prop_name))
                         {
                             self.emit(
                                 IssueKind::DeprecatedProperty {

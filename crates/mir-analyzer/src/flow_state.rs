@@ -643,9 +643,10 @@ impl FlowState {
         })
     }
 
-    /// Whether this is a hook of `owner::$prop`, where reading or writing it touches the backing value.
-    pub(crate) fn in_own_hook(&self, owner: &str, prop: &str) -> bool {
-        self.hooked_property.as_deref() == Some(prop)
+    /// Whether `$this->prop` here is inside a hook of `owner::$prop`, so it touches the backing value.
+    pub(crate) fn in_own_hook(&self, on_this: bool, owner: &str, prop: &str) -> bool {
+        on_this
+            && self.hooked_property.as_deref() == Some(prop)
             && self
                 .self_fqcn
                 .as_deref()

@@ -1879,7 +1879,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 if let Some(msg) = p
                                     .deprecated
                                     .as_ref()
-                                    .filter(|_| !ctx.in_own_hook(&prop_owner, &prop_name))
+                                    .filter(|_| {
+                                        let on_this = matches!(&pa.object.kind, ExprKind::Variable(v) if v.as_ref() == "this");
+                                        !ctx.in_own_hook(on_this, &prop_owner, &prop_name)
+                                    })
                                 {
                                     self.emit(
                                         IssueKind::DeprecatedProperty {
