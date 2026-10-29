@@ -709,8 +709,12 @@ impl ParamOrderVisitor<'_> {
     fn check(&mut self, params: &[php_ast::owned::Param], function: impl FnOnce() -> String) {
         use mir_issues::IssueKind;
         let is_required = |p: &php_ast::owned::Param| p.default.is_none() && !p.variadic;
-        let is_promoted =
-            |p: &php_ast::owned::Param| p.modifiers.visibility.is_some() || p.modifiers.is_readonly;
+        let is_promoted = |p: &php_ast::owned::Param| {
+            p.modifiers.visibility.is_some()
+                || p.modifiers.set_visibility.is_some()
+                || p.modifiers.is_readonly
+                || p.modifiers.is_final
+        };
         let mut found: Vec<Finding> = Vec::new();
         let deprecation_8_4 = self.php_version >= PhpVersion::new(8, 4);
         // A promoted one is the parser's `default-value-type` compile error.
