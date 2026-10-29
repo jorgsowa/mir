@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `require __DIR__ . '/x.php'` in a file given by a relative path (`mir .`, `mir src`) resolves to the analyzed `x.php`: it was joined with the file's directory twice, so taint from the included file's top-level code was lost and a version-gated include didn't silence the included file's version-too-low errors.
 - A file that every analyzed `require` / `include` of loads only under a `PHP_VERSION_ID` check above the target version (`if (\PHP_VERSION_ID >= 80500) { require __DIR__.'/bootstrap85.php'; }`, also `else` / `elseif` branches of `<` checks) no longer reports version-too-low `ParseError`s in a batch run, as PHP never compiles it there (symfony/polyfill-uuid `bootstrap85.php` at 8.3 and 8.4).
 - A parameter a method proves an object, with `instanceof` or a callee's assertion, keeps its taint guard when its parameters and the properties it reads would otherwise take every label slot, so request data no longer reaches the guarded call as `TaintedCallable` (Laravel `TokenGuard::user()` through `Query\Builder::whereIn()` and `where()`).
 - The key of an iterated array is known never to be an object, so request data in it no longer passes a callee's `instanceof Closure` guard as `TaintedCallable` (Laravel `EloquentUserProvider::retrieveByCredentials()` passing `$key` to `Builder::where()`).
