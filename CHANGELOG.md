@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `!is_callable($c)` drops the `[class, method]` array that `is_array()` narrows a `callable` to, so `is_array($by) && !is_callable($by)` leaves only the non-callable array (Laravel `Collection::sortBy()` `PossiblyInvalidArgument`).
 - A function declared inside an `if` (a polyfill behind `function_exists()`) is checked with its own parameters and return type when another file declares the same name: symfony/polyfill-intl-grapheme reported `UndefinedVariable` for its parameters and polyfill-uuid `InvalidReturnType` against another file's signature.
 - A function that calls `func_get_args()` / `func_num_args()` keeps its `@param` types in its body and gets no `MissingParamType` for a parameter typed by `@param`; a method that does is checked for `UndefinedDocblockClass` in its `@param` types. The variadic added for the extra arguments made the declaration look like a different one.
 - A `require __DIR__ . '/x.php'` in a file given by a relative path (`mir .`, `mir src`) resolves to the analyzed `x.php`: it was joined with the file's directory twice, so taint from the included file's top-level code was lost and a version-gated include didn't silence the included file's version-too-low errors.

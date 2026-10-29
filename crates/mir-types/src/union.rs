@@ -1003,6 +1003,13 @@ impl Type {
         self
     }
 
+    /// Narrow as if `is_callable($x)` is false: the `[class, method]` array a
+    /// `callable` was narrowed to by `is_array()` is callable too.
+    pub fn narrow_to_not_callable(&self) -> Type {
+        let callable_array = callable_array();
+        self.filter(|t| !t.is_callable() && *t != callable_array)
+    }
+
     /// Narrow as if `is_callable($x)` is true.
     ///
     /// PHP accepts closures, TCallable, strings (function names), arrays

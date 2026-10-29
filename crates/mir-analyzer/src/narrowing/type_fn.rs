@@ -187,7 +187,7 @@ pub(crate) fn type_fn_narrowed(
             if is_true {
                 current.narrow_to_callable()
             } else {
-                current.filter(|t| !t.is_callable())
+                current.narrow_to_not_callable()
             }
         }
         "is_scalar" => {
