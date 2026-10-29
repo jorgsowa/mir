@@ -1158,21 +1158,27 @@ impl<'a> ExpressionAnalyzer<'a> {
         if undeclared.len() < named.len() {
             return;
         }
+        // A created property exists from then on, for reads and later writes alike.
+        let guard = crate::narrowing::extract_expr_guard_key(object, ctx, self.db, &self.file)
+            .map(|key| (key, std::sync::Arc::from(prop_name)));
+        if guard
+            .as_ref()
+            .is_some_and(|g| ctx.property_exists_guards.contains(g))
+        {
+            return;
+        }
+        let mut created = false;
         for fqcn in undeclared {
-            self.check_dynamic_property_creation(fqcn.as_ref(), prop_name, object, ctx, span);
+            created |= self.check_dynamic_property_creation(fqcn.as_ref(), prop_name, span);
+        }
+        if let Some(guard) = guard.filter(|_| created) {
+            ctx.property_exists_guards.insert(guard);
         }
     }
 
     /// A write to a property `fqcn` does not declare: deprecated from 8.2, an `Error` on
-    /// enums and readonly classes.
-    fn check_dynamic_property_creation(
-        &mut self,
-        fqcn: &str,
-        prop_name: &str,
-        object: &Expr,
-        ctx: &mut FlowState,
-        span: Span,
-    ) {
+    /// enums and readonly classes. Returns whether the write creates the property.
+    fn check_dynamic_property_creation(&mut self, fqcn: &str, prop_name: &str, span: Span) -> bool {
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let fatal = match crate::db::find_class_like(self.db, here) {
             Some(crate::db::ClassLike::Enum(_)) => true,
@@ -1184,24 +1190,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .iter()
                             .any(|strict| strict.eq_ignore_ascii_case(fqcn)))
             }
-            _ => return,
+            _ => return false,
         };
         if crate::db::find_method_in_chain(self.db, here, "__set").is_some()
             || crate::db::has_unknown_ancestor(self.db, fqcn)
             || self.class_property_from_plugin(fqcn, prop_name).is_some()
         {
-            return;
-        }
-        // A created property exists from then on, for reads and later writes alike.
-        if let Some(key) =
-            crate::narrowing::extract_expr_guard_key(object, ctx, self.db, &self.file)
-        {
-            if !ctx
-                .property_exists_guards
-                .insert((key, std::sync::Arc::from(prop_name)))
-            {
-                return;
-            }
+            return false;
         }
         let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
         let ancestor_classes = || {
@@ -1217,7 +1212,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
         // A `@mixin` class forwards members through magic the collector cannot see.
         if ancestor_classes().any(|c| !c.mixins.is_empty()) {
-            return;
+            return true;
         }
         let allows_dynamic = || {
             ancestors.iter().any(|ancestor| {
@@ -1228,7 +1223,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if !fatal
             && (self.php_version < crate::php_version::PhpVersion::new(8, 2) || allows_dynamic())
         {
-            return;
+            return true;
         }
         let (class, property) = (fqcn.to_string(), prop_name.to_string());
         if fatal {
@@ -1244,6 +1239,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 span,
             );
         }
+        true
     }
 
     pub(crate) fn check_property_readonly_write(
