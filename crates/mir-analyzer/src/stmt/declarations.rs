@@ -327,8 +327,17 @@ impl<'a> StatementsAnalyzer<'a> {
             if let ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(default) = &prop.default {
                     let mut ea = self.expr_analyzer(&param_default_ctx);
-                    let _ = ea.analyze(default, &mut param_default_ctx);
+                    let default_ty = ea.analyze(default, &mut param_default_ctx);
                     self.check_property_default_range(&fqcn, prop.name.as_str(), default);
+                    if let Some(kind) = self.property_default_type_issue(
+                        &fqcn,
+                        prop,
+                        &decl.body.members,
+                        default,
+                        &default_ty,
+                    ) {
+                        self.add_issue_at(kind, default.span);
+                    }
                 }
                 if !prop.hooks.is_empty() {
                     let property_ty = crate::db::find_property_in_class(
@@ -483,7 +492,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    fn add_issue_at(&mut self, kind: IssueKind, span: Span) {
+    pub(crate) fn add_issue_at(&mut self, kind: IssueKind, span: Span) {
         let (line, col_start) = self.offset_to_line_col(span.start);
         let (line_end, col_end) = self.offset_to_line_col(span.end);
         self.issues.add(Issue::new(

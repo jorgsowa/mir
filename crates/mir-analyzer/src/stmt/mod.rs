@@ -2,10 +2,13 @@
 /// control flow (if/else, loops, try/catch, return).
 mod control_flow;
 mod declarations;
+mod default_value;
 mod expressions;
 mod flow;
 mod loops;
 mod return_type;
+
+pub(crate) use default_value::refers_to_constant;
 pub(crate) use return_type::erase_templates_to_bounds;
 
 use crate::ast_ext::NameResolveExt as _;

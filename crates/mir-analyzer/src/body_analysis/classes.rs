@@ -419,6 +419,67 @@ impl<'a> BodyAnalyzer<'a> {
     /// key, mirroring `methdecl:`/`propdecl:` — so find-references with an
     /// unknown owner (`Foo::BAR` on an unresolvable `Foo`) can still surface
     /// the declaration. Shared by class/trait/interface/enum member loops.
+    /// Reports a typed class constant whose constant-expression value its type rejects.
+    #[allow(clippy::too_many_arguments)]
+    fn check_class_const_value_type(
+        &self,
+        constant: &php_ast::owned::ClassConstDecl,
+        members: &[php_ast::owned::ClassMember],
+        scope_cx: &MethodScopeCx,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if self.mode != AnalysisMode::Full
+            || self.php_version < crate::PhpVersion::new(8, 3)
+            || constant.type_hint.is_none()
+            || !crate::stmt::refers_to_constant(&constant.value)
+        {
+            return;
+        }
+        let mut ctx = crate::flow_state::FlowState::new();
+        ctx.self_fqcn = Some(scope_cx.fqcn.clone());
+        ctx.parent_fqcn = scope_cx.parent_fqcn.clone();
+        ctx.static_fqcn = Some(scope_cx.fqcn.clone());
+        ctx.strict_types = scope_cx.strict_types;
+        // The value's own issues come from the class constant checks; only its type is needed.
+        let mut buf = mir_issues::IssueBuffer::new().discarding();
+        let mut sa = crate::stmt::StatementsAnalyzer::new(
+            self.db,
+            file.clone(),
+            source,
+            source_map,
+            &mut buf,
+            None,
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
+            self.php_version,
+            self.mode,
+        );
+        let value_ty = sa.expr_analyzer(&ctx).analyze(&constant.value, &mut ctx);
+        let Some(kind) =
+            sa.class_const_value_type_issue(&scope_cx.fqcn, constant, members, &value_ty)
+        else {
+            return;
+        };
+        let span = constant.value.span;
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+        all_issues.push(Issue::new(
+            kind,
+            mir_issues::Location {
+                file: file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+            },
+        ));
+    }
+
     pub(super) fn record_class_const_decl(
         &self,
         constant: &php_ast::owned::ClassConstDecl,
@@ -1704,8 +1765,17 @@ impl<'a> BodyAnalyzer<'a> {
                     sa.collect_navigation_facts = self.collect_navigation_facts;
                     sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                     let mut ea = sa.expr_analyzer(&default_ctx);
-                    let _ = ea.analyze(default, &mut default_ctx);
+                    let default_ty = ea.analyze(default, &mut default_ctx);
                     sa.check_property_default_range(fqcn, prop.name.as_str(), default);
+                    if let Some(kind) = sa.property_default_type_issue(
+                        fqcn,
+                        prop,
+                        &decl.body.members,
+                        default,
+                        &default_ty,
+                    ) {
+                        sa.add_issue_at(kind, default.span);
+                    }
                     drop(sa);
                     if self.mode == AnalysisMode::Full {
                         all_issues.extend(buf.into_all_issues());
@@ -1741,6 +1811,15 @@ impl<'a> BodyAnalyzer<'a> {
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
                     self.record_class_const_decl(c, fqcn, file, source, source_map);
+                    self.check_class_const_value_type(
+                        c,
+                        &decl.body.members,
+                        &scope_cx,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
                 }
                 continue;
             };
