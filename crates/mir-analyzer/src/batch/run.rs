@@ -495,6 +495,7 @@ impl AnalysisSession {
         }
 
         self.db.salsa.set_batch_asts(Default::default());
+        std::thread::spawn(move || drop(parsed_files));
 
         if self.cache.is_none() {
             let replay_files: HashMap<Arc<str>, crate::session::BatchReplayFile> = body_results

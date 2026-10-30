@@ -592,9 +592,12 @@ fn run_with_progress(
         }));
         let r = session.analyze_paths(files, &opts);
         pb.finish_and_clear();
+        session.finish_for_exit();
         r
     } else {
-        session.analyze_paths(files, &opts)
+        let r = session.analyze_paths(files, &opts);
+        session.finish_for_exit();
+        r
     }
 }
 

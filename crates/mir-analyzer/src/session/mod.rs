@@ -351,6 +351,16 @@ impl AnalysisSession {
         }
     }
 
+    /// Persist every cache and leak the session: for a process about to exit,
+    /// freeing the database and its ASTs is pure overhead.
+    pub fn finish_for_exit(self) {
+        self.flush_analysis_cache();
+        if let Some(stubs) = self.db.stub_cache.as_deref() {
+            stubs.flush();
+        }
+        std::mem::forget(self);
+    }
+
     /// Whether the workspace symbol index singleton is populated (seeded by
     /// [`Self::warm_start_files`] or built by `index_batch`) — symbol lookups
     /// answer from the O(1) map instead of the tracked O(all-files) walk.
