@@ -788,11 +788,11 @@ impl<'a> StatementsAnalyzer<'a> {
                         if let Some(key) =
                             crate::expr::helpers::literal_array_key_of_kind(&idx.kind)
                         {
-                            let current = ctx.get_var(&name);
+                            let current = ctx.get_var(name);
                             let updated =
                                 crate::expr::helpers::remove_key_from_shapes(&current, &key);
                             if updated != current {
-                                ctx.set_var(&name, updated);
+                                ctx.set_var(name, updated);
                             }
                         }
                     }

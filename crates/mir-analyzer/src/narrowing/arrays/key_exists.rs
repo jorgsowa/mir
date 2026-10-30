@@ -243,7 +243,7 @@ pub(crate) fn narrow_array_key_exists_condition(
             // would be.
             _ => {
                 let key_ty = if let Some(name) = extract_var_name(key_value) {
-                    Some(ctx.get_var(&name))
+                    Some(ctx.get_var(name))
                 } else if let Some((obj, prop)) = extract_any_prop_access(key_value) {
                     Some(resolve_prop_current_type(ctx, &obj, &prop, db, file))
                 } else {
@@ -262,14 +262,14 @@ pub(crate) fn narrow_array_key_exists_condition(
         if let Some(key) = literal_key {
             if is_true {
                 if let Some(var_name) = extract_var_name(arr_value) {
-                    let current = ctx.get_var(&var_name);
+                    let current = ctx.get_var(var_name);
                     // array_key_exists() throws TypeError on a null 2nd arg,
                     // so reaching the true branch already proves $arr wasn't
                     // null.
                     let non_null = current.remove_null();
                     let narrowed = add_key_to_sealed_shapes(&non_null, &key);
                     if narrowed != current {
-                        ctx.set_var(&var_name, narrowed);
+                        ctx.set_var(var_name, narrowed);
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(arr_value) {
                     narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
@@ -360,13 +360,13 @@ pub(crate) fn narrow_array_key_exists_condition(
                 // guarantee the key's presence — see
                 // `remove_key_from_sealed_shapes`.
                 if let Some(var_name) = extract_var_name(arr_value) {
-                    let current = ctx.get_var(&var_name);
+                    let current = ctx.get_var(var_name);
                     // array_key_exists() throws TypeError on a null 2nd arg,
                     // so reaching the false branch also proves $arr wasn't
                     // null.
                     let non_null = current.remove_null();
                     let narrowed = remove_key_from_sealed_shapes(&non_null, &key);
-                    set_narrowed(ctx, &var_name, &current, narrowed, true);
+                    set_narrowed(ctx, var_name, &current, narrowed, true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(arr_value) {
                     let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                     if !current.is_mixed() {

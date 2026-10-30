@@ -224,8 +224,8 @@ pub fn narrow_from_condition(
             if let Some(nc) = extract_null_coalesce(&b.left) {
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
-                        let current = ctx.get_var(&var_name);
-                        ctx.narrow_var(&var_name, current.remove_null());
+                        let current = ctx.get_var(var_name);
+                        ctx.narrow_var(var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
@@ -252,8 +252,8 @@ pub fn narrow_from_condition(
             } else if let Some(nc) = extract_null_coalesce(&b.right) {
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
-                        let current = ctx.get_var(&var_name);
-                        ctx.narrow_var(&var_name, current.remove_null());
+                        let current = ctx.get_var(var_name);
+                        ctx.narrow_var(var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
@@ -301,7 +301,7 @@ pub fn narrow_from_condition(
                         effective_true,
                     );
                 } else if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_null(ctx, &name, effective_true);
+                    narrow_var_null(ctx, name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let ExprKind::NullsafeMethodCall(mc) = &b.left.kind {
@@ -343,7 +343,7 @@ pub fn narrow_from_condition(
                         effective_true,
                     );
                 } else if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_null(ctx, &name, effective_true);
+                    narrow_var_null(ctx, name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.right) {
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let ExprKind::NullsafeMethodCall(mc) = &b.right.kind {
@@ -361,7 +361,7 @@ pub fn narrow_from_condition(
             // `$x === true` / `$x === false`
             else if matches!(b.right.kind, ExprKind::Bool(true)) {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_bool(ctx, &name, true, effective_true);
+                    narrow_var_bool(ctx, name, true, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -380,7 +380,7 @@ pub fn narrow_from_condition(
                 }
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_bool(ctx, &name, false, effective_true);
+                    narrow_var_bool(ctx, name, false, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -399,7 +399,7 @@ pub fn narrow_from_condition(
             // assignment exprs, so this also handles `false === ($x = expr)`.
             else if matches!(b.left.kind, ExprKind::Bool(true)) {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_bool(ctx, &name, true, effective_true);
+                    narrow_var_bool(ctx, name, true, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -412,7 +412,7 @@ pub fn narrow_from_condition(
                 }
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_bool(ctx, &name, false, effective_true);
+                    narrow_var_bool(ctx, name, false, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -577,12 +577,7 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
-                    narrow_var_literal_string(
-                        ctx,
-                        &name,
-                        &class_name_str.to_text(),
-                        effective_true,
-                    );
+                    narrow_var_literal_string(ctx, name, &class_name_str.to_text(), effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     // `$this->prop === 'literal'`
                     narrow_prop_literal_string(
@@ -738,12 +733,7 @@ pub fn narrow_from_condition(
                     );
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
-                    narrow_var_literal_string(
-                        ctx,
-                        &name,
-                        &class_name_str.to_text(),
-                        effective_true,
-                    );
+                    narrow_var_literal_string(ctx, name, &class_name_str.to_text(), effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     // `'literal' === $this->prop`
                     narrow_prop_literal_string(
@@ -773,7 +763,7 @@ pub fn narrow_from_condition(
             // `$x === 42`
             else if let ExprKind::Int(n) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_literal_int(ctx, &name, *n, effective_true);
+                    narrow_var_literal_int(ctx, name, *n, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -784,7 +774,7 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_literal_int(ctx, &name, *n, effective_true);
+                    narrow_var_literal_int(ctx, name, *n, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -838,11 +828,11 @@ pub fn narrow_from_condition(
             // flipping the operator when the literal was on the left instead.
             if let Some(var_name) = extract_var_name(&b.left) {
                 if let Some(n) = extract_int_bound(&b.right, ctx, db, file) {
-                    narrow_var_int_comparison(ctx, &var_name, b.op, n, is_true);
+                    narrow_var_int_comparison(ctx, var_name, b.op, n, is_true);
                 }
             } else if let Some(var_name) = extract_var_name(&b.right) {
                 if let Some(n) = extract_int_bound(&b.left, ctx, db, file) {
-                    narrow_var_int_comparison(ctx, &var_name, flip_comparison_op(b.op), n, is_true);
+                    narrow_var_int_comparison(ctx, var_name, flip_comparison_op(b.op), n, is_true);
                 }
             } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                 if let Some(n) = extract_int_bound(&b.right, ctx, db, file) {
@@ -942,8 +932,8 @@ pub fn narrow_from_condition(
             if let Some(nc) = extract_null_coalesce(&b.left) {
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
-                        let current = ctx.get_var(&var_name);
-                        ctx.narrow_var(&var_name, current.remove_null());
+                        let current = ctx.get_var(var_name);
+                        ctx.narrow_var(var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
@@ -964,8 +954,8 @@ pub fn narrow_from_condition(
             } else if let Some(nc) = extract_null_coalesce(&b.right) {
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
-                        let current = ctx.get_var(&var_name);
-                        ctx.narrow_var(&var_name, current.remove_null());
+                        let current = ctx.get_var(var_name);
+                        ctx.narrow_var(var_name, current.remove_null());
                     }
                 } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
@@ -985,7 +975,7 @@ pub fn narrow_from_condition(
                 }
             } else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_loose_null(ctx, &name, effective_true);
+                    narrow_var_loose_null(ctx, name, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_path_access(&b.left) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -995,7 +985,7 @@ pub fn narrow_from_condition(
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_loose_null(ctx, &name, effective_true);
+                    narrow_var_loose_null(ctx, name, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_path_access(&b.right) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -1009,7 +999,7 @@ pub fn narrow_from_condition(
             // to the truthy/falsy narrowing a bare `if ($x)` already gets.
             else if let ExprKind::Bool(value) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                    narrow_var_loose_bool(ctx, name, *value == effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                     // `null == true` is false, so a true match against the
@@ -1030,7 +1020,7 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::Bool(value) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                    narrow_var_loose_bool(ctx, name, *value == effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, *value == effective_true);
@@ -1321,7 +1311,7 @@ pub fn narrow_from_condition(
             // once that holds.
             else if let ExprKind::Int(n) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_loose_int(ctx, &name, *n, effective_true);
+                    narrow_var_loose_int(ctx, name, *n, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_loose_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -1332,7 +1322,7 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_loose_int(ctx, &name, *n, effective_true);
+                    narrow_var_loose_int(ctx, name, *n, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_loose_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
@@ -1366,7 +1356,7 @@ pub fn narrow_from_condition(
                     db,
                     file,
                 ) {
-                    let current = ctx.get_var(&var_name);
+                    let current = ctx.get_var(var_name);
                     let narrowed = if is_true {
                         narrow_instanceof_preserving_subtypes(
                             &current,
@@ -1377,7 +1367,7 @@ pub fn narrow_from_condition(
                     } else {
                         filter_out_instanceof_match(&current, &class_name, db)
                     };
-                    set_narrowed(ctx, &var_name, &current, narrowed, true);
+                    set_narrowed(ctx, var_name, &current, narrowed, true);
                 }
             } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
                 if let Some(class_name) = extract_class_name(
@@ -1487,15 +1477,15 @@ pub fn narrow_from_condition(
                             ) {
                                 ctx.class_exists_guards.insert(fqcn);
                             } else if let Some(var_name) = extract_var_name(arg_value) {
-                                let current = ctx.get_var(&var_name);
+                                let current = ctx.get_var(var_name);
                                 let narrowed = if bare.eq_ignore_ascii_case("interface_exists") {
                                     current.narrow_to_interface_string()
                                 } else {
                                     current.narrow_to_class_string()
                                 };
-                                set_narrowed(ctx, &var_name, &current, narrowed, true);
+                                set_narrowed(ctx, var_name, &current, narrowed, true);
                                 ctx.class_exists_guarded_exprs
-                                    .insert(std::sync::Arc::from(var_name.as_str()));
+                                    .insert(std::sync::Arc::from(var_name));
                             } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                                 if !current.is_mixed() {
@@ -1606,7 +1596,7 @@ pub fn narrow_from_condition(
                     if let Some(arg_value) = call.args.first().and_then(|arg_expr| arg_expr.value())
                     {
                         if let Some(var_name) = extract_var_name(arg_value) {
-                            narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
+                            narrow_from_type_fn(ctx, bare, var_name, db, is_true);
                         } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                             narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                         } else if let Some((fqcn, prop)) =
@@ -1740,7 +1730,7 @@ pub fn narrow_from_condition(
                                     .and_then(|a| a.value())
                                     .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
-                                let current = ctx.get_var(&var_name);
+                                let current = ctx.get_var(var_name);
                                 if allow_string {
                                     // When allow_string is true, string/class-string atoms are
                                     // valid is_a() true-branch values — preserve them so the
@@ -1777,7 +1767,7 @@ pub fn narrow_from_condition(
                                     // Don't mark diverges when allow_string is set: a
                                     // class-string variable may still be a valid non-object
                                     // value that passes the test.
-                                    set_narrowed(ctx, &var_name, &current, narrowed, false);
+                                    set_narrowed(ctx, var_name, &current, narrowed, false);
                                 } else {
                                     let narrowed = if is_true {
                                         narrow_instanceof_preserving_subtypes(
@@ -1789,7 +1779,7 @@ pub fn narrow_from_condition(
                                     } else {
                                         filter_out_instanceof_match(&current, &class_name, db)
                                     };
-                                    set_narrowed(ctx, &var_name, &current, narrowed, true);
+                                    set_narrowed(ctx, var_name, &current, narrowed, true);
                                 }
                             }
                         } else if let Some((obj, prop)) = extract_any_prop_access(obj_value) {
@@ -1868,7 +1858,7 @@ pub fn narrow_from_condition(
                                 db,
                                 file,
                             ) {
-                                let current = ctx.get_var(&var_name);
+                                let current = ctx.get_var(var_name);
                                 if is_true {
                                     let narrowed = narrow_strict_subclass_of(
                                         &current,
@@ -1878,7 +1868,7 @@ pub fn narrow_from_condition(
                                     );
                                     // mark_diverges=false: the exact class being absent from
                                     // strict-subclass narrowing doesn't make the branch dead.
-                                    set_narrowed(ctx, &var_name, &current, narrowed, false);
+                                    set_narrowed(ctx, var_name, &current, narrowed, false);
                                 }
                                 // False branch: leave current type unchanged.
                             }
@@ -1930,7 +1920,7 @@ pub fn narrow_from_condition(
                     call.args.first().and_then(|arg_expr| arg_expr.value())
                 {
                     if let Some(var_name) = extract_var_name(arg_value) {
-                        narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
+                        narrow_from_type_fn(ctx, bare, var_name, db, is_true);
                     } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                         narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                     } else if let Some((fqcn, prop)) =
@@ -2030,15 +2020,15 @@ pub fn narrow_from_condition(
                 if let Some(var_name) = extract_var_name(var_expr) {
                     if is_true {
                         // remove null; mark as definitely assigned
-                        let current = ctx.get_var(&var_name);
-                        ctx.narrow_var(&var_name, current.remove_null());
+                        let current = ctx.get_var(var_name);
+                        ctx.narrow_var(var_name, current.remove_null());
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars)
-                            .insert(mir_types::Name::from(var_name.as_str()));
-                    } else if ctx.var_is_defined(&var_name) {
+                            .insert(mir_types::Name::from(var_name));
+                    } else if ctx.var_is_defined(var_name) {
                         // isset($x) is false and $x is always assigned (e.g. a
                         // parameter) → the only other way isset() can be false is
                         // $x being null.
-                        narrow_var_null(ctx, &var_name, true);
+                        narrow_var_null(ctx, var_name, true);
                     }
                 } else if is_true {
                     // `isset($base[$k])` implies `$base` is a non-null, indexable
@@ -2102,7 +2092,7 @@ pub fn narrow_from_condition(
         // empty($x)
         ExprKind::Empty(var_expr) => {
             if let Some(var_name) = extract_var_name(var_expr) {
-                let current = ctx.get_var(&var_name);
+                let current = ctx.get_var(var_name);
                 let narrowed = if is_true {
                     // empty($x) is true: x is falsy
                     current.narrow_to_falsy()
@@ -2111,7 +2101,7 @@ pub fn narrow_from_condition(
                     current.narrow_to_truthy()
                 };
                 if !narrowed.is_empty() {
-                    ctx.narrow_var(&var_name, narrowed);
+                    ctx.narrow_var(var_name, narrowed);
                 }
             } else {
                 if !is_true {
@@ -2150,7 +2140,7 @@ pub fn narrow_from_condition(
         // Narrow the target variable based on the truthiness of the expression result.
         ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign | AssignOp::Coalesce) => {
             if let Some(var_name) = extract_var_name(&a.target) {
-                let current = ctx.get_var(&var_name);
+                let current = ctx.get_var(var_name);
                 let mut narrowed = if is_true {
                     current.narrow_to_truthy()
                 } else {
@@ -2162,7 +2152,7 @@ pub fn narrow_from_condition(
                     narrowed.possibly_undefined = false;
                 }
                 if !narrowed.is_empty() {
-                    ctx.narrow_var(&var_name, narrowed);
+                    ctx.narrow_var(var_name, narrowed);
                 } else if !current.is_empty() && !current.is_mixed() {
                     ctx.diverges = true;
                 }
@@ -2203,18 +2193,18 @@ pub fn narrow_from_condition(
         // if ($x)  — truthy/falsy narrowing
         _ => {
             if let Some(var_name) = extract_var_name(expr) {
-                let current = ctx.get_var(&var_name);
+                let current = ctx.get_var(var_name);
                 let narrowed = if is_true {
                     current.narrow_to_truthy()
                 } else {
                     current.narrow_to_falsy()
                 };
                 if !narrowed.is_empty() {
-                    ctx.narrow_var(&var_name, narrowed);
+                    ctx.narrow_var(var_name, narrowed);
                 } else if !current.is_empty()
                     && !current.is_mixed()
                     && !current.falsy_stripped
-                    && ctx.var_is_defined(&var_name)
+                    && ctx.var_is_defined(var_name)
                 {
                     // The variable's type can never satisfy this truthiness
                     // constraint → this branch is statically unreachable.
@@ -2493,7 +2483,7 @@ fn narrow_nullsafe_method_call_null(
     let ExprKind::Identifier(method_name) = &mc.method.kind else {
         return;
     };
-    let obj_ty = ctx.get_var(&obj_var);
+    let obj_ty = ctx.get_var(obj_var);
     // Only the receiver's non-null atoms matter here — `?Bar $bar` has
     // `Bar|null`, and the whole point is deducing $bar's nullability, not
     // requiring it to already be known non-null.
@@ -2518,7 +2508,7 @@ fn narrow_nullsafe_method_call_null(
     {
         return;
     }
-    narrow_var_null(ctx, &obj_var, is_null);
+    narrow_var_null(ctx, obj_var, is_null);
 }
 
 fn narrow_static_prop_null(

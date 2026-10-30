@@ -188,14 +188,14 @@ pub(crate) fn apply_one_assertion(
                     None => assertion.ty.clone(),
                 };
                 let ty = if assertion.negated {
-                    let current = resolve_prop_current_type(ctx, &obj_key, prop_name, db, file);
+                    let current = resolve_prop_current_type(ctx, obj_key, prop_name, db, file);
                     negate_assertion_type(&current, &ty, db)
                 } else {
                     ty
                 };
                 let proved_prop_non_null = !ty.is_nullable();
-                ctx.set_prop_refined(&obj_key, prop_name, ty);
-                narrow_receiver_non_null_on_prop_match(ctx, &obj_key, proved_prop_non_null);
+                ctx.set_prop_refined(obj_key, prop_name, ty);
+                narrow_receiver_non_null_on_prop_match(ctx, obj_key, proved_prop_non_null);
                 return true;
             }
         }
@@ -214,11 +214,11 @@ pub(crate) fn apply_one_assertion(
                 None => assertion.ty.clone(),
             };
             let ty = if assertion.negated {
-                negate_assertion_type(&ctx.get_var(&obj_key), &ty, db)
+                negate_assertion_type(&ctx.get_var(obj_key), &ty, db)
             } else {
                 ty
             };
-            ctx.narrow_var(&obj_key, ty);
+            ctx.narrow_var(obj_key, ty);
             return true;
         }
     }
@@ -288,7 +288,7 @@ pub(crate) fn apply_one_assertion(
         if !assertion.param_key.is_empty() {
             let path = &assertion.param_key;
             let base = if let Some(name) = extract_var_name(arg_value) {
-                Some(ShapeBase::Var(name))
+                Some(ShapeBase::Var(name.to_owned()))
             } else if let Some((obj, prop)) = extract_chained_prop_access(arg_value) {
                 // `extract_chained_prop_access` subsumes the bare 1-hop case
                 // (identical `(obj, prop)` for `$x->prop`) and additionally
@@ -322,19 +322,19 @@ pub(crate) fn apply_one_assertion(
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
             };
-            let current = ctx.get_var(&var_name);
+            let current = ctx.get_var(var_name);
             let ty = if assertion.negated {
                 negate_assertion_type(&current, &ty, db)
             } else {
                 instanceof_assertion_type(&current, &ty, db, &ctx.template_param_names)
                     .unwrap_or_else(|| positive_assertion_type(&current, ty, db))
             };
-            ctx.narrow_var(&var_name, ty);
+            ctx.narrow_var(var_name, ty);
             if !assertion.negated
                 && !assertion.ty.types.is_empty()
                 && assertion.ty.types.iter().all(Atomic::is_object)
             {
-                crate::taint::guard_object(ctx, &var_name);
+                crate::taint::guard_object(ctx, var_name);
             }
             applied = true;
         } else if let Some((obj, prop)) = extract_chained_prop_access(arg_value) {
@@ -449,7 +449,7 @@ pub(super) fn method_call_receiver_fqcn(
     method_name: &str,
 ) -> Option<std::sync::Arc<str>> {
     let obj_ty = if let Some(obj_var) = extract_var_name(object) {
-        ctx.get_var(&obj_var)
+        ctx.get_var(obj_var)
     } else if let Some((obj_var, prop)) = extract_any_prop_access(object) {
         // `extract_any_prop_access` also matches a nullsafe (`?->`) receiver,
         // unlike the plain-`->`-only `extract_prop_access` — as the self-out
@@ -718,7 +718,7 @@ fn assertion_arg_type(
     file: &str,
 ) -> Type {
     if let Some(var_name) = extract_var_name(expr) {
-        return ctx.get_var(&var_name);
+        return ctx.get_var(var_name);
     }
     if let Some((obj_var, prop)) = extract_prop_access(expr) {
         return resolve_prop_current_type(ctx, &obj_var, &prop, db, file);

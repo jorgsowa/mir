@@ -56,7 +56,7 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
                 narrow_var_to_literal_enum_case(
                     db,
                     ctx,
-                    &var_name,
+                    var_name,
                     &enum_fqcn,
                     &case_name,
                     effective_true,
@@ -114,7 +114,7 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
                 narrow_var_to_literal_enum_case(
                     db,
                     ctx,
-                    &var_name,
+                    var_name,
                     &enum_fqcn,
                     &case_name,
                     effective_true,
@@ -175,7 +175,7 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
                 narrow_var_to_literal_enum_case(
                     db,
                     ctx,
-                    &var_name,
+                    var_name,
                     &enum_fqcn,
                     &case_name,
                     effective_true,
@@ -188,7 +188,7 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
                     db,
                     file,
                 ) {
-                    narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
+                    narrow_var_to_class_string(ctx, var_name, &fqcn, effective_true, db);
                 }
             }
         }
@@ -522,7 +522,7 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
                 narrow_var_to_literal_enum_case(
                     db,
                     ctx,
-                    &var_name,
+                    var_name,
                     &enum_fqcn,
                     &case_name,
                     effective_true,
@@ -535,7 +535,7 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
                     db,
                     file,
                 ) {
-                    narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
+                    narrow_var_to_class_string(ctx, var_name, &fqcn, effective_true, db);
                 }
             }
         }

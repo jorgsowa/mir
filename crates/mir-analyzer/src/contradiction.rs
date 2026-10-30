@@ -22,20 +22,13 @@ use php_ast::owned::{Expr, ExprKind};
 
 use mir_types::{Atomic, Type};
 
+use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
 
 enum Lit {
     Int(i64),
     Str(String),
-}
-
-fn extract_var(expr: &Expr) -> Option<String> {
-    match &expr.kind {
-        ExprKind::Variable(name) => Some(name.to_string()),
-        ExprKind::Parenthesized(inner) => extract_var(inner),
-        _ => None,
-    }
 }
 
 fn extract_lit(expr: &Expr) -> Option<Lit> {
@@ -716,15 +709,15 @@ pub(crate) fn impossible_comparison(expr: &Expr, ctx: &FlowState) -> Option<(Str
     }
 
     let (var_name, lit, var_on_left) =
-        if let (Some(v), Some(l)) = (extract_var(&b.left), extract_lit(&b.right)) {
+        if let (Some(v), Some(l)) = (extract_simple_var(&b.left), extract_lit(&b.right)) {
             (v, l, true)
-        } else if let (Some(v), Some(l)) = (extract_var(&b.right), extract_lit(&b.left)) {
+        } else if let (Some(v), Some(l)) = (extract_simple_var(&b.right), extract_lit(&b.left)) {
             (v, l, false)
         } else {
             return None;
         };
 
-    let ty = ctx.get_var(&var_name);
+    let ty = ctx.get_var(var_name);
     // Only judge against a *closed, precise* type — a literal union (`1|2|3`,
     // `"a"|"b"`) or a bounded int range (`int<5, max>`). These only arise from
     // docblocks (`@param`, `@assert`) or literal/range inference, never from a

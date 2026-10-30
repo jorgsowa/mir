@@ -59,9 +59,7 @@ impl<'a> StatementsAnalyzer<'a> {
             };
             if let ExprKind::Assign(a) = &cond.kind {
                 if let Some(var_name) = extract_simple_var(&a.target) {
-                    running_ctx
-                        .last_write_locs
-                        .remove(&Name::from(var_name.as_str()));
+                    running_ctx.last_write_locs.remove(&Name::from(var_name));
                 }
             }
         }
@@ -400,7 +398,7 @@ impl<'a> StatementsAnalyzer<'a> {
             );
             if let Some(ann) = annotations
                 .into_iter()
-                .find(|a| a.name.as_deref() == Some(vname.as_str()))
+                .find(|a| a.name.as_deref() == Some(vname))
             {
                 value_ty = ann.ty;
             }
@@ -415,17 +413,17 @@ impl<'a> StatementsAnalyzer<'a> {
 
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
-                entry.set_var(&var_name, key_ty.clone());
+                entry.set_var(var_name, key_ty.clone());
                 // `foreach ($_GET as $k => $v)`: the key is attacker-controlled
                 // exactly as much as the value (a reflected-XSS vector via GET
                 // param NAMES).
-                entry.clear_prop_taints(&var_name);
-                entry.taint_var(&var_name, key_taint);
+                entry.clear_prop_taints(var_name);
+                entry.taint_var(var_name, key_taint);
                 if key_is_plain {
-                    entry.mark_plain(&var_name);
+                    entry.mark_plain(var_name);
                 }
                 // Emit ResolvedSymbol for key variable at binding position
-                self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
+                self.record_symbol_for_var(key_expr.span, var_name, key_ty.clone());
             }
         }
         let value_var = extract_simple_var(&fe.value);
@@ -445,40 +443,38 @@ impl<'a> StatementsAnalyzer<'a> {
             self.expr_analyzer(&entry)
                 .check_byref_arg_purity(&fe.expr, &entry, fe.expr.span);
         }
-        if let Some(ref vname) = value_var {
+        if let Some(vname) = value_var {
             let intentionally_unused = is_intentionally_unused_foreach_value(vname, &fe.body);
-            entry.set_var(vname.as_str(), value_ty.clone());
-            entry.clear_prop_taints(vname.as_str());
-            entry.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
+            entry.set_var(vname, value_ty.clone());
+            entry.clear_prop_taints(vname);
+            entry.taint_var_with_parts(vname, iterable_taint, value_parts);
             if let Some(trail) = &iterable_trail {
                 std::sync::Arc::make_mut(&mut entry.taint_trails).insert(
-                    Name::from(vname.as_str()),
+                    Name::from(vname),
                     crate::taint::extend_trail(trail.clone(), &fe.value, self.source),
                 );
             }
             if value_is_by_ref {
                 // By-reference iteration: writes to this variable always mutate
                 // the source array through the reference, so they are never dead.
-                entry
-                    .foreach_byref_var_names
-                    .insert(Name::from(vname.as_str()));
+                entry.foreach_byref_var_names.insert(Name::from(vname));
             } else if !intentionally_unused {
-                entry
-                    .foreach_value_var_names
-                    .insert(Name::from(vname.as_str()));
+                entry.foreach_value_var_names.insert(Name::from(vname));
             }
             let (line, line_end, col_start, col_end) = self.span_to_location(fe.value.span);
             // Recording the header write is what triggers UnusedForeachValue
             // when the value is never read in the body.
             if !intentionally_unused {
-                entry.record_write(vname.as_str(), line, col_start, line_end, col_end);
+                entry.record_write(vname, line, col_start, line_end, col_end);
             }
             // Emit ResolvedSymbol for value variable at binding position
             self.record_symbol_for_var(fe.value.span, vname, value_ty.clone());
             if value_ty.is_mixed_not_template() {
                 self.issues.add(
                     Issue::new(
-                        IssueKind::MixedAssignment { var: vname.clone() },
+                        IssueKind::MixedAssignment {
+                            var: vname.to_owned(),
+                        },
                         Location {
                             file: self.file.clone(),
                             line,
@@ -522,18 +518,18 @@ impl<'a> StatementsAnalyzer<'a> {
             |sa, iter| {
                 if let Some(key_expr) = &fe.key {
                     if let Some(var_name) = extract_simple_var(key_expr) {
-                        iter.set_var(&var_name, key_ty.clone());
-                        iter.clear_prop_taints(&var_name);
-                        iter.taint_var(&var_name, key_taint);
+                        iter.set_var(var_name, key_ty.clone());
+                        iter.clear_prop_taints(var_name);
+                        iter.taint_var(var_name, key_taint);
                         if key_is_plain {
-                            iter.mark_plain(&var_name);
+                            iter.mark_plain(var_name);
                         }
                     }
                 }
-                if let Some(ref vname) = value_var {
-                    iter.set_var(vname.as_str(), value_ty.clone());
-                    iter.clear_prop_taints(vname.as_str());
-                    iter.taint_var_with_parts(vname.as_str(), iterable_taint, value_parts);
+                if let Some(vname) = value_var {
+                    iter.set_var(vname, value_ty.clone());
+                    iter.clear_prop_taints(vname);
+                    iter.taint_var_with_parts(vname, iterable_taint, value_parts);
                 } else {
                     sa.expr_analyzer(iter).assign_to_target(
                         &fe.value,
@@ -806,7 +802,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         self.db,
                         &self.file,
                     ) {
-                        case_ctx.set_var(&vn, union_ctx.get_var(&vn));
+                        case_ctx.set_var(vn, union_ctx.get_var(vn));
                     } else {
                         let mut union_ctx = pre_ctx.branch();
                         if let Some(vn) = crate::narrowing::narrow_type_fn_disjuncts(
@@ -814,7 +810,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             &mut union_ctx,
                             self.db,
                         ) {
-                            case_ctx.set_var(&vn, union_ctx.get_var(&vn));
+                            case_ctx.set_var(vn, union_ctx.get_var(vn));
                         } else {
                             let mut union_ctx = pre_ctx.branch();
                             if let Some(vn) = crate::narrowing::narrow_mixed_disjuncts(
@@ -823,7 +819,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 self.db,
                                 &self.file,
                             ) {
-                                case_ctx.set_var(&vn, union_ctx.get_var(&vn));
+                                case_ctx.set_var(vn, union_ctx.get_var(vn));
                             } else {
                                 let mut union_ctx = pre_ctx.branch();
                                 let prop_result =

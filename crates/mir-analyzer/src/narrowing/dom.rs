@@ -29,7 +29,7 @@ pub(super) fn narrow_dom_node_type(ctx: &mut FlowState, left: &Expr, right: &Exp
     let Some(var) = extract_var_name(&pa.object) else {
         return;
     };
-    let current = ctx.get_var(&var);
+    let current = ctx.get_var(var);
     if !current.types.iter().any(is_dom_node) {
         return;
     }
@@ -45,7 +45,7 @@ pub(super) fn narrow_dom_node_type(ctx: &mut FlowState, left: &Expr, right: &Exp
             narrowed.add_type(atomic.clone());
         }
     }
-    ctx.narrow_var(&var, narrowed);
+    ctx.narrow_var(var, narrowed);
 }
 
 fn is_dom_node(atomic: &Atomic) -> bool {

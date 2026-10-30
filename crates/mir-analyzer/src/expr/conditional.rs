@@ -720,7 +720,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if let ExprKind::PropertyAccess(pa) = &subject_expr.kind {
             if extract_string_from_expr(&pa.property).as_deref() == Some("value") {
                 if let Some(receiver_name) = crate::expr::extract_simple_var(&pa.object) {
-                    let receiver_ty = ctx.get_var(&receiver_name);
+                    let receiver_ty = ctx.get_var(receiver_name);
                     let receiver_atoms: Vec<&Atomic> = receiver_ty
                         .types
                         .iter()

@@ -968,14 +968,14 @@ pub(crate) fn narrow_array_emptiness_condition(
     if let ExprKind::Array(elems) = &right.kind {
         if elems.is_empty() {
             if let Some(var_name) = extract_var_name(left) {
-                let current = ctx.get_var(&var_name);
+                let current = ctx.get_var(var_name);
                 let narrowed = if effective_true {
                     current.narrow_to_empty_collection()
                 } else {
                     current.narrow_to_non_empty_collection()
                 };
                 if !narrowed.is_empty() && narrowed != current {
-                    ctx.set_var(&var_name, narrowed);
+                    ctx.set_var(var_name, narrowed);
                 }
             } else if let Some((obj, prop)) = extract_any_prop_access(left) {
                 narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
@@ -990,14 +990,14 @@ pub(crate) fn narrow_array_emptiness_condition(
     } else if let ExprKind::Array(elems) = &left.kind {
         if elems.is_empty() {
             if let Some(var_name) = extract_var_name(right) {
-                let current = ctx.get_var(&var_name);
+                let current = ctx.get_var(var_name);
                 let narrowed = if effective_true {
                     current.narrow_to_empty_collection()
                 } else {
                     current.narrow_to_non_empty_collection()
                 };
                 if !narrowed.is_empty() && narrowed != current {
-                    ctx.set_var(&var_name, narrowed);
+                    ctx.set_var(var_name, narrowed);
                 }
             } else if let Some((obj, prop)) = extract_any_prop_access(right) {
                 narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);

@@ -439,11 +439,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         // logic. But variables consumed BEFORE the RHS (carry-forward from a prior
         // loop iteration) must NOT be re-armed, to prevent false "unused" reports on
         // patterns like `foreach (...) { use($prev); $prev = $item; }`.
-        let target_var_name: Option<String> = match &a.target.kind {
-            ExprKind::Variable(v) => Some(v.to_string()),
+        let target_var_name: Option<&str> = match &a.target.kind {
+            ExprKind::Variable(v) => Some(v),
             _ => None,
         };
-        let pre_rhs_consumed_count = target_var_name.as_deref().map(|name| {
+        let pre_rhs_consumed_count = target_var_name.map(|name| {
             let sym = mir_types::Name::from(name);
             ctx.consumed_write_locs
                 .iter()
@@ -456,7 +456,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // `FlowState::self_ref_closure_hint`.
         let prev_self_ref_hint = ctx.self_ref_closure_hint.take();
         if a.op == AssignOp::Assign && !a.by_ref {
-            ctx.self_ref_closure_hint = target_var_name.as_deref().map(mir_types::Name::from);
+            ctx.self_ref_closure_hint = target_var_name.map(mir_types::Name::from);
         }
         self.vivifying_reference = a.by_ref && matches!(a.value.kind, ExprKind::ArrayAccess(_));
         if self.vivifying_reference {
@@ -548,8 +548,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // If the target variable was consumed during RHS analysis (e.g. `$x = f($x)`),
                 // re-arm the new write location so it is treated as a fresh pending write.
                 // This allows subsequent iterations to detect it as dead if never read.
-                if let (Some(name), Some(pre_count)) = (&target_var_name, pre_rhs_consumed_count) {
-                    let sym = mir_types::Name::from(name.as_str());
+                if let (Some(name), Some(pre_count)) = (target_var_name, pre_rhs_consumed_count) {
+                    let sym = mir_types::Name::from(name);
                     let post_count = ctx
                         .consumed_write_locs
                         .iter()
@@ -707,10 +707,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // fast path (unlike the non-variable branch below, which
                     // falls through to `assign_to_target`) never routed
                     // through any purity check at all.
-                    self.check_var_write_purity(&var_name, ctx, expr_span);
+                    self.check_var_write_purity(var_name, ctx, expr_span);
                     // `.=` reads the LHS before writing — mark the old write consumed.
-                    ctx.mark_consumed(&var_name);
-                    let lhs_ty = ctx.get_var(&var_name);
+                    ctx.mark_consumed(var_name);
+                    let lhs_ty = ctx.get_var(var_name);
                     let result_ty = if let (Some(l), Some(r)) =
                         (as_concat_str(&lhs_ty), as_concat_str(&rhs_ty))
                     {
@@ -726,14 +726,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     } else {
                         Type::single(Atomic::TString)
                     };
-                    ctx.set_var(&var_name, result_ty.clone());
+                    ctx.set_var(var_name, result_ty.clone());
                     // `.=`'s result keeps the OLD value's content (unlike plain
                     // `=`, which fully replaces it) — so it stays tainted if
                     // either side was, not just the RHS.
-                    ctx.taint_var(&var_name, rhs_taint);
+                    ctx.taint_var(var_name, rhs_taint);
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
-                    ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
+                    ctx.record_var_location(var_name, line, col_start, line_end, col_end);
                     result_ty
                 } else {
                     // A non-variable target (`$this->log .= 'x'`, `$arr[$k] .= 'x'`)
@@ -798,7 +798,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Capture count before LHS analysis: `$a += $i` reads $a (consuming its prior
                 // write) then writes a fresh $a. Re-arm the new write so it is independently
                 // trackable as a dead write — same logic as AssignOp::Assign.
-                let pre_lhs_consumed_count = target_var_name.as_deref().map(|name| {
+                let pre_lhs_consumed_count = target_var_name.map(|name| {
                     let sym = mir_types::Name::from(name);
                     ctx.consumed_write_locs
                         .iter()
@@ -837,8 +837,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                 apply_compound_assign_taint(&a.target, should_taint, ctx, self.db, &self.file);
-                if let (Some(name), Some(pre_count)) = (&target_var_name, pre_lhs_consumed_count) {
-                    let sym = mir_types::Name::from(name.as_str());
+                if let (Some(name), Some(pre_count)) = (target_var_name, pre_lhs_consumed_count) {
+                    let sym = mir_types::Name::from(name);
                     let post_count = ctx
                         .consumed_write_locs
                         .iter()
@@ -860,7 +860,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // with the `mixed` that an undefined-variable read would otherwise
                 // produce.
                 let is_undefined_var =
-                    extract_simple_var(&a.target).is_some_and(|name| !ctx.var_is_defined(&name));
+                    extract_simple_var(&a.target).is_some_and(|name| !ctx.var_is_defined(name));
                 // `$arr['a'] ??= 'y'` on a single-level literal array offset: if the
                 // array's shape proves the key is definitely absent (or definitely
                 // present with a non-null value), we know for certain whether the
@@ -917,11 +917,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => {
                 if let Some(var_name) = extract_simple_var(&a.target) {
                     // Compound assignment reads the LHS before writing — mark old write consumed.
-                    ctx.mark_consumed(&var_name);
-                    ctx.set_var(&var_name, Type::mixed());
+                    ctx.mark_consumed(var_name);
+                    ctx.set_var(var_name, Type::mixed());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
-                    ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
+                    ctx.record_var_location(var_name, line, col_start, line_end, col_end);
                 }
                 Type::mixed()
             }
@@ -2799,10 +2799,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // variables may be consumed by name elsewhere.
                 let mut names_known = false;
                 if let Some(var_name) = extract_simple_var(inner) {
-                    ctx.read_vars
-                        .insert(mir_types::Name::from(var_name.as_str()));
-                    ctx.mark_consumed(&var_name);
-                    let var_ty = ctx.get_var(&var_name);
+                    ctx.read_vars.insert(mir_types::Name::from(var_name));
+                    ctx.mark_consumed(var_name);
+                    let var_ty = ctx.get_var(var_name);
                     names_known = matches!(var_ty.types.as_slice(), [Atomic::TLiteralString(_)]);
                     for atomic in &var_ty.types {
                         if let Atomic::TLiteralString(accessed_var_name) = atomic {

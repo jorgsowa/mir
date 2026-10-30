@@ -1272,9 +1272,9 @@ pub fn as_concat_str(ty: &Type) -> Option<String> {
     }
 }
 
-pub fn extract_simple_var(expr: &Expr) -> Option<String> {
+pub fn extract_simple_var(expr: &Expr) -> Option<&str> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.to_string()),
+        ExprKind::Variable(name) => Some(name),
         ExprKind::Parenthesized(inner) => extract_simple_var(inner),
         _ => None,
     }

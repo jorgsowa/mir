@@ -251,7 +251,9 @@ pub(crate) fn extract_class_fqcn_from_expr(
 pub(crate) fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::PropertyAccess(pa) => {
-            let obj = extract_var_name(&pa.object).or_else(|| method_chain_key(&pa.object))?;
+            let obj = extract_var_name(&pa.object)
+                .map(str::to_owned)
+                .or_else(|| method_chain_key(&pa.object))?;
             let prop = match &pa.property.kind {
                 ExprKind::Identifier(s) => s.as_ref().to_string(),
                 _ => return None,
@@ -259,7 +261,9 @@ pub(crate) fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String
             Some((obj, prop))
         }
         ExprKind::MethodCall(call) if call.args.is_empty() => {
-            let obj = extract_var_name(&call.object).or_else(|| method_chain_key(&call.object))?;
+            let obj = extract_var_name(&call.object)
+                .map(str::to_owned)
+                .or_else(|| method_chain_key(&call.object))?;
             let ExprKind::Identifier(name) = &call.method.kind else {
                 return None;
             };
@@ -284,7 +288,9 @@ pub(crate) fn method_chain_key(expr: &php_ast::owned::Expr) -> Option<String> {
             let ExprKind::Identifier(name) = &call.method.kind else {
                 return None;
             };
-            let base = extract_var_name(&call.object).or_else(|| method_chain_key(&call.object))?;
+            let base = extract_var_name(&call.object)
+                .map(str::to_owned)
+                .or_else(|| method_chain_key(&call.object))?;
             Some(format!("{base}->{}", method_call_key(name)))
         }
         ExprKind::Parenthesized(inner) => method_chain_key(inner),
@@ -384,7 +390,9 @@ pub(super) fn extract_nullsafe_prop_access(
 ) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::NullsafePropertyAccess(pa) => {
-            let obj = extract_var_name(&pa.object).or_else(|| method_chain_key(&pa.object))?;
+            let obj = extract_var_name(&pa.object)
+                .map(str::to_owned)
+                .or_else(|| method_chain_key(&pa.object))?;
             let prop = match &pa.property.kind {
                 ExprKind::Identifier(s) => s.as_ref().to_string(),
                 _ => return None,
@@ -581,9 +589,9 @@ fn strip_parens(mut e: &php_ast::owned::Expr) -> &php_ast::owned::Expr {
     e
 }
 
-pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
+pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<&str> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.to_string()),
+        ExprKind::Variable(name) => Some(name),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
         // is_null($x = expr) — narrow the assigned variable, not the RHS
         ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign) => extract_var_name(&a.target),
@@ -664,7 +672,7 @@ impl MatchSubject {
         file: &str,
     ) -> Option<Self> {
         if let Some(name) = extract_var_name(expr) {
-            return Some(MatchSubject::Var(name));
+            return Some(MatchSubject::Var(name.to_owned()));
         }
         if let Some((obj, prop)) = extract_prop_access(expr) {
             return Some(MatchSubject::Prop(obj, prop));
@@ -753,10 +761,10 @@ pub(crate) fn promote_assignment_effects(
     match &expr.kind {
         ExprKind::Assign(a) => {
             if let Some(var_name) = extract_var_name(&a.target) {
-                let sym = mir_types::Name::from(var_name.as_str());
+                let sym = mir_types::Name::from(var_name);
                 if ctx.possibly_assigned_vars.contains(&sym) {
-                    let ty = ctx.get_var(&var_name);
-                    ctx.narrow_var(&var_name, ty);
+                    let ty = ctx.get_var(var_name);
+                    ctx.narrow_var(var_name, ty);
                     std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&sym);
                 }
             }
@@ -970,7 +978,7 @@ pub(super) enum ScalarArgTarget {
 impl ScalarArgTarget {
     pub(super) fn extract(expr: &php_ast::owned::Expr) -> Option<Self> {
         if let Some(name) = extract_var_name(expr) {
-            return Some(ScalarArgTarget::Var(name));
+            return Some(ScalarArgTarget::Var(name.to_owned()));
         }
         // `extract_any_prop_access` so a nullsafe receiver (`$x?->prop`) is
         // recognized too — a plain `->` on a null receiver evaluates to null

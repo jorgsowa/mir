@@ -100,8 +100,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // genuinely unknown.
         let mut result = Type::empty();
         if let Some(var_name) = extract_simple_var(inner) {
-            ctx.read_vars
-                .insert(mir_types::Name::from(var_name.as_str()));
+            ctx.read_vars.insert(mir_types::Name::from(var_name));
             for atomic in &inner_ty.types {
                 if let Atomic::TLiteralString(accessed_var_name) = atomic {
                     ctx.read_vars

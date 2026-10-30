@@ -29,9 +29,9 @@ use super::type_fn::{
 /// or an instanceof on a different variable), signaling the caller should not
 /// treat the whole set as one OR-chain over a single variable.
 #[allow(clippy::too_many_arguments)]
-fn collect_instanceof(
-    expr: &php_ast::owned::Expr,
-    var_name: &mut Option<String>,
+fn collect_instanceof<'e>(
+    expr: &'e php_ast::owned::Expr,
+    var_name: &mut Option<&'e str>,
     class_names: &mut Vec<String>,
     db: &dyn MirDatabase,
     file: &str,
@@ -109,19 +109,19 @@ fn collect_instanceof(
 /// Returns the discovered variable name on success (the caller may want to
 /// know which variable was narrowed, e.g. to re-apply the result on top of a
 /// different context — see `analyze_switch_stmt`'s fallthrough handling).
-pub(crate) fn narrow_instanceof_disjuncts(
-    conditions: &[&php_ast::owned::Expr],
+pub(crate) fn narrow_instanceof_disjuncts<'e>(
+    conditions: &[&'e php_ast::owned::Expr],
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
-) -> Option<String> {
+) -> Option<&'e str> {
     if conditions.len() < 2 {
         return None;
     }
     let self_fqcn = ctx.self_fqcn.as_deref();
     let parent_fqcn = ctx.parent_fqcn.as_deref();
 
-    let mut var_name: Option<String> = None;
+    let mut var_name: Option<&str> = None;
     let mut class_names: Vec<String> = vec![];
     let all_ok = conditions.iter().all(|cond| {
         collect_instanceof(
@@ -140,14 +140,14 @@ pub(crate) fn narrow_instanceof_disjuncts(
     }
     let vn = var_name?;
 
-    let current = ctx.get_var(&vn);
+    let current = ctx.get_var(vn);
     // Narrow to the union of all instanceof types, classifying each union
     // member against every disjunct at once (see narrow_or_instanceof_union's
     // doc comment for why this can't be done by narrowing per-class and
     // merging afterward).
     let narrowed =
         narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
-    set_narrowed(ctx, &vn, &current, narrowed, true);
+    set_narrowed(ctx, vn, &current, narrowed, true);
     Some(vn)
 }
 
@@ -157,7 +157,7 @@ pub(crate) fn narrow_instanceof_disjuncts(
 /// on a property receiver). Kept as its own narrower helper — used only by
 /// `narrow_or_instanceof_true` — rather than folding into
 /// `collect_instanceof`/`narrow_instanceof_disjuncts`: that function's
-/// `Option<String>` result is also consumed by switch/match fallthrough
+/// variable-name result is also consumed by switch/match fallthrough
 /// narrowing (`stmt/control_flow.rs`, `expr/conditional.rs`) via plain
 /// `ctx.get_var`/`set_var`, which has no property equivalent.
 fn collect_prop_instanceof(
@@ -441,7 +441,7 @@ const NARROWING_TYPE_FNS: &[&str] = &[
 /// (`is_int($x)`) recognized by [`NARROWING_TYPE_FNS`]. Returns `None` for
 /// anything else — a different function, more than one argument, or an
 /// argument that isn't a plain variable.
-fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> {
+fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&'static str, &str)> {
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;
     };
@@ -462,7 +462,7 @@ fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> 
 /// (rather than folding into `extract_type_fn_check`) for the same reason
 /// `collect_prop_instanceof` is kept separate from `collect_instanceof`: the
 /// var-only extractor's result feeds `narrow_type_fn_disjuncts`'s
-/// `Option<String>`, which switch-fallthrough narrowing consumes via plain
+/// variable-name result, which switch-fallthrough narrowing consumes via plain
 /// `ctx.get_var`/`set_var` — a property receiver has no such representation.
 fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, String, String)> {
     let ExprKind::FunctionCall(call) = &expr.kind else {
@@ -490,15 +490,15 @@ fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, Stri
 /// Returns the narrowed variable name on success; `None` when the shape
 /// doesn't apply (mixed condition kinds, or checks on different variables) —
 /// the caller should fall back to narrowing each condition individually.
-pub(crate) fn narrow_type_fn_disjuncts(
-    conditions: &[&php_ast::owned::Expr],
+pub(crate) fn narrow_type_fn_disjuncts<'e>(
+    conditions: &[&'e php_ast::owned::Expr],
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
-) -> Option<String> {
+) -> Option<&'e str> {
     if conditions.len() < 2 {
         return None;
     }
-    let mut var_name: Option<String> = None;
+    let mut var_name: Option<&str> = None;
     let mut fn_names: Vec<&str> = Vec::with_capacity(conditions.len());
     for cond in conditions {
         let (fn_name, vn) = extract_type_fn_check(cond)?;
@@ -510,16 +510,16 @@ pub(crate) fn narrow_type_fn_disjuncts(
         fn_names.push(fn_name);
     }
     let vn = var_name?;
-    let original = ctx.get_var(&vn);
+    let original = ctx.get_var(vn);
     let mut union_ty = Type::empty();
     for fn_name in &fn_names {
         let mut scratch = ctx.branch();
-        scratch.narrow_var(&vn, original.clone());
-        narrow_from_type_fn(&mut scratch, fn_name, &vn, db, true);
-        union_ty.merge_with(&scratch.get_var(&vn));
+        scratch.narrow_var(vn, original.clone());
+        narrow_from_type_fn(&mut scratch, fn_name, vn, db, true);
+        union_ty.merge_with(&scratch.get_var(vn));
     }
     if !union_ty.is_empty() {
-        ctx.narrow_var(&vn, union_ty);
+        ctx.narrow_var(vn, union_ty);
     }
     Some(vn)
 }
@@ -529,7 +529,7 @@ pub(crate) fn narrow_type_fn_disjuncts(
 /// (e.g. `is_int($this->prop), is_string($this->prop)`). Returns `true` when
 /// it matched and applied narrowing — returns the narrowed `(obj_var, prop)`
 /// receiver on success, the property-side equivalent of the var-side
-/// function's `Option<String>` (see `extract_type_fn_check_prop`'s doc
+/// function's variable-name result (see `extract_type_fn_check_prop`'s doc
 /// comment for why a plain variable name can't represent this).
 pub(crate) fn narrow_prop_type_fn_disjuncts(
     conditions: &[&php_ast::owned::Expr],
@@ -686,7 +686,7 @@ fn is_a_or_subclass_of_call_receiver(expr: &php_ast::owned::Expr) -> Option<&php
 /// name here; [`narrow_mixed_disjuncts`] then narrows each top-level
 /// condition via `narrow_from_condition`, which re-dispatches into this same
 /// machinery for any nested disjunct.
-fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<String> {
+fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<&str> {
     let expr = peel_parens(expr);
     match &expr.kind {
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => extract_var_name(&b.left),
@@ -712,16 +712,16 @@ fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<String> {
 /// already uses, generalized to a mix of condition kinds via the top-level
 /// [`narrow_from_condition`] dispatcher instead of a single specialized
 /// narrowing function.
-pub(crate) fn narrow_mixed_disjuncts(
-    conditions: &[&php_ast::owned::Expr],
+pub(crate) fn narrow_mixed_disjuncts<'e>(
+    conditions: &[&'e php_ast::owned::Expr],
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
-) -> Option<String> {
+) -> Option<&'e str> {
     if conditions.len() < 2 {
         return None;
     }
-    let mut var_name: Option<String> = None;
+    let mut var_name: Option<&str> = None;
     for cond in conditions {
         let vn = single_leaf_disjunct_var(cond)?;
         match &var_name {
@@ -731,16 +731,16 @@ pub(crate) fn narrow_mixed_disjuncts(
         }
     }
     let vn = var_name?;
-    let original = ctx.get_var(&vn);
+    let original = ctx.get_var(vn);
     let mut union_ty = Type::empty();
     for cond in conditions {
         let mut scratch = ctx.branch();
-        scratch.narrow_var(&vn, original.clone());
+        scratch.narrow_var(vn, original.clone());
         narrow_from_condition(cond, &mut scratch, true, db, file);
-        union_ty.merge_with(&scratch.get_var(&vn));
+        union_ty.merge_with(&scratch.get_var(vn));
     }
     if !union_ty.is_empty() {
-        ctx.narrow_var(&vn, union_ty);
+        ctx.narrow_var(vn, union_ty);
     }
     Some(vn)
 }

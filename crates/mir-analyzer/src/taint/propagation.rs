@@ -552,7 +552,7 @@ pub fn expr_taint(
             let Some(var_name) = crate::expr::helpers::extract_simple_var(inner) else {
                 return Taint::NONE;
             };
-            ctx.get_var(&var_name)
+            ctx.get_var(var_name)
                 .types
                 .iter()
                 .fold(Taint::NONE, |acc, atomic| match atomic {

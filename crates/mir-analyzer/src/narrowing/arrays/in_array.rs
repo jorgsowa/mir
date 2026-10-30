@@ -181,9 +181,9 @@ pub(crate) fn strip_haystack_null(
     file: &str,
 ) {
     if let Some(var_name) = extract_var_name(haystack_expr) {
-        let current = ctx.get_var(&var_name);
+        let current = ctx.get_var(var_name);
         if current.is_nullable() {
-            ctx.set_var(&var_name, current.remove_null());
+            ctx.set_var(var_name, current.remove_null());
         }
     } else if let Some((obj, prop)) = extract_any_prop_access(haystack_expr) {
         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
@@ -242,13 +242,13 @@ pub(crate) fn narrow_in_array_condition(
         };
         if let Some(var_name) = extract_var_name(needle_value) {
             if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
-                let current = ctx.get_var(&var_name);
+                let current = ctx.get_var(var_name);
                 let loose_safe = strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
                 if (!current.is_mixed() || strict) && is_true && loose_safe {
                     // intersect: keep only types that could match a haystack value
                     let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
                     if !narrowed.is_empty() && narrowed != current {
-                        ctx.set_var(&var_name, narrowed);
+                        ctx.set_var(var_name, narrowed);
                     }
                 } else if !current.is_mixed() && !is_true && loose_safe {
                     // False branch: safe only when the current type is a
@@ -261,7 +261,7 @@ pub(crate) fn narrow_in_array_condition(
                         let narrowed =
                             current.filter(|a| !haystack_ty.types.iter().any(|h| h == a));
                         if !narrowed.is_empty() && narrowed != current {
-                            ctx.set_var(&var_name, narrowed);
+                            ctx.set_var(var_name, narrowed);
                         }
                     }
                 }
