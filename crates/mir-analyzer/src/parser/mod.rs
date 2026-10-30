@@ -21,7 +21,7 @@ pub use type_from_hint::{type_from_hint, type_from_hint_owned};
 pub(crate) fn parse_error_issues(
     file: &Arc<str>,
     source: &str,
-    parsed: &php_rs_parser::ParseResult,
+    parsed: &crate::recursion::ParsedSource,
     version: PhpVersion,
 ) -> Vec<mir_issues::Issue> {
     let abstract_methods = abstract_methods_by_class(parsed, version);
@@ -102,7 +102,7 @@ fn abstract_group(rule: Option<ForbiddenRule>) -> Option<bool> {
 
 /// Before 8.5 PHP reports a concrete class's or enum's abstract members in one error.
 fn abstract_methods_by_class(
-    parsed: &php_rs_parser::ParseResult,
+    parsed: &crate::recursion::ParsedSource,
     version: PhpVersion,
 ) -> Vec<AbstractMethods> {
     let mut classes: Vec<(u32, AbstractMethods)> = Vec::new();
@@ -246,7 +246,7 @@ fn set_hook_error_rank(rule: Option<ForbiddenRule>) -> Option<u8> {
 
 /// The set-hook parameter errors after the first one PHP reports for the same hook.
 fn shadowed_set_hook_errors(
-    parsed: &php_rs_parser::ParseResult,
+    parsed: &crate::recursion::ParsedSource,
 ) -> Vec<(u32, Option<ForbiddenRule>)> {
     let errors: Vec<_> = parsed
         .errors
@@ -313,7 +313,7 @@ fn parse_error_to_issue(
     err: &php_rs_parser::diagnostics::ParseError,
     file: &Arc<str>,
     source: &str,
-    parsed: &php_rs_parser::ParseResult,
+    parsed: &crate::recursion::ParsedSource,
     version: PhpVersion,
 ) -> mir_issues::Issue {
     let span = err.span();

@@ -753,7 +753,7 @@ fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &
 
 // parse_file tracked query (S0 — owned parse, salsa-memoized)
 
-/// Newtype so `Arc<ParseResult>` can be a salsa tracked-query return type.
+/// Newtype so `Arc<GuardedParse>` can be a salsa tracked-query return type.
 ///
 /// Equality is pointer identity — salsa uses it to decide whether
 /// downstream queries need re-running after a re-parse.
@@ -775,7 +775,7 @@ impl PartialEq for TrackedParseResult {
 impl Eq for TrackedParseResult {}
 
 /// Parse `file`'s source text into a fully-owned, lifetime-free
-/// [`php_rs_parser::ParseResult`] and memoize it in Salsa.
+/// [`crate::recursion::ParsedSource`] and memoize it in Salsa.
 ///
 /// Salsa invalidates this memo whenever `file.text(db)` changes.  All
 /// downstream queries that need the AST or source-map should call this
@@ -1061,7 +1061,7 @@ pub struct PreparedAnalysisFile<'a> {
 }
 
 impl PreparedAnalysisFile<'_> {
-    pub fn parse_result(&self) -> &php_rs_parser::ParseResult {
+    pub fn parse_result(&self) -> &crate::recursion::ParsedSource {
         &self.parsed.0
     }
 }

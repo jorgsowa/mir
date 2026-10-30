@@ -35,11 +35,18 @@ pub fn ensure_phase_stack<R>(f: impl FnOnce() -> R) -> R {
     grow(PHASE_RED_ZONE, PHASE_SEGMENT_SIZE, f)
 }
 
+/// The owned AST, errors and line index of a parse, without the copy of the source text and the comments `php_rs_parser::ParseResult` carries.
+pub struct ParsedSource {
+    pub program: php_ast::owned::Program,
+    pub errors: Vec<php_rs_parser::diagnostics::ParseError>,
+    pub source_map: php_rs_parser::source_map::SourceMap,
+}
+
 /// A parse result whose deeply nested AST is dropped on a stack large enough for the recursive `Drop`.
-pub struct GuardedParse(Option<php_rs_parser::ParseResult>);
+pub struct GuardedParse(Option<ParsedSource>);
 
 impl std::ops::Deref for GuardedParse {
-    type Target = php_rs_parser::ParseResult;
+    type Target = ParsedSource;
 
     fn deref(&self) -> &Self::Target {
         self.0.as_ref().expect("present until dropped")
@@ -55,11 +62,21 @@ impl Drop for GuardedParse {
 
 /// Parses `source`, guaranteeing enough stack for deeply nested input.
 pub fn parse_versioned(source: &str, version: php_ast::PhpVersion) -> GuardedParse {
+    parse_with(
+        source,
+        &php_rs_parser::ParseOptions::default().version(version),
+    )
+}
+
+fn parse_with(source: &str, options: &php_rs_parser::ParseOptions) -> GuardedParse {
     GuardedParse(Some(ensure_phase_stack(|| {
-        php_rs_parser::parse_with(
-            source,
-            &php_rs_parser::ParseOptions::default().version(version),
-        )
+        let arena = php_rs_parser::bumpalo::Bump::new();
+        let parsed = php_rs_parser::parse_arena_with(&arena, source, options);
+        ParsedSource {
+            program: php_ast::owned::to_owned_program(&parsed.program),
+            errors: parsed.errors,
+            source_map: parsed.source_map,
+        }
     })))
 }
 
@@ -75,7 +92,7 @@ pub fn parse_for_file(path: &str, source: &str, php_version: crate::PhpVersion) 
 
 /// Parses `source` with the default PHP version; see [`parse_versioned`].
 pub fn parse(source: &str) -> GuardedParse {
-    GuardedParse(Some(ensure_phase_stack(|| php_rs_parser::parse(source))))
+    parse_with(source, &php_rs_parser::ParseOptions::default())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
