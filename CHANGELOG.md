@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.89.0] - 2026-10-30
+
 ### Added
 
 - New issues: `InvalidUnpack` (MIR0231) for unpacking a scalar or `null` into a call; `DynamicPropertyCreation` (MIR1014, PHP 8.2+ deprecation) and `InvalidDynamicProperty` (MIR0016, enums, readonly and `@strict-properties` classes); `ImplicitlyNullableParameter` (MIR1013); `OptionalParameterBeforeRequired` (MIR1012); `NonPublicMagicMethod` (MIR1513); `UseStatementHasNoEffect` (MIR1511); `PrivateFinalMethod` (MIR1512); `TraitInstantiation` (MIR0720); `EnumInstantiation` (MIR0719); `DuplicateEnumCaseValue` (MIR0718).
@@ -23,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Code is parsed at the configured PHP version (`--php-version`, `<phpVersion>` or composer's `require.php`); every target below 8.6 used to parse as 8.5. Parser and compile-error messages use PHP's wording for that version, and `ParseError` carries the parser's identifier (`[version-too-low]`, also `code` in JSON).
 - Many inheritance, enum, readonly, override, clone and attribute messages use PHP's text. `OverriddenMethodAccess` and `OverriddenPropertyAccess` are errors, and inheritance issues for trait members are reported at the class's `use` line.
 - `ParseError`, `CompileError`, `InvalidDocblock`, `InvalidDocblockType` and `UnevaluatedCode` messages no longer repeat the issue name.
-- Stub cache format 24 → 32.
+- Stub cache format 17 → 32.
 - Performance: batch analysis parses each file once, builds suppression maps in parallel and skips teardown at CLI exit (cold run on a 10,800-file vendor tree 8.5 → 7.3 s, peak RSS 1.33 → 1.18 GB; cached run 3.3 → 2.3 s); parsed files keep no second copy of source or comments (~10 MB less RSS on Symfony and Laravel); taint branch forks no longer deep-clone state (~4% less CPU on Symfony); references queries for a new name use per-file identifier sets (4.5 s → 5 ms on a 96 MB tree); `FileAnalysis::symbol_at` uses a position index (~100x faster on large files). `AnalysisSession::finish_for_exit()` writes caches and leaks the session for hosts about to exit.
+- Dependencies were updated.
+- Workspace and internal crate versions were updated to `0.89.0`.
 
 ### Fixed
 
