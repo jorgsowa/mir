@@ -20,7 +20,27 @@ pub struct Name(ustr::Ustr);
 impl Name {
     #[inline]
     pub fn new(s: &str) -> Self {
-        Self(ustr::ustr(s))
+        // Hot names are re-interned constantly from every worker; a per-thread
+        // direct-mapped cache keeps them off the interner's bin locks.
+        const SLOTS: usize = 4096;
+        thread_local! {
+            static RECENT: [std::cell::Cell<Option<ustr::Ustr>>; SLOTS] =
+                const { [const { std::cell::Cell::new(None) }; SLOTS] };
+        }
+        let mut h = rustc_hash::FxHasher::default();
+        std::hash::Hasher::write(&mut h, s.as_bytes());
+        let slot = (std::hash::Hasher::finish(&h) as usize) & (SLOTS - 1);
+        RECENT.with(|recent| {
+            let cell = &recent[slot];
+            if let Some(u) = cell.get() {
+                if u.as_str() == s {
+                    return Self(u);
+                }
+            }
+            let u = ustr::ustr(s);
+            cell.set(Some(u));
+            Self(u)
+        })
     }
 
     #[inline]
