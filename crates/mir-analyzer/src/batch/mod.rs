@@ -130,12 +130,16 @@ impl BatchOptions {
 struct ParsedProjectFile {
     file: Arc<str>,
     source: Arc<str>,
-    parsed: crate::recursion::GuardedParse,
+    parsed: Arc<crate::recursion::GuardedParse>,
 }
 
 impl ParsedProjectFile {
     fn new(file: Arc<str>, source: Arc<str>, php_version: PhpVersion) -> Self {
-        let parsed = crate::recursion::parse_for_file(&file, source.as_ref(), php_version);
+        let parsed = Arc::new(crate::recursion::parse_for_file(
+            &file,
+            source.as_ref(),
+            php_version,
+        ));
         Self {
             file,
             source,

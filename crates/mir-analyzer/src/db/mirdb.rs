@@ -159,6 +159,7 @@ pub struct MirDbStorage {
     /// file versions are naturally evicted (different hash → different key).
     /// Sharded so parallel workers don't serialise on one lock.
     parse_cache: Arc<crate::parse_cache::ParseCache>,
+    batch_asts: Arc<parking_lot::RwLock<BatchAsts>>,
     /// Pre-built FQCN symbol index singleton. Written imperatively by
     /// `rebuild_workspace_symbol_index` and read only by the per-name
     /// `indexed_*_loc` projections (one HIGH-durability dep each) instead of
@@ -368,6 +369,7 @@ impl Default for MirDbStorage {
             analyze_config_input: Arc::default(),
             stub_cache: Arc::default(),
             parse_cache: Arc::default(),
+            batch_asts: Arc::default(),
             workspace_symbol_index_input: Arc::default(),
             file_decl_snapshots: Arc::default(),
             frozen_index: None,
@@ -720,6 +722,31 @@ impl MirDatabase for MirDbStorage {
 
     fn parse_cache(&self) -> Arc<crate::parse_cache::ParseCache> {
         self.parse_cache.clone()
+    }
+
+    fn batch_parse(
+        &self,
+        path: &str,
+        text: &str,
+        version: crate::PhpVersion,
+    ) -> Option<Arc<crate::recursion::GuardedParse>> {
+        let asts = self.batch_asts.read();
+        let ast = asts.get(path)?;
+        (ast.version == version && ast.source.as_ref() == text).then(|| Arc::clone(&ast.parsed))
+    }
+}
+
+pub(crate) struct BatchAst {
+    pub source: Arc<str>,
+    pub version: crate::PhpVersion,
+    pub parsed: Arc<crate::recursion::GuardedParse>,
+}
+
+type BatchAsts = FxHashMap<Arc<str>, BatchAst>;
+
+impl MirDbStorage {
+    pub(crate) fn set_batch_asts(&self, asts: BatchAsts) {
+        *self.batch_asts.write() = asts;
     }
 }
 

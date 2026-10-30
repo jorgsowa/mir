@@ -30,6 +30,19 @@ impl AnalysisSession {
             })
             .collect();
         let _t_read = _t0.elapsed();
+        self.db.salsa.set_batch_asts(
+            parsed_files
+                .iter()
+                .map(|p| {
+                    let ast = crate::db::BatchAst {
+                        source: p.source.clone(),
+                        version: php_version,
+                        parsed: Arc::clone(&p.parsed),
+                    };
+                    (p.file.clone(), ast)
+                })
+                .collect(),
+        );
 
         let file_data: Vec<(Arc<str>, Arc<str>)> = parsed_files
             .iter()
@@ -480,6 +493,8 @@ impl AnalysisSession {
                 }
             }
         }
+
+        self.db.salsa.set_batch_asts(Default::default());
 
         if self.cache.is_none() {
             let replay_files: HashMap<Arc<str>, crate::session::BatchReplayFile> = body_results

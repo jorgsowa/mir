@@ -800,6 +800,9 @@ impl Eq for TrackedParseResult {}
 pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult {
     let text = file.text(db);
     let version = db_php_version(db);
+    if let Some(parsed) = db.batch_parse(file.path(db), text, version) {
+        return TrackedParseResult(parsed);
+    }
     TrackedParseResult(Arc::new(crate::recursion::parse_for_file(
         file.path(db),
         text.as_ref(),

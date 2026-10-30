@@ -109,7 +109,14 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
     let path = Arc::clone(file.path(db));
     // Untracked: a memoized `parse_file` would pin a second AST of every callee file for the run.
     let version = crate::db::queries::db_php_version(db);
-    let parsed = crate::recursion::parse_for_file(&path, file.text(db).as_ref(), version);
+    let text = file.text(db);
+    let parsed = db.batch_parse(&path, text, version).unwrap_or_else(|| {
+        Arc::new(crate::recursion::parse_for_file(
+            &path,
+            text.as_ref(),
+            version,
+        ))
+    });
     let mut facts = FileSourceFacts::default();
     crate::body_analysis::for_each_file_scope_decl(&parsed.program.stmts, &mut |stmt| {
         let _scope = crate::db::ns_scope::enter(db, &path, stmt.span.start);
@@ -198,7 +205,10 @@ fn included_files(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
     if !crate::include_graph::may_include(text) {
         return Arc::from([]);
     }
-    let parsed = crate::recursion::parse(text.as_ref());
+    let version = crate::db::queries::db_php_version(db);
+    let parsed = db
+        .batch_parse(file.path(db), text, version)
+        .unwrap_or_else(|| Arc::new(crate::recursion::parse(text.as_ref())));
     let path = std::path::Path::new(file.path(db).as_ref());
     crate::include_graph::static_include_paths(&parsed.program, path)
         .iter()

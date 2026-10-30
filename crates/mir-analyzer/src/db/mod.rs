@@ -220,6 +220,14 @@ pub trait MirDatabase: salsa::Database {
     /// `collect_file_definitions_uncached` avoids re-parsing files that were
     /// already parsed in the same session.
     fn parse_cache(&self) -> Arc<crate::parse_cache::ParseCache>;
+
+    /// The running batch's parse of `path`, when it parsed this `text` at `version`.
+    fn batch_parse(
+        &self,
+        path: &str,
+        text: &str,
+        version: crate::PhpVersion,
+    ) -> Option<Arc<crate::recursion::GuardedParse>>;
 }
 
 /// Whether `path` lies under a `vendor` directory (Composer dependencies).
@@ -264,6 +272,7 @@ pub use self::inferred_types::{
     inferred_method_return_type_demand, inferred_property_type_demand, method_param_sinks,
     method_taint_summary,
 };
+pub(crate) use self::mirdb::BatchAst;
 pub use self::mirdb::MirDbStorage;
 pub use self::nodes::*;
 pub use self::path_interner::PathInterner;
