@@ -341,6 +341,19 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_array(&mut self, elements: &[ArrayElement], ctx: &mut FlowState) -> Type {
         use mir_types::atomic::{ArrayKey, KeyedProperty};
 
+        fn seed_values(
+            builder: &mut mir_types::UnionBuilder,
+            keyed_props: &indexmap::IndexMap<ArrayKey, KeyedProperty>,
+            overwritten: &[Type],
+        ) {
+            for ty in overwritten
+                .iter()
+                .chain(keyed_props.values().map(|p| &p.ty))
+            {
+                builder.merge(ty);
+            }
+        }
+
         if elements.is_empty() {
             return Type::single(Atomic::TKeyedArray {
                 properties: Box::default(),
@@ -355,11 +368,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut can_be_keyed = true;
         let mut next_int_key: i64 = 0;
 
-        // Accumulated in the same pass as the keyed-shape attempt above, so
-        // that a spread or a non-literal key partway through only falls back
-        // to the generic TArray shape below — it never re-analyzes any
-        // element's value/key expression a second time.
+        // Filled only once the literal falls back to a generic array: merging
+        // every keyed shape is quadratic, and a keyed result never reads it.
         let mut all_value_types = mir_types::UnionBuilder::new();
+        let mut overwritten_values: Vec<Type> = Vec::new();
         let mut key_union = mir_types::UnionBuilder::new();
         // Keys whose current `keyed_props` entry came from a spread rather
         // than an explicit literal key — a later literal key overriding one
@@ -372,7 +384,6 @@ impl<'a> ExpressionAnalyzer<'a> {
         for elem in elements.iter() {
             if elem.is_spread() {
                 let value_ty = self.analyze(elem.value(), ctx);
-                all_value_types.merge(&crate::call::spread_element_type(self.db, &value_ty));
                 key_union.merge(&spread_key_type(self.db, &value_ty));
                 // A spread of a single, closed, string-keyed shape (the common
                 // `[...$defaults, ...$overrides]` config-merge idiom) can still
@@ -393,12 +404,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match spread_shape_props {
                     Some(props) if can_be_keyed => {
                         for (k, prop) in props.iter() {
-                            keyed_props.insert(k.clone(), prop.clone());
+                            if let Some(old) = keyed_props.insert(k.clone(), prop.clone()) {
+                                overwritten_values.push(old.ty);
+                            }
                             spread_contributed_keys.insert(k.clone());
                         }
                         is_list = false;
                     }
-                    _ => can_be_keyed = false,
+                    _ => {
+                        if can_be_keyed {
+                            can_be_keyed = false;
+                            seed_values(&mut all_value_types, &keyed_props, &overwritten_values);
+                        }
+                        all_value_types
+                            .merge(&crate::call::spread_element_type(self.db, &value_ty));
+                    }
                 }
                 continue;
             }
@@ -432,7 +452,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Some(ArrayKey::Int(*i))
                     }
                     _ => {
-                        can_be_keyed = false;
+                        if can_be_keyed {
+                            can_be_keyed = false;
+                            seed_values(&mut all_value_types, &keyed_props, &overwritten_values);
+                        }
                         None
                     }
                 }
@@ -442,13 +465,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 key_union.add(Atomic::TInt);
                 Some(k)
             };
-            all_value_types.merge(&value_ty);
-
-            // Once a prior element already forced the generic-array fallback
-            // (a spread, or a key that didn't resolve to a single literal),
-            // there's no shape left to build — only the accumulators above
-            // still matter for the remaining elements.
+            // Once an element forced the generic-array fallback (a spread, or
+            // a key that didn't resolve to a single literal), there's no shape
+            // left to build — only the accumulators still matter.
             if !can_be_keyed {
+                all_value_types.merge(&value_ty);
                 continue;
             }
             let array_key = array_key.expect("can_be_keyed is only true when a key was resolved");
@@ -471,13 +492,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             }
             spread_contributed_keys.remove(&array_key);
-            keyed_props.insert(
+            if let Some(old) = keyed_props.insert(
                 array_key,
                 KeyedProperty {
                     ty: value_ty,
                     optional: false,
                 },
-            );
+            ) {
+                overwritten_values.push(old.ty);
+            }
         }
 
         if can_be_keyed {
