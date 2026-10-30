@@ -233,16 +233,109 @@ struct CacheFile {
     /// Persisted so that the next run can invalidate dependents before definition collection.
     #[serde(default)]
     reverse_deps: HashMap<String, HashSet<String>>,
+    /// Content digests of registered files without an entry of their own
+    /// (vendor files that are indexed, never analyzed).
+    #[serde(default)]
+    dep_hashes: HashMap<String, DepHash>,
 }
 
 /// View for serializing cache data without cloning. Generic so `flush` can
 /// pass maps of borrowed keys/entries — bincode encodes `&str`/`&CacheEntry`
 /// identically to their owned counterparts in [`CacheFile`].
 #[derive(Serialize)]
-struct CacheFileView<E: Serialize, R: Serialize> {
+struct CacheFileView<E: Serialize, R: Serialize, D: Serialize> {
     version: u64,
     entries: E,
     reverse_deps: R,
+    dep_hashes: D,
+}
+
+/// Truncated BLAKE3 digest of a dependency-only file's content.
+type DepHash = [u8; 16];
+
+fn dep_hash(content_hex: &str) -> DepHash {
+    let mut hash = DepHash::default();
+    for (i, byte) in hash.iter_mut().enumerate() {
+        *byte = content_hex
+            .get(2 * i..2 * i + 2)
+            .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+            .unwrap_or(0);
+    }
+    hash
+}
+
+/// Declarations newly registered or changed in a session, matched against
+/// the missing names of cached results.
+#[derive(Default)]
+pub struct DeclaredNames {
+    /// Lowercased last segments, so a match doesn't depend on how a missing
+    /// name was qualified when reported.
+    short_names: HashSet<String>,
+    class_like: bool,
+}
+
+impl DeclaredNames {
+    pub fn add_class_like(&mut self, fqcn: &str) {
+        self.class_like = true;
+        self.short_names.insert(name_key(fqcn));
+    }
+
+    pub fn add_function_or_constant(&mut self, name: &str) {
+        self.short_names.insert(name_key(name));
+    }
+
+    pub fn add_slice(&mut self, slice: &mir_codebase::definitions::StubSlice) {
+        for fqcn in slice
+            .classes
+            .iter()
+            .map(|c| &c.fqcn)
+            .chain(slice.interfaces.iter().map(|c| &c.fqcn))
+            .chain(slice.traits.iter().map(|c| &c.fqcn))
+            .chain(slice.enums.iter().map(|c| &c.fqcn))
+        {
+            self.add_class_like(fqcn);
+        }
+        for name in slice
+            .functions
+            .iter()
+            .map(|f| &f.fqn)
+            .chain(slice.constants.iter().map(|(name, _)| name))
+        {
+            self.add_function_or_constant(name);
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.short_names.is_empty()
+    }
+
+    fn may_resolve(&self, issue: &Issue) -> bool {
+        use mir_issues::IssueKind as K;
+        match &issue.kind {
+            K::UndefinedFunction { name }
+            | K::UndefinedClass { name }
+            | K::UndefinedTrait { name }
+            | K::UndefinedDocblockClass { name }
+            | K::UndefinedThrowsDocblock { name }
+            | K::UndefinedAttributeClass { name } => self.short_names.contains(&name_key(name)),
+            K::UndefinedConstant { name } if !name.contains("::") => {
+                self.short_names.contains(&name_key(name))
+            }
+            // A member can come from any newly declared ancestor or trait.
+            K::UndefinedConstant { .. }
+            | K::UndefinedMethod { .. }
+            | K::UndefinedProperty { .. }
+            | K::UndefinedTraitAliasMethod { .. } => self.class_like,
+            _ => false,
+        }
+    }
+}
+
+fn name_key(name: &str) -> String {
+    name.rsplit('\\')
+        .next()
+        .unwrap_or(name)
+        .to_ascii_lowercase()
 }
 
 /// Thread-safe, disk-backed cache for per-file analysis results.
@@ -257,6 +350,10 @@ pub struct AnalysisCache {
     unresolved_entries: Mutex<HashSet<FileId>>,
     /// Reverse dependency graph loaded from disk (from the previous run).
     reverse_deps: Mutex<HashMap<FileId, HashSet<FileId>>>,
+    dep_hashes: Mutex<HashMap<FileId, DepHash>>,
+    /// Content hashes of entries evicted this session, so an evicted file is
+    /// not mistaken for an edited one.
+    evicted_hashes: Mutex<HashMap<FileId, String>>,
     /// Epoch this cache validates against (build fingerprint + PHP version).
     /// Written into the on-disk file and re-checked on the next `load`.
     epoch: u64,
@@ -291,6 +388,11 @@ impl AnalysisCache {
                 (id, dep_ids)
             })
             .collect();
+        let dep_hashes: HashMap<FileId, DepHash> = disk
+            .dep_hashes
+            .into_iter()
+            .map(|(path, hash)| (id_map.assign_or_get(&path), hash))
+            .collect();
 
         let unresolved_entries = entries
             .iter()
@@ -305,6 +407,8 @@ impl AnalysisCache {
             entries: Mutex::new(entries),
             unresolved_entries: Mutex::new(unresolved_entries),
             reverse_deps: Mutex::new(reverse_deps),
+            dep_hashes: Mutex::new(dep_hashes),
+            evicted_hashes: Mutex::new(HashMap::default()),
             epoch,
             dirty: AtomicBool::new(false),
         }
@@ -361,6 +465,45 @@ impl AnalysisCache {
             .get(&id)
             .map(|entry| entry.content_hash.clone());
         stored_hash.is_some_and(|hash| hash == hash_content(content))
+    }
+
+    /// Record a registered file's content and report whether it is unchanged
+    /// since this cache last saw it, analyzed or as a dependency.
+    pub fn observe_dependency(&self, file_path: &str, content: &str) -> bool {
+        self.observe_content(file_path, &hash_content(content))
+    }
+
+    /// [`Self::observe_dependency`] for a known [`hash_content`] digest.
+    pub fn observe_content(&self, file_path: &str, content_hex: &str) -> bool {
+        let id = self.file_id_map.lock().assign_or_get(file_path);
+        let hash = dep_hash(content_hex);
+        if self.dep_hashes.lock().get(&id) == Some(&hash) {
+            return true;
+        }
+        let entry_matches = self
+            .entries
+            .lock()
+            .get(&id)
+            .map(|e| e.content_hash == content_hex);
+        let known = entry_matches.unwrap_or(false)
+            || self
+                .evicted_hashes
+                .lock()
+                .get(&id)
+                .is_some_and(|h| h == content_hex);
+        self.dep_hashes.lock().insert(id, hash);
+        // `flush` keeps only hashes of files without an entry.
+        if entry_matches.is_none() {
+            self.dirty.store(true, Ordering::Relaxed);
+        }
+        known
+    }
+
+    fn remember_evicted(&self, evicted: impl IntoIterator<Item = (FileId, CacheEntry)>) {
+        let mut hashes = self.evicted_hashes.lock();
+        for (id, entry) in evicted {
+            hashes.insert(id, entry.content_hash);
+        }
     }
 
     /// Return the paths of every file that currently has a cache entry.
@@ -444,11 +587,19 @@ impl AnalysisCache {
                 Some((path, dep_paths))
             })
             .collect();
+        // An entry already records its file's content.
+        let dep_hashes_guard = self.dep_hashes.lock();
+        let dep_hashes: HashMap<&str, &DepHash> = dep_hashes_guard
+            .iter()
+            .filter(|(id, _)| !entries_guard.contains_key(id))
+            .filter_map(|(&id, hash)| id_map.path(id).map(|p| (p, hash)))
+            .collect();
 
         let view = CacheFileView {
             version: self.epoch,
             entries: &entries,
             reverse_deps: &reverse_deps,
+            dep_hashes: &dep_hashes,
         };
         if let Ok(bytes) = bincode::serialize(&view) {
             // Tempfile in the same directory so the rename is atomic on every
@@ -563,14 +714,17 @@ impl AnalysisCache {
 
         // Phase 2: evict (reverse_deps lock released above, entries lock taken per file).
         let mut entries = self.entries.lock();
-        let mut count = 0;
-        for id in &to_evict {
-            count += usize::from(entries.remove(id).is_some());
-        }
+        let evicted: Vec<(FileId, CacheEntry)> = to_evict
+            .iter()
+            .filter_map(|id| entries.remove(id).map(|e| (*id, e)))
+            .collect();
+        let count = evicted.len();
         let mut unresolved = self.unresolved_entries.lock();
         for id in &to_evict {
             unresolved.remove(id);
         }
+        drop((entries, unresolved));
+        self.remember_evicted(evicted);
         if count > 0 {
             self.dirty.store(true, Ordering::Relaxed);
         }
@@ -583,13 +737,64 @@ impl AnalysisCache {
         let mut entries = self.entries.lock();
         let mut unresolved = self.unresolved_entries.lock();
         let count = unresolved.len();
+        let evicted: Vec<(FileId, CacheEntry)> = unresolved
+            .drain()
+            .filter_map(|id| entries.remove(&id).map(|e| (id, e)))
+            .collect();
+        drop((entries, unresolved));
+        self.remember_evicted(evicted);
         if count > 0 {
-            for id in unresolved.drain() {
-                entries.remove(&id);
-            }
             self.dirty.store(true, Ordering::Relaxed);
         }
         count
+    }
+
+    /// Evict results with a missing name that `declared` may now provide.
+    pub fn evict_unresolved_declaring(&self, declared: &DeclaredNames) -> Vec<String> {
+        if declared.is_empty() {
+            return Vec::new();
+        }
+        self.evict_unresolved_where(|issue| declared.may_resolve(issue))
+    }
+
+    /// Evict results with an issue matching `stale`; returns their paths.
+    /// `stale` runs without the cache's locks held, so it may call back in.
+    pub fn evict_unresolved_where(&self, stale: impl Fn(&Issue) -> bool) -> Vec<String> {
+        let candidates: Vec<(FileId, Option<std::sync::Arc<[Issue]>>)> = {
+            let entries = self.entries.lock();
+            let unresolved = self.unresolved_entries.lock();
+            unresolved
+                .iter()
+                .map(|id| (*id, entries.get(id).map(|e| e.issues.clone())))
+                .collect()
+        };
+        let stale_ids: Vec<FileId> = candidates
+            .into_iter()
+            .filter(|(_, issues)| issues.as_ref().is_none_or(|i| i.iter().any(&stale)))
+            .map(|(id, _)| id)
+            .collect();
+        let mut entries = self.entries.lock();
+        let mut unresolved = self.unresolved_entries.lock();
+        let evicted: Vec<(FileId, CacheEntry)> = stale_ids
+            .iter()
+            .filter_map(|id| {
+                unresolved.remove(id);
+                entries.remove(id).map(|e| (*id, e))
+            })
+            .collect();
+        drop((entries, unresolved));
+        let paths: Vec<String> = {
+            let id_map = self.file_id_map.lock();
+            evicted
+                .iter()
+                .filter_map(|(id, _)| id_map.path(*id).map(str::to_string))
+                .collect()
+        };
+        if !evicted.is_empty() {
+            self.dirty.store(true, Ordering::Relaxed);
+        }
+        self.remember_evicted(evicted);
+        paths
     }
 
     /// Remove a single file's cache entry.
@@ -598,8 +803,10 @@ impl AnalysisCache {
             return;
         };
         let mut entries = self.entries.lock();
-        if entries.remove(&id).is_some() {
+        if let Some(entry) = entries.remove(&id) {
             self.unresolved_entries.lock().remove(&id);
+            drop(entries);
+            self.remember_evicted([(id, entry)]);
             self.dirty.store(true, Ordering::Relaxed);
         }
     }
@@ -927,6 +1134,7 @@ mod tests {
             version: cache_epoch(TEST_PHP_V, 0).wrapping_add(1), // deliberately wrong epoch
             entries: &entries,
             reverse_deps: &reverse_deps,
+            dep_hashes: HashMap::<String, DepHash>::default(),
         };
         std::fs::write(
             dir.path().join("cache.bin"),

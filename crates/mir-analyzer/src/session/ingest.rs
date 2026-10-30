@@ -21,7 +21,7 @@ struct WarmStartHit {
 const SETTLE_ROUNDS: usize = 4;
 
 type ChangedInput = (Arc<str>, Arc<str>, bool);
-type IndexedSources = (Vec<crate::db::SourceFile>, Vec<ChangedInput>, bool);
+type IndexedSources = (Vec<crate::db::SourceFile>, Vec<ChangedInput>);
 
 /// Existing definitions that lost ownership of a name to this mirror batch.
 /// Cached resolved consumers point to the old owner, so invalidate those
@@ -406,7 +406,10 @@ impl AnalysisSession {
         if let Some(cache) = session.cache.as_deref() {
             let paths: Vec<String> = changed_inputs
                 .iter()
-                .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
+                .filter(|(file, source, existed)| {
+                    let unchanged = cache.observe_dependency(file, source);
+                    *existed || !unchanged
+                })
                 .map(|(file, _, _)| file.to_string())
                 .collect();
             cache.evict_files_and_dependents(&paths);
@@ -550,10 +553,9 @@ impl AnalysisSession {
 
         // 1. Register the chunk as HIGH-durability inputs, with one revision
         //    bump for the chunk rather than one per new file.
-        let (sources, changed_inputs, had_index): IndexedSources = {
+        let (sources, changed_inputs): IndexedSources = {
             let mut session = self.defer_revision_bumps();
             let db = &mut session.db.salsa;
-            let had_index = db.workspace_symbol_index_singleton().is_some();
             let mut changed_inputs = Vec::new();
             let sources = files
                 .iter()
@@ -569,22 +571,32 @@ impl AnalysisSession {
                     )
                 })
                 .collect();
-            (sources, changed_inputs, had_index)
+            (sources, changed_inputs)
         };
         let registered = sources.len();
-        if let Some(cache) = self.cache.as_deref() {
-            let paths: Vec<String> = changed_inputs
+        // Inputs whose content this cache hasn't seen: only their declarations
+        // are new to cached results.
+        let unseen_paths: Vec<String> = match self.cache.as_deref() {
+            Some(cache) => changed_inputs
                 .iter()
-                .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
+                .filter(|(file, source, existed)| {
+                    let unchanged = cache.observe_dependency(file, source);
+                    *existed || !unchanged
+                })
                 .map(|(file, _, _)| file.to_string())
-                .collect();
-            cache.evict_files_and_dependents(&paths);
-            if !had_index && !changed_inputs.is_empty() {
-                cache.evict_unresolved();
-            }
+                .collect(),
+            None => Vec::new(),
+        };
+        if let Some(cache) = self.cache.as_deref() {
+            cache.evict_files_and_dependents(&unseen_paths);
         }
 
         if cancel.is_cancelled() {
+            if let Some(cache) = self.cache.as_deref() {
+                if !unseen_paths.is_empty() {
+                    cache.evict_unresolved();
+                }
+            }
             return crate::IndexBatchOutcome {
                 registered,
                 cancelled: true,
@@ -621,6 +633,23 @@ impl AnalysisSession {
             };
         drop(view);
 
+        if let Some(cache) = self.cache.as_deref() {
+            let changed_files: HashSet<crate::db::SourceFile> = unseen_paths
+                .iter()
+                .filter_map(|file| self.db.lookup_source_file(file))
+                .collect();
+            let mut declared = crate::cache::DeclaredNames::default();
+            for (_, file_decls) in decls.iter().filter(|(sf, _)| changed_files.contains(sf)) {
+                for decl in file_decls.class_like() {
+                    declared.add_class_like(decl.name.as_str());
+                }
+                for decl in file_decls.functions().chain(file_decls.constants()) {
+                    declared.add_function_or_constant(decl.name.as_str());
+                }
+            }
+            cache.evict_unresolved_declaring(&declared);
+        }
+
         if cancel.is_cancelled() {
             return crate::IndexBatchOutcome {
                 registered,
@@ -631,7 +660,7 @@ impl AnalysisSession {
 
         // 3. Apply to the singleton under a SHORT write window — only cheap map
         //    construction / merge runs here (no parse).
-        let (declarations_changed, displaced_owners) = {
+        let displaced_owners = {
             let db = &mut self.db.salsa;
             let declarations_changed = decls
                 .iter()
@@ -648,17 +677,13 @@ impl AnalysisSession {
             } else {
                 db.merge_precomputed_into_workspace_index(&decls);
             }
-            let displaced_owners = old_index
+            old_index
                 .zip(candidates)
                 .map(|(old, candidates)| displaced_cache_owners(db, &old, &candidates))
-                .unwrap_or_default();
-            (declarations_changed, displaced_owners)
+                .unwrap_or_default()
         };
         if let Some(cache) = self.cache.as_deref() {
             cache.evict_with_dependents(&displaced_owners);
-            if declarations_changed {
-                cache.evict_unresolved();
-            }
         }
 
         crate::IndexBatchOutcome {

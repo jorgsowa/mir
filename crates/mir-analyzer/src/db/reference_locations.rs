@@ -105,6 +105,31 @@ pub(crate) fn issues_have_unresolved_names(issues: &[Issue]) -> bool {
     })
 }
 
+/// The file declaring the name a missing-name `issue` reports, if any does now.
+pub(crate) fn missing_name_declaring_file(
+    db: &dyn MirDatabase,
+    issue: &Issue,
+) -> Option<SourceFile> {
+    use mir_issues::IssueKind as K;
+    let loc = match &issue.kind {
+        K::UndefinedClass { name }
+        | K::UndefinedTrait { name }
+        | K::UndefinedDocblockClass { name }
+        | K::UndefinedThrowsDocblock { name }
+        | K::UndefinedAttributeClass { name } => {
+            class_like_loc(db, Fqcn::from_str(db, name.trim_start_matches('\\')))
+        }
+        K::UndefinedFunction { name } => {
+            function_loc(db, Fqcn::from_str(db, name.trim_start_matches('\\')))
+        }
+        K::UndefinedConstant { name } if !name.contains("::") => {
+            symbol_loc(db, name.trim_start_matches('\\'))
+        }
+        _ => None,
+    };
+    loc.map(|loc| loc.file())
+}
+
 /// Analyze one file: parse-error issues plus full body analysis, assembled
 /// from per-scope memos (see [`super::scopes::infer_scope`]).
 ///

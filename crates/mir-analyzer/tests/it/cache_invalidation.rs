@@ -490,3 +490,114 @@ fn matching_warm_cache_entries_survive_bulk_registration() {
         );
     }
 }
+
+#[test]
+fn new_file_declaring_missing_class_reanalyzes_cached_consumer() {
+    let src_dir = create_temp_dir("new declaration: source files");
+    let cache_dir = create_temp_dir("new declaration: cache");
+    let consumer = write_file(
+        &src_dir,
+        "a.php",
+        "<?php\nfunction f(): void { new \\App\\Foo(); }\n",
+    );
+    let opts = BatchOptions::new().without_symbols();
+    let undefined = |result: &mir_analyzer::AnalysisResult| {
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UndefinedClass")
+    };
+
+    let mut first = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    assert!(undefined(
+        &first.analyze_paths(std::slice::from_ref(&consumer), &opts)
+    ));
+
+    let declaring = write_file(&src_dir, "b.php", "<?php\nnamespace App;\nclass Foo {}\n");
+    let mut second = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    assert!(
+        !undefined(&second.analyze_paths(&[consumer, declaring], &opts)),
+        "a cached UndefinedClass must not survive a new file declaring the class"
+    );
+}
+
+/// Index `helper` as a dependency-only file, then batch-analyze `consumer`;
+/// returns how many files the body pass analyzed.
+fn reanalyzed_with_indexed_helper(
+    cache_dir: &std::path::Path,
+    helper: (&str, &str),
+    consumer: &std::path::Path,
+) -> usize {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let n = Arc::new(AtomicUsize::new(0));
+    let counter = n.clone();
+    let opts = BatchOptions::new()
+        .without_symbols()
+        .with_progress_callback(Arc::new(move || {
+            counter.fetch_add(1, Ordering::Relaxed);
+        }));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
+    session.index_batch(
+        &[(Arc::from(helper.0), Arc::from(helper.1))],
+        IndexParallelism::Sequential,
+        &IndexCancel::new(),
+    );
+    session.analyze_paths(&[consumer.to_path_buf()], &opts);
+    n.load(Ordering::Relaxed)
+}
+
+#[test]
+fn indexed_dependency_evicts_dependents_only_when_changed() {
+    let src_dir = create_temp_dir("indexed dependency: source files");
+    let cache_dir = create_temp_dir("indexed dependency: cache");
+    let helper_path = src_dir.path().join("helpers.php");
+    let helper_path = helper_path.to_str().unwrap();
+    let helper = "<?php\nfunction helper(): int { return 1; }\n";
+    let consumer = write_file(
+        &src_dir,
+        "consumer.php",
+        "<?php\nfunction g(): int { return helper(); }\n",
+    );
+
+    let run =
+        |source| reanalyzed_with_indexed_helper(cache_dir.path(), (helper_path, source), &consumer);
+    assert_eq!(run(helper), 1, "cold run analyzes the consumer");
+    assert_eq!(
+        run(helper),
+        0,
+        "an unchanged dependency keeps its dependents cached"
+    );
+    assert_eq!(
+        run("<?php\nfunction helper(): string { return ''; }\n"),
+        1,
+        "a changed dependency re-analyzes its dependents"
+    );
+}
+
+#[test]
+fn index_batch_of_unrelated_declarations_keeps_negative_lookup() {
+    let dir = create_temp_dir("unrelated declaration");
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let consumer = "<?php\nnew Mage();\n";
+    assert!(has_undefined_class(
+        &mut session,
+        "/mirror/app.php",
+        consumer
+    ));
+
+    session.index_batch(
+        &[(
+            Arc::from("/mirror/Wizard.php"),
+            Arc::from("<?php\nclass Wizard {}\n"),
+        )],
+        IndexParallelism::Sequential,
+        &IndexCancel::new(),
+    );
+    assert!(
+        session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/app.php", &hash_content(consumer)),
+        "a declaration of another name must not evict the negative lookup"
+    );
+}

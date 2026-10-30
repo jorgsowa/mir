@@ -387,3 +387,39 @@ fn set_workspace_files_registers_sources_without_parsing() {
     session.set_file_text(c_path.clone(), c_src.clone());
     assert_eq!(session.source_of(&c_path).as_deref(), Some(c_src.as_ref()));
 }
+
+#[test]
+fn cached_undefined_class_is_reanalyzed_once_psr4_provides_it() {
+    let root = create_temp_dir("lazy load cache");
+    let cache_dir = create_temp_dir("lazy load cache: cache");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+    let consumer = write(
+        &root,
+        "consumer.php",
+        "<?php\nuse App\\Widget;\nfunction f(): void { new Widget(); }\n",
+    );
+    let psr4 = make_psr4(&root, "App\\\\", "src");
+    let undefined = |psr4: Arc<mir_analyzer::composer::Psr4Map>| {
+        AnalysisSession::new(PhpVersion::LATEST)
+            .with_psr4(psr4)
+            .with_cache_dir(cache_dir.path())
+            .analyze_paths(
+                std::slice::from_ref(&consumer),
+                &BatchOptions::new().without_symbols(),
+            )
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UndefinedClass")
+    };
+    assert!(undefined(psr4.clone()));
+
+    write(
+        &root,
+        "src/Widget.php",
+        "<?php\nnamespace App;\nclass Widget {}\n",
+    );
+    assert!(
+        !undefined(psr4),
+        "a cached UndefinedClass must not survive the class appearing under PSR-4"
+    );
+}

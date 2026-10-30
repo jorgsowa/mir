@@ -146,6 +146,20 @@ impl AnalysisSession {
         // return callable leaves every dependent's result intact. A missing or
         // pre-firewall (empty) stored surface is treated as unknown and cascades.
         if let Some(cache) = &self.cache {
+            // A new or edited file may declare a name a cached result reported
+            // missing; that result has no dependency edge to it.
+            let mut declared = crate::cache::DeclaredNames::default();
+            for (parsed, (defs, _, _, _)) in parsed_files.iter().zip(file_defs.iter()) {
+                let seen = content_hexes
+                    .get(&parsed.file)
+                    .is_some_and(|h| cache.observe_content(&parsed.file, h));
+                if seen {
+                    continue;
+                }
+                declared.add_slice(&defs.slice);
+            }
+            cache.evict_unresolved_declaring(&declared);
+
             let content_changed: Vec<String> = file_data
                 .iter()
                 .filter_map(|(f, _src)| {
@@ -252,6 +266,21 @@ impl AnalysisSession {
         let _t_before_lazy = _t0.elapsed();
         if let Some(psr4) = self.psr4.clone() {
             self.lazy_load_missing_classes(psr4, php_version, &mut all_issues);
+        }
+        // A cached missing name may now be declared by a file the cache hasn't
+        // seen (one PSR-4 resolves on demand). Names reported missing although
+        // declared by a seen file stay as they are.
+        if let Some(cache) = &self.cache {
+            let db = self.snapshot_db();
+            let stale = cache.evict_unresolved_where(|issue| {
+                crate::db::missing_name_declaring_file(&db, issue).is_some_and(|file| {
+                    !cache.observe_dependency(file.path(&db).as_ref(), file.text(&db).as_ref())
+                })
+            });
+            if !stale.is_empty() {
+                cache.evict_with_dependents(&stale);
+                topology_changed = true;
+            }
         }
         let _t_lazyload_ms = (_t0.elapsed() - _t_before_lazy).as_secs_f64() * 1000.0;
 
