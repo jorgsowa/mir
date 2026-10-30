@@ -625,7 +625,7 @@ fn visit_index<V: OwnedVisitor>(visitor: &mut V, expr: &Expr) -> ControlFlow<V::
         }
         ExprKind::ArrayAccess(aa) => aa
             .index
-            .as_deref()
+            .as_ref()
             .map_or(ControlFlow::Continue(()), |i| visitor.visit_expr(i)),
         _ => ControlFlow::Continue(()),
     }
@@ -687,7 +687,7 @@ impl OwnedVisitor for Scan<'_> {
 
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
         if let ExprKind::Yield(y) = &expr.kind {
-            for yielded in [y.key.as_deref(), y.value.as_deref()].into_iter().flatten() {
+            for yielded in [y.key.as_ref(), y.value.as_ref()].into_iter().flatten() {
                 let value = self.value_facts(yielded);
                 self.facts.returns_param |= value.reads_param;
                 self.facts.returns_prop |= value.reads_prop;

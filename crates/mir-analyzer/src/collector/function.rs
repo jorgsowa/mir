@@ -360,12 +360,7 @@ impl DefinitionCollector<'_> {
                 // user code). Stubs use #[Deprecated(since: '...', ...)] with args
                 // which would otherwise flood callers with spurious DeprecatedCall.
                 if decl.attributes.iter().any(|a| {
-                    a.args.is_empty()
-                        && a.name
-                            .parts
-                            .last()
-                            .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                            .unwrap_or(false)
+                    a.args.is_empty() && a.name.last_part().eq_ignore_ascii_case("Deprecated")
                 }) {
                     Some(Arc::from(""))
                 } else {

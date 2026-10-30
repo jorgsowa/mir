@@ -18,54 +18,52 @@ use std::sync::Arc;
 
 /// `$x |> f(...)` as the call `f($x)` it evaluates to; any other callable `$c` as `$c($x)`.
 pub(crate) fn pipe_as_call(b: &BinaryExpr, span: Span) -> Expr {
-    let args: Box<[Arg]> = Box::new([Arg::new(
-        None,
-        ArgKind::Value((*b.left).clone()),
-        b.left.span,
-    )]);
+    let args: Box<[Arg]> = Box::new([Arg::new(None, ArgKind::Value(b.left.clone()), b.left.span)]);
     let kind = match &b.right.kind {
         ExprKind::CallableCreate(cc) => match &cc.kind {
-            CallableCreateKind::Function(name) => ExprKind::FunctionCall(FunctionCallExpr {
-                name: name.clone(),
-                args,
-            }),
+            CallableCreateKind::Function(name) => {
+                ExprKind::FunctionCall(Box::new(FunctionCallExpr {
+                    name: Expr::clone(name),
+                    args,
+                }))
+            }
             CallableCreateKind::Method { object, method } => {
                 ExprKind::MethodCall(Box::new(MethodCallExpr {
-                    object: object.clone(),
-                    method: method.clone(),
+                    object: Expr::clone(object),
+                    method: Expr::clone(method),
                     args,
                 }))
             }
             CallableCreateKind::NullsafeMethod { object, method } => {
                 ExprKind::NullsafeMethodCall(Box::new(MethodCallExpr {
-                    object: object.clone(),
-                    method: method.clone(),
+                    object: Expr::clone(object),
+                    method: Expr::clone(method),
                     args,
                 }))
             }
             CallableCreateKind::StaticMethod { class, method } => match &method.kind {
                 ExprKind::Identifier(_) => {
                     ExprKind::StaticMethodCall(Box::new(StaticMethodCallExpr {
-                        class: class.clone(),
-                        method: method.clone(),
+                        class: Expr::clone(class),
+                        method: Expr::clone(method),
                         args,
                     }))
                 }
                 _ => ExprKind::StaticMethodCallDynamic(Box::new(StaticMethodCallDynamicExpr {
-                    class: class.clone(),
-                    method: method.clone(),
+                    class: Expr::clone(class),
+                    method: Expr::clone(method),
                     args,
                 })),
             },
-            _ => ExprKind::FunctionCall(FunctionCallExpr {
+            _ => ExprKind::FunctionCall(Box::new(FunctionCallExpr {
                 name: b.right.clone(),
                 args,
-            }),
+            })),
         },
-        _ => ExprKind::FunctionCall(FunctionCallExpr {
+        _ => ExprKind::FunctionCall(Box::new(FunctionCallExpr {
             name: b.right.clone(),
             args,
-        }),
+        })),
     };
     Expr { kind, span }
 }

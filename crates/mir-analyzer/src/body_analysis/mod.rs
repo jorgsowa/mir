@@ -494,17 +494,7 @@ fn collect_decl_spans(
                 ));
             }
             StmtKind::Namespace(ns) => {
-                let raw_ns = ns
-                    .name
-                    .as_ref()
-                    .map(|n| {
-                        n.parts
-                            .iter()
-                            .map(|p| p.as_ref())
-                            .collect::<Vec<_>>()
-                            .join("\\")
-                    })
-                    .unwrap_or_default();
+                let raw_ns = ns.name.as_ref().map(|n| n.join_parts()).unwrap_or_default();
                 let child_prefix = if raw_ns.is_empty() {
                     String::new()
                 } else {

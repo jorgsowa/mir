@@ -306,7 +306,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 (value, kind)
             }
             ExprKind::AnonymousClass(_) => return,
-            _ => (n.class.as_ref(), SinkKind::Callable),
+            _ => (&n.class, SinkKind::Callable),
         };
         let issue = kind.issue();
         if crate::taint::reaches_sink(

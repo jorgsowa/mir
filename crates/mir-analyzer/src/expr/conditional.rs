@@ -451,7 +451,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ) && self.is_constant_arm(&aa.array, ctx)
                     && aa
                         .index
-                        .as_deref()
+                        .as_ref()
                         .is_some_and(|i| self.is_constant_arm(i, ctx))
             }
             _ => extract_literal_int(cond).is_some(),

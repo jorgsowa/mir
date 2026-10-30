@@ -398,8 +398,8 @@ pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
         return Some(guard);
     }
     let (call, literal, op) = match (&b.left.kind, &b.right.kind) {
-        (ExprKind::Int(_) | ExprKind::Bool(_), _) => (&*b.right, &b.left.kind, flipped(b.op)?),
-        (_, ExprKind::Int(_) | ExprKind::Bool(_)) => (&*b.left, &b.right.kind, b.op),
+        (ExprKind::Int(_) | ExprKind::Bool(_), _) => (&b.right, &b.left.kind, flipped(b.op)?),
+        (_, ExprKind::Int(_) | ExprKind::Bool(_)) => (&b.left, &b.right.kind, b.op),
         _ => return None,
     };
     let (guarded, safe, is_preg) = guard_of_call(call)?;
@@ -416,9 +416,9 @@ pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
 /// other values, which a variable's type narrowing doesn't treat as a proof either.
 fn guarded_by_literal(b: &php_ast::owned::BinaryExpr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
     let subject = if is_literal(&b.right) {
-        &*b.left
+        &b.left
     } else if is_literal(&b.left) {
-        &*b.right
+        &b.right
     } else {
         return None;
     };
@@ -571,7 +571,7 @@ fn guarded_subject(expr: &Expr) -> Option<Guarded<'_>> {
             let ExprKind::Variable(var) = &aa.array.kind else {
                 return None;
             };
-            let key = crate::expr::assignment::literal_key_name(aa.index.as_deref())?;
+            let key = crate::expr::assignment::literal_key_name(aa.index.as_ref())?;
             Some(Guarded::Element {
                 var: var.trim_start_matches('$'),
                 key,

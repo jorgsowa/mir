@@ -8,7 +8,7 @@ use php_ast::owned::YieldExpr;
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_yield(&mut self, y: &YieldExpr, ctx: &mut FlowState) -> Type {
         let key_ty = y.key.as_ref().map(|key| self.analyze(key, ctx));
-        let yielded_taint = [y.key.as_deref(), y.value.as_deref()]
+        let yielded_taint = [y.key.as_ref(), y.value.as_ref()]
             .into_iter()
             .flatten()
             .fold(crate::taint::Taint::NONE, |acc, e| {

@@ -760,13 +760,13 @@ pub(super) fn infer_const_value(
                 return None;
             }
             let own = collector.own_constants.as_ref();
-            let resolved = match (class_name.kind, &*class_name.parts) {
-                (php_ast::ast::NameKind::Unqualified, [only])
+            let resolved = match (class_name.kind, class_name.as_str()) {
+                (php_ast::ast::NameKind::Unqualified, only)
                     if only.eq_ignore_ascii_case("self") =>
                 {
                     own?.fqcn.clone()
                 }
-                (php_ast::ast::NameKind::Unqualified, [only])
+                (php_ast::ast::NameKind::Unqualified, only)
                     if only.eq_ignore_ascii_case("parent") =>
                 {
                     own?.parent.clone()?
@@ -1041,13 +1041,9 @@ impl<'a> DefinitionCollector<'a> {
     /// imports, independent of stub vs source. Stub purity (phpstorm-stubs)
     /// flows from these attributes when a docblock tag is absent.
     fn pure_attr(&self, attrs: &[php_ast::owned::Attribute]) -> bool {
-        attrs.iter().any(|a| {
-            a.name
-                .parts
-                .last()
-                .map(|p| p.as_ref().eq_ignore_ascii_case("Pure"))
-                .unwrap_or(false)
-        })
+        attrs
+            .iter()
+            .any(|a| a.name.last_part().eq_ignore_ascii_case("Pure"))
     }
 
     fn parse_docblock_from_node(
@@ -1163,12 +1159,12 @@ impl<'a> DefinitionCollector<'a> {
         let php_ast::owned::ExprKind::Name(name) = &expr.kind else {
             return None;
         };
-        match (name.kind, &*name.parts) {
+        match (name.kind, name.as_str()) {
             (NameKind::Error, _) => None,
-            (NameKind::Unqualified, [only]) if only.eq_ignore_ascii_case("self") => {
+            (NameKind::Unqualified, only) if only.eq_ignore_ascii_case("self") => {
                 class_fqcn.map(str::to_string)
             }
-            (NameKind::Unqualified, [only])
+            (NameKind::Unqualified, only)
                 if only.eq_ignore_ascii_case("static") || only.eq_ignore_ascii_case("parent") =>
             {
                 None
@@ -1183,14 +1179,13 @@ impl<'a> DefinitionCollector<'a> {
 
     fn resolve_ast_name(&self, name: &php_ast::owned::Name) -> String {
         use php_ast::ast::NameKind;
-        match (name.kind, &*name.parts) {
-            (NameKind::FullyQualified, _) => name.join_parts(),
-            (NameKind::Relative, _) => match &self.namespace {
-                Some(ns) => format!("{ns}\\{}", name.join_parts()),
+        match name.kind {
+            NameKind::FullyQualified => name.join_parts(),
+            NameKind::Relative => match &self.namespace {
+                Some(ns) => format!("{ns}\\{}", name.as_str()),
                 None => name.join_parts(),
             },
-            (_, [only]) => self.resolve_name(only),
-            _ => self.resolve_name(&name.join_parts()),
+            _ => self.resolve_name(name.as_str()),
         }
     }
 
@@ -1779,13 +1774,10 @@ impl<'a> DefinitionCollector<'a> {
         attributes: &[php_ast::owned::Attribute],
     ) -> Option<Arc<str>> {
         doc_tag.map(Arc::from).or_else(|| {
-            if attributes.iter().any(|a| {
-                a.name
-                    .parts
-                    .last()
-                    .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                    .unwrap_or(false)
-            }) {
+            if attributes
+                .iter()
+                .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
+            {
                 Some(Arc::from(""))
             } else {
                 None
@@ -2322,12 +2314,12 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                 use php_ast::ast::UseKind;
                 for item in use_decl.uses.iter() {
                     if item.alias.is_none()
-                        && item.name.parts.len() == 1
+                        && item.name.part_count() == 1
                         && self.namespace.is_none()
                     {
                         self.issues.add(Issue::new(
                             mir_issues::IssueKind::UseStatementHasNoEffect {
-                                name: item.name.parts[0].to_string(),
+                                name: item.name.join_parts(),
                             },
                             self.location(item.span.start, item.span.end),
                         ));
@@ -2882,12 +2874,7 @@ impl<'a> DefinitionCollector<'a> {
             .map(|s| Arc::from(s.as_str()))
             .collect();
         data_provider_targets.extend(m.attributes.iter().filter_map(|a| {
-            let is_data_provider = a
-                .name
-                .parts
-                .last()
-                .map(|p| p.as_ref().eq_ignore_ascii_case("DataProvider"))
-                .unwrap_or(false);
+            let is_data_provider = a.name.last_part().eq_ignore_ascii_case("DataProvider");
             if !is_data_provider {
                 return None;
             }
@@ -2912,13 +2899,10 @@ impl<'a> DefinitionCollector<'a> {
             assertions,
             throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                if m.attributes.iter().any(|a| {
-                    a.name
-                        .parts
-                        .last()
-                        .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                        .unwrap_or(false)
-                }) {
+                if m.attributes
+                    .iter()
+                    .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
+                {
                     Some(Arc::from(""))
                 } else {
                     None

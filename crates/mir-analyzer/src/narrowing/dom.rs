@@ -56,7 +56,7 @@ fn is_dom_node(atomic: &Atomic) -> bool {
 fn node_type_class(expr: &Expr) -> Option<&'static str> {
     let value = match &expr.kind {
         ExprKind::Int(n) => *n,
-        ExprKind::Name(name) if name.parts.len() == 1 => match &*name.parts[0] {
+        ExprKind::Name(name) if name.part_count() == 1 => match name.as_str() {
             "XML_ELEMENT_NODE" => 1,
             "XML_ATTRIBUTE_NODE" => 2,
             "XML_TEXT_NODE" => 3,

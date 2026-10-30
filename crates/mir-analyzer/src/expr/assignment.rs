@@ -168,17 +168,17 @@ fn taint_array_element_write(
 ) {
     match &aa.array.kind {
         ExprKind::Variable(name) => {
-            let key = literal_key_name(aa.index.as_deref());
+            let key = literal_key_name(aa.index.as_ref());
             ctx.write_key_taint(name, key, taint, replace && key.is_some());
-            if let (None, Some(index)) = (key, aa.index.as_deref()) {
+            if let (None, Some(index)) = (key, aa.index.as_ref()) {
                 ctx.taint_key_names(name, crate::taint::expr_taint(index, ctx, db, file));
             }
         }
         ExprKind::ArrayAccess(inner) => match &inner.array.kind {
             ExprKind::Variable(name) => {
-                let key = literal_key_name(inner.index.as_deref());
+                let key = literal_key_name(inner.index.as_ref());
                 ctx.write_key_taint(name, key, taint, false);
-                if let (None, Some(index)) = (key, inner.index.as_deref()) {
+                if let (None, Some(index)) = (key, inner.index.as_ref()) {
                     ctx.taint_key_names(name, crate::taint::expr_taint(index, ctx, db, file));
                 }
             }
@@ -867,7 +867,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // right-hand side runs — no need to fall back to a plain union of
                 // "maybe the old value, maybe the new one".
                 let literal_offset_state = match &a.target.kind {
-                    ExprKind::ArrayAccess(aa) => match (&aa.array.kind, aa.index.as_deref()) {
+                    ExprKind::ArrayAccess(aa) => match (&aa.array.kind, aa.index.as_ref()) {
                         (ExprKind::Variable(name), Some(idx)) => {
                             literal_array_key_of_kind(&idx.kind).and_then(|key| {
                                 let base = ctx.get_var(name.trim_start_matches('$'));
@@ -2205,7 +2205,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
                         let found = crate::db::find_property_in_chain(self.db, here, prop_name);
                         let late_bound = matches!(&spa.class.kind, ExprKind::Name(n)
-                            if matches!(&*n.parts, [only] if only.eq_ignore_ascii_case("static")));
+                            if n.as_str().eq_ignore_ascii_case("static"));
                         if found.is_none() && !late_bound {
                             self.report_undefined_static_property(
                                 &fqcn,

@@ -41,6 +41,22 @@ impl ByteStringExt for php_ast::owned::ByteString {
     }
 }
 
+pub(crate) trait StringPartsExt {
+    /// The parts of an interpolated string, heredoc or shell command.
+    fn string_parts(&self) -> &[php_ast::owned::StringPart];
+}
+
+impl StringPartsExt for php_ast::owned::ExprKind {
+    fn string_parts(&self) -> &[php_ast::owned::StringPart] {
+        use php_ast::owned::ExprKind;
+        match self {
+            ExprKind::InterpolatedString(parts) | ExprKind::ShellExec(parts) => parts,
+            ExprKind::Heredoc(heredoc) => &heredoc.parts,
+            _ => &[],
+        }
+    }
+}
+
 pub(crate) trait NameRefExt {
     /// A function, class or constant reference as written, without the leading
     /// backslash of a fully qualified name (`namespace\` stays on a relative one).
@@ -54,13 +70,10 @@ impl NameRefExt for php_ast::owned::ExprKind {
         use php_ast::ast::NameKind;
         use php_ast::owned::ExprKind;
         match self {
-            ExprKind::Name(n) => Some(match (n.kind, &*n.parts) {
-                (NameKind::Error, _) => return None,
-                (NameKind::Relative, _) => {
-                    std::borrow::Cow::Owned(format!("namespace\\{}", n.join_parts()))
-                }
-                (_, [only]) => std::borrow::Cow::Borrowed(only),
-                _ => std::borrow::Cow::Owned(n.join_parts()),
+            ExprKind::Name(n) => Some(match n.kind {
+                NameKind::Error => return None,
+                NameKind::Relative => std::borrow::Cow::Owned(format!("namespace\\{}", n.as_str())),
+                _ => std::borrow::Cow::Borrowed(n.as_str()),
             }),
             _ => None,
         }
@@ -84,8 +97,10 @@ impl NameBareExt for php_ast::owned::ExprKind {
         use php_ast::ast::NameKind;
         use php_ast::owned::ExprKind;
         match self {
-            ExprKind::Name(n) => match (n.kind, &*n.parts) {
-                (NameKind::Unqualified | NameKind::FullyQualified, [only]) => Some(only),
+            ExprKind::Name(n) => match n.kind {
+                NameKind::Unqualified | NameKind::FullyQualified if n.part_count() == 1 => {
+                    Some(n.as_str())
+                }
                 _ => None,
             },
             _ => None,
@@ -116,15 +131,15 @@ pub(crate) fn resolve_ast_name(
     file: &str,
 ) -> String {
     use php_ast::ast::NameKind;
-    match (n.kind, &*n.parts) {
-        (NameKind::Error, _) => String::new(),
-        (NameKind::FullyQualified, _) => n.join_parts(),
-        (NameKind::Relative, _) => crate::db::prefix_file_namespace(db, file, &n.join_parts()),
-        (_, [only]) => crate::db::resolve_name(db, file, only),
-        (_, [first, rest @ ..]) => {
-            crate::db::resolve_qualified_name(db, file, first, &rest.join("\\"))
-        }
-        (_, []) => String::new(),
+    match n.kind {
+        NameKind::Error => String::new(),
+        NameKind::FullyQualified => n.as_str().to_string(),
+        NameKind::Relative => crate::db::prefix_file_namespace(db, file, n.as_str()),
+        _ => match n.as_str().split_once('\\') {
+            Some((first, rest)) => crate::db::resolve_qualified_name(db, file, first, rest),
+            None if n.as_str().is_empty() => String::new(),
+            None => crate::db::resolve_name(db, file, n.as_str()),
+        },
     }
 }
 
@@ -192,19 +207,19 @@ impl FunctionRefExt for php_ast::owned::ExprKind {
         let php_ast::owned::ExprKind::Name(n) = self else {
             return None;
         };
-        let (qualified, global) = match (n.kind, &*n.parts) {
-            (NameKind::Error, _) => return None,
-            (NameKind::FullyQualified, [only]) => (Cow::Borrowed(&**only), None),
-            (NameKind::FullyQualified, _) => (Cow::Owned(n.join_parts()), None),
-            (NameKind::Relative, _) => (
-                Cow::Owned(crate::db::prefix_file_namespace(db, file, &n.join_parts())),
+        let name = n.as_str();
+        let (qualified, global) = match n.kind {
+            NameKind::Error => return None,
+            NameKind::FullyQualified => (Cow::Borrowed(name), None),
+            NameKind::Relative => (
+                Cow::Owned(crate::db::prefix_file_namespace(db, file, name)),
                 None,
             ),
-            (NameKind::Unqualified, [only]) => match imported_function(db, file, only) {
+            NameKind::Unqualified => match imported_function(db, file, name) {
                 Some(imported) => (Cow::Owned(imported), None),
                 None => match db.file_namespace(file) {
-                    Some(ns) => (Cow::Owned(format!("{ns}\\{only}")), Some(&**only)),
-                    None => (Cow::Borrowed(&**only), None),
+                    Some(ns) => (Cow::Owned(format!("{ns}\\{name}")), Some(name)),
+                    None => (Cow::Borrowed(name), None),
                 },
             },
             _ => (Cow::Owned(resolve_ast_name(n, db, file)), None),

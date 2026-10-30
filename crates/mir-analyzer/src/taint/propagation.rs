@@ -338,12 +338,8 @@ pub fn held_prop_taint(
             .into_iter()
             .fold(Taint::NONE, |acc, (_, taint)| acc | taint),
         ExprKind::Ternary(t) => {
-            held_prop_taint(
-                t.then_expr.as_deref().unwrap_or(&t.condition),
-                ctx,
-                db,
-                file,
-            ) | held_prop_taint(&t.else_expr, ctx, db, file)
+            held_prop_taint(t.then_expr.as_ref().unwrap_or(&t.condition), ctx, db, file)
+                | held_prop_taint(&t.else_expr, ctx, db, file)
         }
         ExprKind::NullCoalesce(nc) => {
             held_prop_taint(&nc.left, ctx, db, file) | held_prop_taint(&nc.right, ctx, db, file)
@@ -467,7 +463,7 @@ fn to_string_taint(
     let receiver = unwrap_parens(expr);
     let classes: Vec<String> = match &receiver.kind {
         ExprKind::Ternary(t) => {
-            let then_expr = t.then_expr.as_deref().unwrap_or(&t.condition);
+            let then_expr = t.then_expr.as_ref().unwrap_or(&t.condition);
             return to_string_taint(then_expr, ctx, db, file)
                 | to_string_taint(&t.else_expr, ctx, db, file);
         }
@@ -578,7 +574,7 @@ pub fn expr_taint(
                 crate::db::global_var_taint(db, file, var)
             } else if let (ExprKind::Variable(name), Some(key)) = (
                 &aa.array.kind,
-                crate::expr::assignment::literal_key_name(aa.index.as_deref()),
+                crate::expr::assignment::literal_key_name(aa.index.as_ref()),
             ) {
                 let n = name.trim_start_matches('$');
                 if ctx
@@ -683,14 +679,17 @@ pub fn expr_taint(
             _ => expr_taint(&u.operand, ctx, db, file),
         },
 
-        ExprKind::InterpolatedString(parts)
-        | ExprKind::Heredoc { parts, .. }
-        | ExprKind::ShellExec(parts) => {
-            let taint = parts.iter().fold(Taint::NONE, |acc, p| match p {
-                StringPart::Expr(e) => acc | stringified_taint(e, ctx, db, file),
-                StringPart::Literal(_) => acc,
-                _ => acc,
-            });
+        ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) | ExprKind::ShellExec(_) => {
+            use crate::ast_ext::StringPartsExt;
+            let taint = expr
+                .kind
+                .string_parts()
+                .iter()
+                .fold(Taint::NONE, |acc, p| match p {
+                    StringPart::Expr(e) => acc | stringified_taint(e, ctx, db, file),
+                    StringPart::Literal(_) => acc,
+                    _ => acc,
+                });
             if !matches!(expr.kind, ExprKind::ShellExec(_)) && starts_with_fixed_url_origin(expr) {
                 taint.without(Taint::SSRF | Taint::FILE)
             } else {

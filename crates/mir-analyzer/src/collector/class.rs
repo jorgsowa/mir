@@ -361,13 +361,10 @@ impl<'a> DefinitionCollector<'a> {
                         default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                            if p.attributes.iter().any(|a| {
-                                a.name
-                                    .parts
-                                    .last()
-                                    .map(|part| part.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                    .unwrap_or(false)
-                            }) {
+                            if p.attributes
+                                .iter()
+                                .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
+                            {
                                 Some(Arc::from(""))
                             } else {
                                 None
@@ -451,13 +448,10 @@ impl<'a> DefinitionCollector<'a> {
                         is_final: c.modifiers.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                            if c.attributes.iter().any(|a| {
-                                a.name
-                                    .parts
-                                    .last()
-                                    .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                    .unwrap_or(false)
-                            }) {
+                            if c.attributes
+                                .iter()
+                                .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
+                            {
                                 Some(Arc::from(""))
                             } else {
                                 None
@@ -681,13 +675,11 @@ impl<'a> DefinitionCollector<'a> {
             is_readonly: decl.modifiers.is_readonly,
             deprecated: class_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 // Also detect #[Deprecated] / #[\Deprecated] PHP attribute
-                if decl.attributes.iter().any(|a| {
-                    a.name
-                        .parts
-                        .last()
-                        .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                        .unwrap_or(false)
-                }) {
+                if decl
+                    .attributes
+                    .iter()
+                    .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
+                {
                     Some(Arc::from(""))
                 } else {
                     None
@@ -738,8 +730,7 @@ pub(crate) const ATTR_TARGET_ALL: i64 = 63;
 /// Returns `None` if no `#[Attribute]` is present, `Some(flags)` otherwise.
 pub(crate) fn parse_attribute_flags(attrs: &[php_ast::owned::Attribute]) -> Option<i64> {
     for attr in attrs {
-        let last = attr.name.parts.last()?;
-        if !last.as_ref().eq_ignore_ascii_case("Attribute") {
+        if !attr.name.last_part().eq_ignore_ascii_case("Attribute") {
             continue;
         }
         // Found `#[Attribute]` or `#[\Attribute]`.

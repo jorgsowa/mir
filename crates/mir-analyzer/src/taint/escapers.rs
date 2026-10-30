@@ -168,10 +168,10 @@ pub(super) fn starts_with_fixed_url_origin(expr: &Expr) -> bool {
         ExprKind::Binary(b) if matches!(b.op, php_ast::ast::BinaryOp::Concat) => {
             starts_with_fixed_url_origin(&b.left)
         }
-        ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
+        ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) => {
             // Adjacent literal parts form one run; stop at the first interpolation.
             let mut prefix = String::new();
-            for part in parts.iter() {
+            for part in crate::ast_ext::StringPartsExt::string_parts(&expr.kind) {
                 match part {
                     StringPart::Literal(l) => prefix.push_str(l.as_str()),
                     _ => break,

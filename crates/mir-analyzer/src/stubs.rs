@@ -203,10 +203,9 @@ fn global_name(kind: &ExprKind) -> Option<std::borrow::Cow<'_, str>> {
     let ExprKind::Name(n) = kind else {
         return None;
     };
-    match (n.kind, &*n.parts) {
-        (NameKind::Relative | NameKind::Error, _) => None,
-        (_, [only]) => Some(std::borrow::Cow::Borrowed(only)),
-        _ => Some(std::borrow::Cow::Owned(n.join_parts())),
+    match n.kind {
+        NameKind::Relative | NameKind::Error => None,
+        _ => Some(std::borrow::Cow::Borrowed(n.as_str())),
     }
 }
 

@@ -84,13 +84,7 @@ impl<'a> BodyAnalyzer<'a> {
                     .args
                     .iter()
                     .map(|arg| AttributeArgInfo {
-                        name: arg.name.as_ref().map(|n| {
-                            n.parts
-                                .iter()
-                                .map(|p| p.as_ref())
-                                .collect::<Vec<_>>()
-                                .join("\\")
-                        }),
+                        name: arg.name.as_ref().map(|n| n.join_parts()),
                         type_string: arg
                             .value()
                             .and_then(|v| self.constant_expr_type(v, file, site.class)),

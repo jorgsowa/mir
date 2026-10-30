@@ -222,13 +222,7 @@ impl<'a> DefinitionCollector<'a> {
                             deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {
                                     if p.attributes.iter().any(|a| {
-                                        a.name
-                                            .parts
-                                            .last()
-                                            .map(|part| {
-                                                part.as_ref().eq_ignore_ascii_case("Deprecated")
-                                            })
-                                            .unwrap_or(false)
+                                        a.name.last_part().eq_ignore_ascii_case("Deprecated")
                                     }) {
                                         Some(Arc::from(""))
                                     } else {
@@ -296,11 +290,7 @@ impl<'a> DefinitionCollector<'a> {
                             deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {
                                     if c.attributes.iter().any(|a| {
-                                        a.name
-                                            .parts
-                                            .last()
-                                            .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                            .unwrap_or(false)
+                                        a.name.last_part().eq_ignore_ascii_case("Deprecated")
                                     }) {
                                         Some(Arc::from(""))
                                     } else {

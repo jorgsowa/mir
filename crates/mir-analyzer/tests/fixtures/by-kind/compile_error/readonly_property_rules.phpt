@@ -15,7 +15,7 @@ final class Untyped {
 
 final class Promoted {
     public function __construct(public readonly $b) {}
-//                              ^^^^^^^^^^^^^^^ CompileError: Readonly property App\Promoted::$b must have type [untyped-readonly-property]
+//                              ^^^^^^^^^^^^^^^^^^ CompileError: Readonly property App\Promoted::$b must have type [untyped-readonly-property]
 }
 
 readonly class Point {

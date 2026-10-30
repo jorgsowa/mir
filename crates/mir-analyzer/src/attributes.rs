@@ -188,11 +188,7 @@ fn record_class_refs_in_expr(
 // ---------------------------------------------------------------------------
 
 fn is_attribute_class_annotation(attr: &Attribute) -> bool {
-    attr.name
-        .parts
-        .last()
-        .map(|p| p.as_ref().eq_ignore_ascii_case("Attribute"))
-        .unwrap_or(false)
+    attr.name.last_part().eq_ignore_ascii_case("Attribute")
 }
 
 /// Built-in attributes whose targets and repetition the parser checks, from the version PHP added each.
@@ -867,7 +863,7 @@ fn check_attribute_list(
                 match maybe_flags {
                     None => {
                         // Class has no `#[Attribute]` annotation → not an attribute class.
-                        let short = attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
+                        let short = attr.name.last_part();
                         issues.push(invalid_attr(
                             format!("Class {short} does not have an #[Attribute] annotation"),
                             loc.clone(),
@@ -876,7 +872,7 @@ fn check_attribute_list(
                     Some(flags) => {
                         // Check target mismatch (skip for TARGET_ALL = 63).
                         if flags != ATTR_TARGET_ALL && (flags & target_flag) == 0 {
-                            let short = attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
+                            let short = attr.name.last_part();
                             issues.push(invalid_attr(
                                 format!("Attribute {short} cannot be used on this target"),
                                 loc.clone(),
@@ -895,8 +891,7 @@ fn check_attribute_list(
                                     *prev_start,
                                     *prev_end,
                                 );
-                                let short =
-                                    attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
+                                let short = attr.name.last_part();
                                 // Emit on the first occurrence (prev_loc), matching Psalm's behavior.
                                 issues.push(invalid_attr(
                                     format!("Attribute {short} is not repeatable"),

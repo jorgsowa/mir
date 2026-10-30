@@ -195,8 +195,8 @@ impl WriteScanner {
         let ExprKind::Name(name) = &class.kind else {
             return None;
         };
-        match (name.kind, &*name.parts) {
-            (NameKind::Unqualified, [only])
+        match (name.kind, name.as_str()) {
+            (NameKind::Unqualified, only)
                 if only.eq_ignore_ascii_case("self") || only.eq_ignore_ascii_case("static") =>
             {
                 self.class.clone()
@@ -212,12 +212,7 @@ impl WriteScanner {
 
 /// Lowercases a qualified name, preserving backslash separators.
 fn lower_name(name: &Name) -> String {
-    name.parts
-        .iter()
-        .map(|p| p.as_ref())
-        .collect::<Vec<_>>()
-        .join("\\")
-        .to_lowercase()
+    name.as_str().to_lowercase()
 }
 
 /// Qualifies a class name against a lowercased namespace.

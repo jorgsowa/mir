@@ -133,13 +133,10 @@ impl DefinitionCollector<'_> {
                     }
                     let case_deprecated =
                         case_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                            if c.attributes.iter().any(|a| {
-                                a.name
-                                    .parts
-                                    .last()
-                                    .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                    .unwrap_or(false)
-                            }) {
+                            if c.attributes
+                                .iter()
+                                .any(|a| a.name.last_part().eq_ignore_ascii_case("Deprecated"))
+                            {
                                 Some(Arc::from(""))
                             } else {
                                 None
@@ -275,11 +272,7 @@ impl DefinitionCollector<'_> {
                             deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
                                 || {
                                     if c.attributes.iter().any(|a| {
-                                        a.name
-                                            .parts
-                                            .last()
-                                            .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                            .unwrap_or(false)
+                                        a.name.last_part().eq_ignore_ascii_case("Deprecated")
                                     }) {
                                         Some(Arc::from(""))
                                     } else {

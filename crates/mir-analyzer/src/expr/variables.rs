@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use super::helpers::extract_simple_var;
@@ -124,22 +123,19 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr: &Expr,
         ctx: &mut FlowState,
     ) -> Type {
-        let joined: Cow<'_, str> = match &*name.parts {
-            [only] => Cow::Borrowed(only),
-            _ => Cow::Owned(name.join_parts()),
-        };
+        let joined = name.as_str();
         let namespace = self.db.file_namespace(self.file.as_ref());
         let in_namespace = |n: &str| namespace.as_ref().map(|ns| format!("{ns}\\{n}"));
         // Only unqualified names fall back to the global constant.
         let exact = match name.kind {
             NameKind::FullyQualified => Some(joined.to_string()),
-            NameKind::Relative => Some(in_namespace(&joined).unwrap_or_else(|| joined.to_string())),
+            NameKind::Relative => Some(in_namespace(joined).unwrap_or_else(|| joined.to_string())),
             NameKind::Qualified => {
                 Some(crate::ast_ext::resolve_ast_name(name, self.db, &self.file))
             }
             _ => None,
         };
-        let name_str: &str = exact.as_deref().unwrap_or(&joined);
+        let name_str: &str = exact.as_deref().unwrap_or(joined);
         let ns_qualified = if exact.is_some() {
             None
         } else {

@@ -49,10 +49,7 @@ fn find_attr<'a>(
 
 /// Whether an attribute argument's name (e.g. `from:`) matches `target`.
 fn arg_name_is(arg: &Arg, target: &str) -> bool {
-    arg.name
-        .as_ref()
-        .and_then(|n| n.parts.last())
-        .is_some_and(|p| p.as_ref() == target)
+    arg.name.as_ref().is_some_and(|n| n.last_part() == target)
 }
 
 /// Locate the value for an argument that is either the `pos`-th positional
@@ -154,15 +151,12 @@ mod tests {
     }
 
     fn name(parts: &[&str], fq: bool) -> Name {
-        Name {
-            parts: parts.iter().map(|p| Box::from(*p)).collect(),
-            kind: if fq {
-                NameKind::FullyQualified
-            } else {
-                NameKind::Unqualified
-            },
-            span: span(),
-        }
+        let kind = if fq {
+            NameKind::FullyQualified
+        } else {
+            NameKind::Unqualified
+        };
+        Name::from_parts(parts, kind, span())
     }
 
     fn expr(kind: ExprKind) -> Expr {
@@ -178,7 +172,11 @@ mod tests {
     }
 
     fn named(n: &str, value: Expr) -> Arg {
-        Arg::new(Some(name(&[n], false)), ArgKind::Value(value), span())
+        Arg::new(
+            Some(Box::new(name(&[n], false))),
+            ArgKind::Value(value),
+            span(),
+        )
     }
 
     fn array(pairs: &[(&str, &str)]) -> Expr {

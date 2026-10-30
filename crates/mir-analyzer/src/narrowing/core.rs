@@ -716,15 +716,13 @@ pub(super) fn extract_class_name(
     file: &str,
 ) -> Option<String> {
     match &expr.kind {
-        ExprKind::Name(n) => match (n.kind, &*n.parts) {
-            (php_ast::ast::NameKind::Unqualified, [only])
+        ExprKind::Name(n) => match (n.kind, n.as_str()) {
+            (php_ast::ast::NameKind::Unqualified, only)
                 if only.eq_ignore_ascii_case("self") || only.eq_ignore_ascii_case("static") =>
             {
                 self_fqcn.map(|s| s.to_string())
             }
-            (php_ast::ast::NameKind::Unqualified, [only])
-                if only.eq_ignore_ascii_case("parent") =>
-            {
+            (php_ast::ast::NameKind::Unqualified, only) if only.eq_ignore_ascii_case("parent") => {
                 parent_fqcn.map(|s| s.to_string())
             }
             (php_ast::ast::NameKind::Error, _) => None,

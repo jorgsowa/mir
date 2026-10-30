@@ -25,9 +25,6 @@ pub(crate) fn parse_error_issues(
     version: PhpVersion,
 ) -> Vec<mir_issues::Issue> {
     let abstract_methods = abstract_methods_by_class(parsed, version);
-    let backing_types = unparsed_backing_types(source, parsed, version);
-    let keyword_enum = keyword_enum_name(source, parsed, version);
-    let keyword_enum_recovery = keyword_enum.as_ref().map(|k| k.recovery.clone());
     let shadowed_set_hook = shadowed_set_hook_errors(parsed);
     parsed
         .errors
@@ -35,285 +32,39 @@ pub(crate) fn parse_error_issues(
         .filter(|err| {
             !is_redundant_parse_error(err)
                 && raised_at(err, source, &parsed.program, version)
-                && !backing_types
-                    .iter()
-                    .any(|b| b.header.contains(&err.span().start))
-                && !keyword_enum_recovery
-                    .as_ref()
-                    .is_some_and(|r| r.contains(&err.span().start))
                 && !shadowed_by_final_abstract(err, &parsed.errors)
                 && !shadowed_set_hook.contains(&(err.span().start, err.forbidden_rule()))
         })
         .filter_map(|err| {
             let mut issue = parse_error_to_issue(err, file, source, parsed, version);
-            let grouped = err.forbidden_rule() == Some(ForbiddenRule::AbstractAnonymousClassMethod);
-            if let Some(class) = abstract_methods
-                .iter()
-                .find(|c| grouped && c.offsets.contains(&err.span().start))
-            {
+            if let Some(class) = abstract_methods.iter().find(|c| {
+                abstract_group(err.forbidden_rule()) == Some(c.is_enum)
+                    && c.offsets.contains(&err.span().start)
+            }) {
                 if class.offsets[0] != err.span().start {
                     return None;
                 }
                 if let mir_issues::IssueKind::CompileError { message, .. } = &mut issue.kind {
-                    *message = class.message();
+                    *message = class.message(version);
                 }
             }
             Some(issue)
         })
-        .chain(backing_types.iter().map(|b| b.issue(file, source, parsed)))
-        .chain(keyword_enum.map(|k| k.issue(file, source, parsed, version)))
         .collect()
 }
 
-/// `enum self` / `enum parent`, which the parser reads as the constant `enum` followed by a
-/// keyword; PHP declares the enum and rejects its reserved name.
-struct KeywordEnumName {
-    /// From the `enum` keyword to the end of its body; the parser's errors there are its recovery.
-    recovery: std::ops::Range<u32>,
-    name: Span,
-}
-
-impl KeywordEnumName {
-    fn issue(
-        &self,
-        file: &Arc<str>,
-        source: &str,
-        parsed: &php_rs_parser::ParseResult,
-        version: PhpVersion,
-    ) -> mir_issues::Issue {
-        let name = &source[self.name.start as usize..self.name.end as usize];
-        let message = if version < PhpVersion::new(8, 4) {
-            format!("Cannot use '{name}' as class name as it is reserved")
-        } else {
-            format!("Cannot use \"{name}\" as an enum name as it is reserved")
-        };
-        let source_map = &parsed.source_map;
-        let (line, col_start) =
-            crate::diagnostics::offset_to_line_col(source, self.name.start, source_map);
-        let (line_end, col_end) =
-            crate::diagnostics::offset_to_line_col(source, self.name.end, source_map);
-        mir_issues::Issue::new(
-            mir_issues::IssueKind::CompileError {
-                message,
-                code: "reserved-enum-name".to_string(),
-            },
-            mir_issues::Location {
-                file: file.clone(),
-                line,
-                line_end,
-                col_start,
-                col_end,
-            },
-        )
-    }
-}
-
-fn keyword_enum_name(
-    source: &str,
-    parsed: &php_rs_parser::ParseResult,
-    version: PhpVersion,
-) -> Option<KeywordEnumName> {
-    if version < PhpVersion::new(8, 1) {
-        return None;
-    }
-    let is_ident = |c: char| c.is_alphanumeric() || c == '_' || !c.is_ascii();
-    parsed.errors.iter().find_map(|err| {
-        let start = err.span().start as usize;
-        let after = source.get(start..)?;
-        let len = after.find(|c: char| !is_ident(c)).unwrap_or(after.len());
-        let name = &after[..len];
-        if !name.eq_ignore_ascii_case("self") && !name.eq_ignore_ascii_case("parent") {
-            return None;
-        }
-        let rest = after[len..].trim_start();
-        let declares = rest.starts_with(['{', ':'])
-            || rest
-                .get(..10)
-                .is_some_and(|w| w.eq_ignore_ascii_case("implements"));
-        let before = source[..start].trim_end();
-        let keyword = before.get(before.len().checked_sub(4)?..)?;
-        let enum_start = before.len() - 4;
-        let at_boundary = !before[..enum_start].ends_with(|c: char| is_ident(c) || c == '$');
-        (declares && keyword.eq_ignore_ascii_case("enum") && at_boundary).then(|| KeywordEnumName {
-            recovery: enum_start as u32..body_end(source, (start + len) as u32),
-            name: Span::new(start as u32, (start + len) as u32),
-        })
-    })
-}
-
-/// The offset after the `}` closing the first body opened at or after `from`, or the end of
-/// `source` when it is unterminated.
-fn body_end(source: &str, from: u32) -> u32 {
-    use php_lexer::TokenKind;
-    let (tokens, _) = php_lexer::lex_all(source);
-    let mut depth = 0u32;
-    for token in tokens.iter().filter(|t| t.span.start >= from) {
-        match token.kind {
-            TokenKind::LeftBrace => depth += 1,
-            TokenKind::RightBrace if depth == 1 => return token.span.end,
-            TokenKind::RightBrace => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-    source.len() as u32
-}
-
-/// An enum backing type the parser stops at (`?int`, `int|string`), which PHP parses
-/// and rejects at compile time.
-struct UnparsedBackingType {
-    span: Span,
-    /// From the enum name to the end of the type; the parser's errors there are replaced.
-    header: std::ops::Range<u32>,
-    message: String,
-}
-
-impl UnparsedBackingType {
-    fn issue(
-        &self,
-        file: &Arc<str>,
-        source: &str,
-        parsed: &php_rs_parser::ParseResult,
-    ) -> mir_issues::Issue {
-        let source_map = &parsed.source_map;
-        let (line, col_start) =
-            crate::diagnostics::offset_to_line_col(source, self.span.start, source_map);
-        let (line_end, col_end) =
-            crate::diagnostics::offset_to_line_col(source, self.span.end, source_map);
-        mir_issues::Issue::new(
-            mir_issues::IssueKind::CompileError {
-                message: self.message.clone(),
-                code: "invalid-enum-backing-type".to_string(),
-            },
-            mir_issues::Location {
-                file: file.clone(),
-                line,
-                line_end,
-                col_start,
-                col_end,
-            },
-        )
-    }
-}
-
-fn unparsed_backing_types(
-    source: &str,
-    parsed: &php_rs_parser::ParseResult,
-    version: PhpVersion,
-) -> Vec<UnparsedBackingType> {
-    let mut found: Vec<UnparsedBackingType> = Vec::new();
-    if version < PhpVersion::new(8, 1) {
-        return found;
-    }
-    for err in &parsed.errors {
-        let offset = err.span().start;
-        if err.forbidden_rule().is_some() || found.iter().any(|b| b.header.contains(&offset)) {
-            continue;
-        }
-        let scope = decl_at(&parsed.program, offset, DeclTarget::EnumHeader, version);
-        let Some((enum_name, _, name_end)) = scope.found.clone() else {
-            continue;
-        };
-        let Some(after_name) = source.get(name_end as usize..) else {
-            continue;
-        };
-        let Some(after_colon) = after_name.trim_start().strip_prefix(':') else {
-            continue;
-        };
-        let type_start = source.len() - after_colon.trim_start().len();
-        let mut written = after_colon.trim_start();
-        written = &written[..written.find('{').unwrap_or(written.len())];
-        if let Some(implements) = written.to_ascii_lowercase().find("implements") {
-            written = &written[..implements];
-        }
-        let written = written.trim_end();
-        let type_end = type_start + written.len();
-        if !written.contains(['?', '|']) || !(type_start..=type_end).contains(&(offset as usize)) {
-            continue;
-        }
-        let resolve = |name: &str| scope.scope.resolve_str(name);
-        let Some(ty) = backing_type_text(written, &enum_name, &resolve, version) else {
-            continue;
-        };
-        found.push(UnparsedBackingType {
-            span: Span::new(type_start as u32, type_end as u32),
-            header: name_end..type_end as u32 + 1,
-            message: format!("Enum backing type must be int or string, {ty} given"),
-        });
-    }
-    found
-}
-
-/// A written `?T` or union type as PHP prints it, with class names resolved by `resolve`.
-fn backing_type_text(
-    written: &str,
-    enum_name: &str,
-    resolve: &dyn Fn(&str) -> String,
-    version: PhpVersion,
-) -> Option<String> {
-    use mir_types::{Atomic, Type};
-    let (nullable, union) = match written.strip_prefix('?') {
-        Some(rest) => (true, rest.trim_start()),
-        None => (false, written),
-    };
-    let named = |fqcn: &str| Atomic::TNamedObject {
-        fqcn: mir_types::Name::from(fqcn),
-        type_params: Default::default(),
-    };
-    let array = || Atomic::TArray {
-        key: Box::new(Type::array_key()),
-        value: Box::new(Type::mixed()),
-    };
-    let mut atomics = Vec::new();
-    for part in union.split('|').map(str::trim) {
-        let is_name = !part.is_empty()
-            && part
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_' || c == '\\' || !c.is_ascii());
-        if !is_name {
-            return None;
-        }
-        let atomic = match part.to_ascii_lowercase().as_str() {
-            "int" => Atomic::TInt,
-            "string" => Atomic::TString,
-            "float" => Atomic::TFloat,
-            "bool" => Atomic::TBool,
-            "false" => Atomic::TFalse,
-            "true" => Atomic::TTrue,
-            "null" => Atomic::TNull,
-            "array" => array(),
-            "object" => Atomic::TObject,
-            "mixed" => Atomic::TMixed,
-            "void" => Atomic::TVoid,
-            "never" => Atomic::TNever,
-            "iterable" => {
-                atomics.push(array());
-                named("Traversable")
-            }
-            "self" => named(enum_name),
-            "callable" | "static" | "parent" => return None,
-            _ => named(&resolve(part)),
-        };
-        atomics.push(atomic);
-    }
-    if nullable {
-        atomics.push(Atomic::TNull);
-    }
-    Some(crate::util::php_type_text(
-        &Type::from_vec(atomics),
-        version,
-    ))
-}
-
-/// An anonymous class's abstract methods that PHP reports together, before 8.5.
+/// A class's or enum's abstract members that PHP reports together, before 8.5.
 struct AbstractMethods {
+    is_enum: bool,
     class: String,
+    /// Methods, then property hooks such as `$p::get`.
     methods: Vec<String>,
-    /// Offsets of the parser's per-method diagnostics.
+    /// Offsets of the parser's per-member diagnostics.
     offsets: Vec<u32>,
 }
 
 impl AbstractMethods {
-    fn message(&self) -> String {
+    fn message(&self, version: PhpVersion) -> String {
         let count = self.methods.len();
         let plural = if count == 1 { "" } else { "s" };
         let mut list: Vec<String> = self
@@ -326,6 +77,12 @@ impl AbstractMethods {
             list.push("...".to_string());
         }
         let list = list.join(", ");
+        if self.is_enum && version >= PhpVersion::new(8, 2) {
+            return format!(
+                "Enum {} must implement {count} abstract private method{plural} ({list})",
+                self.class
+            );
+        }
         format!(
             "Class {} contains {count} abstract method{plural} and must therefore be declared abstract or implement the remaining methods ({list})",
             self.class
@@ -333,8 +90,17 @@ impl AbstractMethods {
     }
 }
 
-/// Before 8.5 PHP aggregates the abstract methods of an anonymous class into one error;
-/// the parser already aggregates an enum's.
+/// Whether the parser's diagnostic is one PHP groups per enum (`Some(true)`) or class before 8.5.
+fn abstract_group(rule: Option<ForbiddenRule>) -> Option<bool> {
+    match rule? {
+        ForbiddenRule::AbstractEnumMethod => Some(true),
+        ForbiddenRule::AbstractAnonymousClassMethod
+        | ForbiddenRule::AbstractMemberInConcreteClass => Some(false),
+        _ => None,
+    }
+}
+
+/// Before 8.5 PHP reports a concrete class's or enum's abstract members in one error.
 fn abstract_methods_by_class(
     parsed: &php_rs_parser::ParseResult,
     version: PhpVersion,
@@ -344,16 +110,24 @@ fn abstract_methods_by_class(
         return Vec::new();
     }
     for err in &parsed.errors {
-        if err.forbidden_rule() != Some(ForbiddenRule::AbstractAnonymousClassMethod) {
+        let Some(is_enum) = abstract_group(err.forbidden_rule()) else {
+            continue;
+        };
+        if shadowed_by_final_abstract(err, &parsed.errors) {
             continue;
         }
         let start = err.span().start;
         let Some((class, method, scope)) =
-            find_decl_in_scope(&parsed.program, start, DeclTarget::Method, version)
+            find_decl_in_scope(&parsed.program, start, DeclTarget::Method, version).or_else(|| {
+                find_decl_in_scope(&parsed.program, start, DeclTarget::Property, version)
+            })
         else {
             continue;
         };
-        match classes.iter_mut().find(|(s, _)| *s == scope) {
+        match classes
+            .iter_mut()
+            .find(|(s, group)| *s == scope && group.is_enum == is_enum)
+        {
             Some((_, group)) => {
                 group.methods.push(method);
                 group.offsets.push(start);
@@ -361,6 +135,7 @@ fn abstract_methods_by_class(
             None => classes.push((
                 scope,
                 AbstractMethods {
+                    is_enum,
                     class,
                     methods: vec![method],
                     offsets: vec![start],
@@ -368,7 +143,81 @@ fn abstract_methods_by_class(
             )),
         }
     }
+    for (scope, group) in &mut classes {
+        if !group.is_enum {
+            // The parser names only a concrete class's first abstract method.
+            group.methods = abstract_member_names(&parsed.program, *scope);
+        }
+    }
     classes.into_iter().map(|(_, group)| group).collect()
+}
+
+/// The abstract methods, then the abstract property hooks, of the class starting at `start`.
+fn abstract_member_names(program: &php_ast::owned::Program, start: u32) -> Vec<String> {
+    use php_ast::owned::visitor::OwnedVisitor;
+    struct ClassAt {
+        start: u32,
+        names: Vec<String>,
+    }
+    impl ClassAt {
+        fn collect(&mut self, members: &[php_ast::owned::ClassMember]) {
+            use php_ast::owned::{ClassMemberKind, PropertyHookBody};
+            let mut hooks = Vec::new();
+            for member in members {
+                match &member.kind {
+                    ClassMemberKind::Method(m) if m.modifiers.is_abstract => {
+                        self.names
+                            .push(m.name.as_str().unwrap_or_default().to_string());
+                    }
+                    ClassMemberKind::Property(p) if p.modifiers.is_abstract => {
+                        for hook in p.hooks.iter() {
+                            if matches!(hook.body, PropertyHookBody::Abstract) {
+                                let kind = match hook.kind {
+                                    php_ast::ast::PropertyHookKind::Get => "get",
+                                    _ => "set",
+                                };
+                                let name = p.name.as_str().unwrap_or_default();
+                                hooks.push(format!("${name}::{kind}"));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            self.names.extend(hooks);
+        }
+    }
+    impl OwnedVisitor for ClassAt {
+        type Break = ();
+        fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+            if let php_ast::owned::StmtKind::Class(c) = &stmt.kind {
+                if stmt.span.start == self.start {
+                    self.collect(&c.body.members);
+                    return std::ops::ControlFlow::Break(());
+                }
+            }
+            crate::recursion::walk_stmt(self, stmt)
+        }
+        fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
+            if let php_ast::owned::ExprKind::AnonymousClass(c) = &expr.kind {
+                if expr.span.start == self.start {
+                    self.collect(&c.body.members);
+                    return std::ops::ControlFlow::Break(());
+                }
+            }
+            crate::recursion::walk_expr(self, expr)
+        }
+    }
+    let mut finder = ClassAt {
+        start,
+        names: Vec::new(),
+    };
+    for stmt in &program.stmts {
+        if finder.visit_stmt(stmt).is_break() {
+            break;
+        }
+    }
+    finder.names
 }
 
 /// An enum's abstract-method error on a `final abstract` method, where PHP stops at the modifier error.
@@ -474,6 +323,7 @@ fn parse_error_to_issue(
 
     let message =
         php_message(err, source, &parsed.program, version).unwrap_or_else(|| err.to_string());
+    let message = with_anonymous_class_name(message, err.span().start, &parsed.program, version);
     let code = err.code().to_owned();
     let rule = err.forbidden_rule();
     let kind = if rule == Some(ForbiddenRule::ParentWithoutParentClass) {
@@ -493,6 +343,26 @@ fn parse_error_to_issue(
             col_end,
         },
     )
+}
+
+/// `message` with the parser's `class@anonymous` named as PHP does from 8.0, after the class's parent or first interface.
+fn with_anonymous_class_name(
+    message: String,
+    offset: u32,
+    program: &php_ast::owned::Program,
+    version: PhpVersion,
+) -> String {
+    if version < PhpVersion::new(8, 0) || !message.contains("class@anonymous") {
+        return message;
+    }
+    let class = [DeclTarget::Property, DeclTarget::Method]
+        .into_iter()
+        .find_map(|target| find_decl(program, offset, target, version))
+        .map(|(class, _)| class);
+    match class {
+        Some(class) if class.ends_with("@anonymous") => message.replace("class@anonymous", &class),
+        _ => message,
+    }
 }
 
 /// Whether PHP rejects the parser's diagnostic at compile time (`php -l` prints `Fatal error`).
@@ -658,16 +528,13 @@ fn php_message(
 ) -> Option<String> {
     let parser_message = || err.to_string();
     let before = |major, minor| version < PhpVersion::new(major, minor);
-    let (target, message): (DeclTarget, fn(&str, &str) -> String) = match err.forbidden_rule()? {
-        ForbiddenRule::ReadonlyPropertyHooks => {
-            return Some("Hooked properties cannot be readonly".to_string())
-        }
+    match err.forbidden_rule()? {
         ForbiddenRule::InvalidInterfaceMethodModifier if before(8, 1) => {
             let (interface, method) =
                 find_decl(program, err.span().start, DeclTarget::Method, version)?;
-            return Some(format!(
+            Some(format!(
                 "Access type for interface method {interface}::{method}() must be omitted"
-            ));
+            ))
         }
         // The parser words a trait alias's `readonly` in 8.3's text on every version.
         ForbiddenRule::ModifierNotAllowed if before(8, 3) => {
@@ -675,37 +542,49 @@ fn php_message(
             let modifier = message
                 .strip_prefix("Cannot use the ")?
                 .strip_suffix(" modifier on a method")?;
-            return Some(format!("Cannot use '{modifier}' as method modifier"));
+            Some(format!("Cannot use '{modifier}' as method modifier"))
         }
         ForbiddenRule::InvalidTraitAliasModifier if before(8, 3) => {
             let message = parser_message();
             let modifier = message.split('"').nth(1)?;
-            return Some(format!("Cannot use '{modifier}' as method modifier"));
+            Some(format!("Cannot use '{modifier}' as method modifier"))
         }
-        ForbiddenRule::AbstractPropertyWithoutAbstractHook => {
-            return (parser_message() == "properties cannot be abstract").then(|| {
-                if before(8, 3) {
-                    "Properties cannot be declared abstract"
-                } else if before(8, 4) {
-                    "Cannot use the abstract modifier on a property"
-                } else {
-                    "Only hooked properties may be declared abstract"
-                }
-                .to_string()
-            });
+        ForbiddenRule::AbstractPropertyWithoutAbstractHook if before(8, 3) => {
+            Some("Properties cannot be declared abstract".to_string())
         }
-        ForbiddenRule::InterfacePropertyWithoutHooks if before(8, 4) => {
-            return Some(if before(8, 1) {
-                "Interfaces may not include member variables".to_string()
+        ForbiddenRule::AbstractFinalConflict if before(8, 3) => {
+            let message = parser_message();
+            (message != "Cannot use the final modifier on an abstract class")
+                .then(|| "Cannot use the final modifier on an abstract class member".to_string())
+        }
+        ForbiddenRule::InvalidConstantModifier if before(8, 3) => {
+            let message = parser_message();
+            let modifier = message
+                .strip_prefix("Cannot use the ")?
+                .strip_suffix(" modifier on a class constant")?;
+            Some(format!("Cannot use '{modifier}' as constant modifier"))
+        }
+        ForbiddenRule::EnumProperty if before(8, 2) => {
+            Some("Enums may not include properties".to_string())
+        }
+        ForbiddenRule::VirtualPropertyAsymmetricVisibility if before(8, 6) => {
+            let message = parser_message();
+            Some(if let Some(rest) = message.strip_prefix("set-only ") {
+                format!("Write-only {rest}")
             } else {
-                "Interfaces may not include properties".to_string()
-            });
+                format!("Read-only {}", message.strip_prefix("get-only ")?)
+            })
         }
+        ForbiddenRule::InterfacePropertyWithoutHooks if before(8, 4) => Some(if before(8, 1) {
+            "Interfaces may not include member variables".to_string()
+        } else {
+            "Interfaces may not include properties".to_string()
+        }),
         ForbiddenRule::ReservedClassName
         | ForbiddenRule::KeywordAsDeclarationName
         | ForbiddenRule::ReservedEnumName => {
             let (name, kind) = reserved_declaration_name(err, source)?;
-            return Some(if before(8, 4) {
+            Some(if before(8, 4) {
                 format!("Cannot use '{name}' as class name as it is reserved")
             } else {
                 let article = if kind.starts_with(['a', 'e', 'i']) {
@@ -714,53 +593,49 @@ fn php_message(
                     "a"
                 };
                 format!("Cannot use \"{name}\" as {article} {kind} name as it is reserved")
-            });
+            })
         }
         ForbiddenRule::ReservedClassReference if before(8, 4) => {
             let message = parser_message().replace('"', "'");
-            return Some(if before(8, 0) {
+            Some(if before(8, 0) {
                 message.replace(", as it", " as it")
             } else {
                 message
-            });
+            })
         }
         ForbiddenRule::ReservedTypeName if before(8, 4) => {
             let message = parser_message();
             let name = message.split('"').nth(1)?;
-            return Some(format!(
+            Some(format!(
                 "Cannot use '{name}' as class name as it is reserved"
-            ));
+            ))
         }
         ForbiddenRule::MultipleVisibilityModifiers | ForbiddenRule::DuplicateModifier
             if before(8, 1) =>
         {
             let token = promoted_param_modifier(err, source, program)?;
-            return Some(format!(
+            Some(format!(
                 "syntax error, unexpected token \"{}\", expecting variable",
                 token.to_ascii_lowercase()
-            ));
+            ))
         }
         ForbiddenRule::ReferenceToNonReferenceable if before(8, 1) => {
-            return Some("Cannot assign reference to non referencable value".to_string())
+            Some("Cannot assign reference to non referencable value".to_string())
         }
         ForbiddenRule::GeneratorReturnType if before(8, 0) => {
             let message = parser_message();
-            let ty = message.rsplit(", ").next()?.strip_suffix(" given")?;
-            return Some(format!(
+            // PHP 7.4 names a nullable type without its `?`.
+            let ty = message
+                .rsplit(", ")
+                .next()?
+                .strip_suffix(" given")?
+                .trim_start_matches('?');
+            Some(format!(
                 "Generators may only declare a return type of Generator, Iterator, Traversable, or iterable, {ty} is not permitted"
-            ));
-        }
-        ForbiddenRule::AllowDynamicPropertiesOnInvalidClass if before(8, 5) => {
-            let message = parser_message().replace("#[\\", "#[");
-            if before(8, 4) && !message.contains(" readonly class ") {
-                return Some(message.rsplit_once(' ')?.0.to_string());
-            }
-            return Some(message);
+            ))
         }
         ForbiddenRule::AbstractMemberInConcreteClass if before(8, 5) => {
-            return Some(
-                parser_message().replace("the remaining method (", "the remaining methods ("),
-            );
+            Some(parser_message().replace("the remaining method (", "the remaining methods ("))
         }
         ForbiddenRule::InvalidNullableType if before(8, 2) => {
             let message = parser_message();
@@ -771,11 +646,11 @@ fn php_message(
                     "Cannot use '{name}' as class name as it is reserved"
                 ));
             }
-            return Some(if message.starts_with("null ") {
+            Some(if message.starts_with("null ") {
                 "Null can not be used as a standalone type".to_string()
             } else {
                 message
-            });
+            })
         }
         ForbiddenRule::StandaloneTypeInComposite if before(8, 0) => {
             let message = parser_message();
@@ -783,22 +658,42 @@ fn php_message(
                 return Some(message);
             }
             let after = source.get(err.span().end as usize..).unwrap_or_default();
-            return Some(if after.trim_start().starts_with(['$', '&', '.']) {
+            Some(if after.trim_start().starts_with(['$', '&', '.']) {
                 "void cannot be used as a parameter type".to_string()
             } else {
                 "Void type cannot be nullable".to_string()
-            });
+            })
         }
-        ForbiddenRule::RedundantType if before(8, 4) => {
-            return Some(parser_message().replace(
-                ", bool must be used instead",
-                ", bool should be used instead",
-            ));
+        ForbiddenRule::RedundantType if before(8, 4) => Some(parser_message().replace(
+            ", bool must be used instead",
+            ", bool should be used instead",
+        )),
+        ForbiddenRule::ClassFetchOnLiteral | ForbiddenRule::ClassFetchOnFoldedValue
+            if before(8, 3) =>
+        {
+            let message = parser_message();
+            let value = message.strip_prefix("Cannot use \"::class\" on ")?;
+            let value = if matches!(value, "true" | "false") {
+                "bool"
+            } else {
+                value
+            };
+            Some(format!("Cannot use \"::class\" on value of type {value}"))
         }
-        ForbiddenRule::ClassFetchOnLiteral if before(8, 3) => {
-            return Some(
-                parser_message().replace("\"::class\" on ", "\"::class\" on value of type "),
-            );
+        ForbiddenRule::UnpackNonArray if before(8, 4) => {
+            Some("Only arrays and Traversables can be unpacked".to_string())
+        }
+        ForbiddenRule::PositionalAfterNamedArgument if version == PhpVersion::new(8, 0) => {
+            (parser_message() == "Cannot use argument unpacking after named arguments")
+                .then(|| "Cannot combine named arguments and argument unpacking".to_string())
+        }
+        ForbiddenRule::DefaultValueType if before(8, 0) => {
+            default_value_message_74(&parser_message())
+        }
+        ForbiddenRule::DefaultValueType if before(8, 3) => {
+            let message = parser_message();
+            let value = message.strip_prefix("Cannot use ")?.split(' ').next()?;
+            matches!(value, "true" | "false").then(|| message.replacen(value, "bool", 1))
         }
         ForbiddenRule::PureEnumCaseValue if version == PhpVersion::new(8, 1) => {
             let (enum_name, case) =
@@ -808,86 +703,77 @@ fn php_message(
             if let Some(ty) = literal_case_value_type(source, err.span()) {
                 message.push_str(&format!(", try adding \": {ty}\" to the enum declaration"));
             }
-            return Some(message);
-        }
-        ForbiddenRule::DuplicateType => {
-            let message = parser_message();
-            let written = message.split('\'').nth(1)?;
-            // A relative class name would need the file's imports to print as PHP does.
-            let name = match written.strip_prefix('\\') {
-                Some(fully_qualified) => fully_qualified.to_string(),
-                None if BUILTIN_TYPE_NAMES.contains(&written.to_ascii_lowercase().as_str()) => {
-                    written.to_ascii_lowercase()
-                }
-                None => return None,
-            };
-            return Some(format!("Duplicate type {name} is redundant"));
-        }
-        ForbiddenRule::AppendOutsideWrite => {
-            let message = parser_message();
-            let mut chars = message.chars();
-            let first = chars.next()?;
-            return Some(first.to_uppercase().chain(chars).collect());
-        }
-        ForbiddenRule::DuplicateMatchDefault => {
-            return Some("Match expressions may only contain one default arm".to_string())
+            Some(message)
         }
         ForbiddenRule::RealCast => {
-            return Some("The (real) cast has been removed, use (float) instead".to_string())
-        }
-        ForbiddenRule::UnsetCast => {
-            return Some("The (unset) cast is no longer supported".to_string())
-        }
-        ForbiddenRule::YieldOutsideFunction => {
-            return Some("The \"yield\" expression can only be used inside a function".to_string())
+            Some("The (real) cast has been removed, use (float) instead".to_string())
         }
         ForbiddenRule::InvalidCodepointEscape => {
             let message = parser_message();
-            return message
+            message
                 .strip_suffix(": empty code point")
-                .map(str::to_string);
+                .map(str::to_string)
         }
         ForbiddenRule::HeredocBodyIndentation => {
             let indent = heredoc_closing_indent(source, err.span())?;
-            return Some(format!(
+            Some(format!(
                 "Invalid body indentation level (expecting an indentation level of at least {indent})"
-            ));
+            ))
         }
         ForbiddenRule::UnterminatedComment => {
             let line = source[..source.len().min(err.span().start as usize)]
                 .matches('\n')
                 .count()
                 + 1;
-            return Some(format!("Unterminated comment starting line {line}"));
+            Some(format!("Unterminated comment starting line {line}"))
         }
-        ForbiddenRule::GetHookParameters => (DeclTarget::Property, |class, prop| {
-            format!("get hook of property {class}::${prop} must not have a parameter list")
-        }),
-        ForbiddenRule::SetHookParameterCount => (DeclTarget::Property, |class, prop| {
-            format!("set hook of property {class}::${prop} must accept exactly one parameters")
-        }),
-        ForbiddenRule::SetVisibilityWiderThanVisibility => {
-            (DeclTarget::Property, |class, prop| {
-                format!("Visibility of property {class}::${prop} must not be weaker than set visibility")
-            })
-        }
-        ForbiddenRule::EnumCaseNamedClass => return Some(
-            "A class constant must not be called 'class'; it is reserved for class name fetching"
-                .to_string(),
-        ),
-        ForbiddenRule::UntypedReadonlyProperty => (DeclTarget::Property, |class, prop| {
-            format!("Readonly property {class}::${prop} must have type")
-        }),
-        ForbiddenRule::StaticReadonlyProperty => (DeclTarget::Property, |class, prop| {
-            format!("Static property {class}::${prop} cannot be readonly")
-        }),
-        ForbiddenRule::InvalidEnumBackingType => (DeclTarget::EnumBackingType, |_, ty| {
-            format!("Enum backing type must be int or string, {ty} given")
-        }),
+        _ => None,
+    }
+}
+
+/// PHP 7.4's message for a default value its single, possibly nullable, type rejects.
+fn default_value_message_74(message: &str) -> Option<String> {
+    let (owner, ty) = message
+        .split_once(" as default value for ")?
+        .1
+        .rsplit_once(" of type ")?;
+    let ty = ty.strip_prefix('?').unwrap_or(ty);
+    let builtin = ty.to_ascii_lowercase();
+    // PHP 7.4 has no `mixed`, `null`, `false` or `true` type, so those are class names.
+    let is_class = !matches!(
+        builtin.as_str(),
+        "int" | "float" | "string" | "bool" | "array" | "iterable" | "callable" | "object"
+    );
+    if owner.starts_with("parameter ") {
+        let rule = match builtin.as_str() {
+            _ if is_class => "a class type can only be NULL",
+            "int" => "a int type can only be int or NULL",
+            "float" => "a float type can only be float, integer, or NULL",
+            "string" => "a string type can only be string or NULL",
+            "bool" => "a bool type can only be bool or NULL",
+            "array" => "array type can only be an array or NULL",
+            "iterable" => "iterable type can only be an array or NULL",
+            "callable" => "callable type can only be NULL",
+            "object" => "an object type can only be NULL",
+            _ => return None,
+        };
+        return Some(format!("Default value for parameters with {rule}"));
+    }
+    if is_class {
+        return Some(format!("Property of type {ty} may not have default value"));
+    }
+    let allowed = match builtin.as_str() {
+        "int" => "int",
+        "float" => "float or int",
+        "string" => "string",
+        "bool" => "bool",
+        "array" | "iterable" => "an array",
+        "object" => "object",
         _ => return None,
     };
-    let (class, name) = find_decl(program, err.span().start, target, version)?;
-    Some(message(&class, &name))
+    Some(format!(
+        "Default value for property of type {ty} can only be {allowed}"
+    ))
 }
 
 /// `int` or `string` for a literal enum case value after the `=` at `eq`.
@@ -938,16 +824,6 @@ fn find_decl_in_scope(
     target: DeclTarget,
     version: PhpVersion,
 ) -> Option<(String, String, u32)> {
-    decl_at(program, offset, target, version).found
-}
-
-/// The finder stopped at the `target` declared at `offset`, in that declaration's scope.
-fn decl_at(
-    program: &php_ast::owned::Program,
-    offset: u32,
-    target: DeclTarget,
-    version: PhpVersion,
-) -> DeclAt {
     let mut finder = DeclAt {
         offset,
         target,
@@ -961,14 +837,8 @@ fn decl_at(
             break;
         }
     }
-    finder
+    finder.found
 }
-
-/// Type keywords PHP prints in lowercase in its messages.
-const BUILTIN_TYPE_NAMES: [&str; 17] = [
-    "int", "float", "string", "bool", "void", "never", "mixed", "object", "iterable", "callable",
-    "array", "null", "true", "false", "self", "parent", "static",
-];
 
 #[derive(PartialEq)]
 enum DeclTarget {
@@ -977,11 +847,7 @@ enum DeclTarget {
     /// A method parameter.
     Param,
     Method,
-    ClassConst,
     EnumCase,
-    EnumBackingType,
-    /// An enum declaration; found with the end of its name in place of the enum's start.
-    EnumHeader,
 }
 
 /// Finds the class-like enclosing the `target` declared at `offset`, and the target's name.
@@ -1012,13 +878,13 @@ impl NameScope {
         }
     }
 
-    pub(crate) fn resolve_str(&self, name: &str) -> String {
-        let namespace = (!self.namespace.is_empty()).then(|| self.namespace.clone());
-        crate::collector::resolution::resolve_name(name, &namespace, &self.imports)
-    }
-
     pub(crate) fn resolve(&self, name: &php_ast::owned::Name) -> String {
-        self.resolve_str(&name_to_string_owned(name))
+        let namespace = (!self.namespace.is_empty()).then(|| self.namespace.clone());
+        crate::collector::resolution::resolve_name(
+            &name_to_string_owned(name),
+            &namespace,
+            &self.imports,
+        )
     }
 
     /// Applies a `namespace` or `use` statement; for a braced namespace, returns the outer
@@ -1077,10 +943,6 @@ impl DeclAt {
         self.scope.qualify(name)
     }
 
-    fn resolve(&self, name: &php_ast::owned::Name) -> String {
-        self.scope.resolve(name)
-    }
-
     fn in_class(&mut self, name: &str, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
         self.classes.push((self.qualify(name), stmt.span.start));
         let flow = crate::recursion::walk_stmt(self, stmt);
@@ -1100,17 +962,6 @@ impl DeclAt {
         let (class, scope) = self.classes.last().cloned().unwrap_or_default();
         self.found = Some((class, name.as_str().unwrap_or_default().to_string(), scope));
         std::ops::ControlFlow::Break(())
-    }
-
-    /// The backing type as PHP names it: a builtin lowercased, a class name resolved.
-    fn backing_type_name(&self, name: &php_ast::owned::Name) -> String {
-        let written = name_to_string_owned(name);
-        let lower = written.to_ascii_lowercase();
-        if BUILTIN_TYPE_NAMES.contains(&lower.as_str()) {
-            lower
-        } else {
-            self.resolve(name)
-        }
     }
 }
 
@@ -1142,22 +993,7 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
                 return self.in_class(d.name.as_str().unwrap_or_default(), stmt)
             }
             StmtKind::Enum(d) => {
-                let name = d.name.as_str().unwrap_or_default();
-                if let Some(ty) = d.scalar_type.as_ref().filter(|ty| {
-                    self.target == DeclTarget::EnumBackingType && ty.span().start == self.offset
-                }) {
-                    let mut backing = self.backing_type_name(ty);
-                    if backing == "self" {
-                        backing = self.qualify(name);
-                    }
-                    self.found = Some((self.qualify(name), backing, stmt.span.start));
-                    return std::ops::ControlFlow::Break(());
-                }
-                if self.target == DeclTarget::EnumHeader && stmt.span.start <= self.offset {
-                    self.found = Some((self.qualify(name), String::new(), d.name.span.end));
-                    return std::ops::ControlFlow::Break(());
-                }
-                return self.in_class(name, stmt);
+                return self.in_class(d.name.as_str().unwrap_or_default(), stmt);
             }
             _ => {}
         }
@@ -1172,9 +1008,6 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
         match &member.kind {
             ClassMemberKind::Property(p) => {
                 self.found(DeclTarget::Property, member.span, &p.name)?
-            }
-            ClassMemberKind::ClassConst(c) => {
-                self.found(DeclTarget::ClassConst, member.span, &c.name)?
             }
             ClassMemberKind::Method(m) => {
                 self.found(DeclTarget::Method, member.span, &m.name)?;
@@ -1196,9 +1029,6 @@ impl php_ast::owned::visitor::OwnedVisitor for DeclAt {
         match &member.kind {
             EnumMemberKind::Method(m) => self.found(DeclTarget::Method, member.span, &m.name)?,
             EnumMemberKind::Case(c) => self.found(DeclTarget::EnumCase, member.span, &c.name)?,
-            EnumMemberKind::ClassConst(c) => {
-                self.found(DeclTarget::ClassConst, member.span, &c.name)?
-            }
             _ => {}
         }
         php_ast::owned::visitor::walk_owned_enum_member(self, member)
@@ -1430,25 +1260,11 @@ pub(crate) fn name_to_string<'src>(name: &php_ast::ast::Name<'_, 'src>) -> Cow<'
 
 /// Same as [`name_to_string`] but for the owned (lifetime-free) AST.
 pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> Cow<'_, str> {
-    let fully_qualified = name.kind == php_ast::ast::NameKind::FullyQualified;
-    let relative = name.kind == php_ast::ast::NameKind::Relative;
-    if let [single] = &*name.parts {
-        if !fully_qualified && !relative {
-            return Cow::Borrowed(single);
-        }
+    match name.kind {
+        php_ast::ast::NameKind::FullyQualified => Cow::Owned(format!("\\{}", name.as_str())),
+        php_ast::ast::NameKind::Relative => Cow::Owned(format!("namespace\\{}", name.as_str())),
+        _ => Cow::Borrowed(name.as_str()),
     }
-    let len = name.parts.iter().map(|p| p.len() + 1).sum::<usize>();
-    let mut out = String::with_capacity(len + 9);
-    if relative {
-        out.push_str("namespace");
-    }
-    for (i, part) in name.parts.iter().enumerate() {
-        if fully_qualified || relative || i > 0 {
-            out.push('\\');
-        }
-        out.push_str(part);
-    }
-    Cow::Owned(out)
 }
 
 #[cfg(test)]

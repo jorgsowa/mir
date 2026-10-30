@@ -602,7 +602,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let variable = aa
                         .index
                         .as_ref()
-                        .and_then(|idx| super::helpers::extract_string_from_expr(idx))
+                        .and_then(super::helpers::extract_string_from_expr)
                         .unwrap_or_else(|| bare.to_string());
                     self.emit(
                         IssueKind::ImpureGlobalVariable { variable },

@@ -40,7 +40,7 @@ pub(super) fn is_request_server_key(key: &str) -> bool {
 
 /// The key of a `$_SERVER[$key]` read whose entry isn't known statically.
 pub fn server_dynamic_key(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&Expr> {
-    let key = aa.index.as_deref()?;
+    let key = aa.index.as_ref()?;
     (is_superglobal_var(&aa.array, "_SERVER")
         && !matches!(key.kind, ExprKind::String(_) | ExprKind::Int(_)))
     .then_some(key)
@@ -150,7 +150,7 @@ pub(super) fn is_superglobal_var(expr: &Expr, name: &str) -> bool {
 /// A superglobal entry PHP, the server or the environment sets rather than the
 /// client: `$_SERVER['DOCUMENT_ROOT']`, `$_FILES[x]['tmp_name']`.
 pub fn is_trusted_superglobal_field(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
-    let Some(ExprKind::String(key)) = aa.index.as_deref().map(|i| &i.kind) else {
+    let Some(ExprKind::String(key)) = aa.index.as_ref().map(|i| &i.kind) else {
         return false;
     };
     if is_superglobal_var(&aa.array, "_SERVER") {
@@ -165,7 +165,7 @@ pub fn is_trusted_superglobal_field(aa: &php_ast::owned::ArrayAccessExpr) -> boo
 
 /// The global variable `$GLOBALS['name']` reads.
 pub(super) fn globals_entry(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&str> {
-    let Some(ExprKind::String(key)) = aa.index.as_deref().map(|i| &i.kind) else {
+    let Some(ExprKind::String(key)) = aa.index.as_ref().map(|i| &i.kind) else {
         return None;
     };
     is_superglobal_var(&aa.array, "GLOBALS").then_some(key.as_str())
@@ -173,7 +173,7 @@ pub(super) fn globals_entry(aa: &php_ast::owned::ArrayAccessExpr) -> Option<&str
 
 /// `$GLOBALS['_GET']` reads the superglobal itself.
 pub fn is_globals_superglobal_alias(aa: &php_ast::owned::ArrayAccessExpr) -> bool {
-    matches!(aa.index.as_deref().map(|i| &i.kind), Some(ExprKind::String(key)) if is_superglobal(key.as_str()))
+    matches!(aa.index.as_ref().map(|i| &i.kind), Some(ExprKind::String(key)) if is_superglobal(key.as_str()))
         && is_superglobal_var(&aa.array, "GLOBALS")
 }
 

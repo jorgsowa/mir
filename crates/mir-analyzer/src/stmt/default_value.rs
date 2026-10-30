@@ -184,9 +184,7 @@ impl<'a> StatementsAnalyzer<'a> {
             ExprKind::Binary(b) => folds(&b.left) && folds(&b.right),
             ExprKind::NullCoalesce(n) => folds(&n.left) && folds(&n.right),
             ExprKind::Ternary(t) => {
-                folds(&t.condition)
-                    && t.then_expr.as_deref().is_none_or(folds)
-                    && folds(&t.else_expr)
+                folds(&t.condition) && t.then_expr.as_ref().is_none_or(folds) && folds(&t.else_expr)
             }
             ExprKind::Array(elements) => elements.iter().all(|el| {
                 el.key.as_ref().is_none_or(folds)
@@ -274,7 +272,7 @@ pub(crate) fn refers_to_constant(expr: &Expr) -> bool {
         ExprKind::NullCoalesce(n) => refers_to_constant(&n.left) || refers_to_constant(&n.right),
         ExprKind::Ternary(t) => {
             refers_to_constant(&t.condition)
-                || t.then_expr.as_deref().is_some_and(refers_to_constant)
+                || t.then_expr.as_ref().is_some_and(refers_to_constant)
                 || refers_to_constant(&t.else_expr)
         }
         ExprKind::Array(elements) => elements.iter().any(|el| {

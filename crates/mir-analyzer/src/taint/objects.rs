@@ -282,7 +282,7 @@ impl php_ast::owned::visitor::OwnedVisitor for ObjectTests {
                 }
             }
             ExprKind::FunctionCall(fc) if matches!(fc.name.kind, ExprKind::Name(_)) => {
-                self.call(TestingCallee::Function((*fc.name).clone()), &fc.args);
+                self.call(TestingCallee::Function(fc.name.clone()), &fc.args);
             }
             _ => {}
         }
@@ -406,7 +406,7 @@ pub(super) fn split_param_parts(
             (parts.intersection(slots), computed.intersection(slots))
         }
         ExprKind::Ternary(t) => {
-            either(&[t.then_expr.as_deref().unwrap_or(&t.condition), &t.else_expr])
+            either(&[t.then_expr.as_ref().unwrap_or(&t.condition), &t.else_expr])
         }
         ExprKind::NullCoalesce(nc) => either(&[&nc.left, &nc.right]),
         ExprKind::Array(elements) => either(
@@ -673,12 +673,8 @@ pub fn value_may_hold_object(
             .iter()
             .any(|el| value_may_hold_object(el.value(), ctx, db, file)),
         ExprKind::Ternary(t) => {
-            value_may_hold_object(
-                t.then_expr.as_deref().unwrap_or(&t.condition),
-                ctx,
-                db,
-                file,
-            ) || value_may_hold_object(&t.else_expr, ctx, db, file)
+            value_may_hold_object(t.then_expr.as_ref().unwrap_or(&t.condition), ctx, db, file)
+                || value_may_hold_object(&t.else_expr, ctx, db, file)
         }
         ExprKind::NullCoalesce(nc) => {
             value_may_hold_object(&nc.left, ctx, db, file)

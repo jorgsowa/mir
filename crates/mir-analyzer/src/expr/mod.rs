@@ -641,7 +641,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             | ExprKind::Bool(_)
             | ExprKind::Null => literals::analyze(&expr.kind),
 
-            ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
+            ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) => {
                 // A heredoc (or, in principle, a double-quoted string) with no
                 // embedded expression parts is just as much a compile-time
                 // literal as an equivalent quoted string — fold it to
@@ -652,7 +652,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let mut literal = String::new();
                 let mut all_literal = true;
                 let mut any_non_empty_literal = false;
-                for part in parts.iter() {
+                for part in crate::ast_ext::StringPartsExt::string_parts(&expr.kind) {
                     match part {
                         php_ast::owned::StringPart::Literal(s) => {
                             if !s.is_empty() {
@@ -680,8 +680,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     Type::single(Atomic::TString)
                 }
             }
-            ExprKind::Nowdoc { value, .. } => {
-                Type::single(Atomic::TLiteralString(value.as_ref().into()))
+            ExprKind::Nowdoc(nowdoc) => {
+                Type::single(Atomic::TLiteralString(nowdoc.value.as_ref().into()))
             }
             ExprKind::ShellExec(parts) => {
                 // The backtick operator is a shell-exec sink exactly like

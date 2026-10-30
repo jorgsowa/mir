@@ -48,22 +48,20 @@ pub fn taint_trail(
             ExprKind::Variable(name) if is_superglobal(name) => None,
             _ => Some(child(&aa.array)),
         },
-        ExprKind::Binary(op) => first(&mut [&*op.left, &*op.right].into_iter()),
-        ExprKind::NullCoalesce(nc) => first(&mut [&*nc.left, &*nc.right].into_iter()),
-        ExprKind::Ternary(t) => first(
-            &mut [
-                t.then_expr.as_deref().unwrap_or(&t.condition),
-                &*t.else_expr,
-            ]
-            .into_iter(),
+        ExprKind::Binary(op) => first(&mut [&op.left, &op.right].into_iter()),
+        ExprKind::NullCoalesce(nc) => first(&mut [&nc.left, &nc.right].into_iter()),
+        ExprKind::Ternary(t) => {
+            first(&mut [t.then_expr.as_ref().unwrap_or(&t.condition), &t.else_expr].into_iter())
+        }
+        ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) | ExprKind::ShellExec(_) => first(
+            &mut crate::ast_ext::StringPartsExt::string_parts(&expr.kind)
+                .iter()
+                .filter_map(|p| match p {
+                    StringPart::Expr(e) => Some(e),
+                    StringPart::Literal(_) => None,
+                    _ => None,
+                }),
         ),
-        ExprKind::InterpolatedString(parts)
-        | ExprKind::Heredoc { parts, .. }
-        | ExprKind::ShellExec(parts) => first(&mut parts.iter().filter_map(|p| match p {
-            StringPart::Expr(e) => Some(e),
-            StringPart::Literal(_) => None,
-            _ => None,
-        })),
         ExprKind::Array(elements) => first(
             &mut elements
                 .iter()

@@ -174,7 +174,7 @@ fn closure_var_rebind(
         _ => return None,
     };
     let call_expr = match &next_expr.kind {
-        ExprKind::Assign(a) => a.value.as_ref(),
+        ExprKind::Assign(a) => &a.value,
         _ => next_expr,
     };
 
