@@ -930,6 +930,30 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
     collect_file_definitions_uncached(db, file)
 }
 
+/// The names a file's code resolves against.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileNameScope {
+    pub namespace: Option<Arc<str>>,
+    pub namespace_blocks: Arc<[mir_codebase::NamespaceBlock]>,
+    pub class_imports: Arc<FxHashMap<Name, Name>>,
+    pub function_imports: Arc<FxHashMap<Name, Name>>,
+    pub const_imports: Arc<FxHashMap<Name, Name>>,
+}
+
+/// No `lru`: read on every name resolution, and an LRU-tracked fetch takes a
+/// global lock that `collect_file_definitions` would make every worker contend on.
+#[salsa::tracked]
+pub fn file_name_scope(db: &dyn MirDatabase, file: SourceFile) -> Arc<FileNameScope> {
+    let slice = &collect_file_definitions(db, file).slice;
+    Arc::new(FileNameScope {
+        namespace: slice.namespace.clone(),
+        namespace_blocks: Arc::clone(&slice.namespace_blocks),
+        class_imports: Arc::clone(&slice.class_imports),
+        function_imports: Arc::clone(&slice.function_imports),
+        const_imports: Arc::clone(&slice.const_imports),
+    })
+}
+
 // File-level inferred-type Salsa query
 
 type MethodInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Type>>;

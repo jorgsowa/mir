@@ -433,21 +433,14 @@ impl MirDatabase for MirDbStorage {
             return block.namespace;
         }
         let sf = self.lookup_source_file(file)?;
-        crate::db::collect_file_definitions(self, sf)
-            .slice
-            .namespace
-            .clone()
+        crate::db::file_name_scope(self, sf).namespace.clone()
     }
 
     fn file_namespace_blocks(&self, file: &str) -> Arc<[mir_codebase::NamespaceBlock]> {
         let Some(sf) = self.lookup_source_file(file) else {
             return Arc::default();
         };
-        Arc::clone(
-            &crate::db::collect_file_definitions(self, sf)
-                .slice
-                .namespace_blocks,
-        )
+        Arc::clone(&crate::db::file_name_scope(self, sf).namespace_blocks)
     }
 
     fn file_function_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
@@ -457,11 +450,7 @@ impl MirDatabase for MirDbStorage {
         let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
-        Arc::clone(
-            &crate::db::collect_file_definitions(self, sf)
-                .slice
-                .function_imports,
-        )
+        Arc::clone(&crate::db::file_name_scope(self, sf).function_imports)
     }
 
     fn file_const_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
@@ -471,11 +460,7 @@ impl MirDatabase for MirDbStorage {
         let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
-        Arc::clone(
-            &crate::db::collect_file_definitions(self, sf)
-                .slice
-                .const_imports,
-        )
+        Arc::clone(&crate::db::file_name_scope(self, sf).const_imports)
     }
 
     fn file_class_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
@@ -492,11 +477,7 @@ impl MirDatabase for MirDbStorage {
         let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
-        let imports = Arc::clone(
-            &crate::db::collect_file_definitions(self, sf)
-                .slice
-                .class_imports,
-        );
+        let imports = Arc::clone(&crate::db::file_name_scope(self, sf).class_imports);
         cache.class_imports = Some((Arc::from(file), imports.clone()));
         imports
     }
