@@ -858,13 +858,14 @@ fn kind_columns(raw: &str, kind: &str) -> (u16, u16) {
 /// Case-insensitive `str::find` for an ASCII directive keyword. Kind names
 /// are already matched case-insensitively (`KindSet::matches`); the keyword
 /// itself was still exact-case, so `@MIR-IGNORE`/`@Psalm-Suppress` silently
-/// matched nothing. `to_ascii_lowercase` never changes a string's byte
-/// length (only ASCII bytes are touched), so the returned index stays valid
-/// against the original, non-lowercased `haystack`.
+/// matched nothing.
 fn find_ci(haystack: &str, needle: &str) -> Option<usize> {
-    haystack
-        .to_ascii_lowercase()
-        .find(&needle.to_ascii_lowercase())
+    let (hay, pat) = (haystack.as_bytes(), needle.as_bytes());
+    if pat.is_empty() {
+        return Some(0);
+    }
+    hay.windows(pat.len())
+        .position(|w| w.eq_ignore_ascii_case(pat))
 }
 
 struct Comment<'a> {

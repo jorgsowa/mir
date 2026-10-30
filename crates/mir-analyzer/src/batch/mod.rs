@@ -184,6 +184,42 @@ impl AnalysisSession {
         Some(map)
     }
 
+    fn prebuild_suppression_maps(
+        &mut self,
+        db: &dyn MirDatabase,
+        issues: &[Issue],
+        analyzed_files: &[Arc<str>],
+    ) {
+        use rayon::prelude::*;
+        let mut wanted: rustc_hash::FxHashSet<&Arc<str>> = issues
+            .iter()
+            .filter(|i| !i.suppressed)
+            .map(|i| &i.location.file)
+            .collect();
+        wanted.extend(analyzed_files);
+        let pending: Vec<(Arc<str>, Arc<str>)> = wanted
+            .into_iter()
+            .filter_map(|file| {
+                let text = db.lookup_source_file(file)?.text(db).clone();
+                let fresh = self
+                    .suppression_maps
+                    .get(file)
+                    .is_some_and(|(cached, _)| cached.as_ref() == text.as_ref());
+                (!fresh).then(|| (file.clone(), text))
+            })
+            .collect();
+        let built: Vec<_> = pending
+            .into_par_iter()
+            .map(|(file, text)| {
+                let map = Arc::new(crate::suppression::SuppressionMap::from_source(&text));
+                (file, text, map)
+            })
+            .collect();
+        for (file, text, map) in built {
+            self.suppression_maps.insert(file, (text, map));
+        }
+    }
+
     /// Cumulative hit / miss counts on the persistent definition cache attached
     /// to this session. `(0, 0)` when no cache is configured.
     #[doc(hidden)]
@@ -221,6 +257,7 @@ impl AnalysisSession {
         analyzed_files: &[Arc<str>],
     ) {
         let db = self.snapshot_db();
+        self.prebuild_suppression_maps(&db, issues, analyzed_files);
         let mut cache: HashMap<Arc<str>, Option<Arc<crate::suppression::SuppressionMap>>> =
             HashMap::default();
         for issue in issues.iter_mut() {
