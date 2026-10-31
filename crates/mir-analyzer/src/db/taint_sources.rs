@@ -100,6 +100,8 @@ type DeclKey = (Name, Option<Name>);
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct FileSourceFacts {
     decls: FxHashMap<DeclKey, DeclFacts>,
+    /// Methods writing each `(class, property key)`, from `decls`.
+    prop_writers: FxHashMap<(Name, Name), Vec<Name>>,
     /// Values top-level code assigns to global variables.
     globals: Vec<(Name, ValueFacts)>,
 }
@@ -173,6 +175,15 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
         .filter(|(_, value)| value.reads_source || !value.callees.is_empty())
         .map(|(name, value)| (Name::new(&name), value))
         .collect();
+    for ((owner, method), decl) in &facts.decls {
+        let Some(method) = method else { continue };
+        for (key, _) in &decl.prop_writes {
+            let writers = facts.prop_writers.entry((*owner, *key)).or_default();
+            if !writers.contains(method) {
+                writers.push(*method);
+            }
+        }
+    }
     Arc::new(facts)
 }
 
@@ -882,13 +893,9 @@ pub(crate) fn class_property_writers(
             continue;
         }
         let owner = Name::new(owner.as_ref());
-        for ((decl_owner, method), decl) in file_source_facts(db, sf).decls.iter() {
-            let (true, Some(method)) = (*decl_owner == owner, method) else {
-                continue;
-            };
-            if decl.prop_writes.iter().any(|(k, _)| *k == key)
-                && *prop_write_reads_source(db, sf, owner, *method, key)
-            {
+        let facts = file_source_facts(db, sf);
+        for method in facts.prop_writers.get(&(owner, key)).into_iter().flatten() {
+            if *prop_write_reads_source(db, sf, owner, *method, key) {
                 writers.push((owner, *method));
             }
         }
@@ -1023,17 +1030,23 @@ pub(crate) fn method_implementations(
     class: &str,
     method_lower: &str,
 ) -> Arc<[Name]> {
+    called_implementations(db, Name::new(class), Name::new(method_lower)).clone()
+}
+
+// Memoized: taint asks this for nearly every call it follows.
+#[salsa::tracked]
+fn called_implementations(db: &dyn MirDatabase, class: Name, method: Name) -> Arc<[Name]> {
     let Some((owner, def)) = crate::db::find_method_respecting_precedence(
         db,
-        crate::db::Fqcn::from_str(db, class),
-        method_lower,
+        crate::db::Fqcn::from_str(db, class.as_str()),
+        method.as_str(),
     ) else {
         return Arc::from([]);
     };
     if !def.is_abstract && !crate::db::is_interface(db, owner.as_ref()) {
         return Arc::from([]);
     }
-    implementations(db, Name::new(class), Name::new(method_lower)).clone()
+    implementations(db, class, method).clone()
 }
 
 /// Workspace classes under each of their ancestors, keyed by lowercased FQCN.
