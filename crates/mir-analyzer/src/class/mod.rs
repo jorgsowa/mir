@@ -22,9 +22,9 @@ use crate::db::MirDatabase;
 pub struct ClassAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     /// Only report issues for classes defined in these files (empty = all files).
-    analyzed_files: HashSet<Arc<str>>,
+    analyzed_files: Arc<HashSet<Arc<str>>>,
     /// Source text keyed by file path, used to extract snippets for class-level issues.
-    sources: HashMap<Arc<str>, &'a str>,
+    sources: Arc<HashMap<Arc<str>, &'a str>>,
 }
 
 impl<'a> ClassAnalyzer<'a> {
@@ -39,9 +39,34 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
         Self {
             db,
-            analyzed_files: files,
-            sources,
+            analyzed_files: Arc::new(files),
+            sources: Arc::new(sources),
         }
+    }
+
+    /// [`Self::analyze_all`] with the class checks spread over the rayon pool,
+    /// each worker on its own clone of `db`.
+    pub fn analyze_all_par<D>(&self, db: D) -> Vec<Issue>
+    where
+        D: MirDatabase + Clone + Send,
+    {
+        use rayon::prelude::*;
+        let classes = crate::db::analyzed_class_defs(self.db, &self.analyzed_files);
+        let (analyzed_files, sources) = (&self.analyzed_files, &self.sources);
+        let per_class: Vec<Vec<Issue>> = classes
+            .par_iter()
+            .map_with(db, |db, (fqcn, class)| {
+                ClassAnalyzer {
+                    db: &*db as &dyn MirDatabase,
+                    analyzed_files: Arc::clone(analyzed_files),
+                    sources: Arc::clone(sources),
+                }
+                .class_issues(fqcn, class)
+            })
+            .collect();
+        let mut issues: Vec<Issue> = per_class.into_iter().flatten().collect();
+        issues.extend(self.analyze_non_class_likes());
+        issues
     }
 
     /// Build an `Issue` of `kind` at `location` (with a source snippet when
@@ -62,6 +87,249 @@ impl<'a> ClassAnalyzer<'a> {
         issues.push(issue);
     }
 
+    /// Class-level checks of one plain class.
+    fn class_issues(&self, fqcn: &Arc<str>, class: &crate::db::ClassLike) -> Vec<Issue> {
+        let mut issues = Vec::new();
+        let location: Option<Location> = class.location().cloned();
+        let parent_fqcn: Option<Arc<str>> = class.parent().cloned();
+        let is_abstract = class.is_abstract();
+
+        // ---- 1. Final-class extension check / deprecated parent check ------
+        if let Some(parent_fqcn) = parent_fqcn.as_ref() {
+            let parent_here = crate::db::Fqcn::from_str(self.db, parent_fqcn.as_ref());
+            let parent_pulled = crate::db::find_class_like(self.db, parent_here);
+            let parent_is_final = parent_pulled
+                .as_ref()
+                .map(|c| c.is_final())
+                .unwrap_or(false);
+            let parent_deprecated: Option<Arc<str>> =
+                parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
+            if let Some(canonical) = parent_pulled.as_ref() {
+                if let Some((used, canonical_str)) =
+                    crate::fqcn_case_mismatch(parent_fqcn.as_ref(), canonical.fqcn().as_ref())
+                {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::WrongCaseClass {
+                            used,
+                            canonical: canonical_str,
+                        },
+                        location.as_ref(),
+                    );
+                }
+            }
+            // The body pass reports extending an enum or trait as a compile error;
+            // the member checks below would only add cascades.
+            if parent_pulled
+                .as_ref()
+                .is_some_and(|p| p.is_enum() || p.is_trait())
+            {
+                return issues;
+            }
+            if parent_pulled.is_some() {
+                if parent_is_final {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::InvalidExtendClass {
+                            parent: parent_fqcn.to_string(),
+                            child: fqcn.to_string(),
+                        },
+                        location.as_ref(),
+                    );
+                }
+                // A `readonly class` (PHP 8.2 whole-class modifier) must
+                // extend another `readonly` class, and vice versa — both
+                // directions are a hard PHP fatal.
+                let parent_readonly = parent_pulled
+                    .as_ref()
+                    .map(|c| c.is_readonly())
+                    .unwrap_or(false);
+                if class.is_readonly() != parent_readonly {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::ReadonlyClassExtendsMismatch {
+                            parent: parent_fqcn.to_string(),
+                            child: fqcn.to_string(),
+                            parent_readonly,
+                        },
+                        location.as_ref(),
+                    );
+                }
+                if let Some(msg) = parent_deprecated {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::DeprecatedClass {
+                            name: parent_fqcn.to_string(),
+                            message: Some(msg).filter(|m| !m.is_empty()),
+                        },
+                        location.as_ref(),
+                    );
+                }
+            }
+        }
+
+        // ---- 1b. Deprecated interface / trait checks -----------------------
+        for iface_fqcn in class.interfaces() {
+            let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+            if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
+                if let Some((used, canonical_str)) =
+                    crate::fqcn_case_mismatch(iface_fqcn.as_ref(), iface.fqcn().as_ref())
+                {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::WrongCaseClass {
+                            used,
+                            canonical: canonical_str,
+                        },
+                        location.as_ref(),
+                    );
+                }
+                if let Some(msg) = iface.deprecated() {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::DeprecatedInterface {
+                            name: iface_fqcn.to_string(),
+                            message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                        },
+                        location.as_ref(),
+                    );
+                }
+            }
+        }
+        for trait_fqcn in class.class_traits() {
+            let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+            if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
+                if let Some((used, canonical_str)) =
+                    crate::fqcn_case_mismatch(trait_fqcn.as_ref(), t.fqcn().as_ref())
+                {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::WrongCaseClass {
+                            used,
+                            canonical: canonical_str,
+                        },
+                        location.as_ref(),
+                    );
+                }
+                if let Some(msg) = t.deprecated() {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::DeprecatedTrait {
+                            name: trait_fqcn.to_string(),
+                            message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                        },
+                        location.as_ref(),
+                    );
+                }
+            }
+        }
+
+        // ---- 1c. Generic type-arg bound checks -----------------------------
+        // `@implements`/`@extends` type args were never checked against the
+        // target's own `@template T of Bound` — only method/function calls and
+        // (as of the `new`-bound fix) constructor-argument inference were.
+        // A concrete violation here (e.g. `@implements Container<Unrelated>`
+        // where `Container`'s `T` is bounded to `Base`) was silently accepted.
+        for (iface, args) in class.implements_type_args() {
+            self.check_generic_type_args(iface.as_ref(), args, location.as_ref(), &mut issues);
+        }
+        if let Some(parent_fqcn) = parent_fqcn.as_ref() {
+            let extends_args = class.extends_type_args();
+            if !extends_args.is_empty() {
+                self.check_generic_type_args(
+                    parent_fqcn.as_ref(),
+                    extends_args,
+                    location.as_ref(),
+                    &mut issues,
+                );
+            }
+        }
+
+        // The checks below look the class up by name; a same-named enum,
+        // interface or trait (a polyfill behind a version check) would answer.
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        if !crate::db::find_class_like(self.db, here).is_some_and(|c| c.is_class()) {
+            return issues;
+        }
+        // A compile error in the body pass; the enum contracts' members would cascade.
+        if crate::db::extends_or_implements(self.db, fqcn.as_ref(), "UnitEnum") {
+            return issues;
+        }
+
+        self.check_constant_overrides(fqcn, class.own_constants(), &mut issues);
+        if let crate::db::ClassLike::Class(def) = &class {
+            self.check_ambiguous_constants(
+                fqcn,
+                "Class",
+                &def.own_constants,
+                def.parent.as_ref(),
+                &def.interfaces,
+                location.as_ref(),
+                &mut issues,
+            );
+            self.check_trait_method_collisions(def, &mut issues);
+            // A readonly class makes every property readonly, its traits' too.
+            if !def.is_readonly {
+                self.check_trait_member_compatibility(
+                    fqcn,
+                    Some(&def.own_properties),
+                    def.parent.as_deref(),
+                    &def.own_constants,
+                    &def.traits,
+                    &def.trait_use_locations,
+                    location.as_ref(),
+                    &mut issues,
+                );
+            }
+        }
+
+        // Skip abstract classes for "must implement" checks
+        if is_abstract {
+            // Still check override compatibility for abstract classes
+            self.check_overrides(fqcn, location.as_ref(), &mut issues);
+            self.check_magic_method_casing(fqcn, &mut issues);
+            return issues;
+        }
+
+        // A parent that brings `Traversable` is internal (it iterates) or reported itself.
+        let parent_traversable = parent_fqcn
+            .as_ref()
+            .is_some_and(|p| crate::db::extends_or_implements(self.db, p.as_ref(), "Traversable"));
+        if !parent_traversable
+            && crate::db::extends_or_implements(self.db, fqcn.as_ref(), "Traversable")
+            && !crate::db::extends_or_implements(self.db, fqcn.as_ref(), "Iterator")
+            && !crate::db::extends_or_implements(self.db, fqcn.as_ref(), "IteratorAggregate")
+        {
+            self.push_located_issue(
+                &mut issues,
+                IssueKind::CompileError {
+                    message: format!(
+                        "Class {fqcn} must implement interface Traversable as part of either Iterator or IteratorAggregate"
+                    ),
+                    code: "traversable-without-iterator".to_string(),
+                },
+                location.as_ref(),
+            );
+        }
+
+        // ---- 2. Abstract parent methods must be implemented ----------------
+        self.check_abstract_methods_implemented(fqcn, location.as_ref(), &mut issues);
+        self.check_abstract_property_hooks(fqcn, false, location.as_ref(), &mut issues);
+
+        // ---- 3. Interface methods must be implemented ----------------------
+        self.check_interface_methods_implemented(fqcn, location.as_ref(), &mut issues);
+
+        // ---- 4. Method override compatibility ------------------------------
+        self.check_overrides(fqcn, location.as_ref(), &mut issues);
+
+        // ---- 5. Magic method casing ----------------------------------------
+        self.check_magic_method_casing(fqcn, &mut issues);
+
+        // ---- 6. Missing constructor ----------------------------------------
+        self.check_missing_constructor(fqcn, location.as_ref(), &mut issues);
+        issues
+    }
+
     /// Run all class-level checks and return every discovered issue.
     pub fn analyze_all(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
@@ -71,245 +339,15 @@ impl<'a> ClassAnalyzer<'a> {
         // / stub classes are never materialized (they aren't in `analyzed_files`),
         // which is the dominant cost on cold start over a large `vendor/`.
         for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
-            let fqcn = &fqcn;
-            let location: Option<Location> = class.location().cloned();
-            let parent_fqcn: Option<Arc<str>> = class.parent().cloned();
-            let is_abstract = class.is_abstract();
-
-            // ---- 1. Final-class extension check / deprecated parent check ------
-            if let Some(parent_fqcn) = parent_fqcn.as_ref() {
-                let parent_here = crate::db::Fqcn::from_str(self.db, parent_fqcn.as_ref());
-                let parent_pulled = crate::db::find_class_like(self.db, parent_here);
-                let parent_is_final = parent_pulled
-                    .as_ref()
-                    .map(|c| c.is_final())
-                    .unwrap_or(false);
-                let parent_deprecated: Option<Arc<str>> =
-                    parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
-                if let Some(canonical) = parent_pulled.as_ref() {
-                    if let Some((used, canonical_str)) =
-                        crate::fqcn_case_mismatch(parent_fqcn.as_ref(), canonical.fqcn().as_ref())
-                    {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::WrongCaseClass {
-                                used,
-                                canonical: canonical_str,
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                }
-                // The body pass reports extending an enum or trait as a compile error;
-                // the member checks below would only add cascades.
-                if parent_pulled
-                    .as_ref()
-                    .is_some_and(|p| p.is_enum() || p.is_trait())
-                {
-                    continue;
-                }
-                if parent_pulled.is_some() {
-                    if parent_is_final {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::InvalidExtendClass {
-                                parent: parent_fqcn.to_string(),
-                                child: fqcn.to_string(),
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                    // A `readonly class` (PHP 8.2 whole-class modifier) must
-                    // extend another `readonly` class, and vice versa — both
-                    // directions are a hard PHP fatal.
-                    let parent_readonly = parent_pulled
-                        .as_ref()
-                        .map(|c| c.is_readonly())
-                        .unwrap_or(false);
-                    if class.is_readonly() != parent_readonly {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::ReadonlyClassExtendsMismatch {
-                                parent: parent_fqcn.to_string(),
-                                child: fqcn.to_string(),
-                                parent_readonly,
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                    if let Some(msg) = parent_deprecated {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::DeprecatedClass {
-                                name: parent_fqcn.to_string(),
-                                message: Some(msg).filter(|m| !m.is_empty()),
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                }
-            }
-
-            // ---- 1b. Deprecated interface / trait checks -----------------------
-            for iface_fqcn in class.interfaces() {
-                let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
-                if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
-                    if let Some((used, canonical_str)) =
-                        crate::fqcn_case_mismatch(iface_fqcn.as_ref(), iface.fqcn().as_ref())
-                    {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::WrongCaseClass {
-                                used,
-                                canonical: canonical_str,
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                    if let Some(msg) = iface.deprecated() {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::DeprecatedInterface {
-                                name: iface_fqcn.to_string(),
-                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                }
-            }
-            for trait_fqcn in class.class_traits() {
-                let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
-                if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
-                    if let Some((used, canonical_str)) =
-                        crate::fqcn_case_mismatch(trait_fqcn.as_ref(), t.fqcn().as_ref())
-                    {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::WrongCaseClass {
-                                used,
-                                canonical: canonical_str,
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                    if let Some(msg) = t.deprecated() {
-                        self.push_located_issue(
-                            &mut issues,
-                            IssueKind::DeprecatedTrait {
-                                name: trait_fqcn.to_string(),
-                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
-                            },
-                            location.as_ref(),
-                        );
-                    }
-                }
-            }
-
-            // ---- 1c. Generic type-arg bound checks -----------------------------
-            // `@implements`/`@extends` type args were never checked against the
-            // target's own `@template T of Bound` — only method/function calls and
-            // (as of the `new`-bound fix) constructor-argument inference were.
-            // A concrete violation here (e.g. `@implements Container<Unrelated>`
-            // where `Container`'s `T` is bounded to `Base`) was silently accepted.
-            for (iface, args) in class.implements_type_args() {
-                self.check_generic_type_args(iface.as_ref(), args, location.as_ref(), &mut issues);
-            }
-            if let Some(parent_fqcn) = parent_fqcn.as_ref() {
-                let extends_args = class.extends_type_args();
-                if !extends_args.is_empty() {
-                    self.check_generic_type_args(
-                        parent_fqcn.as_ref(),
-                        extends_args,
-                        location.as_ref(),
-                        &mut issues,
-                    );
-                }
-            }
-
-            // The checks below look the class up by name; a same-named enum,
-            // interface or trait (a polyfill behind a version check) would answer.
-            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-            if !crate::db::find_class_like(self.db, here).is_some_and(|c| c.is_class()) {
-                continue;
-            }
-            // A compile error in the body pass; the enum contracts' members would cascade.
-            if crate::db::extends_or_implements(self.db, fqcn.as_ref(), "UnitEnum") {
-                continue;
-            }
-
-            self.check_constant_overrides(fqcn, class.own_constants(), &mut issues);
-            if let crate::db::ClassLike::Class(def) = &class {
-                self.check_ambiguous_constants(
-                    fqcn,
-                    "Class",
-                    &def.own_constants,
-                    def.parent.as_ref(),
-                    &def.interfaces,
-                    location.as_ref(),
-                    &mut issues,
-                );
-                self.check_trait_method_collisions(def, &mut issues);
-                // A readonly class makes every property readonly, its traits' too.
-                if !def.is_readonly {
-                    self.check_trait_member_compatibility(
-                        fqcn,
-                        Some(&def.own_properties),
-                        def.parent.as_deref(),
-                        &def.own_constants,
-                        &def.traits,
-                        &def.trait_use_locations,
-                        location.as_ref(),
-                        &mut issues,
-                    );
-                }
-            }
-
-            // Skip abstract classes for "must implement" checks
-            if is_abstract {
-                // Still check override compatibility for abstract classes
-                self.check_overrides(fqcn, location.as_ref(), &mut issues);
-                self.check_magic_method_casing(fqcn, &mut issues);
-                continue;
-            }
-
-            // A parent that brings `Traversable` is internal (it iterates) or reported itself.
-            let parent_traversable = parent_fqcn.as_ref().is_some_and(|p| {
-                crate::db::extends_or_implements(self.db, p.as_ref(), "Traversable")
-            });
-            if !parent_traversable
-                && crate::db::extends_or_implements(self.db, fqcn.as_ref(), "Traversable")
-                && !crate::db::extends_or_implements(self.db, fqcn.as_ref(), "Iterator")
-                && !crate::db::extends_or_implements(self.db, fqcn.as_ref(), "IteratorAggregate")
-            {
-                self.push_located_issue(
-                    &mut issues,
-                    IssueKind::CompileError {
-                        message: format!(
-                            "Class {fqcn} must implement interface Traversable as part of either Iterator or IteratorAggregate"
-                        ),
-                        code: "traversable-without-iterator".to_string(),
-                    },
-                    location.as_ref(),
-                );
-            }
-
-            // ---- 2. Abstract parent methods must be implemented ----------------
-            self.check_abstract_methods_implemented(fqcn, location.as_ref(), &mut issues);
-            self.check_abstract_property_hooks(fqcn, false, location.as_ref(), &mut issues);
-
-            // ---- 3. Interface methods must be implemented ----------------------
-            self.check_interface_methods_implemented(fqcn, location.as_ref(), &mut issues);
-
-            // ---- 4. Method override compatibility ------------------------------
-            self.check_overrides(fqcn, location.as_ref(), &mut issues);
-
-            // ---- 5. Magic method casing ----------------------------------------
-            self.check_magic_method_casing(fqcn, &mut issues);
-
-            // ---- 6. Missing constructor ----------------------------------------
-            self.check_missing_constructor(fqcn, location.as_ref(), &mut issues);
+            issues.extend(self.class_issues(&fqcn, &class));
         }
+        issues.extend(self.analyze_non_class_likes());
+        issues
+    }
+
+    /// Checks of the analyzed interfaces, enums and traits, and class cycles.
+    fn analyze_non_class_likes(&self) -> Vec<Issue> {
+        let mut issues = Vec::new();
 
         // ---- 5. Interface-level #[Override] check + extends casing --------
         // Interfaces are not included in the class loop above, so scan them

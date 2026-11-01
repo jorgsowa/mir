@@ -319,7 +319,7 @@ impl AnalysisSession {
                 analyzed_file_set.clone(),
                 &file_data,
             )
-            .analyze_all();
+            .analyze_all_par(self.db.snapshot_db());
             all_issues.extend(class_issues);
         }
         let _t_class_analyzer_ms = _t_class_analyzer.elapsed().as_secs_f64() * 1000.0;

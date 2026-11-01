@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking:** `mir_types::Atomic::TKeyedArray::properties` is an `Arc<KeyedProperties>` (an `IndexMap` with `FxBuildHasher`), so cloning a shape no longer copies its entries.
-- Performance: array shapes are shared instead of copied and type merges skip members already present (WordPress cold run 4.9 → 2.7 s, peak RSS 2.36 → 0.76 GB; Laravel 4% fewer instructions).
+- Performance: array shapes are shared instead of copied and type merges skip members already present (WordPress cold run 4.9 → 2.7 s, peak RSS 2.36 → 0.76 GB; Laravel 4% fewer instructions); class-level checks run in parallel.
 
 ## [0.89.0] - 2026-10-30
 
