@@ -341,10 +341,16 @@ impl AnalysisSession {
             Vec<crate::symbol::ResolvedSymbol>,
             Vec<RefLoc>,
         );
-        let body_results: Vec<BodyResult> = parsed_files
-            .par_iter()
-            .filter(|parsed| !files_with_incomplete_ast.contains(&parsed.file))
-            .map_with((db_main, self.cache.clone()), |(db, cache), parsed| {
+        // Largest files first, handed out one at a time, so the slowest file
+        // doesn't start last; results are put back in file order.
+        let mut order: Vec<usize> = (0..parsed_files.len())
+            .filter(|&i| !files_with_incomplete_ast.contains(&parsed_files[i].file))
+            .collect();
+        order.sort_by_key(|&i| std::cmp::Reverse(parsed_files[i].source().len()));
+        let analyze_file =
+            |(db, cache): &mut (MirDbStorage, Option<Arc<crate::cache::AnalysisCache>>),
+             parsed: &ParsedProjectFile|
+             -> BodyResult {
                 let mut driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                 // Diagnostics-only consumers never read the symbol vecs —
                 // don't build them (a Type clone per reference) at all.
@@ -448,8 +454,16 @@ impl AnalysisSession {
                     symbols
                 };
                 (parsed.file.clone(), issues, symbols, pending)
+            };
+        let mut indexed: Vec<(usize, BodyResult)> = order
+            .into_iter()
+            .par_bridge()
+            .map_with((db_main, self.cache.clone()), |state, i| {
+                (i, analyze_file(state, &parsed_files[i]))
             })
             .collect();
+        indexed.sort_unstable_by_key(|(i, _)| *i);
+        let body_results: Vec<BodyResult> = indexed.into_iter().map(|(_, r)| r).collect();
 
         let _t_body_analysis = _t0.elapsed();
 
