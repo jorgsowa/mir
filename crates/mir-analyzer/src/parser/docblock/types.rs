@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 fn associative_array_marker() -> Type {
     Type::single(Atomic::TKeyedArray {
-        properties: Box::default(),
+        properties: Arc::default(),
         is_open: true,
         is_list: false,
     })
@@ -465,7 +465,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             u.add_type(Atomic::TLiteralString(Arc::from("")));
             u.add_type(Atomic::TLiteralString(Arc::from("0")));
             u.add_type(Atomic::TKeyedArray {
-                properties: Box::default(),
+                properties: Arc::default(),
                 is_open: false,
                 is_list: true,
             });
@@ -993,7 +993,7 @@ pub(super) fn strip_ascii_ci_prefix<'a>(s: &'a str, prefix: &str) -> Option<&'a 
 
 pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     use mir_types::atomic::KeyedProperty;
-    let mut properties: IndexMap<ArrayKey, KeyedProperty> = IndexMap::new();
+    let mut properties: mir_types::KeyedProperties = mir_types::KeyedProperties::default();
     let mut is_open = false;
     let mut auto_index = 0i64;
 
@@ -1053,7 +1053,7 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     }
 
     Type::single(Atomic::TKeyedArray {
-        properties: Box::new(properties),
+        properties: Arc::new(properties),
         is_open,
         is_list,
     })

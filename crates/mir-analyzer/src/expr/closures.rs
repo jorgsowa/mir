@@ -227,7 +227,7 @@ fn widen_record_literals(ty: &Type) -> Type {
                     })
                     .collect();
                 out.add_type(Atomic::TKeyedArray {
-                    properties: Box::new(properties),
+                    properties: Arc::new(properties),
                     is_open: *is_open,
                     is_list: false,
                 });

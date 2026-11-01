@@ -106,7 +106,7 @@ pub(crate) fn add_key_to_sealed_shapes(
             if !properties.contains_key(key) {
                 changed = true;
                 if *is_open || !is_real_union {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     // A newly-proven key only keeps the shape a list if it
                     // continues the sequence (next contiguous int index) —
                     // a string key, or any non-contiguous int, proves this
@@ -121,7 +121,7 @@ pub(crate) fn add_key_to_sealed_shapes(
                         },
                     );
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: stays_list,
                     });
@@ -136,12 +136,12 @@ pub(crate) fn add_key_to_sealed_shapes(
             if let Some(prop) = properties.get(key) {
                 if prop.optional {
                     changed = true;
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(new_prop) = new_props.get_mut(key) {
                         new_prop.optional = false;
                     }
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });

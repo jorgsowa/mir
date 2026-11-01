@@ -287,13 +287,13 @@ pub(crate) fn narrow_shape_path_to_asserted(
                     continue;
                 };
 
-                let mut new_props = properties.clone();
+                let mut new_props = mir_types::KeyedProperties::clone(properties);
                 if let Some(p) = new_props.get_mut(key) {
                     p.ty = narrowed_value;
                     p.optional = false;
                 }
                 result.add_type(Atomic::TKeyedArray {
-                    properties: new_props,
+                    properties: std::sync::Arc::new(new_props),
                     is_open: *is_open,
                     is_list: *is_list,
                 });
@@ -333,7 +333,7 @@ pub(crate) fn set_shape_path(
                 is_list,
             } => {
                 touched = true;
-                let mut new_props = properties.clone();
+                let mut new_props = mir_types::KeyedProperties::clone(properties);
                 let value_ty = if rest.is_empty() {
                     asserted.clone()
                 } else {
@@ -351,7 +351,7 @@ pub(crate) fn set_shape_path(
                     },
                 );
                 result.add_type(Atomic::TKeyedArray {
-                    properties: new_props,
+                    properties: std::sync::Arc::new(new_props),
                     is_open: *is_open,
                     is_list: *is_list,
                 });
@@ -414,7 +414,7 @@ fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<
                 is_list,
             } => {
                 if properties.contains_key(key) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(prop) = new_props.get_mut(key) {
                         let mut narrowed_ty = prop.ty.remove_null();
                         if !rest.is_empty() {
@@ -429,7 +429,7 @@ fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -504,7 +504,7 @@ fn narrow_shape_path_null(
                         changed = true;
                         continue;
                     }
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = narrowed_ty;
                         if !is_null {
@@ -513,18 +513,18 @@ fn narrow_shape_path_null(
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
                 } else if let Some(deeper) = narrow_shape_path_null(&prop.ty, rest, is_null) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = deeper;
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -624,7 +624,7 @@ fn narrow_shape_path_instanceof(
                         changed = true;
                         continue;
                     }
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = narrowed_ty;
                         if is_true {
@@ -633,7 +633,7 @@ fn narrow_shape_path_instanceof(
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -645,13 +645,13 @@ fn narrow_shape_path_instanceof(
                     template_param_names,
                     is_true,
                 ) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = deeper;
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -734,7 +734,7 @@ fn narrow_shape_path_type_fn(
                         changed = true;
                         continue;
                     }
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = narrowed_ty;
                         if proves_non_null {
@@ -743,20 +743,20 @@ fn narrow_shape_path_type_fn(
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
                 } else if let Some(deeper) =
                     narrow_shape_path_type_fn(&prop.ty, rest, fn_name, db, is_true)
                 {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = deeper;
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -850,7 +850,7 @@ pub(crate) fn narrow_shape_path_key_exists(
                 is_list,
             } => {
                 if properties.contains_key(head) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(prop) = new_props.get_mut(head) {
                         if let Some(deeper) = narrow_shape_path_key_exists(&prop.ty, rest, key) {
                             prop.ty = deeper;
@@ -866,7 +866,7 @@ pub(crate) fn narrow_shape_path_key_exists(
                         }
                     }
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -912,7 +912,7 @@ pub(crate) fn narrow_shape_path_key_exists_false(
                 is_list,
             } => {
                 if properties.contains_key(head) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(prop) = new_props.get_mut(head) {
                         if let Some(deeper) =
                             narrow_shape_path_key_exists_false(&prop.ty, rest, key)
@@ -929,7 +929,7 @@ pub(crate) fn narrow_shape_path_key_exists_false(
                         }
                     }
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -1068,7 +1068,7 @@ fn narrow_shape_path_empty_collection(
             result.add_type(atomic.clone());
             continue;
         };
-        let mut new_props = properties.clone();
+        let mut new_props = mir_types::KeyedProperties::clone(properties);
         if let Some(p) = new_props.get_mut(key) {
             p.ty = narrowed;
             if is_empty {
@@ -1077,7 +1077,7 @@ fn narrow_shape_path_empty_collection(
         }
         changed = true;
         result.add_type(Atomic::TKeyedArray {
-            properties: new_props,
+            properties: std::sync::Arc::new(new_props),
             is_open: *is_open,
             is_list: *is_list,
         });
@@ -1131,7 +1131,7 @@ pub(crate) fn narrow_empty_shape_key(
                 is_list,
             } => {
                 if properties.contains_key(&key) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(prop) = new_props.get_mut(&key) {
                         if is_true {
                             // empty($base['key']) true: the key's value (if any) is
@@ -1152,7 +1152,7 @@ pub(crate) fn narrow_empty_shape_key(
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -1193,7 +1193,7 @@ fn narrow_not_empty_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) 
                 is_list,
             } => {
                 if properties.contains_key(key) {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(prop) = new_props.get_mut(key) {
                         if is_last {
                             let narrowed_ty = prop.ty.narrow_to_truthy();
@@ -1213,7 +1213,7 @@ fn narrow_not_empty_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) 
                     }
                     changed = true;
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });

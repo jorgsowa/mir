@@ -3,7 +3,6 @@ use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use std::sync::Arc;
 
-use indexmap::IndexMap;
 use php_ast::owned::{CallableCreateKind, Expr, ExprKind};
 use php_ast::Span;
 
@@ -698,7 +697,7 @@ fn filtered_keyed_shape(
     else {
         return None;
     };
-    let mut properties = properties.clone();
+    let mut properties = mir_types::KeyedProperties::clone(properties);
     for prop in properties.values_mut() {
         prop.optional = true;
         prop.ty = filtered_value(
@@ -710,7 +709,7 @@ fn filtered_keyed_shape(
         );
     }
     Some(Type::single(Atomic::TKeyedArray {
-        properties,
+        properties: std::sync::Arc::new(properties),
         is_open: *is_open,
         is_list: false,
     }))
@@ -1397,7 +1396,7 @@ pub(crate) fn array_change_key_case_return_type(arg_types: &[Type]) -> Option<Ty
             _ => return None,
         },
     };
-    let mut new_properties = IndexMap::new();
+    let mut new_properties = mir_types::KeyedProperties::default();
     for (k, prop) in properties.iter() {
         let new_key = match k {
             ArrayKey::String(s) => {
@@ -1413,7 +1412,7 @@ pub(crate) fn array_change_key_case_return_type(arg_types: &[Type]) -> Option<Ty
         new_properties.insert(new_key, prop.clone());
     }
     Some(Type::single(Atomic::TKeyedArray {
-        properties: Box::new(new_properties),
+        properties: Arc::new(new_properties),
         is_open: *is_open,
         is_list: *is_list,
     }))
@@ -1652,7 +1651,7 @@ fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
 /// full set of names it reads then isn't statically knowable.
 pub(crate) fn compact_return_type(ctx: &FlowState, args: &[php_ast::owned::Arg]) -> Option<Type> {
     use mir_types::atomic::KeyedProperty;
-    let mut properties = IndexMap::new();
+    let mut properties = mir_types::KeyedProperties::default();
     for arg in args {
         if arg.unpack() {
             return None;
@@ -1672,7 +1671,7 @@ pub(crate) fn compact_return_type(ctx: &FlowState, args: &[php_ast::owned::Arg])
         return None;
     }
     Some(Type::single(Atomic::TKeyedArray {
-        properties: Box::new(properties),
+        properties: Arc::new(properties),
         is_open: false,
         is_list: false,
     }))

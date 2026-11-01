@@ -235,8 +235,8 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
             is_open,
             is_list,
         } => Atomic::TKeyedArray {
-            properties: Box::new(
-                properties
+            properties: std::sync::Arc::new(
+                std::sync::Arc::unwrap_or_clone(properties)
                     .into_iter()
                     .map(|(key, prop)| {
                         let resolved_ty = ru!(prop.ty);
@@ -374,8 +374,8 @@ pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
                 is_open,
                 is_list,
             } => Atomic::TKeyedArray {
-                properties: Box::new(
-                    properties
+                properties: std::sync::Arc::new(
+                    std::sync::Arc::unwrap_or_clone(properties)
                         .into_iter()
                         .map(|(key, prop)| {
                             let ty = fill_self_static_parent(prop.ty, class_fqcn);

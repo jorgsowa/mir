@@ -3,7 +3,6 @@ use mir_types::{ArrayKey, Atomic, Type, Variance};
 /// then converts tags into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
 
-use indexmap::IndexMap;
 use phpdoc_parser::{body_text, parse as parse_phpdoc};
 
 // ---------------------------------------------------------------------------

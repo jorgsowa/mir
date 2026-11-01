@@ -2144,7 +2144,7 @@ impl FlowState {
 
                 match (ty_if, ty_else) {
                     (Some(a), Some(b)) => {
-                        let merged = if Arc::ptr_eq(a, b) {
+                        let merged = if Arc::ptr_eq(a, b) || a == b {
                             a.clone()
                         } else {
                             let mut m = (**a).clone();
@@ -2162,7 +2162,7 @@ impl FlowState {
                         if in_pre {
                             let pre_arc = pre.vars.get(&name);
                             let merged = match pre_arc {
-                                Some(pt) if Arc::ptr_eq(a, pt) => a.clone(),
+                                Some(pt) if Arc::ptr_eq(a, pt) || a == pt => a.clone(),
                                 Some(pt) => {
                                     let mut m = (**a).clone();
                                     m.merge_with(pt);
@@ -2188,7 +2188,7 @@ impl FlowState {
                         if in_pre {
                             let pre_arc = pre.vars.get(&name);
                             let merged = match pre_arc {
-                                Some(pt) if Arc::ptr_eq(b, pt) => b.clone(),
+                                Some(pt) if Arc::ptr_eq(b, pt) || b == pt => b.clone(),
                                 Some(pt) => {
                                     let mut m = (**pt).clone();
                                     m.merge_with(b);

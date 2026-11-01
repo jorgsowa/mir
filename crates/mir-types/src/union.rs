@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::sync::{Arc, OnceLock};
 
-use crate::atomic::{ArrayKey, Atomic, KeyedProperty};
+use crate::atomic::{ArrayKey, Atomic, KeyedProperties, KeyedProperty};
 use crate::symbol::Name;
-use indexmap::IndexMap;
 
 /// Returns a cached empty `Arc<[Type]>` for `type_params` / `parts` fields.
 /// Re-uses a single Arc allocation so all empty parameter lists share one
@@ -130,11 +129,12 @@ fn combine_keyed_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
     else {
         return None;
     };
-    let non_empty = |p: &IndexMap<ArrayKey, KeyedProperty>| p.values().any(|v| !v.optional);
+    let non_empty = |p: &KeyedProperties| p.values().any(|v| !v.optional);
     if oa != ob || la != lb || non_empty(pa) != non_empty(pb) {
         return None;
     }
-    let mut properties = IndexMap::with_capacity(pa.len().max(pb.len()));
+    let mut properties =
+        KeyedProperties::with_capacity_and_hasher(pa.len().max(pb.len()), Default::default());
     for (key, x) in pa.iter() {
         let prop = match pb.get(key) {
             Some(y) => {
@@ -169,7 +169,7 @@ fn combine_keyed_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
         }
     }
     Some(Atomic::TKeyedArray {
-        properties: Box::new(properties),
+        properties: Arc::new(properties),
         is_open: *oa,
         is_list: *la,
     })
@@ -407,11 +407,14 @@ impl Type {
             atomic
         };
 
+        if self.types.contains(&atomic) {
+            return;
+        }
+
         // Past the limit, fold a new shape into a compatible existing one
         // rather than growing the union (see `MAX_KEYED_SHAPES`).
         let mut atomic = atomic;
         if matches!(atomic, Atomic::TKeyedArray { .. })
-            && !self.types.contains(&atomic)
             && self
                 .types
                 .iter()
@@ -426,13 +429,11 @@ impl Type {
                 .find_map(|(i, t)| combine_keyed_arrays(t, &atomic).map(|c| (i, c)))
             {
                 self.types.remove(idx);
+                if self.types.contains(&combined) {
+                    return;
+                }
                 atomic = combined;
             }
-        }
-
-        // Avoid exact duplicates.
-        if self.types.contains(&atomic) {
-            return;
         }
 
         // Int atomics absorb each other by bound containment (`5 | int<0, max>`
@@ -838,7 +839,7 @@ impl Type {
                     is_open,
                     is_list,
                 } => Atomic::TKeyedArray {
-                    properties: Box::new(
+                    properties: Arc::new(
                         properties
                             .iter()
                             .map(|(k, p)| {
@@ -912,7 +913,7 @@ impl Type {
                 Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. } => {}
                 Atomic::TArray { .. } | Atomic::TList { .. } => {
                     out.add_type(Atomic::TKeyedArray {
-                        properties: Box::default(),
+                        properties: Arc::default(),
                         is_open: false,
                         is_list: true,
                     });
@@ -1195,6 +1196,10 @@ impl Type {
             return;
         }
         for atomic in &other.types {
+            // `add_type` may rewrite a conditional, so only plain atomics short-circuit.
+            if !matches!(atomic, Atomic::TConditional { .. }) && self.types.contains(atomic) {
+                continue;
+            }
             self.add_type(atomic.clone());
         }
         self.possibly_undefined |= other.possibly_undefined;
@@ -1303,7 +1308,7 @@ impl Type {
                         })
                         .collect();
                     result.add_type(Atomic::TKeyedArray {
-                        properties: Box::new(new_props),
+                        properties: Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -2736,7 +2741,7 @@ impl UnionBuilder {
 
 /// `list{class-string|object, non-empty-string}`: the `[class, method]` form of a callable.
 fn callable_array() -> Atomic {
-    let mut properties = IndexMap::with_capacity(2);
+    let mut properties = KeyedProperties::with_capacity_and_hasher(2, Default::default());
     properties.insert(
         ArrayKey::Int(0),
         KeyedProperty {
@@ -2752,7 +2757,7 @@ fn callable_array() -> Atomic {
         },
     );
     Atomic::TKeyedArray {
-        properties: Box::new(properties),
+        properties: Arc::new(properties),
         is_open: false,
         is_list: true,
     }
@@ -3145,8 +3150,7 @@ mod tests {
     #[test]
     fn substitute_keyed_array_property_types() {
         use crate::atomic::{ArrayKey, KeyedProperty};
-        use indexmap::IndexMap;
-        let mut props = IndexMap::new();
+        let mut props = KeyedProperties::default();
         props.insert(
             ArrayKey::String(Arc::from("name")),
             KeyedProperty {
@@ -3162,7 +3166,7 @@ mod tests {
             },
         );
         let ty = Type::single(Atomic::TKeyedArray {
-            properties: Box::new(props),
+            properties: Arc::new(props),
             is_open: true,
             is_list: false,
         });
@@ -3730,7 +3734,7 @@ mod tests {
                 value: Box::new(Type::mixed()),
             },
             &Type::single(Atomic::TKeyedArray {
-                properties: Box::default(),
+                properties: Arc::default(),
                 is_open: false,
                 is_list: true,
             }),
@@ -3943,7 +3947,7 @@ mod tests {
 
     fn shape(props: &[(&str, Atomic, bool)], is_open: bool) -> Atomic {
         Atomic::TKeyedArray {
-            properties: Box::new(
+            properties: Arc::new(
                 props
                     .iter()
                     .map(|(k, ty, optional)| {

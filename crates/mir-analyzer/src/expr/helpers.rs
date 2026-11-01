@@ -1,5 +1,4 @@
 use crate::ast_ext::ByteStringExt as _;
-use indexmap::IndexMap;
 use mir_types::{ArrayKey, Atomic, Name, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Expr, ExprKind};
@@ -209,7 +208,7 @@ fn set_nested_keyed_value_at(
         else {
             unreachable!("filtered to TKeyedArray above")
         };
-        let mut new_properties = properties.clone();
+        let mut new_properties = mir_types::KeyedProperties::clone(properties);
         let existing = properties.get(key);
         let new_inner = if rest.is_empty() {
             leaf_value.clone()
@@ -226,7 +225,7 @@ fn set_nested_keyed_value_at(
             },
         );
         result.add_type(Atomic::TKeyedArray {
-            properties: new_properties,
+            properties: std::sync::Arc::new(new_properties),
             is_open: *is_open,
             is_list: still_list,
         });
@@ -298,7 +297,7 @@ fn fresh_path_value(steps: &[WriteStep], leaf: &Type) -> Type {
     let inner = fresh_path_value(rest, leaf);
     match step {
         WriteStep::Literal(key) => {
-            let mut properties = IndexMap::new();
+            let mut properties = mir_types::KeyedProperties::default();
             properties.insert(
                 key.clone(),
                 mir_types::atomic::KeyedProperty {
@@ -307,7 +306,7 @@ fn fresh_path_value(steps: &[WriteStep], leaf: &Type) -> Type {
                 },
             );
             Type::single(Atomic::TKeyedArray {
-                properties: Box::new(properties),
+                properties: std::sync::Arc::new(properties),
                 is_open: false,
                 is_list: false,
             })
@@ -355,7 +354,7 @@ pub fn set_nested_write_path(current: &Type, steps: &[WriteStep], leaf: &Type) -
                     None if !*is_open => fresh_path_value(rest, leaf),
                     None => return None,
                 };
-                let mut new_properties = properties.clone();
+                let mut new_properties = mir_types::KeyedProperties::clone(properties);
                 new_properties.insert(
                     key.clone(),
                     mir_types::atomic::KeyedProperty {
@@ -366,7 +365,7 @@ pub fn set_nested_write_path(current: &Type, steps: &[WriteStep], leaf: &Type) -
                 let still_list = *is_list
                     && (existing.is_some() || *key == ArrayKey::Int(properties.len() as i64));
                 result.add_type(Atomic::TKeyedArray {
-                    properties: new_properties,
+                    properties: std::sync::Arc::new(new_properties),
                     is_open: *is_open,
                     is_list: still_list,
                 });
@@ -443,10 +442,10 @@ pub fn remove_key_from_shapes(ty: &Type, key: &ArrayKey) -> Type {
         {
             if properties.contains_key(key) {
                 changed = true;
-                let mut new_props = properties.clone();
+                let mut new_props = mir_types::KeyedProperties::clone(properties);
                 new_props.shift_remove(key);
                 result.add_type(Atomic::TKeyedArray {
-                    properties: new_props,
+                    properties: std::sync::Arc::new(new_props),
                     is_open: *is_open,
                     is_list: *is_list,
                 });
@@ -558,7 +557,7 @@ fn try_insert_new_shape_key(
     result.from_docblock = current.from_docblock;
     for atomic in &current.types {
         if grow_untyped && is_untyped_array(atomic) {
-            let mut properties = IndexMap::new();
+            let mut properties = mir_types::KeyedProperties::default();
             properties.insert(
                 key.clone(),
                 mir_types::atomic::KeyedProperty {
@@ -567,7 +566,7 @@ fn try_insert_new_shape_key(
                 },
             );
             result.add_type(Atomic::TKeyedArray {
-                properties: Box::new(properties),
+                properties: std::sync::Arc::new(properties),
                 is_open: true,
                 is_list: false,
             });
@@ -587,7 +586,7 @@ fn try_insert_new_shape_key(
         let next_is_list = *is_list
             && (properties.contains_key(key)
                 || matches!(key, ArrayKey::Int(i) if *i == properties.len() as i64));
-        let mut new_properties = properties.clone();
+        let mut new_properties = mir_types::KeyedProperties::clone(properties);
         new_properties.insert(
             key.clone(),
             mir_types::atomic::KeyedProperty {
@@ -596,7 +595,7 @@ fn try_insert_new_shape_key(
             },
         );
         result.add_type(Atomic::TKeyedArray {
-            properties: new_properties,
+            properties: std::sync::Arc::new(new_properties),
             is_open: *is_open,
             is_list: next_is_list,
         });
@@ -637,7 +636,7 @@ fn try_insert_literal_union_keys(
             return None;
         };
         let optional = properties.is_empty() && !inside_loop;
-        let mut new_properties = properties.clone();
+        let mut new_properties = mir_types::KeyedProperties::clone(properties);
         for key in &keys {
             match new_properties.get_mut(key) {
                 Some(prop) => prop.ty = Type::merge(&prop.ty, new_value),
@@ -657,7 +656,7 @@ fn try_insert_literal_union_keys(
         }
         let next_is_list = *is_list && new_properties.len() == properties.len();
         result.add_type(Atomic::TKeyedArray {
-            properties: new_properties,
+            properties: std::sync::Arc::new(new_properties),
             is_open: *is_open,
             is_list: next_is_list,
         });
@@ -692,7 +691,7 @@ fn try_push_new_shape_key(current: &Type, new_value: &Type) -> Option<Type> {
         else {
             unreachable!("filtered to growable TKeyedArray above")
         };
-        let mut new_properties = properties.clone();
+        let mut new_properties = mir_types::KeyedProperties::clone(properties);
         new_properties.insert(
             ArrayKey::Int(properties.len() as i64),
             mir_types::atomic::KeyedProperty {
@@ -701,7 +700,7 @@ fn try_push_new_shape_key(current: &Type, new_value: &Type) -> Option<Type> {
             },
         );
         result.add_type(Atomic::TKeyedArray {
-            properties: new_properties,
+            properties: std::sync::Arc::new(new_properties),
             is_open: *is_open,
             is_list: true,
         });
@@ -758,7 +757,7 @@ pub fn widen_array_with_value_and_key(
                 else {
                     unreachable!("filtered to TKeyedArray above")
                 };
-                let mut new_properties = properties.clone();
+                let mut new_properties = mir_types::KeyedProperties::clone(properties);
                 // The key is now definitely assigned on this path, regardless
                 // of whether it was previously optional.
                 new_properties.insert(
@@ -769,7 +768,7 @@ pub fn widen_array_with_value_and_key(
                     },
                 );
                 result.add_type(Atomic::TKeyedArray {
-                    properties: new_properties,
+                    properties: std::sync::Arc::new(new_properties),
                     is_open: *is_open,
                     is_list: *is_list,
                 });
@@ -1190,7 +1189,7 @@ fn keyed_array_union(left: &Type, right: &Type) -> Option<Type> {
         }
     }
     Some(Type::single(Atomic::TKeyedArray {
-        properties: Box::new(props),
+        properties: std::sync::Arc::new(props),
         is_open: *l_open || *r_open,
         is_list: *l_list && *r_list,
     }))

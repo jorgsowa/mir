@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// A read of a key the shape doesn't list: an open shape may hold anything there.
 fn merge_unknown_key_read(
     result: &mut Type,
-    properties: &indexmap::IndexMap<mir_types::atomic::ArrayKey, mir_types::atomic::KeyedProperty>,
+    properties: &mir_types::KeyedProperties,
     is_open: bool,
 ) {
     if is_open {
@@ -343,7 +343,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         fn seed_values(
             builder: &mut mir_types::UnionBuilder,
-            keyed_props: &indexmap::IndexMap<ArrayKey, KeyedProperty>,
+            keyed_props: &mir_types::KeyedProperties,
             overwritten: &[Type],
         ) {
             for ty in overwritten
@@ -356,14 +356,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         if elements.is_empty() {
             return Type::single(Atomic::TKeyedArray {
-                properties: Box::default(),
+                properties: Arc::default(),
                 is_open: false,
                 is_list: true,
             });
         }
 
-        let mut keyed_props: indexmap::IndexMap<ArrayKey, KeyedProperty> =
-            indexmap::IndexMap::new();
+        let mut keyed_props: mir_types::KeyedProperties = mir_types::KeyedProperties::default();
         let mut is_list = true;
         let mut can_be_keyed = true;
         let mut next_int_key: i64 = 0;
@@ -522,7 +521,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             return Type::single(Atomic::TKeyedArray {
-                properties: Box::new(keyed_props),
+                properties: Arc::new(keyed_props),
                 is_open: false,
                 is_list,
             });

@@ -452,7 +452,7 @@ where
             is_open,
             is_list,
         } => {
-            let properties = properties
+            let properties = std::sync::Arc::unwrap_or_clone(properties)
                 .into_iter()
                 .map(|(k, prop)| {
                     (
@@ -465,7 +465,7 @@ where
                 })
                 .collect();
             Type::single(Atomic::TKeyedArray {
-                properties: Box::new(properties),
+                properties: Arc::new(properties),
                 is_open,
                 is_list,
             })
@@ -656,8 +656,7 @@ pub(super) fn infer_const_value(
         // non-literal key, or any element value that isn't itself inferable.
         php_ast::owned::ExprKind::Array(elements) => {
             use mir_types::atomic::{ArrayKey, KeyedProperty};
-            let mut keyed_props: indexmap::IndexMap<ArrayKey, KeyedProperty> =
-                indexmap::IndexMap::new();
+            let mut keyed_props: mir_types::KeyedProperties = mir_types::KeyedProperties::default();
             let mut is_list = true;
             let mut next_int_key: i64 = 0;
             for elem in elements.iter() {
@@ -692,7 +691,7 @@ pub(super) fn infer_const_value(
                 );
             }
             Some(Type::single(Atomic::TKeyedArray {
-                properties: Box::new(keyed_props),
+                properties: Arc::new(keyed_props),
                 is_open: false,
                 is_list,
             }))
@@ -1486,7 +1485,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_open,
                     is_list,
                 } => {
-                    let mut new_props = properties.clone();
+                    let mut new_props = mir_types::KeyedProperties::clone(properties);
                     for prop in new_props.values_mut() {
                         prop.ty = self.resolve_union_doc_with_templates(
                             prop.ty.clone(),
@@ -1496,7 +1495,7 @@ impl<'a> DefinitionCollector<'a> {
                         );
                     }
                     result.add_type(mir_types::Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });

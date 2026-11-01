@@ -1543,7 +1543,7 @@ pub(crate) fn preg_match_matches_type(flags: i64, pattern: Option<&str>) -> Type
         ty: ty.clone(),
         optional: false,
     };
-    let mut props = indexmap::IndexMap::new();
+    let mut props = mir_types::KeyedProperties::default();
     props.insert(mir_types::atomic::ArrayKey::Int(0), prop(&leaf));
     for (i, name) in names.into_iter().flatten().enumerate() {
         if let Some(name) = name {
@@ -1555,7 +1555,7 @@ pub(crate) fn preg_match_matches_type(flags: i64, pattern: Option<&str>) -> Type
         props.insert(mir_types::atomic::ArrayKey::Int(i as i64 + 1), prop(&leaf));
     }
     Type::single(Atomic::TKeyedArray {
-        properties: Box::new(props),
+        properties: Arc::new(props),
         is_open: false,
         is_list: false,
     })
@@ -1666,7 +1666,7 @@ fn preg_match_leaf(flags: i64) -> Type {
     if flags & PREG_OFFSET_CAPTURE != 0 {
         // array{0: string, 1: int} — with PREG_UNMATCHED_AS_NULL, 0 also
         // admits null (unmatched groups report offset -1).
-        let mut props = indexmap::IndexMap::new();
+        let mut props = mir_types::KeyedProperties::default();
         props.insert(
             mir_types::atomic::ArrayKey::Int(0),
             mir_types::atomic::KeyedProperty {
@@ -1682,7 +1682,7 @@ fn preg_match_leaf(flags: i64) -> Type {
             },
         );
         Type::single(Atomic::TKeyedArray {
-            properties: Box::new(props),
+            properties: Arc::new(props),
             is_open: false,
             is_list: true,
         })

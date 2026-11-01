@@ -694,7 +694,7 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
                 is_open,
                 is_list,
             } => Atomic::TKeyedArray {
-                properties: Box::new(
+                properties: std::sync::Arc::new(
                     properties
                         .iter()
                         .map(|(k, p)| {
