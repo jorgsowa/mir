@@ -1101,6 +1101,12 @@ pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<
 /// Composite: resolve `fqn` to its defining file, then locate the
 /// function within it.
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
+    function_by_name(db, fqn).clone()
+}
+
+/// [`find_function`] memoized per name, like [`class_like_by_name`].
+#[salsa::tracked(returns(ref))]
+fn function_by_name<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
     let SymbolLoc::Function { file, idx } = function_loc(db, fqn)? else {
         return None;
     };
@@ -1123,11 +1129,18 @@ pub(crate) fn function_loc_from(
         return Some(global);
     };
     let key = fqn.name(db).ascii_lowercase();
-    let own = crate::db::collect_file_declarations(db, here)
-        .functions()
-        .find(|d| d.lookup_key() == key)
-        .map(|d| d.loc);
+    let own = file_function_locs(db, here).get(&key).copied();
     Some(own.unwrap_or(global))
+}
+
+/// The functions `file` declares, by lowercased name; the first declaration wins.
+#[salsa::tracked(returns(ref))]
+fn file_function_locs(db: &dyn MirDatabase, file: SourceFile) -> FxHashMap<Name, SymbolLoc> {
+    let mut locs = FxHashMap::default();
+    for decl in crate::db::collect_file_declarations(db, file).functions() {
+        locs.entry(decl.lookup_key()).or_insert(decl.loc);
+    }
+    locs
 }
 
 /// [`find_function`] as seen from `file`, preferring a declaration in that file
