@@ -90,8 +90,118 @@ pub struct KeyedProperty {
     pub optional: bool,
 }
 
-/// Entries of an `array{...}` shape, in declaration order.
-pub type KeyedProperties = IndexMap<ArrayKey, KeyedProperty, rustc_hash::FxBuildHasher>;
+type KeyedMap = IndexMap<ArrayKey, KeyedProperty, rustc_hash::FxBuildHasher>;
+
+/// Entries of an `array{...}` shape, in declaration order. Remembers its
+/// order-independent hash, since a shared shape is hashed again whenever a
+/// type holding it is interned; any mutable access forgets it.
+#[derive(Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct KeyedProperties {
+    map: KeyedMap,
+    #[serde(skip)]
+    hash: std::sync::OnceLock<u64>,
+}
+
+impl KeyedProperties {
+    pub fn with_capacity_and_hasher(n: usize, hasher: rustc_hash::FxBuildHasher) -> Self {
+        KeyedMap::with_capacity_and_hasher(n, hasher).into()
+    }
+
+    /// Hash of the entries, independent of their order (equality ignores it too).
+    pub fn entries_hash(&self) -> u64 {
+        *self.hash.get_or_init(|| {
+            self.map.iter().fold(0u64, |combined, (k, v)| {
+                let mut entry_hasher = rustc_hash::FxHasher::default();
+                k.hash(&mut entry_hasher);
+                v.hash(&mut entry_hasher);
+                combined.wrapping_add(std::hash::Hasher::finish(&entry_hasher))
+            })
+        })
+    }
+}
+
+impl From<KeyedMap> for KeyedProperties {
+    fn from(map: KeyedMap) -> Self {
+        KeyedProperties {
+            map,
+            hash: std::sync::OnceLock::new(),
+        }
+    }
+}
+
+impl Clone for KeyedProperties {
+    fn clone(&self) -> Self {
+        KeyedProperties {
+            map: self.map.clone(),
+            hash: self.hash.clone(),
+        }
+    }
+}
+
+impl std::fmt::Debug for KeyedProperties {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.map.fmt(f)
+    }
+}
+
+impl PartialEq for KeyedProperties {
+    fn eq(&self, other: &Self) -> bool {
+        self.map == other.map
+    }
+}
+
+impl Eq for KeyedProperties {}
+
+impl std::ops::Deref for KeyedProperties {
+    type Target = KeyedMap;
+    fn deref(&self) -> &KeyedMap {
+        &self.map
+    }
+}
+
+impl std::ops::DerefMut for KeyedProperties {
+    fn deref_mut(&mut self) -> &mut KeyedMap {
+        self.hash = std::sync::OnceLock::new();
+        &mut self.map
+    }
+}
+
+impl FromIterator<(ArrayKey, KeyedProperty)> for KeyedProperties {
+    fn from_iter<I: IntoIterator<Item = (ArrayKey, KeyedProperty)>>(iter: I) -> Self {
+        KeyedMap::from_iter(iter).into()
+    }
+}
+
+impl Extend<(ArrayKey, KeyedProperty)> for KeyedProperties {
+    fn extend<I: IntoIterator<Item = (ArrayKey, KeyedProperty)>>(&mut self, iter: I) {
+        std::ops::DerefMut::deref_mut(self).extend(iter);
+    }
+}
+
+impl IntoIterator for KeyedProperties {
+    type Item = (ArrayKey, KeyedProperty);
+    type IntoIter = indexmap::map::IntoIter<ArrayKey, KeyedProperty>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a KeyedProperties {
+    type Item = (&'a ArrayKey, &'a KeyedProperty);
+    type IntoIter = indexmap::map::Iter<'a, ArrayKey, KeyedProperty>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut KeyedProperties {
+    type Item = (&'a ArrayKey, &'a mut KeyedProperty);
+    type IntoIter = indexmap::map::IterMut<'a, ArrayKey, KeyedProperty>;
+    fn into_iter(self) -> Self::IntoIter {
+        std::ops::DerefMut::deref_mut(self).iter_mut()
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Boxed variant payloads — keep `Atomic` (and `Type`, which inlines two) small
@@ -694,17 +804,7 @@ impl Hash for Atomic {
                 is_list,
             } => {
                 (T::TKeyedArray as u8).hash(state);
-                // Combine per-entry hashes commutatively (wrapping add) so the
-                // result is order-independent, consistent with PartialEq which
-                // uses IndexMap value equality — without allocating and sorting.
-                let mut combined: u64 = 0;
-                for (k, v) in properties.iter() {
-                    let mut entry_hasher = rustc_hash::FxHasher::default();
-                    k.hash(&mut entry_hasher);
-                    v.hash(&mut entry_hasher);
-                    combined = combined.wrapping_add(std::hash::Hasher::finish(&entry_hasher));
-                }
-                combined.hash(state);
+                properties.entries_hash().hash(state);
                 properties.len().hash(state);
                 is_open.hash(state);
                 is_list.hash(state);
