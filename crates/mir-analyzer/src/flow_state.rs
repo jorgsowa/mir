@@ -13,6 +13,8 @@ type ClassExistsGuards = FxHashSet<Arc<str>>;
 
 /// A dead write: `(variable, line, col_start, line_end, col_end)`.
 type DeadWrite = (Name, u32, u16, u32, u16);
+/// `(line, col_start, line_end, col_end)` of a write.
+type WriteLoc = (u32, u16, u32, u16);
 
 /// Append `src` dead writes onto `dst`, skipping entries already present.
 ///
@@ -321,7 +323,7 @@ pub struct FlowState {
 
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection.
-    pub read_vars: FxHashSet<Name>,
+    pub read_vars: Arc<FxHashSet<Name>>,
 
     /// Names of function/method parameters in this scope (stripped of `$`).
     /// Used to exclude parameters from UnusedVariable detection.
@@ -381,7 +383,7 @@ pub struct FlowState {
 
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
-    pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
+    pub var_locations: Arc<FxHashMap<Name, (u32, u16, u32, u16)>>,
 
     /// Tracks unread write locations per variable.
     /// When a variable is written, its entry is replaced. When the variable
@@ -390,11 +392,11 @@ pub struct FlowState {
     /// Multiple locations arise from branch merges where different paths left
     /// different writes pending (e.g. a pre-loop write and a loop-body write):
     /// a later read consumes ALL of them, since any could be the live value.
-    pub last_write_locs: FxHashMap<Name, WriteLocs>,
+    pub last_write_locs: Arc<FxHashMap<Name, WriteLocs>>,
 
     /// Dead writes collected during analysis: writes that were overwritten
     /// without being read first. Accumulated via union across branches.
-    pub dead_writes: Vec<(Name, u32, u16, u32, u16)>,
+    pub dead_writes: Arc<Vec<DeadWrite>>,
 
     /// Write locations that were consumed by a read on SOME path. A write is
     /// only dead if NO path reads it, so consumption is permanent: merges
@@ -403,7 +405,7 @@ pub struct FlowState {
     /// like `$x = new stdClass; foreach (...) { $x = $v; } return $x === ...`
     /// where the pre-loop write is overwritten in the body but read on the
     /// loop-never-ran path.
-    pub consumed_write_locs: FxHashSet<(Name, (u32, u16, u32, u16))>,
+    pub consumed_write_locs: Arc<FxHashSet<(Name, WriteLoc)>>,
 
     /// Variables that are foreach iteration values in this scope.
     /// Used to emit UnusedForeachValue instead of UnusedVariable for these names.
@@ -726,16 +728,16 @@ impl FlowState {
             ref_aliases: FxHashMap::default(),
             escaped_vars: Arc::default(),
             cloned_local_vars: FxHashSet::default(),
-            read_vars: FxHashSet::default(),
+            read_vars: FxHashSet::default().into(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
             static_var_names: Arc::new(FxHashSet::default()),
             declared_var_types: Arc::new(FxHashMap::default()),
             diverges: false,
-            var_locations: FxHashMap::default(),
-            last_write_locs: FxHashMap::default(),
-            dead_writes: Vec::new(),
-            consumed_write_locs: FxHashSet::default(),
+            var_locations: FxHashMap::default().into(),
+            last_write_locs: FxHashMap::default().into(),
+            dead_writes: Vec::new().into(),
+            consumed_write_locs: FxHashSet::default().into(),
             foreach_value_var_names: FxHashSet::default(),
             foreach_byref_var_names: FxHashSet::default(),
             catch_var_names: FxHashSet::default(),
@@ -1872,7 +1874,7 @@ impl FlowState {
         col_end: u16,
     ) {
         let sym = Name::from(name.trim_start_matches('$'));
-        self.var_locations
+        std::sync::Arc::make_mut(&mut self.var_locations)
             .entry(sym)
             .or_insert((line, col_start, line_end, col_end));
         self.record_write(name, line, col_start, line_end, col_end);
@@ -1895,14 +1897,14 @@ impl FlowState {
         col_end: u16,
     ) {
         let sym = Name::from(name.trim_start_matches('$'));
-        if let Some(old_locs) = self.last_write_locs.remove(&sym) {
+        if let Some(old_locs) = std::sync::Arc::make_mut(&mut self.last_write_locs).remove(&sym) {
             // Previous write(s) overwritten without being read → dead writes.
             for old_loc in old_locs {
-                self.dead_writes
+                std::sync::Arc::make_mut(&mut self.dead_writes)
                     .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
             }
         }
-        self.last_write_locs.insert(
+        std::sync::Arc::make_mut(&mut self.last_write_locs).insert(
             sym,
             smallvec::smallvec![(line, col_start, line_end, col_end)],
         );
@@ -1918,11 +1920,11 @@ impl FlowState {
 
     /// [`Self::mark_consumed`] for an already-interned name.
     pub fn mark_consumed_sym(&mut self, sym: Name) {
-        if let Some(locs) = self.last_write_locs.remove(&sym) {
+        if let Some(locs) = std::sync::Arc::make_mut(&mut self.last_write_locs).remove(&sym) {
             // Consumption is permanent across branch merges: see
             // `consumed_write_locs`.
             for loc in locs {
-                self.consumed_write_locs.insert((sym, loc));
+                std::sync::Arc::make_mut(&mut self.consumed_write_locs).insert((sym, loc));
             }
         }
     }
@@ -1932,13 +1934,13 @@ impl FlowState {
     /// count as read here, and write locations they consumed stay consumed.
     pub fn absorb_branch_reads(&mut self, branch: &FlowState) {
         for name in branch.read_vars.iter() {
-            self.read_vars.insert(*name);
+            std::sync::Arc::make_mut(&mut self.read_vars).insert(*name);
         }
         for key in branch.consumed_write_locs.iter() {
-            self.consumed_write_locs.insert(*key);
+            std::sync::Arc::make_mut(&mut self.consumed_write_locs).insert(*key);
         }
         let consumed = &self.consumed_write_locs;
-        self.last_write_locs.retain(|name, locs| {
+        std::sync::Arc::make_mut(&mut self.last_write_locs).retain(|name, locs| {
             locs.retain(|loc| !consumed.contains(&(*name, *loc)));
             !locs.is_empty()
         });
@@ -2003,10 +2005,9 @@ impl FlowState {
             result.diverges = false;
             // Variables read in the diverging branch still count as used.
             for name in if_ctx.read_vars.iter() {
-                result.read_vars.insert(*name);
+                std::sync::Arc::make_mut(&mut result.read_vars).insert(*name);
             }
-            result
-                .consumed_write_locs
+            std::sync::Arc::make_mut(&mut result.consumed_write_locs)
                 .extend(if_ctx.consumed_write_locs.iter().copied());
             // Remove pending writes that were consumed in the diverging branch.
             // Use consumed_write_locs rather than read_vars to avoid incorrectly
@@ -2014,13 +2015,16 @@ impl FlowState {
             // accumulation (not because they were actually consumed this iteration).
             {
                 let consumed = &result.consumed_write_locs;
-                result.last_write_locs.retain(|name, locs| {
+                std::sync::Arc::make_mut(&mut result.last_write_locs).retain(|name, locs| {
                     locs.retain(|loc| !consumed.contains(&(*name, *loc)));
                     !locs.is_empty()
                 });
             }
             // Dead writes from the diverging branch are still dead.
-            extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
+            extend_dead_writes_dedup(
+                Arc::make_mut(&mut result.dead_writes),
+                Arc::unwrap_or_clone(if_ctx.dead_writes),
+            );
             for name in if_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
@@ -2043,20 +2047,22 @@ impl FlowState {
             result.diverges = false;
             // Variables read in the diverging branch still count as used.
             for name in else_ctx.read_vars.iter() {
-                result.read_vars.insert(*name);
+                std::sync::Arc::make_mut(&mut result.read_vars).insert(*name);
             }
-            result
-                .consumed_write_locs
+            std::sync::Arc::make_mut(&mut result.consumed_write_locs)
                 .extend(else_ctx.consumed_write_locs.iter().copied());
             // Remove pending writes consumed in the diverging branch.
             {
                 let consumed = &result.consumed_write_locs;
-                result.last_write_locs.retain(|name, locs| {
+                std::sync::Arc::make_mut(&mut result.last_write_locs).retain(|name, locs| {
                     locs.retain(|loc| !consumed.contains(&(*name, *loc)));
                     !locs.is_empty()
                 });
             }
-            extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
+            extend_dead_writes_dedup(
+                Arc::make_mut(&mut result.dead_writes),
+                Arc::unwrap_or_clone(else_ctx.dead_writes),
+            );
             for name in else_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
@@ -2078,19 +2084,23 @@ impl FlowState {
             result.diverges = true;
             // Variables read in either diverging branch still count as used.
             for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
-                result.read_vars.insert(*name);
+                std::sync::Arc::make_mut(&mut result.read_vars).insert(*name);
             }
-            result
-                .consumed_write_locs
+            std::sync::Arc::make_mut(&mut result.consumed_write_locs)
                 .extend(if_ctx.consumed_write_locs.iter().copied());
-            result
-                .consumed_write_locs
+            std::sync::Arc::make_mut(&mut result.consumed_write_locs)
                 .extend(else_ctx.consumed_write_locs.iter().copied());
             // `result` is `pre.clone()`; both branches already contain pre's
             // dead writes, so rebuild deduped rather than concatenating.
-            result.dead_writes.clear();
-            extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
-            extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
+            std::sync::Arc::make_mut(&mut result.dead_writes).clear();
+            extend_dead_writes_dedup(
+                Arc::make_mut(&mut result.dead_writes),
+                Arc::unwrap_or_clone(if_ctx.dead_writes),
+            );
+            extend_dead_writes_dedup(
+                Arc::make_mut(&mut result.dead_writes),
+                Arc::unwrap_or_clone(else_ctx.dead_writes),
+            );
             for name in if_ctx
                 .foreach_value_var_names
                 .iter()
@@ -2411,7 +2421,7 @@ impl FlowState {
 
         // Read vars: union — if either branch reads a var, it counts as read
         for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
-            result.read_vars.insert(*name);
+            std::sync::Arc::make_mut(&mut result.read_vars).insert(*name);
         }
 
         result.has_dynamic_var_def = dynamic_var_def;
@@ -2452,7 +2462,9 @@ impl FlowState {
             .iter()
             .chain(else_ctx.var_locations.iter())
         {
-            result.var_locations.entry(*name).or_insert(*loc);
+            std::sync::Arc::make_mut(&mut result.var_locations)
+                .entry(*name)
+                .or_insert(*loc);
         }
 
         // Dead writes: union of both branches, deduplicated. `result` is
@@ -2461,14 +2473,19 @@ impl FlowState {
         // concatenating onto pre's copy (which would grow the Vec ~3× per merge
         // → exponential under nested-loop fixpoint analysis; see
         // `extend_dead_writes_dedup`).
-        result.dead_writes.clear();
-        extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
-        extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
+        std::sync::Arc::make_mut(&mut result.dead_writes).clear();
+        extend_dead_writes_dedup(
+            Arc::make_mut(&mut result.dead_writes),
+            Arc::unwrap_or_clone(if_ctx.dead_writes),
+        );
+        extend_dead_writes_dedup(
+            Arc::make_mut(&mut result.dead_writes),
+            Arc::unwrap_or_clone(else_ctx.dead_writes),
+        );
 
         // Consumed write locations: union — a write read on ANY path is used.
         result.consumed_write_locs = if_ctx.consumed_write_locs;
-        result
-            .consumed_write_locs
+        std::sync::Arc::make_mut(&mut result.consumed_write_locs)
             .extend(else_ctx.consumed_write_locs.iter().copied());
 
         // Last write locs: union from both branches, plus pre_ctx variables that
@@ -2477,7 +2494,7 @@ impl FlowState {
         // both branches were consumed on all paths (e.g. read in condition) and
         // must not be re-added. Entries whose location was consumed on either
         // path are filtered — that write is used.
-        result.last_write_locs = FxHashMap::default();
+        result.last_write_locs = Default::default();
         {
             let consumed = &result.consumed_write_locs;
             let add =
@@ -2501,7 +2518,7 @@ impl FlowState {
                 .chain(else_ctx.last_write_locs.iter())
             {
                 for loc in locs.iter() {
-                    add(&mut result.last_write_locs, name, loc);
+                    add(Arc::make_mut(&mut result.last_write_locs), name, loc);
                 }
             }
         }

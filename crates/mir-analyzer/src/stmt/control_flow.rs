@@ -59,7 +59,8 @@ impl<'a> StatementsAnalyzer<'a> {
             };
             if let ExprKind::Assign(a) = &cond.kind {
                 if let Some(var_name) = extract_simple_var(&a.target) {
-                    running_ctx.last_write_locs.remove(&Name::from(var_name));
+                    std::sync::Arc::make_mut(&mut running_ctx.last_write_locs)
+                        .remove(&Name::from(var_name));
                 }
             }
         }
@@ -569,11 +570,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     })
                 })
                 .collect();
-            post.dead_writes
+            std::sync::Arc::make_mut(&mut post.dead_writes)
                 .retain(|write| !resurrected_pre_writes.contains(write));
             for (name, line, col_start, line_end, col_end) in resurrected_pre_writes {
                 let loc = (line, col_start, line_end, col_end);
-                let writes = post.last_write_locs.entry(name).or_default();
+                let writes = std::sync::Arc::make_mut(&mut post.last_write_locs)
+                    .entry(name)
+                    .or_default();
                 if !writes.contains(&loc) {
                     writes.push(loc);
                 }
@@ -1042,12 +1045,12 @@ impl<'a> StatementsAnalyzer<'a> {
             m
         });
         // Apply reads gathered from diverging case arms.
-        ctx.read_vars.extend(diverging_reads);
-        ctx.consumed_write_locs
+        std::sync::Arc::make_mut(&mut ctx.read_vars).extend(diverging_reads);
+        std::sync::Arc::make_mut(&mut ctx.consumed_write_locs)
             .extend(diverging_consumed.iter().copied());
         {
             let consumed = &ctx.consumed_write_locs;
-            ctx.last_write_locs.retain(|name, locs| {
+            std::sync::Arc::make_mut(&mut ctx.last_write_locs).retain(|name, locs| {
                 locs.retain(|loc| !consumed.contains(&(*name, *loc)));
                 !locs.is_empty()
             });
@@ -1289,7 +1292,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
             for (name, loc) in finally_ctx.var_locations.iter() {
-                result.var_locations.entry(*name).or_insert(*loc);
+                std::sync::Arc::make_mut(&mut result.var_locations)
+                    .entry(*name)
+                    .or_insert(*loc);
             }
             result.has_dynamic_var_def =
                 result.has_dynamic_var_def || finally_ctx.has_dynamic_var_def;
@@ -1301,24 +1306,24 @@ impl<'a> StatementsAnalyzer<'a> {
             // so that the save-restore pattern (assign before try, restore in finally)
             // is not falsely flagged as UnusedVariable.
             for name in finally_ctx.read_vars.iter() {
-                result.read_vars.insert(*name);
+                std::sync::Arc::make_mut(&mut result.read_vars).insert(*name);
                 // If the try body overwrote this variable (making its pre-try write appear
                 // dead), that pre-try write is NOT dead on the exception path (where the
                 // overwrite never happened). Mark any pre-try writes as consumed so they
                 // are not falsely reported.
                 if let Some(locs) = pre_ctx.last_write_locs.get(name) {
                     for loc in locs {
-                        result.consumed_write_locs.insert((*name, *loc));
+                        std::sync::Arc::make_mut(&mut result.consumed_write_locs)
+                            .insert((*name, *loc));
                     }
                 }
             }
-            result
-                .consumed_write_locs
+            std::sync::Arc::make_mut(&mut result.consumed_write_locs)
                 .extend(finally_ctx.consumed_write_locs.iter().copied());
             // Remove pending writes consumed in the finally block.
             {
                 let consumed = result.consumed_write_locs.clone();
-                result.last_write_locs.retain(|name, locs| {
+                std::sync::Arc::make_mut(&mut result.last_write_locs).retain(|name, locs| {
                     locs.retain(|loc| !consumed.contains(&(*name, *loc)));
                     !locs.is_empty()
                 });

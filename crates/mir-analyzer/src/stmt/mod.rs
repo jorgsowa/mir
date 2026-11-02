@@ -560,7 +560,8 @@ impl<'a> StatementsAnalyzer<'a> {
                         // Not a write: a `@var` for a name never otherwise defined must not
                         // surface as UnusedVariable.
                         if !ctx.var_is_defined(name) {
-                            ctx.read_vars.insert(mir_types::Name::from(name.as_str()));
+                            std::sync::Arc::make_mut(&mut ctx.read_vars)
+                                .insert(mir_types::Name::from(name.as_str()));
                         }
                         ctx.set_var(name.as_str(), ann.ty.clone());
                     }
@@ -1342,12 +1343,14 @@ impl<'a> StatementsAnalyzer<'a> {
             // overwrote or never read stays pending. (`read_vars` is not
             // usable here: it also holds reads from earlier outer iterations.)
             for (name, pre_locs) in pre.last_write_locs.iter() {
-                if let Some(locs) = next.last_write_locs.get_mut(name) {
+                if let Some(locs) =
+                    std::sync::Arc::make_mut(&mut next.last_write_locs).get_mut(name)
+                {
                     locs.retain(|l| {
                         !(pre_locs.contains(l) && iter.consumed_write_locs.contains(&(*name, *l)))
                     });
                     if locs.is_empty() {
-                        next.last_write_locs.remove(name);
+                        std::sync::Arc::make_mut(&mut next.last_write_locs).remove(name);
                     }
                 }
             }

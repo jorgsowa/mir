@@ -1306,7 +1306,7 @@ fn seed_param_locations(
         // assigned to `$this->prop` by PHP — mark them read so that constructors
         // with an empty body don't trigger UnusedParam.
         if p.modifiers.visibility.is_some() {
-            ctx.read_vars.insert(Name::from(name));
+            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(Name::from(name));
         }
     }
 }

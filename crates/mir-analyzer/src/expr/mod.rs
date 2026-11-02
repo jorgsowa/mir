@@ -1038,11 +1038,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // fallback in emit_unused_variables.
                 let names: Vec<mir_types::Name> = ctx.last_write_locs.keys().copied().collect();
                 for name in names {
-                    ctx.read_vars.insert(name);
+                    std::sync::Arc::make_mut(&mut ctx.read_vars).insert(name);
                 }
-                for (name, locs) in ctx.last_write_locs.drain() {
+                for (name, locs) in std::sync::Arc::make_mut(&mut ctx.last_write_locs).drain() {
                     for loc in locs {
-                        ctx.consumed_write_locs.insert((name, loc));
+                        std::sync::Arc::make_mut(&mut ctx.consumed_write_locs).insert((name, loc));
                     }
                 }
                 Type::mixed()
