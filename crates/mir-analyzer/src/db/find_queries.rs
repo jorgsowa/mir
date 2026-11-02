@@ -37,10 +37,6 @@ fn find_named_def<T>(
         .cloned()
 }
 
-fn def_at<T>(defs: &[Arc<T>], idx: u32) -> Option<Arc<T>> {
-    defs.get(idx as usize).cloned()
-}
-
 fn analyzed_source_files(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
@@ -217,20 +213,83 @@ fn constant_loc_on_demand<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Opti
 }
 
 fn class_like_from_loc(db: &dyn MirDatabase, loc: SymbolLoc) -> Option<ClassLike> {
+    class_like_ref_from_loc(db, loc).map(ClassLikeRef::to_class_like)
+}
+
+fn class_like_ref_from_loc(db: &dyn MirDatabase, loc: SymbolLoc) -> Option<ClassLikeRef<'_>> {
     match loc {
-        SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Class),
-        SymbolLoc::Interface { file, idx } => interface_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Interface),
-        SymbolLoc::Trait { file, idx } => trait_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Trait),
-        SymbolLoc::Enum { file, idx } => enum_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Enum),
+        SymbolLoc::Class { file, idx } => {
+            file_class_defs(db, file).get(idx).map(ClassLikeRef::Class)
+        }
+        SymbolLoc::Interface { file, idx } => file_interface_defs(db, file)
+            .get(idx)
+            .map(ClassLikeRef::Interface),
+        SymbolLoc::Trait { file, idx } => {
+            file_trait_defs(db, file).get(idx).map(ClassLikeRef::Trait)
+        }
+        SymbolLoc::Enum { file, idx } => file_enum_defs(db, file).get(idx).map(ClassLikeRef::Enum),
         SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => None,
+    }
+}
+
+/// A memoized class-like borrowed from the database; reading it skips the
+/// `Arc` refcount traffic that [`ClassLike`] costs on hot shared classes.
+#[derive(Debug, Clone, Copy)]
+pub enum ClassLikeRef<'db> {
+    Class(&'db Arc<ClassDef>),
+    Interface(&'db Arc<InterfaceDef>),
+    Trait(&'db Arc<TraitDef>),
+    Enum(&'db Arc<EnumDef>),
+}
+
+impl<'db> ClassLikeRef<'db> {
+    pub fn to_class_like(self) -> ClassLike {
+        match self {
+            ClassLikeRef::Class(c) => ClassLike::Class(c.clone()),
+            ClassLikeRef::Interface(i) => ClassLike::Interface(i.clone()),
+            ClassLikeRef::Trait(t) => ClassLike::Trait(t.clone()),
+            ClassLikeRef::Enum(e) => ClassLike::Enum(e.clone()),
+        }
+    }
+
+    pub fn fqcn(self) -> &'db Arc<str> {
+        match self {
+            ClassLikeRef::Class(c) => &c.fqcn,
+            ClassLikeRef::Interface(i) => &i.fqcn,
+            ClassLikeRef::Trait(t) => &t.fqcn,
+            ClassLikeRef::Enum(e) => &e.fqcn,
+        }
+    }
+
+    pub fn own_methods(self) -> &'db mir_codebase::definitions::MemberMap<Arc<MethodDef>> {
+        match self {
+            ClassLikeRef::Class(c) => &c.own_methods,
+            ClassLikeRef::Interface(i) => &i.own_methods,
+            ClassLikeRef::Trait(t) => &t.own_methods,
+            ClassLikeRef::Enum(e) => &e.own_methods,
+        }
+    }
+
+    pub fn own_properties(self) -> &'db mir_codebase::definitions::MemberMap<PropertyDef> {
+        match self {
+            ClassLikeRef::Class(c) => &c.own_properties,
+            ClassLikeRef::Interface(i) => &i.own_properties,
+            ClassLikeRef::Trait(t) => &t.own_properties,
+            ClassLikeRef::Enum(e) => &e.own_properties,
+        }
+    }
+
+    pub fn template_params(self) -> &'db [mir_codebase::definitions::TemplateParam] {
+        match self {
+            ClassLikeRef::Class(c) => &c.template_params,
+            ClassLikeRef::Interface(i) => &i.template_params,
+            ClassLikeRef::Trait(t) => &t.template_params,
+            ClassLikeRef::Enum(_) => &[],
+        }
+    }
+
+    pub fn is_class(self) -> bool {
+        matches!(self, ClassLikeRef::Class(_))
     }
 }
 
@@ -641,19 +700,27 @@ pub fn global_constant_in_file<'db>(
         .map(|(_, ty)| Arc::new(ty.clone()))
 }
 
-/// Salsa-tracked per-(file, idx) class storage. One memo entry per distinct
-/// class ever queried; subsequent calls return the same Arc cheaply.
-#[salsa::tracked]
-pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<ClassDef>> {
+/// The classes `file` declares, indexed like its collected slice, with
+/// cross-file imports resolved. Keyed by file alone: a single-input query
+/// skips salsa's argument interner, a shared lock on every class lookup.
+#[salsa::tracked(returns(ref))]
+fn file_class_defs(db: &dyn MirDatabase, file: SourceFile) -> Vec<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
-    let class = def_at(&defs.slice.classes, idx)?;
-    let class = resolve_cross_file_imports(db, class);
-    if db.is_user_stub_source_file(file) {
-        if let Some(real) = real_class_shadowed_by_stub(db, &class) {
-            return Some(Arc::new(merge_stub_over_real(&class, &real)));
-        }
-    }
-    Some(class)
+    let in_user_stub = db.is_user_stub_source_file(file);
+    defs.slice
+        .classes
+        .iter()
+        .map(|class| {
+            let class = resolve_cross_file_imports(db, class.clone());
+            match in_user_stub
+                .then(|| real_class_shadowed_by_stub(db, &class))
+                .flatten()
+            {
+                Some(real) => Arc::new(merge_stub_over_real(&class, &real)),
+                None => class,
+            }
+        })
+        .collect()
 }
 
 /// The project/vendor declaration of a class that a user stub also declares.
@@ -732,7 +799,7 @@ fn add_missing_names(into: &mut Vec<Arc<str>>, from: &[Arc<str>]) {
 }
 
 /// Alias body declared on `from_class`, read from the raw collected slice (not
-/// `class_def_at`) so mutually-importing classes can't form a query cycle.
+/// `file_class_defs`) so mutually-importing classes can't form a query cycle.
 fn declared_type_alias(db: &dyn MirDatabase, from_class: &str, name: &str) -> Option<Type> {
     let loc = class_like_loc(db, Fqcn::from_str(db, from_class))?;
     let defs = collect_file_definitions(db, loc.file());
@@ -896,46 +963,67 @@ pub fn analyzed_trait_defs(
     )
 }
 
-#[salsa::tracked]
-pub fn interface_def_at(
-    db: &dyn MirDatabase,
-    file: SourceFile,
-    idx: u32,
-) -> Option<Arc<InterfaceDef>> {
+/// [`file_class_defs`] for interfaces.
+#[salsa::tracked(returns(ref))]
+fn file_interface_defs(db: &dyn MirDatabase, file: SourceFile) -> Vec<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
-    let def = def_at(&defs.slice.interfaces, idx)?;
-    let def = resolve_interface_cross_file_imports(db, def);
-    if db.is_user_stub_source_file(file) {
-        if let Some(real) = real_interface_shadowed_by_stub(db, &def) {
-            return Some(Arc::new(merge_interface_stub_over_real(&def, &real)));
-        }
-    }
-    Some(def)
+    let in_user_stub = db.is_user_stub_source_file(file);
+    defs.slice
+        .interfaces
+        .iter()
+        .map(|def| {
+            let def = resolve_interface_cross_file_imports(db, def.clone());
+            match in_user_stub
+                .then(|| real_interface_shadowed_by_stub(db, &def))
+                .flatten()
+            {
+                Some(real) => Arc::new(merge_interface_stub_over_real(&def, &real)),
+                None => def,
+            }
+        })
+        .collect()
 }
 
-#[salsa::tracked]
-pub fn trait_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<TraitDef>> {
+/// [`file_class_defs`] for traits.
+#[salsa::tracked(returns(ref))]
+fn file_trait_defs(db: &dyn MirDatabase, file: SourceFile) -> Vec<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
-    let def = def_at(&defs.slice.traits, idx)?;
-    Some(resolve_trait_cross_file_imports(db, def))
+    defs.slice
+        .traits
+        .iter()
+        .map(|def| resolve_trait_cross_file_imports(db, def.clone()))
+        .collect()
 }
 
-#[salsa::tracked]
-pub fn enum_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<EnumDef>> {
+/// [`file_class_defs`] for enums.
+#[salsa::tracked(returns(ref))]
+fn file_enum_defs(db: &dyn MirDatabase, file: SourceFile) -> Vec<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
-    let def = def_at(&defs.slice.enums, idx)?;
-    Some(resolve_enum_cross_file_imports(db, def))
+    defs.slice
+        .enums
+        .iter()
+        .map(|def| resolve_enum_cross_file_imports(db, def.clone()))
+        .collect()
 }
 
-#[salsa::tracked]
+/// [`file_class_defs`] for free functions.
+#[salsa::tracked(returns(ref))]
+fn file_function_defs(db: &dyn MirDatabase, file: SourceFile) -> Vec<Arc<FunctionDef>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice
+        .functions
+        .iter()
+        .map(|function| resolve_function_cross_file_imports(db, function.clone()))
+        .collect()
+}
+
+/// Function `idx` of `file`'s collected slice, imports resolved.
 pub fn function_def_at(
     db: &dyn MirDatabase,
     file: SourceFile,
     idx: u32,
 ) -> Option<Arc<FunctionDef>> {
-    let defs = collect_file_definitions(db, file);
-    let function = def_at(&defs.slice.functions, idx)?;
-    Some(resolve_function_cross_file_imports(db, function))
+    file_function_defs(db, file).get(idx as usize).cloned()
 }
 
 /// [`resolve_cross_file_imports`] for a free function's signature.
@@ -975,6 +1063,14 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     class_like_loc(db, fqcn).and_then(|loc| class_like_from_loc(db, loc))
 }
 
+/// [`find_class_like`] borrowing the memoized definition instead of cloning it.
+pub fn find_class_like_ref<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+) -> Option<ClassLikeRef<'db>> {
+    class_like_loc(db, fqcn).and_then(|loc| class_like_ref_from_loc(db, loc))
+}
+
 /// Whether the workspace symbol index already holds `fqcn`, as opposed to
 /// [`find_class_like`] finding it on demand.
 pub fn class_like_indexed(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> bool {
@@ -992,7 +1088,7 @@ pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Ar
     let SymbolLoc::Function { file, idx } = function_loc(db, fqn)? else {
         return None;
     };
-    function_def_at(db, file, idx as u32).clone()
+    function_def_at(db, file, idx as u32)
 }
 
 /// Where function `fqn` is declared as seen from `file`: a declaration in
@@ -1028,7 +1124,7 @@ pub fn find_function_from<'db>(
     let SymbolLoc::Function { file, idx } = function_loc_from(db, file, fqn)? else {
         return None;
     };
-    function_def_at(db, file, idx as u32).clone()
+    function_def_at(db, file, idx as u32)
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate a global
@@ -1058,7 +1154,7 @@ pub fn find_method_in_class<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<Arc<MethodDef>> {
-    let class = find_class_like(db, fqcn)?;
+    let class = find_class_like_ref(db, fqcn)?;
     // Keys are lowercase-normalized at collection time, so one lowercase of
     // the query gives an O(1) hashed lookup instead of a scan of all methods.
     let lower: std::borrow::Cow<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
@@ -1070,7 +1166,7 @@ pub fn find_method_in_class<'db>(
         return Some(m.clone());
     }
     // Synthesize PHP built-in enum static methods.
-    if let ClassLike::Enum(e) = &class {
+    if let ClassLikeRef::Enum(e) = class {
         let is_backed = e.scalar_type.is_some();
         if lower == "cases" {
             let enum_ty = mir_types::Type::single(Atomic::TNamedObject {
@@ -1198,8 +1294,8 @@ pub fn find_property_in_class<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<PropertyDef> {
-    let class = find_class_like(db, fqcn)?;
-    class.own_properties()?.get(name).cloned()
+    let class = find_class_like_ref(db, fqcn)?;
+    class.own_properties().get(name).cloned()
 }
 
 /// Locate a class constant named `name` on the class `fqcn`'s **own**
@@ -1418,25 +1514,49 @@ pub fn method_is_pure_in_chain(db: &dyn MirDatabase, fqcn: Fqcn<'_>, name: &str)
             .unwrap_or(false);
     }
 
+    let lower: std::borrow::Cow<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(name)
+    };
+    chain_method_purity(db, fqcn)
+        .get(lower.as_ref())
+        .copied()
+        .unwrap_or(false)
+}
+
+/// Lowercased method names whose purity `fqcn`'s ancestor chain decides: the
+/// nearest `@impure` or inheritable `@pure` declaration wins.
+#[salsa::tracked(returns(ref))]
+fn chain_method_purity<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+) -> Arc<FxHashMap<Arc<str>, bool>> {
+    let mut purity = FxHashMap::default();
     for (depth, ancestor) in class_ancestors_by_fqcn(db, fqcn).iter().enumerate() {
         let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
-        if let Some(method) = find_method_in_class(db, here, name) {
+        let Some(class) = find_class_like_ref(db, here) else {
+            continue;
+        };
+        for (name, method) in class.own_methods() {
             // An explicit impure declaration is more specific than every
             // inherited purity annotation. It is commonly used by adapters
             // that deliberately implement a generally pure interface with an
             // effectful legacy implementation.
-            if method.is_impure {
-                return false;
-            }
-            if method.is_pure
+            let decided = if method.is_impure {
+                false
+            } else if method.is_pure
                 && (depth == 0
                     || method.visibility != mir_codebase::definitions::Visibility::Private)
             {
-                return true;
-            }
+                true
+            } else {
+                continue;
+            };
+            purity.entry(name.clone()).or_insert(decided);
         }
     }
-    false
+    Arc::new(purity)
 }
 
 /// If `method` has `@inheritDoc`, walks the ancestor chain of `receiver_fqcn`
@@ -1572,7 +1692,7 @@ fn walk_method_with_precedence<'db>(
     if !visited.insert(class_name.clone()) {
         return None;
     }
-    let class = find_class_like(db, fqcn)?;
+    let class = find_class_like_ref(db, fqcn)?;
 
     // Check this class/trait's own methods first.
     if let Some(m) = find_method_in_class(db, fqcn, method_lower) {
@@ -1583,7 +1703,7 @@ fn walk_method_with_precedence<'db>(
     }
 
     // For a plain class: respect its insteadof exclusions when walking its traits.
-    if let ClassLike::Class(cls) = &class {
+    if let ClassLikeRef::Class(cls) = class {
         // Check trait aliases: `use Trait { orig_method as alias_name; }`
         if let Some((opt_trait_fqcn, orig_method, vis_override, alias_cased)) =
             cls.trait_aliases.get(method_lower)
@@ -1644,7 +1764,7 @@ fn walk_method_with_precedence<'db>(
     }
 
     // For traits and interfaces: plain ancestor walk (no per-class insteadof).
-    for ancestor_fqcn in class.ancestor_fqcns() {
+    for ancestor_fqcn in class.to_class_like().ancestor_fqcns() {
         let here = Fqcn::interned(db, Name::new(ancestor_fqcn.as_ref()));
         if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
             return Some(result);

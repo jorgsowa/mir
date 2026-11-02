@@ -740,33 +740,58 @@ pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
     }
 }
 
-fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSet<String>> {
-    let mut reverse: HashMap<String, HashSet<String>> = HashMap::default();
-
-    let mut add_symbol_edge = |symbol_key: &str, dependent_file: &str| {
-        let lookup = crate::defining_file_lookup_key(symbol_key);
-        if let Some(defining_file) = db.symbol_defining_file(lookup) {
-            let def = defining_file.as_ref().to_string();
-            if def != dependent_file {
-                reverse
-                    .entry(def)
-                    .or_default()
-                    .insert(dependent_file.to_string());
-            }
-        }
-    };
-
+fn build_reverse_deps<D>(db: &D) -> HashMap<String, HashSet<String>>
+where
+    D: crate::db::MirDatabase + Clone + Send,
+{
+    let mut edges: Vec<(Arc<str>, Arc<str>)> = Vec::new();
     for sf in db.all_source_files() {
         let file = sf.path(db);
         for symbol in crate::db::file_structural_symbols(db, sf).iter() {
-            add_symbol_edge(symbol, file.as_ref());
+            edges.push((Arc::from(symbol.as_str()), file.clone()));
         }
     }
-
     for (ref_file, symbol_key) in db.all_reference_location_pairs() {
-        add_symbol_edge(&symbol_key, ref_file.as_ref());
+        edges.push((symbol_key, ref_file));
     }
 
+    let mut lookups: Vec<&str> = edges
+        .iter()
+        .map(|(symbol, _)| crate::defining_file_lookup_key(symbol))
+        .collect();
+    lookups.sort_unstable();
+    lookups.dedup();
+    let defining_files: HashMap<&str, Arc<str>> = lookups
+        .into_par_iter()
+        .map_with(db.clone(), |db, lookup| {
+            db.symbol_defining_file(lookup).map(|file| (lookup, file))
+        })
+        .flatten()
+        .collect();
+
+    let mut reverse: HashMap<String, HashSet<String>> = HashMap::default();
+    for (symbol, dependent_file) in &edges {
+        let lookup = crate::defining_file_lookup_key(symbol);
+        let Some(def) = defining_files.get(lookup) else {
+            continue;
+        };
+        if def.as_ref() == dependent_file.as_ref() {
+            continue;
+        }
+        match reverse.get_mut(def.as_ref()) {
+            Some(dependents) => {
+                if !dependents.contains(dependent_file.as_ref()) {
+                    dependents.insert(dependent_file.to_string());
+                }
+            }
+            None => {
+                reverse.insert(
+                    def.to_string(),
+                    HashSet::from_iter([dependent_file.to_string()]),
+                );
+            }
+        }
+    }
     reverse
 }
 

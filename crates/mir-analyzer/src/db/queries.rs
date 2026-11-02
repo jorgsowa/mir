@@ -19,12 +19,16 @@ pub struct ClassKind {
 
 pub fn class_kind(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
-    let class = crate::db::find_class_like(db, here)?;
+    let class = crate::db::find_class_like_ref(db, here)?;
     Some(ClassKind {
-        is_interface: class.is_interface(),
-        is_trait: class.is_trait(),
-        is_enum: class.is_enum(),
-        is_abstract: class.is_abstract(),
+        is_interface: matches!(class, ClassLikeRef::Interface(_)),
+        is_trait: matches!(class, ClassLikeRef::Trait(_)),
+        is_enum: matches!(class, ClassLikeRef::Enum(_)),
+        is_abstract: match class {
+            ClassLikeRef::Class(c) => c.is_abstract,
+            ClassLikeRef::Interface(_) => true,
+            ClassLikeRef::Trait(_) | ClassLikeRef::Enum(_) => false,
+        },
     })
 }
 
@@ -34,7 +38,7 @@ pub fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
 
 pub fn class_exists(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
-    crate::db::find_class_like(db, here).is_some()
+    crate::db::find_class_like_ref(db, here).is_some()
 }
 
 /// True when `fqcn` is a `final` class (or an enum, which is implicitly
@@ -188,8 +192,8 @@ pub(crate) fn prefix_file_namespace(db: &dyn MirDatabase, file: &str, name: &str
 /// [`class_template_params`], which resolves the inherited case too.
 pub fn declared_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[TemplateParam]>> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
-    let class = crate::db::find_class_like(db, here)?;
-    Some(Arc::from(class.template_params().to_vec()))
+    let class = crate::db::find_class_like_ref(db, here)?;
+    Some(Arc::from(class.template_params()))
 }
 
 /// The `@template` params that parameterize `fqcn` — its own, or if it
@@ -683,23 +687,56 @@ pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) 
 
 /// Every workspace class (not interface, trait or enum) that extends or
 /// implements `ancestor`, in workspace order.
-///
-/// Memoized per ancestor, so a caller that asks "could some class be both an
-/// `ancestor` and something else" scans the workspace once per ancestor
-/// instead of on every check. Uses the uncached subtype walk: this memo
-/// outlives the pass-scoped subtype cache and must record its dependencies.
 #[salsa::tracked]
 pub fn classes_implementing<'db>(db: &'db dyn MirDatabase, ancestor: Fqcn<'db>) -> Arc<[Name]> {
     let ancestor = ancestor.name(db);
-    crate::db::workspace_classes(db)
-        .iter()
-        .filter(|fqcn| {
-            let here = Fqcn::from_str(db, fqcn.as_str());
-            crate::db::find_class_like(db, here).is_some_and(|c| c.is_class())
-                && extends_or_implements_uncached(db, fqcn.as_str(), ancestor.as_str())
-        })
-        .copied()
-        .collect()
+    let key = effective_ancestor(db, ancestor.as_str()).to_ascii_lowercase();
+    class_implementors(db)
+        .get(key.as_str())
+        .map_or_else(|| Arc::from([]), |classes| Arc::from(classes.as_slice()))
+}
+
+/// Workspace classes keyed by the lowercased name of themselves and of each
+/// ancestor, so [`classes_implementing`] costs one workspace scan in total.
+/// Uses the uncached ancestor walk: this memo outlives the pass-scoped
+/// subtype cache and must record its dependencies.
+#[salsa::tracked]
+fn class_implementors(db: &dyn MirDatabase) -> Arc<FxHashMap<Box<str>, Vec<Name>>> {
+    let mut index: FxHashMap<Box<str>, Vec<Name>> = FxHashMap::default();
+    let mut keys: Vec<Box<str>> = Vec::new();
+    for &fqcn in crate::db::workspace_classes(db).iter() {
+        let here = Fqcn::from_str(db, fqcn.as_str());
+        if !crate::db::find_class_like_ref(db, here).is_some_and(ClassLikeRef::is_class) {
+            continue;
+        }
+        keys.clear();
+        keys.push(fqcn.as_str().to_ascii_lowercase().into());
+        keys.extend(
+            crate::db::class_ancestors_by_fqcn(db, here)
+                .iter()
+                .map(|p| p.to_ascii_lowercase().into()),
+        );
+        keys.sort_unstable();
+        keys.dedup();
+        for key in keys.drain(..) {
+            index.entry(key).or_default().push(fqcn);
+        }
+    }
+    Arc::new(index)
+}
+
+/// `ancestor`, or its short name when it is namespace-qualified but unknown.
+/// This recovers global stub classes (DOMNode, etc.) that were incorrectly
+/// namespace-qualified when referenced from namespaced files without a
+/// leading backslash.
+fn effective_ancestor<'a>(db: &dyn MirDatabase, ancestor: &'a str) -> &'a str {
+    if ancestor.contains('\\') {
+        let fqcn = crate::db::Fqcn::from_str(db, ancestor);
+        if crate::db::find_class_like_ref(db, fqcn).is_none() {
+            return ancestor.rsplit('\\').next().unwrap_or(ancestor);
+        }
+    }
+    ancestor
 }
 
 fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
@@ -708,21 +745,7 @@ fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &
         return false;
     };
 
-    // If the ancestor is namespace-qualified but doesn't exist in the symbol table,
-    // fall back to the short name. This recovers global stub classes (DOMNode, etc.)
-    // that were incorrectly namespace-qualified when referenced from namespaced files
-    // without a leading backslash.
-    let short: Option<&str> = if ancestor.contains('\\') {
-        let fqcn = crate::db::Fqcn::from_str(db, ancestor);
-        if crate::db::find_class_like(db, fqcn).is_none() {
-            ancestor.rsplit('\\').next()
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    let eff = short.unwrap_or(ancestor);
+    let eff = effective_ancestor(db, ancestor);
 
     if child == eff || child.eq_ignore_ascii_case(eff) {
         return true;

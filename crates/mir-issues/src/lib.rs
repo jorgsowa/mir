@@ -2530,6 +2530,10 @@ impl IssueBuffer {
         self
     }
 
+    pub fn is_discarding(&self) -> bool {
+        self.discard
+    }
+
     pub fn add(&mut self, issue: Issue) {
         if self.discard {
             return;

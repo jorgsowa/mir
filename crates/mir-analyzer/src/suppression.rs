@@ -195,7 +195,7 @@ impl SuppressionMap {
 
     /// Scan `source` for suppression directives.
     pub fn from_source(source: &str) -> Self {
-        if !contains_ascii_case(source, "ignore") && !contains_ascii_case(source, "suppress") {
+        if !keyword_positions(source).iter().any(Option::is_some) {
             return SuppressionMap::default();
         }
 
@@ -349,11 +349,23 @@ impl SuppressionMap {
     }
 }
 
-fn contains_ascii_case(haystack: &str, needle: &str) -> bool {
-    haystack
-        .as_bytes()
-        .windows(needle.len())
-        .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+/// Byte offset of each `KEYWORDS` entry's first case-insensitive occurrence in `text`.
+fn keyword_positions(text: &str) -> [Option<usize>; KEYWORDS.len()] {
+    let bytes = text.as_bytes();
+    let mut first = [None; KEYWORDS.len()];
+    for at in (0..bytes.len()).filter(|&i| bytes[i] == b'@') {
+        let rest = &bytes[at..];
+        for (slot, &(keyword, ..)) in first.iter_mut().zip(KEYWORDS) {
+            if slot.is_none()
+                && rest
+                    .get(..keyword.len())
+                    .is_some_and(|w| w.eq_ignore_ascii_case(keyword.as_bytes()))
+            {
+                *slot = Some(at);
+            }
+        }
+    }
+    first
 }
 
 fn insert_line(lines: &mut FxHashMap<u32, KindSet>, line: u32, kinds: KindSet) {
@@ -394,7 +406,7 @@ fn heredoc_body_mask(raw_lines: &[&str]) -> Vec<bool> {
 /// If `line` opens a heredoc (`<<<IDENT`) or nowdoc (`<<<'IDENT'`/`<<<"IDENT"`),
 /// return the closing identifier to watch for.
 fn find_heredoc_opener(line: &str) -> Option<&str> {
-    let pos = line.find("<<<")?;
+    let pos = line.as_bytes().windows(3).position(|w| w == b"<<<")?;
     let rest = line[pos + 3..].trim_start();
     let (quote, rest) = match rest.as_bytes().first() {
         Some(b'\'') => (Some(b'\''), &rest[1..]),
@@ -770,8 +782,9 @@ fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
     // so an earlier table entry never shadows a later-defined keyword that
     // the author actually wrote earlier in the comment.
     let mut best: Option<(usize, &str, Scope, bool)> = None;
-    for &(keyword, scope, force_all) in KEYWORDS {
-        let Some(pos) = find_ci(comment.content, keyword) else {
+    let positions = keyword_positions(comment.content);
+    for (&(keyword, scope, force_all), pos) in KEYWORDS.iter().zip(positions) {
+        let Some(pos) = pos else {
             continue;
         };
         // Reject keyword matches that are really a prefix of a longer token

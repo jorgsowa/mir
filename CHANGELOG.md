@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** `mir_types::Atomic::TKeyedArray::properties` is an `Arc<KeyedProperties>` (an `IndexMap` with `FxBuildHasher`), so cloning a shape no longer copies its entries.
 - Performance: array shapes are shared instead of copied and type merges skip members already present (WordPress cold run 4.9 → 2.7 s, peak RSS 2.36 → 0.76 GB; Laravel 4% fewer instructions); class-level checks run in parallel; body analysis starts with the largest files, so the slowest file no longer finishes last (WordPress body analysis 2.26 → 1.86 s).
+- Performance: less lock contention and repeated work in class and function lookups, type interning, parameter-list deduplication, taint property-writer lookups and the reverse-dependency build (WordPress cold run 4% fewer instructions, 9% less user CPU).
+
+### Fixed
+
+- Taint: a call to an own method that stores request data on `$this`, itself or through a helper it passes the data to, now taints those properties for the rest of the caller (e.g. WordPress `WP::main()` → `send_headers()`).
 
 ## [0.89.0] - 2026-10-30
 

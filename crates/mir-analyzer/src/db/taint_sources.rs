@@ -63,8 +63,8 @@ struct DeclFacts {
     body: ValueFacts,
     /// Values written to `$this->prop` or a static property of the class.
     prop_writes: Vec<(Name, ValueFacts)>,
-    /// Calls to the class's own methods `(class, lowercased method)` that pass a parameter's data.
-    own_param_calls: Vec<(Name, Name)>,
+    /// Calls to the class's own methods `(class, lowercased method)`, with what their arguments carry.
+    own_calls: Vec<((Name, Name), ValueFacts)>,
     /// Some `return` may carry a parameter's data.
     returns_param: bool,
     /// Some `return` may carry a property of `$this`.
@@ -77,7 +77,7 @@ impl DeclFacts {
     fn is_empty(&self) -> bool {
         self.body.is_empty()
             && self.prop_writes.is_empty()
-            && self.own_param_calls.is_empty()
+            && self.own_calls.is_empty()
             && !self.returns_param
             && !self.returns_prop
             && !self.may_reach_sink
@@ -727,7 +727,7 @@ impl OwnedVisitor for Scan<'_> {
         if self.is_sink(expr) {
             self.facts.may_reach_sink = true;
         }
-        self.record_own_param_call(expr);
+        self.record_own_call(expr);
         match self.inspect(expr) {
             Inspect::Source => self.facts.body.reads_source = true,
             Inspect::Callee(callee) => self.facts.body.push(callee),
@@ -740,7 +740,7 @@ impl OwnedVisitor for Scan<'_> {
 }
 
 impl Scan<'_> {
-    fn record_own_param_call(&mut self, expr: &Expr) {
+    fn record_own_call(&mut self, expr: &Expr) {
         let (class, method, args) = match &expr.kind {
             ExprKind::MethodCall(mc) if matches!(&mc.object.kind, ExprKind::Variable(v) if &**v == "this") => {
                 (self.self_fqcn, &mc.method, &mc.args)
@@ -759,18 +759,17 @@ impl Scan<'_> {
         let (Some(class), ExprKind::Identifier(name)) = (class, &method.kind) else {
             return;
         };
-        let passes_param = args
-            .iter()
-            .filter_map(|a| a.value())
-            .any(|value| self.value_facts(value).reads_param);
-        if passes_param {
-            let call = (
-                class,
-                Name::new(&crate::util::php_ident_lowercase(name.as_ref())),
-            );
-            if !self.facts.own_param_calls.contains(&call) {
-                self.facts.own_param_calls.push(call);
-            }
+        let mut passed = ValueFacts::default();
+        for value in args.iter().filter_map(|a| a.value()) {
+            passed.merge(&self.value_facts(value));
+        }
+        let call = (
+            class,
+            Name::new(&crate::util::php_ident_lowercase(name.as_ref())),
+        );
+        match self.facts.own_calls.iter_mut().find(|(c, _)| *c == call) {
+            Some((_, existing)) => existing.merge(&passed),
+            None => self.facts.own_calls.push((call, passed)),
         }
     }
 
@@ -881,15 +880,32 @@ pub(crate) fn class_property_writers(
     class: &str,
     key: Name,
 ) -> Vec<(Name, Name)> {
+    let from_package = crate::taint::vendor_package(from).map(Name::new);
+    property_writers(db, Name::new(class), key, from_package).clone()
+}
+
+/// [`class_property_writers`] for callers in Composer package `from_package`
+/// (`None` for project code); memoized since every read of the property asks.
+#[salsa::tracked(returns(ref), cycle_fn = property_writers_cycle, cycle_initial = property_writers_initial)]
+fn property_writers(
+    db: &dyn MirDatabase,
+    class: Name,
+    key: Name,
+    from_package: Option<Name>,
+) -> Vec<(Name, Name)> {
     let mut writers = Vec::new();
-    for owner in crate::db::class_ancestors_by_fqcn(db, crate::db::Fqcn::from_str(db, class)).iter()
-    {
+    let here = crate::db::Fqcn::from_str(db, class.as_str());
+    for owner in crate::db::class_ancestors_by_fqcn(db, here).iter() {
         let Some(sf) = crate::db::class_like_loc(db, crate::db::Fqcn::from_str(db, owner.as_ref()))
             .map(|loc| loc.file())
         else {
             continue;
         };
-        if !super::inferred_types::summarizable(db, sf, from) {
+        let path = sf.path(db);
+        let summarizable = !crate::stubs::is_stub_path(path.as_ref())
+            && crate::taint::vendor_package(path)
+                .is_none_or(|package| from_package.is_some_and(|from| from.as_str() == package));
+        if !summarizable {
             continue;
         }
         let owner = Name::new(owner.as_ref());
@@ -901,6 +917,29 @@ pub(crate) fn class_property_writers(
         }
     }
     writers
+}
+
+fn property_writers_initial(
+    _db: &dyn MirDatabase,
+    _id: salsa::Id,
+    _class: Name,
+    _key: Name,
+    _from_package: Option<Name>,
+) -> Vec<(Name, Name)> {
+    Vec::new()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn property_writers_cycle(
+    _db: &dyn MirDatabase,
+    _cycle: &salsa::Cycle,
+    _last: &Vec<(Name, Name)>,
+    value: Vec<(Name, Name)>,
+    _class: Name,
+    _key: Name,
+    _from_package: Option<Name>,
+) -> Vec<(Name, Name)> {
+    value
 }
 
 /// Whether a write to property `key` in method `method` of `owner` may store source data.
@@ -1176,16 +1215,63 @@ fn decl_stores_param(
         return false;
     };
     decl.prop_writes.iter().any(|(_, value)| value.reads_param)
-        || decl.own_param_calls.iter().any(|(class, callee)| {
-            let Some((callee_owner, _)) = crate::db::find_method_in_chain(
-                db,
-                crate::db::Fqcn::from_str(db, class.as_str()),
-                callee.as_str(),
-            ) else {
-                return false;
-            };
-            method_decl(db, file.path(db), callee_owner.as_ref(), callee.as_str())
-                .is_some_and(|(sf, (owner, method))| *decl_stores_param(db, sf, owner, method))
+        || decl
+            .own_calls
+            .iter()
+            .filter(|(_, passed)| passed.reads_param)
+            .any(|(callee, _)| {
+                own_callee_decl(db, file, *callee)
+                    .is_some_and(|(sf, (owner, method))| *decl_stores_param(db, sf, owner, method))
+            })
+}
+
+/// The declaration a call to the class's own method `(class, method)` runs.
+fn own_callee_decl(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    (class, callee): (Name, Name),
+) -> Option<(SourceFile, DeclKey)> {
+    let (callee_owner, _) = crate::db::find_method_in_chain(
+        db,
+        crate::db::Fqcn::from_str(db, class.as_str()),
+        callee.as_str(),
+    )?;
+    method_decl(db, file.path(db), callee_owner.as_ref(), callee.as_str())
+}
+
+/// Whether `owner::method_lower` may store source data in a property, directly
+/// or through the class's own methods it calls.
+pub(crate) fn method_stores_source(
+    db: &dyn MirDatabase,
+    from: &str,
+    owner: &str,
+    method_lower: &str,
+) -> bool {
+    method_decl(db, from, owner, method_lower)
+        .is_some_and(|(sf, (owner, method))| *decl_stores_source(db, sf, owner, method))
+}
+
+#[salsa::tracked(cycle_fn = reads_source_cycle, cycle_initial = reads_source_initial)]
+fn decl_stores_source(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    owner: Name,
+    method: Option<Name>,
+) -> bool {
+    let facts = file_source_facts(db, file);
+    let Some(decl) = facts.decls.get(&(owner, method)) else {
+        return false;
+    };
+    let from = file.path(db);
+    decl.prop_writes
+        .iter()
+        .any(|(_, value)| value_reads_source(db, from, value))
+        || decl.own_calls.iter().any(|(callee, passed)| {
+            own_callee_decl(db, file, *callee).is_some_and(|(sf, (owner, method))| {
+                *decl_stores_source(db, sf, owner, method)
+                    || (value_reads_source(db, from, passed)
+                        && *decl_stores_param(db, sf, owner, method))
+            })
         })
 }
 

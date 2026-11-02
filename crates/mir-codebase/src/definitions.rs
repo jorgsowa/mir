@@ -102,37 +102,74 @@ mod interned_types {
         GLOBAL_UNION_INTERN.get_or_init(|| dashmap::DashMap::with_hasher(Default::default()))
     }
 
-    /// Try to intern a Type if it matches a common type, otherwise wrap in Arc.
-    pub fn intern_or_wrap(union: Type) -> Arc<Type> {
-        // Fast path 1: single-atomic scalar — covered by `OnceLock` constants.
-        // Avoids any DashMap traffic for the most common case. Excludes
-        // `falsy_stripped`/`possibly_absent_offset` types (e.g.
+    /// The shared `Arc` of a single-atomic scalar `union` without flags.
+    fn scalar_singleton(union: &Type) -> Option<Arc<Type>> {
+        // Excludes `falsy_stripped`/`possibly_absent_offset` types (e.g.
         // `preg_replace_callback`'s narrowed `string`, or a generic
         // array-offset read's value type) — the canonical singleton never
         // carries either flag, so returning it here would silently drop it.
-        if union.types.len() == 1
-            && !union.possibly_undefined
-            && !union.from_docblock
-            && !union.falsy_stripped
-            && !union.possibly_absent_offset
+        if union.types.len() != 1
+            || union.possibly_undefined
+            || union.from_docblock
+            || union.falsy_stripped
+            || union.possibly_absent_offset
         {
-            match &union.types[0] {
-                mir_types::Atomic::TString => return string(),
-                mir_types::Atomic::TInt => return int(),
-                mir_types::Atomic::TFloat => return float(),
-                mir_types::Atomic::TBool => return bool(),
-                mir_types::Atomic::TMixed => return mixed(),
-                mir_types::Atomic::TNull => return null(),
-                mir_types::Atomic::TVoid => return void(),
-                _ => {}
-            }
+            return None;
         }
-        // Fast path 2: empty Type — also a common case (e.g. unresolved
-        // return type). Don't pollute the intern table with these.
+        match &union.types[0] {
+            mir_types::Atomic::TString => Some(string()),
+            mir_types::Atomic::TInt => Some(int()),
+            mir_types::Atomic::TFloat => Some(float()),
+            mir_types::Atomic::TBool => Some(bool()),
+            mir_types::Atomic::TMixed => Some(mixed()),
+            mir_types::Atomic::TNull => Some(null()),
+            mir_types::Atomic::TVoid => Some(void()),
+            _ => None,
+        }
+    }
+
+    /// Try to intern a Type if it matches a common type, otherwise wrap in Arc.
+    pub fn intern_or_wrap(union: Type) -> Arc<Type> {
+        if let Some(scalar) = scalar_singleton(&union) {
+            return scalar;
+        }
+        // Empty Type — also a common case (e.g. unresolved return type).
+        // Don't pollute the intern table with these.
         if union.types.is_empty() {
             return Arc::new(union);
         }
-        // Global path: dedup against any previously-seen identical Type.
+        let hash = {
+            use std::hash::BuildHasher;
+            rustc_hash::FxBuildHasher.hash_one(&union)
+        };
+        let slot = (hash as usize) & (LOCAL_SLOTS - 1);
+        let hit = LOCAL_CACHE.with(|cache| {
+            cache.borrow()[slot]
+                .as_ref()
+                .filter(|(h, arc)| *h == hash && **arc == union)
+                .map(|(_, arc)| Arc::clone(arc))
+        });
+        if let Some(hit) = hit {
+            return hit;
+        }
+        let interned = intern_global(union);
+        LOCAL_CACHE.with(|cache| cache.borrow_mut()[slot] = Some((hash, Arc::clone(&interned))));
+        interned
+    }
+
+    const LOCAL_SLOTS: usize = 1024;
+
+    type LocalSlots = std::cell::RefCell<Box<[Option<(u64, Arc<Type>)>]>>;
+
+    thread_local! {
+        /// Direct-mapped front for the global table. It holds only Arcs taken
+        /// from that table: equal types that differ in key order (equality
+        /// ignores it) must keep resolving to the table's one representative.
+        static LOCAL_CACHE: LocalSlots =
+            std::cell::RefCell::new(vec![None; LOCAL_SLOTS].into_boxed_slice());
+    }
+
+    fn intern_global(union: Type) -> Arc<Type> {
         let table = global_intern_table();
         if let Some(existing) = table.get(&union) {
             return Arc::clone(existing.value());
@@ -1065,9 +1102,9 @@ pub struct StubSlice {
 // Param list deduplication
 // ---------------------------------------------------------------------------
 
-use std::sync::Mutex;
-
-type ParamCache = Mutex<FxHashMap<Vec<DeclaredParam>, Arc<[DeclaredParam]>>>;
+/// Sharded so slices collected in parallel don't serialize on one lock.
+type ParamCache =
+    dashmap::DashMap<Vec<DeclaredParam>, Arc<[DeclaredParam]>, rustc_hash::FxBuildHasher>;
 
 /// Global cache of canonical Arc<[DeclaredParam]> instances for deduplication.
 /// Shared across all StubSlices to deduplicate vendor code with millions of
@@ -1082,15 +1119,19 @@ static PARAM_DEDUP_CACHE: std::sync::OnceLock<ParamCache> = std::sync::OnceLock:
 ///
 /// Expected memory savings: 100–150 MiB on cold start (vendor collection).
 pub fn deduplicate_params_in_slice(slice: &mut StubSlice) {
-    let cache: &ParamCache = PARAM_DEDUP_CACHE.get_or_init(|| Mutex::new(FxHashMap::default()));
-    let mut canonical_params = cache.lock().unwrap();
+    let cache: &ParamCache =
+        PARAM_DEDUP_CACHE.get_or_init(|| dashmap::DashMap::with_hasher(Default::default()));
 
-    let mut deduplicate = |params: &mut Arc<[DeclaredParam]>| {
-        if let Some(existing) = canonical_params.get(params.as_ref()) {
+    let deduplicate = |params: &mut Arc<[DeclaredParam]>| {
+        if let Some(existing) = cache.get(params.as_ref()) {
             *params = existing.clone();
-        } else {
-            canonical_params.insert(params.as_ref().to_vec(), params.clone());
+            return;
         }
+        let canonical = cache
+            .entry(params.as_ref().to_vec())
+            .or_insert_with(|| params.clone())
+            .clone();
+        *params = canonical;
     };
 
     // Deduplicate method params in all classes

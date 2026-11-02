@@ -2079,6 +2079,9 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
+        if self.issues.is_discarding() {
+            return;
+        }
         let issue = self.build_issue(kind, severity, span);
         self.issues.add(issue);
     }

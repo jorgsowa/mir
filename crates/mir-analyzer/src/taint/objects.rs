@@ -957,8 +957,10 @@ pub fn own_call_prop_writes(
     else {
         return Vec::new();
     };
-    if args_taint(args, ctx, db, file).is_empty()
-        || !crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), &lower)
+    let stores_args = !args_taint(args, ctx, db, file).is_empty()
+        && crate::db::taint_sources::method_stores_param(db, file, owner.as_ref(), &lower);
+    if !stores_args
+        && !crate::db::taint_sources::method_stores_source(db, file, owner.as_ref(), &lower)
     {
         return Vec::new();
     }

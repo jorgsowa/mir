@@ -1095,15 +1095,24 @@ pub(super) fn is_user_code(location: Option<&mir_types::Location>) -> bool {
 }
 
 /// `…/vendor/<vendor>/<package>` prefix of a Composer dependency's path.
-pub(super) fn vendor_package(path: &str) -> Option<&str> {
-    let start = path
-        .match_indices("vendor")
-        .filter(|(i, _)| *i == 0 || path[..*i].ends_with(['/', '\\']))
-        .map(|(i, _)| i + "vendor".len())
-        .filter(|end| path[*end..].starts_with(['/', '\\']))
-        .last()?;
-    let mut separators = path[start..]
-        .match_indices(['/', '\\'])
+pub(crate) fn vendor_package(path: &str) -> Option<&str> {
+    if !path.contains("vendor") {
+        return None;
+    }
+    let bytes = path.as_bytes();
+    let is_sep = |b: u8| b == b'/' || b == b'\\';
+    let start = (0..bytes.len().checked_sub(b"vendor/".len())? + 1)
+        .rev()
+        .find(|&i| {
+            bytes[i..].starts_with(b"vendor")
+                && is_sep(bytes[i + b"vendor".len()])
+                && (i == 0 || is_sep(bytes[i - 1]))
+        })?
+        + b"vendor".len();
+    let mut separators = bytes[start..]
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| is_sep(**b))
         .map(|(i, _)| start + i);
     separators.next()?;
     separators.next()?;
@@ -1380,5 +1389,33 @@ fn has_taint_guard(condition: &Expr) -> bool {
         }
         ExprKind::Binary(b) => has_taint_guard(&b.left) || has_taint_guard(&b.right),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::vendor_package;
+
+    #[test]
+    fn vendor_package_prefix() {
+        assert_eq!(
+            vendor_package("/app/vendor/acme/pkg/src/A.php"),
+            Some("/app/vendor/acme/pkg")
+        );
+        assert_eq!(vendor_package("vendor/acme/pkg"), Some("vendor/acme/pkg"));
+        assert_eq!(
+            vendor_package(r"C:\app\vendor\acme\pkg\A.php"),
+            Some(r"C:\app\vendor\acme\pkg")
+        );
+        assert_eq!(
+            vendor_package("/vendor/a/b/tests/vendor/c/d/E.php"),
+            Some("/vendor/a/b/tests/vendor/c/d")
+        );
+        assert_eq!(vendor_package("/app/vendor/acme"), None);
+        assert_eq!(vendor_package("/app/vendor/"), None);
+        assert_eq!(vendor_package("/app/vendor"), None);
+        assert_eq!(vendor_package("/app/myvendor/acme/pkg/A.php"), None);
+        assert_eq!(vendor_package("/app/vendors/acme/pkg/A.php"), None);
+        assert_eq!(vendor_package(""), None);
     }
 }
