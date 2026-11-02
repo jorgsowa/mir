@@ -1593,7 +1593,10 @@ impl<'a> BodyAnalyzer<'a> {
         mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
-        {
+        // Inferring one method needs only its body: class-level checks report
+        // issues and references, which this mode discards.
+        let one_method = self.mode == AnalysisMode::InferenceOnly && self.only_method.is_some();
+        if !one_method {
             let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
             crate::attributes::check_class_attributes(
                 decl,
@@ -1633,6 +1636,34 @@ impl<'a> BodyAnalyzer<'a> {
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
+
+        if one_method {
+            let scope_cx = MethodScopeCx {
+                fqcn: Arc::from(fqcn),
+                parent_fqcn,
+                detect_ctor: true,
+                with_templates: true,
+                check_returns: true,
+                analyze_param_defaults: true,
+                strict_types: crate::body_analysis::is_strict_types_file(source),
+            };
+            for member in decl.body.members.iter() {
+                if let php_ast::owned::ClassMemberKind::Method(method) = &member.kind {
+                    self.analyze_method_scope(
+                        method,
+                        &member.span,
+                        &scope_cx,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        all_symbols.as_deref_mut(),
+                        None,
+                    );
+                }
+            }
+            return;
+        }
 
         if let Some(parent) = &decl.extends {
             let parent_resolved = crate::ast_ext::resolve_ast_name(parent, self.db, file.as_ref());

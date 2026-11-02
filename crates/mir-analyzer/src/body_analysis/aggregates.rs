@@ -11,7 +11,8 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
-        {
+        let one_method = self.mode == AnalysisMode::InferenceOnly && self.only_method.is_some();
+        if !one_method {
             let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
             crate::attributes::check_trait_attributes(
                 decl,
@@ -38,6 +39,33 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
         );
         let fqcn: &str = &resolved;
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: None,
+            detect_ctor: true,
+            with_templates: false,
+            check_returns: false,
+            analyze_param_defaults: true,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
+        };
+        if one_method {
+            for member in decl.body.members.iter() {
+                if let php_ast::owned::ClassMemberKind::Method(method) = &member.kind {
+                    self.analyze_method_scope(
+                        method,
+                        &member.span,
+                        &scope_cx,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        all_symbols.as_deref_mut(),
+                        None,
+                    );
+                }
+            }
+            return;
+        }
         crate::diagnostics::check_trait_adaptations(
             decl.body.members.iter().filter_map(|m| match &m.kind {
                 php_ast::owned::ClassMemberKind::TraitUse(tu) => Some(tu),
@@ -60,15 +88,6 @@ impl<'a> BodyAnalyzer<'a> {
             all_issues,
         );
 
-        let scope_cx = MethodScopeCx {
-            fqcn: Arc::from(fqcn),
-            parent_fqcn: None,
-            detect_ctor: true,
-            with_templates: false,
-            check_returns: false,
-            analyze_param_defaults: true,
-            strict_types: crate::body_analysis::is_strict_types_file(source),
-        };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 self.check_property_member(
