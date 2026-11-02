@@ -598,7 +598,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Emit `@trace $var` directives
-        if let Some(doc_str) = doc {
+        if let Some(doc_str) = doc.filter(|d| d.contains("trace")) {
             let trace_vars = crate::parser::DocblockParser::parse(doc_str).trace_vars;
             for var_name in trace_vars {
                 let ty = ctx.get_var(&var_name);
@@ -1139,7 +1139,7 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     fn extract_mir_checks_from(&self, doc: Option<&str>) -> Vec<(String, String)> {
-        let Some(doc) = doc else {
+        let Some(doc) = doc.filter(|d| d.contains("mir-check")) else {
             return vec![];
         };
         crate::parser::DocblockParser::parse(doc).mir_checks
@@ -1166,7 +1166,8 @@ impl<'a> StatementsAnalyzer<'a> {
         current_method_name: Option<&str>,
         current_function_fqn: Option<&str>,
     ) -> Vec<VarAnnotation> {
-        let Some(doc) = doc else {
+        // Every `@var` form (`@psalm-var`, `@phpstan-var`) names "var".
+        let Some(doc) = doc.filter(|d| d.contains("var")) else {
             return Vec::new();
         };
         let parsed = crate::parser::DocblockParser::parse(doc);
