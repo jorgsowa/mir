@@ -147,6 +147,12 @@ impl std::fmt::Debug for KeyedProperties {
 
 impl PartialEq for KeyedProperties {
     fn eq(&self, other: &Self) -> bool {
+        // Remembered hashes that differ settle it without visiting the entries.
+        if let (Some(a), Some(b)) = (self.hash.get(), other.hash.get()) {
+            if a != b {
+                return false;
+            }
+        }
         self.map == other.map
     }
 }
