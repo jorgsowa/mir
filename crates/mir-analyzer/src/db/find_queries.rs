@@ -317,6 +317,15 @@ pub enum ClassLike {
 }
 
 impl ClassLike {
+    pub fn as_ref(&self) -> ClassLikeRef<'_> {
+        match self {
+            ClassLike::Class(c) => ClassLikeRef::Class(c),
+            ClassLike::Interface(i) => ClassLikeRef::Interface(i),
+            ClassLike::Trait(t) => ClassLikeRef::Trait(t),
+            ClassLike::Enum(e) => ClassLikeRef::Enum(e),
+        }
+    }
+
     pub fn fqcn(&self) -> &Arc<str> {
         match self {
             ClassLike::Class(c) => &c.fqcn,
@@ -1060,7 +1069,7 @@ fn resolve_function_cross_file_imports(
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
     // O(1) index lookup (borrowing the frozen index on batch passes), then a
     // per-(file, idx) salsa-memoized fetch of the Arc<Storage>.
-    class_like_loc(db, fqcn).and_then(|loc| class_like_from_loc(db, loc))
+    class_like_by_name(db, fqcn).clone()
 }
 
 /// [`find_class_like`] borrowing the memoized definition instead of cloning it.
@@ -1068,7 +1077,14 @@ pub fn find_class_like_ref<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
 ) -> Option<ClassLikeRef<'db>> {
-    class_like_loc(db, fqcn).and_then(|loc| class_like_ref_from_loc(db, loc))
+    class_like_by_name(db, fqcn).as_ref().map(ClassLike::as_ref)
+}
+
+/// The class-like `fqcn` names, memoized per name: one fetch per lookup
+/// instead of one for its location and one for its file's definitions.
+#[salsa::tracked(returns(ref))]
+fn class_like_by_name<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
+    class_like_loc(db, fqcn).and_then(|loc| class_like_from_loc(db, loc))
 }
 
 /// Whether the workspace symbol index already holds `fqcn`, as opposed to
