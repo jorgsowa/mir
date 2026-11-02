@@ -264,7 +264,7 @@ pub use self::find_queries::{
     trait_in_file, ClassLike, ClassLikeRef,
 };
 pub(crate) use self::find_queries::{
-    class_like_loc, function_loc, function_loc_from, indexed_symbol_loc, symbol_loc,
+    class_like_loc, constant_loc, function_loc, function_loc_from, indexed_symbol_loc, symbol_loc,
 };
 pub use self::inferred_types::{
     function_param_sinks, function_taint_summary, global_var_taint,

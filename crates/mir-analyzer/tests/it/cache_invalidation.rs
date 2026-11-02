@@ -601,3 +601,25 @@ fn index_batch_of_unrelated_declarations_keeps_negative_lookup() {
         "a declaration of another name must not evict the negative lookup"
     );
 }
+
+#[test]
+fn unchanged_rerun_keeps_result_with_bareword_constant_named_like_a_function() {
+    // `{$a[file]}` reports `UndefinedConstant` for `file`, which only a constant
+    // could declare; the built-in function of that name must not make the next
+    // run take its stub for a new declaration and re-analyze the file.
+    let src_dir = create_temp_dir("bareword_constant: source files");
+    let cache_dir = create_temp_dir("bareword_constant: cache");
+    let consumer = write_file(
+        &src_dir,
+        "trace.php",
+        "<?php\nfunction show(array $a): void {\n    echo \"line {$a[line]} in {$a[file]}\\n\";\n}\n",
+    );
+    let paths = [consumer];
+
+    assert_eq!(reanalyzed_count(cache_dir.path(), &paths), 1);
+    assert_eq!(
+        reanalyzed_count(cache_dir.path(), &paths),
+        0,
+        "an unchanged second run must replay the cached result"
+    );
+}

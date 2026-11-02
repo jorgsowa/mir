@@ -123,7 +123,7 @@ pub(crate) fn missing_name_declaring_file(
             function_loc(db, Fqcn::from_str(db, name.trim_start_matches('\\')))
         }
         K::UndefinedConstant { name } if !name.contains("::") => {
-            symbol_loc(db, name.trim_start_matches('\\'))
+            constant_loc(db, Fqcn::from_str(db, name.trim_start_matches('\\')))
         }
         _ => None,
     };

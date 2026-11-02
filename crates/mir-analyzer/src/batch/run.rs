@@ -581,6 +581,14 @@ impl AnalysisSession {
 
         // Persist cache hits/misses to disk
         if let Some(cache) = &self.cache {
+            // Remember the files declaring names a result reports missing, so
+            // the next run doesn't take them for new and evict that result.
+            let db = self.snapshot_db();
+            cache.for_each_unresolved_issue(|issue| {
+                if let Some(file) = crate::db::missing_name_declaring_file(&db, issue) {
+                    cache.observe_dependency(file.path(&db).as_ref(), file.text(&db).as_ref());
+                }
+            });
             cache.flush();
         }
 

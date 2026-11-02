@@ -173,7 +173,7 @@ pub(crate) fn function_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<Symbol
 }
 
 /// Where global constant `fqn` is declared: the symbol index, else on demand.
-fn constant_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
+pub(crate) fn constant_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
     indexed_constant_loc(db, fqn).or_else(|| *constant_loc_on_demand(db, fqn))
 }
 

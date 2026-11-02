@@ -757,6 +757,22 @@ impl AnalysisCache {
         self.evict_unresolved_where(|issue| declared.may_resolve(issue))
     }
 
+    /// Visit every issue of the results that report a missing name, without
+    /// the cache's locks held.
+    pub fn for_each_unresolved_issue(&self, mut visit: impl FnMut(&Issue)) {
+        let issues: Vec<std::sync::Arc<[Issue]>> = {
+            let entries = self.entries.lock();
+            let unresolved = self.unresolved_entries.lock();
+            unresolved
+                .iter()
+                .filter_map(|id| entries.get(id).map(|e| e.issues.clone()))
+                .collect()
+        };
+        for issue in issues.iter().flat_map(|i| i.iter()) {
+            visit(issue);
+        }
+    }
+
     /// Evict results with an issue matching `stale`; returns their paths.
     /// `stale` runs without the cache's locks held, so it may call back in.
     pub fn evict_unresolved_where(&self, stale: impl Fn(&Issue) -> bool) -> Vec<String> {
