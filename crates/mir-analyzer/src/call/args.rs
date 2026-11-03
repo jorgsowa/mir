@@ -557,9 +557,11 @@ pub(crate) fn check_method_visibility_with_magic(
                 parent == owner_fqcn.as_ref()
                     || crate::db::extends_or_implements(ea.db, parent, owner_fqcn.as_ref())
             });
+            // PHP's protected check is symmetric: an ancestor may call a descendant's method.
             caller_fqcn.is_empty()
                 || !(caller_fqcn == owner_fqcn.as_ref()
                     || crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref())
+                    || crate::db::extends_or_implements(ea.db, owner_fqcn.as_ref(), caller_fqcn)
                     || related_via_parent)
         }
         Visibility::Public => false,
