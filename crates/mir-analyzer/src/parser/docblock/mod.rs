@@ -174,7 +174,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "throws" => {
+                "throws" | "psalm-throws" | "phpstan-throws" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let first_word = body_str.split_whitespace().next().unwrap_or("");
                         let desc = if capture_descriptions {
@@ -191,7 +191,9 @@ impl DocblockParser {
                                     tag.span.start,
                                     text,
                                 );
-                                result.throws.push(class.to_string());
+                                if !result.throws.iter().any(|t| t == class) {
+                                    result.throws.push(class.to_string());
+                                }
                                 if !desc.is_empty() {
                                     result
                                         .throws_descriptions
@@ -413,7 +415,7 @@ impl DocblockParser {
                             .push(tag_head_span(text, tag.span.start, tag.span.end));
                     }
                 }
-                "property" => {
+                "property" | "psalm-property" | "phpstan-property" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
@@ -423,7 +425,7 @@ impl DocblockParser {
                                 tag.span.start,
                                 text,
                             );
-                            result.properties.push(DocProperty {
+                            result.push_property(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name: name.trim_start_matches('$').to_string(),
@@ -433,7 +435,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "property-read" => {
+                "property-read" | "psalm-property-read" | "phpstan-property-read" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
@@ -443,7 +445,7 @@ impl DocblockParser {
                                 tag.span.start,
                                 text,
                             );
-                            result.properties.push(DocProperty {
+                            result.push_property(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name: name.trim_start_matches('$').to_string(),
@@ -453,7 +455,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "property-write" => {
+                "property-write" | "psalm-property-write" | "phpstan-property-write" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             record_backslash_keyword_types(
@@ -463,7 +465,7 @@ impl DocblockParser {
                                 tag.span.start,
                                 text,
                             );
-                            result.properties.push(DocProperty {
+                            result.push_property(DocProperty {
                                 tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name: name.trim_start_matches('$').to_string(),
@@ -473,7 +475,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "method" | "psalm-method" => {
+                "method" | "psalm-method" | "phpstan-method" => {
                     let body_str = body_text(tag.body.as_ref())
                         .unwrap_or_default()
                         .trim()
@@ -498,6 +500,9 @@ impl DocblockParser {
                             tag.span.start,
                             text,
                         );
+                        result
+                            .methods
+                            .retain(|prev| !prev.name.eq_ignore_ascii_case(&m.name));
                         result.methods.push(m);
                     }
                 }
@@ -565,45 +570,6 @@ impl DocblockParser {
                             let (ty, negated) = parse_assertion_type(&ty_str);
                             let (name, key) = split_array_key_suffix(&name);
                             result.assertions_if_false.push((name, key, ty, negated));
-                        }
-                    }
-                }
-                "psalm-property" => {
-                    if let Some(body_str) = body_text(tag.body.as_ref()) {
-                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            result.properties.push(DocProperty {
-                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
-                                type_hint: ty_str,
-                                name,
-                                read_only: false,
-                                write_only: false,
-                            });
-                        }
-                    }
-                }
-                "psalm-property-read" => {
-                    if let Some(body_str) = body_text(tag.body.as_ref()) {
-                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            result.properties.push(DocProperty {
-                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
-                                type_hint: ty_str,
-                                name,
-                                read_only: true,
-                                write_only: false,
-                            });
-                        }
-                    }
-                }
-                "psalm-property-write" => {
-                    if let Some(body_str) = body_text(tag.body.as_ref()) {
-                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            result.properties.push(DocProperty {
-                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
-                                type_hint: ty_str,
-                                name,
-                                read_only: false,
-                                write_only: true,
-                            });
                         }
                     }
                 }
@@ -1060,6 +1026,12 @@ impl ParsedDocblock {
             unescape: arcs(&self.taint_unescape),
             flow_params: arcs(&self.taint_flow_params),
         }))
+    }
+
+    /// The last tag for a name wins, so `@phpstan-property` overrides a preceding `@property`.
+    fn push_property(&mut self, prop: DocProperty) {
+        self.properties.retain(|prev| prev.name != prop.name);
+        self.properties.push(prop);
     }
 
     fn fill_invalid_annotation_spans(&mut self, span: (u32, u32)) {
