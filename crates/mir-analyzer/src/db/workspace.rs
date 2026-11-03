@@ -582,25 +582,45 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
 }
 
 fn choose_winner(
+    key: Name,
     locs: &[SymbolLoc],
     db: &dyn MirDatabase,
     user_stubs: &std::collections::HashSet<SourceFile>,
 ) -> Option<SymbolLoc> {
-    let mut best = None;
+    // Within a tier the winner must not depend on registration order: prefer
+    // the file an autoloader maps the name to, then the greatest path, which
+    // picks a polyfill's newest-PHP variant (`bootstrap80.php` over `bootstrap.php`).
+    let mut best: Option<(SymbolTier, bool, Arc<str>, SymbolLoc)> = None;
     for loc in locs.iter().copied() {
         let tier = symbol_tier(loc, db, user_stubs);
-        let replace = match best {
+        let path: Arc<str> = loc.file().path(db).as_ref().into();
+        let autoloadable = path_matches_name(&path, key.as_str());
+        let replace = match &best {
             None => true,
-            Some((best_tier, _)) if tier > best_tier => true,
-            Some((best_tier, _)) if tier < best_tier => false,
-            Some((SymbolTier::NativeStub, _)) => false,
-            Some(_) => true,
+            Some((best_tier, ..)) if tier != *best_tier => tier > *best_tier,
+            Some((SymbolTier::NativeStub, ..)) => false,
+            Some((_, best_autoloadable, best_path, _)) => {
+                (autoloadable, &path) > (*best_autoloadable, best_path)
+            }
         };
         if replace {
-            best = Some((tier, loc));
+            best = Some((tier, autoloadable, path, loc));
         }
     }
-    best.map(|(_, loc)| loc)
+    best.map(|(.., loc)| loc)
+}
+
+/// Whether `path` ends in the PSR-4 location of `name` (`App\Foo` → `App/Foo.php`).
+fn path_matches_name(path: &str, name: &str) -> bool {
+    let relative = name.trim_start_matches('\\').replace('\\', "/");
+    let Some(stem) = path.strip_suffix(".php") else {
+        return false;
+    };
+    stem.len() >= relative.len()
+        && stem.is_char_boundary(stem.len() - relative.len())
+        && stem[stem.len() - relative.len()..].eq_ignore_ascii_case(&relative)
+        && (stem.len() == relative.len()
+            || stem.as_bytes()[stem.len() - relative.len() - 1] == b'/')
 }
 
 fn symbol_tier(
@@ -629,7 +649,7 @@ pub(crate) fn insert_symbol(
         if !bucket.contains(&loc) {
             bucket.push(loc);
         }
-        if let Some(winner) = choose_winner(bucket, db, user_stubs) {
+        if let Some(winner) = choose_winner(key, bucket, db, user_stubs) {
             winners.insert(key, winner);
         }
         return;
@@ -645,7 +665,7 @@ pub(crate) fn insert_symbol(
             if !bucket.contains(&loc) {
                 bucket.push(loc);
             }
-            if let Some(winner) = choose_winner(bucket, db, user_stubs) {
+            if let Some(winner) = choose_winner(key, bucket, db, user_stubs) {
                 winners.insert(key, winner);
             }
         }
@@ -673,7 +693,7 @@ pub(crate) fn remove_symbol(
                 winners.insert(key, winner);
             }
             _ => {
-                if let Some(winner) = choose_winner(bucket, db, user_stubs) {
+                if let Some(winner) = choose_winner(key, bucket, db, user_stubs) {
                     winners.insert(key, winner);
                 }
             }

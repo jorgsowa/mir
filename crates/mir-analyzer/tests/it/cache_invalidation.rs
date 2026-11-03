@@ -448,8 +448,9 @@ fn shadowed_definition_evicts_dependents_of_old_owner() {
     );
     session.cache().unwrap().set_reverse_deps(reverse_deps);
 
+    // At the class's autoloadable path, the new declaration wins.
     session.set_file_text(
-        Arc::from("/mirror/new_mage.php"),
+        Arc::from("/mirror/Mage.php"),
         Arc::from("<?php class Mage {}"),
     );
     session.settle_workspace_index();
