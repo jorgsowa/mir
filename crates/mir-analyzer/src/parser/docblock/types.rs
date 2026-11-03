@@ -637,9 +637,22 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             });
             u
         }
-        "class-string" => Type::single(Atomic::TClassString(Some(
-            normalize_fqcn(strip_generic_args(inner.trim())).into(),
-        ))),
+        "class-string" => {
+            // `class-string<A|B>` is `class-string<A>|class-string<B>`; an intersection keeps its
+            // first member, the only one the atom can name.
+            let mut u = Type::empty();
+            for part in split_union(inner.trim()) {
+                let part = part.trim().trim_start_matches('(').trim_end_matches(')');
+                let first = split_intersection(part).into_iter().next().unwrap_or_default();
+                u.add_type(Atomic::TClassString(Some(
+                    normalize_fqcn(strip_generic_args(first.trim())).into(),
+                )));
+            }
+            if u.is_empty() {
+                u.add_type(Atomic::TClassString(None));
+            }
+            u
+        }
         "interface-string" => Type::single(Atomic::TInterfaceString(Some(
             normalize_fqcn(strip_generic_args(inner.trim())).into(),
         ))),
