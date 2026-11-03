@@ -1536,6 +1536,21 @@ pub fn narrow_from_condition(
                                 if !name.is_empty() {
                                     ctx.defined_guards.insert(std::sync::Arc::from(name));
                                 }
+                            } else if let ExprKind::Binary(b) = &value.kind {
+                                // `defined($class.'::NAME')` proves `$class::NAME`.
+                                if let (
+                                    BinaryOp::Concat,
+                                    ExprKind::Variable(var),
+                                    ExprKind::String(member),
+                                ) = (b.op, &b.left.kind, &b.right.kind)
+                                {
+                                    if let Some(constant) = member.as_str().strip_prefix("::") {
+                                        ctx.defined_guards.insert(std::sync::Arc::from(format!(
+                                            "${}::{constant}",
+                                            var.trim_start_matches('$')
+                                        )));
+                                    }
+                                }
                             }
                         }
                     }

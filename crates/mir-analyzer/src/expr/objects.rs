@@ -1714,6 +1714,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             // `$cls` holds a class-string (e.g. `$cls = self::class;`) — the
             // same access form, just via a string rather than an instance.
             ExprKind::Variable(var_name) => {
+                let guard = format!("${}::{const_name}", var_name.trim_start_matches('$'));
+                if ctx.defined_guards.contains(guard.as_str()) {
+                    return Type::mixed();
+                }
                 let obj_ty = ctx.get_var(var_name.as_ref());
                 let mut result = Type::empty();
                 let mut any = false;
