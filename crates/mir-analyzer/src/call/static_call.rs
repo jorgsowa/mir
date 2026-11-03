@@ -685,8 +685,20 @@ impl CallAnalyzer {
             // abstract class name itself) get no such guarantee.
             let uses_late_static_binding = if call.class.kind.is_name_ref() {
                 call.class.kind.name_bare() == Some("static")
+                    // `self` in a trait is the using class, which implements the trait's abstracts.
+                    || (call.class.kind.name_bare() == Some("self")
+                        && crate::flow_state::self_is_trait(ea.db, ctx))
             } else {
                 receiver_is_object_instance
+                    // A declared `class-string<Abstract>` (parameter, call result, property) names
+                    // a concrete subclass; only a local may hold the literal abstract name.
+                    || match &call.class.kind {
+                        ExprKind::Variable(var) => ctx
+                            .param_names
+                            .contains(&Name::from(var.trim_start_matches('$'))),
+                        ExprKind::ClassConstAccess(_) => false,
+                        _ => true,
+                    }
             };
             if resolved.is_abstract && !uses_late_static_binding {
                 ea.emit(
