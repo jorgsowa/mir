@@ -558,6 +558,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
             if let Some(ref name) = ann.name {
+                // `@var T $x` over `$x = f($x)` types the result; the right-hand side still reads the old `$x`.
+                if simple_assignment_lhs(stmt) == Some(name.as_str()) && ctx.var_is_defined(name) {
+                    continue;
+                }
                 let current = ctx.get_var(name.as_str());
                 // `@var` is normally a legitimate widening/narrowing assertion
                 // (e.g. `Animal` -> `Dog`) that must stay silent — only flag it
