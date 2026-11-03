@@ -968,6 +968,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 _ => false,
             });
         if !fits_existing {
+            // A narrowed shape must not outlive a write that adds or retypes a key.
+            if ctx.get_prop_refined(&obj_key, &prop_name).is_some() {
+                match super::helpers::insert_keyed_value(prop_ty, key, value) {
+                    Some(updated) => ctx.set_prop_refined(&obj_key, &prop_name, updated),
+                    None => ctx.clear_prop_refined(&obj_key, &prop_name),
+                }
+            }
             return;
         }
         if let Some(updated) =

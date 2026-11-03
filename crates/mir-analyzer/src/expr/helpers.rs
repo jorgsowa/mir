@@ -178,6 +178,11 @@ pub fn set_nested_keyed_value(
     set_nested_keyed_value_at(current, path, leaf_value, false)
 }
 
+/// [`set_nested_keyed_value`] for a single key that may be absent from the shapes.
+pub fn insert_keyed_value(current: &Type, key: &ArrayKey, value: &Type) -> Option<Type> {
+    set_nested_keyed_value_at(current, std::slice::from_ref(key), value, true)
+}
+
 fn set_nested_keyed_value_at(
     current: &Type,
     path: &[ArrayKey],
