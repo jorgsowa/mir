@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.90.0] - 2026-11-03
+
 ### Added
 
 - `UnusedConstant` (MIR0509): private class and enum constants nothing reads.
@@ -15,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Breaking:** `mir_types::Atomic::TKeyedArray::properties` is an `Arc<KeyedProperties>`, so cloning a shape no longer copies its entries. `KeyedProperties` wraps an `IndexMap` with `FxBuildHasher` (reachable through `Deref`/`DerefMut`) and caches its hash.
-- Performance: array shapes are shared instead of copied and type merges skip members already present (WordPress cold run 4.9 → 2.7 s, peak RSS 2.36 → 0.76 GB; Laravel 4% fewer instructions); class-level checks run in parallel; body analysis starts with the largest files, so the slowest file no longer finishes last (WordPress body analysis 2.26 → 1.86 s).
-- Performance: less lock contention and repeated work in class and function lookups, type interning, parameter-list deduplication, taint property-writer lookups and the reverse-dependency build (WordPress cold run 4% fewer instructions, 9% less user CPU).
+- **Breaking:** `mir_types::Atomic::TKeyedArray::properties` is an `Arc<KeyedProperties>`, so cloning a shape no longer copies its entries. `KeyedProperties` wraps an `IndexMap` with `FxBuildHasher` (reachable through `Deref`/`DerefMut`) and caches its hash. `MirDatabase` has a new required method, `for_each_reference`.
+- Performance: array shapes are shared instead of copied and type merges skip members already present; class-like, function, method and property lookups are memoized, with less lock contention there and in type interning; class-level checks run in parallel and body analysis starts with the largest files; inference skips a loop body's confirming pass when it can't observe the change; statement docblocks are parsed only when they can hold the tag being read; the dead-code pass is faster. Cold runs at `-j 8` against 0.89.0: WordPress 140 → 59 G instructions, peak RSS 2.05 → 0.80 GB; Symfony 11.2 → 9.7 G; Laravel 16.5 → 13.3 G (peak RSS 3–8% higher on both).
+- Workspace and internal crate versions were updated to `0.90.0`.
 
 ### Fixed
 
@@ -25,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A class, function or constant declared more than once resolves to the same declaration on every run: the one at the name's PSR-4 path, else the greatest path (a polyfill's newest-PHP bootstrap). The winner used to depend on registration order, so diagnostics could change between runs.
 - `UnusedFunction` is reported once per declaration instead of once per declaring file, and is no longer skipped when another file declares the same name; `UnusedMethod` keeps the declared name casing.
 - Taint: a call to an own method that stores request data on `$this`, itself or through a helper it passes the data to, now taints those properties for the rest of the caller (e.g. WordPress `WP::main()` → `send_headers()`).
+- False positives on classes and calls: `AbstractMethodCall` through a declared class-string or `self::` in a trait; `InvalidStaticInvocation` for `Ancestor::method()` from an instance method; protected property access from a trait body; `TraitConstantAccessedDirectly` through `self::class` inside the trait; trait aliases of methods from nested trait uses; `ImpossibleLooseComparison` between a `Stringable` object and a string; `InvalidCast` for `GMP`, `CurlHandle` and other internal cast handlers; a native return hint narrowing the parent's docblock refinement; `UndefinedConstant` for `static::CONST` in an abstract class and for `$class::CONST` guarded by `defined($class.'::CONST')`; writes to an `SplObjectStorage` without type arguments; builtins declared once per overload in the stubs (`setcookie()`, `session_set_save_handler()`) accept either signature; a user override of a stub's `#[Pure]` method isn't checked as pure.
+- Flow and types: variables assigned in a `match` arm condition are defined in later arms, while narrowing stays in its arm; a falling-through `switch` case keeps the previous case's state; an assignment in a compound assignment's target offset is visible on its right-hand side (`$a[$k = f()] ??= $k`); variables passed to a bare `Closure` or to a union of literal function names may be out-args; `+=` onto a union of shapes; keys written into a property narrowed to a shape; by-reference closure captures have open shapes inside the closure; an inline `@var` over `$x = f($x)` types only the result; `(object)` of an array or scalar is `stdClass`; `class-string<A&B>` and `class-string<A|B>`; `$this` in a conditional `@return`.
+- The first cached run after a cold run no longer re-analyzes most files (WordPress 137 → 11 G instructions).
 
 ## [0.89.0] - 2026-10-30
 
