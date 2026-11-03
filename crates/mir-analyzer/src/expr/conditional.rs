@@ -167,19 +167,19 @@ impl<'a> ExpressionAnalyzer<'a> {
         let pre_ctx = ctx.clone();
         let mut result = Type::empty();
         let mut arm_ctxs: Vec<FlowState> = Vec::new();
+        // Arm conditions run in order until one matches, so an assignment in a
+        // condition — `match (true) { !$m = f() => …, $m > 1 => … }` — is
+        // visible to that arm's body and to every later arm.
+        let mut cond_ctx = ctx.branch();
         for arm in m.arms.iter() {
-            let mut arm_ctx = ctx.branch();
-            // Always analyze conditions to check for undefined classes and get
-            // types. Analyze against `arm_ctx` (not the parent) so an assignment
-            // in a condition — `match (true) { ($g = f()) !== '' => $g, ... }` —
-            // defines the variable for use in that arm's body.
             let mut arm_ty = Type::empty();
             if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
-                    let cond_ty = self.analyze(cond, &mut arm_ctx);
+                    let cond_ty = self.analyze(cond, &mut cond_ctx);
                     arm_ty.merge_with(&cond_ty);
                 }
             }
+            let mut arm_ctx = cond_ctx.branch();
             // Use type narrowing if the subject is a variable, property,
             // static property, or literal-keyed array-shape path.
             if let Some(target) = &subject_target {
