@@ -2022,6 +2022,12 @@ fn resolve_method_return<'a>(
             fqcn,
             &crate::util::php_ident_lowercase(method_name),
         );
+        // Keyed like the static-call path, so a method this declaration lacks
+        // but another declaration of the same class has still counts as called.
+        ea.record_ref(
+            Arc::from(format!("meth:{fqcn}::{method_name_lower}")),
+            call.method.span,
+        );
         if is_trait {
             // The call may be satisfied by whichever class ends up consuming
             // this trait — record a per-trait marker so DeadCodeAnalyzer can

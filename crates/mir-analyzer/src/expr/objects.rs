@@ -2214,6 +2214,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                             *declaring_class = Some((*fqcn).into());
                             return ty;
                         }
+                        // Keyed like the write path, so a property this
+                        // declaration lacks but another one of the same
+                        // class declares still counts as read.
+                        self.record_ref(Arc::from(format!("prop:{fqcn}::{prop_name}")), span);
                         if !self.in_existence_check && !prop_guarded {
                             self.emit(
                                 IssueKind::UndefinedProperty {
