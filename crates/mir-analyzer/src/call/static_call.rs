@@ -714,6 +714,11 @@ impl CallAnalyzer {
                 && !method_name.starts_with("__")
                 && !is_self_parent_call
                 && !crate::db::has_method_in_chain(ea.db, fqcn.as_str(), "__callStatic")
+                // `Ancestor::method()` from an instance method forwards `$this`, like `parent::`.
+                && !(!ctx.inside_static_method
+                    && ctx.self_fqcn.as_deref().is_some_and(|s| {
+                        crate::db::extends_or_implements(ea.db, s, fqcn.as_str())
+                    }))
             {
                 ea.emit(
                     IssueKind::InvalidStaticInvocation {
