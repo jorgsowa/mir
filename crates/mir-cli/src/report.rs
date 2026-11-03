@@ -8,7 +8,14 @@ use crate::format::{format_issue, format_junit, format_sarif, format_taint_trace
 use crate::path_util::normalize_for_compare;
 use crate::{color, Cli, OutputFormat};
 
-/// Load baseline from `--baseline` flag or auto-discover `psalm-baseline.xml`.
+const BASELINE_FILE: &str = "mir-baseline.xml";
+const PSALM_BASELINE_FILE: &str = "psalm-baseline.xml";
+
+fn cwd() -> PathBuf {
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
+/// Load baseline from `--baseline` flag or auto-discover `mir-baseline.xml` / `psalm-baseline.xml`.
 ///
 /// Returns `None` when `--ignore-baseline` or `--set-baseline` is active.
 pub fn load_baseline(cli: &Cli, _config: &Config) -> Option<(PathBuf, Baseline)> {
@@ -19,13 +26,11 @@ pub fn load_baseline(cli: &Cli, _config: &Config) -> Option<(PathBuf, Baseline)>
     let path = if let Some(p) = &cli.baseline {
         p.clone()
     } else {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let candidate = cwd.join("psalm-baseline.xml");
-        if candidate.exists() {
-            candidate
-        } else {
-            return None;
-        }
+        let cwd = cwd();
+        [BASELINE_FILE, PSALM_BASELINE_FILE]
+            .into_iter()
+            .map(|name| cwd.join(name))
+            .find(|candidate| candidate.exists())?
     };
 
     match Baseline::from_file(&path) {
@@ -42,6 +47,19 @@ pub fn load_baseline(cli: &Cli, _config: &Config) -> Option<(PathBuf, Baseline)>
     }
 }
 
+fn remove_psalm_baseline(cli: &Cli) {
+    let psalm = cwd().join(PSALM_BASELINE_FILE);
+    match std::fs::remove_file(&psalm) {
+        Ok(()) => {
+            if !cli.quiet {
+                eprintln!("mir: removed {}", psalm.display());
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => eprintln!("mir: failed to remove {}: {e}", psalm.display()),
+    }
+}
+
 pub fn run_output(
     cli: &Cli,
     config: &Config,
@@ -51,12 +69,19 @@ pub fn run_output(
     elapsed: std::time::Duration,
 ) {
     // --set-baseline: write every issue to the baseline file and exit 0.
-    if let Some(path) = &cli.set_baseline {
-        let bl = baseline_from_issues(&result.issues, path);
-        match bl.write(path) {
+    if let Some(explicit_path) = &cli.set_baseline {
+        let path = explicit_path
+            .clone()
+            .unwrap_or_else(|| cwd().join(BASELINE_FILE));
+        let bl = baseline_from_issues(&result.issues, &path);
+        match bl.write(&path) {
             Ok(()) => {
                 if !cli.quiet {
                     eprintln!("mir: baseline written to {}", path.display());
+                }
+                // The default target supersedes Psalm's file, which auto-discovery would otherwise still find.
+                if explicit_path.is_none() {
+                    remove_psalm_baseline(cli);
                 }
             }
             Err(e) => eprintln!("mir: failed to write baseline: {e}"),
@@ -131,14 +156,9 @@ pub fn run_output(
 
     // --update-baseline: write back only the issues still present in the baseline.
     if cli.update_baseline {
-        let path = baseline_path.as_deref().map_or_else(
-            || {
-                std::env::current_dir()
-                    .unwrap_or_else(|_| PathBuf::from("."))
-                    .join("psalm-baseline.xml")
-            },
-            |p| p.to_path_buf(),
-        );
+        let path = baseline_path
+            .clone()
+            .unwrap_or_else(|| cwd().join(BASELINE_FILE));
         match new_baseline.write(&path) {
             Ok(()) => {
                 if !cli.quiet {

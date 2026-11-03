@@ -133,19 +133,19 @@ mir -c psalm.xml src/
 On large projects you may want to introduce mir without fixing every pre-existing issue at once. Generate a baseline file that records all current issues:
 
 ```bash
-mir --set-baseline psalm-baseline.xml src/
+mir src/ --set-baseline
 ```
 
-On subsequent runs, pass the baseline to suppress those issues and only report new ones:
+This writes `mir-baseline.xml` and deletes an existing `psalm-baseline.xml`. On subsequent runs, mir picks the baseline up from the current directory and only reports new issues:
 
 ```bash
-mir --baseline psalm-baseline.xml src/
+mir src/
 ```
 
 When you fix issues, shrink the baseline so they are not re-introduced:
 
 ```bash
-mir --update-baseline --baseline psalm-baseline.xml src/
+mir --update-baseline src/
 ```
 
 ### CI integration

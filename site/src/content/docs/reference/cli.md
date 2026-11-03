@@ -27,7 +27,7 @@ Paths default to the current directory when omitted.
 | `-c, --config <FILE>` | auto | Config file (`mir.xml` / `psalm.xml` auto-discovered) |
 | `--baseline <FILE>` | off | Suppress issues listed in a baseline XML |
 | `--error-level <1-8>` | — | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient) |
-| `--set-baseline [FILE]` | — | Write all current issues to a baseline file and exit |
+| `--set-baseline [FILE]` | `mir-baseline.xml` | Write all current issues to a baseline file and exit; without `FILE`, also deletes `psalm-baseline.xml` |
 | `--update-baseline` | off | Remove resolved issues from the baseline |
 | `--ignore-baseline` | off | Report all issues, ignoring the baseline |
 | `--version` | — | Print version |

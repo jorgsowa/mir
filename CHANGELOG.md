@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `--set-baseline` without a file name writes `mir-baseline.xml` and deletes `psalm-baseline.xml` in the current directory. Auto-discovery and `--update-baseline` prefer `mir-baseline.xml` and fall back to `psalm-baseline.xml`.
+
 ## [0.90.0] - 2026-11-03
 
 ### Added

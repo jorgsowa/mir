@@ -79,8 +79,8 @@ CLI flags always override values from the config file.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-c, --config <FILE>` | auto | Config file path. Auto-discovers `mir.xml` / `psalm.xml` if omitted. |
-| `--baseline <FILE>` | auto | Suppress known issues from a baseline XML. Auto-discovers `psalm-baseline.xml`. |
-| `--set-baseline [FILE]` | `psalm-baseline.xml` | Write all current issues to a baseline file and exit. |
+| `--baseline <FILE>` | auto | Suppress known issues from a baseline XML. Auto-discovers `mir-baseline.xml`, then `psalm-baseline.xml`. |
+| `--set-baseline [FILE]` | `mir-baseline.xml` | Write all current issues to a baseline file and exit. Without `FILE`, also deletes `psalm-baseline.xml`. |
 | `--update-baseline` | off | Remove resolved issues from the baseline. |
 | `--ignore-baseline` | off | Report all issues, ignoring the baseline. |
 | `--error-level <1-8>` | from config | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient). |
@@ -101,16 +101,17 @@ This lets you adopt mir incrementally — silence pre-existing issues and focus 
 new ones as they are introduced.
 
 Baseline files use Psalm's XML format, so an existing `psalm-baseline.xml` works
-directly.
+directly. Running `mir --set-baseline` without a file name migrates it: mir writes
+`mir-baseline.xml` and deletes `psalm-baseline.xml`.
 
 ### Baseline workflow
 
 ```bash
 # 1. Generate a baseline from the current issues (first adoption)
-mir --set-baseline psalm-baseline.xml src/
+mir src/ --set-baseline
 
 # 2. Subsequent runs suppress baselined issues automatically
-#    (psalm-baseline.xml in the cwd is picked up automatically)
+#    (mir-baseline.xml in the cwd is picked up automatically)
 mir src/
 
 # 3. Explicitly point to a baseline in a non-standard location
@@ -143,7 +144,7 @@ mir --ignore-baseline src/
 
 ```bash
 # In .github/workflows/mir.yml:
-mir --format github --no-progress --baseline psalm-baseline.xml src/
+mir --format github --no-progress --baseline mir-baseline.xml src/
 ```
 
 ### Strict analysis (errors only, no warnings)

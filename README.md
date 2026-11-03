@@ -14,16 +14,19 @@ A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](htt
 
 ## Features
 
-- **140+ diagnostic rules** across type errors, undefined symbols, dead code, taint, and more
+- **190 diagnostic rules** across type errors, undefined symbols, dead code, taint, and more
 - Sound type system — scalars, objects, generics, unions, intersections, literals, `never`, `void`
 - Full type inference — return types, literal narrowing, `if`/`match`/`instanceof`/`is_string()` etc.
 - Call checking — argument count and types for user-defined and built-in functions/methods
 - Class analysis — inheritance, interface compliance, abstract enforcement, visibility, `readonly`, `final`
-- Dead code detection — unused variables, parameters, private methods, properties, and functions
+- Compile-time errors — code that parses but PHP rejects (trait conflicts, enum rules, invalid `extends`/`implements`), reported with PHP's own wording for the target version
+- Dead code detection — unused variables, parameters, functions, classes, interfaces, traits, enums, and private methods, properties, and constants (`@api` exempts public API)
 - Taint analysis — tracks data from `$_GET`/`$_POST` to HTML/SQL/shell sinks
 - Incremental cache — unchanged files skipped on re-runs via content hashing
 - Parallel analysis — rayon-powered; scales to available CPUs
-- PHP 7.4–8.6 support with version-aware stub filtering
+- PHP 7.4–8.6 support — code is parsed and checked at the target version (`--php-version`, `<phpVersion>`, or composer's `require.php`)
+- Plugins — native mir plugins plus a bridge that runs existing Psalm plugins
+- Psalm compatibility — reads `psalm.xml`; accepts `@psalm-*` annotations
 - Comprehensive built-in coverage — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) (57 extensions, 500+ functions, 100+ classes)
 
 ## Installation
@@ -61,7 +64,8 @@ cargo build --release
 mir                        # analyze current directory
 mir src/ lib/              # analyze specific paths
 mir --format json src/     # machine-readable output
-mir --baseline baseline.xml src/  # suppress known issues
+mir src/ --set-baseline    # record current issues in mir-baseline.xml
+mir --no-taint src/        # skip taint analysis
 ```
 
 See the [CLI reference](https://jorgsowa.github.io/mir/reference/cli/) for all flags and options.

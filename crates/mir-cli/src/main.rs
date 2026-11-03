@@ -74,7 +74,7 @@ struct Cli {
     #[arg(short = 'c', long, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    /// Baseline XML to suppress known issues (baseline.xml or psalm-baseline.xml)
+    /// Baseline XML to suppress known issues [default: mir-baseline.xml, else psalm-baseline.xml]
     #[arg(long, value_name = "FILE")]
     baseline: Option<PathBuf>,
 
@@ -82,9 +82,9 @@ struct Cli {
     #[arg(long, value_name = "1-8")]
     error_level: Option<u8>,
 
-    /// Save all current issues to a baseline file and exit (default: psalm-baseline.xml)
-    #[arg(long, value_name = "FILE", num_args = 0..=1, default_missing_value = "psalm-baseline.xml")]
-    set_baseline: Option<PathBuf>,
+    /// Save all current issues to a baseline file and exit [default: mir-baseline.xml, replacing psalm-baseline.xml]
+    #[arg(long, value_name = "FILE", num_args = 0..=1)]
+    set_baseline: Option<Option<PathBuf>>,
 
     /// Update the baseline by removing issues that are no longer present
     #[arg(long)]
