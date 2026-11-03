@@ -209,7 +209,17 @@ impl CallAnalyzer {
                         // args, so a previously-undefined variable passed to an out-param
                         // (e.g. `$fn($x, $out)` where $out is fresh) is not flagged as
                         // UndefinedVariable when the argument expression is analyzed.
-                        if let Some((_, ref params, _)) = callee_params {
+                        if is_bare_closure_type(&callee_ty) {
+                            // A declared `Closure` says nothing about which params are by-ref.
+                            for value in call.args.iter().filter_map(|a| a.value()) {
+                                if let ExprKind::Variable(name) = &value.kind {
+                                    let name = name.trim_start_matches('$');
+                                    if !ctx.var_is_defined(name) {
+                                        ctx.set_var(name, Type::mixed());
+                                    }
+                                }
+                            }
+                        } else if let Some((_, ref params, _)) = callee_params {
                             super::premark_byref_arg_vars(params, &call.args, ctx);
                         } else if let Some(f) = literal_named_function(&callee_ty, ea) {
                             super::premark_byref_arg_vars(&f.params, &call.args, ctx);
@@ -1794,6 +1804,16 @@ fn literal_named_function(
     };
     let fqn = name.trim_start_matches('\\');
     crate::db::find_function_from(ea.db, &ea.file, crate::db::Fqcn::from_str(ea.db, fqn))
+}
+
+/// `Closure` / `?Closure` without a known signature.
+fn is_bare_closure_type(ty: &Type) -> bool {
+    let non_null = ty.remove_null();
+    !non_null.types.is_empty()
+        && non_null.types.iter().all(|a| {
+            matches!(a, Atomic::TNamedObject { fqcn, .. }
+                if fqcn.as_ref().trim_start_matches('\\').eq_ignore_ascii_case("Closure"))
+        })
 }
 
 /// Every function a union of literal function names (`'preg_match'|'preg_match_all'`) may call.
