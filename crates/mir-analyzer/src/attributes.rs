@@ -125,7 +125,13 @@ fn record_class_refs_in_expr(
                 // and dead-code analysis both missed this usage.
                 if !matches!(&cca.member.kind, ExprKind::Identifier(m) if m.as_ref() == "class") {
                     if let ExprKind::Identifier(member) = &cca.member.kind {
-                        if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                        // `self::X` is keyed as written; dead-code analysis
+                        // resolves it to the class whose body contains it.
+                        let resolved = match resolved.as_str() {
+                            "static" => "self".into(),
+                            _ => resolved,
+                        };
+                        if resolved != "parent" {
                             let (line, col_start) =
                                 offset_to_line_col(source, cca.member.span.start, source_map);
                             let (line_end, col_end) =

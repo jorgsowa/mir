@@ -42,6 +42,7 @@ pub fn dead_code_issue_kinds() -> &'static [&'static str] {
         "UnusedProperty",
         "UnusedFunction",
         "UnusedClass",
+        "UnusedConstant",
     ]
 }
 

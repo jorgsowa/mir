@@ -415,23 +415,21 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
-    /// Reports a typed class constant whose constant-expression value its type rejects.
+    /// Analyzes a class constant's value when it refers to other constants or
+    /// classes, recording those references and reporting a typed constant
+    /// whose value its type rejects.
     #[allow(clippy::too_many_arguments)]
-    fn check_class_const_value_type(
+    pub(super) fn analyze_class_const_value(
         &self,
         constant: &php_ast::owned::ClassConstDecl,
-        members: &[php_ast::owned::ClassMember],
+        members: Option<&[php_ast::owned::ClassMember]>,
         scope_cx: &MethodScopeCx,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
-        if self.mode != AnalysisMode::Full
-            || self.php_version < crate::PhpVersion::new(8, 3)
-            || constant.type_hint.is_none()
-            || !crate::stmt::refers_to_constant(&constant.value)
-        {
+        if self.mode != AnalysisMode::Full || !crate::stmt::refers_to_constant(&constant.value) {
             return;
         }
         let mut ctx = crate::flow_state::FlowState::new();
@@ -454,6 +452,12 @@ impl<'a> BodyAnalyzer<'a> {
             self.mode,
         );
         let value_ty = sa.expr_analyzer(&ctx).analyze(&constant.value, &mut ctx);
+        let Some(members) = members else {
+            return;
+        };
+        if self.php_version < crate::PhpVersion::new(8, 3) || constant.type_hint.is_none() {
+            return;
+        }
         let Some(kind) =
             sa.class_const_value_type_issue(&scope_cx.fqcn, constant, members, &value_ty)
         else {
@@ -1848,9 +1852,9 @@ impl<'a> BodyAnalyzer<'a> {
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
                     self.record_class_const_decl(c, fqcn, file, source, source_map);
-                    self.check_class_const_value_type(
+                    self.analyze_class_const_value(
                         c,
-                        &decl.body.members,
+                        Some(&decl.body.members),
                         &scope_cx,
                         file,
                         source,
@@ -2110,6 +2114,15 @@ impl<'a> BodyAnalyzer<'a> {
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
                     self.record_class_const_decl(c, fqcn, file, source, source_map);
+                    self.analyze_class_const_value(
+                        c,
+                        Some(&decl.body.members),
+                        &scope_cx,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
                 }
                 continue;
             };

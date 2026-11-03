@@ -518,6 +518,9 @@ impl<'a> BodyAnalyzer<'a> {
                 match &member.kind {
                     EnumMemberKind::ClassConst(c) => {
                         self.record_class_const_decl(c, fqcn, file, source, source_map);
+                        self.analyze_class_const_value(
+                            c, None, &scope_cx, file, source, source_map, all_issues,
+                        );
                     }
                     EnumMemberKind::Case(case) => self.push_decl_name_fact(
                         &case.name,
@@ -650,6 +653,9 @@ impl<'a> BodyAnalyzer<'a> {
             let EnumMemberKind::Method(method) = &member.kind else {
                 if let EnumMemberKind::ClassConst(c) = &member.kind {
                     self.record_class_const_decl(c, fqcn, file, source, source_map);
+                    self.analyze_class_const_value(
+                        c, None, &scope_cx, file, source, source_map, all_issues,
+                    );
                 }
                 continue;
             };

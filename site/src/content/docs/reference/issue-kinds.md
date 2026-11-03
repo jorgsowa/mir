@@ -107,6 +107,7 @@ All issue types mir can emit, grouped by category.
 | `UnusedFunction` | A function is defined but never called. |
 | `UnusedForeachValue` | Foreach value variable assigned but never read. |
 | `UnusedClass` | A class is declared but never referenced anywhere in the analyzed code. |
+| `UnusedConstant` | A private class or enum constant is never used. |
 | `UnusedSuppress` | A suppression annotation (`@psalm-suppress` / `@mir-suppress` / `@suppress`) did not match any issue. |
 
 ## Readonly

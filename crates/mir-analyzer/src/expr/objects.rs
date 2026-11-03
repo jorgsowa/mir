@@ -1478,6 +1478,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr_span: php_ast::Span,
         ctx: &FlowState,
     ) -> Type {
+        if expr_name_str(&cca.member).is_none() {
+            let class = cca
+                .class
+                .kind
+                .resolve_name_ref(self.db, &self.file)
+                .and_then(|name| match name.as_str() {
+                    "self" | "static" => ctx.self_fqcn.clone(),
+                    "parent" => ctx.parent_fqcn.clone(),
+                    _ => Some(Arc::from(name.as_str())),
+                });
+            if let Some(class) = class {
+                self.record_dynamic_constant_ref(&class, cca.member.span);
+            }
+        }
         if expr_name_str(&cca.member) == Some("class") {
             if let Some(resolved) = cca.class.kind.resolve_name_ref(self.db, &self.file) {
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {

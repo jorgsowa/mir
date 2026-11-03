@@ -85,8 +85,8 @@ fn normalize_key(key: &str, out: &mut String) -> bool {
         return false;
     };
     let member_is_case_sensitive = match prefix {
-        "cls" | "fn" | "meth" | "dyn" | "objvars" => false,
-        "prop" | "traituse" => true,
+        "cls" | "fn" | "meth" | "dyn" | "dyncnst" | "objvars" => false,
+        "prop" | "cnst" | "traituse" => true,
         _ => return false,
     };
     out.push_str(prefix);
@@ -249,6 +249,32 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         method: method.name.to_string(),
                     },
                     method.location.clone(),
+                    keys,
+                );
+            }
+
+            let class_span = class.location().cloned().map(Arc::new);
+            for (name, constant) in class.own_constants().iter() {
+                if constant.visibility != Some(Visibility::Private) {
+                    continue;
+                }
+                let keys = [
+                    anywhere(format!("cnst:{fqcn_lower}::{name}")),
+                    anywhere(format!("dyncnst:{fqcn_lower}")),
+                    (format!("cnst:self::{name}"), class_span.clone()),
+                ]
+                .into_iter()
+                .chain(
+                    used_traits
+                        .iter()
+                        .map(|(t, span)| (format!("cnst:{t}::{name}"), span.clone())),
+                );
+                candidates.push(
+                    IssueKind::UnusedConstant {
+                        class: fqcn_str.to_string(),
+                        constant: name.to_string(),
+                    },
+                    constant.location.clone(),
                     keys,
                 );
             }

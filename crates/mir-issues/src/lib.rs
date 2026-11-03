@@ -395,6 +395,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/dead_code.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unused_class/`.
     UnusedClass { class: String },
+    /// Emitted by `mir-analyzer/src/dead_code.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_constant/`.
+    UnusedConstant { class: String, constant: String },
     /// Emitted by `mir-analyzer/src/batch/mod.rs` when a `@psalm-suppress` /
     /// `@mir-suppress` / `@suppress` annotation does not match any actual issue.
     /// Fixtures: `tests/fixtures/by-kind/unused_suppress/`.
@@ -1108,6 +1111,7 @@ impl IssueKind {
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
             | IssueKind::UnusedClass { .. }
+            | IssueKind::UnusedConstant { .. }
             | IssueKind::UnusedSuppress { .. }
             | IssueKind::ArgumentTypeCoercion { .. }
             | IssueKind::PropertyTypeCoercion { .. }
@@ -1286,6 +1290,7 @@ impl IssueKind {
             IssueKind::UnusedForeachValue { .. } => "MIR0506",
             IssueKind::UnusedClass { .. } => "MIR0507",
             IssueKind::UnusedSuppress { .. } => "MIR0508",
+            IssueKind::UnusedConstant { .. } => "MIR0509",
 
             // Purity (1700-1799)
             IssueKind::ImpurePropertyAssignment { .. } => "MIR1700",
@@ -1454,15 +1459,14 @@ impl IssueKind {
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
             | "MIR0209" | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400"
             | "MIR0401" | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504"
-            | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002"
-            | "MIR1003" | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009"
-            | "MIR1010" | "MIR1011" | "MIR1012" | "MIR1013" | "MIR1014" | "MIR1100" | "MIR1101"
-            | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202"
-            | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211"
-            | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601"
-            | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => {
-                Some(Severity::Info)
-            }
+            | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0509" | "MIR0901" | "MIR1000" | "MIR1001"
+            | "MIR1002" | "MIR1003" | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008"
+            | "MIR1009" | "MIR1010" | "MIR1011" | "MIR1012" | "MIR1013" | "MIR1014" | "MIR1100"
+            | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201"
+            | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210"
+            | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600"
+            | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902"
+            | "MIR1510" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1549,6 +1553,7 @@ impl IssueKind {
             IssueKind::UnusedFunction { .. } => "UnusedFunction",
             IssueKind::UnusedForeachValue { .. } => "UnusedForeachValue",
             IssueKind::UnusedClass { .. } => "UnusedClass",
+            IssueKind::UnusedConstant { .. } => "UnusedConstant",
             IssueKind::UnusedSuppress { .. } => "UnusedSuppress",
             IssueKind::ArgumentTypeCoercion { .. } => "ArgumentTypeCoercion",
             IssueKind::PropertyTypeCoercion { .. } => "PropertyTypeCoercion",
@@ -1989,6 +1994,9 @@ impl IssueKind {
             }
             IssueKind::UnusedClass { class } => {
                 format!("Class {class} is never referenced")
+            }
+            IssueKind::UnusedConstant { class, constant } => {
+                format!("Private constant {class}::{constant} is never used")
             }
             IssueKind::UnusedSuppress { kind } => {
                 format!("Suppress annotation for '{kind}' is never used")
@@ -2896,6 +2904,10 @@ mod code_tests {
             IssueKind::UnusedFunction { name: s() },
             IssueKind::UnusedForeachValue { name: s() },
             IssueKind::UnusedClass { class: s() },
+            IssueKind::UnusedConstant {
+                class: s(),
+                constant: s(),
+            },
             IssueKind::UnusedSuppress { kind: s() },
             IssueKind::ArgumentTypeCoercion {
                 param: s(),
@@ -3238,6 +3250,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 180);
+        assert_eq!(one_of_each().len(), 181);
     }
 }

@@ -1847,6 +1847,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Record that any constant of `fqcn` may be read through a computed name.
+    pub(crate) fn record_dynamic_constant_ref(&mut self, fqcn: &str, span: php_ast::Span) {
+        self.record_ref(Arc::from(format!("dyncnst:{fqcn}")), span);
+    }
+
     /// Record that every property of the classes in `obj_ty` is read at once
     /// (`get_object_vars`, `(array)`, `foreach` over the object, `serialize`).
     pub(crate) fn record_wholesale_property_read(&mut self, obj_ty: &Type, span: php_ast::Span) {

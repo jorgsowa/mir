@@ -123,6 +123,7 @@ issues keep their code.
 | MIR0506  | UnusedForeachValue            | [dead-code/unused-foreach-value](../dead-code/unused-foreach-value/) |
 | MIR0507  | UnusedClass                   | [dead-code/unused-class](../dead-code/unused-class/) |
 | MIR0508  | UnusedSuppress                | [dead-code/unused-suppress](../dead-code/unused-suppress/) |
+| MIR0509  | UnusedConstant                | [dead-code/unused-constant](../dead-code/unused-constant/) |
 | MIR0600  | ReadonlyPropertyAssignment    | [other/readonly-property-assignment](../other/readonly-property-assignment/) |
 | MIR0601  | ReadonlyPropertyAlreadyInitialized | [other/readonly-property-already-initialized](../other/readonly-property-already-initialized/) |
 | MIR0700  | UnimplementedAbstractMethod   | [inheritance/unimplemented-abstract-method](../inheritance/unimplemented-abstract-method/) |

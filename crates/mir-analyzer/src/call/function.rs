@@ -703,6 +703,12 @@ impl CallAnalyzer {
             }
         }
 
+        if resolved_fn_name == "constant" {
+            if let (Some(ty), Some(span)) = (arg_types.first(), arg_spans.first()) {
+                record_constant_fn_ref(ea, ctx, ty, *span);
+            }
+        }
+
         // A string-literal class name passed to one of these reflection-like
         // builtins is a real (runtime) reference to that class — record it,
         // or a class checked/reflected on only this way is falsely flagged
@@ -1848,4 +1854,35 @@ fn extract_docblock_at_position(src: &str, pos: usize) -> Option<&str> {
         }
     }
     None
+}
+
+/// `constant('Foo::BAR')` reads `Foo::BAR`; a computed name inside a class may
+/// read any of that class's constants.
+fn record_constant_fn_ref(
+    ea: &mut ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    name_ty: &mir_types::Type,
+    span: php_ast::Span,
+) {
+    let mut all_literal = !name_ty.types.is_empty();
+    for atomic in &name_ty.types {
+        let mir_types::Atomic::TLiteralString(name) = atomic else {
+            all_literal = false;
+            continue;
+        };
+        let Some((class, constant)) = name.as_ref().split_once("::") else {
+            continue;
+        };
+        let class = super::callable::callable_string_class(ctx, class);
+        let here = crate::db::Fqcn::from_str(ea.db, &class);
+        if let Some((owner, _)) = crate::db::find_class_constant_in_chain(ea.db, here, constant) {
+            ea.record_class_ref(&class, span);
+            ea.record_ref(Arc::from(format!("cnst:{owner}::{constant}")), span);
+        }
+    }
+    if !all_literal {
+        if let Some(fqcn) = ctx.self_fqcn.clone() {
+            ea.record_dynamic_constant_ref(&fqcn, span);
+        }
+    }
 }
