@@ -58,6 +58,9 @@ jobs:
             os: ubuntu-latest
           - target: aarch64-apple-darwin
             os: macos-latest
+          # Cross-compiled on the arm runner; the Intel macos-13 runner hangs.
+          - target: x86_64-apple-darwin
+            os: macos-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
     steps:
