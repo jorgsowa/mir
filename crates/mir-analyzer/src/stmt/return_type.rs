@@ -211,12 +211,21 @@ pub(crate) fn named_object_return_compatible(
             ) {
                 return crate::db::has_method_in_chain(db, actual_fqcn.as_ref(), "__invoke");
             }
-            // Extract declared FQCN — also handle self/static/parent in declared type
+            let parent_class: Name;
             let declared_fqcn: &Name = match declared_atom {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,
-                Atomic::TParent { fqcn } => fqcn,
+                Atomic::TParent { fqcn } => {
+                    match crate::subtype::parent_keyword_target(db, fqcn.as_ref()) {
+                        crate::subtype::ParentKeyword::Unknown => return true,
+                        crate::subtype::ParentKeyword::Class(parent) => {
+                            parent_class = Name::from(parent);
+                            &parent_class
+                        }
+                        crate::subtype::ParentKeyword::Missing => fqcn,
+                    }
+                }
                 _ => return false,
             };
 

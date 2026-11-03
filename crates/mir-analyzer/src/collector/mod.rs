@@ -30,6 +30,7 @@ mod annotation;
 mod class;
 mod r#enum;
 pub(crate) use r#enum::{enum_case_value_key, php_value_type_name};
+pub(crate) use resolution::fill_self_static_parent;
 mod function;
 mod interface;
 mod literal_types;

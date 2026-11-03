@@ -295,6 +295,29 @@ fn substitute_static_in_type(
     result
 }
 
+/// The class `parent` names in a member of `declaring`; in a trait, the parent of
+/// the receiver's ancestor that uses it.
+fn declaring_parent(db: &dyn MirDatabase, declaring: &str, receiver: &str) -> Option<Arc<str>> {
+    let class_like =
+        |name: &str| crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, name));
+    let owner = class_like(declaring)?;
+    if !owner.is_trait() {
+        return owner.parent().cloned();
+    }
+    let mut current = class_like(receiver)?;
+    for _ in 0..64 {
+        if current
+            .class_traits()
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case(declaring))
+        {
+            return current.parent().cloned();
+        }
+        current = class_like(current.parent()?)?;
+    }
+    None
+}
+
 fn substitute_static_atom(
     db: &dyn MirDatabase,
     a: Atomic,
@@ -315,6 +338,15 @@ fn substitute_static_atom(
             Atomic::TNamedObject {
                 fqcn: declaring,
                 type_params: mir_types::union::vec_to_type_params(Vec::new()),
+            }
+        }
+        Atomic::TParent { fqcn: declaring } if !declaring.is_empty() => {
+            match declaring_parent(db, declaring.as_ref(), fqcn) {
+                Some(parent) => Atomic::TNamedObject {
+                    fqcn: Name::from(parent.as_ref()),
+                    type_params: mir_types::union::vec_to_type_params(Vec::new()),
+                },
+                None => Atomic::TParent { fqcn: declaring },
             }
         }
         // `parent::m()` keeps the caller's late static binding; the parent's type args don't apply.

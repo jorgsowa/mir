@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changing a declaration's kind with the same name (`class Foo` → `interface Foo`) no longer leaves it unresolvable in long-running sessions.
 - A closure rebound with an object as `$newScope` (`$f->bindTo($obj, $obj)`, `Closure::bind($f, $obj, $obj)`) is scoped to that object's class, so its protected and private members are no longer reported as undefined or inaccessible.
 - `!is_callable($x)` removes `Closure` from the type, so `Closure|iterable` narrows to `iterable`.
+- `parent` resolves to the parent class in a called method's return type and in declared-return checks (in a trait, to the parent of the class using it), and `self`/`parent` in an inline `@var` resolve to the enclosing class instead of staying unresolved.
 
 ## [0.90.0] - 2026-11-03
 

@@ -317,7 +317,7 @@ fn is_self_static_parent_keyword(name: &Name) -> bool {
     )
 }
 
-pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
+pub(crate) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = union.from_docblock;

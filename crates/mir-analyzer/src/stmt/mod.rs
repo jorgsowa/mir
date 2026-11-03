@@ -611,7 +611,10 @@ impl<'a> StatementsAnalyzer<'a> {
         let mir_checks = self.extract_mir_checks_from(doc);
         let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
         for (expr_text, expected_str) in mir_checks {
-            let expected_raw = parse_type_string(&expected_str);
+            let mut expected_raw = parse_type_string(&expected_str);
+            if let Some(fqcn) = ctx.self_fqcn.as_deref() {
+                expected_raw = crate::collector::fill_self_static_parent(expected_raw, fqcn);
+            }
             // Resolve the expected type through the file's namespace/imports so that
             // `\Foo\Bar` in a @mir-check directive matches the stored `Foo\Bar` (sans `\`).
             let expected = resolve_union_for_file(expected_raw, self.db, &self.file);
@@ -1267,16 +1270,22 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
         tags.into_iter()
-            .map(|(name, ty)| VarAnnotation {
-                name,
-                ty: return_type::resolve_union_for_file_with_templates(
-                    ty,
-                    self.db,
-                    &self.file,
-                    &template_names,
-                    &template_params,
-                    defining_entity,
-                ),
+            .map(|(name, ty)| {
+                let ty = match self_fqcn {
+                    Some(fqcn) => crate::collector::fill_self_static_parent(ty, fqcn),
+                    None => ty,
+                };
+                VarAnnotation {
+                    name,
+                    ty: return_type::resolve_union_for_file_with_templates(
+                        ty,
+                        self.db,
+                        &self.file,
+                        &template_names,
+                        &template_params,
+                        defining_entity,
+                    ),
+                }
             })
             .collect()
     }

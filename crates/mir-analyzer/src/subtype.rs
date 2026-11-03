@@ -11,6 +11,7 @@
 //! don't need to switch — but new call sites should reach for this function
 //! first.
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
@@ -279,11 +280,20 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     named_object_type_params_ok(db, sub_fqcn, sub_params, sup_fqcn, sup_params)
                         && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
                 }
-                // `self`/`parent` in a declared type name that class, so any subclass fits.
-                (
-                    Atomic::TNamedObject { fqcn: sub_fqcn, .. },
-                    Atomic::TSelf { fqcn: sup_fqcn } | Atomic::TParent { fqcn: sup_fqcn },
-                ) => extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref()),
+                // `self` in a declared type names that class, so any subclass fits.
+                (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TSelf { fqcn: sup_fqcn }) => {
+                    extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
+                }
+                (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TParent { fqcn: owner }) => {
+                    match parent_keyword_target(db, owner.as_ref()) {
+                        ParentKeyword::Unknown => true,
+                        ParentKeyword::Class(parent) => {
+                            sub_fqcn.eq_ignore_ascii_case(&parent)
+                                || extends_or_implements(db, sub_fqcn.as_ref(), &parent)
+                        }
+                        ParentKeyword::Missing => false,
+                    }
+                }
                 // An invokable object (one with an __invoke() method) satisfies a
                 // callable(...): R / Closure(...): R target — mirrors the same
                 // leniency `call/args/types.rs::named_object_subtype` already
@@ -853,4 +863,23 @@ fn collapse_complete_enums(db: &dyn MirDatabase, ty: Type) -> Type {
         }
     }
     result
+}
+
+pub(crate) enum ParentKeyword {
+    /// Declared in a trait: the using class's parent isn't known here.
+    Unknown,
+    Class(Arc<str>),
+    Missing,
+}
+
+/// What `parent` written in a member of `owner` names.
+pub(crate) fn parent_keyword_target(db: &dyn MirDatabase, owner: &str) -> ParentKeyword {
+    match crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, owner)) {
+        Some(class_like) if class_like.is_trait() => ParentKeyword::Unknown,
+        Some(class_like) => class_like
+            .parent()
+            .cloned()
+            .map_or(ParentKeyword::Missing, ParentKeyword::Class),
+        None => ParentKeyword::Unknown,
+    }
 }
