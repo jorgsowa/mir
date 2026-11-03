@@ -19,7 +19,7 @@ class FooTest {
     }
 
     private static function unrelatedHelper(): array {
-//  ^ +2:5 UnusedMethod: Private method FooTest::unrelatedhelper() is never called
+//  ^ +2:5 UnusedMethod: Private method FooTest::unrelatedHelper() is never called
         return [];
     }
 }

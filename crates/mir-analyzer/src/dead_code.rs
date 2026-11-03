@@ -240,7 +240,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 candidates.push(
                     IssueKind::UnusedMethod {
                         class: fqcn_str.to_string(),
-                        method: name.to_string(),
+                        method: method.name.to_string(),
                     },
                     method.location.clone(),
                     keys,

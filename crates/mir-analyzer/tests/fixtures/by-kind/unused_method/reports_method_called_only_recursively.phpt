@@ -13,7 +13,7 @@ final class A {
     }
 
     private function viaClosure(int $n): callable {
-//  ^ +2:5 UnusedMethod: Private method A::viaclosure() is never called
+//  ^ +2:5 UnusedMethod: Private method A::viaClosure() is never called
         return fn() => $this->viaClosure($n);
     }
 }
