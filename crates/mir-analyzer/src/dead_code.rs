@@ -390,6 +390,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
             let Some(props) = class.own_properties() else {
                 continue;
             };
+            // Without `__serialize`, `serialize()` reads every property of a
+            // class built to be unserialized.
+            let declares = |m: &str| class.own_methods().contains_key(m);
+            let natively_serialized = !declares("__serialize")
+                && ["__sleep", "__wakeup", "__unserialize"]
+                    .into_iter()
+                    .any(declares);
             for (name, prop) in props.iter() {
                 if prop.visibility != Visibility::Private {
                     continue;
@@ -414,11 +421,9 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     prop.location.clone(),
                     keys,
                 );
-                // A static write-only buffer is the memory-reservation idiom
-                // (`self::$reserved = str_repeat('x', 32768)`), freed on fatal errors.
                 if let Some(last) = candidates.list.last_mut() {
                     last.needs_read =
-                        !prop.is_static && prop.ty.as_deref().is_some_and(is_plain_data);
+                        !natively_serialized && prop.ty.as_deref().is_some_and(is_plain_data);
                 }
             }
         }

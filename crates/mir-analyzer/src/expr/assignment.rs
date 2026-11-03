@@ -6,6 +6,7 @@ use super::helpers::{
 };
 use super::ExpressionAnalyzer;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
@@ -526,7 +527,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
-                self.pure_write_target = !a.by_ref;
+                // `$this->reserved = str_repeat('x', 32768)` reserves memory
+                // to free on fatal errors: the write is the use.
+                self.pure_write_target = !a.by_ref
+                    && !matches!(&a.value.kind, ExprKind::FunctionCall(fc)
+                    if fc.name.kind.name_bare().is_some_and(|n| {
+                        n.trim_start_matches('\\').eq_ignore_ascii_case("str_repeat")
+                    }));
                 self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
                 self.pure_write_target = false;
                 // A PLAIN (non-`=&`) write to a variable already ref-aliased

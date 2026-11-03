@@ -1,6 +1,5 @@
 ===description===
-A private instance property holding plain data that is only assigned with `=` is never read;
-static ones may reserve memory on purpose
+A private property holding plain data that is only assigned with `=` is never read
 ===config===
 <mir>
   <findUnusedCode>true</findUnusedCode>
@@ -11,6 +10,7 @@ final class Counter {
     private int $writeOnly = 0;
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Counter::$writeOnly is never read
     private static string $staticWriteOnly = '';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Counter::$staticWriteOnly is never read
     /** @var list<string> */
     private array $listWriteOnly = [];
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Counter::$listWriteOnly is never read
