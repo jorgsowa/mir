@@ -29,16 +29,28 @@ foreach (require $here . '/packages.php' as ['slug' => $slug, 'url' => $url, 'ta
         }
     }
 
-    echo "== $slug: composer install ...\n";
+    composerInstall($slug, $dest);
+
+    // Packages that keep Psalm in an isolated tools install need it for their configured Psalm plugins.
+    foreach (glob($dest . '/tools/*/composer.json') ?: [] as $toolManifest) {
+        $tool = json_decode((string)file_get_contents($toolManifest), true);
+        if (isset($tool['require']['vimeo/psalm']) || isset($tool['require-dev']['vimeo/psalm'])) {
+            composerInstall($slug, dirname($toolManifest));
+        }
+    }
+}
+
+function composerInstall(string $slug, string $dir): void
+{
+    echo "== $slug: composer install in $dir ...\n";
     passthru(sprintf(
         'composer install --working-dir=%s --no-scripts --no-plugins --no-interaction --prefer-dist --ignore-platform-reqs --quiet',
-        escapeshellarg($dest)
+        escapeshellarg($dir)
     ), $status);
     if ($status !== 0) {
-        fwrite(STDERR, "== $slug: composer install failed\n");
+        fwrite(STDERR, "== $slug: composer install failed in $dir\n");
         exit(1);
     }
-
 }
 
 echo "\nDone. Run the baseline harness with:\n  harness/run.php\n";
