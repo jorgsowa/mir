@@ -384,6 +384,19 @@ impl DefinitionCollector<'_> {
             type_aliases: Self::stored_type_aliases(&type_aliases),
         };
 
+        // phpstorm-stubs declare an overloaded builtin (`setcookie()` with `$expires` or
+        // `$options`) once per signature; accept the arguments of either.
+        if crate::stubs::is_stub_path(&self.file) {
+            if let Some(existing) = self
+                .slice
+                .functions
+                .iter_mut()
+                .find(|f| f.fqn.eq_ignore_ascii_case(&storage.fqn))
+            {
+                *existing = std::sync::Arc::new(merge_overloads(existing, &storage));
+                return;
+            }
+        }
         self.slice.functions.push(std::sync::Arc::new(storage));
 
         // Scan the function body for `@var`-annotated global declarations.
@@ -394,5 +407,43 @@ impl DefinitionCollector<'_> {
     pub(super) fn collect_global_stmt(&mut self, stmt: &php_ast::owned::Stmt) {
         // Top-level `global $x` — unusual in PHP but valid.
         self.try_collect_global_var_annotation(stmt);
+    }
+}
+
+/// One signature accepting the arguments of either overload of a stub function.
+fn merge_overloads(
+    first: &mir_codebase::definitions::FunctionDef,
+    second: &mir_codebase::definitions::FunctionDef,
+) -> mir_codebase::definitions::FunctionDef {
+    let union = |a: &Option<std::sync::Arc<mir_types::Type>>,
+                 b: &Option<std::sync::Arc<mir_types::Type>>| match (a, b) {
+        (Some(a), Some(b)) => Some(std::sync::Arc::new(mir_types::Type::merge(a, b))),
+        _ => None,
+    };
+    let len = first.params.len().max(second.params.len());
+    let params: Vec<_> = (0..len)
+        .map(|i| match (first.params.get(i), second.params.get(i)) {
+            (Some(a), Some(b)) => {
+                let mut p = a.clone();
+                p.ty = union(&a.ty, &b.ty);
+                p.out_ty = union(&a.out_ty, &b.out_ty);
+                p.has_default |= b.has_default;
+                p.is_optional |= b.is_optional;
+                p.is_byref |= b.is_byref;
+                p.is_variadic |= b.is_variadic;
+                p
+            }
+            (Some(only), None) | (None, Some(only)) => {
+                let mut p = only.clone();
+                p.is_optional = true;
+                p
+            }
+            (None, None) => unreachable!("index below the longer list"),
+        })
+        .collect();
+    mir_codebase::definitions::FunctionDef {
+        params: params.into(),
+        return_type: union(&first.return_type, &second.return_type),
+        ..first.clone()
     }
 }
