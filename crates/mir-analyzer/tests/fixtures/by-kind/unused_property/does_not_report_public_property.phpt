@@ -7,5 +7,6 @@ does not report public property
 ===file===
 <?php
 class Foo {
+//<^ +2:1 UnusedClass: Class Foo is never referenced
     public string $name = 'bar';
 }

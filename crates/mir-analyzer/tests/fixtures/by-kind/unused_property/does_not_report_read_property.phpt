@@ -7,6 +7,7 @@ does not report read property
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private string $name = 'bar';
 
     public function getName(): string {

@@ -9,6 +9,7 @@ isn't statically known.
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private function helper(): void {}
 
     public function run(string $name): void {

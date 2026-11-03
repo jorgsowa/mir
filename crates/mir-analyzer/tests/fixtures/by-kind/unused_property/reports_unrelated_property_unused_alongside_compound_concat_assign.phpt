@@ -8,6 +8,7 @@ property on the same class.
 ===file===
 <?php
 class Foo {
+//<^ +7:1 UnusedClass: Class Foo is never referenced
     private string $log = '';
     private string $unused = '';
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Foo::$unused is never read

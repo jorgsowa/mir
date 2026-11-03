@@ -12,3 +12,4 @@ final class OnlyUsedViaImportTypeFrom {}
 
 /** @psalm-import-type UserId from OnlyUsedViaImportTypeFrom */
 class Consumer {}
+//<^^^^^^^^^^^^^^^^^ UnusedClass: Class Consumer is never referenced

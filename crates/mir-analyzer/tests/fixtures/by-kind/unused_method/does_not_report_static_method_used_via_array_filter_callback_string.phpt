@@ -7,6 +7,7 @@ a private static method used only as a "Class::method" string callback to array_
 ===file===
 <?php
 class Filters {
+//<^ +6:1 UnusedClass: Class Filters is never referenced
     private static function keep(int $x): bool { return $x > 0; }
 
     public static function run(array $items): array {

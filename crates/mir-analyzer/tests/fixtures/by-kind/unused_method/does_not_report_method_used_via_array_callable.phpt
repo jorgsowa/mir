@@ -9,6 +9,7 @@ reported unused.
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private function helper(): void {}
 
     public function run(): void {

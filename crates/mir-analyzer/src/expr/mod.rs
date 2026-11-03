@@ -1847,6 +1847,34 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// `'App\\Handlers\\' . $name` builds a class name: record the namespace
+    /// so classes declared in it count as referenced.
+    pub(crate) fn record_namespace_prefix_ref(&mut self, prefix_ty: &Type, span: php_ast::Span) {
+        if self.mode == AnalysisMode::InferenceOnly || !self.record_reference_locations {
+            return;
+        }
+        let [Atomic::TLiteralString(prefix)] = prefix_ty.types.as_slice() else {
+            return;
+        };
+        let namespace = prefix.trim_start_matches('\\');
+        let Some(namespace) = namespace.strip_suffix('\\') else {
+            return;
+        };
+        let is_namespace = !namespace.is_empty()
+            && namespace.split('\\').all(|segment| {
+                segment
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || !c.is_ascii())
+                    && segment
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_' || !c.is_ascii())
+            });
+        if is_namespace {
+            self.record_ref(Arc::from(format!("nsprefix:{namespace}\\")), span);
+        }
+    }
+
     /// Record that any constant of `fqcn` may be read through a computed name.
     pub(crate) fn record_dynamic_constant_ref(&mut self, fqcn: &str, span: php_ast::Span) {
         self.record_ref(Arc::from(format!("dyncnst:{fqcn}")), span);

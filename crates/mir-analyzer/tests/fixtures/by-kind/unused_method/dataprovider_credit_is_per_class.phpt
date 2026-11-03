@@ -7,6 +7,7 @@ dataProvider credit does not leak to an unrelated class or a genuinely unused me
 ===file===
 <?php
 class FooTest {
+//<^ +15:1 UnusedClass: Class FooTest is never referenced
     /**
      * @dataProvider provideCases
      */
@@ -25,6 +26,7 @@ class FooTest {
 }
 
 class OtherTest {
+//<^ +4:1 UnusedClass: Class OtherTest is never referenced
     private static function providecases(): array {
 //  ^ +2:5 UnusedMethod: Private method OtherTest::providecases() is never called
         return [];

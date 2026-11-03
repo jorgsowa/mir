@@ -8,6 +8,7 @@ unrelated class's private method.
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private function helper(): void {}
 
     public function run(string $name): callable {
@@ -16,6 +17,7 @@ class Foo {
 }
 
 class Bar {
+//<^ +2:1 UnusedClass: Class Bar is never referenced
     private function unused(): void {}
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method Bar::unused() is never called
 }

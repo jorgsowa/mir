@@ -3,6 +3,7 @@ does not count call after throw expression
 ===file===
 <?php
 class Foo {
+//<^ +7:1 UnusedClass: Class Foo is never referenced
     public function run(): void {
         $value = throw new RuntimeException('stop');
         $this->helper();

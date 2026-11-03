@@ -296,6 +296,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             BinaryOp::Concat => {
+                self.record_namespace_prefix_ref(&left_ty, b.left.span);
                 self.check_implicit_to_string_cast(&left_ty, b.left.span);
                 self.check_implicit_to_string_cast(&right_ty, b.right.span);
                 // Flag when a union member is an array (not stringifiable).

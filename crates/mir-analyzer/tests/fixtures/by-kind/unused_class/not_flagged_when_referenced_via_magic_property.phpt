@@ -11,3 +11,4 @@ final class OnlyUsedViaMagicProperty {}
 
 /** @property OnlyUsedViaMagicProperty $thing */
 class Consumer {}
+//<^^^^^^^^^^^^^^^^^ UnusedClass: Class Consumer is never referenced

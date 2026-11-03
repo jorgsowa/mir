@@ -3,6 +3,7 @@ a multi-line @psalm-suppress docblock above a declaration reaches the declaratio
 ===file===
 <?php
 class C {
+//<^ +6:1 UnusedClass: Class C is never referenced
     /**
      * @psalm-suppress UnusedMethod
      */

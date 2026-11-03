@@ -16,6 +16,8 @@ class Box {}
 
 /** @extends Box<OnlyUsedInExtendsTypeArg> */
 class ConcreteBox extends Box {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedClass: Class ConcreteBox is never referenced
 
 /** @template T of OnlyUsedInTemplateBound */
 class BoundedBox {}
+//<^^^^^^^^^^^^^^^^^^^ UnusedClass: Class BoundedBox is never referenced

@@ -12,3 +12,4 @@ final class OnlyUsedInMagicMethodParam {}
 
 /** @method OnlyUsedInMagicMethodReturn getThing(OnlyUsedInMagicMethodParam $arg) */
 class Consumer {}
+//<^^^^^^^^^^^^^^^^^ UnusedClass: Class Consumer is never referenced

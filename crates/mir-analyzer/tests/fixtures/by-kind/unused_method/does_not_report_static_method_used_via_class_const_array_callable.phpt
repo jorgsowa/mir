@@ -9,6 +9,7 @@ a class-string type, distinct from the `['Foo', 'helper']` string-literal form.
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private static function helper(): void {}
 
     public static function run(): void {

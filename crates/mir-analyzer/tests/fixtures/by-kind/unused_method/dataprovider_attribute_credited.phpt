@@ -12,6 +12,7 @@ class DataProvider {
 }
 
 class BarTest {
+//<^ +9:1 UnusedClass: Class BarTest is never referenced
     #[DataProvider('provideCases')]
     public function testAdd(int $a, int $b): void {
         echo $a + $b;

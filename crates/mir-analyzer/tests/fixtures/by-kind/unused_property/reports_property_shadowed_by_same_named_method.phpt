@@ -5,6 +5,7 @@ to share one reference-index key and the method's usage hid the property).
 ===file===
 <?php
 class Foo {
+//<^ +10:1 UnusedClass: Class Foo is never referenced
     private string $bar = 'x';
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Foo::$bar is never read
 

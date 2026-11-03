@@ -10,6 +10,7 @@ magic methods not reported
 ===file===
 <?php
 class Magic {
+//<^ +17:1 UnusedClass: Class Magic is never referenced
     private function __construct() {}
     private function __destruct() {}
     private function __call(string $name, array $arguments): mixed { return null; }

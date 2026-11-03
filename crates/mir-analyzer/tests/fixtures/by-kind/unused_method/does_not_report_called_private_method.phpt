@@ -7,6 +7,7 @@ does not report called private method
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     public function run(): void {
         $this->helper();
     }

@@ -8,6 +8,7 @@ A private static method used only through first-class-callable syntax
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private static function helper(): void {}
 
     public static function run(): void {

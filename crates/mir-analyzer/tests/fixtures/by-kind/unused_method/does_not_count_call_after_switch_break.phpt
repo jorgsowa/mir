@@ -3,6 +3,7 @@ does not count call after switch break
 ===file===
 <?php
 class Foo {
+//<^ +10:1 UnusedClass: Class Foo is never referenced
     public function run(int $mode): void {
         switch ($mode) {
             case 1:

@@ -37,6 +37,8 @@ const MAGIC_METHODS: &[&str] = &[
 struct Candidate {
     kind: IssueKind,
     location: Option<mir_types::Location>,
+    /// Lowercased FQCN of a class-like, matched against built class names.
+    class_name: Option<String>,
 }
 
 /// A reference key that keeps candidate `id` alive, optionally only when the
@@ -67,7 +69,11 @@ impl Candidates {
         keys: impl IntoIterator<Item = Key>,
     ) {
         let id = self.list.len() as u32;
-        self.list.push(Candidate { kind, location });
+        self.list.push(Candidate {
+            kind,
+            location,
+            class_name: None,
+        });
         for (key, within) in keys {
             self.by_key
                 .entry(key)
@@ -85,7 +91,7 @@ fn normalize_key(key: &str, out: &mut String) -> bool {
         return false;
     };
     let member_is_case_sensitive = match prefix {
-        "cls" | "fn" | "meth" | "dyn" | "dyncnst" | "objvars" => false,
+        "cls" | "fn" | "meth" | "dyn" | "dyncnst" | "objvars" | "nsprefix" => false,
         "prop" | "cnst" | "traituse" => true,
         _ => return false,
     };
@@ -131,8 +137,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
         let mut used = vec![false; candidates.list.len()];
         let mut normalized = String::new();
         let mut positions_buf: Vec<(Arc<str>, u32, u16)> = Vec::new();
+        let mut namespace_prefixes: Vec<String> = Vec::new();
         self.db.for_each_reference(&mut |symbol, positions| {
             if !normalize_key(symbol, &mut normalized) {
+                return;
+            }
+            if let Some(prefix) = normalized.strip_prefix("nsprefix:") {
+                namespace_prefixes.push(prefix.to_string());
                 return;
             }
             let Some(credits) = candidates.by_key.get(normalized.as_str()) else {
@@ -158,6 +169,16 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
             }
         });
+
+        if !namespace_prefixes.is_empty() {
+            for (candidate, used) in candidates.list.iter().zip(used.iter_mut()) {
+                if let Some(class) = &candidate.class_name {
+                    *used |= namespace_prefixes
+                        .iter()
+                        .any(|p| class.starts_with(p.as_str()));
+                }
+            }
+        }
 
         candidates
             .list
@@ -310,30 +331,60 @@ impl<'a> DeadCodeAnalyzer<'a> {
         }
     }
 
-    /// Final concrete classes: other kinds may be used through inheritance.
+    /// Every class-like declared in the analyzed files: inheritance, type
+    /// hints and docblocks all record a class reference.
     fn collect_classes(&self, candidates: &mut Candidates) {
         let stub_vfs = StubVfs::new();
-        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
-            if class.is_abstract() || !class.is_final() {
-                continue;
-            }
-            let crate::db::ClassLike::Class(c) = &class else {
-                continue;
-            };
-            if c.location
-                .as_ref()
-                .is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref()))
+        let files = &self.analyzed_files;
+        let class_likes = crate::db::analyzed_class_defs(self.db, files)
+            .into_iter()
+            .chain(
+                crate::db::analyzed_interface_defs(self.db, files)
+                    .into_iter()
+                    .map(|(f, d)| (f, crate::db::ClassLike::Interface(d))),
+            )
+            .chain(
+                crate::db::analyzed_trait_defs(self.db, files)
+                    .into_iter()
+                    .map(|(f, d)| (f, crate::db::ClassLike::Trait(d))),
+            )
+            .chain(
+                crate::db::analyzed_enum_defs(self.db, files)
+                    .into_iter()
+                    .map(|(f, d)| (f, crate::db::ClassLike::Enum(d))),
+            );
+        for (fqcn, class) in class_likes {
+            let location = class.location();
+            if location.is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref()))
+                || self.is_test_case(&fqcn)
             {
                 continue;
             }
+            let class_name = fqcn.to_ascii_lowercase();
             candidates.push(
                 IssueKind::UnusedClass {
                     class: fqcn.to_string(),
                 },
-                c.location.clone(),
-                [anywhere(format!("cls:{}", fqcn.to_ascii_lowercase()))],
+                location.cloned(),
+                [anywhere(format!("cls:{class_name}"))],
             );
+            if let Some(last) = candidates.list.last_mut() {
+                last.class_name = Some(class_name);
+            }
         }
+    }
+
+    /// Test runners (PHPUnit `TestCase`, framework `*TestCase` bases) load
+    /// test classes themselves.
+    fn is_test_case(&self, fqcn: &str) -> bool {
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        crate::db::class_ancestors_by_fqcn(self.db, here)
+            .iter()
+            .skip(1)
+            .any(|a| {
+                let short = a.rsplit('\\').next().unwrap_or(a);
+                short.to_ascii_lowercase().ends_with("testcase")
+            })
     }
 
     fn collect_functions(&self, candidates: &mut Candidates) {

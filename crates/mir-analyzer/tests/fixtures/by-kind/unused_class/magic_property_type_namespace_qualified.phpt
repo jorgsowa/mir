@@ -21,3 +21,4 @@ final class Money {}
  * @method Money getBalance()
  */
 class Wallet {}
+//<^^^^^^^^^^^^^^^ UnusedClass: Class App\Wallet is never referenced

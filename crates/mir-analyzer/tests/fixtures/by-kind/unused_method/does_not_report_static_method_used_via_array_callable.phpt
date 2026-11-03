@@ -8,6 +8,7 @@ class-string array-callable literal must not be reported unused.
 ===file===
 <?php
 class Foo {
+//<^ +6:1 UnusedClass: Class Foo is never referenced
     private static function helper(): void {}
 
     public static function run(): void {

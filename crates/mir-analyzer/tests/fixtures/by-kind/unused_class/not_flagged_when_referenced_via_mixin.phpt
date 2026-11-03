@@ -11,3 +11,4 @@ final class OnlyUsedViaMixin {}
 
 /** @mixin OnlyUsedViaMixin */
 class Consumer {}
+//<^^^^^^^^^^^^^^^^^ UnusedClass: Class Consumer is never referenced

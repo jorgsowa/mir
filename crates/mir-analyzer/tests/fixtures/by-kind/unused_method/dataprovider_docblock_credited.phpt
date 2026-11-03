@@ -7,6 +7,7 @@
 ===file===
 <?php
 class FooTest {
+//<^ +11:1 UnusedClass: Class FooTest is never referenced
     /**
      * @dataProvider provideCases
      */
