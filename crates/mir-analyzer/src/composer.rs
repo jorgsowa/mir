@@ -304,13 +304,22 @@ fn parse_vendor(
 /// other entry parses correctly.
 fn read_classmap(vendor_dir: &Path, base_dir: &Path) -> FxHashMap<String, PathBuf> {
     let path = vendor_dir.join("composer/autoload_classmap.php");
-    let Ok(bytes) = std::fs::read(&path) else {
-        return FxHashMap::default();
+    let mut classmap: FxHashMap<String, PathBuf> = match std::fs::read(&path) {
+        Ok(bytes) => {
+            parse_composer_autoload_array(&String::from_utf8_lossy(&bytes), vendor_dir, base_dir)
+                .into_iter()
+                .collect()
+        }
+        Err(_) => FxHashMap::default(),
     };
-    let content = String::from_utf8_lossy(&bytes);
-    parse_composer_autoload_array(&content, vendor_dir, base_dir)
-        .into_iter()
-        .collect()
+    // `autoload_real.php` requires the loader directly, so the classmap never lists it.
+    let class_loader = vendor_dir.join("composer/ClassLoader.php");
+    if class_loader.is_file() {
+        classmap
+            .entry("Composer\\Autoload\\ClassLoader".to_string())
+            .or_insert(class_loader);
+    }
+    classmap
 }
 
 /// Read `vendor/composer/autoload_files.php`. Falls back to walking

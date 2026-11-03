@@ -2,6 +2,7 @@
 
 mod baseline_psalm_aliases;
 mod color_output;
+mod composer_class_loader;
 mod config_outside_project_root;
 mod default_baseline_file;
 mod file_extensions;
