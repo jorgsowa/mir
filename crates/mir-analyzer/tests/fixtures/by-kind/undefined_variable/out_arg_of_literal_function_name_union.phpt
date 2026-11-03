@@ -8,5 +8,5 @@ function matchAll(string $regexp, string $subject, int $flags): array {
     if (false === $match($regexp, $subject, $matches, $flags)) {
         return [];
     }
-    return $matches ?? [];
+    return $matches;
 }

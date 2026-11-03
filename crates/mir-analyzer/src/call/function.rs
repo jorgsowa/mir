@@ -224,8 +224,32 @@ impl CallAnalyzer {
                         } else if let Some(f) = literal_named_function(&callee_ty, ea) {
                             super::premark_byref_arg_vars(&f.params, &call.args, ctx);
                         } else if let Some(fns) = literal_named_functions(&callee_ty, ea) {
-                            for f in fns {
-                                super::premark_byref_arg_vars(&f.params, &call.args, ctx);
+                            // The call fills the out-param, so its nullable `= null` default is gone.
+                            for (i, arg) in call.args.iter().enumerate() {
+                                let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind)
+                                else {
+                                    continue;
+                                };
+                                let name = name.trim_start_matches('$');
+                                if ctx.var_is_defined(name) {
+                                    continue;
+                                }
+                                let mut out = Type::empty();
+                                for f in &fns {
+                                    let Some(p) = f.params.get(i).filter(|p| p.is_byref) else {
+                                        continue;
+                                    };
+                                    let ty = p
+                                        .out_ty
+                                        .as_ref()
+                                        .or(p.ty.as_ref())
+                                        .map(|t| (**t).clone())
+                                        .unwrap_or_else(Type::mixed);
+                                    out.merge_with(&ty.remove_null());
+                                }
+                                if !out.is_empty() {
+                                    ctx.set_var(name, out);
+                                }
                             }
                         }
 
