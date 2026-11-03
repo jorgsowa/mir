@@ -526,7 +526,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                self.pure_write_target = !a.by_ref;
                 self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
+                self.pure_write_target = false;
                 // A PLAIN (non-`=&`) write to a variable already ref-aliased
                 // to a property mutates that property through the reference
                 // — run the same purity/immutability gate a direct
@@ -1876,6 +1878,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
                                 pa.property.span,
                             );
+                            if self.pure_write_target {
+                                self.record_ref(
+                                    std::sync::Arc::from(format!(
+                                        "propw:{}::{}",
+                                        prop_owner, prop_name
+                                    )),
+                                    pa.property.span,
+                                );
+                            }
                             // Emit DeprecatedProperty if the property is deprecated
                             if let Some(ref p) = prop_def {
                                 if let Some(msg) = p
@@ -2220,6 +2231,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                             std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
                             spa.member.span,
                         );
+                        if self.pure_write_target {
+                            self.record_ref(
+                                std::sync::Arc::from(format!(
+                                    "propw:{}::{}",
+                                    prop_owner, prop_name
+                                )),
+                                spa.member.span,
+                            );
+                        }
                         self.record_symbol(
                             spa.member.span,
                             crate::symbol::ReferenceKind::PropertyAccess {

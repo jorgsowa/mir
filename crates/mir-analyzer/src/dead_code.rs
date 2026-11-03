@@ -39,6 +39,8 @@ struct Candidate {
     location: Option<mir_types::Location>,
     /// Lowercased FQCN of a class-like, matched against built class names.
     class_name: Option<String>,
+    /// A property that only plain `=` writes don't keep alive.
+    needs_read: bool,
 }
 
 /// A reference key that keeps candidate `id` alive, optionally only when the
@@ -73,6 +75,7 @@ impl Candidates {
             kind,
             location,
             class_name: None,
+            needs_read: false,
         });
         for (key, within) in keys {
             self.by_key
@@ -92,7 +95,7 @@ fn normalize_key(key: &str, out: &mut String) -> bool {
     };
     let member_is_case_sensitive = match prefix {
         "cls" | "fn" | "meth" | "dyn" | "dyncnst" | "objvars" | "nsprefix" => false,
-        "prop" | "cnst" | "traituse" => true,
+        "prop" | "propw" | "cnst" | "traituse" => true,
         _ => return false,
     };
     out.push_str(prefix);
@@ -108,10 +111,71 @@ fn normalize_key(key: &str, out: &mut String) -> bool {
     true
 }
 
+/// A value with no object inside: writing it into a property that is never
+/// read has no effect (an object could be kept alive for its destructor).
+fn is_plain_data(ty: &mir_types::Type) -> bool {
+    use mir_types::Atomic as A;
+    !ty.types.is_empty()
+        && ty.types.iter().all(|atomic| match atomic {
+            A::TString
+            | A::TLiteralString(_)
+            | A::TNonEmptyString
+            | A::TNumericString
+            | A::TClassString(_)
+            | A::TInterfaceString(_)
+            | A::TEnumString
+            | A::TTraitString
+            | A::TInt
+            | A::TLiteralInt(_)
+            | A::TIntRange { .. }
+            | A::TPositiveInt
+            | A::TNegativeInt
+            | A::TNonNegativeInt
+            | A::TFloat
+            | A::TIntegralFloat
+            | A::TLiteralFloat(..)
+            | A::TBool
+            | A::TTrue
+            | A::TFalse
+            | A::TNull
+            | A::TNumeric => true,
+            A::TArray { key, value } | A::TNonEmptyArray { key, value } => {
+                is_plain_data(key) && is_plain_data(value)
+            }
+            A::TList { value } | A::TNonEmptyList { value } => is_plain_data(value),
+            A::TKeyedArray { properties, .. } => properties.values().all(|p| is_plain_data(&p.ty)),
+            _ => false,
+        })
+}
+
+type Position = (Arc<str>, u32, u16);
+
 fn contains(span: &mir_types::Location, file: &str, line: u32, col: u16) -> bool {
     span.file.as_ref() == file
         && (line, col) >= (span.line, span.col_start)
         && (line, col) < (span.line_end, span.col_end)
+}
+
+fn credit_references(
+    candidates: &Candidates,
+    credits: &[Credit],
+    positions: &[Position],
+    used: &mut [bool],
+) {
+    for credit in credits {
+        let own_span = candidates.list[credit.id as usize].location.as_ref();
+        // A reference from inside the declaration itself (recursion,
+        // `new self`) doesn't keep it alive.
+        if positions.iter().any(|(file, line, col)| {
+            !own_span.is_some_and(|s| contains(s, file, *line, *col))
+                && credit
+                    .within
+                    .as_ref()
+                    .is_none_or(|w| contains(w, file, *line, *col))
+        }) {
+            used[credit.id as usize] = true;
+        }
+    }
 }
 
 pub struct DeadCodeAnalyzer<'a> {
@@ -136,8 +200,11 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
         let mut used = vec![false; candidates.list.len()];
         let mut normalized = String::new();
-        let mut positions_buf: Vec<(Arc<str>, u32, u16)> = Vec::new();
+        let mut positions_buf: Vec<Position> = Vec::new();
         let mut namespace_prefixes: Vec<String> = Vec::new();
+        // Property references are settled once every pure write is known.
+        let mut property_refs: Vec<(String, Vec<Position>)> = Vec::new();
+        let mut pure_writes: FxHashMap<String, FxHashSet<Position>> = FxHashMap::default();
         self.db.for_each_reference(&mut |symbol, positions| {
             if !normalize_key(symbol, &mut normalized) {
                 return;
@@ -146,29 +213,49 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 namespace_prefixes.push(prefix.to_string());
                 return;
             }
+            if let Some(member) = normalized.strip_prefix("propw:") {
+                let key = format!("prop:{member}");
+                if candidates.by_key.contains_key(&key) {
+                    pure_writes.entry(key).or_default().extend(positions);
+                }
+                return;
+            }
             let Some(credits) = candidates.by_key.get(normalized.as_str()) else {
                 return;
             };
             if credits.iter().all(|c| used[c.id as usize]) {
                 return;
             }
+            if normalized.starts_with("prop:") {
+                property_refs.push((normalized.clone(), positions.collect()));
+                return;
+            }
             positions_buf.clear();
             positions_buf.extend(positions);
-            for credit in credits {
-                let own_span = candidates.list[credit.id as usize].location.as_ref();
-                // A reference from inside the declaration itself (recursion,
-                // `new self`) doesn't keep it alive.
-                if positions_buf.iter().any(|(file, line, col)| {
-                    !own_span.is_some_and(|s| contains(s, file, *line, *col))
-                        && credit
-                            .within
-                            .as_ref()
-                            .is_none_or(|w| contains(w, file, *line, *col))
-                }) {
-                    used[credit.id as usize] = true;
-                }
-            }
+            credit_references(&candidates, credits, &positions_buf, &mut used);
         });
+        let no_writes = FxHashSet::default();
+        for (key, positions) in property_refs {
+            let writes = pure_writes.get(&key).unwrap_or(&no_writes);
+            let reads: Vec<Position> = positions
+                .iter()
+                .filter(|p| !writes.contains(*p))
+                .cloned()
+                .collect();
+            for credit in &candidates.by_key[&key] {
+                let considered = if candidates.list[credit.id as usize].needs_read {
+                    &reads
+                } else {
+                    &positions
+                };
+                credit_references(
+                    &candidates,
+                    std::slice::from_ref(credit),
+                    considered,
+                    &mut used,
+                );
+            }
+        }
 
         if !namespace_prefixes.is_empty() {
             for (candidate, used) in candidates.list.iter().zip(used.iter_mut()) {
@@ -327,6 +414,12 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     prop.location.clone(),
                     keys,
                 );
+                // A static write-only buffer is the memory-reservation idiom
+                // (`self::$reserved = str_repeat('x', 32768)`), freed on fatal errors.
+                if let Some(last) = candidates.list.last_mut() {
+                    last.needs_read =
+                        !prop.is_static && prop.ty.as_deref().is_some_and(is_plain_data);
+                }
             }
         }
     }

@@ -86,6 +86,9 @@ pub struct ExpressionAnalyzer<'a> {
     pub codebase_symbols_only: bool,
     /// When false, skip recording reference-location postings.
     pub record_reference_locations: bool,
+    /// Set while assigning the target of a plain `=`, whose property writes
+    /// don't read the property.
+    pub(crate) pure_write_target: bool,
     /// When true, collect compact codebase-name navigation facts.
     pub collect_navigation_facts: bool,
     /// When true, collect compact typed facts for codebase symbol resolution.
@@ -392,6 +395,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             capture_symbol_types: true,
             codebase_symbols_only: false,
             record_reference_locations: true,
+            pure_write_target: false,
             collect_navigation_facts: false,
             collect_resolved_navigation_facts: false,
             in_existence_check: false,
@@ -1727,7 +1731,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // constant tokens may span a qualified path (`\Config\DB_HOST`);
         // narrow to the final segment for the same reason.
         let mut start = span.start;
-        if symbol_key.starts_with("prop:")
+        if (symbol_key.starts_with("prop:") || symbol_key.starts_with("propw:"))
             && self.source.as_bytes().get(start as usize) == Some(&b'$')
         {
             start += 1;
