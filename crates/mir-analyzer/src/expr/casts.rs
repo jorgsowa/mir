@@ -378,7 +378,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                     value: Box::new(Type::mixed()),
                 })
             }
-            CastKind::Object => Type::single(Atomic::TObject),
+            CastKind::Object => {
+                // Objects pass through unchanged; anything else becomes a stdClass.
+                if inner_ty.is_mixed() || inner_ty.types.is_empty() {
+                    return Type::single(Atomic::TObject);
+                }
+                let mut out = Type::empty();
+                for atom in inner_ty.types.iter() {
+                    if !atom.is_definitely_non_object() {
+                        out.add_type(atom.clone());
+                    } else {
+                        out.add_type(Atomic::TNamedObject {
+                            fqcn: mir_types::Name::from("stdClass"),
+                            type_params: Default::default(),
+                        });
+                    }
+                }
+                out
+            }
             CastKind::Unset | CastKind::Void => Type::single(Atomic::TNull),
             _ => Type::mixed(),
         }
