@@ -25,7 +25,7 @@ src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL 
 ## Features
 
 - **Psalm compatibility:** reads `psalm.xml` (`errorLevel` 1–8, `<issueHandlers>`), `psalm-baseline.xml`, `@psalm-*` annotations and suppressions, and runs existing Psalm plugins.
-- **190 diagnostic rules** with stable codes (`MIR0201`): type errors, undefined symbols, nullability, arrays, generics, purity, dead code, taint and more. See the [issue reference](https://jorgsowa.github.io/mir/reference/issues/).
+- **189 diagnostic rules** with stable codes (`MIR0201`): type errors, undefined symbols, nullability, arrays, generics, purity, dead code, taint and more. See the [issue reference](https://jorgsowa.github.io/mir/reference/issues/).
 - **Type system:** scalars, objects, generics and templates, unions, intersections, literals, array shapes, `class-string<T>`, conditional return types, `never`, `void`.
 - **Inference and narrowing:** return types, literal narrowing, `if` / `match` / `switch` / `instanceof` / `is_*()` / `isset()` guards, assertion annotations, and functions whose body is an `instanceof` check.
 - **Call checking:** argument count, types, named arguments and by-reference parameters for user code and built-ins.
