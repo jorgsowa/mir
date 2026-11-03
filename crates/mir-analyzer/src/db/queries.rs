@@ -906,8 +906,14 @@ pub fn collect_file_definitions_uncached(
         path.clone(),
         text,
         &parsed.source_map,
-    )
-    .with_php_version(php_version);
+    );
+    // `@since`/`@removed` name PHP versions only in stubs; in vendor and project
+    // code they are the library's own versions.
+    let collector = if crate::stubs::is_stub_path(path) || db.is_user_stub_source_file(file) {
+        collector.with_php_version(php_version)
+    } else {
+        collector
+    };
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
     all_issues.extend(collector_issues);
     mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);

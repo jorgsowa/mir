@@ -443,8 +443,7 @@ pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> Analysi
         file.clone(),
         source,
         &parsed.source_map,
-    )
-    .with_php_version(php_version);
+    );
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
     collected_issues.extend(collector_issues);
     mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
