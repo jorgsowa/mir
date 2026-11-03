@@ -83,3 +83,6 @@ PHP 8 allows any Unicode letter in identifiers, so the distinction matters for c
 | `mir-codebase` | `Codebase` — thread-safe DashMap registry of all symbols |
 | `mir-analyzer` | `ExpressionAnalyzer`, `StatementsAnalyzer`, `CallAnalyzer`, `ClassAnalyzer`, `DeadCodeAnalyzer`, `ProjectAnalyzer`, stubs loader, `build.rs` code-gen |
 | `mir-cli` | `clap` binary — flags, progress bar, output formatters, config/baseline loading |
+| `mir-plugin` | Plugin API (`MirPlugin`, `PluginRegistry`), dylib loading and the Psalm plugin bridge |
+| `mir-plugin-example` | Example Rust plugin built as a `cdylib` |
+| `mir-wasm` | WebAssembly bindings used by the playground |
