@@ -65,6 +65,10 @@ mir application/library application/module public/
 
 mir will recursively scan all `.php` files under the given paths and print any issues to stdout.
 
+When the project has a `composer.json`, mir reads its autoload sections to find
+the project files and loads vendor classes on demand, so you can run plain `mir`
+from the project root.
+
 ### Targeting a PHP version
 
 mir supports PHP 7.4–8.6. If your project targets a specific version, pass `--php-version`:
@@ -89,17 +93,22 @@ mir -j 4 src/
 Each issue is printed on one line with the format:
 
 ```
-path/to/file.php:LINE:COL  IssueKind  message
+path/to/file.php:LINE:COL severity[CODE] IssueKind: message
 ```
 
 For example:
 
 ```
-src/Controller/UserController.php:42:5  UndefinedMethod  Method User::getName() does not exist
-src/Service/Mailer.php:17:12  InvalidArgument  Argument 1 of sendMessage expects string, int provided
+src/demo.php:16:6 error[MIR0201] InvalidArgument: Argument $s of greet() expects 'string', got '42'
+src/demo.php:18:0 error[MIR0004] UndefinedMethod: Method User::getName() does not exist
+src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL injection
+  = taint flow: $_GET['q'] (line 20) → $q (line 20)
 ```
 
-A non-zero exit code (`1`) means at least one issue was found; exit code `0` means the analysis is clean.
+Taint issues add a `taint flow` line showing how the data reached the sink.
+
+Exit code `1` means at least one error was reported; warnings and info-level
+issues (shown with `--show-info`) don't fail the run.
 
 ### Issue kinds
 
@@ -127,6 +136,18 @@ mir auto-discovers `mir.xml` or `psalm.xml` in the project root. You can also sp
 ```bash
 mir -c psalm.xml src/
 ```
+
+### Find dead code
+
+Unused code checks are off by default. Enable them with `--find-dead-code` or
+`<findUnusedCode>true</findUnusedCode>`:
+
+```bash
+mir --find-dead-code src/
+```
+
+Mark classes and members that are used from outside the analyzed code with
+`@api` to keep them out of the report.
 
 ### Suppress existing issues with a baseline
 
@@ -187,7 +208,7 @@ mir supports several output formats suited to CI environments:
 
 ```bash
 # GitHub Actions inline annotations
-mir --format github --no-progress src/
+mir --format github-actions --no-progress src/
 
 # JUnit XML (compatible with most CI systems)
 mir --format junit src/ > results.xml
@@ -198,10 +219,8 @@ mir --format sarif src/ > results.sarif
 
 ### Incremental analysis
 
-For large codebases, enable the incremental cache to speed up repeated runs:
-
-```bash
-mir --cache-dir .mir-cache src/
-```
+Results are cached in `.mir/cache` under the composer root, so repeated runs
+skip files that haven't changed. Add `.mir/` to `.gitignore`.
+Use `--no-cache` for a run without it and `--clear-cache` to delete it.
 
 See the [CLI Reference](/mir/reference/cli/) for the full list of options and the [Docblock Annotations](/mir/reference/docblock/) page for how to annotate your PHP code with type information.

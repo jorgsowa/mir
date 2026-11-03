@@ -48,13 +48,11 @@ import heroLogo from '../../assets/logo-hero.png';
 
 ## What mir reports
 
-```text title="$ mir analyze src/"
-src/Controller/UserController.php:42:5  UndefinedMethod   Method User::getName() does not exist
-src/Service/Mailer.php:17:12            InvalidArgument   Argument 1 of sendMessage expects string, int provided
-src/Domain/Order.php:88:9              NullMethodCall     Cannot call method on possibly null value
-src/Http/Search.php:23:14              TaintedSql         Tainted data from $_GET flows into SQL sink
-
-4 errors in 312 files · 0.42s
+```text title="$ mir src/"
+src/demo.php:16:6 error[MIR0201] InvalidArgument: Argument $s of greet() expects 'string', got '42'
+src/demo.php:18:0 error[MIR0004] UndefinedMethod: Method User::getName() does not exist
+src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL injection
+  = taint flow: $_GET['q'] (line 20) → $q (line 20)
 ```
 
 ## Browse by category
@@ -67,7 +65,7 @@ src/Http/Search.php:23:14              TaintedSql         Tainted data from $_GE
   <LinkCard title="Redundancy" href="/mir/reference/issues/redundancy/redundant-condition/" description="Conditions that can't fail, casts and annotations that do nothing." />
   <LinkCard title="Dead code" href="/mir/reference/issues/dead-code/unused-variable/" description="Unused variables, parameters, methods, properties, functions; unreachable code." />
   <LinkCard title="Inheritance" href="/mir/reference/issues/inheritance/unimplemented-abstract-method/" description="Abstract / interface compliance, signature and visibility mismatches, final violations." />
-  <LinkCard title="Security" href="/mir/reference/issues/security/tainted-html/" description="Taint analysis from `$_GET` / `$_POST` to HTML, SQL, and shell sinks." />
+  <LinkCard title="Security" href="/mir/reference/issues/security/tainted-html/" description="Taint analysis from `$_GET` / `$_POST` to HTML, SQL, shell, header, SSRF and other sinks." />
   <LinkCard title="Generics" href="/mir/reference/issues/generics/invalid-template-param/" description="`@template` parameter constraint and substitution checks." />
   <LinkCard title="Other" href="/mir/reference/issues/other/deprecated-method/" description="Deprecations, internal access, throws, readonly, parse and docblock errors." />
 </CardGrid>
