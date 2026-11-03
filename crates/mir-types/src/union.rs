@@ -1012,7 +1012,11 @@ impl Type {
     /// `callable` was narrowed to by `is_array()` is callable too.
     pub fn narrow_to_not_callable(&self) -> Type {
         let callable_array = callable_array();
-        self.filter(|t| !t.is_callable() && *t != callable_array)
+        self.filter(|t| {
+            !t.is_callable()
+                && *t != callable_array
+                && !matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.eq_ignore_ascii_case("Closure"))
+        })
     }
 
     /// Narrow as if `is_callable($x)` is true.
