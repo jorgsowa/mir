@@ -1882,6 +1882,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         if crate::db::class_kind(self.db, fqcn).is_some_and(|k| k.is_trait) {
+            // Inside the trait's own body, `self::class` / `$this` name the using class.
+            if ctx
+                .self_fqcn
+                .as_deref()
+                .is_some_and(|s| s.eq_ignore_ascii_case(fqcn))
+            {
+                return Type::mixed();
+            }
             self.emit(
                 IssueKind::TraitConstantAccessedDirectly {
                     trait_name: fqcn.to_string(),
