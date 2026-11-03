@@ -658,12 +658,14 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
             if use_var.by_ref {
                 // Code holding the same reference can add keys before the closure runs.
-                let opens_shape = captured_ty.types.iter().any(
-                    |a| matches!(a, Atomic::TKeyedArray { is_open: false, .. }),
-                ) && !captured_ty
+                let opens_shape = captured_ty
                     .types
                     .iter()
-                    .any(|a| matches!(a, Atomic::TKeyedArray { is_open: true, .. }));
+                    .any(|a| matches!(a, Atomic::TKeyedArray { is_open: false, .. }))
+                    && !captured_ty
+                        .types
+                        .iter()
+                        .any(|a| matches!(a, Atomic::TKeyedArray { is_open: true, .. }));
                 let inner_ty = if opens_shape {
                     with_open_shapes(&captured_ty, true)
                 } else {

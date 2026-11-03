@@ -643,7 +643,10 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             let mut u = Type::empty();
             for part in split_union(inner.trim()) {
                 let part = part.trim().trim_start_matches('(').trim_end_matches(')');
-                let first = split_intersection(part).into_iter().next().unwrap_or_default();
+                let first = split_intersection(part)
+                    .into_iter()
+                    .next()
+                    .unwrap_or_default();
                 u.add_type(Atomic::TClassString(Some(
                     normalize_fqcn(strip_generic_args(first.trim())).into(),
                 )));

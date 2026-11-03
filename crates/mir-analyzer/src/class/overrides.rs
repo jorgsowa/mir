@@ -603,7 +603,8 @@ impl<'a> ClassAnalyzer<'a> {
                             } else {
                                 // The hint may also narrow the refinement (`array` for `array{..}|null`).
                                 parent_ret.types.iter().any(|a| {
-                                    mir_types::Type::single(a.clone()).is_subtype_structural(child_ret)
+                                    mir_types::Type::single(a.clone())
+                                        .is_subtype_structural(child_ret)
                                 })
                             });
                     if !compatible {
