@@ -1002,6 +1002,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Yield(y) => self.analyze_yield(y, ctx),
 
             // --- Magic constants -------------------------------------------
+            // Inside a trait `__CLASS__` names the using class, unknown here.
+            ExprKind::MagicConst(php_ast::ast::MagicConstKind::Class)
+                if ctx.self_fqcn.is_some() && !crate::flow_state::self_is_trait(self.db, ctx) =>
+            {
+                let fqcn = ctx.self_fqcn.as_deref().unwrap_or_default();
+                Type::single(Atomic::TClassString(Some(mir_types::Name::from(fqcn))))
+            }
             ExprKind::MagicConst(kind) => ExpressionAnalyzer::analyze_magic_const(kind),
 
             // --- Include/require --------------------------------------------
