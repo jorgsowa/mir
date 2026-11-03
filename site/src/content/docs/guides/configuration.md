@@ -49,6 +49,10 @@ You can also point to a config file explicitly with `-c`.
 | `<phpVersion>` | Target PHP version string, e.g. `8.2`. Supported range: `7.4`–`8.6`. |
 | `<findUnusedCode>` | Enable dead-code detection (`true`/`false`). Default: `false`. |
 | `<findUnusedVariables>` | Enable unused-variable checking (`true`/`false`). Default: `false`. |
+| `memoizeMethodCallResults` attribute | Assume repeated zero-argument method calls on the same object return the same value, so narrowing `$a->b()` holds for later calls, as in Psalm. Default: `false`. |
+| `<stubs>` | Extra stub files (`<file name="..."/>`) or directories (`<directory name="..."/>`) to load. Stubs take precedence over vendor definitions. |
+| `<forbiddenFunctions>` | `<function name="..."/>` entries reported as `ForbiddenCode` when called. |
+| `<plugins>` | Rust and Psalm plugins to load. See [Plugins](#plugins). |
 
 ### Psalm error levels
 
@@ -79,20 +83,49 @@ CLI flags always override values from the config file.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-c, --config <FILE>` | auto | Config file path. Auto-discovers `mir.xml` / `psalm.xml` if omitted. |
+| `--php-version <X.Y>` | from config | Target PHP version (e.g. `8.2`). |
+| `--error-level <1-8>` | from config | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient). |
+| `--find-dead-code` | from config | Report unused code, like `<findUnusedCode>true</findUnusedCode>`. |
+| `--no-taint` | off | Skip taint analysis. |
 | `--baseline <FILE>` | auto | Suppress known issues from a baseline XML. Auto-discovers `mir-baseline.xml`, then `psalm-baseline.xml`. |
 | `--set-baseline [FILE]` | `mir-baseline.xml` | Write all current issues to a baseline file and exit. Without `FILE`, also deletes `psalm-baseline.xml`. |
 | `--update-baseline` | off | Remove resolved issues from the baseline. |
 | `--ignore-baseline` | off | Report all issues, ignoring the baseline. |
-| `--error-level <1-8>` | from config | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient). |
-| `--php-version <X.Y>` | from config | Target PHP version (e.g. `8.2`). |
-| `--format <FORMAT>` | `text` | Output format: `text`, `json`, `github`, `junit`, `sarif`. |
+| `--format <FORMAT>` | `text` | Output format: `text`, `json`, `github-actions`, `junit`, `sarif`. |
 | `--show-info` | off | Include info-level issues (redundancies, style). |
-| `-j, --threads <N>` | CPU count | Parallelism. |
-| `--cache-dir <DIR>` | off | Enable incremental cache in `DIR`. |
-| `--stats` | off | Print file count, error/warning totals, elapsed time. |
-| `-v, --verbose` | off | Print per-file issue counts. |
-| `-q, --quiet` | off | Suppress all output; use exit code only. |
-| `--no-progress` | off | Disable the progress bar. |
+
+See the [CLI reference](/mir/reference/cli/) for the full list.
+
+## Plugins
+
+mir loads two kinds of plugins from `<plugins>`:
+
+```xml
+<plugins>
+  <!-- Rust plugin built as a shared library -->
+  <rustPlugin path="plugins/libmy_plugin.so" />
+  <!-- Psalm plugin installed with composer -->
+  <pluginClass class="Psalm\PhpUnitPlugin\Plugin" />
+  <!-- Psalm plugin loaded from a file -->
+  <plugin filename="tools/MyPsalmPlugin.php" />
+</plugins>
+```
+
+**Rust plugins** implement `MirPlugin` from the
+[`mir-plugin`](https://crates.io/crates/mir-plugin) crate and export it with
+`mir_plugin::export_plugin!`. Build them as a `cdylib` with the same Rust
+toolchain and `mir-plugin` version as the `mir` binary. The
+[example plugin](https://github.com/jorgsowa/mir/tree/main/crates/mir-plugin-example)
+reports calls to `var_dump()` and provides a return type for a helper function.
+
+**Psalm plugins** run in a `php` subprocess that boots the project's
+`vendor/autoload.php`. Stub files, function and method return type providers,
+and the class-like and function-like analysis hooks are supported; other hooks
+are skipped with a warning. Set `MIR_PHP` to choose the PHP binary and
+`MIR_PSALM_AUTOLOAD` to point at a Psalm install outside the project's vendor
+directory.
+
+A configured plugin that fails to load stops the run with exit code `2`.
 
 ## Baselines
 
@@ -144,10 +177,10 @@ mir --ignore-baseline src/
 
 ```bash
 # In .github/workflows/mir.yml:
-mir --format github --no-progress --baseline mir-baseline.xml src/
+mir --format github-actions --no-progress src/
 ```
 
-### Strict analysis (errors only, no warnings)
+### Strictest analysis
 
 ```bash
 mir --error-level 1 src/
@@ -170,8 +203,12 @@ mir --php-version 8.1 src/
 </issueHandlers>
 ```
 
-### Incremental analysis with caching
+### Caching
+
+The cache is on by default (`.mir/cache` under the composer root). Add `.mir/`
+to `.gitignore`, or move the cache with `--cache-dir`:
 
 ```bash
-mir --cache-dir .mir-cache src/
+mir --cache-dir /tmp/mir-cache src/
+mir --no-cache src/      # one run without the cache
 ```
