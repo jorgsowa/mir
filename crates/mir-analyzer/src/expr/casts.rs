@@ -6,6 +6,23 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::CastKind;
 use php_ast::owned::Expr;
 
+/// Internal classes whose cast handler converts them without a warning.
+fn has_cast_handler(atom: &Atomic, kind: &CastKind) -> bool {
+    let Atomic::TNamedObject { fqcn, .. } = atom else {
+        return false;
+    };
+    let name = fqcn.as_ref().trim_start_matches('\\');
+    let eq = |n: &str| name.eq_ignore_ascii_case(n);
+    match kind {
+        // CurlHandle, CurlMultiHandle and Dba\Connection cast to their object id, as their resources did.
+        CastKind::Int => {
+            eq("GMP") || eq("CurlHandle") || eq("CurlMultiHandle") || eq("Dba\\Connection")
+        }
+        CastKind::Float | CastKind::String => eq("GMP"),
+        _ => false,
+    }
+}
+
 /// Try to fold a `(int)` cast of a single known literal to a literal int result.
 fn fold_int_cast(ty: &Type) -> Option<Type> {
     if ty.types.len() != 1 {
@@ -140,7 +157,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TKeyedArray { .. }
                             | Atomic::TNamedObject { .. }
                             | Atomic::TObject
-                    )
+                    ) && !has_cast_handler(t, kind)
                 }) && !inner_ty.contains(is_scalar_safe)
                 {
                     self.emit(
@@ -180,7 +197,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TKeyedArray { .. }
                             | Atomic::TNamedObject { .. }
                             | Atomic::TObject
-                    )
+                    ) && !has_cast_handler(t, kind)
                 }) && !inner_ty.contains(is_scalar_safe)
                 {
                     self.emit(
@@ -252,6 +269,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 else {
                     for atom in inner_ty.types.iter() {
                         if let Atomic::TNamedObject { fqcn, .. } = atom {
+                            if has_cast_handler(atom, kind) {
+                                continue;
+                            }
                             let fqcn_str = fqcn.as_str();
                             let here = crate::db::Fqcn::from_str(self.db, fqcn_str);
                             let is_concrete = crate::db::find_class_like(self.db, here)
