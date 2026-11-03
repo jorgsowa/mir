@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `@since`/`@removed` tags in vendor code are no longer read as PHP versions, so a library method tagged `@since 8.4` stays defined when targeting PHP 8.0.
 - Changing a declaration's kind with the same name (`class Foo` → `interface Foo`) no longer leaves it unresolvable in long-running sessions.
+- A closure rebound with an object as `$newScope` (`$f->bindTo($obj, $obj)`, `Closure::bind($f, $obj, $obj)`) is scoped to that object's class, so its protected and private members are no longer reported as undefined or inaccessible.
 
 ## [0.90.0] - 2026-11-03
 

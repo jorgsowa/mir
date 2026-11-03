@@ -184,15 +184,34 @@ pub(crate) enum ClosureRebind {
     UnknownThis,
 }
 
+/// An object `$newScope` variable scopes the closure to its declared class.
+fn resolve_object_var_scope(
+    db: &dyn crate::db::MirDatabase,
+    ctx: &FlowState,
+    expr: &php_ast::owned::Expr,
+) -> Option<Arc<str>> {
+    let ExprKind::Variable(name) = &expr.kind else {
+        return None;
+    };
+    let ty = ctx.get_var(name.as_ref());
+    let [Atomic::TNamedObject { fqcn, .. }] = ty.types.as_slice() else {
+        return None;
+    };
+    crate::db::class_exists(db, fqcn).then(|| Arc::from(*fqcn))
+}
+
 /// Classify a rebind from its `$newThis`/`$newScope` args. Rebinding to `$this`
 /// (or unbinding with `null`) keeps the enclosing class.
 pub(crate) fn closure_rebind(
     db: &dyn crate::db::MirDatabase,
     file: &str,
+    ctx: &FlowState,
     new_this: Option<&php_ast::owned::Expr>,
     scope: Option<&php_ast::owned::Expr>,
 ) -> Option<ClosureRebind> {
-    if let Some(scope) = scope.and_then(|e| resolve_literal_class_scope(db, file, e)) {
+    if let Some(scope) = scope.and_then(|e| {
+        resolve_literal_class_scope(db, file, e).or_else(|| resolve_object_var_scope(db, ctx, e))
+    }) {
         return Some(ClosureRebind::Scope(scope));
     }
     match &new_this?.kind {
@@ -242,9 +261,10 @@ pub(crate) fn is_closure_literal(expr: &php_ast::owned::Expr) -> bool {
 fn static_closure_bind_rebind(
     ea: &ExpressionAnalyzer<'_>,
     call: &StaticMethodCallExpr,
+    ctx: &FlowState,
 ) -> Option<ClosureRebind> {
     let arg = |i: usize| call.args.get(i).and_then(|a| a.value());
-    let rebind = closure_rebind(ea.db, &ea.file, arg(1), arg(2))?;
+    let rebind = closure_rebind(ea.db, &ea.file, ctx, arg(1), arg(2))?;
     // Only a closure literal is known to receive the rebound `$this`.
     let literal_closure = arg(0).is_some_and(is_closure_literal);
     (literal_closure || matches!(rebind, ClosureRebind::Scope(_))).then_some(rebind)
@@ -447,7 +467,7 @@ impl CallAnalyzer {
         // below and its use in the arg loop). A literal class name (`Foo::class`/
         // `'Foo'`) resolves the scope; any other rebind only leaves `$this` unknown.
         let bind_scope = if fqcn_arc.as_ref() == "Closure" && method_name_lower == "bind" {
-            static_closure_bind_rebind(ea, call)
+            static_closure_bind_rebind(ea, call, ctx)
         } else {
             None
         };

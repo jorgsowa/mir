@@ -65,6 +65,7 @@ fn receiver_class_bindings(
 fn inline_closure_rebind(
     ea: &ExpressionAnalyzer<'_>,
     call: &MethodCallExpr,
+    ctx: &FlowState,
 ) -> Option<super::ClosureRebind> {
     let ExprKind::Identifier(method) = &call.method.kind else {
         return None;
@@ -74,9 +75,9 @@ fn inline_closure_rebind(
     }
     let arg = |i: usize| call.args.get(i).and_then(|a| a.value());
     if method.eq_ignore_ascii_case("bindTo") {
-        super::closure_rebind(ea.db, &ea.file, arg(0), arg(1))
+        super::closure_rebind(ea.db, &ea.file, ctx, arg(0), arg(1))
     } else if method.eq_ignore_ascii_case("call") {
-        super::closure_rebind(ea.db, &ea.file, arg(0), None)
+        super::closure_rebind(ea.db, &ea.file, ctx, arg(0), None)
     } else {
         None
     }
@@ -502,7 +503,7 @@ impl CallAnalyzer {
         span: Span,
         nullsafe: bool,
     ) -> Type {
-        let obj_ty = match inline_closure_rebind(ea, call) {
+        let obj_ty = match inline_closure_rebind(ea, call, ctx) {
             Some(rebind) => {
                 let guard =
                     crate::flow_state::ScopeOverrideGuard::apply_rebind(ctx, ea.db, &rebind);

@@ -146,6 +146,7 @@ fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ct
 fn closure_var_rebind(
     db: &dyn MirDatabase,
     file: &str,
+    ctx: &FlowState,
     stmt: &php_ast::owned::Stmt,
     next: Option<&php_ast::owned::Stmt>,
 ) -> Option<crate::call::ClosureRebind> {
@@ -199,7 +200,7 @@ fn closure_var_rebind(
                 return None;
             }
             let arg = |i: usize| smc.args.get(i).and_then(|a| a.value());
-            crate::call::closure_rebind(db, file, arg(1), arg(2))
+            crate::call::closure_rebind(db, file, ctx, arg(1), arg(2))
         }
         ExprKind::MethodCall(mc) => {
             if !matches!(&mc.object.kind, ExprKind::Variable(v) if v == var_name) {
@@ -210,9 +211,9 @@ fn closure_var_rebind(
             };
             let arg = |i: usize| mc.args.get(i).and_then(|a| a.value());
             if method_name.eq_ignore_ascii_case("bindTo") {
-                crate::call::closure_rebind(db, file, arg(0), arg(1))
+                crate::call::closure_rebind(db, file, ctx, arg(0), arg(1))
             } else if method_name.eq_ignore_ascii_case("call") {
-                crate::call::closure_rebind(db, file, arg(0), None)
+                crate::call::closure_rebind(db, file, ctx, arg(0), None)
             } else {
                 None
             }
@@ -445,7 +446,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 break;
             }
 
-            match closure_var_rebind(self.db, &self.file, stmt, stmts.get(i + 1)) {
+            match closure_var_rebind(self.db, &self.file, ctx, stmt, stmts.get(i + 1)) {
                 Some(rebind) => {
                     let guard =
                         crate::flow_state::ScopeOverrideGuard::apply_rebind(ctx, self.db, &rebind);
