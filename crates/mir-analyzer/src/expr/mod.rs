@@ -1014,6 +1014,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Include/require --------------------------------------------
             ExprKind::Include(_, inner) => {
                 self.analyze(inner, ctx);
+                // The included file runs in this scope and may use any
+                // private member through `$this` / `self::`.
+                if let Some(fqcn) = ctx.self_fqcn.clone() {
+                    self.record_dynamic_member_ref(&fqcn, expr.span);
+                }
                 // A tainted path is local/remote file inclusion — the same
                 // File-sink risk as fopen()/file_get_contents(), but this is
                 // its own AST node (not a FunctionCall), so classify_sink's
@@ -1838,6 +1843,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             });
             if let Some(fqcn) = fqcn {
                 self.record_dynamic_member_ref(fqcn, span);
+            }
+        }
+    }
+
+    /// Record that every property of the classes in `obj_ty` is read at once
+    /// (`get_object_vars`, `(array)`, `foreach` over the object, `serialize`).
+    pub(crate) fn record_wholesale_property_read(&mut self, obj_ty: &Type, span: php_ast::Span) {
+        if self.mode == AnalysisMode::InferenceOnly {
+            return;
+        }
+        for atomic in obj_ty.remove_null().types.iter() {
+            if let Some(fqcn) = atomic.named_object_fqcn() {
+                self.record_ref(Arc::from(format!("objvars:{fqcn}")), span);
             }
         }
     }

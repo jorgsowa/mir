@@ -327,6 +327,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TBool)
             }
             CastKind::Array => {
+                self.record_wholesale_property_read(&inner_ty, inner.span);
                 // Check for RedundantCast when already array. Skipped when
                 // `falsy_stripped` — the cast is coercing away a real (but deliberately
                 // unmodelled) `false`/`null` failure variant, not a no-op.

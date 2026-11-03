@@ -694,6 +694,15 @@ impl CallAnalyzer {
             }
         }
 
+        if matches!(
+            resolved_fn_name.as_str(),
+            "get_object_vars" | "serialize" | "var_export"
+        ) {
+            if let (Some(ty), Some(span)) = (arg_types.first(), arg_spans.first()) {
+                ea.record_wholesale_property_read(ty, *span);
+            }
+        }
+
         // A string-literal class name passed to one of these reflection-like
         // builtins is a real (runtime) reference to that class — record it,
         // or a class checked/reflected on only this way is falsely flagged

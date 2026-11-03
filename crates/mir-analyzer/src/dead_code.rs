@@ -69,7 +69,7 @@ fn normalize_key(key: &str, out: &mut String) -> bool {
         return false;
     };
     let member_is_case_sensitive = match prefix {
-        "cls" | "fn" | "meth" | "dyn" => false,
+        "cls" | "fn" | "meth" | "dyn" | "objvars" => false,
         "prop" | "traituse" => true,
         _ => return false,
     };
@@ -226,9 +226,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 if prop.visibility != Visibility::Private {
                     continue;
                 }
-                let keys = [format!("prop:{fqcn_lower}::{name}"), dyn_key.clone()]
-                    .into_iter()
-                    .chain(used_traits.iter().map(|t| format!("traituse:{t}::{name}")));
+                let keys = [
+                    format!("prop:{fqcn_lower}::{name}"),
+                    dyn_key.clone(),
+                    format!("objvars:{fqcn_lower}"),
+                ]
+                .into_iter()
+                .chain(used_traits.iter().map(|t| format!("traituse:{t}::{name}")));
                 candidates.push(
                     IssueKind::UnusedProperty {
                         class: fqcn_str.to_string(),

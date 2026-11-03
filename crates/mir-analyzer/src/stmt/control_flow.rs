@@ -403,6 +403,13 @@ impl<'a> StatementsAnalyzer<'a> {
             )
         });
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
+        if arr_ty.types.iter().any(|a| {
+            a.named_object_fqcn()
+                .is_some_and(|f| !crate::db::extends_or_implements(self.db, f, "Traversable"))
+        }) {
+            self.expr_analyzer(ctx)
+                .record_wholesale_property_read(&arr_ty, fe.expr.span);
+        }
         let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 
         if let Some(vname) = extract_simple_var(&fe.value) {
