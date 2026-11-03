@@ -1735,6 +1735,17 @@ pub fn find_method_respecting_precedence<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
+    method_by_precedence(db, fqcn, Name::new(name)).clone()
+}
+
+/// [`find_method_respecting_precedence`] memoized per class and name as written.
+#[salsa::tracked(returns(ref))]
+fn method_by_precedence<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: Name,
+) -> Option<(Arc<str>, Arc<MethodDef>)> {
+    let name = name.as_str();
     let lower = name.to_ascii_lowercase();
     let mut visited = std::collections::HashSet::<Arc<str>>::new();
     walk_method_with_precedence(db, fqcn, &lower, &mut visited).or_else(|| {
