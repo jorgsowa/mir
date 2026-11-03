@@ -609,8 +609,8 @@ pub enum IssueKind {
     InvalidOverride { class: String, member: String },
 
     // --- Security (taint) ---------------------------------------------------
-    /// Not yet emitted (generic taint sink; specific sinks use `TaintedHtml`, `TaintedSql`, `TaintedShell`).
-    /// No fixtures yet.
+    /// Emitted for a `@taint-sink` kind with no dedicated issue.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_input/`.
     TaintedInput { sink: String },
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/tainted_html/`.
@@ -643,6 +643,18 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/tainted_callable/`.
     TaintedCallable,
+    /// Emitted by `mir-analyzer/src/call/function.rs` for filesystem path arguments.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_file/`.
+    TaintedFile,
+    /// Emitted by `mir-analyzer/src/expr/mod.rs` for `include`/`require` paths.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_include/`.
+    TaintedInclude,
+    /// Emitted by `mir-analyzer/src/expr/mod.rs` for `eval()` code.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_eval/`.
+    TaintedEval,
+    /// Emitted by `mir-analyzer/src/call/function.rs` for `unserialize()` payloads.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_unserialize/`.
+    TaintedUnserialize,
 
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
@@ -1016,6 +1028,10 @@ impl IssueKind {
             | IssueKind::TaintedLdap
             | IssueKind::TaintedXpath
             | IssueKind::TaintedCallable
+            | IssueKind::TaintedFile
+            | IssueKind::TaintedInclude
+            | IssueKind::TaintedEval
+            | IssueKind::TaintedUnserialize
             | IssueKind::CircularInheritance { .. }
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
@@ -1349,6 +1365,10 @@ impl IssueKind {
             IssueKind::TaintedLdap => "MIR0808",
             IssueKind::TaintedXpath => "MIR0809",
             IssueKind::TaintedCallable => "MIR0810",
+            IssueKind::TaintedFile => "MIR0811",
+            IssueKind::TaintedInclude => "MIR0812",
+            IssueKind::TaintedEval => "MIR0813",
+            IssueKind::TaintedUnserialize => "MIR0814",
 
             // Generics (0900-0999)
             IssueKind::InvalidTemplateParam { .. } => "MIR0900",
@@ -1441,9 +1461,10 @@ impl IssueKind {
             | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714"
             | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228"
             | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805"
-            | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0900" | "MIR1205"
-            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602"
-            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0811" | "MIR0812"
+            | "MIR0813" | "MIR0814" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400"
+            | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605"
+            | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1619,6 +1640,10 @@ impl IssueKind {
             IssueKind::TaintedLdap => "TaintedLdap",
             IssueKind::TaintedXpath => "TaintedXpath",
             IssueKind::TaintedCallable => "TaintedCallable",
+            IssueKind::TaintedFile => "TaintedFile",
+            IssueKind::TaintedInclude => "TaintedInclude",
+            IssueKind::TaintedEval => "TaintedEval",
+            IssueKind::TaintedUnserialize => "TaintedUnserialize",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
             IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
             IssueKind::DeprecatedConstant { .. } => "DeprecatedConstant",
@@ -2263,6 +2288,14 @@ impl IssueKind {
             IssueKind::TaintedXpath => "Tainted XPath query — possible XPath injection".to_string(),
             IssueKind::TaintedCallable => {
                 "Tainted callable — user input chooses the code that runs".to_string()
+            }
+            IssueKind::TaintedFile => "Tainted file path — possible path traversal".to_string(),
+            IssueKind::TaintedInclude => {
+                "Tainted include path — possible file inclusion".to_string()
+            }
+            IssueKind::TaintedEval => "Tainted eval() code — possible code injection".to_string(),
+            IssueKind::TaintedUnserialize => {
+                "Tainted unserialize() payload — possible object injection".to_string()
             }
 
             IssueKind::DeprecatedCall { name, message } => {
@@ -3054,6 +3087,10 @@ mod code_tests {
             IssueKind::TaintedLdap,
             IssueKind::TaintedXpath,
             IssueKind::TaintedCallable,
+            IssueKind::TaintedFile,
+            IssueKind::TaintedInclude,
+            IssueKind::TaintedEval,
+            IssueKind::TaintedUnserialize,
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -3250,6 +3287,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 181);
+        assert_eq!(one_of_each().len(), 185);
     }
 }

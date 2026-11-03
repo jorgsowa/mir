@@ -568,7 +568,7 @@ impl Baseline {
     }
 }
 
-/// Psalm kinds that report the same finding as a mir kind.
+/// Other baseline kinds (Psalm's, or older mir's) that report the same finding as a mir kind.
 fn psalm_kind_aliases(mir_kind: &str) -> &'static [&'static str] {
     match mir_kind {
         "PossiblyUndefinedVariable" => &["PossiblyUndefinedGlobalVariable"],
@@ -578,6 +578,10 @@ fn psalm_kind_aliases(mir_kind: &str) -> &'static [&'static str] {
             "TypeDoesNotContainType",
             "TypeDoesNotContainNull",
         ],
+        // Baselines written before these sinks had their own kinds.
+        "TaintedFile" | "TaintedInclude" | "TaintedEval" | "TaintedUnserialize" => {
+            &["TaintedInput"]
+        }
         _ => &[],
     }
 }

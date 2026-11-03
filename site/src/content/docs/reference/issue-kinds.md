@@ -140,7 +140,7 @@ All issue types mir can emit, grouped by category.
 
 | Kind | Description |
 |------|-------------|
-| `TaintedInput` | Tainted user input flows to a sensitive sink (generic taint sink). |
+| `TaintedInput` | Tainted input reaches a `@taint-sink` parameter of a kind with no dedicated issue. |
 | `TaintedHtml` | User-controlled input reaches an HTML output sink without sanitization. |
 | `TaintedSql` | User-controlled input reaches a SQL sink without parameterization. |
 | `TaintedShell` | User-controlled input reaches a shell execution sink without escaping. |
@@ -151,6 +151,10 @@ All issue types mir can emit, grouped by category.
 | `TaintedLdap` | User-controlled input reaches an LDAP search filter or base DN. |
 | `TaintedXpath` | User-controlled input reaches an XPath expression. |
 | `TaintedCallable` | User-controlled input chooses which function, method or class runs. |
+| `TaintedFile` | User-controlled input reaches a filesystem path. |
+| `TaintedInclude` | User-controlled input picks the file that `include` or `require` loads. |
+| `TaintedEval` | User-controlled input reaches `eval()`. |
+| `TaintedUnserialize` | User-controlled input reaches `unserialize()`. |
 
 ## Generics
 

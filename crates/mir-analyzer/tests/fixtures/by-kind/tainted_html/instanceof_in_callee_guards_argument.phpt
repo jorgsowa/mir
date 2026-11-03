@@ -181,8 +181,8 @@ function controller(Storage $storage, Provider $provider, Request $request): voi
 function objects(Storage $storage, Provider $provider): void {
     $decoded = json_decode((string) $_GET['j']);
     $storage->put('a', $decoded);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
     $storage->show($decoded);
 //  ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     $provider->retrieve(['handler' => $decoded]);

@@ -17,5 +17,5 @@ positional check even though it's still the same $filename parameter.
 function test(): void {
     $path = $_GET['name'];
     file_put_contents(data: 'safe-constant', filename: $path);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
 }

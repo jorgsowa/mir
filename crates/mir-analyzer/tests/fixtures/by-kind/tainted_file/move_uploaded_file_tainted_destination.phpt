@@ -18,12 +18,12 @@ override alongside the named-argument resolution.
 function test(): void {
     $dest = $_GET['dest'];
     move_uploaded_file('/tmp/upload_tmp', $dest);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
 }
 
 function testNamedArgs(): void {
     move_uploaded_file(from: '/tmp/upload_tmp', to: $_GET['dest']);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
 }
 
 function testSafe(): void {

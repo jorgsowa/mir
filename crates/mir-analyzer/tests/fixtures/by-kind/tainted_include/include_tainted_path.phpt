@@ -17,12 +17,12 @@ it. A tainted path here is local/remote file inclusion.
 function test(): void {
     $page = $_GET['page'];
     include $page . '.php';
-//  ^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'include'
+//  ^^^^^^^^^^^^^^^^^^^^^^ TaintedInclude: Tainted include path — possible file inclusion
 }
 
 function testRequire(): void {
     require $_GET['page'];
-//  ^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'include'
+//  ^^^^^^^^^^^^^^^^^^^^^ TaintedInclude: Tainted include path — possible file inclusion
 }
 
 function testSafe(): void {

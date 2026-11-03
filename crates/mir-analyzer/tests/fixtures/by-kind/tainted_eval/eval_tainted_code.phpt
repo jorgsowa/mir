@@ -16,7 +16,7 @@ it. Tainted data reaching eval() is arbitrary code execution.
 function test(): void {
     $code = $_GET['code'];
     eval($code);
-//  ^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'eval'
+//  ^^^^^^^^^^^ TaintedEval: Tainted eval() code — possible code injection
 }
 
 function testSafe(): void {

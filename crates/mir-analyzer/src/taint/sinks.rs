@@ -125,12 +125,8 @@ impl SinkKind {
             SinkKind::Shell => IssueKind::TaintedShell,
             SinkKind::Header => IssueKind::TaintedHeader,
             SinkKind::Cookie => IssueKind::TaintedCookie,
-            SinkKind::File => IssueKind::TaintedInput {
-                sink: "file".to_string(),
-            },
-            SinkKind::Unserialize => IssueKind::TaintedInput {
-                sink: "unserialize".to_string(),
-            },
+            SinkKind::File => IssueKind::TaintedFile,
+            SinkKind::Unserialize => IssueKind::TaintedUnserialize,
             SinkKind::Ssrf => IssueKind::TaintedSsrf,
             SinkKind::Ldap => IssueKind::TaintedLdap,
             SinkKind::Xpath => IssueKind::TaintedXpath,
@@ -403,8 +399,7 @@ pub fn classify_constructor_sink(db: &dyn crate::db::MirDatabase, fqcn: &str) ->
 /// Map a `@taint-sink <kind> $param` docblock tag's free-text kind to the
 /// issue it should raise. Named kinds reuse the issue the matching built-in
 /// sink raises (`classify_sink` / `classify_method_sink`); anything else,
-/// including typos, falls back to the generic `TaintedInput`, as
-/// `classify_sink`'s File/Unserialize arms do.
+/// including typos, falls back to the generic `TaintedInput`.
 pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
     match kind {
         "llm_prompt" => mir_issues::IssueKind::TaintedLlmPrompt,
@@ -417,6 +412,10 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
         "cookie" => mir_issues::IssueKind::TaintedCookie,
         "sql" => mir_issues::IssueKind::TaintedSql,
         "shell" => mir_issues::IssueKind::TaintedShell,
+        "file" => mir_issues::IssueKind::TaintedFile,
+        "include" => mir_issues::IssueKind::TaintedInclude,
+        "eval" => mir_issues::IssueKind::TaintedEval,
+        "unserialize" => mir_issues::IssueKind::TaintedUnserialize,
         other => mir_issues::IssueKind::TaintedInput {
             sink: other.to_string(),
         },

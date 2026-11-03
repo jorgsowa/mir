@@ -13,5 +13,5 @@ tainted payload reaching unserialize is reported (object injection)
 <?php
 function test(): void {
     $obj = unserialize($_COOKIE['session']);
-//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'unserialize'
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedUnserialize: Tainted unserialize() payload — possible object injection
 }

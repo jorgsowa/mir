@@ -14,5 +14,5 @@ tainted path reaching file_get_contents is reported (path traversal / SSRF)
 function test(): void {
     $path = $_GET['path'];
     $data = file_get_contents($path);
-//          ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
+//          ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
 }

@@ -14,5 +14,5 @@ a tainted path passed to file_put_contents is reported even when the data is saf
 function test(): void {
     $path = $_GET['name'];
     file_put_contents($path, 'safe-constant');
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
 }

@@ -1030,18 +1030,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::reaches_sink(
                     inner,
                     crate::taint::Taint::FILE,
-                    &IssueKind::TaintedInput {
-                        sink: "include".to_string(),
-                    },
+                    &IssueKind::TaintedInclude,
                     ctx,
                     self.db,
                     &self.file,
                     self.taint_summary,
                 ) {
                     self.emit_taint(
-                        IssueKind::TaintedInput {
-                            sink: "include".to_string(),
-                        },
+                        IssueKind::TaintedInclude,
                         expr.span,
                         inner,
                         crate::taint::Taint::FILE,
@@ -1074,18 +1070,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::reaches_sink(
                     inner,
                     crate::taint::Taint::EVAL,
-                    &IssueKind::TaintedInput {
-                        sink: "eval".to_string(),
-                    },
+                    &IssueKind::TaintedEval,
                     ctx,
                     self.db,
                     &self.file,
                     self.taint_summary,
                 ) {
                     self.emit_taint(
-                        IssueKind::TaintedInput {
-                            sink: "eval".to_string(),
-                        },
+                        IssueKind::TaintedEval,
                         expr.span,
                         inner,
                         crate::taint::Taint::EVAL,

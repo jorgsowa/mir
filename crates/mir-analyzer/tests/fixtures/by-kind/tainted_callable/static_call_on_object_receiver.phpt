@@ -17,7 +17,7 @@ final class R {
 
 function f(): void {
     $r = unserialize($_GET['x'], ['allowed_classes' => [R::class]]);
-//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'unserialize'
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedUnserialize: Tainted unserialize() payload — possible object injection
     if ($r instanceof R) {
         $r::m();
     }

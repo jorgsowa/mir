@@ -23,7 +23,7 @@ function sinks(): void {
     file_get_contents(env('HOME') . '/x');
     shell_exec('cd ' . env('PWD'));
     file_get_contents(env($_GET['k']));
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedFile: Tainted file path — possible path traversal
 }
 
 /** @param array<string, string> $env */

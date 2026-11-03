@@ -158,6 +158,10 @@ issues keep their code.
 | MIR0808  | TaintedLdap                   | [security/tainted-ldap](../security/tainted-ldap/) |
 | MIR0809  | TaintedXpath                  | [security/tainted-xpath](../security/tainted-xpath/) |
 | MIR0810  | TaintedCallable               | [security/tainted-callable](../security/tainted-callable/) |
+| MIR0811  | TaintedFile                   | [security/tainted-file](../security/tainted-file/) |
+| MIR0812  | TaintedInclude                | [security/tainted-include](../security/tainted-include/) |
+| MIR0813  | TaintedEval                   | [security/tainted-eval](../security/tainted-eval/) |
+| MIR0814  | TaintedUnserialize            | [security/tainted-unserialize](../security/tainted-unserialize/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

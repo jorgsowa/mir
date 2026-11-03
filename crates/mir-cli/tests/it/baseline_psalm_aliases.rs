@@ -151,3 +151,46 @@ fn composer_root_run_matches_baseline_keys_relative_to_the_baseline_dir() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+#[test]
+fn generic_tainted_input_entries_consume_dedicated_sink_kinds() {
+    let dir = TempDir::new().expect("failed to create temp dir");
+    std::fs::write(
+        dir.path().join("a.php"),
+        "<?php\n\
+         function f(): void {\n\
+         \x20   $a = file_get_contents((string) $_GET['a']);\n\
+         \x20   include (string) $_GET['b'];\n\
+         \x20   eval((string) $_GET['c']);\n\
+         \x20   $d = unserialize((string) $_GET['d']);\n\
+         }\n",
+    )
+    .unwrap();
+    run(dir.path(), &["--set-baseline", "psalm-baseline.xml"]);
+    let written = std::fs::read_to_string(dir.path().join("psalm-baseline.xml")).unwrap();
+    for kind in [
+        "TaintedFile",
+        "TaintedInclude",
+        "TaintedEval",
+        "TaintedUnserialize",
+    ] {
+        assert!(written.contains(&format!("<{kind}>")), "{written}");
+    }
+    let legacy = [
+        "TaintedFile",
+        "TaintedInclude",
+        "TaintedEval",
+        "TaintedUnserialize",
+    ]
+    .iter()
+    .fold(written, |xml, kind| xml.replace(kind, "TaintedInput"));
+    std::fs::write(dir.path().join("psalm-baseline.xml"), legacy).unwrap();
+
+    let out = run(dir.path(), &["--format", "json", "--report-stale-baseline"]);
+
+    let tainted: Vec<String> = emitted_kinds(&out)
+        .into_iter()
+        .filter(|k| k.starts_with("Tainted"))
+        .collect();
+    assert_eq!(tainted, Vec::<String>::new());
+}
