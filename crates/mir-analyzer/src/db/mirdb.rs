@@ -575,6 +575,13 @@ impl MirDatabase for MirDbStorage {
         self.locked_ref_index().has_reference(symbol)
     }
 
+    fn for_each_reference(
+        &self,
+        visit: &mut dyn FnMut(&str, &mut dyn Iterator<Item = (Arc<str>, u32, u16)>),
+    ) {
+        self.locked_ref_index().for_each_symbol(visit);
+    }
+
     fn clear_file_references(&self, file: &str) {
         let Some(file_no) = self.lookup_path(file) else {
             return;

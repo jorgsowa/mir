@@ -1,18 +1,13 @@
-/// Dead-code detector.
-///
-/// After body analysis has recorded all method/property/function references into the
-/// codebase, this analyzer walks every class and reports:
-///
-/// - `UnusedMethod`   — private method that is never called
-/// - `UnusedProperty` — private property that is never read
-/// - `UnusedFunction` — non-public free function that is never called
-///
-/// Magic methods (`__construct`, `__destruct`, `__toString`, etc.) and
-/// constructors are excluded because they are called implicitly.
+//! Dead-code detector: after body analysis has recorded every reference,
+//! reports private methods and properties, final classes and free functions
+//! that nothing references. One pass over the reference index matches keys
+//! case-insensitively where PHP names are case-insensitive.
+
 use std::sync::Arc;
 
 use mir_codebase::definitions::Visibility;
 use mir_issues::{Issue, IssueKind, Severity};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::MirDatabase;
 use crate::stubs::StubVfs;
@@ -38,51 +33,124 @@ const MAGIC_METHODS: &[&str] = &[
     "__debuginfo",
 ];
 
+/// A declaration reported as dead unless a reference to one of its keys exists.
+struct Candidate {
+    kind: IssueKind,
+    location: Option<mir_types::Location>,
+}
+
+#[derive(Default)]
+struct Candidates {
+    list: Vec<Candidate>,
+    /// Normalized reference key → candidates that key keeps alive.
+    by_key: FxHashMap<String, Vec<u32>>,
+}
+
+impl Candidates {
+    fn push(
+        &mut self,
+        kind: IssueKind,
+        location: Option<mir_types::Location>,
+        keys: impl IntoIterator<Item = String>,
+    ) {
+        let id = self.list.len() as u32;
+        self.list.push(Candidate { kind, location });
+        for key in keys {
+            self.by_key.entry(key).or_default().push(id);
+        }
+    }
+}
+
+/// Reference key with the case-insensitive parts (class, function and method
+/// names) lowercased; property and constant names keep their case.
+fn normalize_key(key: &str, out: &mut String) -> bool {
+    out.clear();
+    let Some((prefix, rest)) = key.split_once(':') else {
+        return false;
+    };
+    let member_is_case_sensitive = match prefix {
+        "cls" | "fn" | "meth" | "dyn" => false,
+        "prop" | "traituse" => true,
+        _ => return false,
+    };
+    out.push_str(prefix);
+    out.push(':');
+    match rest.split_once("::").filter(|_| member_is_case_sensitive) {
+        Some((class, member)) => {
+            out.extend(class.chars().map(|c| c.to_ascii_lowercase()));
+            out.push_str("::");
+            out.push_str(member);
+        }
+        None => out.extend(rest.chars().map(|c| c.to_ascii_lowercase())),
+    }
+    true
+}
+
 pub struct DeadCodeAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     /// Only report dead code defined in these files (empty = all files).
     /// Threading the project file set keeps the pass from materializing and
     /// flagging private members of lazily-loaded vendor classes (whose bodies
     /// are never analyzed, so every private member looks unreferenced).
-    analyzed_files: rustc_hash::FxHashSet<Arc<str>>,
+    analyzed_files: FxHashSet<Arc<str>>,
 }
 
 impl<'a> DeadCodeAnalyzer<'a> {
-    pub fn with_files(
-        db: &'a dyn MirDatabase,
-        analyzed_files: rustc_hash::FxHashSet<Arc<str>>,
-    ) -> Self {
+    pub fn with_files(db: &'a dyn MirDatabase, analyzed_files: FxHashSet<Arc<str>>) -> Self {
         Self { db, analyzed_files }
     }
 
     pub fn analyze(&self) -> Vec<Issue> {
-        let mut issues = Vec::new();
+        let mut candidates = Candidates::default();
+        self.collect_private_members(&mut candidates);
+        self.collect_classes(&mut candidates);
+        self.collect_functions(&mut candidates);
 
-        // Walk only plain classes (not interfaces/traits/enums); private
-        // members on the other kinds aren't subject to dead-code reporting.
-        // `analyzed_class_defs` already restricts to the project file set and
-        // returns plain classes only, so vendor classes are never enumerated.
+        let mut used = vec![false; candidates.list.len()];
+        let mut normalized = String::new();
+        self.db.for_each_reference(&mut |symbol, _positions| {
+            if !normalize_key(symbol, &mut normalized) {
+                return;
+            }
+            if let Some(ids) = candidates.by_key.get(normalized.as_str()) {
+                for &id in ids {
+                    used[id as usize] = true;
+                }
+            }
+        });
+
+        candidates
+            .list
+            .into_iter()
+            .zip(used)
+            .filter(|(_, used)| !used)
+            .map(|(candidate, _)| {
+                let mut issue = Issue::new(
+                    candidate.kind,
+                    crate::diagnostics::storage_loc_to_location(candidate.location.as_ref()),
+                );
+                issue.severity = Severity::Info;
+                issue
+            })
+            .collect()
+    }
+
+    /// Private methods and properties of plain classes; the other class-like
+    /// kinds aren't subject to dead-code reporting.
+    fn collect_private_members(&self, candidates: &mut Candidates) {
         for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
             let fqcn_str = fqcn.as_ref();
+            let fqcn_lower = fqcn_str.to_ascii_lowercase();
 
             // A `$obj->$name`/`$obj->$name()`/`Class::$$name` access anywhere
-            // in the codebase means some private member of this class may be
-            // reached only dynamically — the exact member is unknowable
-            // statically, so exempt the whole class rather than false-flag it.
-            if self.db.has_reference(&format!("dyn:{fqcn_str}")) {
-                continue;
-            }
+            // may reach any private member, so it keeps all of them alive.
+            let dyn_key = format!("dyn:{fqcn_lower}");
 
-            // Direct traits only miss the `traituse:` exemption for nested
-            // composition (`class C { use Outer; } trait Outer { use Inner; }`,
-            // where `Inner`'s own method calls the private member) — the marker
-            // is recorded under `Inner`'s FQCN, which never appears in `C`'s
-            // direct `use` list. Walk the already-transitive ancestor chain
-            // (also used for method/property resolution) and keep only the
-            // trait entries, mirroring the pattern already used for transitive
-            // `@psalm-require-extends` trait-constraint checking.
+            // A trait's own body calling `$this->m()` is recorded under the
+            // trait (`traituse:`); walk the transitive ancestors so nested
+            // composition (`use Outer` where `Outer` uses `Inner`) is covered.
             let here = crate::db::Fqcn::from_str(self.db, fqcn_str);
-            let used_traits: Vec<Arc<str>> = crate::db::class_ancestors_by_fqcn(self.db, here)
+            let used_traits: Vec<String> = crate::db::class_ancestors_by_fqcn(self.db, here)
                 .iter()
                 .filter(|a| a.as_ref() != fqcn_str)
                 .filter(|a| {
@@ -92,140 +160,110 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         Some(crate::db::ClassLike::Trait(_))
                     )
                 })
-                .cloned()
+                .map(|t| t.to_ascii_lowercase())
                 .collect();
 
             // `@dataProvider name` / `#[DataProvider('name')]` methods are invoked by
-            // PHPUnit via reflection, never through an ordinary call site — collect every
-            // name any method in this class points to so the loop below can credit them.
-            let data_provider_names: rustc_hash::FxHashSet<String> = class
+            // PHPUnit via reflection, never through an ordinary call site.
+            let data_provider_names: FxHashSet<String> = class
                 .own_methods()
                 .iter()
                 .flat_map(|(_, m)| m.data_provider_targets.iter())
                 .map(|s| s.to_ascii_lowercase())
                 .collect();
 
-            // Methods.
             for (name, method) in class.own_methods().iter() {
                 if method.visibility != Visibility::Private {
                     continue;
                 }
                 let name_lower = name.to_ascii_lowercase();
-                if MAGIC_METHODS.contains(&name_lower.as_str()) {
-                    continue;
-                }
-                let referenced = self
-                    .db
-                    .has_reference(&format!("meth:{}::{}", fqcn_str, name_lower))
-                    || used_traits.iter().any(|t| {
-                        self.db
-                            .has_reference(&format!("traituse:{t}::{name_lower}"))
-                    })
-                    || data_provider_names.contains(&name_lower);
-                if !referenced {
-                    let location =
-                        crate::diagnostics::storage_loc_to_location(method.location.as_ref());
-                    issues.push(Issue::new(
-                        IssueKind::UnusedMethod {
-                            class: fqcn_str.to_string(),
-                            method: name.to_string(),
-                        },
-                        location,
-                    ));
-                }
-            }
-
-            // Properties.
-            if let Some(props) = class.own_properties() {
-                for (name, prop) in props.iter() {
-                    if prop.visibility != Visibility::Private {
-                        continue;
-                    }
-                    let referenced =
-                        self.db
-                            .has_reference(&format!("prop:{}::{}", fqcn_str, name.as_ref()))
-                            || used_traits.iter().any(|t| {
-                                self.db
-                                    .has_reference(&format!("traituse:{t}::{}", name.as_ref()))
-                            });
-                    if !referenced {
-                        let location =
-                            crate::diagnostics::storage_loc_to_location(prop.location.as_ref());
-                        issues.push(Issue::new(
-                            IssueKind::UnusedProperty {
-                                class: fqcn_str.to_string(),
-                                property: name.to_string(),
-                            },
-                            location,
-                        ));
-                    }
-                }
-            }
-        }
-
-        // --- Non-referenced classes ---
-        let stub_vfs = StubVfs::new();
-        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
-            let fqcn_str = fqcn.as_ref();
-
-            // Skip abstract and non-final classes — they may be used via inheritance or type hints
-            // in ways the reference tracker doesn't capture. Only flag final classes, which are
-            // true leaf types that can only be used by being directly instantiated/referenced.
-            if class.is_abstract() || !class.is_final() {
-                continue;
-            }
-
-            // Skip vendor/stub files.
-            let location = match &class {
-                crate::db::ClassLike::Class(c) => c.location.clone(),
-                _ => continue,
-            };
-            if let Some(loc) = &location {
-                if stub_vfs.is_stub_file(loc.file.as_ref()) {
-                    continue;
-                }
-                if !self.analyzed_files.is_empty()
-                    && !self.analyzed_files.contains(loc.file.as_ref())
+                if MAGIC_METHODS.contains(&name_lower.as_str())
+                    || data_provider_names.contains(&name_lower)
                 {
                     continue;
                 }
-            }
-
-            if !self.db.has_reference(&format!("cls:{fqcn_str}")) {
-                let loc = crate::diagnostics::storage_loc_to_location(location.as_ref());
-                issues.push(Issue::new(
-                    IssueKind::UnusedClass {
+                let keys = [format!("meth:{fqcn_lower}::{name_lower}"), dyn_key.clone()]
+                    .into_iter()
+                    .chain(
+                        used_traits
+                            .iter()
+                            .map(|t| format!("traituse:{t}::{name_lower}")),
+                    );
+                candidates.push(
+                    IssueKind::UnusedMethod {
                         class: fqcn_str.to_string(),
+                        method: name.to_string(),
                     },
-                    loc,
-                ));
+                    method.location.clone(),
+                    keys,
+                );
             }
-        }
 
-        // --- Non-referenced free functions ---
-        for (fqn, f) in crate::db::analyzed_function_defs(self.db, &self.analyzed_files) {
-            if let Some(loc) = &f.location {
-                if stub_vfs.is_stub_file(loc.file.as_ref()) {
+            let Some(props) = class.own_properties() else {
+                continue;
+            };
+            for (name, prop) in props.iter() {
+                if prop.visibility != Visibility::Private {
                     continue;
                 }
-            }
-            if !self.db.has_reference(&format!("fn:{fqn}")) {
-                let location = crate::diagnostics::storage_loc_to_location(f.location.as_ref());
-                issues.push(Issue::new(
-                    IssueKind::UnusedFunction {
-                        name: f.short_name.to_string(),
+                let keys = [format!("prop:{fqcn_lower}::{name}"), dyn_key.clone()]
+                    .into_iter()
+                    .chain(used_traits.iter().map(|t| format!("traituse:{t}::{name}")));
+                candidates.push(
+                    IssueKind::UnusedProperty {
+                        class: fqcn_str.to_string(),
+                        property: name.to_string(),
                     },
-                    location,
-                ));
+                    prop.location.clone(),
+                    keys,
+                );
             }
         }
+    }
 
-        // Downgrade all dead-code issues to Info
-        for issue in &mut issues {
-            issue.severity = Severity::Info;
+    /// Final concrete classes: other kinds may be used through inheritance.
+    fn collect_classes(&self, candidates: &mut Candidates) {
+        let stub_vfs = StubVfs::new();
+        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
+            if class.is_abstract() || !class.is_final() {
+                continue;
+            }
+            let crate::db::ClassLike::Class(c) = &class else {
+                continue;
+            };
+            if c.location
+                .as_ref()
+                .is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref()))
+            {
+                continue;
+            }
+            candidates.push(
+                IssueKind::UnusedClass {
+                    class: fqcn.to_string(),
+                },
+                c.location.clone(),
+                [format!("cls:{}", fqcn.to_ascii_lowercase())],
+            );
         }
+    }
 
-        issues
+    fn collect_functions(&self, candidates: &mut Candidates) {
+        let stub_vfs = StubVfs::new();
+        for (fqn, f) in crate::db::analyzed_function_defs(self.db, &self.analyzed_files) {
+            if f.location
+                .as_ref()
+                .is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref()))
+            {
+                continue;
+            }
+            candidates.push(
+                IssueKind::UnusedFunction {
+                    name: f.short_name.to_string(),
+                },
+                f.location.clone(),
+                [format!("fn:{}", fqn.to_ascii_lowercase())],
+            );
+        }
     }
 }
 

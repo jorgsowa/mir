@@ -225,6 +225,22 @@ impl RefIndex {
             .is_some_and(|l| !l.is_empty())
     }
 
+    /// Visit every symbol that has locations, with its `(file, line, col_start)` positions.
+    pub fn for_each_symbol(
+        &self,
+        visit: &mut dyn FnMut(&str, &mut dyn Iterator<Item = (Arc<str>, u32, u16)>),
+    ) {
+        for (&symbol_id, locs) in &self.by_symbol {
+            if locs.is_empty() {
+                continue;
+            }
+            let mut positions = locs
+                .iter()
+                .map(|&(f, line, cs, _)| (self.paths.path_of(f), line, cs));
+            visit(&self.symbols[symbol_id as usize], &mut positions);
+        }
+    }
+
     /// All files referencing `symbol`.
     pub fn referencers_of(&self, symbol: &str) -> Vec<Arc<str>> {
         self.lookup_symbol(symbol)
