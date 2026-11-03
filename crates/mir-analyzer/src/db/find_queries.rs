@@ -1544,6 +1544,17 @@ pub fn find_method_in_chain<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
+    method_in_chain(db, fqcn, Name::new(name)).clone()
+}
+
+/// [`find_method_in_chain`] memoized per class and name as written.
+#[salsa::tracked(returns(ref))]
+fn method_in_chain<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: Name,
+) -> Option<(Arc<str>, Arc<MethodDef>)> {
+    let name = name.as_str();
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
         if let Some(m) = find_method_in_class(db, here, name) {
