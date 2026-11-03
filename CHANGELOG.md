@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `!is_callable($x)` removes `Closure` from the type, so `Closure|iterable` narrows to `iterable`.
 - `parent` resolves to the parent class in a called method's return type and in declared-return checks (in a trait, to the parent of the class using it), and `self`/`parent` in an inline `@var` resolve to the enclosing class instead of staying unresolved.
 - `@return self<...>` keeps its type arguments, so Symfony Config builder chains (`->arrayPrototype()->...->end()`) return the right level. A template-typed property read or written through `$this` stays the open template instead of taking the template's default.
+- An anonymous class (`new class extends A implements I {}`) is typed as its supertypes instead of `object`, so it can be assigned to an `A`- or `I`-typed property. One that declares public members its supertypes lack stays `object`.
 
 ## [0.90.0] - 2026-11-03
 

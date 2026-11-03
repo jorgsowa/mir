@@ -831,11 +831,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             _ => {
                 let ty = self.analyze(&n.class, ctx);
+                if matches!(n.class.kind, ExprKind::AnonymousClass(_)) {
+                    return ty;
+                }
                 // Check if the expression could evaluate to a valid class name
-                // (but skip anonymous class definitions, which are valid)
-                if !matches!(n.class.kind, ExprKind::AnonymousClass(_))
-                    && !is_valid_class_name_type(&ty)
-                {
+                if !is_valid_class_name_type(&ty) {
                     self.emit(
                         IssueKind::InvalidStringClass {
                             actual: ty.to_string(),

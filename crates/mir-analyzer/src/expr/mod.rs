@@ -876,7 +876,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 sa.collect_navigation_facts = self.collect_navigation_facts;
                 sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                 sa.analyze_class_decl_stmt(anon, ctx);
-                Type::single(Atomic::TObject)
+                self.anonymous_class_type(anon)
             }
 
             // --- Property access -------------------------------------------
@@ -2345,6 +2345,70 @@ impl<'a> ExpressionAnalyzer<'a> {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+impl ExpressionAnalyzer<'_> {
+    /// `new class extends A implements I {}` is an `A&I`; one with public members
+    /// those supertypes don't declare stays `object`, so the members remain callable.
+    fn anonymous_class_type(&self, anon: &php_ast::owned::ClassDecl) -> Type {
+        use php_ast::ast::Visibility;
+        use php_ast::owned::ClassMemberKind;
+        let supertypes: Vec<String> = anon
+            .extends
+            .iter()
+            .chain(anon.implements.iter())
+            .map(|name| crate::ast_ext::resolve_ast_name(name, self.db, &self.file))
+            .filter(|fqcn| crate::db::class_exists(self.db, fqcn))
+            .collect();
+        let is_public =
+            |v: Option<Visibility>| !matches!(v, Some(Visibility::Private | Visibility::Protected));
+        let declared_on_supertype = |member: &str, is_method: bool| {
+            supertypes.iter().any(|fqcn| {
+                if is_method {
+                    crate::db::has_method_in_chain(self.db, fqcn, member)
+                } else {
+                    crate::db::find_property_in_chain(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn),
+                        member,
+                    )
+                    .is_some()
+                }
+            })
+        };
+        let adds_public_member = anon.body.members.iter().any(|member| match &member.kind {
+            ClassMemberKind::Method(m) => {
+                let name = m.name.as_str().unwrap_or_default();
+                if name.eq_ignore_ascii_case("__construct") {
+                    m.params.iter().any(|p| {
+                        p.modifiers
+                            .visibility
+                            .is_some_and(|v| v == Visibility::Public)
+                            && !declared_on_supertype(p.name.as_str().unwrap_or_default(), false)
+                    })
+                } else {
+                    is_public(m.modifiers.visibility) && !declared_on_supertype(name, true)
+                }
+            }
+            ClassMemberKind::Property(p) => {
+                is_public(p.modifiers.visibility)
+                    && !declared_on_supertype(p.name.as_str().unwrap_or_default(), false)
+            }
+            _ => false,
+        });
+        let named = |fqcn: &String| Atomic::TNamedObject {
+            fqcn: mir_types::Name::from(fqcn.as_str()),
+            type_params: mir_types::union::empty_type_params(),
+        };
+        match supertypes.as_slice() {
+            [] => Type::single(Atomic::TObject),
+            _ if adds_public_member => Type::single(Atomic::TObject),
+            [only] => Type::single(named(only)),
+            all => Type::single(Atomic::TIntersection {
+                parts: all.iter().map(|f| Type::single(named(f))).collect(),
+            }),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
