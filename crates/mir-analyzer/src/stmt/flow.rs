@@ -546,6 +546,18 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                 }
                 mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
+                // `A&B` is throwable when any part is (`new class extends \Exception implements I {}`).
+                mir_types::Atomic::TIntersection { parts }
+                    if parts.iter().flat_map(|p| p.types.iter()).any(|a| match a {
+                        mir_types::Atomic::TNamedObject { fqcn, .. } => {
+                            let r = crate::db::resolve_name(self.db, &self.file, fqcn);
+                            r == "Throwable"
+                                || crate::db::extends_or_implements(self.db, &r, "Throwable")
+                                || crate::db::has_unknown_ancestor(self.db, &r)
+                                || !crate::db::class_exists(self.db, &r)
+                        }
+                        _ => false,
+                    }) => {}
                 // Template params with a throwable bound are valid to throw; the caller owns
                 // any @throws declaration — suppress both InvalidThrow and MissingThrowsDocblock.
                 mir_types::Atomic::TTemplateParam { as_type, .. } => {
