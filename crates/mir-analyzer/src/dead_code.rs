@@ -86,6 +86,12 @@ fn normalize_key(key: &str, out: &mut String) -> bool {
     true
 }
 
+fn contains(span: &mir_types::Location, file: &str, line: u32, col: u16) -> bool {
+    span.file.as_ref() == file
+        && (line, col) >= (span.line, span.col_start)
+        && (line, col) < (span.line_end, span.col_end)
+}
+
 pub struct DeadCodeAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     /// Only report dead code defined in these files (empty = all files).
@@ -108,12 +114,26 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
         let mut used = vec![false; candidates.list.len()];
         let mut normalized = String::new();
-        self.db.for_each_reference(&mut |symbol, _positions| {
+        let mut positions_buf: Vec<(Arc<str>, u32, u16)> = Vec::new();
+        self.db.for_each_reference(&mut |symbol, positions| {
             if !normalize_key(symbol, &mut normalized) {
                 return;
             }
-            if let Some(ids) = candidates.by_key.get(normalized.as_str()) {
-                for &id in ids {
+            let Some(ids) = candidates.by_key.get(normalized.as_str()) else {
+                return;
+            };
+            if ids.iter().all(|&id| used[id as usize]) {
+                return;
+            }
+            positions_buf.clear();
+            positions_buf.extend(positions);
+            for &id in ids {
+                let own_span = candidates.list[id as usize].location.as_ref();
+                // A reference from inside the declaration itself (recursion,
+                // `new self`) doesn't keep it alive.
+                if positions_buf.iter().any(|(file, line, col)| {
+                    !own_span.is_some_and(|s| contains(s, file, *line, *col))
+                }) {
                     used[id as usize] = true;
                 }
             }
