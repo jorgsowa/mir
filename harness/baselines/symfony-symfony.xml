@@ -122,9 +122,6 @@
       <code><![CDATA[Configuration]]></code>
       <code><![CDATA[parent]]></code>
     </UndefinedClass>
-    <UndefinedMethod>
-      <code><![CDATA[$registeredListener->globalListenerDisabled()]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/Symfony/Bridge/PhpUnit/Legacy/CommandForV9.php">
     <UndefinedClass>
@@ -135,9 +132,6 @@
       <code><![CDATA[Loader]]></code>
       <code><![CDATA[parent]]></code>
     </UndefinedClass>
-    <UndefinedMethod>
-      <code><![CDATA[$registeredListener->globalListenerDisabled()]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/Symfony/Bridge/PhpUnit/Legacy/PolyfillAssertTrait.php">
     <UndefinedClass>
@@ -235,16 +229,6 @@
   <file src="src/Symfony/Bridge/Twig/Extension/StopwatchExtension.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->stopwatch;]]></code>
-    </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Bridge/Twig/Extension/TranslationExtension.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->translator = new class implements TranslatorInterface {
-                use TranslatorTrait;
-            }]]></code>
-    </InvalidPropertyAssignment>
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->translator;]]></code>
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Bridge/Twig/Form/TwigRendererEngine.php">
@@ -400,66 +384,6 @@
     </InvalidTemplateParam>
     <UndefinedMethod>
       <code><![CDATA[$callableXML->childNodes->item(0)->setAttribute('priority', $eventDispatcher->getListenerPriority($event, $listener))]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/DependencyInjection/Configuration.php">
-    <UndefinedMethod>
-      <code><![CDATA[$root
-            ->arrayNode('retry_failed')
-                ->canBeEnabled()
-                ->addDefaultsIfNotSet()
-                ->beforeNormalization()
-                    ->ifArray()
-                    ->then(static function ($v) {
-                        if (isset($v['retry_strategy']) && (isset($v['http_codes']) || isset($v['delay']) || isset($v['multiplier']) || isset($v['max_delay']) || isset($v['jitter']))) {
-                            throw new \InvalidArgumentException('The "retry_strategy" option cannot be used along with the "http_codes", "delay", "multiplier", "max_delay" or "jitter" options.');
-                        }
-
-                        return $v;
-                    })
-                ->end()
-                ->children()
-                    ->scalarNode('retry_strategy')->defaultNull()->info('service id to override the retry strategy.')->end()
-                    ->arrayNode('http_codes', 'http_code')
-                        ->performNoDeepMerging()
-                        ->acceptAndWrap(['int', 'string'])
-                        ->beforeNormalization()
-                            ->ifArray()
-                            ->then(static function ($v) {
-                                $list = [];
-                                foreach ($v as $key => $val) {
-                                    if (is_numeric($val)) {
-                                        $list[] = ['code' => $val];
-                                    } elseif (\is_array($val)) {
-                                        if (isset($val['code']) || isset($val['methods'])) {
-                                            $list[] = $val;
-                                        } else {
-                                            $list[] = ['code' => $key, 'methods' => $val];
-                                        }
-                                    } elseif (true === $val || null === $val) {
-                                        $list[] = ['code' => $key];
-                                    }
-                                }
-
-                                return $list;
-                            })
-                        ->end()
-                        ->useAttributeAsKey('code')
-                        ->arrayPrototype()
-                            ->children()
-                                ->integerNode('code')->end()
-                                ->arrayNode('methods', 'method')
-                                    ->acceptAndWrap(['string'])
-                                    ->beforeNormalization()
-                                    ->ifArray()
-                                        ->then(static fn ($v) => array_map('strtoupper', $v))
-                                    ->end()
-                                    ->stringPrototype()->end()
-                                    ->info('A list of HTTP methods that triggers a retry for this status code. When empty, all methods are retried.')
-                                ->end()
-                            ->end()
-                        ->end()
-                        ->info('A list of HTTP status code that triggers a retry.')]]></code>
     </UndefinedMethod>
   </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/EventListener/ConsoleProfilerListener.php">
@@ -1080,13 +1004,9 @@
             'float' => FloatNodeDefinition::class,
             'enum' => EnumNodeDefinition::class,
         ]]]></code>
-      <code><![CDATA[$this->parent = $parent]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Config/Definition/Builder/NodeDefinition.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->parent = $parent]]></code>
-    </InvalidPropertyAssignment>
     <InvalidTemplateParam>
       <code><![CDATA[$child->setPathSeparator($separator)]]></code>
     </InvalidTemplateParam>
@@ -1132,9 +1052,6 @@
     </InvalidReturnType>
   </file>
   <file src="src/Symfony/Component/Console/Application.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->runningCommand = $command]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return array_keys($alternatives);]]></code>
       <code><![CDATA[return $namespaces;]]></code>
@@ -1173,7 +1090,6 @@
   </file>
   <file src="src/Symfony/Component/Console/Command/TraceableCommand.php">
     <InvalidPropertyAssignment>
-      <code><![CDATA[$this->command = $command]]></code>
       <code><![CDATA[$this->arguments = $input->getArguments()]]></code>
       <code><![CDATA[$this->options = $input->getOptions()]]></code>
     </InvalidPropertyAssignment>
@@ -1339,16 +1255,6 @@
       <code><![CDATA[$configuration]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/DependencyInjection/ContainerBuilder.php">
-    <UndefinedClass>
-      <code><![CDATA[ClassLoader]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php">
-    <UndefinedClass>
-      <code><![CDATA[ClassLoader]]></code>
-    </UndefinedClass>
-  </file>
   <file src="src/Symfony/Component/DependencyInjection/EnvVarProcessor.php">
     <InvalidArgument>
       <code><![CDATA[$env]]></code>
@@ -1498,11 +1404,6 @@
     <InvalidArgument>
       <code><![CDATA[$arg1]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/ErrorHandler/ErrorEnhancer/ClassNotFoundErrorEnhancer.php">
-    <UndefinedClass>
-      <code><![CDATA[ClassLoader]]></code>
-    </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/ErrorHandler/ErrorEnhancer/UndefinedMethodErrorEnhancer.php">
     <ImpossibleIdenticalComparison>
@@ -1721,15 +1622,6 @@
       <code><![CDATA[$matches[1]]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToLocalizedStringTransformer.php">
-    <InvalidArgument>
-      <code><![CDATA[$timezone]]></code>
-      <code><![CDATA[\Locale::getDefault()]]></code>
-    </InvalidArgument>
-    <TooFewArguments>
-      <code><![CDATA[new \IntlGregorianCalendar($timezone, \Locale::getDefault())]]></code>
-    </TooFewArguments>
-  </file>
   <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToRfc3339Transformer.php">
     <InvalidArgument>
       <code><![CDATA[$matches[2]]]></code>
@@ -1783,9 +1675,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Form/FormErrorIterator.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $children;]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return key($this->errors);]]></code>
     </NullableReturnStatement>
@@ -1832,8 +1721,6 @@
   </file>
   <file src="src/Symfony/Component/HttpClient/MockHttpClient.php">
     <UndefinedMethod>
-      <code><![CDATA[$this->responseFactory->valid()]]></code>
-      <code><![CDATA[$this->responseFactory->current()]]></code>
       <code><![CDATA[$this->responseFactory->next()]]></code>
     </UndefinedMethod>
   </file>
@@ -1968,21 +1855,9 @@
     </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/HttpKernel/DataCollector/DumpDataCollector.php">
-    <InaccessibleProperty>
-      <code><![CDATA[line]]></code>
-    </InaccessibleProperty>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->fileLinkFormat = $fileLinkFormat instanceof FileLinkFormatter && false === $fileLinkFormat->format('', 0) ? false : $fileLinkFormat]]></code>
     </InvalidPropertyAssignment>
-    <UndefinedMethod>
-      <code><![CDATA[$this->style('meta', '%s')]]></code>
-      <code><![CDATA[$this->style('', $file)]]></code>
-      <code><![CDATA[$this->style('', $name)]]></code>
-      <code><![CDATA[$this->style('', $link)]]></code>
-      <code><![CDATA[$this->style('meta', $name)]]></code>
-      <code><![CDATA[$this->style('meta', $line)]]></code>
-      <code><![CDATA[$this->dumpLine(0)]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/Symfony/Component/HttpKernel/DataCollector/LoggerDataCollector.php">
     <InvalidPropertyAssignment>
@@ -2027,11 +1902,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $this->surrogate;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/HttpKernel/HttpClientKernel.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$response->headers = $headers]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpKernel/HttpKernel.php">
     <NullableReturnStatement>
@@ -2307,23 +2177,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $definition->getClass();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Messenger/MessageBus.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->middlewareAggregate = new class($middlewareHandlers) implements \IteratorAggregate {
-                private \ArrayObject $cachedIterator;
-
-                public function __construct(
-                    private \Traversable $middlewareHandlers,
-                ) {
-                }
-
-                public function getIterator(): \Traversable
-                {
-                    return $this->cachedIterator ??= new \ArrayObject(iterator_to_array($this->middlewareHandlers, false));
-                }
-            }]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Messenger/Middleware/DispatchAfterCurrentBusMiddleware.php">
     <InvalidArgument>
