@@ -118,26 +118,15 @@ impl FileDeclarations {
     }
 }
 
+// Rows carry the symbol kind and slot the workspace index stores, so a kind
+// change (`class Foo` -> `interface Foo`) must not compare equal.
 impl PartialEq for FileDeclarations {
     fn eq(&self, other: &Self) -> bool {
-        fn same_keys<'a>(
-            left: impl Iterator<Item = FileDecl> + 'a,
-            right: impl Iterator<Item = FileDecl> + 'a,
-        ) -> bool {
-            let mut left = left;
-            let mut right = right;
-            loop {
-                match (left.next(), right.next()) {
-                    (None, None) => return true,
-                    (Some(a), Some(b)) if a.key == b.key => {}
-                    _ => return false,
-                }
-            }
-        }
-
-        same_keys(self.class_like(), other.class_like())
-            && same_keys(self.functions(), other.functions())
-            && same_keys(self.constants(), other.constants())
+        self.file == other.file
+            && self.class_like == other.class_like
+            && self.functions == other.functions
+            && self.constants == other.constants
+            && self.rows == other.rows
     }
 }
 
@@ -875,90 +864,44 @@ mod decl_projection_tests {
     }
 
     #[test]
-    fn file_declarations_compare_by_lookup_keys_only() {
+    fn file_declarations_differ_on_kind_slot_or_casing() {
         let mut db = crate::db::MirDbStorage::default();
-        let file_a = db.upsert_source_file_with_durability(
+        let file = db.upsert_source_file_with_durability(
             Arc::from("a.php"),
             Arc::from("<?php\n"),
             salsa::Durability::LOW,
         );
-        let file_b = db.upsert_source_file_with_durability(
-            Arc::from("b.php"),
-            Arc::from("<?php\n"),
-            salsa::Durability::LOW,
+        let decls = |name: &str, loc: SymbolLoc| FileDeclarations {
+            file,
+            rows: Arc::from(
+                vec![FileDeclRow {
+                    name: Name::new(name),
+                    key: Name::new(name).ascii_lowercase(),
+                    packed_loc: PackedSymbolLoc::from_symbol_loc(loc),
+                }]
+                .into_boxed_slice(),
+            ),
+            class_like: 0..1,
+            functions: 1..1,
+            constants: 1..1,
+        };
+        let class = decls("App\\Thing", SymbolLoc::Class { file, idx: 0 });
+
+        assert_eq!(
+            class,
+            decls("App\\Thing", SymbolLoc::Class { file, idx: 0 })
         );
-
-        let decls_a = FileDeclarations {
-            file: file_a,
-            rows: Arc::from(
-                vec![
-                    FileDeclRow {
-                        name: Name::new("App\\Thing"),
-                        key: Name::new("App\\Thing").ascii_lowercase(),
-                        packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Class {
-                            file: file_a,
-                            idx: 0,
-                        }),
-                    },
-                    FileDeclRow {
-                        name: Name::new("App\\run"),
-                        key: Name::new("App\\run").ascii_lowercase(),
-                        packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Function {
-                            file: file_a,
-                            idx: 0,
-                        }),
-                    },
-                    FileDeclRow {
-                        name: Name::new("THING"),
-                        key: Name::new("THING"),
-                        packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Constant {
-                            file: file_a,
-                            idx: 0,
-                        }),
-                    },
-                ]
-                .into_boxed_slice(),
-            ),
-            class_like: 0..1,
-            functions: 1..2,
-            constants: 2..3,
-        };
-        let decls_b = FileDeclarations {
-            file: file_b,
-            rows: Arc::from(
-                vec![
-                    FileDeclRow {
-                        name: Name::new("app\\thing"),
-                        key: Name::new("app\\thing").ascii_lowercase(),
-                        packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Trait {
-                            file: file_b,
-                            idx: 9,
-                        }),
-                    },
-                    FileDeclRow {
-                        name: Name::new("APP\\RUN"),
-                        key: Name::new("APP\\RUN").ascii_lowercase(),
-                        packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Function {
-                            file: file_b,
-                            idx: 4,
-                        }),
-                    },
-                    FileDeclRow {
-                        name: Name::new("THING"),
-                        key: Name::new("THING"),
-                        packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Constant {
-                            file: file_b,
-                            idx: 7,
-                        }),
-                    },
-                ]
-                .into_boxed_slice(),
-            ),
-            class_like: 0..1,
-            functions: 1..2,
-            constants: 2..3,
-        };
-
-        assert_eq!(decls_a, decls_b);
+        assert_ne!(
+            class,
+            decls("App\\Thing", SymbolLoc::Interface { file, idx: 0 })
+        );
+        assert_ne!(
+            class,
+            decls("App\\Thing", SymbolLoc::Class { file, idx: 1 })
+        );
+        assert_ne!(
+            class,
+            decls("App\\THING", SymbolLoc::Class { file, idx: 0 })
+        );
     }
 }

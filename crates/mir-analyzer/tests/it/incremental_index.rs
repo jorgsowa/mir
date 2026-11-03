@@ -187,6 +187,45 @@ fn declaration_change_updates_index_incrementally() {
     );
 }
 
+#[test]
+fn kind_change_with_same_name_updates_index() {
+    let root = create_temp_dir("decl_kind_change");
+    let app_src = root.path().join("src");
+    fs::create_dir_all(&app_src).unwrap();
+    write_composer(root.path());
+
+    let mut session = make_session(root.path());
+    session.ensure_all_stubs();
+    session.finalize_index();
+
+    let path: Arc<str> = Arc::from(app_src.join("Foo.php").to_string_lossy().as_ref());
+    session.ingest_file(
+        path.clone(),
+        Arc::from("<?php\nnamespace App;\nclass Foo { public function run(): void {} }\n"),
+    );
+    assert!(session.contains_method("App\\Foo", "run"));
+
+    session.ingest_file(
+        path.clone(),
+        Arc::from("<?php\nnamespace App;\ninterface Foo { public function run(): void; }\n"),
+    );
+    assert!(
+        session.contains_class("App\\Foo"),
+        "class -> interface must keep resolving"
+    );
+    assert!(session.contains_method("App\\Foo", "run"));
+
+    session.ingest_file(
+        path.clone(),
+        Arc::from("<?php\nnamespace App;\ntrait Foo { public function run(): void {} }\n"),
+    );
+    assert!(
+        session.contains_class("App\\Foo"),
+        "interface -> trait must keep resolving"
+    );
+    assert!(session.contains_method("App\\Foo", "run"));
+}
+
 /// When an edited file currently owns a duplicated symbol, the incremental
 /// subtract path must detect the ambiguity and fall back to a rebuild instead
 /// of dropping the surviving declaration from the workspace index.
