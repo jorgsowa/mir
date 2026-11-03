@@ -1669,12 +1669,23 @@ fn chain_method_purity<'db>(
     fqcn: Fqcn<'db>,
 ) -> Arc<FxHashMap<Arc<str>, bool>> {
     let mut purity = FxHashMap::default();
+    let mut user_overridden: rustc_hash::FxHashSet<Arc<str>> = Default::default();
     for (depth, ancestor) in class_ancestors_by_fqcn(db, fqcn).iter().enumerate() {
         let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
         let Some(class) = find_class_like_ref(db, here) else {
             continue;
         };
         for (name, method) in class.own_methods() {
+            let from_stub = method
+                .location
+                .as_ref()
+                .is_some_and(|loc| crate::stubs::is_stub_path(loc.file.as_ref()));
+            if !from_stub {
+                user_overridden.insert(name.clone());
+            } else if user_overridden.contains(name) {
+                // A stub's `#[Pure]` is an IDE hint about the builtin, not a contract on overrides.
+                continue;
+            }
             // An explicit impure declaration is more specific than every
             // inherited purity annotation. It is commonly used by adapters
             // that deliberately implement a generally pure interface with an
