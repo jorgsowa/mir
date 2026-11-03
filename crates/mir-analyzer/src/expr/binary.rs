@@ -373,7 +373,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &left_ty,
                     &right_ty,
                     self.php_version,
-                ) {
+                ) && !self.stringable_vs_string(&left_ty, &right_ty)
+                    && !self.stringable_vs_string(&right_ty, &left_ty)
+                {
                     let op = if b.op == BinaryOp::Equal { "==" } else { "!=" };
                     self.emit(
                         IssueKind::ImpossibleLooseComparison {
@@ -437,6 +439,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             BinaryOp::Instanceof => Type::single(Atomic::TBool),
             _ => Type::mixed(),
         }
+    }
+
+    /// A Stringable object loosely compares to a string by its `__toString()` value.
+    fn stringable_vs_string(&self, obj_side: &Type, other: &Type) -> bool {
+        other.types.iter().any(|a| a.is_string())
+            && obj_side.types.iter().any(|a| match a {
+                Atomic::TNamedObject { fqcn, .. } => {
+                    crate::db::has_method_in_chain(self.db, fqcn, "__toString")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Stringable")
+                }
+                _ => false,
+            })
     }
 
     fn check_implicit_to_string_cast(&mut self, ty: &Type, span: Span) {
