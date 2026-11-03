@@ -736,17 +736,24 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 value: Box::new(value),
             })
         }
-        // `self<T>`/`static<T>`/`parent<T>` — a common Doctrine/Collection-style
+        // `static<T>`/`parent<T>` — a common Doctrine/Collection-style
         // "generic self-referencing collection" pattern. These pseudo-type atoms
         // carry no `type_params` field of their own (unlike `TNamedObject`), so
         // the written `<...>` args are dropped rather than parsed as a bogus
-        // named class called "self"/"static"/"parent" — substitution re-attaches
+        // named class called "static"/"parent" — substitution re-attaches
         // the real receiver's own type params regardless.
         "static" | "$this" => Type::single(Atomic::TStaticObject {
             fqcn: mir_types::Name::from(""),
         }),
-        "self" => Type::single(Atomic::TSelf {
-            fqcn: mir_types::Name::from(""),
+        // `self<T>` names the declaring class with these args; the collector fills the class in.
+        "self" => Type::single(Atomic::TNamedObject {
+            fqcn: mir_types::Name::from("self"),
+            type_params: mir_types::union::vec_to_type_params(
+                split_generics(inner)
+                    .iter()
+                    .map(|p| parse_type_string(p.trim()))
+                    .collect(),
+            ),
         }),
         "parent" => Type::single(Atomic::TParent {
             fqcn: mir_types::Name::from(""),

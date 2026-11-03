@@ -2157,8 +2157,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // ancestor template with no receiver-supplied args at all.
                         let class_tps = crate::db::class_template_params(self.db, fqcn.as_ref())
                             .unwrap_or_default();
-                        let own_bindings =
-                            crate::generic::build_class_bindings(&class_tps, type_params);
+                        // `$this` leaves its class's templates open, so their defaults don't apply.
+                        let own_bindings = if on_this && type_params.is_empty() {
+                            rustc_hash::FxHashMap::default()
+                        } else {
+                            crate::generic::build_class_bindings(&class_tps, type_params)
+                        };
                         let inherited = crate::db::inherited_template_bindings(
                             self.db,
                             fqcn.as_ref(),

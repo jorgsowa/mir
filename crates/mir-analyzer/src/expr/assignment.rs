@@ -2062,10 +2062,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         )
                                         .map(|tps| tps.to_vec())
                                         .unwrap_or_default();
-                                        let mut bindings = crate::generic::build_class_bindings(
-                                            &class_tps,
-                                            type_params,
-                                        );
+                                        // `$this` leaves its class's templates open, so their defaults don't apply.
+                                        let this_receiver = type_params.is_empty()
+                                            && matches!(&pa.object.kind, ExprKind::Variable(v) if v.as_ref() == "this");
+                                        let mut bindings = if this_receiver {
+                                            FxHashMap::default()
+                                        } else {
+                                            crate::generic::build_class_bindings(
+                                                &class_tps,
+                                                type_params,
+                                            )
+                                        };
                                         let inherited_bindings =
                                             crate::db::inherited_template_bindings(
                                                 self.db,

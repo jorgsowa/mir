@@ -1,12 +1,7 @@
 ===description===
-`parse_generic`'s catch-all had no special case for `self`/`static`/
-`parent` as the generic base name, unlike the bare-word path — `@return
-self<T>` (a common Doctrine/Collection-style "generic self-referencing
-collection" pattern) parsed as a bogus `TNamedObject` named `"self"`
-instead of `TSelf`, an unresolvable pseudo-class that collapsed method
-resolution on it to `mixed`. The written `<T>` is dropped (`TSelf`
-carries no `type_params` of its own), matching how a bare `@return self`
-already resolves via the receiver's own concrete binding.
+`@return self<T>` names the declaring class with the written type
+arguments, so a call through a subclass receiver returns `Collection<int>`
+instead of collapsing to `mixed`.
 ===config===
 <mir>
   <issueHandlers>
@@ -30,6 +25,6 @@ class IntCollection extends Collection {}
 /** @param IntCollection<int> $c */
 function test($c): void {
     $result = $c->identity();
-    /** @mir-check $result is IntCollection<int> */
+    /** @mir-check $result is Collection<int> */
     $_ = 1;
 }

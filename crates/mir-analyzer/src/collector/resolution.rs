@@ -343,6 +343,17 @@ pub(crate) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
             Atomic::TInterfaceString(Some(ref name)) if is_self_static_parent_keyword(name) => {
                 Atomic::TInterfaceString(Some(class_fqcn.into()))
             }
+            Atomic::TNamedObject { fqcn, type_params } if fqcn.as_ref() == "self" => {
+                Atomic::TNamedObject {
+                    fqcn: class_fqcn.into(),
+                    type_params: vec_to_type_params(
+                        type_params
+                            .iter()
+                            .map(|t| fill_self_static_parent(t.clone(), class_fqcn))
+                            .collect(),
+                    ),
+                }
+            }
             // Keywords nested in generic arguments / array element types (`list<self>`).
             Atomic::TNamedObject { fqcn, type_params } if !type_params.is_empty() => {
                 Atomic::TNamedObject {
