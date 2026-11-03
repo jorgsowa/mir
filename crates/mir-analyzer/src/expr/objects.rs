@@ -1591,7 +1591,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // Inside a trait, `self::`/`static::CONST` may be
                         // defined on the using class via late static binding,
                         // not the trait itself — skip the undefined check.
+                        // `static::CONST` in an abstract class may name a constant its subclasses declare.
+                        let deferred_to_subclass = resolved == "static"
+                            && matches!(
+                                crate::db::find_class_like(self.db, here),
+                                Some(crate::db::ClassLike::Class(c)) if c.is_abstract
+                            );
                         if found.is_none()
+                            && !deferred_to_subclass
                             && !crate::db::has_unknown_ancestor(self.db, self_fqcn)
                             && !crate::flow_state::self_is_trait(self.db, ctx)
                         {
