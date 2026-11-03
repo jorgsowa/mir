@@ -725,6 +725,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut pending_conditions: Vec<&php_ast::owned::Expr> = Vec::new();
         // The previous body can run on into this one, so the labels alone don't say what the subject is.
         let mut entered_by_fallthrough = false;
+        let mut fallthrough_in: Option<FlowState> = None;
         for case in sw.body.cases.iter() {
             let mut case_ctx = pre_ctx.branch();
             if let Some(val) = &case.value {
@@ -1029,9 +1030,16 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
 
+            // The previous body runs on into this one without re-testing the subject.
+            if !body_is_empty {
+                if let Some(prev) = fallthrough_in.take() {
+                    case_ctx = FlowState::merge_branches(&pre_ctx, case_ctx, Some(prev));
+                }
+            }
             self.analyze_stmts(&case.body, &mut case_ctx);
             if !body_is_empty {
                 entered_by_fallthrough = !case_ctx.diverges;
+                fallthrough_in = entered_by_fallthrough.then(|| case_ctx.clone());
                 pending_conditions.clear();
             }
             case_results.push(case_ctx);
