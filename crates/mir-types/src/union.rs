@@ -410,7 +410,11 @@ impl Type {
         if self.types.contains(&atomic) {
             return;
         }
+        self.add_absent_type(atomic);
+    }
 
+    /// [`Self::add_type`] for a plain atomic `self` neither holds nor is subsumed by as `mixed`.
+    fn add_absent_type(&mut self, atomic: Atomic) {
         // Past the limit, fold a new shape into a compatible existing one
         // rather than growing the union (see `MAX_KEYED_SHAPES`).
         let mut atomic = atomic;
@@ -1197,10 +1201,13 @@ impl Type {
         }
         for atomic in &other.types {
             // `add_type` may rewrite a conditional, so only plain atomics short-circuit.
-            if !matches!(atomic, Atomic::TConditional { .. }) && self.types.contains(atomic) {
-                continue;
+            if matches!(atomic, Atomic::TConditional { .. }) {
+                self.add_type(atomic.clone());
+            } else if !self.types.contains(atomic)
+                && !self.types.iter().any(|t| matches!(t, Atomic::TMixed))
+            {
+                self.add_absent_type(atomic.clone());
             }
-            self.add_type(atomic.clone());
         }
         self.possibly_undefined |= other.possibly_undefined;
     }
