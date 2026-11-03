@@ -175,10 +175,16 @@ impl<'a> DeadCodeAnalyzer<'a> {
             .collect()
     }
 
-    /// Private methods and properties of plain classes; the other class-like
-    /// kinds aren't subject to dead-code reporting.
+    /// Private members of classes and enums; interface members are public and
+    /// a trait's private members belong to whichever class composes it.
     fn collect_private_members(&self, candidates: &mut Candidates) {
-        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
+        let enums = crate::db::analyzed_enum_defs(self.db, &self.analyzed_files)
+            .into_iter()
+            .map(|(fqcn, e)| (fqcn, crate::db::ClassLike::Enum(e)));
+        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files)
+            .into_iter()
+            .chain(enums)
+        {
             let fqcn_str = fqcn.as_ref();
             let fqcn_lower = fqcn_str.to_ascii_lowercase();
 
