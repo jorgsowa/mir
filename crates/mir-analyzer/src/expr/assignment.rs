@@ -2589,7 +2589,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                     self.db, fqcn, type_params,
                                                 )
                                             {
+                                                // An unparameterized receiver leaves its templates unbound.
+                                                let unbound = expected.contains(|a| {
+                                                    matches!(a, Atomic::TTemplateParam { .. })
+                                                });
                                                 if !expected.is_mixed()
+                                                    && !unbound
                                                     && !property_assign_compatible(
                                                         &ty, &expected, self.db,
                                                     )
