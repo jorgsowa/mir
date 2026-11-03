@@ -1443,7 +1443,8 @@ pub(crate) fn getenv_return_type(arg_types: &[Type]) -> Option<Type> {
         return Some(result);
     }
     let name_ty = name_ty?;
-    if !name_ty.types.is_empty() && name_ty.types.iter().all(|a| a.is_string()) {
+    // An int name is coerced to a string; only `null` selects the all-vars overload.
+    if !name_ty.types.is_empty() && name_ty.types.iter().all(|a| a.is_string() || a.is_int()) {
         let mut result = Type::single(Atomic::TString);
         result.add_type(Atomic::TFalse);
         return Some(result);

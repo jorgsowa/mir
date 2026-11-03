@@ -2904,14 +2904,14 @@ class IntlGregorianCalendar extends IntlCalendar
     /**
      * Create the Gregorian Calendar class
      * @link https://www.php.net/manual/en/intlgregoriancalendar.construct
-     * @param int $timezoneOrYear [optional]
-     * @param int $localeOrMonth [optional]
+     * @param IntlTimeZone|DateTimeZone|string|int|null $timezoneOrYear [optional]
+     * @param string|int|null $localeOrMonth [optional]
      * @param int $day [optional]
      * @param int $hour [optional]
      * @param int $minute [optional]
      * @param int $second [optional]
      */
-    public function __construct($timezoneOrYear, $localeOrMonth, $day, $hour, $minute, $second) {}
+    public function __construct($timezoneOrYear = null, $localeOrMonth = null, $day = 0, $hour = 0, $minute = 0, $second = 0) {}
 
     /**
      * Set the Gregorian Calendar the change date
@@ -6945,7 +6945,7 @@ function intltz_use_daylight_time(IntlTimeZone $timezone): bool {}
 /**
  * (PHP 5 &gt;=5.5.0 PECL intl &gt;= 3.0.0a1)<br/>
  * @param DateTimeZone|IntlTimeZone|string|int|null $timezoneOrYear [optional]
- * @param string|null $localeOrMonth [optional]
+ * @param string|int|null $localeOrMonth [optional]
  * @param int $day [optional]
  * @param int $hour [optional]
  * @param int $minute [optional]
@@ -6955,7 +6955,7 @@ function intltz_use_daylight_time(IntlTimeZone $timezone): bool {}
  * @pure
  */
 #[Deprecated( reason: 'use IntlGregorianCalendar::__construct(), IntlGregorianCalendar::createFromDate(), or IntlGregorianCalendar::createFromDateTime() instead', since: '8.4' )]
-function intlgregcal_create_instance($timezoneOrYear, $localeOrMonth, $day, $hour, $minute, $second): ?IntlGregorianCalendar {}
+function intlgregcal_create_instance($timezoneOrYear = null, $localeOrMonth = null, $day = 0, $hour = 0, $minute = 0, $second = 0): ?IntlGregorianCalendar {}
 
 /**
  * @param IntlGregorianCalendar $calendar

@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An anonymous class (`new class extends A implements I {}`) is typed as its supertypes instead of `object`, so it can be assigned to an `A`- or `I`-typed property. One that declares public members its supertypes lack stays `object`.
 - `Composer\Autoload\ClassLoader` resolves from `vendor/composer/ClassLoader.php`; Composer leaves it out of the classmap.
 - A class declared under a `class_alias()` target name (the `if (false) { class Alias {} }` IDE stub) inherits the aliased class, so its methods are no longer reported as undefined.
+- Stubs: `IntlGregorianCalendar::__construct()` and `intlgregcal_create_instance()` take optional arguments, including a time zone and locale; `getenv()` with an `int` or `int|string` name returns `string|false`.
 
 ## [0.90.0] - 2026-11-03
 
