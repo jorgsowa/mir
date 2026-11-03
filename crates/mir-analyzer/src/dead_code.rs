@@ -156,6 +156,20 @@ fn contains(span: &mir_types::Location, file: &str, line: u32, col: u16) -> bool
         && (line, col) < (span.line_end, span.col_end)
 }
 
+fn has_private_member(class: &crate::db::ClassLike) -> bool {
+    class
+        .own_methods()
+        .values()
+        .any(|m| m.visibility == Visibility::Private)
+        || class
+            .own_constants()
+            .values()
+            .any(|c| c.visibility == Some(Visibility::Private))
+        || class
+            .own_properties()
+            .is_some_and(|props| props.values().any(|p| p.visibility == Visibility::Private))
+}
+
 fn credit_references(
     candidates: &Candidates,
     credits: &[Credit],
@@ -194,13 +208,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
     pub fn analyze(&self) -> Vec<Issue> {
         let mut candidates = Candidates::default();
-        self.collect_private_members(&mut candidates);
-        self.collect_classes(&mut candidates);
+        let class_likes = crate::db::analyzed_class_likes(self.db, &self.analyzed_files);
+        self.collect_private_members(&class_likes, &mut candidates);
+        self.collect_classes(&class_likes, &mut candidates);
         self.collect_functions(&mut candidates);
 
         let mut used = vec![false; candidates.list.len()];
         let mut normalized = String::new();
-        let mut positions_buf: Vec<Position> = Vec::new();
         let mut namespace_prefixes: Vec<String> = Vec::new();
         // Property references are settled once every pure write is known.
         let mut property_refs: Vec<(String, Vec<Position>)> = Vec::new();
@@ -226,13 +240,25 @@ impl<'a> DeadCodeAnalyzer<'a> {
             if credits.iter().all(|c| used[c.id as usize]) {
                 return;
             }
-            if normalized.starts_with("prop:") {
+            if normalized.starts_with("prop:")
+                && credits
+                    .iter()
+                    .any(|c| candidates.list[c.id as usize].needs_read)
+            {
                 property_refs.push((normalized.clone(), positions.collect()));
                 return;
             }
-            positions_buf.clear();
-            positions_buf.extend(positions);
-            credit_references(&candidates, credits, &positions_buf, &mut used);
+            for position in positions {
+                credit_references(
+                    &candidates,
+                    credits,
+                    std::slice::from_ref(&position),
+                    &mut used,
+                );
+                if credits.iter().all(|c| used[c.id as usize]) {
+                    break;
+                }
+            }
         });
         let no_writes = FxHashSet::default();
         for (key, positions) in property_refs {
@@ -257,14 +283,15 @@ impl<'a> DeadCodeAnalyzer<'a> {
             }
         }
 
-        if !namespace_prefixes.is_empty() {
-            for (candidate, used) in candidates.list.iter().zip(used.iter_mut()) {
-                if let Some(class) = &candidate.class_name {
-                    *used |= namespace_prefixes
-                        .iter()
-                        .any(|p| class.starts_with(p.as_str()));
-                }
-            }
+        for (candidate, used) in candidates.list.iter().zip(used.iter_mut()) {
+            let Some(class) = &candidate.class_name else {
+                continue;
+            };
+            *used = *used
+                || namespace_prefixes
+                    .iter()
+                    .any(|p| class.starts_with(p.as_str()))
+                || matches!(&candidate.kind, IssueKind::UnusedClass { class } if self.is_test_case(class));
         }
 
         candidates
@@ -285,14 +312,19 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
     /// Private members of classes and enums; interface members are public and
     /// a trait's private members belong to whichever class composes it.
-    fn collect_private_members(&self, candidates: &mut Candidates) {
-        let enums = crate::db::analyzed_enum_defs(self.db, &self.analyzed_files)
-            .into_iter()
-            .map(|(fqcn, e)| (fqcn, crate::db::ClassLike::Enum(e)));
-        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files)
-            .into_iter()
-            .chain(enums)
-        {
+    fn collect_private_members(
+        &self,
+        class_likes: &[(Arc<str>, crate::db::ClassLike)],
+        candidates: &mut Candidates,
+    ) {
+        for (fqcn, class) in class_likes {
+            if !matches!(
+                class,
+                crate::db::ClassLike::Class(_) | crate::db::ClassLike::Enum(_)
+            ) || !has_private_member(class)
+            {
+                continue;
+            }
             let fqcn_str = fqcn.as_ref();
             let fqcn_lower = fqcn_str.to_ascii_lowercase();
 
@@ -431,31 +463,15 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
     /// Every class-like declared in the analyzed files: inheritance, type
     /// hints and docblocks all record a class reference.
-    fn collect_classes(&self, candidates: &mut Candidates) {
+    fn collect_classes(
+        &self,
+        class_likes: &[(Arc<str>, crate::db::ClassLike)],
+        candidates: &mut Candidates,
+    ) {
         let stub_vfs = StubVfs::new();
-        let files = &self.analyzed_files;
-        let class_likes = crate::db::analyzed_class_defs(self.db, files)
-            .into_iter()
-            .chain(
-                crate::db::analyzed_interface_defs(self.db, files)
-                    .into_iter()
-                    .map(|(f, d)| (f, crate::db::ClassLike::Interface(d))),
-            )
-            .chain(
-                crate::db::analyzed_trait_defs(self.db, files)
-                    .into_iter()
-                    .map(|(f, d)| (f, crate::db::ClassLike::Trait(d))),
-            )
-            .chain(
-                crate::db::analyzed_enum_defs(self.db, files)
-                    .into_iter()
-                    .map(|(f, d)| (f, crate::db::ClassLike::Enum(d))),
-            );
         for (fqcn, class) in class_likes {
             let location = class.location();
-            if location.is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref()))
-                || self.is_test_case(&fqcn)
-            {
+            if location.is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref())) {
                 continue;
             }
             let class_name = fqcn.to_ascii_lowercase();

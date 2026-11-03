@@ -972,6 +972,44 @@ pub fn analyzed_trait_defs(
     )
 }
 
+/// Every class-like declared in `analyzed_files`, from one pass over their
+/// definitions, sorted by FQCN.
+pub fn analyzed_class_likes(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<(Arc<str>, ClassLike)> {
+    let mut out = Vec::new();
+    for sf in analyzed_source_files(db, analyzed_files) {
+        let slice = &collect_file_definitions(db, sf).slice;
+        out.extend(
+            slice
+                .classes
+                .iter()
+                .map(|d| (d.fqcn.clone(), ClassLike::Class(d.clone()))),
+        );
+        out.extend(
+            slice
+                .interfaces
+                .iter()
+                .map(|d| (d.fqcn.clone(), ClassLike::Interface(d.clone()))),
+        );
+        out.extend(
+            slice
+                .traits
+                .iter()
+                .map(|d| (d.fqcn.clone(), ClassLike::Trait(d.clone()))),
+        );
+        out.extend(
+            slice
+                .enums
+                .iter()
+                .map(|d| (d.fqcn.clone(), ClassLike::Enum(d.clone()))),
+        );
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 /// Free functions declared in `analyzed_files`, one entry per declaration
 /// (a name declared under several `function_exists` guards appears once per site).
 pub fn analyzed_function_defs(
