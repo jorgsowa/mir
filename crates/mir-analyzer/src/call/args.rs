@@ -434,6 +434,25 @@ fn substitute_static_atom(
                 type_params: mir_types::union::vec_to_type_params(substituted),
             }
         }
+        Atomic::TConditional { data } => {
+            let mir_types::atomic::ConditionalData {
+                param_name,
+                subject,
+                if_true,
+                if_false,
+            } = *data;
+            let sub = |t: Type| {
+                substitute_static_in_type(db, t, fqcn, static_fqcn, receiver_type_params)
+            };
+            Atomic::TConditional {
+                data: Box::new(mir_types::atomic::ConditionalData {
+                    param_name,
+                    subject,
+                    if_true: sub(if_true),
+                    if_false: sub(if_false),
+                }),
+            }
+        }
         other => other,
     }
 }
