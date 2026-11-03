@@ -172,14 +172,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         // visible to that arm's body and to every later arm.
         let mut cond_ctx = ctx.branch();
         for arm in m.arms.iter() {
+            let mut arm_ctx = cond_ctx.branch();
             let mut arm_ty = Type::empty();
             if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
-                    let cond_ty = self.analyze(cond, &mut cond_ctx);
+                    let cond_ty = self.analyze(cond, &mut arm_ctx);
                     arm_ty.merge_with(&cond_ty);
                 }
+                // Only new variables carry over; narrowing inside a condition does not.
+                let mut next = arm_ctx.branch();
+                for (name, ty) in cond_ctx.vars.iter() {
+                    if cond_ctx.var_is_defined(name.as_str()) {
+                        std::sync::Arc::make_mut(&mut next.vars).insert(*name, ty.clone());
+                    }
+                }
+                cond_ctx = next;
             }
-            let mut arm_ctx = cond_ctx.branch();
             // Use type narrowing if the subject is a variable, property,
             // static property, or literal-keyed array-shape path.
             if let Some(target) = &subject_target {
