@@ -19,6 +19,28 @@ use std::sync::Arc;
 /// the undefined-capture case, but only as much as is safe for an
 /// already-typed variable. A bare `null` has no base type to widen to, so it
 /// becomes `mixed` (`$seen = null;` filled in by a sibling closure).
+/// Sets `is_open` on every keyed-array shape in `ty`.
+fn with_open_shapes(ty: &Type, open: bool) -> Type {
+    let mut out = ty.clone();
+    out.types = ty
+        .types
+        .iter()
+        .map(|a| match a {
+            Atomic::TKeyedArray {
+                properties,
+                is_list,
+                ..
+            } => Atomic::TKeyedArray {
+                properties: properties.clone(),
+                is_open: open,
+                is_list: *is_list,
+            },
+            other => other.clone(),
+        })
+        .collect();
+    out
+}
+
 fn widen_byref_capture(ty: Type) -> Type {
     if matches!(ty.types.as_slice(), [Atomic::TNull]) {
         return Type::mixed();
@@ -568,7 +590,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.record_symbol(p.name.span, ReferenceKind::Variable(Arc::from(trimmed)), ty);
             }
         }
-        let mut byref_captures: Vec<(&str, Type)> = Vec::new();
+        let mut byref_captures: Vec<(&str, Type, bool)> = Vec::new();
         let mut taint_captures = Vec::new();
         for use_var in c.use_vars.iter() {
             let name = use_var.name.or_error().trim_start_matches('$');
@@ -634,10 +656,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ReferenceKind::Variable(Arc::from(name)),
                 captured_ty.clone(),
             );
-            closure_ctx.set_var(name, captured_ty.clone());
             if use_var.by_ref {
+                // Code holding the same reference can add keys before the closure runs.
+                let opens_shape = captured_ty.types.iter().any(
+                    |a| matches!(a, Atomic::TKeyedArray { is_open: false, .. }),
+                ) && !captured_ty
+                    .types
+                    .iter()
+                    .any(|a| matches!(a, Atomic::TKeyedArray { is_open: true, .. }));
+                let inner_ty = if opens_shape {
+                    with_open_shapes(&captured_ty, true)
+                } else {
+                    captured_ty.clone()
+                };
+                closure_ctx.set_var(name, inner_ty.clone());
                 ctx.alias_var(name);
-                byref_captures.push((name, captured_ty));
+                byref_captures.push((name, inner_ty, opens_shape));
+            } else {
+                closure_ctx.set_var(name, captured_ty.clone());
             }
             closure_ctx.taint_var(
                 name,
@@ -758,8 +794,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         // The closure may run zero or more times, so a by-ref write widens the
         // parent's type rather than replacing it. A bare `null` becomes `mixed`,
         // matching the capture side (`widen_byref_capture`).
-        for (name, captured_ty) in byref_captures {
+        for (name, captured_ty, opened_shape) in byref_captures {
             let written_ty = closure_ctx.get_var(name);
+            let (written_ty, captured_ty) = if opened_shape {
+                (
+                    with_open_shapes(&written_ty, false),
+                    with_open_shapes(&captured_ty, false),
+                )
+            } else {
+                (written_ty, captured_ty)
+            };
             let pre_ty = ctx.get_var(name);
             if matches!(pre_ty.types.as_slice(), [Atomic::TNull]) {
                 ctx.set_var(name, Type::mixed());
