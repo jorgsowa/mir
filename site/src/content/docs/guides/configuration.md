@@ -76,6 +76,19 @@ Each child element of `<issueHandlers>` is an issue kind name with an `errorLeve
 </issueHandlers>
 ```
 
+As in Psalm, nested `<errorLevel type="...">` blocks set the level for files under the listed `<directory>` and `<file>` entries, relative to the config file. The first matching block wins; other files use the element's `errorLevel` attribute, if any. `<referencedClass>`, `<referencedMethod>` and similar filters are not supported and never match.
+
+```xml
+<issueHandlers>
+  <PossiblyUndefinedVariable errorLevel="error">
+    <errorLevel type="suppress">
+      <directory name="tests" />
+      <file name="src/Legacy.php" />
+    </errorLevel>
+  </PossiblyUndefinedVariable>
+</issueHandlers>
+```
+
 ## CLI flags
 
 CLI flags always override values from the config file.

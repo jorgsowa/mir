@@ -146,6 +146,7 @@ fn main() {
     }
 
     let (mut config, config_base) = load_config(&cli);
+    analyze::resolve_scoped_issue_handlers(&mut config, &config_base);
 
     if let Some(level) = cli.error_level {
         config.error_level = Some(level.clamp(1, 8));

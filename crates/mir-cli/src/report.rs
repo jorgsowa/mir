@@ -328,7 +328,9 @@ fn effective_severity(issue: &Issue, config: &Config) -> Option<Severity> {
     if issue.suppressed {
         return None;
     }
-    let sev = if let Some(level) = config.issue_handlers.get(issue.kind.display_name()) {
+    let kind = issue.kind.display_name();
+    let level = scoped_level(issue, kind, config).or_else(|| config.issue_handlers.get(kind));
+    let sev = if let Some(level) = level {
         match level {
             ErrorLevel::Error => Severity::Error,
             ErrorLevel::Warning => Severity::Warning,
@@ -341,6 +343,20 @@ fn effective_severity(issue: &Issue, config: &Config) -> Option<Severity> {
         issue.severity
     };
     Some(sev)
+}
+
+fn scoped_level<'a>(issue: &Issue, kind: &str, config: &'a Config) -> Option<&'a ErrorLevel> {
+    let mut scopes = config
+        .scoped_issue_handlers
+        .iter()
+        .filter(|scope| scope.kind == kind)
+        .peekable();
+    scopes.peek()?;
+    let file = std::path::Path::new(issue.location.file.as_ref());
+    let file = crate::path_util::normalize_for_compare(&cwd().join(file));
+    scopes
+        .find(|scope| scope.resolved.iter().any(|p| file.starts_with(p)))
+        .map(|scope| &scope.level)
 }
 
 fn downgraded_by_psalm_level(issue: &Issue, config: &Config) -> bool {

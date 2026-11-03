@@ -378,6 +378,19 @@ fn build_batch_opts(find_dead_code: bool, config: &Config) -> BatchOptions {
     opts
 }
 
+/// Resolve each scoped issue handler's directories and files against `config_base`.
+pub(crate) fn resolve_scoped_issue_handlers(config: &mut Config, config_base: &std::path::Path) {
+    for scope in &mut config.scoped_issue_handlers {
+        scope.resolved = scope
+            .dirs
+            .iter()
+            .flat_map(|d| expand_glob_dir(d, config_base))
+            .chain(scope.files.iter().map(|f| config_base.join(f)))
+            .map(|p| normalize_for_compare(&p))
+            .collect();
+    }
+}
+
 fn resolve_ignore_dirs(config: &Config, config_base: &std::path::Path) -> Vec<PathBuf> {
     config
         .ignore_dirs

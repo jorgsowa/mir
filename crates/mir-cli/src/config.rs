@@ -38,6 +38,19 @@ pub struct PsalmPluginEntry {
     pub config_xml: Option<String>,
 }
 
+/// One `<errorLevel type="...">` block nested in an `<issueHandlers>` entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopedIssueHandler {
+    pub kind: String,
+    pub level: ErrorLevel,
+    /// `<directory name>` / `<file name>` entries as written; filters such as
+    /// `<referencedClass>` are not supported and never match.
+    pub dirs: Vec<String>,
+    pub files: Vec<String>,
+    /// `dirs` and `files` resolved against the config directory.
+    pub resolved: Vec<std::path::PathBuf>,
+}
+
 /// Parsed contents of `mir.xml`.
 #[derive(Debug, Clone, Default)]
 pub struct Config {
@@ -50,6 +63,9 @@ pub struct Config {
     pub file_extensions: Vec<String>,
     /// Per-issue-kind severity overrides from `<issueHandlers>`.
     pub issue_handlers: HashMap<String, ErrorLevel>,
+    /// Path-scoped overrides (`<Kind><errorLevel type="..."><directory/></errorLevel></Kind>`),
+    /// in declaration order; the first match wins over `issue_handlers`.
+    pub scoped_issue_handlers: Vec<ScopedIssueHandler>,
     /// Optional Psalm-compatible strictness, 1 (strictest) to 8 (most lenient).
     /// `None` keeps mir's own severities.
     pub error_level: Option<u8>,
@@ -137,6 +153,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
     // Accumulated text content for the current element
     let mut text_buf = String::new();
     let mut unused_variables_explicit = false;
+    let mut open_scope: Option<usize> = None;
 
     loop {
         match reader.read_event() {
@@ -191,6 +208,22 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                         }
                     }
                 }
+
+                if name == "errorLevel" && is_issue_handler_entry(&path) {
+                    open_scope = attr_value(&e, "type")
+                        .and_then(|t| ErrorLevel::from_str(&t))
+                        .map(|level| {
+                            config.scoped_issue_handlers.push(ScopedIssueHandler {
+                                kind: path.last().cloned().unwrap_or_default(),
+                                level,
+                                dirs: Vec::new(),
+                                files: Vec::new(),
+                                resolved: Vec::new(),
+                            });
+                            config.scoped_issue_handlers.len() - 1
+                        });
+                }
+                collect_scoped_path(&e, &path, open_scope, &mut config);
 
                 // <file name="..."> or <directory name="..."> inside project files.
                 if name == "file" || name == "directory" {
@@ -257,6 +290,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     }
                 }
 
+                collect_scoped_path(&e, &path, open_scope, &mut config);
                 if name == "file" || name == "directory" {
                     collect_project_file_entry(&e, &path, &mut config);
                 }
@@ -294,6 +328,9 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
 
             Ok(Event::End(_)) => {
                 let key = path.pop().unwrap_or_default();
+                if key == "errorLevel" && is_issue_handler_entry(&path) {
+                    open_scope = None;
+                }
                 let parent = path.last().map_or("", |s| s.as_str());
                 match (key.as_str(), parent) {
                     ("phpVersion", _) if !text_buf.is_empty() => {
@@ -346,6 +383,33 @@ fn collect_project_file_entry<'a>(
                 _ => {}
             }
         }
+    }
+}
+
+/// Whether `path` ends at an issue kind element directly under `<issueHandlers>`.
+fn is_issue_handler_entry(path: &[String]) -> bool {
+    path.len() >= 2 && path[path.len() - 2] == "issueHandlers"
+}
+
+/// Handle `<directory name>` / `<file name>` inside a scoped `<errorLevel>`.
+fn collect_scoped_path(
+    e: &quick_xml::events::BytesStart<'_>,
+    path: &[String],
+    open_scope: Option<usize>,
+    config: &mut Config,
+) {
+    let Some(idx) = open_scope else { return };
+    if path.last().map(String::as_str) != Some("errorLevel") {
+        return;
+    }
+    let Some(name) = attr_value(e, "name") else {
+        return;
+    };
+    let scope = &mut config.scoped_issue_handlers[idx];
+    match bytes_to_string(e.name().as_ref()).as_str() {
+        "directory" => scope.dirs.push(name),
+        "file" => scope.files.push(name),
+        _ => {}
     }
 }
 
@@ -623,6 +687,34 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_scoped_issue_handlers() {
+        let cfg = Config::parse(
+            r#"<psalm><issueHandlers>
+                <PossiblyUnusedMethod errorLevel="info">
+                    <errorLevel type="suppress">
+                        <directory name="tests"/>
+                        <file name="src/Legacy.php"></file>
+                        <referencedMethod name="App\\Foo::bar"/>
+                    </errorLevel>
+                    <errorLevel type="bogus"><directory name="ignored"/></errorLevel>
+                </PossiblyUnusedMethod>
+            </issueHandlers><projectFiles><directory name="src"/></projectFiles></psalm>"#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.issue_handlers.get("PossiblyUnusedMethod"),
+            Some(&ErrorLevel::Info)
+        );
+        assert_eq!(cfg.scoped_issue_handlers.len(), 1);
+        let scope = &cfg.scoped_issue_handlers[0];
+        assert_eq!(scope.kind, "PossiblyUnusedMethod");
+        assert_eq!(scope.level, ErrorLevel::Suppress);
+        assert_eq!(scope.dirs, ["tests"]);
+        assert_eq!(scope.files, ["src/Legacy.php"]);
+        assert_eq!(cfg.project_dirs, ["src"]);
+    }
 
     #[test]
     fn parses_file_extensions() {
