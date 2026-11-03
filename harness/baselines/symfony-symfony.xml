@@ -24,16 +24,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $this->container->get($name);]]></code>
     </NullableReturnStatement>
-    <UndefinedVariable>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-    </UndefinedVariable>
-  </file>
-  <file src="src/Symfony/Bridge/Doctrine/Messenger/DoctrineCloseConnectionMiddleware.php">
-    <UndefinedVariable>
-      <code><![CDATA[$connection]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Bridge/Doctrine/PropertyInfo/DoctrineExtractor.php">
     <InvalidTemplateParam>
@@ -44,12 +34,6 @@
     <InvalidArgument>
       <code><![CDATA[$token->getTokenValue()]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Bridge/Doctrine/Types/AbstractUidType.php">
-    <AbstractMethodCall>
-      <code><![CDATA[$this->getUidClass()::fromString($value)]]></code>
-      <code><![CDATA[$this->getUidClass()::fromString($value)]]></code>
-    </AbstractMethodCall>
   </file>
   <file src="src/Symfony/Bridge/Monolog/Processor/WebProcessor.php">
     <InvalidPropertyAssignment>
@@ -478,11 +462,6 @@
                         ->info('A list of HTTP status code that triggers a retry.')]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/DependencyInjection/FrameworkExtension.php">
-    <UndefinedConstant>
-      <code><![CDATA[$class::PROVIDER_IPS]]></code>
-    </UndefinedConstant>
-  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/EventListener/ConsoleProfilerListener.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$command->arguments = $input->getArguments()]]></code>
@@ -566,15 +545,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->resourceLocales = array_keys($this->options['resource_files'])]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Bundle/SecurityBundle/DataCollector/SecurityDataCollector.php">
-    <NonExistentArrayOffset>
-      <code><![CDATA['listeners']]></code>
-      <code><![CDATA['firewall']]></code>
-      <code><![CDATA['firewall']]></code>
-      <code><![CDATA['auth_profile_token']]></code>
-      <code><![CDATA['deauth_profile_token']]></code>
-    </NonExistentArrayOffset>
   </file>
   <file src="src/Symfony/Bundle/SecurityBundle/DependencyInjection/Security/Factory/CustomAuthenticatorFactory.php">
     <NullMethodCall>
@@ -695,10 +665,6 @@
             CacheItem::class
         )]]></code>
     </InvalidPropertyAssignment>
-    <UndefinedVariable>
-      <code><![CDATA[$expiredIds]]></code>
-      <code><![CDATA[$expiredIds]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/AbstractTagAwareAdapter.php">
     <InvalidPropertyAssignment>
@@ -777,10 +743,6 @@
             CacheItem::class
         )]]></code>
     </InvalidPropertyAssignment>
-    <UndefinedVariable>
-      <code><![CDATA[$expiredIds]]></code>
-      <code><![CDATA[$expiredIds]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/ApcuAdapter.php">
     <NullableReturnStatement>
@@ -855,19 +817,10 @@
       <code><![CDATA[return $failed;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Cache/Adapter/FilesystemTagAwareAdapter.php">
-    <UndefinedTraitAliasMethod>
-      <code><![CDATA[]]></code>
-    </UndefinedTraitAliasMethod>
-  </file>
   <file src="src/Symfony/Component/Cache/Adapter/MemcachedAdapter.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[null !== $password]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidArgument>
-      <code><![CDATA[[__CLASS__, 'encodeKey']]]></code>
-      <code><![CDATA[[__CLASS__, 'encodeKey']]]></code>
-    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $failed;]]></code>
       <code><![CDATA[return $this->checkResultCode($this->getClient()->setMulti($encodedValues, $lifetime)) ? $failed : false;]]></code>
@@ -1096,11 +1049,6 @@
       <code><![CDATA[ClusterInterface]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/Cache/Traits/RelayProxy.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[jsonstrappend]]></code>
-    </MethodSignatureMismatch>
-  </file>
   <file src="src/Symfony/Component/Clock/MonotonicClock.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[false === $offset = hrtime()]]></code>
@@ -1119,15 +1067,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->prototype = $this->getNodeBuilder()->node(null, $type)->setParent($this)]]></code>
     </InvalidPropertyAssignment>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->prototype('variable');]]></code>
-      <code><![CDATA[return $this->prototype('scalar');]]></code>
-      <code><![CDATA[return $this->prototype('string');]]></code>
-      <code><![CDATA[return $this->prototype('boolean');]]></code>
-      <code><![CDATA[return $this->prototype('integer');]]></code>
-      <code><![CDATA[return $this->prototype('float');]]></code>
-      <code><![CDATA[return $this->prototype('enum');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="src/Symfony/Component/Config/Definition/Builder/NodeBuilder.php">
     <InvalidPropertyAssignment>
@@ -1143,16 +1082,6 @@
         ]]]></code>
       <code><![CDATA[$this->parent = $parent]]></code>
     </InvalidPropertyAssignment>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->node($name, 'array');]]></code>
-      <code><![CDATA[return $this->node($name, 'scalar');]]></code>
-      <code><![CDATA[return $this->node($name, 'boolean');]]></code>
-      <code><![CDATA[return $this->node($name, 'integer');]]></code>
-      <code><![CDATA[return $this->node($name, 'float');]]></code>
-      <code><![CDATA[return $this->node($name, 'enum');]]></code>
-      <code><![CDATA[return $this->node($name, 'variable');]]></code>
-      <code><![CDATA[return $this->node($name, 'string');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="src/Symfony/Component/Config/Definition/Builder/NodeDefinition.php">
     <InvalidPropertyAssignment>
@@ -1290,9 +1219,6 @@
     <ImplicitFloatToIntCast>
       <code><![CDATA[$default]]></code>
     </ImplicitFloatToIntCast>
-    <InvalidArgument>
-      <code><![CDATA[[__CLASS__, 'width']]]></code>
-    </InvalidArgument>
     <InvalidThrow>
       <code><![CDATA[]]></code>
     </InvalidThrow>
@@ -1309,9 +1235,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[null === $current = $this->current()]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidArgument>
-      <code><![CDATA[$visited[$currentNode] = true]]></code>
-    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $this->children->key();]]></code>
     </NullableReturnStatement>
@@ -1421,16 +1344,7 @@
       <code><![CDATA[ClassLoader]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/DependencyInjection/Dumper/GraphvizDumper.php">
-    <ImpossibleLooseComparison>
-      <code><![CDATA[$id == $origin]]></code>
-    </ImpossibleLooseComparison>
-  </file>
   <file src="src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php">
-    <InvalidArgument>
-      <code><![CDATA[$definitions[$argument] = 1 + $definitions[$argument]]]></code>
-      <code><![CDATA[$definitions[$argument] = 1]]></code>
-    </InvalidArgument>
     <UndefinedClass>
       <code><![CDATA[ClassLoader]]></code>
     </UndefinedClass>
@@ -1491,11 +1405,6 @@
       <code><![CDATA[true]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/DependencyInjection/Loader/Configurator/Traits/BindTrait.php">
-    <InaccessibleProperty>
-      <code><![CDATA[definition]]></code>
-    </InaccessibleProperty>
-  </file>
   <file src="src/Symfony/Component/DependencyInjection/Loader/ContentLoaderTrait.php">
     <InvalidArgument>
       <code><![CDATA[$forLocator]]></code>
@@ -1503,8 +1412,6 @@
   </file>
   <file src="src/Symfony/Component/DependencyInjection/ParameterBag/ParameterBag.php">
     <InvalidTemplateParam>
-      <code><![CDATA[$this->resolveValue($key, $resolving)]]></code>
-      <code><![CDATA[$this->resolveValue($v, $resolving)]]></code>
       <code><![CDATA[$this->resolveValue($this->get($key), $resolving)]]></code>
     </InvalidTemplateParam>
   </file>
@@ -1581,24 +1488,6 @@
       <code><![CDATA[getenv($name)]]></code>
       <code><![CDATA[getenv($name)]]></code>
     </InvalidCast>
-  </file>
-  <file src="src/Symfony/Component/Emoji/EmojiTransliterator.php">
-    <ImmutablePropertyModification>
-      <code><![CDATA[$this->quickCheck ??= str_starts_with(array_key_first($this->map), ':') ? ':' : self::QUICK_CHECK]]></code>
-      <code><![CDATA[$this->transliterator ??= clone $transliterator ??= \Transliterator::createFromRules('[:any:]* > '.$cookie)]]></code>
-    </ImmutablePropertyModification>
-    <ImpureFunctionCall>
-      <code><![CDATA[str_starts_with(array_key_first($this->map), ':')]]></code>
-      <code><![CDATA[random_bytes(8)]]></code>
-    </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[self::create($this->id, \Transliterator::REVERSE)]]></code>
-      <code><![CDATA[\Transliterator::createFromRules('[:any:]* > '.$cookie)]]></code>
-    </ImpureMethodCall>
-    <ImpureStaticVariable>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </ImpureStaticVariable>
   </file>
   <file src="src/Symfony/Component/Emoji/Resources/bin/build.php">
     <UndefinedMethod>
@@ -1820,17 +1709,6 @@
       <code><![CDATA[$this->structuredValues = $structuredValues]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Form/Console/Descriptor/JsonDescriptor.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA['default' === $name]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
-  <file src="src/Symfony/Component/Form/Console/Descriptor/TextDescriptor.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA['default' === $name]]></code>
-      <code><![CDATA['nestedOptions' === $name]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Form/Extension/Core/DataAccessor/PropertyPathAccessor.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[null !== $dataAccessor = $dataMapper->getDataAccessor()]]></code>
@@ -1877,11 +1755,6 @@
       <code><![CDATA[$number]]></code>
       <code><![CDATA[$number]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/WeekToArrayTransformer.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[transform]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Symfony/Component/Form/Extension/Core/Type/FileType.php">
     <ImplicitFloatToIntCast>
@@ -1953,9 +1826,6 @@
     </NullArgument>
   </file>
   <file src="src/Symfony/Component/HttpClient/Internal/CurlClientState.php">
-    <InvalidCast>
-      <code><![CDATA[$response->handle]]></code>
-    </InvalidCast>
     <InvalidPropertyAssignment>
       <code><![CDATA[self::$curlVersion ??= curl_version()]]></code>
     </InvalidPropertyAssignment>
@@ -1967,11 +1837,6 @@
       <code><![CDATA[$this->responseFactory->next()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Component/HttpClient/NativeHttpClient.php">
-    <NonExistentArrayOffset>
-      <code><![CDATA['request_header']]></code>
-    </NonExistentArrayOffset>
-  </file>
   <file src="src/Symfony/Component/HttpClient/Response/AsyncResponse.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[null !== $chunk]]></code>
@@ -1982,13 +1847,6 @@
       <code><![CDATA[null !== $this->client]]></code>
       <code><![CDATA[null !== $this->response]]></code>
     </ImpossibleIdenticalComparison>
-  </file>
-  <file src="src/Symfony/Component/HttpClient/Response/TransportResponseTrait.php">
-    <AbstractMethodCall>
-      <code><![CDATA[self::schedule($response, $runningResponses)]]></code>
-      <code><![CDATA[self::perform($multi, $responses)]]></code>
-      <code><![CDATA[self::select($multi, min($timeoutMin, max(0, $timeoutMax - $elapsedTimeout)))]]></code>
-    </AbstractMethodCall>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/BinaryFileResponse.php">
     <InvalidArgument>
@@ -2017,25 +1875,11 @@
       <code><![CDATA[headers_send($statusCode)]]></code>
     </UndefinedFunction>
   </file>
-  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Handler/AbstractSessionHandler.php">
-    <InvalidArgument>
-      <code><![CDATA[$params]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Handler/MongoDbSessionHandler.php">
     <UndefinedClass>
       <code><![CDATA[Client]]></code>
       <code><![CDATA[Client]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/NativeSessionStorage.php">
-    <InvalidArgument>
-      <code><![CDATA[$this->saveHandler]]></code>
-      <code><![CDATA[false]]></code>
-    </InvalidArgument>
-    <TooFewArguments>
-      <code><![CDATA[session_set_save_handler($this->saveHandler, false)]]></code>
-    </TooFewArguments>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Proxy/SessionHandlerProxy.php">
     <InvalidPropertyAssignment>
@@ -2102,12 +1946,6 @@
       <code><![CDATA[Constraint]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/Bundle/AbstractBundle.php">
-    <InvalidStaticInvocation>
-      <code><![CDATA[BaseAbstractBundle::getContainerExtension()]]></code>
-      <code><![CDATA[BaseAbstractBundle::getPath()]]></code>
-    </InvalidStaticInvocation>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/Controller/ArgumentResolver/QueryParameterValueResolver.php">
     <InvalidArgument>
       <code><![CDATA[[$uidType, 'fromString']]]></code>
@@ -2164,9 +2002,6 @@
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpKernel/Event/ControllerEvent.php">
-    <InvalidArgument>
-      <code><![CDATA[$controller]]></code>
-    </InvalidArgument>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->controller = $controller]]></code>
       <code><![CDATA[$this->controller = $controller]]></code>
@@ -2202,20 +2037,11 @@
     <NullableReturnStatement>
       <code><![CDATA[return $response;]]></code>
     </NullableReturnStatement>
-    <UndefinedVariable>
-      <code><![CDATA[$controllerMetadata]]></code>
-      <code><![CDATA[$controllerMetadata]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/HttpKernel/Kernel.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->container->get('http_kernel');]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/HttpKernel/Log/DebugLoggerConfigurator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->processor = \is_object($processor) ? $processor : $processor(...)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpKernel/Resources/welcome.html.php">
     <UndefinedVariable>
@@ -2390,7 +2216,6 @@
   <file src="src/Symfony/Component/Lock/Store/RedisStore.php">
     <InvalidArgument>
       <code><![CDATA[array_merge([$resource], $args)]]></code>
-      <code><![CDATA[array_merge([$resource], $args)]]></code>
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Lock/Store/StoreFactory.php">
@@ -2515,12 +2340,6 @@
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/Messenger/Transport/Serialization/PhpSerializer.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[';' === $sep]]></code>
-      <code><![CDATA['E' === $kind]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Messenger/Transport/Serialization/Serializer.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->classToTypeMap = array_flip($this->typeToClassMap)]]></code>
@@ -2606,12 +2425,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $this->dsn;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Notifier/FlashMessage/AbstractFlashMessageImportanceMapper.php">
-    <UndefinedConstant>
-      <code><![CDATA[static::IMPORTANCE_MAP]]></code>
-      <code><![CDATA[static::IMPORTANCE_MAP]]></code>
-    </UndefinedConstant>
   </file>
   <file src="src/Symfony/Component/Notifier/Test/AbstractTransportFactoryTestCase.php">
     <UndefinedClass>
@@ -2793,12 +2606,6 @@
       <code><![CDATA[$rate]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Routing/Matcher/Dumper/CompiledUrlMatcherDumper.php">
-    <InvalidArgument>
-      <code><![CDATA[[__CLASS__, 'export']]]></code>
-      <code><![CDATA[[__CLASS__, 'export']]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Routing/RouteCompiler.php">
     <ImplicitFloatToIntCast>
       <code><![CDATA[$pos]]></code>
@@ -2907,7 +2714,6 @@
   <file src="src/Symfony/Component/Semaphore/Store/RedisStore.php">
     <InvalidArgument>
       <code><![CDATA[array_merge([$resource], $args)]]></code>
-      <code><![CDATA[array_merge([$resource], $args)]]></code>
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Serializer/Context/ContextBuilderTrait.php">
@@ -2964,9 +2770,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Serializer/Normalizer/NumberNormalizer.php">
-    <InvalidCast>
-      <code><![CDATA[$data]]></code>
-    </InvalidCast>
     <UnhandledMatchCondition>
       <code><![CDATA[match ($type) {
             Number::class => 'The data must be a "string" representing a decimal number, or an "int".',
@@ -2991,16 +2794,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $codePoints;]]></code>
     </InvalidReturnType>
-    <UndefinedVariable>
-      <code><![CDATA[$matches]]></code>
-      <code><![CDATA[$matches]]></code>
-    </UndefinedVariable>
-  </file>
-  <file src="src/Symfony/Component/String/ByteString.php">
-    <UndefinedVariable>
-      <code><![CDATA[$matches]]></code>
-      <code><![CDATA[$matches]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/String/LazyString.php">
     <ImpossibleIdenticalComparison>
@@ -3020,40 +2813,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return grapheme_strlen($this->string);]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Translation/Bridge/Loco/LocoProvider.php">
-    <InvalidArgument>
-      <code><![CDATA[$responses[$response] = [
-                    'locale' => $locale,
-                    'domain' => $domain,
-                    'previousCatalogue' => $previousCatalogue,
-                ]]]></code>
-      <code><![CDATA[$responses[$this->client->request('DELETE', \sprintf('assets/%s.json', rawurlencode($id)))] = $id]]></code>
-      <code><![CDATA[$responses[$response] = [
-                    'tag' => $tag,
-                    'assetId' => $id,
-                ]]]></code>
-      <code><![CDATA[$responses[$response] = [
-                'tag' => $tag,
-                'assetId' => null,
-            ]]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Translation/Bridge/Lokalise/LokaliseProvider.php">
-    <UndefinedVariable>
-      <code><![CDATA[$h]]></code>
-    </UndefinedVariable>
-  </file>
-  <file src="src/Symfony/Component/Translation/Extractor/Visitor/TransMethodVisitor.php">
-    <UndefinedMethod>
-      <code><![CDATA[$node->name->getLast()]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Component/Translation/Loader/XliffFileLoader.php">
-    <UndefinedMethod>
-      <code><![CDATA[$child->getAttribute('disp')]]></code>
-      <code><![CDATA[$child->getAttribute('hex')]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/Symfony/Component/Translation/Provider/Dsn.php">
     <NullableReturnStatement>
@@ -3170,11 +2929,6 @@
     <TooFewArguments>
       <code><![CDATA[new Lexer()]]></code>
     </TooFewArguments>
-  </file>
-  <file src="src/Symfony/Component/Uid/Factory/TimeBasedUuidFactory.php">
-    <UndefinedClass>
-      <code><![CDATA[$class]]></code>
-    </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/Uid/Ulid.php">
     <InvalidPropertyAssignment>
@@ -3337,9 +3091,6 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/VarDumper/Caster/ResourceCaster.php">
-    <InvalidCast>
-      <code><![CDATA[$dba]]></code>
-    </InvalidCast>
     <UndefinedClass>
       <code><![CDATA[\Dba\Connection]]></code>
     </UndefinedClass>
@@ -3370,24 +3121,10 @@
       <code><![CDATA[$item->type = $item->class]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/VarDumper/Dumper/HtmlDumper.php">
-    <InvalidStaticInvocation>
-      <code><![CDATA[AbstractDumper::dumpLine(0)]]></code>
-      <code><![CDATA[AbstractDumper::dumpLine($depth)]]></code>
-    </InvalidStaticInvocation>
-  </file>
   <file src="src/Symfony/Component/VarExporter/Internal/LazyDecoratorTrait.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->lazyObjectState->realInstance;]]></code>
     </InvalidReturnType>
-    <TraitConstantAccessedDirectly>
-      <code><![CDATA[$class::LAZY_OBJECT_PROPERTY_SCOPES]]></code>
-    </TraitConstantAccessedDirectly>
-  </file>
-  <file src="src/Symfony/Component/VarExporter/Internal/Registry.php">
-    <UndefinedVariable>
-      <code><![CDATA[$name]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/WebLink/Link.php">
     <InvalidPropertyAssignment>
@@ -3409,11 +3146,6 @@
       <code><![CDATA[return parent::getTransition();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Workflow/MarkingStore/MethodMarkingStore.php">
-    <InvalidMethodCall>
-      <code><![CDATA[$type->getName()]]></code>
-    </InvalidMethodCall>
-  </file>
   <file src="src/Symfony/Component/Yaml/Command/LintCommand.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[null === $this->format]]></code>
@@ -3431,11 +3163,7 @@
     </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[return $value;]]></code>
-      <code><![CDATA[return (object) $output;]]></code>
     </InvalidReturnType>
-    <UndefinedVariable>
-      <code><![CDATA[$length]]></code>
-    </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/Yaml/Unescaper.php">
     <ImplicitFloatToIntCast>
@@ -3463,11 +3191,6 @@
     <UndefinedClass>
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Contracts/Service/ServiceSubscriberTrait.php">
-    <UndefinedMethod>
-      <code><![CDATA[$attribute->newInstance()]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/Symfony/Contracts/Service/Test/ServiceLocatorTestCase.php">
     <UndefinedClass>

@@ -34,12 +34,6 @@
       <code><![CDATA[static::strlen($value)]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Mixin.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $callable;]]></code>
-      <code><![CDATA[return $callable;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="src/PsalmPlugin.php">
     <UndefinedClass>
       <code><![CDATA[PluginEntryPointInterface]]></code>
