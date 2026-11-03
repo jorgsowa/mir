@@ -1164,7 +1164,21 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
-        let Some(body) = &method.body else { return };
+        let Some(body) = &method.body else {
+            let here = crate::db::Fqcn::from_str(self.db, fqcn);
+            let name = method.name.as_str().unwrap_or("");
+            if let Some(declared) = crate::db::find_method_in_class(self.db, here, name) {
+                self.check_and_record_throws_classes(
+                    &declared.throws,
+                    method.name.span,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
+            }
+            return;
+        };
         let method_name = method.name.as_str().unwrap_or("");
 
         if method_name == "__construct" && self.mode == AnalysisMode::Full {

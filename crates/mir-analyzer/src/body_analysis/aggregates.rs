@@ -833,6 +833,16 @@ impl<'a> BodyAnalyzer<'a> {
 
             let method_name = method.name.as_str().unwrap_or("");
             let stored = crate::db::find_method_in_class(self.db, iface_fqcn_ref, method_name);
+            if let Some(stored) = &stored {
+                self.check_and_record_throws_classes(
+                    &stored.throws,
+                    method.name.span,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
+            }
 
             if self.mode == AnalysisMode::Full {
                 let stored_return = stored.as_ref().and_then(|m| m.return_type.as_deref());
