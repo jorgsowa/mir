@@ -227,6 +227,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // idiomatic infinite loop as `while (true)` — PHP truthiness treats
         // every nonzero int as true, only `0` is falsy.
         let is_infinite = is_always_true_literal(&w.condition);
+        let full = self.mode == crate::body_analysis::AnalysisMode::Full;
         let condition = w.condition.clone();
         let mut passes = 0;
         let post = self.analyze_loop_widened(
@@ -257,7 +258,13 @@ impl<'a> StatementsAnalyzer<'a> {
             is_infinite,
             is_infinite,
             Some(&w.condition),
-            None,
+            // Each pass re-judges the head and its held diagnostics, which only
+            // full analysis reports; inference can stop at the first pass.
+            (!full).then_some(&|first: &FlowState, second: &FlowState| {
+                first.differing_vars(second, false).is_some_and(|changed| {
+                    super::loops::body_overwrites_first(&w.body, &[&w.condition], &changed, &[])
+                })
+            }),
         );
         if passes == 1 {
             for issue in held_head_issues.drain(..) {
@@ -334,6 +341,8 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Only the last condition decides whether the loop continues.
         let is_infinite = f.condition.last().is_none_or(is_always_true_literal);
+        let full = self.mode == crate::body_analysis::AnalysisMode::Full;
+        let head: Vec<&php_ast::owned::Expr> = f.condition.iter().collect();
         let mut post = self.analyze_loop_widened(
             &pre,
             entry,
@@ -359,7 +368,11 @@ impl<'a> StatementsAnalyzer<'a> {
             is_infinite,
             is_infinite,
             f.condition.last(),
-            None,
+            (!full).then_some(&|first: &FlowState, second: &FlowState| {
+                first.differing_vars(second, false).is_some_and(|changed| {
+                    super::loops::body_overwrites_first(&f.body, &head, &changed, &[])
+                })
+            }),
         );
         // Every exit path evaluated the condition at least once.
         for cond in f.condition.iter() {
@@ -568,7 +581,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 first
                     .differing_vars(second, unused_tracking)
                     .is_some_and(|changed| {
-                        super::loops::body_overwrites_first(&fe.body, &changed, &seeded)
+                        super::loops::body_overwrites_first(&fe.body, &[], &changed, &seeded)
                     })
             }),
         );

@@ -57,8 +57,12 @@ pub(super) fn narrow_back_edge_keeping_initial(
 /// Whether each of `changed` but `seeded` (set by the loop before every
 /// iteration) is overwritten by a plain top-level assignment before the body
 /// reads it or can leave the iteration, so the body can't observe its state on entry.
+///
+/// `head` holds the expressions each iteration evaluates before the body; a
+/// plain assignment to a variable there counts as overwriting it.
 pub(super) fn body_overwrites_first(
     body: &php_ast::owned::Stmt,
+    head: &[&php_ast::owned::Expr],
     changed: &rustc_hash::FxHashSet<Name>,
     seeded: &[Name],
 ) -> bool {
@@ -68,6 +72,34 @@ pub(super) fn body_overwrites_first(
         .filter(|name| !seeded.contains(name))
         .copied()
         .collect();
+    for expr in head {
+        if remaining.is_empty() {
+            return true;
+        }
+        let (scanned, assigned) = match &expr.kind {
+            ExprKind::Assign(a) if !a.by_ref && a.op == php_ast::ast::AssignOp::Assign => {
+                match &a.target.kind {
+                    ExprKind::Variable(target) => {
+                        (&a.value, Some(Name::from(target.trim_start_matches('$'))))
+                    }
+                    _ => (*expr, None),
+                }
+            }
+            _ => (*expr, None),
+        };
+        let mut scan = MentionScan {
+            names: &remaining,
+            found: Vec::new(),
+            risky: false,
+        };
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_expr(&mut scan, scanned);
+        if scan.risky || !scan.found.is_empty() {
+            return false;
+        }
+        if let Some(assigned) = assigned {
+            remaining.retain(|name| *name != assigned);
+        }
+    }
     if remaining.is_empty() {
         return true;
     }
