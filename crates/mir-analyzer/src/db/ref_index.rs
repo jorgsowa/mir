@@ -34,6 +34,10 @@ type SymbolNo = u32;
 /// `(file, line, col_start, col_end)` with the file as an interned id.
 type LocTuple = (FileNo, u32, u16, u16);
 
+/// Visitor over each referenced symbol and its `(file, line, col_start)` positions.
+pub type ReferenceVisitor<'a> =
+    dyn FnMut(&str, &mut dyn Iterator<Item = (Arc<str>, u32, u16)>) + 'a;
+
 #[derive(Default, Debug)]
 pub struct RefIndex {
     /// File identity, shared with the database and the other file-keyed indexes.
@@ -226,10 +230,7 @@ impl RefIndex {
     }
 
     /// Visit every symbol that has locations, with its `(file, line, col_start)` positions.
-    pub fn for_each_symbol(
-        &self,
-        visit: &mut dyn FnMut(&str, &mut dyn Iterator<Item = (Arc<str>, u32, u16)>),
-    ) {
+    pub fn for_each_symbol(&self, visit: &mut ReferenceVisitor<'_>) {
         for (&symbol_id, locs) in &self.by_symbol {
             if locs.is_empty() {
                 continue;

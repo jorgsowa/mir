@@ -575,10 +575,7 @@ impl MirDatabase for MirDbStorage {
         self.locked_ref_index().has_reference(symbol)
     }
 
-    fn for_each_reference(
-        &self,
-        visit: &mut dyn FnMut(&str, &mut dyn Iterator<Item = (Arc<str>, u32, u16)>),
-    ) {
+    fn for_each_reference(&self, visit: &mut crate::db::ref_index::ReferenceVisitor<'_>) {
         self.locked_ref_index().for_each_symbol(visit);
     }
 

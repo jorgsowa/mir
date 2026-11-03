@@ -110,10 +110,7 @@ pub trait MirDatabase: salsa::Database {
     fn has_reference(&self, symbol: &str) -> bool;
 
     /// Visit every referenced symbol key with its `(file, line, col_start)` positions.
-    fn for_each_reference(
-        &self,
-        visit: &mut dyn FnMut(&str, &mut dyn Iterator<Item = (Arc<str>, u32, u16)>),
-    );
+    fn for_each_reference(&self, visit: &mut crate::db::ref_index::ReferenceVisitor<'_>);
 
     /// Clear reference locations for a file before re-analysis.
     fn clear_file_references(&self, file: &str);
