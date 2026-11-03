@@ -621,6 +621,16 @@ impl ClassLike {
         }
     }
 
+    /// Whether the class-like is marked `@api` / `@psalm-api`.
+    pub fn is_api(&self) -> bool {
+        match self {
+            ClassLike::Class(c) => c.is_api,
+            ClassLike::Interface(i) => i.is_api,
+            ClassLike::Trait(t) => t.is_api,
+            ClassLike::Enum(e) => e.is_api,
+        }
+    }
+
     /// Backed-enum check (`enum Foo: int { ... }`).
     pub fn is_backed_enum(&self) -> bool {
         match self {

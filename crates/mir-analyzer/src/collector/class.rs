@@ -646,6 +646,7 @@ impl<'a> DefinitionCollector<'a> {
         let storage = ClassDef {
             fqcn: fqcn.clone().into(),
             short_name: short_name.into(),
+            is_api: class_doc.is_api,
             parent,
             interfaces,
             traits: trait_uses,

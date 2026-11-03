@@ -368,6 +368,7 @@ impl<'a> DefinitionCollector<'a> {
         self.slice.traits.push(std::sync::Arc::new(TraitDef {
             fqcn: fqcn.into(),
             short_name: Arc::from(trait_name.as_str()),
+            is_api: trait_doc.is_api,
             own_methods,
             own_properties,
             own_constants,

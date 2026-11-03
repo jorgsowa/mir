@@ -471,7 +471,9 @@ impl<'a> DeadCodeAnalyzer<'a> {
         let stub_vfs = StubVfs::new();
         for (fqcn, class) in class_likes {
             let location = class.location();
-            if location.is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref())) {
+            if class.is_api()
+                || location.is_some_and(|loc| stub_vfs.is_stub_file(loc.file.as_ref()))
+            {
                 continue;
             }
             let class_name = fqcn.to_ascii_lowercase();

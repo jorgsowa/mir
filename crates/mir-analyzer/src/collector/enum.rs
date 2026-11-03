@@ -429,6 +429,7 @@ impl DefinitionCollector<'_> {
             .push(std::sync::Arc::new(mir_codebase::EnumDef {
                 fqcn: fqcn.into(),
                 short_name: Arc::from(enum_name.as_str()),
+                is_api: enum_doc.is_api,
                 scalar_type,
                 interfaces,
                 implements_type_args,

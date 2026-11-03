@@ -328,6 +328,7 @@ impl<'a> DefinitionCollector<'a> {
             .push(std::sync::Arc::new(InterfaceDef {
                 fqcn: fqcn.into(),
                 short_name: Arc::from(interface_name.as_str()),
+                is_api: iface_doc.is_api,
                 extends,
                 extends_type_args,
                 own_methods,

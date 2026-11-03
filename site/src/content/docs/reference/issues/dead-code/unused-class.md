@@ -18,4 +18,4 @@ class Helper {} // never used
 
 ## How to fix
 
-Remove the class, or reference it.
+Remove the class, or reference it. Mark a class-like used only from outside the analyzed code (a library's public API) with `@api` or `@psalm-api`.

@@ -721,6 +721,9 @@ pub struct ConstantDef {
 pub struct ClassDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
+    /// Marked `@api` / `@psalm-api`: used from outside the analyzed code.
+    #[serde(default)]
+    pub is_api: bool,
     pub parent: Option<Arc<str>>,
     pub interfaces: Vec<Arc<str>>,
     pub traits: Vec<Arc<str>>,
@@ -820,6 +823,9 @@ impl ClassDef {
 pub struct InterfaceDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
+    /// Marked `@api` / `@psalm-api`: used from outside the analyzed code.
+    #[serde(default)]
+    pub is_api: bool,
     pub extends: Vec<Arc<str>>,
     pub own_methods: MemberMap<Arc<MethodDef>>,
     pub own_constants: MemberMap<ConstantDef>,
@@ -852,6 +858,9 @@ pub struct InterfaceDef {
 pub struct TraitDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
+    /// Marked `@api` / `@psalm-api`: used from outside the analyzed code.
+    #[serde(default)]
+    pub is_api: bool,
     pub own_methods: MemberMap<Arc<MethodDef>>,
     pub own_properties: MemberMap<PropertyDef>,
     pub own_constants: MemberMap<ConstantDef>,
@@ -904,6 +913,9 @@ pub struct EnumCaseDef {
 pub struct EnumDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
+    /// Marked `@api` / `@psalm-api`: used from outside the analyzed code.
+    #[serde(default)]
+    pub is_api: bool,
     pub scalar_type: Option<Type>,
     pub interfaces: Vec<Arc<str>>,
     /// Type arguments from `@implements Interface<T1, T2>`.
