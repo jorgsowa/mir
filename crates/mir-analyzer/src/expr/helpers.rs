@@ -1126,6 +1126,22 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         if let Some(union) = keyed_array_union(left, right) {
             return union;
         }
+        // A union of shapes (`[]` or a filled shape) unions each alternative.
+        if left.types.len() > 1 {
+            let mut merged = Type::empty();
+            for atom in left.types.iter() {
+                match keyed_array_union(&Type::single(atom.clone()), right) {
+                    Some(union) => merged.merge_with(&union),
+                    None => {
+                        merged = Type::empty();
+                        break;
+                    }
+                }
+            }
+            if !merged.is_empty() {
+                return merged;
+            }
+        }
     }
     if left_is_array || right_is_array {
         let merged_left = if left_is_array {
