@@ -2754,3 +2754,179 @@ fn is_literal_scalar(atomic: &Atomic) -> bool {
             | Atomic::TLiteralFloat(_, _)
     )
 }
+
+impl FlowState {
+    /// The variables whose state differs between `self` and `other`; `None` when
+    /// anything else later analysis reads differs too (`inside_loop`, which each
+    /// pass of a loop body resets, aside). Sets a later pass of a loop
+    /// body can only grow by the entries an earlier one added (reads, first write
+    /// locations, consumed writes) are not compared.
+    ///
+    /// With `unused_tracking` false the pending and dead writes, which only
+    /// unused-variable diagnostics read, aren't compared either.
+    pub(crate) fn differing_vars(
+        &self,
+        other: &FlowState,
+        unused_tracking: bool,
+    ) -> Option<FxHashSet<Name>> {
+        if unused_tracking
+            && (self.last_write_locs != other.last_write_locs
+                || self.dead_writes != other.dead_writes)
+        {
+            return None;
+        }
+        macro_rules! same {
+            ($($field:ident),* $(,)?) => {
+                $(if self.$field != other.$field {
+                    return None;
+                })*
+            };
+        }
+        same!(
+            self_fqcn,
+            parent_fqcn,
+            static_fqcn,
+            fn_return_type,
+            fn_declared_throws,
+            locally_caught_throws,
+            inside_finally,
+            is_generator,
+            inside_constructor,
+            current_method_name,
+            hooked_property,
+            current_function_fqn,
+            template_scope_method,
+            template_scope_function,
+            is_in_pure_fn,
+            is_in_immutable_method,
+            is_in_external_mutation_free_method,
+            is_in_immutable_ctor,
+            inside_static_method,
+            strict_types,
+            key_tracking,
+            closures,
+            summarizing_taint,
+            byref_out_slots,
+            tainted_static_props,
+            param_names,
+            byref_param_names,
+            diverges,
+            has_dynamic_var_def,
+            has_dynamic_var_read,
+            has_dynamic_tainted_var_def,
+            template_param_names,
+            template_typed_params,
+            class_exists_guards,
+            class_exists_guarded_exprs,
+            defined_guards,
+            function_exists_guards,
+            method_exists_guards,
+            property_exists_guards,
+            reflection_throws_guards,
+            extension_loaded_guards,
+            readonly_initialized,
+            assigned_this_props,
+            this_escaped_to_call,
+            self_ref_closure_hint,
+        );
+        match (&self.object_guard_slots, &other.object_guard_slots) {
+            (None, None) => {}
+            (Some(a), Some(b)) if Arc::ptr_eq(a, b) => {}
+            _ => return None,
+        }
+        let mut names = FxHashSet::default();
+        diff_map_keys(&self.vars, &other.vars, &mut names);
+        diff_set(&self.assigned_vars, &other.assigned_vars, &mut names);
+        diff_set(
+            &self.possibly_assigned_vars,
+            &other.possibly_assigned_vars,
+            &mut names,
+        );
+        diff_map_keys(&self.tainted_vars, &other.tainted_vars, &mut names);
+        diff_map_keys(&self.tainted_keys, &other.tainted_keys, &mut names);
+        diff_map_keys(&self.key_names, &other.key_names, &mut names);
+        diff_map_keys(&self.taint_trails, &other.taint_trails, &mut names);
+        diff_map_keys(&self.param_parts, &other.param_parts, &mut names);
+        diff_set(&self.plain_vars, &other.plain_vars, &mut names);
+        diff_map_keys(&self.escaped_vars, &other.escaped_vars, &mut names);
+        diff_set(
+            &self.cloned_local_vars,
+            &other.cloned_local_vars,
+            &mut names,
+        );
+        diff_set(&self.static_var_names, &other.static_var_names, &mut names);
+        diff_map_keys(
+            &self.declared_var_types,
+            &other.declared_var_types,
+            &mut names,
+        );
+        diff_set(
+            &self.foreach_value_var_names,
+            &other.foreach_value_var_names,
+            &mut names,
+        );
+        diff_set(
+            &self.foreach_byref_var_names,
+            &other.foreach_byref_var_names,
+            &mut names,
+        );
+        diff_set(&self.catch_var_names, &other.catch_var_names, &mut names);
+        diff_map_keys(&self.guarded_defs, &other.guarded_defs, &mut names);
+        for (a, b) in [
+            (&self.ref_aliases, &other.ref_aliases),
+            (&other.ref_aliases, &self.ref_aliases),
+        ] {
+            for (name, target) in a {
+                if b.get(name) != Some(target) {
+                    names.insert(*name);
+                    names.insert(target.0);
+                }
+            }
+        }
+        for (a, b) in [
+            (&self.object_aliases, &other.object_aliases),
+            (&other.object_aliases, &self.object_aliases),
+        ] {
+            for (name, target) in a.iter() {
+                if b.get(name) != Some(target) {
+                    names.insert(*name);
+                    names.insert(*target);
+                }
+            }
+        }
+        let mut objects = FxHashSet::default();
+        diff_map_keys(&self.prop_refined, &other.prop_refined, &mut objects);
+        diff_map_keys(&self.tainted_props, &other.tainted_props, &mut objects);
+        names.extend(objects.into_iter().map(|(object, _): (Name, Name)| object));
+        Some(names)
+    }
+}
+
+/// Insert into `out` every key whose value differs between `a` and `b`.
+fn diff_map_keys<K, V>(a: &FxHashMap<K, V>, b: &FxHashMap<K, V>, out: &mut FxHashSet<K>)
+where
+    K: std::hash::Hash + Eq + Copy,
+    V: PartialEq,
+{
+    if std::ptr::eq(a, b) {
+        return;
+    }
+    for (key, value) in a {
+        if b.get(key) != Some(value) {
+            out.insert(*key);
+        }
+    }
+    for key in b.keys() {
+        if !a.contains_key(key) {
+            out.insert(*key);
+        }
+    }
+}
+
+/// Insert into `out` every name in exactly one of `a` and `b`.
+fn diff_set(a: &FxHashSet<Name>, b: &FxHashSet<Name>, out: &mut FxHashSet<Name>) {
+    if std::ptr::eq(a, b) {
+        return;
+    }
+    out.extend(a.symmetric_difference(b).copied());
+}

@@ -257,6 +257,7 @@ impl<'a> StatementsAnalyzer<'a> {
             is_infinite,
             is_infinite,
             Some(&w.condition),
+            None,
         );
         if passes == 1 {
             for issue in held_head_issues.drain(..) {
@@ -298,6 +299,7 @@ impl<'a> StatementsAnalyzer<'a> {
             true,
             false,
             Some(&dw.condition),
+            None,
         );
         *ctx = post;
     }
@@ -357,6 +359,7 @@ impl<'a> StatementsAnalyzer<'a> {
             is_infinite,
             is_infinite,
             f.condition.last(),
+            None,
         );
         // Every exit path evaluated the condition at least once.
         for cond in f.condition.iter() {
@@ -513,6 +516,17 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
+        // A second pass can change which writes are dead, which only full analysis reports.
+        let unused_tracking = self.mode == crate::body_analysis::AnalysisMode::Full;
+        // The key and value variables each iteration assigns before the body runs.
+        let seeded: Vec<mir_types::Name> = fe
+            .key
+            .as_ref()
+            .and_then(|key| extract_simple_var(key))
+            .into_iter()
+            .chain(value_var)
+            .map(|name| mir_types::Name::from(name.trim_start_matches('$')))
+            .collect();
         let mut post = self.analyze_loop_widened(
             &pre,
             entry,
@@ -550,6 +564,13 @@ impl<'a> StatementsAnalyzer<'a> {
             loop_guaranteed,
             false,
             None,
+            Some(&|first: &FlowState, second: &FlowState| {
+                first
+                    .differing_vars(second, unused_tracking)
+                    .is_some_and(|changed| {
+                        super::loops::body_overwrites_first(&fe.body, &changed, &seeded)
+                    })
+            }),
         );
         // A guaranteed foreach has no zero-iteration type path, so the loop
         // widening above correctly drops pre-loop types. Keep pre-loop writes

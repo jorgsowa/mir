@@ -1,3 +1,4 @@
+use crate::ast_ext::NameBareExt as _;
 use crate::db::MirDatabase;
 use mir_types::{ArrayKey, Atomic, Name, Type};
 use std::sync::Arc;
@@ -53,6 +54,151 @@ pub(super) fn narrow_back_edge_keeping_initial(
 
 /// Returns true when every variable present in `prev` has the same type in
 /// `next`, indicating the fixed-point has been reached.
+/// Whether each of `changed` but `seeded` (set by the loop before every
+/// iteration) is overwritten by a plain top-level assignment before the body
+/// reads it or can leave the iteration, so the body can't observe its state on entry.
+pub(super) fn body_overwrites_first(
+    body: &php_ast::owned::Stmt,
+    changed: &rustc_hash::FxHashSet<Name>,
+    seeded: &[Name],
+) -> bool {
+    use php_ast::owned::{ExprKind, StmtKind};
+    let mut remaining: Vec<Name> = changed
+        .iter()
+        .filter(|name| !seeded.contains(name))
+        .copied()
+        .collect();
+    if remaining.is_empty() {
+        return true;
+    }
+    let stmts: &[php_ast::owned::Stmt] = match &body.kind {
+        StmtKind::Block(block) => &block.stmts,
+        _ => std::slice::from_ref(body),
+    };
+    for stmt in stmts {
+        let mut scan = MentionScan {
+            names: &remaining,
+            found: Vec::new(),
+            risky: false,
+        };
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_stmt(&mut scan, stmt);
+        if scan.risky {
+            return false;
+        }
+        if scan.found.is_empty() {
+            continue;
+        }
+        let StmtKind::Expression(expr) = &stmt.kind else {
+            return false;
+        };
+        let ExprKind::Assign(assign) = &expr.kind else {
+            return false;
+        };
+        let ExprKind::Variable(target) = &assign.target.kind else {
+            return false;
+        };
+        let target = Name::from(target.trim_start_matches('$'));
+        if assign.by_ref || assign.op != php_ast::ast::AssignOp::Assign {
+            return false;
+        }
+        let mut value_scan = MentionScan {
+            names: &remaining,
+            found: Vec::new(),
+            risky: false,
+        };
+        let _ = php_ast::owned::visitor::OwnedVisitor::visit_expr(&mut value_scan, &assign.value);
+        if !value_scan.found.is_empty() {
+            return false;
+        }
+        remaining.retain(|name| *name != target);
+        if remaining.is_empty() {
+            return true;
+        }
+    }
+    false
+}
+
+/// The `names` an AST subtree mentions, and whether it can leave the iteration
+/// or reach locals in ways a name scan can't see.
+struct MentionScan<'n> {
+    names: &'n [Name],
+    found: Vec<Name>,
+    risky: bool,
+}
+
+impl php_ast::owned::visitor::OwnedVisitor for MentionScan<'_> {
+    type Break = ();
+
+    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::StmtKind;
+        match &stmt.kind {
+            StmtKind::Break(_)
+            | StmtKind::Continue(_)
+            | StmtKind::Return(_)
+            | StmtKind::Throw(_)
+            | StmtKind::Goto(_)
+            | StmtKind::Global(_)
+            | StmtKind::StaticVar(_) => {
+                self.risky = true;
+                return std::ops::ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        crate::recursion::walk_stmt(self, stmt)
+    }
+
+    fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> std::ops::ControlFlow<()> {
+        use php_ast::owned::ExprKind;
+        match &expr.kind {
+            ExprKind::Variable(name) => {
+                let name = Name::from(name.trim_start_matches('$'));
+                if self.names.contains(&name) && !self.found.contains(&name) {
+                    self.found.push(name);
+                }
+            }
+            ExprKind::VariableVariable(_)
+            | ExprKind::Include(..)
+            | ExprKind::Eval(_)
+            | ExprKind::Exit(_)
+            | ExprKind::Throw(_)
+            | ExprKind::Yield(_) => {
+                self.risky = true;
+            }
+            ExprKind::Assign(a) if a.by_ref => self.risky = true,
+            ExprKind::Closure(c) => {
+                for used in c.use_vars.iter() {
+                    let name = Name::from(used.name.as_str().unwrap_or("").trim_start_matches('$'));
+                    self.risky |= used.by_ref;
+                    if self.names.contains(&name) && !self.found.contains(&name) {
+                        self.found.push(name);
+                    }
+                }
+            }
+            ExprKind::FunctionCall(fc) => match &fc.name.kind {
+                ExprKind::Name(_) => {
+                    let callee = fc.name.kind.name_bare().unwrap_or_default();
+                    self.risky |= [
+                        "compact",
+                        "extract",
+                        "get_defined_vars",
+                        "func_get_args",
+                        "func_get_arg",
+                        "parse_str",
+                    ]
+                    .iter()
+                    .any(|f| callee.trim_start_matches('\\').eq_ignore_ascii_case(f));
+                }
+                _ => self.risky = true,
+            },
+            _ => {}
+        }
+        if self.risky {
+            return std::ops::ControlFlow::Break(());
+        }
+        crate::recursion::walk_expr(self, expr)
+    }
+}
+
 pub(super) fn vars_stabilized(
     prev: &rustc_hash::FxHashMap<Name, Arc<Type>>,
     next: &rustc_hash::FxHashMap<Name, Arc<Type>>,

@@ -1260,6 +1260,7 @@ impl<'a> StatementsAnalyzer<'a> {
     /// Returns the post-loop context that merges:
     ///   - the stable widened context after normal loop exit
     ///   - any contexts captured at `break` statements
+    #[allow(clippy::too_many_arguments)]
     fn analyze_loop_widened<F>(
         &mut self,
         pre: &FlowState,
@@ -1268,6 +1269,7 @@ impl<'a> StatementsAnalyzer<'a> {
         loop_guaranteed: bool,
         is_infinite: bool,
         exit_condition: Option<&Expr>,
+        repeats_first_pass: Option<RepeatsFirstPass<'_>>,
     ) -> FlowState
     where
         F: FnMut(&mut Self, &mut FlowState),
@@ -1367,6 +1369,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     current = next;
                     continue;
                 }
+                current = next;
+                stabilized = true;
+                break;
+            }
+            // A second pass that can't observe how its entry differs from the
+            // first's would repeat it exactly, so the first pass is the fixed point.
+            if iter_idx == 0 && repeats_first_pass.is_some_and(|repeats| repeats(&current, &next)) {
                 current = next;
                 stabilized = true;
                 break;
@@ -1494,3 +1503,7 @@ pub(crate) fn widen_for_check(u: Type) -> Type {
     }
     out
 }
+
+/// Whether a loop body's second pass, entered with the second state, would
+/// repeat its first, entered with the first.
+type RepeatsFirstPass<'a> = &'a dyn Fn(&FlowState, &FlowState) -> bool;
