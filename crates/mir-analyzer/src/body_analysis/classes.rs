@@ -2449,11 +2449,26 @@ impl<'a> BodyAnalyzer<'a> {
                     Some(t) => std::slice::from_ref(t),
                     None => &trait_list,
                 };
-                let found = candidates.iter().any(|t| {
+                // A trait also exposes the methods of the traits it uses.
+                let mut pending: Vec<Arc<str>> = candidates.to_vec();
+                let mut seen: rustc_hash::FxHashSet<String> = Default::default();
+                let mut found = false;
+                while let Some(t) = pending.pop() {
+                    if !seen.insert(t.to_ascii_lowercase()) {
+                        continue;
+                    }
                     let here = crate::db::Fqcn::from_str(self.db, t.as_ref());
-                    crate::db::find_class_like(self.db, here)
-                        .is_some_and(|cl| cl.own_methods().contains_key(orig_lower.as_ref()))
-                });
+                    let Some(cl) = crate::db::find_class_like(self.db, here) else {
+                        continue;
+                    };
+                    if cl.own_methods().contains_key(orig_lower.as_ref()) {
+                        found = true;
+                        break;
+                    }
+                    if let crate::db::ClassLike::Trait(td) = &cl {
+                        pending.extend(td.traits.iter().cloned());
+                    }
+                }
                 if !found {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedTraitAliasMethod {
