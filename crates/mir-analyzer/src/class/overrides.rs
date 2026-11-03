@@ -601,7 +601,10 @@ impl<'a> ClassAnalyzer<'a> {
                                     parent_ret, child_ret, self.db, child_file,
                                 )
                             } else {
-                                parent_ret.is_subtype_structural(child_ret)
+                                // The hint may also narrow the refinement (`array` for `array{..}|null`).
+                                parent_ret.types.iter().any(|a| {
+                                    mir_types::Type::single(a.clone()).is_subtype_structural(child_ret)
+                                })
                             });
                     if !compatible {
                         // Primary parent uses the original message format for
