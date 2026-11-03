@@ -940,6 +940,8 @@ pub struct DefinitionCollector<'a> {
     static_writes: literal_types::StaticWrites,
     /// Constants of the class-like being collected, for `self::X` in constant initializers.
     own_constants: Option<OwnConstants>,
+    /// `class_alias(original, alias)` calls with literal names: lowercase alias → original.
+    class_aliases: FxHashMap<String, Arc<str>>,
 }
 
 pub(super) struct OwnConstants {
@@ -994,6 +996,7 @@ impl<'a> DefinitionCollector<'a> {
             ns_blocks: Vec::new(),
             static_writes: literal_types::StaticWrites::default(),
             own_constants: None,
+            class_aliases: FxHashMap::default(),
         }
     }
 
@@ -1077,6 +1080,19 @@ impl<'a> DefinitionCollector<'a> {
     /// `file_namespace()` and the `file_*_imports()` queries can derive them via
     /// `collect_file_definitions`. Called at the end of `collect_slice`.
     fn finalize_slice(&mut self) {
+        // A class declared under an alias's name is an IDE stub (`if (false) { class X {} }`):
+        // at runtime the alias is the original class.
+        if !self.class_aliases.is_empty() {
+            for class in &mut self.slice.classes {
+                let Some(original) = self.class_aliases.get(&class.fqcn.to_ascii_lowercase())
+                else {
+                    continue;
+                };
+                if class.parent.is_none() && !original.eq_ignore_ascii_case(&class.fqcn) {
+                    Arc::make_mut(class).parent = Some(original.clone());
+                }
+            }
+        }
         if self.ns_blocks.len() >= 2 {
             let builders = std::mem::take(&mut self.ns_blocks);
             let ends: Vec<u32> = builders
@@ -2183,6 +2199,47 @@ impl<'a> DefinitionCollector<'a> {
     /// `function_exists()`-wrapped declarations above — a `define()` found
     /// anywhere is treated as unconditionally available, not gated on whether
     /// its enclosing function is ever actually called.
+    fn try_collect_class_alias(&mut self, expr: &php_ast::owned::Expr) {
+        use php_ast::owned::ExprKind;
+        let ExprKind::FunctionCall(call) = &expr.kind else {
+            return;
+        };
+        if !call
+            .name
+            .kind
+            .name_bare()
+            .is_some_and(|n| n.eq_ignore_ascii_case("class_alias"))
+        {
+            return;
+        }
+        let literal_class = |arg: Option<&php_ast::owned::Arg>| -> Option<String> {
+            match &arg?.value()?.kind {
+                ExprKind::String(s) => {
+                    Some(crate::util::runtime_class_name(s.as_str()).to_string())
+                }
+                ExprKind::ClassConstAccess(cca) if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) => {
+                    match &cca.class.kind {
+                        ExprKind::Name(name) => Some(
+                            self.resolve_ast_name(name)
+                                .trim_start_matches('\\')
+                                .to_string(),
+                        ),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            }
+        };
+        let (Some(original), Some(alias)) = (
+            literal_class(call.args.first()),
+            literal_class(call.args.get(1)),
+        ) else {
+            return;
+        };
+        self.class_aliases
+            .insert(alias.to_ascii_lowercase(), Arc::from(original.as_str()));
+    }
+
     fn try_collect_define(&mut self, stmt: &php_ast::owned::Stmt, expr: &php_ast::owned::Expr) {
         let php_ast::owned::ExprKind::FunctionCall(call) = &expr.kind else {
             return;
@@ -2397,6 +2454,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
             // phpstorm-stubs uses this form extensively in *_defines.php files.
             StmtKind::Expression(expr) => {
                 self.try_collect_define(stmt, expr);
+                self.try_collect_class_alias(expr);
             }
 
             // Recurse through control-flow wrappers (`if`/`while`/`for`/`foreach`/
