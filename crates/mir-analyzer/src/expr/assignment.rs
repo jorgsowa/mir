@@ -466,6 +466,19 @@ impl<'a> ExpressionAnalyzer<'a> {
         if let (true, ExprKind::PropertyAccess(pa)) = (a.by_ref, &a.value.kind) {
             self.check_dynamic_property_write_base(pa, ctx, expr_span);
         }
+        // A compound assignment evaluates its target's offsets before the value,
+        // so `$cache[$k = key()] ??= load($k)` defines `$k` for the right-hand side.
+        if a.op != AssignOp::Assign {
+            let mut base = &a.target;
+            while let ExprKind::ArrayAccess(aa) = &base.kind {
+                if let Some(idx) = aa.index.as_ref() {
+                    if matches!(idx.kind, ExprKind::Assign(_)) {
+                        self.analyze(idx, ctx);
+                    }
+                }
+                base = &aa.array;
+            }
+        }
         let rhs_ty = self.analyze(&a.value, ctx);
         self.vivifying_reference = false;
         ctx.self_ref_closure_hint = prev_self_ref_hint;
