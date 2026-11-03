@@ -373,6 +373,39 @@ impl<'a> StatementsAnalyzer<'a> {
         self.function_cache.as_ref().and_then(|(_, f)| f.clone())
     }
 
+    /// Analyzes a branch that type narrowing proves unreachable, from the
+    /// state before narrowing, only to record its references: the types may
+    /// come from docblocks the runtime doesn't enforce. Issues and every
+    /// other effect on the enclosing analysis are discarded.
+    pub(crate) fn analyze_impossible_branch(
+        &mut self,
+        stmt: &php_ast::owned::Stmt,
+        pre_narrowing: &FlowState,
+    ) {
+        if self.mode != AnalysisMode::Full || !self.record_reference_locations {
+            return;
+        }
+        let issues = self.issues.issue_count();
+        let returns = self.return_types.len();
+        let yields = self.yielded_types.len();
+        let breaks: Vec<usize> = self.break_ctx_stack.iter().map(Vec::len).collect();
+        let continues: Vec<usize> = self.continue_ctx_stack.iter().map(Vec::len).collect();
+        let taint_summary = self.taint_summary.clone();
+        let mut dead_ctx = pre_narrowing.branch();
+        dead_ctx.diverges = false;
+        self.analyze_stmt(stmt, &mut dead_ctx);
+        self.issues.truncate_to(issues);
+        self.return_types.truncate(returns);
+        self.yielded_types.truncate(yields);
+        for (frame, len) in self.break_ctx_stack.iter_mut().zip(breaks) {
+            frame.truncate(len);
+        }
+        for (frame, len) in self.continue_ctx_stack.iter_mut().zip(continues) {
+            frame.truncate(len);
+        }
+        self.taint_summary = taint_summary;
+    }
+
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
         for (i, stmt) in stmts.iter().enumerate() {
             if ctx.diverges && !self.is_close_tag_nop(stmt) {

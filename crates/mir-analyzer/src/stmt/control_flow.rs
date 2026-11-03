@@ -33,6 +33,8 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         if !then_ctx.diverges {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
+        } else if !pre_diverges {
+            self.analyze_impossible_branch(&if_stmt.then_branch, ctx);
         }
         let guard_unwritten = guard.is_some_and(|g| then_ctx.has_guarded_def(g.var, g));
         if let Some(g) = guard {
@@ -125,6 +127,8 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut branch_ctx = elseif_true_ctx;
             if !branch_ctx.diverges {
                 self.analyze_stmt(&elseif.body, &mut branch_ctx);
+            } else if !pre_elseif_diverges {
+                self.analyze_impossible_branch(&elseif.body, &pre_elseif);
             }
             elseif_ctxs.push(branch_ctx);
 
@@ -138,10 +142,13 @@ impl<'a> StatementsAnalyzer<'a> {
         // evaluated false — `running_ctx` already reflects exactly that,
         // chained through the loop above, including any assignments made in
         // an elseif's own condition.
+        let else_reachable_before = !pre_diverges;
         let mut else_ctx = running_ctx;
-        if !else_ctx.diverges {
-            if let Some(else_branch) = &if_stmt.else_branch {
+        if let Some(else_branch) = &if_stmt.else_branch {
+            if !else_ctx.diverges {
                 self.analyze_stmt(else_branch, &mut else_ctx);
+            } else if else_reachable_before {
+                self.analyze_impossible_branch(else_branch, ctx);
             }
         }
 
