@@ -145,6 +145,12 @@ pub fn run_output(
             std::collections::HashSet::new()
         };
 
+    // A partial run can't tell whether entries for files it didn't analyze still apply.
+    let unanalyzed_entries = baseline_data
+        .as_mut()
+        .map(|bl| take_unanalyzed_entries(bl, files, baseline_dir.as_deref()))
+        .unwrap_or_default();
+
     let stale_baseline_entries = if cli.report_stale_baseline {
         baseline_data
             .as_ref()
@@ -156,6 +162,7 @@ pub fn run_output(
 
     // --update-baseline: write back only the issues still present in the baseline.
     if cli.update_baseline {
+        new_baseline.entries.extend(unanalyzed_entries.entries);
         let path = baseline_path
             .clone()
             .unwrap_or_else(|| cwd().join(BASELINE_FILE));
@@ -303,6 +310,32 @@ struct StaleBaselineEntry {
     file: String,
     kind: String,
     snippet: String,
+}
+
+/// Removes entries for existing files outside `files`; a missing file's entries stay and go stale.
+fn take_unanalyzed_entries(
+    baseline: &mut Baseline,
+    files: &[PathBuf],
+    baseline_dir: Option<&Path>,
+) -> Baseline {
+    let Some(dir) = baseline_dir else {
+        return Baseline::default();
+    };
+    let cwd = cwd();
+    let analyzed: std::collections::HashSet<PathBuf> = files
+        .iter()
+        .map(|f| normalize_for_compare(&cwd.join(f)))
+        .collect();
+    let mut taken = Baseline::default();
+    baseline.entries.retain(|file, by_kind| {
+        let path = dir.join(file);
+        if !path.exists() || analyzed.contains(&normalize_for_compare(&path)) {
+            return true;
+        }
+        taken.entries.insert(file.clone(), std::mem::take(by_kind));
+        false
+    });
+    taken
 }
 
 fn stale_entries(baseline: &Baseline) -> Vec<StaleBaselineEntry> {

@@ -8,6 +8,7 @@ mod default_baseline_file;
 mod file_extensions;
 mod multiple_paths_composer_root;
 mod no_taint_flag;
+mod partial_run_baseline;
 mod project_files_restrict_composer_discovery;
 mod psalm_error_level;
 mod relative_config_ignore_files;
