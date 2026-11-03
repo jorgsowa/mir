@@ -1898,7 +1898,17 @@ pub fn find_property_in_chain<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, PropertyDef)> {
-    let (owner, mut prop) = find_property_in_chain_uncached(db, fqcn, name)?;
+    property_in_chain(db, fqcn, Name::new(name)).clone()
+}
+
+/// [`find_property_in_chain`] memoized per class and name.
+#[salsa::tracked(returns(ref))]
+fn property_in_chain<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: Name,
+) -> Option<(Arc<str>, PropertyDef)> {
+    let (owner, mut prop) = find_property_in_chain_uncached(db, fqcn, name.as_str())?;
     // A property's `@var` docblock type may carry a bare well-known-global-
     // builtin name purely because of `collector::resolution`'s leniency
     // (P28's class-member sibling to P27's param/return one) — see
