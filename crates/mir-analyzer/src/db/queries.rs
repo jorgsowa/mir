@@ -207,6 +207,9 @@ pub fn declared_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<
 /// [`declared_template_params`] instead only when own-declaration-only is
 /// specifically the question being asked.
 pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[TemplateParam]>> {
+    if !crate::db::ancestry_declares_templates(db, crate::db::Fqcn::from_str(db, fqcn)) {
+        return None;
+    }
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     // A worklist, not a linear `current = parent` chain: a bare interface
     // (`interface DogContainer extends AnimalContainer {}`) may extend
@@ -358,6 +361,9 @@ pub fn inherited_template_bindings(
     fqcn: &str,
     own_bindings: &FxHashMap<Name, Type>,
 ) -> FxHashMap<Name, Type> {
+    if !crate::db::ancestry_declares_templates(db, crate::db::Fqcn::from_str(db, fqcn)) {
+        return FxHashMap::default();
+    }
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
     let mut substitution: FxHashMap<Name, Type> = own_bindings.clone();
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
@@ -474,6 +480,9 @@ pub fn rebind_scope_templates(
     scope: &str,
     bindings: &mut FxHashMap<Name, Type>,
 ) {
+    if !crate::db::ancestry_declares_templates(db, crate::db::Fqcn::from_str(db, fqcn)) {
+        return;
+    }
     if let Some(scoped) = template_bindings_for_ancestor(db, fqcn, own_bindings, scope) {
         bindings.extend(scoped);
     } else if let Some(scoped) = ancestor_path_bindings(db, fqcn, own_bindings, scope, true) {

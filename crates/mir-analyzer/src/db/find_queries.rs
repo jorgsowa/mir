@@ -1400,6 +1400,39 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     order.into()
 }
 
+/// Whether `fqcn` or any class-like it extends, implements or uses declares `@template` params.
+#[salsa::tracked]
+pub fn ancestry_declares_templates<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> bool {
+    let initial: Arc<str> = (*fqcn.name(db)).into();
+    let mut visited = rustc_hash::FxHashSet::<Arc<str>>::default();
+    let mut stack = vec![initial];
+    while let Some(name) = stack.pop() {
+        if !visited.insert(name.clone()) {
+            continue;
+        }
+        let Some(class) = find_class_like(db, Fqcn::interned(db, Name::new(name.as_ref()))) else {
+            continue;
+        };
+        if !class.template_params().is_empty() {
+            return true;
+        }
+        stack.extend(class.ancestor_fqcns());
+        stack.extend(class.interfaces().iter().cloned());
+        stack.extend(class.extends().iter().cloned());
+        stack.extend(class.class_traits().iter().cloned());
+        stack.extend(class.parent().cloned());
+        for (target, _) in class
+            .implements_type_args()
+            .iter()
+            .chain(class.interface_extends_type_args())
+            .chain(class.trait_use_type_args())
+        {
+            stack.push(target.clone());
+        }
+    }
+    false
+}
+
 /// Array-literal property defaults declared directly on `fqcn` (own class,
 /// not ancestors). Each entry is a property whose declared default is an
 /// array literal, with its `(key, value)` pairs flattened to strings: string
