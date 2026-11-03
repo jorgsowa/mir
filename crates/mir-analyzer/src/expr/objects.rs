@@ -2036,6 +2036,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let caller = ctx.self_fqcn.as_deref().unwrap_or("");
                 if caller.is_empty() {
                     true
+                } else if crate::flow_state::self_is_trait(self.db, ctx) {
+                    // The using class is unknown; it may extend the owner.
+                    false
                 } else {
                     // PHP's protected check is symmetric over the class
                     // hierarchy: caller-extends-owner is the common case, but
