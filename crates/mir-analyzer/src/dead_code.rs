@@ -203,36 +203,18 @@ impl<'a> DeadCodeAnalyzer<'a> {
         }
 
         // --- Non-referenced free functions ---
-        let fqns: Vec<mir_types::Name> = crate::db::workspace_functions(self.db)
-            .iter()
-            .copied()
-            .collect();
-        for fqn in fqns {
-            let here = crate::db::Fqcn::from_str(self.db, fqn.as_str());
-            let pulled = crate::db::find_function(self.db, here);
-            let Some(f) = pulled.as_ref() else {
-                continue;
-            };
-            let (location, short_name) = (f.location.clone(), f.short_name.to_string());
-            // Skip PHP built-in and extension functions loaded from stubs —
-            // they are not user-defined dead code.
-            if let Some(loc) = &location {
+        for (fqn, f) in crate::db::analyzed_function_defs(self.db, &self.analyzed_files) {
+            if let Some(loc) = &f.location {
                 if stub_vfs.is_stub_file(loc.file.as_ref()) {
                     continue;
                 }
-                // Restrict to the project file set (when scoped), mirroring the
-                // class-member pass: a function from a lazily-loaded vendor file
-                // is not user dead code.
-                if !self.analyzed_files.is_empty()
-                    && !self.analyzed_files.contains(loc.file.as_ref())
-                {
-                    continue;
-                }
             }
-            if !self.db.has_reference(&format!("fn:{}", fqn.as_ref())) {
-                let location = crate::diagnostics::storage_loc_to_location(location.as_ref());
+            if !self.db.has_reference(&format!("fn:{fqn}")) {
+                let location = crate::diagnostics::storage_loc_to_location(f.location.as_ref());
                 issues.push(Issue::new(
-                    IssueKind::UnusedFunction { name: short_name },
+                    IssueKind::UnusedFunction {
+                        name: f.short_name.to_string(),
+                    },
                     location,
                 ));
             }

@@ -972,6 +972,21 @@ pub fn analyzed_trait_defs(
     )
 }
 
+/// Free functions declared in `analyzed_files`, one entry per declaration
+/// (a name declared under several `function_exists` guards appears once per site).
+pub fn analyzed_function_defs(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::FunctionDef>)> {
+    collect_analyzed_defs(
+        db,
+        analyzed_files,
+        |slice| &slice.functions,
+        |f| f,
+        |f| &f.fqn,
+    )
+}
+
 /// [`file_class_defs`] for interfaces.
 #[salsa::tracked(returns(ref))]
 fn file_interface_defs(db: &dyn MirDatabase, file: SourceFile) -> Vec<Arc<InterfaceDef>> {
