@@ -39,11 +39,24 @@ struct Candidate {
     location: Option<mir_types::Location>,
 }
 
+/// A reference key that keeps candidate `id` alive, optionally only when the
+/// reference sits inside `within`.
+struct Credit {
+    id: u32,
+    within: Option<Arc<mir_types::Location>>,
+}
+
+type Key = (String, Option<Arc<mir_types::Location>>);
+
+fn anywhere(key: String) -> Key {
+    (key, None)
+}
+
 #[derive(Default)]
 struct Candidates {
     list: Vec<Candidate>,
     /// Normalized reference key → candidates that key keeps alive.
-    by_key: FxHashMap<String, Vec<u32>>,
+    by_key: FxHashMap<String, Vec<Credit>>,
 }
 
 impl Candidates {
@@ -51,12 +64,15 @@ impl Candidates {
         &mut self,
         kind: IssueKind,
         location: Option<mir_types::Location>,
-        keys: impl IntoIterator<Item = String>,
+        keys: impl IntoIterator<Item = Key>,
     ) {
         let id = self.list.len() as u32;
         self.list.push(Candidate { kind, location });
-        for key in keys {
-            self.by_key.entry(key).or_default().push(id);
+        for (key, within) in keys {
+            self.by_key
+                .entry(key)
+                .or_default()
+                .push(Credit { id, within });
         }
     }
 }
@@ -119,22 +135,26 @@ impl<'a> DeadCodeAnalyzer<'a> {
             if !normalize_key(symbol, &mut normalized) {
                 return;
             }
-            let Some(ids) = candidates.by_key.get(normalized.as_str()) else {
+            let Some(credits) = candidates.by_key.get(normalized.as_str()) else {
                 return;
             };
-            if ids.iter().all(|&id| used[id as usize]) {
+            if credits.iter().all(|c| used[c.id as usize]) {
                 return;
             }
             positions_buf.clear();
             positions_buf.extend(positions);
-            for &id in ids {
-                let own_span = candidates.list[id as usize].location.as_ref();
+            for credit in credits {
+                let own_span = candidates.list[credit.id as usize].location.as_ref();
                 // A reference from inside the declaration itself (recursion,
                 // `new self`) doesn't keep it alive.
                 if positions_buf.iter().any(|(file, line, col)| {
                     !own_span.is_some_and(|s| contains(s, file, *line, *col))
+                        && credit
+                            .within
+                            .as_ref()
+                            .is_none_or(|w| contains(w, file, *line, *col))
                 }) {
-                    used[id as usize] = true;
+                    used[credit.id as usize] = true;
                 }
             }
         });
@@ -166,22 +186,26 @@ impl<'a> DeadCodeAnalyzer<'a> {
             // may reach any private member, so it keeps all of them alive.
             let dyn_key = format!("dyn:{fqcn_lower}");
 
-            // A trait's own body calling `$this->m()` is recorded under the
-            // trait (`traituse:`); walk the transitive ancestors so nested
-            // composition (`use Outer` where `Outer` uses `Inner`) is covered.
+            // A trait body calling `$this->m()` reaches the composing class's
+            // own `m`: recorded as `traituse:` when the trait lacks `m`, or
+            // under the trait's own `m` it overrides. Walk the transitive
+            // ancestors so nested composition (`use Outer` where `Outer` uses
+            // `Inner`) is covered.
             let here = crate::db::Fqcn::from_str(self.db, fqcn_str);
-            let used_traits: Vec<String> = crate::db::class_ancestors_by_fqcn(self.db, here)
-                .iter()
-                .filter(|a| a.as_ref() != fqcn_str)
-                .filter(|a| {
-                    let ancestor_here = crate::db::Fqcn::from_str(self.db, a.as_ref());
-                    matches!(
-                        crate::db::find_class_like(self.db, ancestor_here),
-                        Some(crate::db::ClassLike::Trait(_))
-                    )
-                })
-                .map(|t| t.to_ascii_lowercase())
-                .collect();
+            let used_traits: Vec<(String, Option<Arc<mir_types::Location>>)> =
+                crate::db::class_ancestors_by_fqcn(self.db, here)
+                    .iter()
+                    .filter(|a| a.as_ref() != fqcn_str)
+                    .filter_map(|a| {
+                        let ancestor_here = crate::db::Fqcn::from_str(self.db, a.as_ref());
+                        match crate::db::find_class_like(self.db, ancestor_here) {
+                            Some(crate::db::ClassLike::Trait(t)) => {
+                                Some((a.to_ascii_lowercase(), t.location.clone().map(Arc::new)))
+                            }
+                            _ => None,
+                        }
+                    })
+                    .collect();
 
             // `@dataProvider name` / `#[DataProvider('name')]` methods are invoked by
             // PHPUnit via reflection, never through an ordinary call site.
@@ -202,13 +226,17 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 {
                     continue;
                 }
-                let keys = [format!("meth:{fqcn_lower}::{name_lower}"), dyn_key.clone()]
-                    .into_iter()
-                    .chain(
-                        used_traits
-                            .iter()
-                            .map(|t| format!("traituse:{t}::{name_lower}")),
-                    );
+                let keys = [
+                    anywhere(format!("meth:{fqcn_lower}::{name_lower}")),
+                    anywhere(dyn_key.clone()),
+                ]
+                .into_iter()
+                .chain(used_traits.iter().flat_map(|(t, span)| {
+                    [
+                        anywhere(format!("traituse:{t}::{name_lower}")),
+                        (format!("meth:{t}::{name_lower}"), span.clone()),
+                    ]
+                }));
                 candidates.push(
                     IssueKind::UnusedMethod {
                         class: fqcn_str.to_string(),
@@ -227,12 +255,17 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     continue;
                 }
                 let keys = [
-                    format!("prop:{fqcn_lower}::{name}"),
-                    dyn_key.clone(),
-                    format!("objvars:{fqcn_lower}"),
+                    anywhere(format!("prop:{fqcn_lower}::{name}")),
+                    anywhere(dyn_key.clone()),
+                    anywhere(format!("objvars:{fqcn_lower}")),
                 ]
                 .into_iter()
-                .chain(used_traits.iter().map(|t| format!("traituse:{t}::{name}")));
+                .chain(used_traits.iter().flat_map(|(t, span)| {
+                    [
+                        anywhere(format!("traituse:{t}::{name}")),
+                        (format!("prop:{t}::{name}"), span.clone()),
+                    ]
+                }));
                 candidates.push(
                     IssueKind::UnusedProperty {
                         class: fqcn_str.to_string(),
@@ -266,7 +299,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     class: fqcn.to_string(),
                 },
                 c.location.clone(),
-                [format!("cls:{}", fqcn.to_ascii_lowercase())],
+                [anywhere(format!("cls:{}", fqcn.to_ascii_lowercase()))],
             );
         }
     }
@@ -285,7 +318,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     name: f.short_name.to_string(),
                 },
                 f.location.clone(),
-                [format!("fn:{}", fqn.to_ascii_lowercase())],
+                [anywhere(format!("fn:{}", fqn.to_ascii_lowercase()))],
             );
         }
     }
