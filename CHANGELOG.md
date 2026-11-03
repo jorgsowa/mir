@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `UnusedConstant` (MIR0509): private class and enum constants nothing reads.
+- `@api` / `@psalm-api` on a class, interface, trait or enum exempts it from `UnusedClass`.
 - Dead-code detection covers more: `UnusedClass` reports non-final and abstract classes, interfaces, traits and enums (subclasses of a `*TestCase` are skipped); private enum methods are checked; a private property of plain data (scalars and arrays of them) that is only assigned with `=` is reported; recursive calls and `new self` no longer keep a declaration alive.
 
 ### Changed
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Dead-code false positives: case-mismatched names (`new foo()` for `Foo`); `[__CLASS__, 'm']` callables (`__CLASS__` is now typed as the enclosing class-string, which also fixes `InvalidArgument` on such callbacks); properties read via `get_object_vars()`, `(array)`, `serialize()`, `var_export()` or `foreach` over the object; members used from a file included in a method; a class's override of a trait method the trait calls; references in branches ruled out only by docblock-based narrowing; `@throws` on interface and abstract methods; class names built from a namespace literal (`'App\\Handlers\\' . $name`); constants used in other constant initializers, member attributes, `constant()` or `self::{$name}`; members missing from the winning declaration of a duplicated class.
+- A class, function or constant declared more than once resolves to the same declaration on every run: the one at the name's PSR-4 path, else the greatest path (a polyfill's newest-PHP bootstrap). The winner used to depend on registration order, so diagnostics could change between runs.
 - `UnusedFunction` is reported once per declaration instead of once per declaring file, and is no longer skipped when another file declares the same name; `UnusedMethod` keeps the declared name casing.
 - Taint: a call to an own method that stores request data on `$this`, itself or through a helper it passes the data to, now taints those properties for the rest of the caller (e.g. WordPress `WP::main()` → `send_headers()`).
 
