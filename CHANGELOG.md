@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `|`, `&` and `^` of two integer literals fold to a literal, so `preg_match_all()` with `PREG_OFFSET_CAPTURE | PREG_SET_ORDER` types `$matches` by its flags.
 - `new $obj()` is typed as `$obj`'s class instead of `object`.
 - A parent's `@param T` no longer narrows a child parameter whose native type adds `null` (`?T`).
+- The false branch of `method_exists($mixed, ...)` keeps `string`, since the argument may be a class name.
 
 ## [0.90.0] - 2026-11-03
 

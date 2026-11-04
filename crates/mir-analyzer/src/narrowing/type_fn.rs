@@ -341,6 +341,10 @@ pub(crate) fn type_fn_narrowed(
                     result.add_type(t.clone());
                 } else if matches!(t, Atomic::TMixed) {
                     result.add_type(Atomic::TObject);
+                    // A class-name string without the member is just as likely.
+                    if !is_true {
+                        result.add_type(Atomic::TString);
+                    }
                 } else if matches!(t, Atomic::TScalar) {
                     result.add_type(Atomic::TString);
                 }

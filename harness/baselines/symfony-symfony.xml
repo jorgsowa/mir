@@ -364,11 +364,6 @@
       <code><![CDATA[$service::class]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/TextDescriptor.php">
-    <InvalidArgument>
-      <code><![CDATA[$controller]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/XmlDescriptor.php">
     <InvalidTemplateParam>
       <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerAliasDocument($alias, $options['id'] ?? null)->childNodes->item(0), true))]]></code>
