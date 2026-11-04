@@ -1,9 +1,7 @@
 ===description===
 `array{...}`/`list{...}` shapes: keyed entries, `?` optional markers,
 positional (unkeyed) entries auto-indexed from 0, quoted non-identifier
-keys, and nesting. `object{...}` has no dedicated shape atom and is
-approximated as plain `object` (property shape is lost — see
-parser/docblock/types.rs).
+keys, and nesting. `object{...}` keeps its property shape.
 ===config===
 <mir>
   <issueHandlers>
@@ -73,7 +71,7 @@ function check_array_shape_generic_value($x) {
 function check_object_shape($x) {
     /**
      * @var object{a: int} $x
-     * @mir-check $x is object
+     * @mir-check $x is object{a: int}
      */
     var_dump($x);
 }

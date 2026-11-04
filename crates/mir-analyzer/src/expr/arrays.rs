@@ -709,6 +709,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         a,
                         Atomic::TNamedObject { .. }
                             | Atomic::TObject
+                            | Atomic::TObjectShape { .. }
                             | Atomic::TArray { .. }
                             | Atomic::TList { .. }
                             | Atomic::TKeyedArray { .. }

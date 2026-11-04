@@ -414,7 +414,7 @@ pub(crate) fn php_type_text(
                 i += 1;
                 3
             }
-            Atomic::TObject => 4,
+            Atomic::TObject | Atomic::TObjectShape { .. } => 4,
             Atomic::TArray { .. } => 5,
             Atomic::TString => 6,
             Atomic::TInt => 7,

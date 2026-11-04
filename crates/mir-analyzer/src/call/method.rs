@@ -983,7 +983,9 @@ impl CallAnalyzer {
                         None => self_out_union.merge_with(&Type::single(atomic.clone())),
                     }
                 }
-                mir_types::Atomic::TObject | mir_types::Atomic::TTemplateParam { .. } => {
+                mir_types::Atomic::TObject
+                | mir_types::Atomic::TObjectShape { .. }
+                | mir_types::Atomic::TTemplateParam { .. } => {
                     result.add_type(mir_types::Atomic::TMixed);
                     self_out_union.merge_with(&Type::single(atomic.clone()));
                 }

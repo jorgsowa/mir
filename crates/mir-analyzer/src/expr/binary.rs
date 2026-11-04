@@ -88,6 +88,7 @@ pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
         | Atomic::TNonEmptyList { .. }
         | Atomic::TKeyedArray { .. }
         | Atomic::TObject
+        | Atomic::TObjectShape { .. }
         | Atomic::TNamedObject { .. }
         | Atomic::TStaticObject { .. }
         | Atomic::TSelf { .. }
@@ -521,6 +522,7 @@ pub(super) fn operand_is_non_numeric(ty: &Type) -> bool {
         | Atomic::TNonEmptyList { .. }
         | Atomic::TKeyedArray { .. }
         | Atomic::TObject
+        | Atomic::TObjectShape { .. }
         | Atomic::TNamedObject { .. }
         | Atomic::TStaticObject { .. }
         | Atomic::TSelf { .. }
@@ -547,6 +549,7 @@ fn operand_has_any_non_numeric_member(ty: &Type) -> bool {
         | Atomic::TNonEmptyList { .. }
         | Atomic::TKeyedArray { .. }
         | Atomic::TObject
+        | Atomic::TObjectShape { .. }
         | Atomic::TNamedObject { .. }
         | Atomic::TStaticObject { .. }
         | Atomic::TSelf { .. }

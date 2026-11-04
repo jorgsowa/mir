@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A protected method is callable from an ancestor of the class that declares or overrides it, as PHP allows, instead of being reported as `UndefinedMethod`.
 - `--update-baseline` on a partial run (`mir src/Foo.php`) keeps the baseline entries of files it didn't analyze, and `--report-stale-baseline` no longer reports them as stale.
 - `@phpstan-method`, `@phpstan-property`, `@phpstan-property-read`, `@phpstan-property-write`, `@psalm-throws` and `@phpstan-throws` are read. A prefixed `@method`/`@property` tag overrides a plain one for the same name.
+- `object{prop: T, ...}` docblock types keep their properties instead of becoming plain `object`: reading `$o->prop` gives `T`, and a shape argument missing a required property or with an incompatible property type is reported as `InvalidArgument`.
 
 ## [0.90.0] - 2026-11-03
 

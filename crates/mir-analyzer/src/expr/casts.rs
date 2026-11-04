@@ -157,6 +157,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TKeyedArray { .. }
                             | Atomic::TNamedObject { .. }
                             | Atomic::TObject
+                            | Atomic::TObjectShape { .. }
                     ) && !has_cast_handler(t, kind)
                 }) && !inner_ty.contains(is_scalar_safe)
                 {
@@ -197,6 +198,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TKeyedArray { .. }
                             | Atomic::TNamedObject { .. }
                             | Atomic::TObject
+                            | Atomic::TObjectShape { .. }
                     ) && !has_cast_handler(t, kind)
                 }) && !inner_ty.contains(is_scalar_safe)
                 {

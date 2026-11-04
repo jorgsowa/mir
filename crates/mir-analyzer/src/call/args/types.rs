@@ -616,11 +616,12 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
             Atomic::TIntersection { parts } => {
                 // An intersection of named types is an object; check if param accepts
                 // `object` or if any part of the intersection satisfies the param.
-                if param
-                    .types
-                    .iter()
-                    .any(|p| matches!(p, Atomic::TObject | Atomic::TMixed))
-                {
+                if param.types.iter().any(|p| {
+                    matches!(
+                        p,
+                        Atomic::TObject | Atomic::TObjectShape { .. } | Atomic::TMixed
+                    )
+                }) {
                     return true;
                 }
                 // If param itself requires an intersection, every required part must
@@ -645,10 +646,18 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
             }
             // Bare `object` satisfies any param that accepts `object` or `mixed`.
             Atomic::TObject => {
+                return param.types.iter().any(|p| {
+                    matches!(
+                        p,
+                        Atomic::TObject | Atomic::TObjectShape { .. } | Atomic::TMixed
+                    )
+                });
+            }
+            Atomic::TObjectShape { .. } => {
                 return param
                     .types
                     .iter()
-                    .any(|p| matches!(p, Atomic::TObject | Atomic::TMixed));
+                    .any(|p| mir_types::union::atomic_subtype(a_atomic, p));
             }
             _ => return false,
         };
@@ -708,7 +717,7 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
 
             let param_fqcn: &Name = match p_atomic {
                 // Any named-object arg satisfies bare `object` or `mixed`.
-                Atomic::TObject | Atomic::TMixed => return true,
+                Atomic::TObject | Atomic::TObjectShape { .. } | Atomic::TMixed => return true,
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,

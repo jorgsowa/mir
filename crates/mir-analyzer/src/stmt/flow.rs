@@ -545,7 +545,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                     }
                 }
-                mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
+                mir_types::Atomic::TMixed
+                | mir_types::Atomic::TObject
+                | mir_types::Atomic::TObjectShape { .. } => {}
                 // `A&B` is throwable when any part is (`new class extends \Exception implements I {}`).
                 mir_types::Atomic::TIntersection { parts }
                     if parts.iter().flat_map(|p| p.types.iter()).any(|a| match a {
@@ -569,7 +571,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || r == "Error"
                                 || crate::db::extends_or_implements(self.db, &r, "Throwable")
                         }
-                        mir_types::Atomic::TMixed | mir_types::Atomic::TObject => true,
+                        mir_types::Atomic::TMixed
+                        | mir_types::Atomic::TObject
+                        | mir_types::Atomic::TObjectShape { .. } => true,
                         _ => false,
                     });
                     if !bound_throwable {

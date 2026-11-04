@@ -801,7 +801,7 @@ fn param_contains_template_or_unknown(
                         || crate::db::extends_or_implements(ea.db, fqcn.as_ref(), arg_fqcn.as_ref())
                         || crate::db::has_unknown_ancestor(ea.db, arg_fqcn.as_ref())
                 }
-                Atomic::TObject | Atomic::TMixed | Atomic::TTemplateParam { .. } => true,
+                Atomic::TObject | Atomic::TObjectShape { .. } | Atomic::TMixed | Atomic::TTemplateParam { .. } => true,
                 _ => false,
             })
         }

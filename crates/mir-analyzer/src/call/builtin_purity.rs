@@ -145,6 +145,7 @@ pub(crate) fn arg_dependent_builtin_purity(fqn: &str, arg_types: &[Type]) -> Opt
                     a,
                     Atomic::TNamedObject { .. }
                         | Atomic::TObject
+                        | Atomic::TObjectShape { .. }
                         | Atomic::TStaticObject { .. }
                         | Atomic::TSelf { .. }
                         | Atomic::TParent { .. }

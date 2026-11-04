@@ -70,7 +70,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         any_invalid_object = true;
                     }
                 }
-                Atomic::TObject => {
+                Atomic::TObject | Atomic::TObjectShape { .. } => {
                     // Unknown object type — assume traversable, skip.
                     has_any_object = true;
                     all_invalid_objects = false;

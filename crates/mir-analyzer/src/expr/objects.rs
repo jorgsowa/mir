@@ -2486,6 +2486,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     return Type::mixed();
                 }
+                Atomic::TObjectShape { properties } => {
+                    if let Some(p) =
+                        properties.get(&mir_types::ArrayKey::String(Arc::from(prop_name)))
+                    {
+                        return p.ty.clone();
+                    }
+                }
                 Atomic::TMixed => return Type::mixed(),
                 _ => {}
             }

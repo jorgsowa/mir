@@ -493,6 +493,7 @@ pub(crate) fn php_value_type_name(ty: &mir_types::Type) -> Option<&'static str> 
         Atomic::TNull => "null",
         Atomic::TArray { .. } | Atomic::TKeyedArray { .. } | Atomic::TList { .. } => "array",
         Atomic::TObject
+        | Atomic::TObjectShape { .. }
         | Atomic::TNamedObject { .. }
         | Atomic::TLiteralEnumCase { .. }
         | Atomic::TSelf { .. }

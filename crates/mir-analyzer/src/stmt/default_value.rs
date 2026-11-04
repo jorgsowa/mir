@@ -377,7 +377,10 @@ fn accepts(declared: &Type, value: &Type) -> bool {
         Atomic::TLiteralEnumCase { .. } | Atomic::TNamedObject { .. } => has(|a| {
             matches!(
                 a,
-                Atomic::TObject | Atomic::TNamedObject { .. } | Atomic::TSelf { .. }
+                Atomic::TObject
+                    | Atomic::TObjectShape { .. }
+                    | Atomic::TNamedObject { .. }
+                    | Atomic::TSelf { .. }
             )
         }),
         a if a.is_int() => has(|a| matches!(a, Atomic::TInt | Atomic::TFloat)),
@@ -399,6 +402,7 @@ fn is_modelled_declared(atomic: &Atomic) -> bool {
             | Atomic::TNull
             | Atomic::TArray { .. }
             | Atomic::TObject
+            | Atomic::TObjectShape { .. }
             | Atomic::TNamedObject { .. }
             | Atomic::TSelf { .. }
     )

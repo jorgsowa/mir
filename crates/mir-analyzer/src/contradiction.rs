@@ -381,6 +381,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TKeyedArray { .. } => TypeFamily::Array,
 
         Atomic::TObject
+        | Atomic::TObjectShape { .. }
         | Atomic::TNamedObject { .. }
         | Atomic::TStaticObject { .. }
         | Atomic::TSelf { .. }
@@ -508,6 +509,7 @@ fn is_object_atomic(a: &Atomic) -> bool {
     matches!(
         a,
         Atomic::TObject
+            | Atomic::TObjectShape { .. }
             | Atomic::TNamedObject { .. }
             | Atomic::TStaticObject { .. }
             | Atomic::TSelf { .. }

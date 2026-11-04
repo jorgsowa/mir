@@ -93,6 +93,7 @@ fn is_object_atomic(t: &Atomic) -> bool {
     matches!(
         t,
         Atomic::TObject
+            | Atomic::TObjectShape { .. }
             | Atomic::TNamedObject { .. }
             | Atomic::TStaticObject { .. }
             | Atomic::TSelf { .. }

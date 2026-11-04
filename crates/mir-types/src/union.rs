@@ -721,7 +721,11 @@ impl Type {
         let has_object = self.types.iter().any(|t| {
             matches!(
                 t,
-                Atomic::TObject | Atomic::TNamedObject { .. } | Atomic::TMixed | Atomic::TNull // null fails instanceof, but mixed/object may include null
+                Atomic::TObject
+                    | Atomic::TObjectShape { .. }
+                    | Atomic::TNamedObject { .. }
+                    | Atomic::TMixed
+                    | Atomic::TNull // null fails instanceof, but mixed/object may include null
             )
         });
         if has_object || self.is_empty() {
@@ -1043,7 +1047,7 @@ impl Type {
         result.possibly_undefined = narrowed.possibly_undefined;
         result.from_docblock = narrowed.from_docblock;
         for atomic in narrowed.types {
-            if matches!(atomic, Atomic::TObject) {
+            if matches!(atomic, Atomic::TObject | Atomic::TObjectShape { .. }) {
                 result.add_type(Atomic::TCallable {
                     params: None,
                     return_type: None,
@@ -1767,6 +1771,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         | Atomic::TKeyedArray { is_list: true, .. } => vec![List],
         // Objects — a specific class instance is an object at runtime.
         Atomic::TObject
+        | Atomic::TObjectShape { .. }
         | Atomic::TNamedObject { .. }
         | Atomic::TStaticObject { .. }
         | Atomic::TSelf { .. }
@@ -1817,6 +1822,7 @@ fn subject_is_decidable(subject: &Atomic) -> bool {
             | Atomic::TArray { .. }
             | Atomic::TList { .. }
             | Atomic::TObject
+            | Atomic::TObjectShape { .. }
             | Atomic::TMixed
             | Atomic::TScalar
     )
@@ -2001,10 +2007,26 @@ fn composite_parts(atomic: &Atomic) -> Option<&'static [Atomic]> {
     }
 }
 
+fn object_shape_subtype(have: &KeyedProperties, want: &KeyedProperties) -> bool {
+    want.iter().all(|(name, wanted)| match have.get(name) {
+        Some(had) => (wanted.optional || !had.optional) && had.ty.is_subtype_structural(&wanted.ty),
+        None => wanted.optional,
+    })
+}
+
 /// Structural `sub <: sup` for a single atomic pair, without hierarchy resolution.
 pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
     if sub == sup {
         return true;
+    }
+    match (sub, sup) {
+        (Atomic::TObjectShape { properties: have }, Atomic::TObjectShape { properties: want }) => {
+            return object_shape_subtype(have, want);
+        }
+        (Atomic::TObjectShape { .. }, _) => return atomic_subtype(&Atomic::TObject, sup),
+        // Without the codebase a class's properties are unknown, so any object may satisfy a shape.
+        (_, Atomic::TObjectShape { .. }) => return atomic_subtype(sub, &Atomic::TObject),
+        _ => {}
     }
     match (sub, sup) {
         // Bottom type

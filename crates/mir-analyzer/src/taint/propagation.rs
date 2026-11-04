@@ -31,6 +31,7 @@ pub(super) fn return_drops_taint(ty: &mir_types::Type) -> bool {
                     | Atomic::TParent { .. }
                     | Atomic::TClosure { .. }
                     | Atomic::TObject
+                    | Atomic::TObjectShape { .. }
             ),
         })
 }

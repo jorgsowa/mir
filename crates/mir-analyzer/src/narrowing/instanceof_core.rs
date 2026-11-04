@@ -176,9 +176,10 @@ pub(super) fn narrow_instanceof_preserving_subtypes(
             // ancestors, so a Closure value satisfying an unrelated class
             // check is still genuinely impossible and correctly falls
             // through to the catch-all below.
-            Atomic::TObject | Atomic::TMixed | Atomic::TCallable { .. } => {
-                result.add_type(narrowed_ty.clone())
-            }
+            Atomic::TObject
+            | Atomic::TObjectShape { .. }
+            | Atomic::TMixed
+            | Atomic::TCallable { .. } => result.add_type(narrowed_ty.clone()),
             Atomic::TIntersection { parts } if intersection_excludes(parts, class_name, db) => {}
             // `$x instanceof C` on an `A&B`-typed value adds C to the
             // intersection rather than replacing it — the value is still
@@ -367,7 +368,7 @@ pub(super) fn narrow_or_instanceof_union(
                     parts: std::sync::Arc::from(vec![Type::single(atomic.clone()), classes]),
                 });
             }
-            Atomic::TObject | Atomic::TMixed => {
+            Atomic::TObject | Atomic::TObjectShape { .. } | Atomic::TMixed => {
                 for cn in class_names {
                     result.add_type(class_atom(cn));
                 }
@@ -776,9 +777,10 @@ pub(super) fn narrow_strict_subclass_of(
             // ancestors, so a Closure value satisfying an unrelated class
             // check is still genuinely impossible and correctly falls
             // through to the catch-all below.
-            Atomic::TObject | Atomic::TMixed | Atomic::TCallable { .. } => {
-                result.add_type(narrowed_ty.clone())
-            }
+            Atomic::TObject
+            | Atomic::TObjectShape { .. }
+            | Atomic::TMixed
+            | Atomic::TCallable { .. } => result.add_type(narrowed_ty.clone()),
             // `is_subclass_of($x, class_name)` on an `A&B`-typed value adds
             // class_name to the intersection rather than discarding it —
             // mirrors narrow_instanceof_preserving_subtypes's TIntersection

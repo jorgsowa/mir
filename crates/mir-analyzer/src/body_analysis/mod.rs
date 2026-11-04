@@ -1360,6 +1360,7 @@ mod docblock_hint_compat {
             | Atomic::TNonEmptyList { .. }
             | Atomic::TKeyedArray { .. } => ARRAY,
             Atomic::TObject
+            | Atomic::TObjectShape { .. }
             | Atomic::TNamedObject { .. }
             | Atomic::TSelf { .. }
             | Atomic::TStaticObject { .. }
@@ -1385,7 +1386,7 @@ mod docblock_hint_compat {
                 CALLABLE | STRING | ARRAY | OBJECT
             }
             // `object` hint takes any object incl. closures.
-            Atomic::TObject => OBJECT | CALLABLE,
+            Atomic::TObject | Atomic::TObjectShape { .. } => OBJECT | CALLABLE,
             other => {
                 let f = fam(other);
                 if f == 0 {

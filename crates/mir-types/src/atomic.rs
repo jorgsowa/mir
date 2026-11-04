@@ -384,6 +384,9 @@ pub enum Atomic {
     // --- Intersection ---
     /// `A&B&C` — PHP 8.1+ pure intersection type
     TIntersection { parts: Arc<[Type]> },
+
+    /// `object{prop: T, ...}` — an object with these public properties.
+    TObjectShape { properties: Arc<KeyedProperties> },
 }
 
 impl Atomic {
@@ -515,6 +518,7 @@ impl Atomic {
         matches!(
             self,
             Atomic::TObject
+                | Atomic::TObjectShape { .. }
                 | Atomic::TNamedObject { .. }
                 | Atomic::TStaticObject { .. }
                 | Atomic::TSelf { .. }
@@ -629,6 +633,7 @@ impl Atomic {
             Atomic::TTraitString => "trait-string",
             Atomic::TLiteralEnumCase { .. } => "enum-case",
             Atomic::TIntersection { .. } => "intersection",
+            Atomic::TObjectShape { .. } => "object",
         }
     }
 }
@@ -698,6 +703,7 @@ enum AtomicTag {
     TTraitString,
     TLiteralEnumCase,
     TIntersection,
+    TObjectShape,
 }
 
 impl Hash for Atomic {
@@ -803,6 +809,11 @@ impl Hash for Atomic {
             Atomic::TNonEmptyList { value } => {
                 (T::TNonEmptyList as u8).hash(state);
                 value.hash(state);
+            }
+            Atomic::TObjectShape { properties } => {
+                (T::TObjectShape as u8).hash(state);
+                properties.entries_hash().hash(state);
+                properties.len().hash(state);
             }
             Atomic::TKeyedArray {
                 properties,

@@ -270,6 +270,23 @@ impl fmt::Display for Atomic {
                     write!(f, "non-empty-list<{value}>")
                 }
             }
+            Atomic::TObjectShape { properties } => {
+                f.write_str("object{")?;
+                for (i, (k, v)) in properties.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    match k {
+                        crate::atomic::ArrayKey::String(s) => f.write_str(s)?,
+                        crate::atomic::ArrayKey::Int(n) => write!(f, "{n}")?,
+                    }
+                    if v.optional {
+                        f.write_str("?")?;
+                    }
+                    write!(f, ": {}", v.ty)?;
+                }
+                f.write_str("}")
+            }
             Atomic::TKeyedArray { properties, .. } => {
                 f.write_str("array{")?;
                 for (i, (k, v)) in properties.iter().enumerate() {

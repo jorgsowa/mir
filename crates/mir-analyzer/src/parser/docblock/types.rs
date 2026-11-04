@@ -318,9 +318,12 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             } else if prefix == "list" {
                 return parse_keyed_array(inner, true);
             } else if prefix == "object" {
-                // `object{prop: Type, ...}` — mir has no object-shape atom,
-                // so approximate as a plain `object` (property shape is lost).
-                return Type::single(Atomic::TObject);
+                return match parse_keyed_array(inner, false).types.into_iter().next() {
+                    Some(Atomic::TKeyedArray { properties, .. }) if !properties.is_empty() => {
+                        Type::single(Atomic::TObjectShape { properties })
+                    }
+                    _ => Type::single(Atomic::TObject),
+                };
             }
         }
     }

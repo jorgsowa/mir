@@ -44,6 +44,7 @@ pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
                 t,
                 Atomic::TNamedObject { .. }
                     | Atomic::TObject
+                    | Atomic::TObjectShape { .. }
                     | Atomic::TSelf { .. }
                     | Atomic::TStaticObject { .. }
                     | Atomic::TClassString(_)

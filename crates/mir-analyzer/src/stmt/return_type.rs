@@ -5,7 +5,7 @@ use crate::db::{extends_or_implements, is_interface, MirDatabase};
 /// Bare `object` (e.g. an anonymous class instance) fits a named-class element, as it
 /// does in a non-nested return position.
 fn bare_object_fits(actual: &Atomic, declared: &Type) -> bool {
-    matches!(actual, Atomic::TObject)
+    matches!(actual, Atomic::TObject | Atomic::TObjectShape { .. })
         && declared
             .types
             .iter()
