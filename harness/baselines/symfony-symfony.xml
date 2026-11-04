@@ -2782,12 +2782,6 @@
       <code><![CDATA[$this->groups = $groups]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Validator/Constraints/LengthValidator.php">
-    <InvalidArgument>
-      <code><![CDATA[$length]]></code>
-      <code><![CDATA[$length]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Validator/Constraints/TimeValidator.php">
     <InvalidArgument>
       <code><![CDATA[$matches[1]]]></code>

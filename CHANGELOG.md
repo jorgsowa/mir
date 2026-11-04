@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `version_compare()` with an operator returns `bool`, and without one `int`.
 - A defensive `false === hrtime()` check is no longer reported as an impossible comparison.
 - `$x === []` and `$x == []` remove object types from `$x`.
+- `($x ?? false) !== false` removes `false` from `$x` as well as `null` (likewise for any other literal fallback).
 
 ## [0.90.0] - 2026-11-03
 

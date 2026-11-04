@@ -218,6 +218,24 @@ pub fn narrow_from_condition(
             narrow_count_or_strlen_equality(ctx, db, file, &b.left, &b.right, b.op, is_true);
             dom::narrow_dom_node_type(ctx, &b.left, &b.right, effective_true);
 
+            // `($x ?? F) !== F` also proves `$x !== F`.
+            let coalesce_fallback = extract_null_coalesce(&b.left)
+                .map(|nc| (nc, &b.right))
+                .or_else(|| extract_null_coalesce(&b.right).map(|nc| (nc, &b.left)));
+            if let Some((nc, fallback)) = coalesce_fallback {
+                if !effective_true && same_literal(&nc.right, fallback) {
+                    let direct = php_ast::owned::Expr {
+                        kind: ExprKind::Binary(Box::new(php_ast::owned::BinaryExpr {
+                            left: nc.left.clone(),
+                            op: b.op,
+                            right: fallback.clone(),
+                        })),
+                        span: expr.span,
+                    };
+                    narrow_from_condition(&direct, ctx, is_true, db, file);
+                }
+            }
+
             // `($x ?? FALLBACK) === FALLBACK` — on the false branch, $x was defined
             // Must be checked before literal comparisons because `b.right` matching a literal
             // would otherwise consume the arm before we check for NullCoalesce on `b.left`.
