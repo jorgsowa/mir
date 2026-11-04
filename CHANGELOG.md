@@ -72,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Values assigned to a by-reference `foreach` variable (`foreach ($a as &$v) { $v = ...; }`) become the element type of the iterated array or list.
 - `glob()` returns `list<string>|false`.
 - `sort()`, `rsort()`, `usort()` and `shuffle()` turn an array with unknown elements into a `list<mixed>`.
+- A method with `@psalm-this-out` and `@return $this` returns the receiver's new type, so `$x = $node->setParent($p)` gets the retyped node.
 
 ## [0.90.0] - 2026-11-03
 

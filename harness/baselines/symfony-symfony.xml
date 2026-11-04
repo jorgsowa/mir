@@ -943,20 +943,10 @@
       <code><![CDATA[$this->sOffset = $time[1] - $offset[0]]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Config/Definition/Builder/ArrayNodeDefinition.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->prototype = $this->getNodeBuilder()->node(null, $type)->setParent($this)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Config/Definition/Builder/NodeDefinition.php">
     <InvalidTemplateParam>
       <code><![CDATA[$child->setPathSeparator($separator)]]></code>
     </InvalidTemplateParam>
-  </file>
-  <file src="src/Symfony/Component/Config/Definition/Builder/TreeBuilder.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->root = $builder->node($name, $type)->setParent($this)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Config/Definition/Dumper/XmlReferenceDumper.php">
     <NullableReturnStatement>

@@ -1634,6 +1634,10 @@ fn resolve_method_return<'a>(
             }
         }
 
+        let returns_this = matches!(
+            resolved.return_ty_raw.types.as_slice(),
+            [mir_types::Atomic::TStaticObject { .. }]
+        );
         let ret_raw =
             substitute_static_in_return(ea.db, resolved.return_ty_raw, fqcn, receiver_type_params);
 
@@ -1927,6 +1931,8 @@ fn resolve_method_return<'a>(
             };
             *self_out_out = Some(self_out_ty);
         }
+        // A fluent `@return $this` hands back the receiver as `@psalm-self-out` left it.
+        let fluent_self_out = self_out_out.as_ref().filter(|_| returns_this).cloned();
 
         // Bare-statement `@psalm-assert` — the method-call counterpart of
         // `call/function.rs`'s unconditional-assert block. Reuses the exact
@@ -1994,6 +2000,9 @@ fn resolve_method_return<'a>(
                 &ctx.template_param_names,
                 native,
             );
+        }
+        if let Some(self_out_ty) = fluent_self_out {
+            return_ty = self_out_ty;
         }
         if is_throwing_dom_document_factory(&resolved.owner_fqcn, &method_name_lower) {
             return_ty = return_ty.falsy_stripped();
