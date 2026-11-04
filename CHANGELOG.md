@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$x === []` and `$x == []` remove object types from `$x`.
 - `($x ?? false) !== false` removes `false` from `$x` as well as `null` (likewise for any other literal fallback).
 - `if ($a['k'])` narrows the shape key's value to truthy, like `!empty($a['k'])`.
+- Negating `floor()`/`ceil()`'s integral float keeps it integral, and an integral float fits a `?int` parameter like an `int` one.
 
 ## [0.90.0] - 2026-11-03
 

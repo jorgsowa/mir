@@ -267,7 +267,8 @@ fn negate_type(ty: &Type) -> Type {
                     },
                 }
             }
-            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => Atomic::TFloat,
+            Atomic::TIntegralFloat => Atomic::TIntegralFloat,
+            Atomic::TFloat | Atomic::TLiteralFloat(..) => Atomic::TFloat,
             _ => {
                 // Non-numeric operands: fallback to int (PHP coerces to 0 then negates).
                 if ty.contains(|t| t.is_int()) {

@@ -199,9 +199,10 @@ pub(crate) fn check_one(
     // TIntegralFloat (floor/ceil/round result) is always a whole-valued float, so passing it to
     // an int param is lossless — silently accept in non-strict mode with no diagnostic.
     // In strict mode PHP still rejects it (TypeError), so fall through to InvalidArgument.
+    let non_null_param = param_ty.remove_null();
     if arg_ty.contains(|t| matches!(t, Atomic::TIntegralFloat))
-        && param_ty.is_single()
-        && param_ty.contains(|t| t.is_int())
+        && non_null_param.is_single()
+        && non_null_param.contains(|t| t.is_int())
         && !ea.strict_types
     {
         return;

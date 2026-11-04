@@ -485,14 +485,6 @@
       <code><![CDATA[null !== $this->projectDir]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Symfony/Component/AssetMapper/Command/DebugAssetMapperCommand.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[-$limit]]></code>
-    </ImplicitFloatToIntCast>
-    <InvalidArgument>
-      <code><![CDATA[$limit]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/AssetMapper/Command/ImportMapAuditCommand.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[1 === $vulnerabilityCount]]></code>
@@ -2470,12 +2462,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->tokenIds = array_flip($tokenIds)]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Security/Http/EventListener/LoginThrottlingListener.php">
-    <InvalidArgument>
-      <code><![CDATA[ceil(($limit->getRetryAfter()->getTimestamp() - time()) / 60)]]></code>
-      <code><![CDATA[ceil(($limit->getRetryAfter()->getTimestamp() - time()) / 60)]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Security/Http/Firewall.php">
     <ImpossibleIdenticalComparison>
