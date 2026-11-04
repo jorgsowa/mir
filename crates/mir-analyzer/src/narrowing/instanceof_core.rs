@@ -385,6 +385,19 @@ pub(super) fn narrow_or_instanceof_union(
                 result.add_type(atomic.clone());
             }
             Atomic::TIntersection { parts } => {
+                let covers = |cn: &String| {
+                    parts.iter().any(|p| {
+                        p.types.iter().any(|a| {
+                            matches!(a, Atomic::TNamedObject { fqcn, .. }
+                                if named_object_matches_instanceof(fqcn, cn, db))
+                        })
+                    })
+                };
+                // A part already satisfying one disjunct keeps the whole atom.
+                if class_names.iter().any(covers) {
+                    result.add_type(atomic.clone());
+                    continue;
+                }
                 let mut remaining = Type::empty();
                 let mut possible = false;
                 for cn in class_names {
@@ -392,52 +405,40 @@ pub(super) fn narrow_or_instanceof_union(
                         continue;
                     }
                     possible = true;
-                    let already_covered = parts.iter().any(|p| {
-                        p.types.iter().any(|a| {
-                            matches!(a, Atomic::TNamedObject { fqcn, .. }
-                                if named_object_matches_instanceof(fqcn, cn, db))
+                    // Same reasoning as the non-intersection `!type_params.is_empty()`
+                    // arm below: if a part is a generic `TNamedObject` that `cn`
+                    // is a subtype of, project its type params onto `cn` instead
+                    // of a raw, empty-type-params atom.
+                    let projected_atom = parts.iter().find_map(|p| {
+                        p.types.iter().find_map(|a| match a {
+                            Atomic::TNamedObject { fqcn, type_params }
+                                if !type_params.is_empty()
+                                    && named_object_matches_instanceof(cn, fqcn, db) =>
+                            {
+                                Some(Atomic::TNamedObject {
+                                    fqcn: cn.as_str().into(),
+                                    type_params: project_type_params_onto_subclass(
+                                        db,
+                                        fqcn,
+                                        type_params,
+                                        cn,
+                                    ),
+                                })
+                            }
+                            _ => None,
                         })
                     });
-                    if !already_covered {
-                        // Same reasoning as the non-intersection `!type_params.is_empty()`
-                        // arm below: if a part is a generic `TNamedObject` that `cn`
-                        // is a subtype of, project its type params onto `cn` instead
-                        // of a raw, empty-type-params atom.
-                        let projected_atom = parts.iter().find_map(|p| {
-                            p.types.iter().find_map(|a| match a {
-                                Atomic::TNamedObject { fqcn, type_params }
-                                    if !type_params.is_empty()
-                                        && named_object_matches_instanceof(cn, fqcn, db) =>
-                                {
-                                    Some(Atomic::TNamedObject {
-                                        fqcn: cn.as_str().into(),
-                                        type_params: project_type_params_onto_subclass(
-                                            db,
-                                            fqcn,
-                                            type_params,
-                                            cn,
-                                        ),
-                                    })
-                                }
-                                _ => None,
-                            })
-                        });
-                        remaining.add_type(projected_atom.unwrap_or_else(|| class_atom(cn)));
-                    }
+                    remaining.add_type(projected_atom.unwrap_or_else(|| class_atom(cn)));
                 }
                 if !possible {
                     // No disjunct can coexist with the intersection.
                     continue;
                 }
-                if remaining.is_empty() {
-                    result.add_type(atomic.clone());
-                } else {
-                    let mut new_parts: Vec<Type> = parts.iter().cloned().collect();
-                    new_parts.push(remaining);
-                    result.add_type(Atomic::TIntersection {
-                        parts: std::sync::Arc::from(new_parts),
-                    });
-                }
+                let mut new_parts: Vec<Type> = parts.iter().cloned().collect();
+                new_parts.push(remaining);
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(new_parts),
+                });
             }
             // Some disjunct(s) are a (possibly indirect) subtype of the atom's own
             // class AND the atom carries concrete type params — project them
@@ -449,6 +450,7 @@ pub(super) fn narrow_or_instanceof_union(
                         .iter()
                         .any(|cn| named_object_matches_instanceof(cn, fqcn, db)) =>
             {
+                let mut classes = Type::empty();
                 for cn in class_names {
                     if named_object_matches_instanceof(cn, fqcn, db) {
                         let projected =
@@ -457,44 +459,30 @@ pub(super) fn narrow_or_instanceof_union(
                             fqcn: cn.as_str().into(),
                             type_params: projected,
                         });
+                    } else if classes_can_coexist(fqcn, cn, db) {
+                        classes.add_type(class_atom(cn));
                     }
                 }
-            }
-            // Some disjunct(s) are a (possibly indirect) subtype of the atom's own
-            // class — e.g. atom is `Foo` and one label checks `instanceof A` where
-            // `A implements Foo` — so the instanceof result subsumes and is
-            // strictly more specific; narrow to just the subsuming disjunct(s)
-            // rather than forming a redundant `Foo&A` intersection.
-            Atomic::TNamedObject { fqcn, .. }
-            | Atomic::TSelf { fqcn }
-            | Atomic::TStaticObject { fqcn }
-            | Atomic::TParent { fqcn }
-                if class_names
-                    .iter()
-                    .any(|cn| named_object_matches_instanceof(cn, fqcn, db)) =>
-            {
-                for cn in class_names {
-                    if named_object_matches_instanceof(cn, fqcn, db) {
-                        result.add_type(class_atom(cn));
-                    }
+                if !classes.is_empty() {
+                    result.add_type(Atomic::TIntersection {
+                        parts: std::sync::Arc::from(vec![Type::single(atomic.clone()), classes]),
+                    });
                 }
             }
-            // A named object matching none of the disjuncts by inheritance in
-            // either direction must not be silently discarded — the
-            // (already-true) instanceof check proved the value ALSO satisfies
-            // one of class_names. Intersect with only the disjuncts that could
-            // actually coexist with this atom (at least one side an interface);
-            // a disjunct that's a concrete class unrelated to this atom's own
-            // concrete class is impossible under PHP's single inheritance and is
-            // dropped instead. Mirrors the equivalent fix in
-            // narrow_instanceof_preserving_subtypes for the single-class case.
+            // A disjunct that subclasses the atom's class narrows to that disjunct
+            // (`Foo` vs `A implements Foo` gives `A`, not `Foo&A`). Any other
+            // disjunct is intersected with the atom when the two can coexist (at
+            // least one side an interface); an unrelated concrete class is
+            // impossible under single inheritance and is dropped.
             Atomic::TNamedObject { fqcn, .. }
             | Atomic::TSelf { fqcn }
             | Atomic::TStaticObject { fqcn }
             | Atomic::TParent { fqcn } => {
                 let mut classes = Type::empty();
                 for cn in class_names {
-                    if classes_can_coexist(fqcn, cn, db) {
+                    if named_object_matches_instanceof(cn, fqcn, db) {
+                        result.add_type(class_atom(cn));
+                    } else if classes_can_coexist(fqcn, cn, db) {
                         classes.add_type(class_atom(cn));
                     }
                 }
