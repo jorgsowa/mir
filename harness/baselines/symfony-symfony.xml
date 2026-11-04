@@ -2397,13 +2397,6 @@
       <code><![CDATA[$rate]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Routing/RouteCompiler.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$pos]]></code>
-      <code><![CDATA[$pos]]></code>
-      <code><![CDATA[$pos]]></code>
-    </ImplicitFloatToIntCast>
-  </file>
   <file src="src/Symfony/Component/Routing/Router.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->matcher = new $this->options['matcher_class']($routes, $this->context)]]></code>

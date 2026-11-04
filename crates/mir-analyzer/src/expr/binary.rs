@@ -601,6 +601,19 @@ fn operand_has_any_array_member(ty: &Type) -> bool {
 ///
 /// Returns `None` to fall through to the `TInt` default.
 fn infer_bitwise_range(op: BinaryOp, left: &Type, right: &Type) -> Option<Type> {
+    if let ([Atomic::TLiteralInt(l)], [Atomic::TLiteralInt(r)]) =
+        (left.types.as_slice(), right.types.as_slice())
+    {
+        let folded = match op {
+            BinaryOp::BitwiseAnd => Some(l & r),
+            BinaryOp::BitwiseOr => Some(l | r),
+            BinaryOp::BitwiseXor => Some(l ^ r),
+            _ => None,
+        };
+        if let Some(v) = folded {
+            return Some(Type::single(Atomic::TLiteralInt(v)));
+        }
+    }
     match op {
         BinaryOp::BitwiseAnd => {
             // If either side is a known non-negative literal, the result is in [0, mask].
