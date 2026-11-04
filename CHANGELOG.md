@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A call on an intersection `A&I` uses the method `A` declares, not an `@method` on `I` with a different signature.
 - `$array + $other` with a non-shape left operand includes the right operand's keys and values, so `explode(...) + [1 => null]` can hold `null`.
 - A `->` call or property read after `?->` in the same chain (`$a?->b()->c()`) can be null, since the chain short-circuits.
+- `++$a[$k]`, `$a[$k]++` and their `--` forms update the int element they change.
 
 ## [0.90.0] - 2026-11-03
 

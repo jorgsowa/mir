@@ -148,6 +148,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let (line_end, col_end) = self.offset_to_line_col(u.operand.span.end);
                     ctx.record_var_location(var_name, line, col_start, line_end, col_end);
                     new_ty
+                } else if let Some(new_ty) = stepped_int_offset(&u.operand, &operand_ty, {
+                    u.op == UnaryPrefixOp::PreIncrement
+                }) {
+                    self.assign_to_target(&u.operand, new_ty.clone(), ctx, u.operand.span);
+                    new_ty
                 } else {
                     Type::single(Atomic::TInt)
                 }
@@ -217,12 +222,43 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if ctx.inside_loop && was_read_before {
                         ctx.mark_consumed(var_name);
                     }
+                } else if let Some(new_ty) = stepped_int_offset(&u.operand, &operand_ty, {
+                    u.op == UnaryPostfixOp::PostIncrement
+                }) {
+                    self.assign_to_target(&u.operand, new_ty, ctx, u.operand.span);
                 }
                 operand_ty
             }
             _ => operand_ty,
         }
     }
+}
+
+/// The value `$a[$k]++`/`--` stores when the element is an int (`null++` on a missing key is 1).
+fn stepped_int_offset(operand: &php_ast::owned::Expr, ty: &Type, increment: bool) -> Option<Type> {
+    let steppable = |a: &Atomic| a.is_int() || (increment && matches!(a, Atomic::TNull));
+    if !matches!(operand.kind, php_ast::owned::ExprKind::ArrayAccess(_))
+        || ty.types.is_empty()
+        || !ty.types.iter().all(steppable)
+    {
+        return None;
+    }
+    let ints = ty.remove_null();
+    if ints.is_empty() {
+        return Some(Type::single(Atomic::TLiteralInt(1)));
+    }
+    let op = if increment {
+        BinaryOp::Add
+    } else {
+        BinaryOp::Sub
+    };
+    let one = Type::single(Atomic::TLiteralInt(1));
+    let mut stepped =
+        infer_int_range_arithmetic(&ints, &one, op).unwrap_or_else(|| Type::single(Atomic::TInt));
+    if ty.is_nullable() {
+        stepped.add_type(Atomic::TLiteralInt(1));
+    }
+    Some(stepped)
 }
 
 /// Infer the result type of the unary negation operator (`-$x`).

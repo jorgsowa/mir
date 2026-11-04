@@ -480,11 +480,6 @@
       <code><![CDATA[null !== $this->projectDir]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Symfony/Component/AssetMapper/Command/ImportMapAuditCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[1 === $vulnerabilityCount]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/AssetMapper/Compressor/BrotliCompressor.php">
     <InvalidArgument>
       <code><![CDATA[[$this->executable, '--best', '--force', "--output=$path.".self::FILE_EXTENSION, '--', $path]]]></code>
