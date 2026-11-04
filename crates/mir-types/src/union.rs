@@ -1518,11 +1518,12 @@ impl Type {
                         &data.if_true,
                         &data.if_false,
                     );
-                    let resolved = param_name
-                        .and_then(|name| lookup(name.as_ref()))
-                        .and_then(|arg_ty| {
-                            resolve_conditional_branch(subject, &arg_ty, if_true, if_false)
-                        });
+                    let resolved =
+                        param_name
+                            .and_then(|name| lookup(name.as_ref()))
+                            .and_then(|arg_ty| {
+                                resolve_conditional_branch(subject, &arg_ty, if_true, if_false)
+                            });
 
                     if let Some(branch) = resolved {
                         // Recursively resolve nested conditionals in the selected branch.

@@ -550,9 +550,9 @@ pub(super) fn filter_out_instanceof_match(
         // is also a C the moment either A or B extends/implements C, so the
         // whole intersection can't survive the negation, not just its own
         // (nonexistent) direct name.
-        Atomic::TIntersection { parts } => {
-            !parts.iter().any(|part| part_is_instance_of(part, class_name, db))
-        }
+        Atomic::TIntersection { parts } => !parts
+            .iter()
+            .any(|part| part_is_instance_of(part, class_name, db)),
         _ => true,
     })
 }
