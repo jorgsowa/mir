@@ -78,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An override without `@return` inherits the parent's conditional `@return` when every branch fits its native return type.
 - A conditional `@return` whose subject is a union (`($b is 0|1 ? A : B)`) resolves at the call site.
 - An omitted argument with an integer default resolves a conditional `@return` on that parameter.
+- A conditional `@param-out` type resolves against the call's arguments instead of staying a raw conditional that nests on every loop pass.
 
 ## [0.90.0] - 2026-11-03
 

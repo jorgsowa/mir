@@ -1032,6 +1032,14 @@ impl CallAnalyzer {
                         Some(bindings) => output_ty.substitute_templates(bindings),
                         None => output_ty,
                     };
+                    let output_ty = crate::call::resolve_conditional_return(
+                        output_ty,
+                        ea.db,
+                        template_bindings.as_ref(),
+                        |name| {
+                            crate::call::conditional_param_type(&params, &call.args, &arg_types, name)
+                        },
+                    );
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
                             let Some(value) = arg.value() else { continue };

@@ -1846,6 +1846,9 @@ fn resolve_method_return<'a>(
             } else {
                 out_ty.substitute_templates(&bindings)
             };
+            let out_ty = super::resolve_conditional_return(out_ty, ea.db, Some(&bindings), |name| {
+                super::conditional_param_type(&resolved.params, &call.args, arg_types, name)
+            });
             if param.out_ty.is_none() && super::has_unbound_template(&out_ty) {
                 continue;
             }
