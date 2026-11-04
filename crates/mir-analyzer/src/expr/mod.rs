@@ -138,6 +138,17 @@ fn bare_closure() -> Atomic {
     }
 }
 
+/// Whether `object` ends a `?->` chain, so a `->` on it is skipped when the chain hits null.
+fn short_circuits(object: &php_ast::owned::Expr) -> bool {
+    match &object.kind {
+        ExprKind::NullsafeMethodCall(_) | ExprKind::NullsafePropertyAccess(_) => true,
+        ExprKind::MethodCall(mc) => short_circuits(&mc.object),
+        ExprKind::PropertyAccess(pa) => short_circuits(&pa.object),
+        ExprKind::ArrayAccess(aa) => short_circuits(&aa.array),
+        _ => false,
+    }
+}
+
 fn is_partial_application(args: &[php_ast::owned::Arg]) -> bool {
     args.iter().any(|a| a.is_placeholder())
 }
@@ -880,6 +891,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             // --- Property access -------------------------------------------
+            ExprKind::PropertyAccess(pa) if short_circuits(&pa.object) => {
+                self.analyze_nullsafe_property_access(pa, ctx)
+            }
             ExprKind::PropertyAccess(pa) => self.analyze_property_access(pa, expr.span, ctx),
 
             ExprKind::NullsafePropertyAccess(pa) => self.analyze_nullsafe_property_access(pa, ctx),
@@ -926,8 +940,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Method calls ----------------------------------------------
             ExprKind::MethodCall(mc) => {
-                let ty =
-                    crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false);
+                let ty = crate::call::CallAnalyzer::analyze_method_call(
+                    self,
+                    mc,
+                    ctx,
+                    expr.span,
+                    short_circuits(&mc.object),
+                );
                 ctx.invalidate_escaped_vars();
                 self.expose_props_to_call(&mc.object, &mc.args, ctx);
                 self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);

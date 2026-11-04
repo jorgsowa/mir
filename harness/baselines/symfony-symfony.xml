@@ -2500,9 +2500,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Serializer/Normalizer/AbstractObjectNormalizer.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $attributesMetadata]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidTemplateParam>
       <code><![CDATA[Type::object($parameterType->getName())]]></code>
     </InvalidTemplateParam>
