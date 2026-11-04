@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `callable` is accepted where `string|array|object` is expected.
 - A `void` call on the left of `??` evaluates to null, so `voidCall() ?? true` is typed as `true`.
 - `UndefinedTrait` names a namespaced trait by its fully qualified name.
+- `version_compare()` with an operator returns `bool`, and without one `int`.
 
 ## [0.90.0] - 2026-11-03
 

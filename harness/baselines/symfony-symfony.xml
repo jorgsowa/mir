@@ -2040,9 +2040,6 @@
     <ImplicitFloatToIntCast>
       <code><![CDATA[$cas]]></code>
     </ImplicitFloatToIntCast>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->useExtendedReturn ??= version_compare(phpversion('memcached'), '2.9.9', '>')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Lock/Store/MongoDbStore.php">
     <UndefinedClass>
