@@ -1637,11 +1637,6 @@
       <code><![CDATA[Constraint]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/Controller/ArgumentResolver/QueryParameterValueResolver.php">
-    <InvalidArgument>
-      <code><![CDATA[[$uidType, 'fromString']]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/Controller/ArgumentResolver/RequestPayloadValueResolver.php">
     <InvalidTemplateParam>
       <code><![CDATA[$this->serializer->deserialize($data, $type, $format, self::CONTEXT_DESERIALIZE + $attribute->serializationContext)]]></code>

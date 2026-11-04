@@ -34,8 +34,8 @@ pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
         let (Some(first), Some(second)) = (first, second) else {
             return false;
         };
-        // The first element must be an object (`[$this, 'm']`) or a
-        // class-string. A plain/literal string is NOT accepted here: a literal
+        // The first element must be an object (`[$this, 'm']`), a class-string or
+        // a non-literal string. A literal string is NOT accepted here: a literal
         // like `["one", "two"]` is only callable if "one" names a real class,
         // which this db-less predicate can't verify — leave that to the regular
         // checks so a non-class string pair is still rejected.
@@ -48,6 +48,8 @@ pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
                     | Atomic::TSelf { .. }
                     | Atomic::TStaticObject { .. }
                     | Atomic::TClassString(_)
+                    | Atomic::TString
+                    | Atomic::TNonEmptyString
                     | Atomic::TMixed
             )
         });
