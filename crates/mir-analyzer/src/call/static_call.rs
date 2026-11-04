@@ -1077,6 +1077,17 @@ impl CallAnalyzer {
                 }
                 merged
             };
+            // A method-level `@template T` shadows a same-named class template.
+            let sig_class_bindings: std::borrow::Cow<'_, FxHashMap<Name, Type>> =
+                if resolved.template_params.is_empty() {
+                    std::borrow::Cow::Borrowed(&return_class_bindings)
+                } else {
+                    let mut b = return_class_bindings.clone();
+                    for tp in resolved.template_params.iter() {
+                        b.remove(&Name::from(tp.name.as_ref()));
+                    }
+                    std::borrow::Cow::Owned(b)
+                };
 
             // `static`'s receiver type params come from the CLASS's own
             // template params, not the method's — attach them before
@@ -1100,10 +1111,10 @@ impl CallAnalyzer {
                 &late_static_fqcn,
                 &own_type_params,
             );
-            let ret_substituted = if return_class_bindings.is_empty() {
+            let ret_substituted = if sig_class_bindings.is_empty() {
                 ret_substituted
             } else {
-                ret_substituted.substitute_templates(&return_class_bindings)
+                ret_substituted.substitute_templates(&sig_class_bindings)
             };
             let ret = match &method_bindings {
                 Some(bindings) => ret_substituted.substitute_templates(bindings),
@@ -1362,10 +1373,10 @@ impl CallAnalyzer {
                         &fqcn_arc,
                         &own_type_params,
                     );
-                    let self_out_ty = if return_class_bindings.is_empty() {
+                    let self_out_ty = if sig_class_bindings.is_empty() {
                         self_out_ty
                     } else {
-                        self_out_ty.substitute_templates(&return_class_bindings)
+                        self_out_ty.substitute_templates(&sig_class_bindings)
                     };
                     let self_out_ty = if !resolved.template_params.is_empty() {
                         let (mut method_bindings, _unchecked) = infer_template_bindings(

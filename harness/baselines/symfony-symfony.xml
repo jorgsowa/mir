@@ -2429,11 +2429,6 @@
       <code><![CDATA[return $this->isVerticallyExpandedCache;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/TypeInfo/Type/ArrayShapeType.php">
-    <InvalidTemplateParam>
-      <code><![CDATA[self::generic(self::builtin(TypeIdentifier::ARRAY), $keyType, $valueType)]]></code>
-    </InvalidTemplateParam>
-  </file>
   <file src="src/Symfony/Component/TypeInfo/TypeContext/TypeContextFactory.php">
     <InvalidArgument>
       <code><![CDATA[true]]></code>
