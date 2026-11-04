@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reset()`, `end()`, `next()` and `prev()` leave the array argument's type unchanged instead of widening it to `array|object`.
 - `new` keeps a literal template argument when the template's bound admits only literals (`@template T of 'a'|'b'`), so `new TreeBuilder($n, 'array')` is a `TreeBuilder<'array'>`.
 - An array shape is checked against `array<K, V>` with the class hierarchy, so `['a' => Sub::class]` fits an `array<string, class-string<Parent>>` property.
+- A trait method that writes no property no longer clears the property narrowing of `$this` when called, the same as a class method.
 
 ## [0.90.0] - 2026-11-03
 

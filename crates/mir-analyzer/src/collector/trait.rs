@@ -313,6 +313,8 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
+        super::mutation_free::infer_mutation_free(&decl.body.members, &mut own_methods);
+
         self.add_docblock_members(
             &trait_doc,
             &type_aliases,
