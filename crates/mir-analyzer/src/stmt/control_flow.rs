@@ -629,6 +629,16 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
         }
+        if let (true, Some(vname), Some(arr_name)) =
+            (value_is_by_ref, value_var, extract_simple_var(&fe.expr))
+        {
+            let mut written = post.get_var(vname);
+            written.possibly_undefined = false;
+            let arr_now = post.get_var(arr_name);
+            if let Some(rewritten) = with_element_type(&arr_now, &written) {
+                post.set_var(arr_name, rewritten);
+            }
+        }
         *ctx = post;
     }
 
@@ -1447,4 +1457,30 @@ fn is_intentionally_unused_foreach_value(name: &str, body: &Stmt) -> bool {
         }
     }
     matches!(name, "ignored" | "unused") || only_break(body)
+}
+
+/// `arr` with each generic array/list atom's element type replaced by `value`;
+/// `None` when an atom is anything else (a shape, an object).
+fn with_element_type(arr: &mir_types::Type, value: &mir_types::Type) -> Option<mir_types::Type> {
+    if arr.types.is_empty() || value.is_empty() {
+        return None;
+    }
+    let mut out = mir_types::Type::empty();
+    for atom in &arr.types {
+        let value = Box::new(value.clone());
+        out.add_type(match atom {
+            Atomic::TList { .. } => Atomic::TList { value },
+            Atomic::TNonEmptyList { .. } => Atomic::TNonEmptyList { value },
+            Atomic::TArray { key, .. } => Atomic::TArray {
+                key: key.clone(),
+                value,
+            },
+            Atomic::TNonEmptyArray { key, .. } => Atomic::TNonEmptyArray {
+                key: key.clone(),
+                value,
+            },
+            _ => return None,
+        });
+    }
+    Some(out)
 }

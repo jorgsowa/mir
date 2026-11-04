@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A trait method that writes no property no longer clears the property narrowing of `$this` when called, the same as a class method.
 - A static method's own `@template T` is inferred from the call instead of taking the type bound to a same-named class template through `@extends`.
 - For a parameter typed with several templates (`@param T|U`), an argument binds the template whose bound accepts it, so `T of Enum` and `U of value-of<T>` no longer report `InvalidTemplateParam` for either an enum case or its value.
+- Values assigned to a by-reference `foreach` variable (`foreach ($a as &$v) { $v = ...; }`) become the element type of the iterated array or list.
 
 ## [0.90.0] - 2026-11-03
 

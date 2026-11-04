@@ -2354,11 +2354,6 @@
         }]]></code>
     </UnhandledMatchCondition>
   </file>
-  <file src="src/Symfony/Component/String/AbstractString.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $chunks;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="src/Symfony/Component/String/AbstractUnicodeString.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$str->string = normalizer_normalize($str->string, $compat ? \Normalizer::NFKC : \Normalizer::NFC)]]></code>
