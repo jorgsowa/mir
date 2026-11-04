@@ -1377,16 +1377,12 @@ impl Type {
                     // `resolve_conditional_returns` for the $param form.
                     let resolved = if let Some(name) = param_name {
                         if let Some(bound) = bindings.get(name) {
-                            if new_subject.types.len() == 1 {
-                                resolve_conditional_branch(
-                                    &new_subject.types[0],
-                                    bound,
-                                    &new_if_true,
-                                    &new_if_false,
-                                )
-                            } else {
-                                None
-                            }
+                            resolve_conditional_branch(
+                                &new_subject,
+                                bound,
+                                &new_if_true,
+                                &new_if_false,
+                            )
                         } else {
                             None
                         }
@@ -1522,24 +1518,11 @@ impl Type {
                         &data.if_true,
                         &data.if_false,
                     );
-                    let resolved = if subject.types.len() == 1 {
-                        if let Some(name) = param_name {
-                            if let Some(arg_ty) = lookup(name.as_ref()) {
-                                resolve_conditional_branch(
-                                    &subject.types[0],
-                                    &arg_ty,
-                                    if_true,
-                                    if_false,
-                                )
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
+                    let resolved = param_name
+                        .and_then(|name| lookup(name.as_ref()))
+                        .and_then(|arg_ty| {
+                            resolve_conditional_branch(subject, &arg_ty, if_true, if_false)
+                        });
 
                     if let Some(branch) = resolved {
                         // Recursively resolve nested conditionals in the selected branch.
@@ -1850,18 +1833,18 @@ fn subject_is_decidable(subject: &Atomic) -> bool {
 /// Otherwise the branch is undecidable and the caller widens to the union of
 /// both branches.
 fn resolve_conditional_branch(
-    subject: &Atomic,
+    subject: &Type,
     arg_ty: &Type,
     if_true: &Type,
     if_false: &Type,
 ) -> Option<Type> {
-    if !subject_is_decidable(subject) {
+    if subject.types.is_empty() || !subject.types.iter().all(subject_is_decidable) {
         return None;
     }
     if arg_ty.types.is_empty() {
         return None;
     }
-    let subject_classes = value_classes(subject);
+    let subject_classes: Vec<ValueClass> = subject.types.iter().flat_map(value_classes).collect();
     let arg_classes: Vec<ValueClass> = arg_ty.types.iter().flat_map(value_classes).collect();
     if arg_classes.is_empty() {
         // Opaque argument (template, `key-of`, …) — no branch is ruled out.
@@ -3618,7 +3601,7 @@ mod tests {
         // A `float` subject is the `Float` class; an int literal is
         // `LitInt`, which is not a float, and floats are not ints.
         let ty = resolve_conditional_branch(
-            &Atomic::TFloat,
+            &Type::single(Atomic::TFloat),
             &Type::single(Atomic::TLiteralInt(42)),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3632,7 +3615,7 @@ mod tests {
     #[test]
     fn resolve_conditional_int_subject_float_literal_false_branch() {
         let ty = resolve_conditional_branch(
-            &Atomic::TInt,
+            &Type::single(Atomic::TInt),
             &Type::single(Atomic::TLiteralFloat(1, 0)),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3646,7 +3629,7 @@ mod tests {
     #[test]
     fn resolve_conditional_float_subject_float_literal_then_branch() {
         let ty = resolve_conditional_branch(
-            &Atomic::TFloat,
+            &Type::single(Atomic::TFloat),
             &Type::single(Atomic::TLiteralFloat(1, 5)),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3660,7 +3643,7 @@ mod tests {
     #[test]
     fn resolve_conditional_int_subject_int_literal_then_branch() {
         let ty = resolve_conditional_branch(
-            &Atomic::TInt,
+            &Type::single(Atomic::TInt),
             &Type::single(Atomic::TLiteralInt(7)),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3676,7 +3659,7 @@ mod tests {
         // A bare `float` argument is never an `int`: disjoint value
         // classes commit to the false branch.
         let ty = resolve_conditional_branch(
-            &Atomic::TInt,
+            &Type::single(Atomic::TInt),
             &Type::single(Atomic::TFloat),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3690,10 +3673,10 @@ mod tests {
     #[test]
     fn resolve_conditional_array_subject_string_arg_false_branch() {
         let ty = resolve_conditional_branch(
-            &Atomic::TArray {
+            &Type::single(Atomic::TArray {
                 key: Box::new(Type::mixed()),
                 value: Box::new(Type::mixed()),
-            },
+            }),
             &Type::single(Atomic::TString),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3707,10 +3690,10 @@ mod tests {
     #[test]
     fn resolve_conditional_array_subject_bool_arg_false_branch() {
         let ty = resolve_conditional_branch(
-            &Atomic::TArray {
+            &Type::single(Atomic::TArray {
                 key: Box::new(Type::mixed()),
                 value: Box::new(Type::mixed()),
-            },
+            }),
             &Type::single(Atomic::TBool),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3727,10 +3710,10 @@ mod tests {
         // branch is never ruled out, and it is not contained in `array`,
         // so the false branch is never ruled out either.
         let ty = resolve_conditional_branch(
-            &Atomic::TArray {
+            &Type::single(Atomic::TArray {
                 key: Box::new(Type::mixed()),
                 value: Box::new(Type::mixed()),
-            },
+            }),
             &Type::mixed(),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3743,10 +3726,10 @@ mod tests {
         // A `list` argument is an `array` (`List` is contained in
         // `Array`), so every argument class is in the subject's class.
         let ty = resolve_conditional_branch(
-            &Atomic::TArray {
+            &Type::single(Atomic::TArray {
                 key: Box::new(Type::mixed()),
                 value: Box::new(Type::mixed()),
-            },
+            }),
             &Type::single(Atomic::TList {
                 value: Box::new(Type::mixed()),
             }),
@@ -3763,9 +3746,9 @@ mod tests {
     fn resolve_conditional_list_subject_keyed_list_arg_then_branch() {
         // A keyed array with `is_list` is a list at runtime.
         let ty = resolve_conditional_branch(
-            &Atomic::TList {
+            &Type::single(Atomic::TList {
                 value: Box::new(Type::mixed()),
-            },
+            }),
             &Type::single(Atomic::TKeyedArray {
                 properties: Arc::default(),
                 is_open: false,
@@ -3786,9 +3769,9 @@ mod tests {
         // overlaps the `list` subject, `String` does not, so neither
         // branch is ruled out.
         let ty = resolve_conditional_branch(
-            &Atomic::TList {
+            &Type::single(Atomic::TList {
                 value: Box::new(Type::mixed()),
-            },
+            }),
             &Type::from_vec(vec![
                 Atomic::TList {
                     value: Box::new(Type::mixed()),
@@ -3807,7 +3790,7 @@ mod tests {
         // as `"123"`), so the value-class lattice cannot reduce it: the
         // branch stays undecidable even for a literal string argument.
         let ty = resolve_conditional_branch(
-            &Atomic::TNumeric,
+            &Type::single(Atomic::TNumeric),
             &Type::single(Atomic::TLiteralString("123".into())),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3820,7 +3803,7 @@ mod tests {
         // A `non-empty-string` subject is refined (`""` is a string but
         // not non-empty), so even a bare string argument is undecidable.
         let ty = resolve_conditional_branch(
-            &Atomic::TNonEmptyString,
+            &Type::single(Atomic::TNonEmptyString),
             &Type::single(Atomic::TString),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3833,7 +3816,7 @@ mod tests {
         // A template parameter has no value classes at all (opaque), so
         // it is undecidable against any subject.
         let ty = resolve_conditional_branch(
-            &Atomic::TString,
+            &Type::single(Atomic::TString),
             &t_param("T"),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3846,7 +3829,7 @@ mod tests {
         // `mixed` is a decidable subject: every value class is contained
         // in `Top`, so a bool argument is always `mixed`.
         let ty = resolve_conditional_branch(
-            &Atomic::TMixed,
+            &Type::single(Atomic::TMixed),
             &Type::single(Atomic::TBool),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3862,7 +3845,7 @@ mod tests {
         // `null` is not a scalar value class: the argument is disjoint
         // from the subject, so the false branch is taken.
         let ty = resolve_conditional_branch(
-            &Atomic::TScalar,
+            &Type::single(Atomic::TScalar),
             &Type::single(Atomic::TNull),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3877,7 +3860,7 @@ mod tests {
     fn resolve_conditional_object_subject_named_arg_then_branch() {
         // A named class instance is an object at runtime.
         let ty = resolve_conditional_branch(
-            &Atomic::TObject,
+            &Type::single(Atomic::TObject),
             &Type::single(Atomic::TNamedObject {
                 fqcn: Name::new("Foo"),
                 type_params: empty_type_params(),
@@ -3897,10 +3880,10 @@ mod tests {
         // instance of another class is undecidable even though both are
         // objects.
         let ty = resolve_conditional_branch(
-            &Atomic::TNamedObject {
+            &Type::single(Atomic::TNamedObject {
                 fqcn: Name::new("Foo"),
                 type_params: empty_type_params(),
-            },
+            }),
             &Type::single(Atomic::TNamedObject {
                 fqcn: Name::new("Bar"),
                 type_params: empty_type_params(),
@@ -3916,10 +3899,10 @@ mod tests {
         // An enum-case subject is refined: the value-class lattice cannot
         // reduce a specific enum case, so an int argument is undecidable.
         let ty = resolve_conditional_branch(
-            &Atomic::TLiteralEnumCase {
+            &Type::single(Atomic::TLiteralEnumCase {
                 enum_fqcn: Name::new("RoundingMode"),
                 case_name: Name::new("Unnecessary"),
-            },
+            }),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3931,7 +3914,7 @@ mod tests {
     fn resolve_conditional_null_subject_bool_arg_false_branch() {
         // `null` and bool are disjoint value classes.
         let ty = resolve_conditional_branch(
-            &Atomic::TNull,
+            &Type::single(Atomic::TNull),
             &Type::single(Atomic::TBool),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
@@ -3947,7 +3930,7 @@ mod tests {
         // `true` is contained in `bool`'s `{true, false}` classes, so
         // the then branch is taken.
         let ty = resolve_conditional_branch(
-            &Atomic::TBool,
+            &Type::single(Atomic::TBool),
             &Type::single(Atomic::TTrue),
             &Type::single(Atomic::TInt),
             &Type::single(Atomic::TString),
