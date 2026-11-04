@@ -423,6 +423,7 @@ pub(crate) fn compute_assertion_template_bindings(
             params,
             &arg_types,
             &arg_names,
+            None,
         )
         .0,
     )

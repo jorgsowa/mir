@@ -1656,6 +1656,7 @@ fn resolve_method_return<'a>(
                 effective_params,
                 &effective_arg_types,
                 &arg_names,
+                Some(resolved.owner_fqcn.as_ref()),
             );
             // Only warn about template shadowing when the declaring class lives
             // in the file under analysis — a shadow inside a stub or vendor
@@ -1856,7 +1857,14 @@ fn resolve_method_return<'a>(
             };
             let out_ty =
                 super::resolve_conditional_return(out_ty, ea.db, Some(&bindings), |name| {
-                    super::conditional_param_type(&resolved.params, &call.args, arg_types, name)
+                    super::conditional_param_type(
+                        ea.db,
+                        Some(&resolved.owner_fqcn),
+                        &resolved.params,
+                        &call.args,
+                        arg_types,
+                        name,
+                    )
                 });
             if param.out_ty.is_none() && super::has_unbound_template(&out_ty) {
                 continue;
@@ -1993,6 +2001,8 @@ fn resolve_method_return<'a>(
                     }));
                 }
                 crate::call::conditional_param_type(
+                    ea.db,
+                    Some(resolved.owner_fqcn.as_ref()),
                     &resolved.params,
                     &call.args,
                     arg_types,

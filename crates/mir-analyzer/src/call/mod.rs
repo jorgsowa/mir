@@ -65,6 +65,8 @@ pub(crate) fn resolve_named_arg_type_index(
 /// The type a conditional return's `$param` discriminates on: the call-site
 /// argument, or its literal default when the argument is omitted.
 pub(crate) fn conditional_param_type(
+    db: &dyn crate::db::MirDatabase,
+    self_fqcn: Option<&str>,
     params: &[mir_codebase::definitions::DeclaredParam],
     call_args: &[php_ast::owned::Arg],
     arg_types: &[mir_types::Type],
@@ -74,15 +76,36 @@ pub(crate) fn conditional_param_type(
     if let Some(arg_idx) = resolve_named_arg_type_index(params, call_args, idx) {
         return arg_types.get(arg_idx).cloned();
     }
-    literal_default_type(&params[idx])
+    literal_default_type(db, &params[idx], self_fqcn)
 }
 
-/// The type of a `true`/`false`/`null`/integer parameter default.
+/// The type of a `true`/`false`/`null`/integer/`self::CONST` parameter default;
+/// `self_fqcn` is the class declaring the parameter.
 pub(crate) fn literal_default_type(
+    db: &dyn crate::db::MirDatabase,
     param: &mir_codebase::definitions::DeclaredParam,
+    self_fqcn: Option<&str>,
 ) -> Option<mir_types::Type> {
     use mir_types::Atomic;
-    let atomic = match param.default_text.as_deref()?.trim().to_ascii_lowercase().as_str() {
+    let text = param.default_text.as_deref()?.trim();
+    if let Some(name) = text
+        .strip_prefix("self::")
+        .or_else(|| text.strip_prefix("static::"))
+    {
+        let fqcn = crate::db::Fqcn::from_str(db, self_fqcn?);
+        let (_, constant) = crate::db::find_class_constant_in_chain(db, fqcn, name)?;
+        let ty = constant.literal_value.unwrap_or(constant.ty);
+        return matches!(
+            ty.types.as_slice(),
+            [Atomic::TLiteralInt(_)
+                | Atomic::TLiteralString(_)
+                | Atomic::TTrue
+                | Atomic::TFalse
+                | Atomic::TNull]
+        )
+        .then_some(ty);
+    }
+    let atomic = match text.to_ascii_lowercase().as_str() {
         "true" => Atomic::TTrue,
         "false" => Atomic::TFalse,
         "null" => Atomic::TNull,

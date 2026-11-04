@@ -983,6 +983,7 @@ impl CallAnalyzer {
                     &params,
                     &arg_types,
                     &arg_names,
+                    None,
                 );
                 if !ea.strict_types {
                     coerce_numeric_strings_to_number_bounds(&mut bindings, &template_params);
@@ -1037,7 +1038,9 @@ impl CallAnalyzer {
                         ea.db,
                         template_bindings.as_ref(),
                         |name| {
-                            crate::call::conditional_param_type(&params, &call.args, &arg_types, name)
+                            crate::call::conditional_param_type(
+                                ea.db, None, &params, &call.args, &arg_types, name,
+                            )
                         },
                     );
                     if param.is_variadic {
@@ -1119,7 +1122,9 @@ impl CallAnalyzer {
                 ea.db,
                 template_bindings.as_ref(),
                 |param_name| {
-                    crate::call::conditional_param_type(&params, &call.args, &arg_types, param_name)
+                    crate::call::conditional_param_type(
+                        ea.db, None, &params, &call.args, &arg_types, param_name,
+                    )
                 },
             );
 

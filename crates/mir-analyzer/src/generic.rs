@@ -19,13 +19,15 @@ use crate::subtype::is_subtype;
 /// `arg_names[i]` is the name the call used for `arg_types[i]` (`None` for a
 /// positional argument), so an argument doesn't have to sit at its declared
 /// parameter's index to bind that parameter's template correctly. Pass `&[]`
-/// when the call site has no named arguments to track.
+/// when the call site has no named arguments to track. `self_fqcn` is the class
+/// declaring the callee, for `self::CONST` parameter defaults.
 pub fn infer_template_bindings(
     db: &dyn MirDatabase,
     template_params: &[TemplateParam],
     params: &[DeclaredParam],
     arg_types: &[Type],
     arg_names: &[Option<String>],
+    self_fqcn: Option<&str>,
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
     let (mut bindings, unchecked) =
         infer_arg_template_bindings(db, template_params, params, arg_types, arg_names);
@@ -41,15 +43,23 @@ pub fn infer_template_bindings(
             continue;
         };
         let mut templates = atoms.iter().filter(|a| !matches!(a, Atomic::TNull));
-        let (Some(Atomic::TTemplateParam { name, .. }), None) = (templates.next(), templates.next())
+        let (Some(Atomic::TTemplateParam { name, .. }), None) =
+            (templates.next(), templates.next())
         else {
             continue;
         };
-        let Some(tp) = template_params.iter().find(|tp| tp.name.as_ref() == name.as_ref()) else {
+        let Some(tp) = template_params
+            .iter()
+            .find(|tp| tp.name.as_ref() == name.as_ref())
+        else {
             continue;
         };
-        if let Some(default) = crate::call::literal_default_type(param) {
-            if tp.bound.as_deref().is_none_or(|b| is_subtype(db, &default, b)) {
+        if let Some(default) = crate::call::literal_default_type(db, param, self_fqcn) {
+            if tp
+                .bound
+                .as_deref()
+                .is_none_or(|b| is_subtype(db, &default, b))
+            {
                 bindings.entry(name.clone()).or_insert(default);
             }
         }

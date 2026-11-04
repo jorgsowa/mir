@@ -331,15 +331,6 @@
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/Console/Application.php">
-    <InvalidArgument>
-      <code><![CDATA[$container->get('event_dispatcher')]]></code>
-      <code><![CDATA[$container->get('console.argument_resolver')]]></code>
-      <code><![CDATA[$container->get('debug.stopwatch')]]></code>
-      <code><![CDATA[$container->get('console.command_loader')]]></code>
-      <code><![CDATA[$container->get($id)]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/JsonDescriptor.php">
     <InvalidArgument>
       <code><![CDATA[$service::class]]></code>
@@ -406,9 +397,6 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Test/KernelTestCase.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return self::$kernel->getContainer()->get('test.service_container');]]></code>
-    </NullableReturnStatement>
     <UndefinedClass>
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
@@ -1696,11 +1684,6 @@
   <file src="src/Symfony/Component/HttpKernel/HttpKernel.php">
     <NullableReturnStatement>
       <code><![CDATA[return $response;]]></code>
-    </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/HttpKernel/Kernel.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->container->get('http_kernel');]]></code>
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/HttpKernel/Resources/welcome.html.php">

@@ -991,6 +991,7 @@ impl CallAnalyzer {
                     effective_params,
                     &arg_types,
                     &arg_names,
+                    Some(resolved.owner_fqcn.as_ref()),
                 );
                 // The method's own `@template ... of Bound`, checked for static
                 // calls (`Foo::bar()`, `self::bar()`, `parent::bar()`) as for
@@ -1139,6 +1140,8 @@ impl CallAnalyzer {
                         }));
                     }
                     crate::call::conditional_param_type(
+                        ea.db,
+                        Some(resolved.owner_fqcn.as_ref()),
                         &resolved.params,
                         &call.args,
                         &arg_types,
@@ -1205,7 +1208,14 @@ impl CallAnalyzer {
                 };
                 let out_ty =
                     super::resolve_conditional_return(out_ty, ea.db, Some(&out_bindings), |name| {
-                        super::conditional_param_type(&resolved.params, &call.args, &arg_types, name)
+                        super::conditional_param_type(
+                            ea.db,
+                            Some(&resolved.owner_fqcn),
+                            &resolved.params,
+                            &call.args,
+                            &arg_types,
+                            name,
+                        )
                     });
                 if param.out_ty.is_none() && super::has_unbound_template(&out_ty) {
                     continue;
@@ -1389,6 +1399,7 @@ impl CallAnalyzer {
                             effective_params,
                             &arg_types,
                             &arg_names,
+                            Some(resolved.owner_fqcn.as_ref()),
                         );
                         for v in method_bindings.values_mut() {
                             *v = crate::stmt::widen_for_check(v.clone());
