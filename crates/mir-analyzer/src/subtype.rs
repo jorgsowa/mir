@@ -259,6 +259,20 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                 return true;
             }
         }
+        // A callable is a callable string, a callable array or an object.
+        if matches!(a, Atomic::TCallable { .. })
+            && [
+                Atomic::TCallableString,
+                Atomic::TNonEmptyList {
+                    value: Box::new(Type::mixed()),
+                },
+                Atomic::TObject,
+            ]
+            .into_iter()
+            .all(|part| is_subtype(db, &Type::single(part), sup))
+        {
+            return true;
+        }
         sup.types.iter().any(|b| {
             // Per-pair structural check: handles scalars (string, int, etc.) when
             // sub is a union — is_subtype_structural above failed because another

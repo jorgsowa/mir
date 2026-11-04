@@ -1568,9 +1568,6 @@
     </UndefinedVariable>
   </file>
   <file src="src/Symfony/Component/EventDispatcher/Debug/WrappedListener.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->listener = $listener]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->listener;]]></code>
     </InvalidReturnType>
@@ -1859,20 +1856,7 @@
       <code><![CDATA[return $this->processedLogs = $rawLogs;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/Event/ControllerAttributeEvent.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->controller = match (true) {
-            $kernelEvent instanceof ControllerEvent => $kernelEvent->getController(),
-            $kernelEvent instanceof ControllerArgumentsEvent => $kernelEvent->getController(),
-            default => null,
-        }]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/Event/ControllerEvent.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->controller = $controller]]></code>
-      <code><![CDATA[$this->controller = $controller]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->controller;]]></code>
     </InvalidReturnType>

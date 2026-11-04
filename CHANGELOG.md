@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@phpstan-method`, `@phpstan-property`, `@phpstan-property-read`, `@phpstan-property-write`, `@psalm-throws` and `@phpstan-throws` are read. A prefixed `@method`/`@property` tag overrides a plain one for the same name.
 - `object{prop: T, ...}` docblock types keep their properties instead of becoming plain `object`: reading `$o->prop` gives `T`, and a shape argument missing a required property or with an incompatible property type is reported as `InvalidArgument`.
 - A loop that always runs at least once (a `foreach` over a non-empty array, `while (true)`) checks its body against the pre-loop state too, so `$x = null; foreach ($nonEmpty as $v) { if (null === $x) ...` is no longer reported as an impossible comparison.
+- `callable` is accepted where `string|array|object` is expected.
 
 ## [0.90.0] - 2026-11-03
 
