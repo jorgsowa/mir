@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `if ($a['k'])` narrows the shape key's value to truthy, like `!empty($a['k'])`.
 - Negating `floor()`/`ceil()`'s integral float keeps it integral, and an integral float fits a `?int` parameter like an `int` one.
 - `|`, `&` and `^` of two integer literals fold to a literal, so `preg_match_all()` with `PREG_OFFSET_CAPTURE | PREG_SET_ORDER` types `$matches` by its flags.
+- `new $obj()` is typed as `$obj`'s class instead of `object`.
 
 ## [0.90.0] - 2026-11-03
 

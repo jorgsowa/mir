@@ -863,11 +863,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 }
-                // Every atom a known `class-string<X>`: instantiates one of the X.
+                // Every atom a known `class-string<X>` or an `X` object: instantiates one of the X.
                 let mut instances = Type::empty();
                 for atomic in &ty.types {
-                    let Some(fqcn) = ctx.class_string_target(atomic) else {
-                        return Type::single(Atomic::TObject);
+                    let fqcn = match atomic {
+                        Atomic::TNamedObject { fqcn, .. } => fqcn.as_ref(),
+                        _ => match ctx.class_string_target(atomic) {
+                            Some(fqcn) => fqcn,
+                            None => return Type::single(Atomic::TObject),
+                        },
                     };
                     instances.add_type(Atomic::TNamedObject {
                         fqcn: mir_types::Name::from(fqcn),

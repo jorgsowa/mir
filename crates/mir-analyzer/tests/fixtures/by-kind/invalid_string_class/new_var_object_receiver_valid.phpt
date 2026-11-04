@@ -6,6 +6,7 @@ constructs a fresh instance of that object's own runtime class. Common
 <mir>
   <issueHandlers>
     <MissingReturnType errorLevel="suppress"/>
+    <MissingThrowsDocblock errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===
