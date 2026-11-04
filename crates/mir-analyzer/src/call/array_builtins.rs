@@ -1113,9 +1113,6 @@ pub(crate) fn sort_byref_type(arr: &Type, reindex: bool) -> Type {
         return arr.clone();
     }
     let (_, value) = crate::stmt::infer_foreach_types(arr);
-    if value.is_mixed() {
-        return arr.clone();
-    }
     let atom = if super::callable::is_non_empty_collection(arr) {
         Atomic::TNonEmptyList {
             value: Box::new(value),

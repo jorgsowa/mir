@@ -71,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - For a parameter typed with several templates (`@param T|U`), an argument binds the template whose bound accepts it, so `T of Enum` and `U of value-of<T>` no longer report `InvalidTemplateParam` for either an enum case or its value.
 - Values assigned to a by-reference `foreach` variable (`foreach ($a as &$v) { $v = ...; }`) become the element type of the iterated array or list.
 - `glob()` returns `list<string>|false`.
+- `sort()`, `rsort()`, `usort()` and `shuffle()` turn an array with unknown elements into a `list<mixed>`.
 
 ## [0.90.0] - 2026-11-03
 
