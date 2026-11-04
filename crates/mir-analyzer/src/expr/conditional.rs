@@ -89,7 +89,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut right_ctx = ctx.branch();
         let right_ty = self.analyze(&nc.right, &mut right_ctx);
         *ctx = FlowState::merge_branches(&pre_ctx, pre_ctx.clone(), Some(right_ctx));
-        let non_null_left = left_ty.remove_null();
+        let mut non_null_left = left_ty.remove_null();
+        // A `void` call evaluates to null.
+        non_null_left.types.retain(|a| !matches!(a, Atomic::TVoid));
         if non_null_left.is_empty() {
             right_ty
         } else {

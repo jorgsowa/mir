@@ -2119,12 +2119,6 @@
       <code><![CDATA[false === $body]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Symfony/Component/Messenger/Bridge/Amqp/Transport/Connection.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->queue($queueName)->ack($message->getDeliveryTag()) ?? true;]]></code>
-      <code><![CDATA[return $this->queue($queueName)->nack($message->getDeliveryTag(), $flags) ?? true;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="src/Symfony/Component/Messenger/Bridge/Doctrine/Transport/Connection.php">
     <UndefinedClass>
       <code><![CDATA[FirebirdPlatform]]></code>
