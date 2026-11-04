@@ -1845,14 +1845,6 @@
       <code><![CDATA[$this->fileLinkFormat = $fileLinkFormat instanceof FileLinkFormatter && false === $fileLinkFormat->format('', 0) ? false : $fileLinkFormat]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/DataCollector/LoggerDataCollector.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->processedLogs = $rawLogs]]></code>
-    </InvalidPropertyAssignment>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->processedLogs = $rawLogs;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/Event/ControllerEvent.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->controller;]]></code>

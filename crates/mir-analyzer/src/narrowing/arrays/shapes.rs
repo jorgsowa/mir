@@ -34,7 +34,7 @@ pub(crate) fn narrow_prop_array_empty(
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     let narrowed = if is_empty {
-        current.narrow_to_empty_collection()
+        narrow_to_empty_array(&current)
     } else {
         current.narrow_to_non_empty_collection()
     };
@@ -52,7 +52,7 @@ pub(crate) fn narrow_static_prop_array_empty(
 ) {
     let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
     let narrowed = if is_empty {
-        current.narrow_to_empty_collection()
+        narrow_to_empty_array(&current)
     } else {
         current.narrow_to_non_empty_collection()
     };
@@ -970,7 +970,7 @@ pub(crate) fn narrow_array_emptiness_condition(
             if let Some(var_name) = extract_var_name(left) {
                 let current = ctx.get_var(var_name);
                 let narrowed = if effective_true {
-                    current.narrow_to_empty_collection()
+                    narrow_to_empty_array(&current)
                 } else {
                     current.narrow_to_non_empty_collection()
                 };
@@ -992,7 +992,7 @@ pub(crate) fn narrow_array_emptiness_condition(
             if let Some(var_name) = extract_var_name(right) {
                 let current = ctx.get_var(var_name);
                 let narrowed = if effective_true {
-                    current.narrow_to_empty_collection()
+                    narrow_to_empty_array(&current)
                 } else {
                     current.narrow_to_non_empty_collection()
                 };
@@ -1045,7 +1045,7 @@ fn narrow_shape_path_empty_collection(
             Atomic::TKeyedArray { properties, .. } => properties.get(key).and_then(|prop| {
                 if rest.is_empty() {
                     let narrowed = if is_empty {
-                        prop.ty.narrow_to_empty_collection()
+                        narrow_to_empty_array(&prop.ty)
                     } else {
                         prop.ty.narrow_to_non_empty_collection()
                     };
@@ -1233,4 +1233,11 @@ fn narrow_not_empty_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) 
     } else {
         None
     }
+}
+
+/// `$x === []` / `$x == []`: an object never equals an array.
+fn narrow_to_empty_array(ty: &Type) -> Type {
+    let mut out = ty.narrow_to_empty_collection();
+    out.types.retain(|a| !a.is_object());
+    out
 }
