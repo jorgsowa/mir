@@ -1233,9 +1233,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/DependencyInjection/Compiler/AutowirePass.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $alias]]></code>
-    </ImpossibleIdenticalComparison>
     <NullableReturnStatement>
       <code><![CDATA[return (fn () => $this->createTypeNotFoundMessage($reference, $label, $currentId))->bindTo($this->typesClone);]]></code>
     </NullableReturnStatement>
@@ -1723,11 +1720,6 @@
     <UndefinedMethod>
       <code><![CDATA[$this->responseFactory->next()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Component/HttpClient/Response/AsyncResponse.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $chunk]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/HttpClient/Response/StreamWrapper.php">
     <ImpossibleIdenticalComparison>

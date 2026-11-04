@@ -1330,6 +1330,9 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let mut current = entry;
         current.inside_loop = true;
+        // A guaranteed loop's `current` holds only post-iteration states, but
+        // every pass must still see the first iteration's entry.
+        let first_entry = loop_guaranteed.then(|| current.clone());
 
         let mut stabilized = false;
         let mut back_edge_pass_done = false;
@@ -1348,7 +1351,12 @@ impl<'a> StatementsAnalyzer<'a> {
             // roll back below if this pass turns out not to be the last one.
             let issues_mark = self.issues.issue_count();
 
-            let mut iter = current.clone();
+            let mut iter = match &first_entry {
+                Some(first) if iter_idx > 0 => {
+                    FlowState::merge_branches(first, current.clone(), None)
+                }
+                _ => current.clone(),
+            };
             // `next` below is built from `pre.clone()` (merge_branches' else-path
             // default), which resets `inside_loop` to whatever it was *before*
             // this loop — so `current = next` loses it again after pass 1
