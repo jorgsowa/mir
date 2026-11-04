@@ -367,6 +367,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
                     && !inferred.is_mixed()
                     && !is_unresolved(inferred, template_params)
                     && !is_subtype(db, inferred, &resolved_bound)
+                    && !is_wider_than_literal_bound(db, inferred, &resolved_bound)
                 {
                     violations.push((&tp.name, inferred, resolved_bound));
                 }
@@ -374,6 +375,15 @@ pub fn check_template_bounds_with_inheritance<'a>(
         }
     }
     violations
+}
+
+/// `int` against a `1|2` bound may hold an allowed value: a coercion, not a violation.
+fn is_wider_than_literal_bound(db: &dyn MirDatabase, inferred: &Type, bound: &Type) -> bool {
+    bound
+        .types
+        .iter()
+        .all(|a| matches!(a, Atomic::TLiteralInt(_) | Atomic::TLiteralString(_)))
+        && is_subtype(db, bound, inferred)
 }
 
 /// Replace a `static` atom in a (already template-substituted) bound with
