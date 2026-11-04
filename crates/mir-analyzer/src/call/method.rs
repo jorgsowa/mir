@@ -1638,8 +1638,16 @@ fn resolve_method_return<'a>(
             resolved.return_ty_raw.types.as_slice(),
             [mir_types::Atomic::TStaticObject { .. }]
         );
-        let ret_raw =
-            substitute_static_in_return(ea.db, resolved.return_ty_raw, fqcn, receiver_type_params);
+        // `static` on an intersection receiver is the whole intersection, not the declaring part.
+        let ret_raw = match full_receiver {
+            Some(full) if returns_this => full.clone(),
+            _ => substitute_static_in_return(
+                ea.db,
+                resolved.return_ty_raw,
+                fqcn,
+                receiver_type_params,
+            ),
+        };
 
         if !resolved.template_params.is_empty() {
             let (method_bindings, unchecked) = infer_template_bindings(
@@ -1846,9 +1854,10 @@ fn resolve_method_return<'a>(
             } else {
                 out_ty.substitute_templates(&bindings)
             };
-            let out_ty = super::resolve_conditional_return(out_ty, ea.db, Some(&bindings), |name| {
-                super::conditional_param_type(&resolved.params, &call.args, arg_types, name)
-            });
+            let out_ty =
+                super::resolve_conditional_return(out_ty, ea.db, Some(&bindings), |name| {
+                    super::conditional_param_type(&resolved.params, &call.args, arg_types, name)
+                });
             if param.out_ty.is_none() && super::has_unbound_template(&out_ty) {
                 continue;
             }

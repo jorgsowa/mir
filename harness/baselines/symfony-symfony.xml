@@ -862,16 +862,10 @@
             null,
             CacheItem::class
         )]]></code>
-      <code><![CDATA[$clone->pool = $this->pool->withSubNamespace($namespace)]]></code>
     </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Cache/Adapter/TraceableAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$clone->pool = $this->pool->withSubNamespace($namespace)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Cache/CacheItem.php">
     <InvalidPropertyAssignment>
