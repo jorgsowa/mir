@@ -1130,12 +1130,21 @@ impl<'a> StatementsAnalyzer<'a> {
             }
             try_ctx.locally_caught_throws = Arc::from(caught);
         }
-        self.analyze_stmts(&tc.body.stmts, &mut try_ctx);
-
-        // A body ending in `return`/`throw` may still throw after its assignments ran.
-        let mut try_reached = try_ctx.clone();
-        try_reached.diverges = false;
-        let catch_base = FlowState::merge_branches(&pre_ctx, try_reached, None);
+        // An exception can leave the body after any statement, including a final
+        // `return`/`throw`, so catch and finally see every intermediate state.
+        let mut throw_points: Option<FlowState> = None;
+        self.analyze_stmts_observed(&tc.body.stmts, &mut try_ctx, &mut |state| {
+            let mut state = state.clone();
+            state.diverges = false;
+            throw_points = Some(match throw_points.take() {
+                Some(acc) => FlowState::merge_branches(&pre_ctx, acc, Some(state)),
+                None => state,
+            });
+        });
+        let catch_base = match throw_points {
+            Some(states) => FlowState::merge_branches(&pre_ctx, states, None),
+            None => pre_ctx.clone(),
+        };
 
         let mut all_catches: Vec<FlowState> = vec![];
         // Resolved types caught by any EARLIER catch clause on this try — used to

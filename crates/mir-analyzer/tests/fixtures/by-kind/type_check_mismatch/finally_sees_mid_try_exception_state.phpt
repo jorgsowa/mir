@@ -1,8 +1,6 @@
 ===description===
-Inside `finally`, a variable reassigned partway through the try body isn't
-narrowed to its final value alone — an exception could have been thrown
-before the try body completed, same conservative pre/post merge already
-used to seed catch blocks
+Inside `finally`, a variable reassigned partway through the try body may hold
+any value it had after a statement of the try body
 ===config===
 <mir>
   <issueHandlers>
@@ -21,7 +19,7 @@ function f(): void {
         risky();
         $x = new B();
     } finally {
-        /** @mir-check $x is B|null */
+        /** @mir-check $x is B|A|null */
         echo get_class($x);
 //                     ^^ PossiblyNullArgument: Argument $object of get_class() might be null
     }

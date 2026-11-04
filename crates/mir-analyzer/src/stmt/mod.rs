@@ -408,6 +408,16 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
+        self.analyze_stmts_observed(stmts, ctx, &mut |_| {});
+    }
+
+    /// [`Self::analyze_stmts`], calling `after_each` with the state after every reachable statement.
+    pub(crate) fn analyze_stmts_observed(
+        &mut self,
+        stmts: &[php_ast::owned::Stmt],
+        ctx: &mut FlowState,
+        after_each: &mut dyn FnMut(&FlowState),
+    ) {
         for (i, stmt) in stmts.iter().enumerate() {
             if ctx.diverges && !self.is_close_tag_nop(stmt) {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
@@ -455,6 +465,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
                 None => self.analyze_stmt(stmt, ctx),
             }
+            after_each(ctx);
         }
     }
 
