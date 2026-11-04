@@ -1690,6 +1690,8 @@ enum ValueClass {
     LitFloat(i64, i64),
     /// A specific `string` literal.
     LitString(Arc<str>),
+    /// `class-string` and its kin — a refinement of [`String`].
+    ClassString,
 }
 
 impl ValueClass {
@@ -1705,7 +1707,18 @@ impl ValueClass {
                     | (Self::Int, Self::LitInt(_))
                     | (Self::Float, Self::LitFloat(..))
                     | (Self::String, Self::LitString(_))
+                    | (Self::String, Self::ClassString)
                     | (Self::Array, Self::List)
+            )
+    }
+
+    /// Whether some value is of both classes. A string literal may name a class.
+    fn overlaps(&self, b: &Self) -> bool {
+        self.includes(b)
+            || b.includes(self)
+            || matches!(
+                (self, b),
+                (Self::ClassString, Self::LitString(_)) | (Self::LitString(_), Self::ClassString)
             )
     }
 }
@@ -1739,11 +1752,11 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         Atomic::TString
         | Atomic::TNonEmptyString
         | Atomic::TNumericString
-        | Atomic::TClassString(_)
+        | Atomic::TCallableString => vec![String],
+        Atomic::TClassString(_)
         | Atomic::TInterfaceString(_)
         | Atomic::TEnumString
-        | Atomic::TTraitString
-        | Atomic::TCallableString => vec![String],
+        | Atomic::TTraitString => vec![ClassString],
         Atomic::TLiteralString(s) => vec![LitString(s.clone())],
         // Arrays — `list` is a refinement of `array`.
         Atomic::TArray { .. }
@@ -1797,6 +1810,7 @@ fn subject_is_decidable(subject: &Atomic) -> bool {
             | Atomic::TFalse
             | Atomic::TBool
             | Atomic::TString
+            | Atomic::TClassString(None)
             | Atomic::TInt
             | Atomic::TFloat
             | Atomic::TLiteralString(_)
@@ -1853,11 +1867,9 @@ fn resolve_conditional_branch(
     let all_match = arg_classes
         .iter()
         .all(|c| subject_classes.iter().any(|s| s.includes(c)));
-    let any_overlap = arg_classes.iter().any(|c| {
-        subject_classes
-            .iter()
-            .any(|s| s.includes(c) || c.includes(s))
-    });
+    let any_overlap = arg_classes
+        .iter()
+        .any(|c| subject_classes.iter().any(|s| s.overlaps(c)));
     if all_match {
         Some(if_true.clone())
     } else if !any_overlap {

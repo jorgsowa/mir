@@ -25,11 +25,6 @@
       <code><![CDATA[return $this->container->get($name);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Bridge/Doctrine/PropertyInfo/DoctrineExtractor.php">
-    <InvalidTemplateParam>
-      <code><![CDATA[Type::collection(Type::object(Collection::class), Type::object($class), null !== $collectionKeyType ? Type::builtin($collectionKeyType) : null)]]></code>
-    </InvalidTemplateParam>
-  </file>
   <file src="src/Symfony/Bridge/Doctrine/Security/RememberMe/DoctrineTokenProvider.php">
     <InvalidArgument>
       <code><![CDATA[$token->getTokenValue()]]></code>
