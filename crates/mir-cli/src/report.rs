@@ -427,7 +427,7 @@ fn baseline_dir(baseline_path: &Path) -> Option<PathBuf> {
     Some(normalize_for_compare(&dir))
 }
 
-/// Baseline keys are relative to the baseline's directory, but composer-root runs report absolute paths.
+/// Baseline keys are relative to the baseline's directory; issues carry absolute or cwd-relative (`./src`) paths.
 fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
     let path = Path::new(file);
     let Some(dir) = baseline_dir else {
@@ -436,11 +436,9 @@ fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
     if let Ok(rel) = path.strip_prefix(dir) {
         return rel.to_string_lossy().into_owned();
     }
-    if path.is_absolute() {
-        let normalized = normalize_for_compare(path);
-        if let Ok(rel) = normalized.strip_prefix(dir) {
-            return rel.to_string_lossy().into_owned();
-        }
+    let normalized = normalize_for_compare(&cwd().join(path));
+    if let Ok(rel) = normalized.strip_prefix(dir) {
+        return rel.to_string_lossy().into_owned();
     }
     file.to_string()
 }

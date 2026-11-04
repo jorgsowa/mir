@@ -500,6 +500,14 @@ pub struct Baseline {
     pub entries: HashMap<String, HashMap<String, Vec<String>>>,
 }
 
+/// `./src/a.php` and `src/a.php` name the same baseline file.
+fn without_cur_dir(path: &str) -> std::path::PathBuf {
+    std::path::Path::new(path)
+        .components()
+        .filter(|c| !matches!(c, std::path::Component::CurDir))
+        .collect()
+}
+
 impl Baseline {
     /// Load a baseline from a file path.
     pub fn from_file(path: &std::path::Path) -> Result<Self, ConfigError> {
@@ -521,9 +529,10 @@ impl Baseline {
             .contains_key(file)
             .then(|| file.to_owned())
             .or_else(|| {
+                let file = without_cur_dir(file);
                 self.entries
                     .keys()
-                    .find(|candidate| std::path::Path::new(candidate) == std::path::Path::new(file))
+                    .find(|candidate| without_cur_dir(candidate) == file)
                     .cloned()
             })?;
         let by_kind = self.entries.get_mut(&baseline_file)?;

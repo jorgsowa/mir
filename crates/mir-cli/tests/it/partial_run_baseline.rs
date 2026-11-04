@@ -93,9 +93,30 @@ fn full_run_still_reports_entries_of_clean_files_stale() {
     let dir = fixture(false);
     std::fs::write(dir.path().join("src/b.php"), "<?php\n").unwrap();
 
-    let out = run(dir.path(), &["--report-stale-baseline", "src"]);
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(!out.status.success(), "{stderr}");
-    assert!(stderr.contains("2 stale baseline issue(s)"), "{stderr}");
-    assert!(stderr.contains("src/b.php"), "{stderr}");
+    for target in ["src", "."] {
+        let out = run(dir.path(), &["--report-stale-baseline", target]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(!out.status.success(), "{target}: {stderr}");
+        assert!(
+            stderr.contains("2 stale baseline issue(s)"),
+            "{target}: {stderr}"
+        );
+        assert!(stderr.contains("src/b.php"), "{target}: {stderr}");
+    }
+}
+
+#[test]
+fn dot_target_writes_baseline_keys_without_dot_prefix() {
+    let dir = fixture(false);
+    run(dir.path(), &["--update-baseline", "."]);
+    let updated = std::fs::read_to_string(dir.path().join("psalm-baseline.xml")).unwrap();
+    assert!(updated.contains(r#"<file src="src/a.php">"#), "{updated}");
+    assert!(!updated.contains("./src"), "{updated}");
+
+    let out = run(dir.path(), &["--report-stale-baseline", "."]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
