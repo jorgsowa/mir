@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An omitted argument with an integer default resolves a conditional `@return` on that parameter.
 - An omitted argument defaulting to `self::CONST` binds its template and resolves conditional `@return` types, so `ContainerInterface::get($id)` returns `object`.
 - `[$string, 'method']` is accepted as a callable; a literal first element still has to name a class.
+- An open array shape passed as a `callable` isn't rejected for lacking exactly two entries.
 - A conditional `@param-out` type resolves against the call's arguments instead of staying a raw conditional that nests on every loop pass.
 - A method returning `static` or `$this`, also nested as in `list<static>`, called on an `A&B` receiver returns `A&B` instead of only the part that declares the method.
 - `($c is class-string ? A : B)` resolves for a `Foo::class` argument and for a non-string argument.

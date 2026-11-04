@@ -1869,9 +1869,14 @@ fn validate_callable_type(
 
     // Check if argument is a keyed array (should be [obj/class, "method"] format)
     for atomic in &arg_ty.types {
-        if let Atomic::TKeyedArray { properties, .. } = atomic {
+        if let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            ..
+        } = atomic
+        {
             // Valid callable arrays should have exactly 2 elements: [0] => object/class, [1] => string
-            if properties.len() != 2 {
+            if properties.len() != 2 && !is_open {
                 ea.emit(
                     IssueKind::InvalidArgument {
                         param: "callback".to_string(),

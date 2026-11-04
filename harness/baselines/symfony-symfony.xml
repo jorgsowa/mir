@@ -1642,12 +1642,6 @@
       <code><![CDATA[$this->serializer->deserialize($data, $type, $format, self::CONTEXT_DESERIALIZE + $attribute->serializationContext)]]></code>
     </InvalidTemplateParam>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/Controller/ControllerResolver.php">
-    <InvalidArgument>
-      <code><![CDATA[$controller]]></code>
-      <code><![CDATA[$controller]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/DataCollector/DumpDataCollector.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->fileLinkFormat = $fileLinkFormat instanceof FileLinkFormatter && false === $fileLinkFormat->format('', 0) ? false : $fileLinkFormat]]></code>
