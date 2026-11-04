@@ -60,7 +60,7 @@ pub fn infer_template_bindings(
                 .as_deref()
                 .is_none_or(|b| is_subtype(db, &default, b))
             {
-                bindings.entry(name.clone()).or_insert(default);
+                bindings.entry(*name).or_insert(default);
             }
         }
     }
