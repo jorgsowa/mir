@@ -974,9 +974,6 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/Clock/MonotonicClock.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false === $offset = hrtime()]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->sOffset = $time[1] - $offset[0]]]></code>
       <code><![CDATA[$this->timezone = \is_string($timezone ??= date_default_timezone_get()) ? $this->withTimeZone($timezone)->timezone : $timezone]]></code>
