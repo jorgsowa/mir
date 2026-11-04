@@ -2018,11 +2018,6 @@
       <code><![CDATA[]]></code>
     </UndefinedThrowsDocblock>
   </file>
-  <file src="src/Symfony/Component/Lock/Store/RedisStore.php">
-    <InvalidArgument>
-      <code><![CDATA[array_merge([$resource], $args)]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Lock/Store/StoreFactory.php">
     <UndefinedClass>
       <code><![CDATA[\MongoDB\Collection]]></code>
@@ -2473,11 +2468,6 @@
     <InvalidArgument>
       <code><![CDATA[$tokenValue]]></code>
       <code><![CDATA[$tokenValue]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Semaphore/Store/RedisStore.php">
-    <InvalidArgument>
-      <code><![CDATA[array_merge([$resource], $args)]]></code>
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Serializer/Context/ContextBuilderTrait.php">

@@ -916,41 +916,54 @@ impl CallAnalyzer {
                     let mut found_method = false;
                     let mut this_self_out = None;
                     let full_receiver_ty = Type::single(atomic.clone());
-                    for part in parts.iter() {
-                        for inner_atomic in &part.types {
-                            if let mir_types::Atomic::TNamedObject {
-                                fqcn,
-                                type_params: receiver_type_params,
-                            } = inner_atomic
-                            {
-                                let fqcn_resolved =
-                                    crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
-                                let resolved_arc = Arc::from(fqcn_resolved.as_str());
-                                if crate::db::has_method_in_chain(ea.db, &resolved_arc, method_name)
-                                {
-                                    found_method = true;
-                                    let mut part_declaring = None;
-                                    intersection_result.merge_with(&resolve_method_return(
-                                        ea,
-                                        ctx,
-                                        call,
-                                        span,
-                                        method_name,
-                                        &resolved_arc,
-                                        &receiver_type_params[..],
-                                        &arg_types,
-                                        &arg_spans,
-                                        sole_spread_ty.clone(),
-                                        &mut part_declaring,
-                                        &mut this_self_out,
-                                        Some(&full_receiver_ty),
-                                        union_has_call_magic,
-                                        false,
-                                    ));
-                                    if declaring.is_none() {
-                                        declaring = part_declaring;
-                                    }
-                                }
+                    let db = ea.db;
+                    let named_parts: Vec<_> = parts
+                        .iter()
+                        .flat_map(|part| part.types.iter())
+                        .filter_map(|a| match a {
+                            mir_types::Atomic::TNamedObject { fqcn, type_params } => {
+                                let resolved = crate::db::resolve_receiver_fqcn(db, &ea.file, fqcn);
+                                Some((Arc::<str>::from(resolved.as_str()), type_params))
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    // A part's real method is the implementation; another part's
+                    // `@method` only documents magic this object doesn't need.
+                    let declares_real = |fqcn: &str| {
+                        crate::db::find_method_in_chain(
+                            db,
+                            crate::db::Fqcn::from_str(db, fqcn),
+                            method_name,
+                        )
+                        .is_some_and(|(_, m)| !m.is_virtual)
+                    };
+                    let any_real = named_parts.iter().any(|(fqcn, _)| declares_real(fqcn));
+                    for (resolved_arc, receiver_type_params) in &named_parts {
+                        if crate::db::has_method_in_chain(ea.db, resolved_arc, method_name)
+                            && (!any_real || declares_real(resolved_arc))
+                        {
+                            found_method = true;
+                            let mut part_declaring = None;
+                            intersection_result.merge_with(&resolve_method_return(
+                                ea,
+                                ctx,
+                                call,
+                                span,
+                                method_name,
+                                resolved_arc,
+                                &receiver_type_params[..],
+                                &arg_types,
+                                &arg_spans,
+                                sole_spread_ty.clone(),
+                                &mut part_declaring,
+                                &mut this_self_out,
+                                Some(&full_receiver_ty),
+                                union_has_call_magic,
+                                false,
+                            ));
+                            if declaring.is_none() {
+                                declaring = part_declaring;
                             }
                         }
                     }
