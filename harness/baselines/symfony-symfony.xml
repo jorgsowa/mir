@@ -2461,7 +2461,6 @@
   <file src="src/Symfony/Component/TypeInfo/TypeResolver/ReflectionTypeResolver.php">
     <InvalidTemplateParam>
       <code><![CDATA[Type::intersection(...array_map(fn (mixed $t): Type => $this->resolve($t, $typeContext), $subject->getTypes()))]]></code>
-      <code><![CDATA[Type::builtin($identifier)]]></code>
     </InvalidTemplateParam>
   </file>
   <file src="src/Symfony/Component/TypeInfo/TypeResolver/StringTypeResolver.php">

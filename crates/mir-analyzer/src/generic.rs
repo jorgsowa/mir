@@ -816,6 +816,61 @@ fn infer_from_callable_params(
     }
 }
 
+/// For a param union of several bare templates (`T|U`), the arg atoms `name` binds:
+/// those its bound accepts, else those no sibling bound accepts and its bound is
+/// unresolved (`U of value-of<T>`). `None` when `name` is the union's only template.
+fn template_share(
+    db: &dyn MirDatabase,
+    bind: &Type,
+    name: Name,
+    param_ty: &Type,
+    template_names: &FxHashSet<Name>,
+) -> Option<Type> {
+    let siblings: Vec<(Name, &Type)> = param_ty
+        .types
+        .iter()
+        .filter_map(|a| match a {
+            Atomic::TTemplateParam { name, as_type, .. } if template_names.contains(name) => {
+                Some((*name, &**as_type))
+            }
+            _ => None,
+        })
+        .collect();
+    if siblings.len() < 2 {
+        return None;
+    }
+    let unresolved = |b: &Type| {
+        b.types.iter().any(|a| {
+            matches!(
+                a,
+                Atomic::TTemplateParam { .. } | Atomic::TValueOf { .. } | Atomic::TKeyOf { .. }
+            )
+        })
+    };
+    let mut share = Type::empty();
+    for atom in &bind.types {
+        let atom_ty = Type::single(atom.clone());
+        let accepting: Vec<Name> = siblings
+            .iter()
+            .filter(|(_, b)| crate::subtype::is_subtype(db, &atom_ty, b))
+            .map(|(n, _)| *n)
+            .collect();
+        let candidates = if accepting.is_empty() {
+            siblings
+                .iter()
+                .filter(|(_, b)| unresolved(b))
+                .map(|(n, _)| *n)
+                .collect()
+        } else {
+            accepting
+        };
+        if candidates.is_empty() || candidates.contains(&name) {
+            share.add_type(atom.clone());
+        }
+    }
+    Some(share)
+}
+
 fn infer_from_pair(
     db: &dyn MirDatabase,
     param_ty: &Type,
@@ -845,6 +900,8 @@ fn infer_from_pair(
             // gate the `TNamedObject` arm below already has.
             Atomic::TTemplateParam { name, .. } if template_names.contains(name) => {
                 let bind = template_residual.bind_value(arg_ty);
+                let own_share = template_share(db, bind, *name, param_ty, template_names);
+                let bind = own_share.as_ref().unwrap_or(bind);
                 if bind.types.is_empty() {
                     // Empty residual: every arg atomic was consumed by another
                     // union alternative (e.g. `class-string<T>`); nothing left
