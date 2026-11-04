@@ -20,11 +20,6 @@
       <code><![CDATA[$this->idField = current($ids)]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Bridge/Doctrine/ManagerRegistry.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->container->get($name);]]></code>
-    </NullableReturnStatement>
-  </file>
   <file src="src/Symfony/Bridge/Doctrine/Security/RememberMe/DoctrineTokenProvider.php">
     <InvalidArgument>
       <code><![CDATA[$token->getTokenValue()]]></code>
@@ -418,11 +413,6 @@
       <code><![CDATA[LogicalNot]]></code>
       <code><![CDATA[LogicalNot]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/Test/TestContainer.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->getPublicContainer()->get($this->privateServicesLocatorId);]]></code>
-    </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Test/WebTestCase.php">
     <NullableReturnStatement>
@@ -1184,9 +1174,6 @@
     <InvalidReturnType>
       <code><![CDATA[array_search($service, $this->services, true) ?: array_search($service, $this->privates, true) ?: null]]></code>
     </InvalidReturnType>
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->serviceContainer->get($id);]]></code>
-    </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/DomCrawler/Crawler.php">
     <NullableReturnStatement>

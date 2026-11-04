@@ -1804,7 +1804,20 @@ pub fn find_implicit_doc_parent<'db>(
                     .then_some(m),
                 // A conditional `@return` is kept when every branch fits the native return.
                 [Atomic::TConditional { .. }] => {
-                    let widened = parent_return.clone().resolve_conditional_returns(|_| None);
+                    let bounds: FxHashMap<Name, Type> = m
+                        .template_params
+                        .iter()
+                        .map(|tp| {
+                            let bound = tp.bound.as_deref().cloned();
+                            (
+                                Name::from(tp.name.as_ref()),
+                                bound.unwrap_or_else(Type::mixed),
+                            )
+                        })
+                        .collect();
+                    let widened = parent_return
+                        .substitute_templates(&bounds)
+                        .resolve_conditional_returns(|_| None);
                     crate::subtype::is_subtype(db, &widened, own_return).then_some(m)
                 }
                 _ => None,
