@@ -30,6 +30,31 @@ pub fn infer_template_bindings(
     let (mut bindings, unchecked) =
         infer_arg_template_bindings(db, template_params, params, arg_types, arg_names);
 
+    // An omitted `@param T $x = null` binds T to its default's type.
+    let passed = bind_args_to_params(params, arg_types, arg_names);
+    for param in params {
+        if param.is_variadic || passed.iter().any(|(p, _)| std::ptr::eq(*p, param)) {
+            continue;
+        }
+        // A `= null` default makes the declared type `T|null`.
+        let Some(atoms) = param.ty.as_deref().map(|t| &t.types) else {
+            continue;
+        };
+        let mut templates = atoms.iter().filter(|a| !matches!(a, Atomic::TNull));
+        let (Some(Atomic::TTemplateParam { name, .. }), None) = (templates.next(), templates.next())
+        else {
+            continue;
+        };
+        let Some(tp) = template_params.iter().find(|tp| tp.name.as_ref() == name.as_ref()) else {
+            continue;
+        };
+        if let Some(default) = crate::call::literal_default_type(param) {
+            if tp.bound.as_deref().is_none_or(|b| is_subtype(db, &default, b)) {
+                bindings.entry(name.clone()).or_insert(default);
+            }
+        }
+    }
+
     // For any template not bound through arguments, fall back to its declared
     // default (`@template T = Default`), then its bound, then mixed.
     for tp in template_params {

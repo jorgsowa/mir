@@ -70,13 +70,19 @@ pub(crate) fn conditional_param_type(
     arg_types: &[mir_types::Type],
     param_name: &str,
 ) -> Option<mir_types::Type> {
-    use mir_types::Atomic;
     let idx = params.iter().position(|p| p.name.as_ref() == param_name)?;
     if let Some(arg_idx) = resolve_named_arg_type_index(params, call_args, idx) {
         return arg_types.get(arg_idx).cloned();
     }
-    let default = params[idx].default_text.as_deref()?.trim();
-    let atomic = match default.to_ascii_lowercase().as_str() {
+    literal_default_type(&params[idx])
+}
+
+/// The type of a `true`/`false`/`null` parameter default.
+pub(crate) fn literal_default_type(
+    param: &mir_codebase::definitions::DeclaredParam,
+) -> Option<mir_types::Type> {
+    use mir_types::Atomic;
+    let atomic = match param.default_text.as_deref()?.trim().to_ascii_lowercase().as_str() {
         "true" => Atomic::TTrue,
         "false" => Atomic::TFalse,
         "null" => Atomic::TNull,

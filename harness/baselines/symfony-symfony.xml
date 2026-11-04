@@ -35,11 +35,6 @@
       <code><![CDATA[$token->getTokenValue()]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Bridge/Monolog/Processor/WebProcessor.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->serverData = $event->getRequest()->server->all()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Bridge/PhpUnit/CoverageListener.php">
     <UndefinedClass>
       <code><![CDATA[TestListener]]></code>
