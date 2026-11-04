@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `array_merge()` and `array_replace()` keep the key type of arrays with `mixed` values (`array<string, mixed>`), and `array_replace()` keeps the key and value types of its arguments instead of returning bare `array`.
 - `reset()`, `end()`, `next()` and `prev()` leave the array argument's type unchanged instead of widening it to `array|object`.
 - `new` keeps a literal template argument when the template's bound admits only literals (`@template T of 'a'|'b'`), so `new TreeBuilder($n, 'array')` is a `TreeBuilder<'array'>`.
+- An array shape is checked against `array<K, V>` with the class hierarchy, so `['a' => Sub::class]` fits an `array<string, class-string<Parent>>` property.
 
 ## [0.90.0] - 2026-11-03
 

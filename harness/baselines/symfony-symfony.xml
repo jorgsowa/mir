@@ -948,20 +948,6 @@
       <code><![CDATA[$this->prototype = $this->getNodeBuilder()->node(null, $type)->setParent($this)]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Config/Definition/Builder/NodeBuilder.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->nodeMapping = [
-            'array' => ArrayNodeDefinition::class,
-            'variable' => VariableNodeDefinition::class,
-            'scalar' => ScalarNodeDefinition::class,
-            'string' => StringNodeDefinition::class,
-            'boolean' => BooleanNodeDefinition::class,
-            'integer' => IntegerNodeDefinition::class,
-            'float' => FloatNodeDefinition::class,
-            'enum' => EnumNodeDefinition::class,
-        ]]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Config/Definition/Builder/NodeDefinition.php">
     <InvalidTemplateParam>
       <code><![CDATA[$child->setPathSeparator($separator)]]></code>

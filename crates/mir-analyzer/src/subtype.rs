@@ -501,6 +501,20 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         && properties.values().any(|p| !p.optional)
                         && properties.values().all(|p| is_subtype(db, &p.ty, lv))
                 }
+                (Atomic::TKeyedArray { properties, .. }, Atomic::TArray { key, value }) => {
+                    shape_entries_fit(db, properties, key, value)
+                }
+                (
+                    Atomic::TKeyedArray {
+                        properties,
+                        is_open,
+                        ..
+                    },
+                    Atomic::TNonEmptyArray { key, value },
+                ) => {
+                    (*is_open || properties.values().any(|p| !p.optional))
+                        && shape_entries_fit(db, properties, key, value)
+                }
                 // array<K1,V1>/non-empty-array<K1,V1> satisfies array<K2,V2> when the key
                 // and value types do (codebase-aware, so array<int,Cat> satisfies
                 // array<int,Animal>) — mir_types::union::atomic_subtype's structural
@@ -605,6 +619,22 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                 _ => false,
             }
         })
+    })
+}
+
+/// Every known entry of a shape fits `array<key, value>`; extra keys of an open shape stay unchecked.
+fn shape_entries_fit(
+    db: &dyn MirDatabase,
+    properties: &mir_types::atomic::KeyedProperties,
+    key: &Type,
+    value: &Type,
+) -> bool {
+    properties.iter().all(|(k, p)| {
+        let key_atom = match k {
+            mir_types::atomic::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
+            mir_types::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+        };
+        is_subtype(db, &Type::single(key_atom), key) && is_subtype(db, &p.ty, value)
     })
 }
 
