@@ -15,6 +15,10 @@ namespace {
      *
      * @link https://php.net/manual/en/class.ffi.php
      * @since 7.4
+     *
+     * @method mixed __call(string $name, array $arguments)
+     * @method mixed __get(string $name)
+     * @method void __set(string $name, mixed $value)
      */
     final class FFI
     {
