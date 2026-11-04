@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `is_string($x ??= ...)` and similar checks on a `??=` assignment narrow `$x`.
 - `if ($isNew = null === $h)` narrows `$h` like `if (null === $h)`.
 - A call on an intersection `A&I` uses the method `A` declares, not an `@method` on `I` with a different signature.
+- `$array + $other` with a non-shape left operand includes the right operand's keys and values, so `explode(...) + [1 => null]` can hold `null`.
 
 ## [0.90.0] - 2026-11-03
 

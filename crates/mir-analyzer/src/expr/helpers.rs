@@ -1143,6 +1143,11 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
             }
         }
     }
+    if left_is_array && right_is_array && !right.is_mixed() {
+        if let Some(widened) = widen_array_values_by(left, right) {
+            return widened;
+        }
+    }
     if left_is_array || right_is_array {
         let merged_left = if left_is_array {
             left.clone()
@@ -1167,6 +1172,36 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         u.add_type(Atomic::TFloat);
         u
     }
+}
+
+/// `$generic + $arr`: the right operand can add its keys and values.
+fn widen_array_values_by(left: &Type, right: &Type) -> Option<Type> {
+    let (right_key, right_value) = crate::stmt::infer_foreach_types(right);
+    if right_value.is_empty() {
+        return None;
+    }
+    let widen = |ty: &Type, extra: &Type| Box::new(Type::merge(ty, extra));
+    let mut out = Type::empty();
+    for atom in &left.types {
+        out.add_type(match atom {
+            Atomic::TArray { key, value } => Atomic::TArray {
+                key: widen(key, &right_key),
+                value: widen(value, &right_value),
+            },
+            Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
+                key: widen(key, &right_key),
+                value: widen(value, &right_value),
+            },
+            Atomic::TList { value } => Atomic::TList {
+                value: widen(value, &right_value),
+            },
+            Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
+                value: widen(value, &right_value),
+            },
+            _ => return None,
+        });
+    }
+    Some(out)
 }
 
 /// `array + array` over single keyed shapes: left keys win, right-only keys are appended.

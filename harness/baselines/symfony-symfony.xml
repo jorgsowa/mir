@@ -729,9 +729,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/MemcachedAdapter.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $password]]></code>
-    </ImpossibleIdenticalComparison>
     <NullableReturnStatement>
       <code><![CDATA[return $failed;]]></code>
       <code><![CDATA[return $this->checkResultCode($this->getClient()->setMulti($encodedValues, $lifetime)) ? $failed : false;]]></code>
