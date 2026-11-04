@@ -2612,11 +2612,6 @@
       <code><![CDATA[MockObject]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/Translation/Translator.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $id]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Translation/TranslatorBag.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[null !== $existingCatalogue = $this->getCatalogue($catalogue->getLocale())]]></code>

@@ -175,6 +175,8 @@ fn ancestor_param_refinement(
             (m.visibility != mir_codebase::definitions::Visibility::Private
                 && !generic
                 && resolvable
+                // A child that adds `null` to the native type accepts it deliberately.
+                && (ty.is_nullable() || !own_ty.is_nullable())
                 && crate::subtype::is_subtype(db, ty, own_ty))
             .then(|| Arc::clone(ty))
         })
