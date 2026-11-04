@@ -63,7 +63,7 @@ pub(crate) fn resolve_named_arg_type_index(
 }
 
 /// The type a conditional return's `$param` discriminates on: the call-site
-/// argument, or a `true`/`false`/`null` default when the argument is omitted.
+/// argument, or its literal default when the argument is omitted.
 pub(crate) fn conditional_param_type(
     params: &[mir_codebase::definitions::DeclaredParam],
     call_args: &[php_ast::owned::Arg],
@@ -77,7 +77,7 @@ pub(crate) fn conditional_param_type(
     literal_default_type(&params[idx])
 }
 
-/// The type of a `true`/`false`/`null` parameter default.
+/// The type of a `true`/`false`/`null`/integer parameter default.
 pub(crate) fn literal_default_type(
     param: &mir_codebase::definitions::DeclaredParam,
 ) -> Option<mir_types::Type> {
@@ -86,7 +86,7 @@ pub(crate) fn literal_default_type(
         "true" => Atomic::TTrue,
         "false" => Atomic::TFalse,
         "null" => Atomic::TNull,
-        _ => return None,
+        text => Atomic::TLiteralInt(text.parse().ok()?),
     };
     Some(mir_types::Type::single(atomic))
 }
