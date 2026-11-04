@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A method with `@psalm-this-out` and `@return $this` returns the receiver's new type, so `$x = $node->setParent($p)` gets the retyped node.
 - `instanceof C` on a value narrowed to `A&(B|C)` (e.g. after `instanceof B || instanceof C`) narrows it to `C`.
 - An omitted argument whose parameter is typed by a template binds that template to its `null`/`true`/`false` default, so `@return (T is null ? A : B)` resolves.
+- An override without `@return` inherits the parent's conditional `@return` when every branch fits its native return type.
 
 ## [0.90.0] - 2026-11-03
 

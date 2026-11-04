@@ -1757,8 +1757,8 @@ pub fn find_inheritdoc_parent<'db>(
 /// Docblock parent of an override that declares no docblock types of its own
 /// (no `@inheritDoc`): the nearest ancestor method whose docblock `@return`
 /// refines the same bare class the override returns natively
-/// (`: Result` vs `@return Result<U, E>`). Narrower or unrelated native return
-/// types never inherit.
+/// (`: Result` vs `@return Result<U, E>`), or whose conditional `@return` fits
+/// the native return. Narrower or unrelated native return types never inherit.
 pub fn find_implicit_doc_parent<'db>(
     db: &'db dyn MirDatabase,
     receiver_fqcn: Fqcn<'db>,
@@ -1767,15 +1767,12 @@ pub fn find_implicit_doc_parent<'db>(
     method: &MethodDef,
 ) -> Option<Arc<MethodDef>> {
     let own_return = method.return_type.as_deref()?;
-    let [Atomic::TNamedObject {
-        fqcn: own_class,
-        type_params,
-    }] = own_return.types.as_slice()
-    else {
-        return None;
+    let own_class = match own_return.types.as_slice() {
+        [Atomic::TNamedObject { fqcn, type_params }] if type_params.is_empty() => Some(fqcn),
+        [Atomic::TNamedObject { .. }] => return None,
+        _ => None,
     };
     let has_own_docblock = own_return.from_docblock
-        || !type_params.is_empty()
         || !method.template_params.is_empty()
         || method
             .params
@@ -1799,13 +1796,19 @@ pub fn find_implicit_doc_parent<'db>(
                 return None;
             }
             let parent_return = m.return_type.as_deref().filter(|t| t.from_docblock)?;
-            let [Atomic::TNamedObject {
-                fqcn: parent_class, ..
-            }] = parent_return.types.as_slice()
-            else {
-                return None;
-            };
-            parent_class.eq_ignore_ascii_case(own_class).then_some(m)
+            match parent_return.types.as_slice() {
+                [Atomic::TNamedObject {
+                    fqcn: parent_class, ..
+                }] => own_class
+                    .is_some_and(|own| parent_class.eq_ignore_ascii_case(own))
+                    .then_some(m),
+                // A conditional `@return` is kept when every branch fits the native return.
+                [Atomic::TConditional { .. }] => {
+                    let widened = parent_return.clone().resolve_conditional_returns(|_| None);
+                    crate::subtype::is_subtype(db, &widened, own_return).then_some(m)
+                }
+                _ => None,
+            }
         })
 }
 
