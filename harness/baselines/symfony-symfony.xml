@@ -1321,12 +1321,6 @@
       <code><![CDATA[Constraint]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/Dotenv/Dotenv.php">
-    <InvalidCast>
-      <code><![CDATA[getenv($name)]]></code>
-      <code><![CDATA[getenv($name)]]></code>
-    </InvalidCast>
-  </file>
   <file src="src/Symfony/Component/Emoji/Resources/bin/build.php">
     <UndefinedMethod>
       <code><![CDATA[$result->getAttribute('cp')]]></code>

@@ -1429,8 +1429,8 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
 /// `array<string, string>` (or `false` on error), while a non-null string
 /// `$name` returns that single variable's value as a `string` (or `false` if
 /// unset) — the `array` alternative can never occur in that branch. Falls
-/// back to the stub's full union when `$name`'s nullability isn't known
-/// (e.g. a plain `?string`), since either overload could apply.
+/// back to the stub's full union when `$name` may be null (e.g. `?string`),
+/// since either overload could apply.
 pub(crate) fn getenv_return_type(arg_types: &[Type]) -> Option<Type> {
     let name_ty = arg_types.first();
     let all_null = |t: &Type| t.types.iter().all(|a| matches!(a, Atomic::TNull));
@@ -1443,8 +1443,8 @@ pub(crate) fn getenv_return_type(arg_types: &[Type]) -> Option<Type> {
         return Some(result);
     }
     let name_ty = name_ty?;
-    // An int name is coerced to a string; only `null` selects the all-vars overload.
-    if !name_ty.types.is_empty() && name_ty.types.iter().all(|a| a.is_string() || a.is_int()) {
+    // Any name is coerced to a string; only `null` selects the all-vars overload.
+    if !name_ty.types.is_empty() && !name_ty.types.iter().any(|a| matches!(a, Atomic::TNull)) {
         let mut result = Type::single(Atomic::TString);
         result.add_type(Atomic::TFalse);
         return Some(result);
