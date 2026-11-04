@@ -67,8 +67,8 @@ pub(crate) use core::{
 };
 use core::{
     array_access_under_prop_hops, extract_class_name, extract_null_coalesce,
-    extract_nullsafe_prop_access, extract_var_name, narrow_count_or_strlen_equality, same_literal,
-    set_narrowed, ScalarArgTarget, UnionNarrowExt,
+    extract_nullsafe_prop_access, extract_var_name, narrow_count_or_strlen_equality, peel_parens,
+    same_literal, set_narrowed, ScalarArgTarget, UnionNarrowExt,
 };
 use enum_class::{
     extract_enum_value_case, narrow_prop_to_specific_class, narrow_static_prop_to_specific_class,
@@ -2172,6 +2172,25 @@ pub fn narrow_from_condition(
         // The assignment has already been evaluated (ctx holds the post-assignment type).
         // Narrow the target variable based on the truthiness of the expression result.
         ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign | AssignOp::Coalesce) => {
+            // `if ($isNew = null === $h)` also narrows by the comparison itself.
+            if let (AssignOp::Assign, ExprKind::Binary(cmp)) = (a.op, &peel_parens(&a.value).kind) {
+                let target = extract_var_name(&a.target);
+                let compares = matches!(
+                    cmp.op,
+                    BinaryOp::Identical
+                        | BinaryOp::NotIdentical
+                        | BinaryOp::Equal
+                        | BinaryOp::NotEqual
+                        | BinaryOp::Instanceof
+                );
+                if compares
+                    && target.is_some()
+                    && extract_var_name(&cmp.left) != target
+                    && extract_var_name(&cmp.right) != target
+                {
+                    narrow_from_condition(&a.value, ctx, is_true, db, file);
+                }
+            }
             if let Some(var_name) = extract_var_name(&a.target) {
                 let current = ctx.get_var(var_name);
                 let mut narrowed = if is_true {

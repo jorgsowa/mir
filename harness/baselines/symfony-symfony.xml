@@ -1397,9 +1397,6 @@
         }, null, new class extends \Exception {
         })]]></code>
     </InvalidPropertyAssignment>
-    <NullableReturnStatement>
-      <code><![CDATA[return $handler;]]></code>
-    </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/ErrorHandler/ErrorRenderer/HtmlErrorRenderer.php">
     <NullableReturnStatement>
