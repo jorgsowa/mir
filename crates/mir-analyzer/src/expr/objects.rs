@@ -274,7 +274,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // → `Box<int>`, not `Box<5>`, so a later `$box->set(6)` for
                     // `set(T)` is not wrongly rejected).
                     any_concrete = true;
-                    params.push(widen_type_param(ty));
+                    let widened = widen_type_param(ty);
+                    // A literal-only bound (`T of 'a'|'b'`) needs the literal itself.
+                    let fits_bound = tp
+                        .bound
+                        .as_ref()
+                        .is_none_or(|b| crate::subtype::is_subtype(self.db, &widened, b));
+                    params.push(if fits_bound { widened } else { ty.clone() });
                 }
                 _ => params.push(Type::mixed()),
             }

@@ -972,14 +972,6 @@
       <code><![CDATA[$this->root = $builder->node($name, $type)->setParent($this)]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Config/Definition/Configuration.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $treeBuilder;]]></code>
-    </InvalidReturnType>
-    <InvalidTemplateParam>
-      <code><![CDATA[new DefinitionConfigurator($treeBuilder, $loader, $file, $file)]]></code>
-    </InvalidTemplateParam>
-  </file>
   <file src="src/Symfony/Component/Config/Definition/Dumper/XmlReferenceDumper.php">
     <NullableReturnStatement>
       <code><![CDATA[return $ref;]]></code>
