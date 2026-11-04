@@ -1110,11 +1110,6 @@
       <code><![CDATA[$values($input)]]></code>
     </TooFewArguments>
   </file>
-  <file src="src/Symfony/Component/Console/Question/Question.php">
-    <InvalidArgument>
-      <code><![CDATA[$callback]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Console/Terminal.php">
     <NullableReturnStatement>
       <code><![CDATA[return self::$colorMode;]]></code>
@@ -1635,11 +1630,6 @@
     </InvalidArgument>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->tempFileObject = $isTemporaryFile ? $file : null]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/HttpFoundation/ParameterBag.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->parameters = array_replace($this->parameters, $parameters)]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/Request.php">
@@ -2334,12 +2324,6 @@
       <code><![CDATA[$tokenValue]]></code>
       <code><![CDATA[$tokenValue]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Serializer/Context/ContextBuilderTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$instance->context = array_merge($this->context, [$key => $value])]]></code>
-      <code><![CDATA[$instance->context = array_merge($this->context, $context)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Serializer/Encoder/XmlEncoder.php">
     <InvalidTemplateParam>

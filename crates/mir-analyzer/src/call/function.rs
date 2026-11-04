@@ -1152,7 +1152,9 @@ impl CallAnalyzer {
                 "array_values" => super::array_builtins::infer_array_values_return(&arg_types)
                     .unwrap_or(return_ty),
                 "array_merge" => super::array_builtins::infer_array_merge_return(&arg_types)
-                    .or_else(|| super::array_builtins::merge_keyed_arrays(&arg_types))
+                    .or_else(|| super::array_builtins::merge_keyed_arrays(&arg_types, true))
+                    .unwrap_or(return_ty),
+                "array_replace" => super::array_builtins::merge_keyed_arrays(&arg_types, false)
                     .unwrap_or(return_ty),
                 // array_fill with a positive count returns a non-empty list.
                 "array_fill" => {

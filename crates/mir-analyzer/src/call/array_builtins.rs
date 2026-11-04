@@ -915,9 +915,9 @@ pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atomic))
 }
 
-/// `array_merge` over arrays with string keys: every key survives (a later
-/// duplicate only overrides the value) and int keys are renumbered to `int`.
-pub(crate) fn merge_keyed_arrays(arg_types: &[Type]) -> Option<Type> {
+/// `array_merge`/`array_replace` over keyed arrays: every key survives (a later
+/// duplicate only overrides the value); `array_merge` renumbers int keys to `int`.
+pub(crate) fn merge_keyed_arrays(arg_types: &[Type], renumber_int_keys: bool) -> Option<Type> {
     let mut keys = Type::empty();
     let mut values = Type::empty();
     for arg in arg_types {
@@ -939,11 +939,11 @@ pub(crate) fn merge_keyed_arrays(arg_types: &[Type]) -> Option<Type> {
             continue;
         }
         let (k, v) = crate::stmt::infer_foreach_types(arg);
-        if k.is_mixed() || v.is_mixed() {
+        if k.is_mixed() {
             return None;
         }
         for atomic in &k.types {
-            let renumbered = if atomic.is_int() {
+            let renumbered = if renumber_int_keys && atomic.is_int() {
                 Atomic::TInt
             } else {
                 atomic.clone()
