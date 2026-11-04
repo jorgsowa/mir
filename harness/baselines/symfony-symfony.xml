@@ -1149,11 +1149,6 @@
       <code><![CDATA[class]]></code>
     </UndefinedProperty>
   </file>
-  <file src="src/Symfony/Component/DependencyInjection/Compiler/ValidateEnvPlaceholdersPass.php">
-    <InvalidArgument>
-      <code><![CDATA[$configuration]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/DependencyInjection/EnvVarProcessor.php">
     <InvalidArgument>
       <code><![CDATA[$env]]></code>

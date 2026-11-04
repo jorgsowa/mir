@@ -186,13 +186,7 @@ pub(super) fn narrow_instanceof_preserving_subtypes(
             // guaranteed to be an A and a B, so dropping them here would
             // falsely reject valid uses of the original intersection.
             Atomic::TIntersection { parts } => {
-                let already_covered = parts.iter().any(|p| {
-                    p.types.iter().any(|a| {
-                        matches!(a, Atomic::TNamedObject { fqcn, .. }
-                            if named_object_matches_instanceof(fqcn, class_name, db))
-                    })
-                });
-                if already_covered {
+                if parts.iter().any(|p| part_is_instance_of(p, class_name, db)) {
                     result.add_type(atomic.clone());
                 } else {
                     // Same reasoning as the non-intersection `!type_params.is_empty()`
@@ -385,14 +379,7 @@ pub(super) fn narrow_or_instanceof_union(
                 result.add_type(atomic.clone());
             }
             Atomic::TIntersection { parts } => {
-                let covers = |cn: &String| {
-                    parts.iter().any(|p| {
-                        p.types.iter().any(|a| {
-                            matches!(a, Atomic::TNamedObject { fqcn, .. }
-                                if named_object_matches_instanceof(fqcn, cn, db))
-                        })
-                    })
-                };
+                let covers = |cn: &String| parts.iter().any(|p| part_is_instance_of(p, cn, db));
                 // A part already satisfying one disjunct keeps the whole atom.
                 if class_names.iter().any(covers) {
                     result.add_type(atomic.clone());
@@ -508,6 +495,18 @@ pub(super) fn narrow_or_instanceof_union(
     result
 }
 
+/// Whether every member of an intersection part (`A` or a union `A|B`) is a `class_name`.
+fn part_is_instance_of(part: &Type, class_name: &str, db: &dyn MirDatabase) -> bool {
+    !part.types.is_empty()
+        && part.types.iter().all(|a| match a {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn } => named_object_matches_instanceof(fqcn, class_name, db),
+            _ => false,
+        })
+}
+
 /// Whether a part of the intersection `parts` can never also be a `class_name`.
 fn intersection_excludes(parts: &[Type], class_name: &str, db: &dyn MirDatabase) -> bool {
     parts.iter().any(|p| {
@@ -551,15 +550,9 @@ pub(super) fn filter_out_instanceof_match(
         // is also a C the moment either A or B extends/implements C, so the
         // whole intersection can't survive the negation, not just its own
         // (nonexistent) direct name.
-        Atomic::TIntersection { parts } => !parts.iter().any(|part| {
-            part.types.iter().any(|inner| match inner {
-                Atomic::TNamedObject { fqcn, .. }
-                | Atomic::TSelf { fqcn }
-                | Atomic::TStaticObject { fqcn }
-                | Atomic::TParent { fqcn } => named_object_matches_instanceof(fqcn, class_name, db),
-                _ => false,
-            })
-        }),
+        Atomic::TIntersection { parts } => {
+            !parts.iter().any(|part| part_is_instance_of(part, class_name, db))
+        }
         _ => true,
     })
 }
