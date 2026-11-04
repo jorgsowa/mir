@@ -1855,11 +1855,6 @@
       <code><![CDATA[return $this->requestType;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/EventListener/ErrorListener.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $config['log_level'];]]></code>
-    </NullableReturnStatement>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/HttpCache/HttpCache.php">
     <InvalidArgument>
       <code><![CDATA[$ignoreErrors]]></code>

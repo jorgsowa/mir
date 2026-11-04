@@ -2261,6 +2261,9 @@ pub fn narrow_from_condition(
                 // `if (self::$prop)` — static-property counterpart of the
                 // instance-property case above.
                 narrow_static_prop_loose_bool(ctx, &fqcn, &prop, db, is_true);
+            } else if matches!(expr.kind, ExprKind::ArrayAccess(_)) {
+                // `if ($a['k'])` narrows like `!empty($a['k'])`.
+                narrow_empty_shape_key(expr, ctx, !is_true, db, file);
             }
         }
     }
