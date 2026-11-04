@@ -1485,11 +1485,6 @@
       <code><![CDATA[$token->value]]></code>
     </ImplicitFloatToIntCast>
   </file>
-  <file src="src/Symfony/Component/Finder/Finder.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->dirs = array_merge($this->dirs, ...$resolvedDirs)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Form/ChoiceList/ArrayChoiceList.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->choices = $choicesByValues]]></code>

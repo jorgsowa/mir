@@ -446,7 +446,7 @@ function scandir(string $directory, int $sorting_order = 0, $context = null): ar
  * GLOB_BRACE - Expands {a,b,c} to match 'a', 'b', or 'c'
  * GLOB_ONLYDIR - Return only directory entries which match the pattern
  * GLOB_ERR - Stop on read errors (like unreadable directories), by default errors are ignored.
- * @return array|false an array containing the matched files/directories, an empty array
+ * @return list<string>|false an array containing the matched files/directories, an empty array
  * if no file matched or false on error.
  * </p>
  * <p>
