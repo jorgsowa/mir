@@ -83,6 +83,10 @@ pub fn resolve_receiver_fqcn(db: &dyn MirDatabase, file: &str, fqcn: &str) -> St
 /// An explicit `use` import for the same bare name still wins, same
 /// priority order `resolve_name` itself uses internally.
 pub fn resolve_docblock_type_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
+    // `Enum::Case`: only the class part is a name to resolve.
+    if let Some((class, member)) = name.split_once("::") {
+        return format!("{}::{member}", resolve_docblock_type_name(db, file, class));
+    }
     if !name.contains('\\') && !name.starts_with('\\') {
         let imports = db.file_class_imports(file);
         let has_explicit_import = imports.get(&Name::new(name)).is_some()

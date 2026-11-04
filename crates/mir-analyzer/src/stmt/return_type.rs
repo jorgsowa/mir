@@ -715,7 +715,11 @@ fn resolve_atomic_for_file(
 ) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
-            if !is_resolvable_class_name(fqcn.as_ref()) {
+            let class_part = match fqcn.split_once("::") {
+                Some((class, _)) if allow_builtin_shortcut => class,
+                _ => fqcn.as_ref(),
+            };
+            if !is_resolvable_class_name(class_part) {
                 return Atomic::TNamedObject { fqcn, type_params };
             }
             let resolved = if allow_builtin_shortcut {

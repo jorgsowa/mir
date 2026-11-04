@@ -2252,9 +2252,6 @@
     </InvalidTemplateParam>
   </file>
   <file src="src/Symfony/Component/Serializer/Normalizer/ArrayDenormalizer.php">
-    <InvalidTemplateParam>
-      <code><![CDATA[$t->getTypeIdentifier()]]></code>
-    </InvalidTemplateParam>
     <UndefinedClass>
       <code><![CDATA[LegacyType]]></code>
     </UndefinedClass>
