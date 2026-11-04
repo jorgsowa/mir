@@ -1134,16 +1134,11 @@ impl<'a> StatementsAnalyzer<'a> {
         if crate::db::class_exists(self.db, &resolved) {
             return;
         }
-        let short = resolved
-            .rsplit('\\')
-            .next()
-            .unwrap_or(resolved.as_str())
-            .to_string();
         let span = name.span;
         let (line, col_start) = self.offset_to_line_col(span.start);
         let (line_end, col_end) = self.offset_to_line_col(span.end);
         self.issues.add(Issue::new(
-            IssueKind::UndefinedTrait { name: short },
+            IssueKind::UndefinedTrait { name: resolved },
             Location {
                 file: self.file.clone(),
                 line,

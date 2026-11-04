@@ -2207,7 +2207,7 @@ impl<'a> BodyAnalyzer<'a> {
                 None => {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedTrait {
-                            name: tr_short.to_string(),
+                            name: trait_fqcn.to_string(),
                         },
                         make_loc(),
                     ));
