@@ -63,3 +63,17 @@ fn issue_handler_wins_over_level() {
     );
     assert!(run(dir.path(), &[]).contains("PossiblyUndefinedVariable"));
 }
+
+#[test]
+fn impossible_comparison_follows_type_does_not_contain_type_level() {
+    let dir = TempDir::new().expect("failed to create temp dir");
+    std::fs::write(
+        dir.path().join("a.php"),
+        "<?php function f(int $i): bool { return $i === 'x'; }\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("mir.xml"), r#"<mir errorLevel="5"></mir>"#).unwrap();
+    assert!(!run(dir.path(), &[]).contains("ImpossibleIdenticalComparison"));
+    std::fs::write(dir.path().join("mir.xml"), r#"<mir errorLevel="4"></mir>"#).unwrap();
+    assert!(run(dir.path(), &[]).contains("ImpossibleIdenticalComparison"));
+}

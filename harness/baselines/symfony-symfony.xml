@@ -72,9 +72,6 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Bridge/PhpUnit/DeprecationErrorHandler/Deprecation.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === self::$vendors]]></code>
-    </ImpossibleIdenticalComparison>
     <UndefinedClass>
       <code><![CDATA[TestCase]]></code>
       <code><![CDATA[TestSuite]]></code>
@@ -242,9 +239,6 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Command/AboutCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[4 === Kernel::MINOR_VERSION]]></code>
-    </ImpossibleIdenticalComparison>
     <UndefinedMethod>
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
@@ -258,9 +252,6 @@
     </UndefinedMethod>
   </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Command/AssetsInstallCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $this->projectDir]]></code>
-    </ImpossibleIdenticalComparison>
     <UndefinedMethod>
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
@@ -474,11 +465,6 @@
     <UndefinedMethod>
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Bundle/WebProfilerBundle/Profiler/CodeExtension.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $this->projectDir]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/AssetMapper/Compressor/BrotliCompressor.php">
     <InvalidArgument>
@@ -1043,11 +1029,6 @@
       <code><![CDATA[$self->name = (new UnicodeString($name))->kebab()]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Console/Command/CompleteCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $compval = $completionInput->getCompletionValue()]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Console/Command/DumpCompletionCommand.php">
     <InvalidArgument>
       <code><![CDATA[$this->getSupportedShells(...)]]></code>
@@ -1070,11 +1051,6 @@
       <code><![CDATA[$this->completionName = $argumentName]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Console/DataCollector/CommandDataCollector.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[Command::class !== $r->getDeclaringClass()]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Console/Descriptor/XmlDescriptor.php">
     <InvalidTemplateParam>
       <code><![CDATA[$parentNode->appendChild($parentNode->ownerDocument->importNode($childNode, true))]]></code>
@@ -1094,9 +1070,6 @@
     <ImplicitFloatToIntCast>
       <code><![CDATA[$completeBars]]></code>
     </ImplicitFloatToIntCast>
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $this->max]]></code>
-    </ImpossibleIdenticalComparison>
     <NullableReturnStatement>
       <code><![CDATA[return preg_replace_callback($regex, $callback, $this->format);]]></code>
     </NullableReturnStatement>
@@ -1118,9 +1091,6 @@
     </ImplicitFloatToIntCast>
   </file>
   <file src="src/Symfony/Component/Console/Helper/TreeHelper.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $current = $this->current()]]></code>
-    </ImpossibleIdenticalComparison>
     <NullableReturnStatement>
       <code><![CDATA[return $this->children->key();]]></code>
     </NullableReturnStatement>
@@ -1267,11 +1237,6 @@
         }]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/DependencyInjection/Kernel/KernelTrait.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $container]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/DependencyInjection/Loader/Configurator/ContainerConfigurator.php">
     <InvalidArgument>
       <code><![CDATA[false]]></code>
@@ -1371,11 +1336,6 @@
     <InvalidArgument>
       <code><![CDATA[$arg1]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/ErrorHandler/ErrorEnhancer/UndefinedMethodErrorEnhancer.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $methods = get_class_methods($className)]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/ErrorHandler/ErrorHandler.php">
     <InvalidArgument>
@@ -1571,11 +1531,6 @@
       <code><![CDATA[$this->structuredValues = $structuredValues]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataAccessor/PropertyPathAccessor.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $dataAccessor = $dataMapper->getDataAccessor()]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToHtml5LocalDateTimeTransformer.php">
     <InvalidArgument>
       <code><![CDATA[$matches[2]]]></code>
@@ -1624,11 +1579,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $this->resolvedGroups[$form];]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Form/Extension/Validator/ViolationMapper/ViolationMapper.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $propertyPath]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/Form/Flow/FormFlowBuilder.php">
     <NullableReturnStatement>
@@ -1685,12 +1635,6 @@
       <code><![CDATA[$this->responseFactory->next()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Component/HttpClient/Response/StreamWrapper.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $this->client]]></code>
-      <code><![CDATA[null !== $this->response]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/HttpFoundation/BinaryFileResponse.php">
     <InvalidArgument>
       <code><![CDATA[$this->tempFileObject ? time() : $this->file->getMTime()]]></code>
@@ -1705,10 +1649,6 @@
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/Request.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === ($requestUri = $this->getRequestUri())]]></code>
-      <code><![CDATA[null === ($baseUrl = $this->getBaseUrlReal())]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[strrpos($host, ']')]]></code>
     </InvalidArgument>
@@ -1804,11 +1744,6 @@
       <code><![CDATA[$controller]]></code>
       <code><![CDATA[$controller]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/HttpKernel/DataCollector/ConfigDataCollector.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[4 === Kernel::MINOR_VERSION]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/HttpKernel/DataCollector/DumpDataCollector.php">
     <InvalidPropertyAssignment>
@@ -1973,22 +1908,10 @@
             )]]></code>
     </InvalidTemplateParam>
   </file>
-  <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/Collection.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false === $searchCount]]></code>
-      <code><![CDATA[false === $attributes]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/EntryManager.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->connection->getResource();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/Query.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false === $result]]></code>
-      <code><![CDATA[null === $result]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/Lock/Store/MemcachedStore.php">
     <ImplicitFloatToIntCast>
@@ -2059,11 +1982,6 @@
                 'StringValue' => json_encode($specialHeaders),
             ]]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Messenger/Bridge/Amqp/Transport/AmqpReceiver.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false === $body]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/Messenger/Bridge/Doctrine/Transport/Connection.php">
     <UndefinedClass>
@@ -2170,20 +2088,10 @@
       <code><![CDATA[$message->getTextBody()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Component/Notifier/Bridge/Clickatell/ClickatellTransport.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $this->from]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Notifier/Bridge/MicrosoftTeams/Test/Action/Input/AbstractInputTestCase.php">
     <UndefinedClass>
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Component/Notifier/Bridge/RingCentral/RingCentralTransport.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $this->from]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/Notifier/Exception/IncompleteDsnException.php">
     <NullableReturnStatement>
@@ -2293,16 +2201,6 @@
       <code><![CDATA[return $this->executableFinder->find('php', false, $dirs);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Process/PhpProcess.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $this->getCommandLine()]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
-  <file src="src/Symfony/Component/Process/PhpSubprocess.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $this->getCommandLine()]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Process/Pipes/AbstractPipes.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->inputBuffer = $input]]></code>
@@ -2331,9 +2229,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/PropertyInfo/Extractor/PhpStanExtractor.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $var->variableName]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[true]]></code>
       <code><![CDATA[$constExprParser = new ConstExprParser(true, true)]]></code>
@@ -2409,11 +2304,6 @@
       <code><![CDATA[return $this->expression->getExpression();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Scheduler/Trigger/PeriodicalTrigger.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false === $i]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Security/Core/Authorization/AccessDecisionManager.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$vote->voter = $voter instanceof \Stringable ? $voter : get_debug_type($voter)]]></code>
@@ -2429,12 +2319,6 @@
       <code><![CDATA[$this->tokenIds = array_flip($tokenIds)]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Component/Security/Http/Firewall.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $exceptionListener]]></code>
-      <code><![CDATA[null !== $logoutListener]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Security/Http/Firewall/ContextListener.php">
     <UndefinedClass>
       <code><![CDATA[LazyLoadingInterface]]></code>
@@ -2444,11 +2328,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $original;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Security/Http/FirewallMap.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $elements[0]]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/Security/Http/LoginLink/LoginLinkHandler.php">
     <InvalidArgument>
@@ -2538,11 +2417,6 @@
       <code><![CDATA[return $codePoints;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="src/Symfony/Component/String/LazyString.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $arguments]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/String/UnicodeString.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$str->string = normalizer_normalize($str->string)]]></code>
@@ -2576,13 +2450,6 @@
       <code><![CDATA[MockObject]]></code>
       <code><![CDATA[MockObject]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Component/Translation/TranslatorBag.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null !== $existingCatalogue = $this->getCatalogue($catalogue->getLocale())]]></code>
-      <code><![CDATA[null === $diffCatalogue = $diffBag->getCatalogue($locale)]]></code>
-      <code><![CDATA[null === $intersectCatalogue = $intersectBag->getCatalogue($locale)]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Symfony/Component/Translation/Util/XliffUtils.php">
     <InvalidArgument>
@@ -2873,11 +2740,6 @@
       <code><![CDATA[return parent::getTransition();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Yaml/Command/LintCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $this->format]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Symfony/Component/Yaml/Exception/ParseException.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->snippet;]]></code>
@@ -2885,9 +2747,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Yaml/Inline.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false !== $scalar = $time->getTimestamp()]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[return $value;]]></code>
     </InvalidReturnType>

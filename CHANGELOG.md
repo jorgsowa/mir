@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** `--set-baseline` without a file name writes `mir-baseline.xml` and deletes `psalm-baseline.xml` in the current directory. Auto-discovery and `--update-baseline` prefer `mir-baseline.xml` and fall back to `psalm-baseline.xml`.
 - **Breaking:** tainted file paths, `include`/`require` paths, `eval()` code and `unserialize()` payloads report `TaintedFile` (MIR0811), `TaintedInclude` (MIR0812), `TaintedEval` (MIR0813) and `TaintedUnserialize` (MIR0814) instead of `TaintedInput`, so Psalm-named suppressions match them. So do `@taint-sink file|include|eval|unserialize` parameters. Baseline entries recorded as `TaintedInput` still match.
+- `ImpossibleIdenticalComparison` and `ImpossibleLooseComparison` follow Psalm's level for `TypeDoesNotContainType` (4), so `errorLevel` 5 and above report them as info.
 
 ### Fixed
 

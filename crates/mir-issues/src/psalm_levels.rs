@@ -51,6 +51,9 @@ pub fn psalm_error_level(name: &str) -> Option<u8> {
         "ForbiddenCode"
         | "IfThisIsMismatch"
         | "ImplicitToStringCast"
+        // Psalm reports these comparisons as TypeDoesNotContainType/RedundantCondition.
+        | "ImpossibleIdenticalComparison"
+        | "ImpossibleLooseComparison"
         | "InternalMethod"
         | "InvalidDocblock"
         | "InvalidDocblockType"
