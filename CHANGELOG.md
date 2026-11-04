@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$array + $other` with a non-shape left operand includes the right operand's keys and values, so `explode(...) + [1 => null]` can hold `null`.
 - A `->` call or property read after `?->` in the same chain (`$a?->b()->c()`) can be null, since the chain short-circuits.
 - `++$a[$k]`, `$a[$k]++` and their `--` forms update the int element they change.
+- A `mixed` value assigned to a nullable property leaves it `mixed` instead of narrowing it to the non-null type, so a later `null ===` check on it is no longer reported as impossible.
 
 ## [0.90.0] - 2026-11-03
 

@@ -1,5 +1,5 @@
 ===description===
-A mixed value assigned to a nullable property refines it to the non-null declared type
+A mixed value assigned to a nullable property keeps it mixed, not the nullable declared type
 ===file===
 <?php
 final class Box {
@@ -11,14 +11,16 @@ final class Box {
 
     public function instance(mixed $m): string {
         $this->h = $m;
-        /** @mir-check $this->h is string */
+        /** @mir-check $this->h is mixed */
         $this->h;
         return $this->h;
+//      ^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
     }
 
     public function viaStatic(mixed $m): string {
         self::$s = $m;
         return self::$s;
+//      ^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
     }
 
     public function nonNullableDeclared(mixed $m): int {
@@ -48,5 +50,6 @@ final class Box {
         $this->h = null;
         $this->h = $m;
         return $this->h;
+//      ^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
     }
 }

@@ -2899,10 +2899,10 @@ fn property_refinement(
     declared: Option<&Type>,
 ) -> Option<Type> {
     if assigned.is_mixed() {
-        // Unknown value: trust it to be non-null rather than flag the declared `T|null`.
+        // Unknown value: keep it `mixed` rather than flag the declared `T|null` either way.
         return declared
             .filter(|d| !d.is_mixed() && d.is_nullable())
-            .map(Type::remove_null);
+            .map(|_| assigned.clone());
     }
     let fits = declared.is_none_or(|d| crate::subtype::is_subtype(db, &assigned.remove_null(), d));
     fits.then(|| assigned.clone())
