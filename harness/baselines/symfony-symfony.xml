@@ -2178,11 +2178,6 @@
       <code><![CDATA[return $definition->getClass();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Messenger/Middleware/DispatchAfterCurrentBusMiddleware.php">
-    <InvalidArgument>
-      <code><![CDATA[$queueLengthBefore]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Messenger/Middleware/HandleMessageMiddleware.php">
     <InvalidThrow>
       <code><![CDATA[]]></code>

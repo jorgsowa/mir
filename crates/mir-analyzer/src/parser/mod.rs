@@ -1205,12 +1205,24 @@ pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<&str>
     if !trimmed.ends_with("*/") {
         return None;
     }
-    let end = trimmed.rfind("*/")?;
-    // Prefer /** docblocks; fall back to /* for inline @var annotations (e.g. Yii2 view files).
-    let start = trimmed[..end]
-        .rfind("/**")
-        .or_else(|| trimmed[..end].rfind("/*"))?;
-    Some(&trimmed[start..end + 2])
+    let nearest = last_comment_start(trimmed)?;
+    // An adjacent /** docblock wins; else a plain /* comment counts (Yii2 view @var).
+    let mut start = nearest;
+    while !trimmed[start..].starts_with("/**") {
+        match last_comment_start(trimmed[..start].trim_end()) {
+            Some(prev) => start = prev,
+            None => {
+                start = nearest;
+                break;
+            }
+        }
+    }
+    Some(&trimmed[start..trimmed[start..].find("*/")? + start + 2])
+}
+
+/// Start of the `/* */` comment that `s` ends with.
+fn last_comment_start(s: &str) -> Option<usize> {
+    s.strip_suffix("*/")?.rfind("/*")
 }
 
 /// A closure's docblock: PHP takes the last one before `function` / `fn`, which may follow its attributes.
@@ -1389,6 +1401,23 @@ mod docblock_lookup_tests {
         assert_eq!(
             find_preceding_docblock(src, offset),
             Some("/** @var Post $model */")
+        );
+    }
+
+    #[test]
+    fn plain_comment_does_not_reach_an_earlier_docblock() {
+        let src = "<?php\n/** @var bool */\n$a = 1;\n/* plain */\n$x = 1;\n";
+        let offset = src.find("$x").unwrap() as u32;
+        assert_eq!(find_preceding_docblock(src, offset), Some("/* plain */"));
+    }
+
+    #[test]
+    fn docblock_wins_over_an_adjacent_plain_comment() {
+        let src = "<?php\n/** @var View $this */\n/* note */\n$x = 1;\n";
+        let offset = src.find("$x").unwrap() as u32;
+        assert_eq!(
+            find_preceding_docblock(src, offset),
+            Some("/** @var View $this */")
         );
     }
 
