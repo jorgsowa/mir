@@ -1010,7 +1010,6 @@
   <file src="src/Symfony/Component/Console/Application.php">
     <InvalidReturnType>
       <code><![CDATA[return array_keys($alternatives);]]></code>
-      <code><![CDATA[return $namespaces;]]></code>
     </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->addCommand(new Command($name));]]></code>
