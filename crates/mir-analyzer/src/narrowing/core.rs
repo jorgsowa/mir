@@ -593,8 +593,10 @@ pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<&str> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
-        // is_null($x = expr) — narrow the assigned variable, not the RHS
-        ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign) => extract_var_name(&a.target),
+        // is_null($x = expr) / is_string($x ??= expr) — narrow the assigned variable, not the RHS
+        ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign | AssignOp::Coalesce) => {
+            extract_var_name(&a.target)
+        }
         _ => None,
     }
 }

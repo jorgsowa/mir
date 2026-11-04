@@ -963,12 +963,6 @@
   <file src="src/Symfony/Component/Clock/MonotonicClock.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->sOffset = $time[1] - $offset[0]]]></code>
-      <code><![CDATA[$this->timezone = \is_string($timezone ??= date_default_timezone_get()) ? $this->withTimeZone($timezone)->timezone : $timezone]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Clock/NativeClock.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->timezone = \is_string($timezone ??= date_default_timezone_get()) ? $this->withTimeZone($timezone)->timezone : $timezone]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Config/Definition/Builder/ArrayNodeDefinition.php">
