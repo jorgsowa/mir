@@ -2076,7 +2076,6 @@
       <code><![CDATA[false]]></code>
     </InvalidArgument>
     <NullableReturnStatement>
-      <code><![CDATA[return $php;]]></code>
       <code><![CDATA[return $this->executableFinder->find('php', false, $dirs);]]></code>
     </NullableReturnStatement>
   </file>

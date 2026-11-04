@@ -114,6 +114,22 @@ pub(crate) use type_fn::{classify_var_predicate, type_fn_narrowed};
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/// The variable a short-circuit RHS assigns: `$x = f()`, also under `!` or parentheses.
+pub(crate) fn assigned_var(rhs: &php_ast::owned::Expr) -> Option<&str> {
+    match &peel_parens(rhs).kind {
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => assigned_var(&u.operand),
+        ExprKind::Assign(a) if a.op == AssignOp::Assign => extract_var_name(&a.target),
+        _ => None,
+    }
+}
+
+/// On the path that skips `rhs`, its assignment never ran.
+fn restore_skipped_rhs_var(rhs: &php_ast::owned::Expr, ctx: &mut FlowState) {
+    if let Some((name, ty)) = ctx.rhs_skipped_vars.get(&rhs.span.start).cloned() {
+        ctx.narrow_var(name.as_str(), ty);
+    }
+}
+
 /// Narrow the types in `ctx` as if `expr` evaluates to `is_true`.
 pub fn narrow_from_condition(
     expr: &php_ast::owned::Expr,
@@ -165,6 +181,7 @@ pub fn narrow_from_condition(
                 let pre = ctx.branch();
 
                 let mut a_false = ctx.branch();
+                restore_skipped_rhs_var(&b.right, &mut a_false);
                 narrow_from_condition(&b.left, &mut a_false, false, db, file);
                 promote_assignment_effects(&b.left, &mut a_false, db, file);
 
@@ -194,6 +211,7 @@ pub fn narrow_from_condition(
                 let pre = ctx.branch();
 
                 let mut a_true = ctx.branch();
+                restore_skipped_rhs_var(&b.right, &mut a_true);
                 narrow_from_condition(&b.left, &mut a_true, true, db, file);
                 promote_assignment_effects(&b.left, &mut a_true, db, file);
 

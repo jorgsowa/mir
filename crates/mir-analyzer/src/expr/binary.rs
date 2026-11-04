@@ -7,7 +7,7 @@ use crate::ast_ext::NameRefExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Type};
+use mir_types::{Atomic, Name, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{
     Arg, ArgKind, BinaryExpr, CallableCreateKind, Expr, ExprKind, FunctionCallExpr, MethodCallExpr,
@@ -113,6 +113,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             B::BooleanAnd | B::LogicalAnd | B::BooleanOr | B::LogicalOr
         ) {
             let _left_ty = self.analyze(&b.left, ctx);
+            let skipped_var = crate::narrowing::assigned_var(&b.right)
+                .filter(|name| ctx.var_is_defined(name))
+                .map(|name| (Name::from(name), ctx.get_var(name)));
             let mut right_ctx = ctx.branch();
             let is_and = matches!(b.op, B::BooleanAnd | B::LogicalAnd);
             crate::narrowing::narrow_from_condition(
@@ -141,6 +144,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             // The RHS runs on some paths only: join its writes with the skipped state.
             *ctx = FlowState::merge_branches(ctx, skipped, Some(right_ctx));
+            if let Some(var) = skipped_var {
+                Arc::make_mut(&mut ctx.rhs_skipped_vars).insert(b.right.span.start, var);
+            }
             return Type::single(Atomic::TBool);
         }
 
