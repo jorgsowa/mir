@@ -283,12 +283,22 @@ fn substitute_static_in_type(
     receiver_fqcn: &Arc<str>,
     static_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
+    static_atom: Option<&Atomic>,
 ) -> Type {
     let from_docblock = t.from_docblock;
     let types: Vec<Atomic> = t
         .types
         .into_iter()
-        .map(|a| substitute_static_atom(db, a, receiver_fqcn, static_fqcn, receiver_type_params))
+        .map(|a| {
+            substitute_static_atom(
+                db,
+                a,
+                receiver_fqcn,
+                static_fqcn,
+                receiver_type_params,
+                static_atom,
+            )
+        })
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
@@ -324,7 +334,12 @@ fn substitute_static_atom(
     fqcn: &Arc<str>,
     static_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
+    static_atom: Option<&Atomic>,
 ) -> Atomic {
+    // On an intersection receiver, `static` is the whole intersection.
+    if let (Atomic::TStaticObject { .. }, Some(receiver)) = (&a, static_atom) {
+        return receiver.clone();
+    }
     match a {
         // `self` is the declaring class, not the caller's subclass. A trait's
         // `self` is the using class, so it still binds to the receiver, as does
@@ -370,6 +385,7 @@ fn substitute_static_atom(
                 fqcn,
                 static_fqcn,
                 receiver_type_params,
+                static_atom,
             )),
         },
         Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
@@ -379,6 +395,7 @@ fn substitute_static_atom(
                 fqcn,
                 static_fqcn,
                 receiver_type_params,
+                static_atom,
             )),
         },
         Atomic::TArray { key, value } => Atomic::TArray {
@@ -388,6 +405,7 @@ fn substitute_static_atom(
                 fqcn,
                 static_fqcn,
                 receiver_type_params,
+                static_atom,
             )),
             value: Box::new(substitute_static_in_type(
                 db,
@@ -395,6 +413,7 @@ fn substitute_static_atom(
                 fqcn,
                 static_fqcn,
                 receiver_type_params,
+                static_atom,
             )),
         },
         Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
@@ -404,6 +423,7 @@ fn substitute_static_atom(
                 fqcn,
                 static_fqcn,
                 receiver_type_params,
+                static_atom,
             )),
             value: Box::new(substitute_static_in_type(
                 db,
@@ -411,6 +431,7 @@ fn substitute_static_atom(
                 fqcn,
                 static_fqcn,
                 receiver_type_params,
+                static_atom,
             )),
         },
         // `self<T>`/`static<T>`/`parent<T>`/`$this<T>` sentinel written in a
@@ -434,6 +455,7 @@ fn substitute_static_atom(
                         fqcn,
                         static_fqcn,
                         receiver_type_params,
+                        static_atom,
                     )
                 })
                 .collect();
@@ -458,6 +480,7 @@ fn substitute_static_atom(
                         fqcn,
                         static_fqcn,
                         receiver_type_params,
+                        static_atom,
                     )
                 })
                 .collect();
@@ -473,8 +496,16 @@ fn substitute_static_atom(
                 if_true,
                 if_false,
             } = *data;
-            let sub =
-                |t: Type| substitute_static_in_type(db, t, fqcn, static_fqcn, receiver_type_params);
+            let sub = |t: Type| {
+                substitute_static_in_type(
+                    db,
+                    t,
+                    fqcn,
+                    static_fqcn,
+                    receiver_type_params,
+                    static_atom,
+                )
+            };
             Atomic::TConditional {
                 data: Box::new(mir_types::atomic::ConditionalData {
                     param_name,
@@ -499,7 +530,32 @@ pub(crate) fn substitute_static_in_return(
     receiver_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
 ) -> Type {
-    substitute_static_in_type(db, ret, receiver_fqcn, receiver_fqcn, receiver_type_params)
+    substitute_static_in_type(
+        db,
+        ret,
+        receiver_fqcn,
+        receiver_fqcn,
+        receiver_type_params,
+        None,
+    )
+}
+
+/// [`substitute_static_in_return`] where `static` is the whole receiver atom (an intersection).
+pub(crate) fn substitute_static_in_return_as(
+    db: &dyn MirDatabase,
+    ret: Type,
+    receiver_fqcn: &Arc<str>,
+    receiver_type_params: &[Type],
+    static_atom: &Atomic,
+) -> Type {
+    substitute_static_in_type(
+        db,
+        ret,
+        receiver_fqcn,
+        receiver_fqcn,
+        receiver_type_params,
+        Some(static_atom),
+    )
 }
 
 /// [`substitute_static_in_return`] where `static` is bound to `static_fqcn` (the late
@@ -511,7 +567,14 @@ pub(crate) fn substitute_late_static_in_return(
     static_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
 ) -> Type {
-    substitute_static_in_type(db, ret, receiver_fqcn, static_fqcn, receiver_type_params)
+    substitute_static_in_type(
+        db,
+        ret,
+        receiver_fqcn,
+        static_fqcn,
+        receiver_type_params,
+        None,
+    )
 }
 
 pub(crate) fn check_method_visibility(

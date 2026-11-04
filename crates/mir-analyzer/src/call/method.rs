@@ -1638,10 +1638,15 @@ fn resolve_method_return<'a>(
             resolved.return_ty_raw.types.as_slice(),
             [mir_types::Atomic::TStaticObject { .. }]
         );
-        // `static` on an intersection receiver is the whole intersection, not the declaring part.
-        let ret_raw = match full_receiver {
-            Some(full) if returns_this => full.clone(),
-            _ => substitute_static_in_return(
+        let ret_raw = match full_receiver.and_then(|full| full.types.first()) {
+            Some(full) => super::args::substitute_static_in_return_as(
+                ea.db,
+                resolved.return_ty_raw,
+                fqcn,
+                receiver_type_params,
+                full,
+            ),
+            None => substitute_static_in_return(
                 ea.db,
                 resolved.return_ty_raw,
                 fqcn,
