@@ -13,5 +13,5 @@ return [
     ['slug' => 'ramsey-uuid', 'url' => 'https://github.com/ramsey/uuid.git', 'tag' => '4.9.3'],
     ['slug' => 'egulias-email-validator', 'url' => 'https://github.com/egulias/EmailValidator.git', 'tag' => '4.0.4'],
     ['slug' => 'vlucas-phpdotenv', 'url' => 'https://github.com/vlucas/phpdotenv.git', 'tag' => 'v5.6.4'],
-    ['slug' => 'symfony-symfony', 'url' => 'https://github.com/symfony/symfony.git', 'tag' => 'v8.1.9'],
+    ['slug' => 'symfony-symfony', 'url' => 'https://github.com/symfony/symfony.git', 'tag' => 'v8.1.11'],
 ];

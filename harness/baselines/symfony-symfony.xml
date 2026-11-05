@@ -301,6 +301,11 @@
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
   </file>
+  <file src="src/Symfony/Bundle/FrameworkBundle/Command/SecretsGenerateKeysCommand.php">
+    <TaintedFile>
+      <code><![CDATA[$vault->rotate($secrets)]]></code>
+    </TaintedFile>
+  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Command/TranslationDebugCommand.php">
     <InvalidReturnType>
       <code><![CDATA[return $state;]]></code>
@@ -583,10 +588,11 @@
                     }
 
                     // Extract tag changes, these should be removed from values in doSave()
+                    // All tags are added, as the item may have been removed from them since it was fetched
                     $value['tag-operations'] = ['add' => [], 'remove' => []];
                     $oldTags = $item->metadata[CacheItem::METADATA_TAGS] ?? [];
-                    foreach (array_diff_key($value['tags'], $oldTags) as $addedTag) {
-                        $value['tag-operations']['add'][] = $getId($tagPrefix.$addedTag, $rootNamespace);
+                    foreach ($value['tags'] as $tag) {
+                        $value['tag-operations']['add'][] = $getId($tagPrefix.$tag, $rootNamespace);
                     }
                     foreach (array_diff_key($oldTags, $value['tags']) as $removedTag) {
                         $value['tag-operations']['remove'][] = $getId($tagPrefix.$removedTag, $rootNamespace);
@@ -764,9 +770,6 @@
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/RedisTagAwareAdapter.php">
-    <InaccessibleProperty>
-      <code><![CDATA[rootNamespace]]></code>
-    </InaccessibleProperty>
     <NullableReturnStatement>
       <code><![CDATA[return $failed;]]></code>
       <code><![CDATA[return $failed;]]></code>
@@ -882,7 +885,6 @@
   <file src="src/Symfony/Component/Cache/Traits/RedisTrait.php">
     <InvalidArgument>
       <code><![CDATA[$pattern]]></code>
-      <code><![CDATA[$address]]></code>
       <code><![CDATA['MATCH']]></code>
     </InvalidArgument>
     <NullableReturnStatement>
@@ -1031,6 +1033,12 @@
       <code><![CDATA[$values($input)]]></code>
     </TooFewArguments>
   </file>
+  <file src="src/Symfony/Component/Console/Output/TestOutput.php">
+    <UndefinedConstant>
+      <code><![CDATA[self::OUTPUT_RAW]]></code>
+      <code><![CDATA[self::VERBOSITY_QUIET]]></code>
+    </UndefinedConstant>
+  </file>
   <file src="src/Symfony/Component/Console/Terminal.php">
     <NullableReturnStatement>
       <code><![CDATA[return self::$colorMode;]]></code>
@@ -1102,6 +1110,11 @@
     <UndefinedProperty>
       <code><![CDATA[class]]></code>
     </UndefinedProperty>
+  </file>
+  <file src="src/Symfony/Component/DependencyInjection/Container.php">
+    <UndefinedClass>
+      <code><![CDATA[LazyLoadingInterface]]></code>
+    </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/DependencyInjection/EnvVarProcessor.php">
     <InvalidArgument>
@@ -1185,6 +1198,10 @@
     </UndefinedMethod>
   </file>
   <file src="src/Symfony/Component/DomCrawler/Field/ChoiceFormField.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->checkedRadio = array_key_last($this->options)]]></code>
+      <code><![CDATA[$this->selectedOption = array_key_last($this->options)]]></code>
+    </InvalidPropertyAssignment>
     <UndefinedMethod>
       <code><![CDATA[$option->hasAttribute('selected')]]></code>
     </UndefinedMethod>
@@ -1477,6 +1494,11 @@
       <code><![CDATA[return $this->resolvedGroups[$form];]]></code>
     </InvalidReturnType>
   </file>
+  <file src="src/Symfony/Component/Form/Extension/Validator/ViolationMapper/ViolationMapper.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $index;]]></code>
+    </NullableReturnStatement>
+  </file>
   <file src="src/Symfony/Component/Form/Flow/FormFlowBuilder.php">
     <NullableReturnStatement>
       <code><![CDATA[return $currentStep;]]></code>
@@ -1711,6 +1733,11 @@
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
   </file>
+  <file src="src/Symfony/Component/JsonPath/JsonCrawler.php">
+    <InvalidThrow>
+      <code><![CDATA[]]></code>
+    </InvalidThrow>
+  </file>
   <file src="src/Symfony/Component/JsonPath/Test/JsonPathAssertionsTrait.php">
     <UndefinedClass>
       <code><![CDATA[Assert]]></code>
@@ -1864,7 +1891,7 @@
   </file>
   <file src="src/Symfony/Component/Messenger/Bridge/Redis/Transport/Connection.php">
     <InvalidReturnType>
-      <code><![CDATA[return $messages ?: null;]]></code>
+      <code><![CDATA[return $messages ?: (isset($delayedMessagesFailure) ? throw $delayedMessagesFailure : null);]]></code>
     </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $id;]]></code>
@@ -2087,6 +2114,12 @@
       <code><![CDATA[return $this->writePropertyCache[$key] = $mutator;]]></code>
     </NullableReturnStatement>
   </file>
+  <file src="src/Symfony/Component/PropertyInfo/Extractor/PhpDocExtractor.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[new CollectionType($wrappedType, $type->isList())]]></code>
+      <code><![CDATA[new GenericType($wrappedType, ...$variableTypes)]]></code>
+    </InvalidTemplateParam>
+  </file>
   <file src="src/Symfony/Component/PropertyInfo/Extractor/PhpStanExtractor.php">
     <InvalidArgument>
       <code><![CDATA[true]]></code>
@@ -2123,6 +2156,11 @@
     <InvalidArgument>
       <code><![CDATA[$rate]]></code>
     </InvalidArgument>
+  </file>
+  <file src="src/Symfony/Component/Routing/Matcher/Dumper/CompiledUrlMatcherDumper.php">
+    <NonExistentArrayOffset>
+      <code><![CDATA[0]]></code>
+    </NonExistentArrayOffset>
   </file>
   <file src="src/Symfony/Component/Routing/Router.php">
     <InvalidPropertyAssignment>
@@ -2178,6 +2216,12 @@
       <code><![CDATA[$this->tokenIds = array_flip($tokenIds)]]></code>
     </InvalidPropertyAssignment>
   </file>
+  <file src="src/Symfony/Component/Security/Http/Authenticator/X509Authenticator.php">
+    <ImplicitFloatToIntCast>
+      <code><![CDATA[hexdec(substr($dn, $i + 1, 2))]]></code>
+      <code><![CDATA[hexdec(substr($dn, $i + 2, 2))]]></code>
+    </ImplicitFloatToIntCast>
+  </file>
   <file src="src/Symfony/Component/Security/Http/Firewall/ContextListener.php">
     <UndefinedClass>
       <code><![CDATA[LazyLoadingInterface]]></code>
@@ -2187,12 +2231,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $original;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Security/Http/LoginLink/LoginLinkHandler.php">
-    <InvalidArgument>
-      <code><![CDATA[$expires]]></code>
-      <code><![CDATA[$expires]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Security/Http/RememberMe/PersistentRememberMeHandler.php">
     <InvalidArgument>
@@ -2268,7 +2306,6 @@
       <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
       <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
       <code><![CDATA[$str->string = normalizer_normalize($str->string)]]></code>
-      <code><![CDATA[$str->string = grapheme_substr($tail, 0, $i)]]></code>
       <code><![CDATA[$this->string = normalizer_normalize($this->string)]]></code>
       <code><![CDATA[$this->string = normalizer_normalize($this->string)]]></code>
     </InvalidPropertyAssignment>
@@ -2367,8 +2404,8 @@
       <code><![CDATA[Type::collection($type, $variableTypes[1], $variableTypes[0])]]></code>
       <code><![CDATA[Type::collection($type)]]></code>
       <code><![CDATA[Type::generic($type, ...$variableTypes)]]></code>
-      <code><![CDATA[Type::intersection(...array_map(fn (TypeNode $t): Type => $this->getTypeFromNode($t, $typeContext), $node->types))]]></code>
       <code><![CDATA[Type::object($className)]]></code>
+      <code><![CDATA[Type::intersection(...$types)]]></code>
     </InvalidTemplateParam>
     <TooFewArguments>
       <code><![CDATA[new Lexer()]]></code>
@@ -2571,12 +2608,6 @@
   <file src="src/Symfony/Component/Workflow/Event/GuardEvent.php">
     <NullableReturnStatement>
       <code><![CDATA[return parent::getTransition();]]></code>
-    </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Yaml/Exception/ParseException.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->snippet;]]></code>
-      <code><![CDATA[return $this->parsedFile;]]></code>
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Yaml/Inline.php">
