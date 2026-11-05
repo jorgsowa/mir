@@ -190,7 +190,7 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
 
         "header" => sinks![at(0, "header", Header)],
         "setcookie" | "setrawcookie" => sinks![any(Cookie)],
-        "mail" => sinks![
+        "mail" | "mb_send_mail" => sinks![
             at(3, "additional_headers", Header),
             at(4, "additional_params", Shell),
         ],

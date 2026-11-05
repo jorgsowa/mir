@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `mb_send_mail` headers and additional parameters are sinks, as for `mail`.
 - `mysqli_execute_query`, `mysqli::execute_query`, `SQLite3::querySingle`, `mysqli_stmt::prepare`, `sqlsrv_query`, `sqlsrv_prepare` and Doctrine DBAL `Connection` query methods are SQL sinks. Only the first argument of a method sink counts, so bound parameters aren't reported.
 - `$_SERVER['REMOTE_HOST']`, `$_SERVER['REDIRECT_HTTP_*']` and `getenv('HTTP_*')` are taint sources.
 - `base64_decode`, `hex2bin`, `urldecode`, `json_decode` and similar decoders restore every kind on a tainted value, so `base64_decode(base64_encode($x))` and `urldecode(basename($x))` stay tainted.
