@@ -414,6 +414,7 @@ pub fn guarded_when<'e>(
             .then(|| {
                 guarded_var(cond)
                     .or_else(|| guarded_by_list(cond, scope))
+                    .or_else(|| guarded_by_map_key(cond, scope))
             })
             .flatten();
     };
@@ -526,6 +527,41 @@ fn compared_subject(expr: &Expr) -> Option<(Guarded<'_>, Taint)> {
         return Some((guarded_subject(arg.value()?)?, safe));
     }
     Some((guarded_subject(expr)?, Taint::ALL))
+}
+
+/// `isset($map[$x])` or `array_key_exists($x, $map)` proves the value is one of the map's keys.
+fn guarded_by_map_key<'e>(cond: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'e>, Taint)> {
+    let (key, map) = match &cond.kind {
+        ExprKind::Isset(vars) => {
+            let [var] = &vars[..] else {
+                return None;
+            };
+            let ExprKind::ArrayAccess(aa) = &var.kind else {
+                return None;
+            };
+            (aa.index.as_ref()?, &aa.array)
+        }
+        ExprKind::FunctionCall(fc) => {
+            let name = fc.name.kind.name_bare()?;
+            if !crate::util::php_ident_lowercase(name).eq("array_key_exists")
+                || fc.args.iter().any(|a| a.name.is_some() || a.unpack())
+            {
+                return None;
+            }
+            (fc.args.first()?.value()?, fc.args.get(1)?.value()?)
+        }
+        _ => return None,
+    };
+    let map_type = match &map.kind {
+        ExprKind::Variable(var) => scope.ctx.get_var(var),
+        _ => crate::expr::constant_expr_type(map, scope.ctx, scope.db, scope.file)?,
+    };
+    let only_listed_keys = !map_type.types.is_empty()
+        && map_type
+            .types
+            .iter()
+            .all(|atom| matches!(atom, mir_types::Atomic::TKeyedArray { is_open: false, .. }));
+    only_listed_keys.then(|| compared_subject(key)).flatten()
 }
 
 fn is_literal(expr: &Expr) -> bool {
