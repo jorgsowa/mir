@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking:** `--set-baseline` without a file name writes `mir-baseline.xml` and deletes `psalm-baseline.xml` in the current directory. Auto-discovery and `--update-baseline` prefer `mir-baseline.xml` and fall back to `psalm-baseline.xml`.
-- **Breaking:** tainted file paths, `include`/`require` paths, `eval()` code and `unserialize()` payloads report `TaintedFile` (MIR0811), `TaintedInclude` (MIR0812), `TaintedEval` (MIR0813) and `TaintedUnserialize` (MIR0814) instead of `TaintedInput`, so Psalm-named suppressions match them. So do `@taint-sink file|include|eval|unserialize` parameters. Baseline entries recorded as `TaintedInput` still match.
+- **Breaking:** tainted file paths, `include`/`require` paths, `eval()` code and `unserialize()` payloads report `TaintedFile` (MIR0811), `TaintedInclude` (MIR0812), `TaintedEval` (MIR0813) and `TaintedUnserialize` (MIR0814) instead of `TaintedInput`, so Psalm-named suppressions match them. So do `@taint-sink file|include|eval|unserialize` parameters. Baseline entries recorded as `TaintedInput` still match. An `<issueHandlers>` entry for `TaintedInput` doesn't cover them: add the new names.
 - `ImpossibleIdenticalComparison` and `ImpossibleLooseComparison` follow Psalm's level for `TypeDoesNotContainType` (4), so `errorLevel` 5 and above report them as info.
 
 ### Fixed
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A protected method is callable from an ancestor of the class that declares or overrides it, as PHP allows, instead of being reported as `UndefinedMethod`.
 - `--update-baseline` on a partial run (`mir src/Foo.php`) keeps the baseline entries of files it didn't analyze, and `--report-stale-baseline` no longer reports them as stale.
 - `mir .` writes baseline keys as `src/a.php` instead of `./src/a.php`, so it matches Psalm baselines. Existing `./`-prefixed entries still match.
-- Baseline keys use `/` on Windows too, so a baseline written there matches on other platforms. Existing `\\`-separated entries still match on Windows.
+- Baseline keys use `/` on Windows too, so a baseline written there matches on other platforms. Existing `\`-separated entries still match on Windows.
 - Baseline keys are written relative to the baseline's directory when it contains the file. Keys relative to the working directory still match, and a partial `--update-baseline` keeps them, as with `--baseline ../b.xml` or `--baseline build/b.xml`.
 - `@phpstan-method`, `@phpstan-property`, `@phpstan-property-read`, `@phpstan-property-write`, `@psalm-throws` and `@phpstan-throws` are read. A prefixed `@method`/`@property` tag overrides a plain one for the same name.
 - `object{prop: T, ...}` docblock types keep their properties instead of becoming plain `object`: reading `$o->prop` gives `T`, and a shape argument missing a required property or with an incompatible property type is reported as `InvalidArgument`.
