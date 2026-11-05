@@ -431,7 +431,7 @@ pub fn narrow_from_condition(
                     // strict equality requires; re-entering the top-level match
                     // dispatches to whatever arm (FunctionCall, Instanceof, Isset,
                     // ...) already handles that expression shape directly.
-                    narrow_from_condition(&b.left, ctx, effective_true, db, file);
+                    narrow_bool_valued(&b.left, ctx, effective_true, db, file);
                 }
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
@@ -447,7 +447,7 @@ pub fn narrow_from_condition(
                     // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
                     narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
                     // `is_string($x) === false` — see the `=== true` comment above.
-                    narrow_from_condition(&b.left, ctx, !effective_true, db, file);
+                    narrow_bool_valued(&b.left, ctx, !effective_true, db, file);
                 }
             }
             // `true === $x` / `false === $x` — symmetric; extract_var_name looks through
@@ -463,7 +463,7 @@ pub fn narrow_from_condition(
                 {
                     narrow_static_prop_bool(ctx, &fqcn, &prop, db, true, effective_true);
                 } else {
-                    narrow_from_condition(&b.right, ctx, effective_true, db, file);
+                    narrow_bool_valued(&b.right, ctx, effective_true, db, file);
                 }
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
@@ -477,7 +477,7 @@ pub fn narrow_from_condition(
                     narrow_static_prop_bool(ctx, &fqcn, &prop, db, false, effective_true);
                 } else {
                     narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
-                    narrow_from_condition(&b.right, ctx, !effective_true, db, file);
+                    narrow_bool_valued(&b.right, ctx, !effective_true, db, file);
                 }
             }
             // `$enum->value === 'H'` narrows $enum to the specific backed-enum
@@ -2322,6 +2322,20 @@ pub fn narrow_from_condition(
                 narrow_empty_shape_key(expr, ctx, !is_true, db, file);
             }
         }
+    }
+}
+
+/// Narrows by `expr === true/false` as a bare condition, except that an array element
+/// isn't known to be a bool: failing `$a['k'] === false` doesn't make it truthy.
+fn narrow_bool_valued(
+    expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    if !matches!(expr.kind, ExprKind::ArrayAccess(_)) {
+        narrow_from_condition(expr, ctx, is_true, db, file);
     }
 }
 
