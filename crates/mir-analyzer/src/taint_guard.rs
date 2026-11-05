@@ -5,7 +5,7 @@
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
-use php_ast::ast::BinaryOp;
+use php_ast::ast::{BinaryOp, CastKind};
 use php_ast::owned::{Arg, Expr, ExprKind};
 
 use crate::taint::Taint;
@@ -418,22 +418,28 @@ pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
     (holds == matched_when).then_some((guarded, safe))
 }
 
-/// `$x === 'lit'` proves the value is the program's own literal; the loose `==` also admits
-/// other values, which a variable's type narrowing doesn't treat as a proof either.
+/// `$x === 'lit'` proves the value is the program's own literal; `$x == 'lit'` as far as
+/// [`case_safe_kinds`] allows.
 fn guarded_by_literal(b: &php_ast::owned::BinaryExpr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
-    let subject = if is_literal(&b.right) {
-        &b.left
+    let (subject, literal) = if is_literal(&b.right) {
+        (&b.left, &b.right)
     } else if is_literal(&b.left) {
-        &b.right
+        (&b.right, &b.left)
     } else {
         return None;
     };
-    let identical = match b.op {
-        BinaryOp::Identical => true,
-        BinaryOp::NotIdentical => false,
+    let (matched_when, comparison_safe) = match b.op {
+        BinaryOp::Identical => (true, Taint::ALL),
+        BinaryOp::NotIdentical => (false, Taint::ALL),
+        BinaryOp::Equal => (true, case_safe_kinds(literal)?),
+        BinaryOp::NotEqual => (false, case_safe_kinds(literal)?),
         _ => return None,
     };
-    (holds == identical).then_some((guarded_subject(subject)?, Taint::ALL))
+    if holds != matched_when {
+        return None;
+    }
+    let (guarded, safe) = compared_subject(subject)?;
+    Some((guarded, safe.intersection(comparison_safe)))
 }
 
 /// `in_array($x, ['a', 'b'], true)` proves the value is one of the listed literals.
@@ -454,14 +460,38 @@ fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     let ExprKind::Array(items) = &fc.args.get(1)?.value()?.kind else {
         return None;
     };
-    if !strict
-        || items
-            .iter()
-            .any(|item| item.is_spread() || item.is_by_ref() || !is_literal(item.value()))
-    {
-        return None;
+    let mut comparison_safe = Taint::ALL;
+    for item in items.iter() {
+        if item.is_spread() || item.is_by_ref() || !is_literal(item.value()) {
+            return None;
+        }
+        if !strict {
+            comparison_safe = comparison_safe.intersection(case_safe_kinds(item.value())?);
+        }
     }
-    Some((guarded_subject(fc.args.first()?.value()?)?, Taint::ALL))
+    let (guarded, safe) = compared_subject(fc.args.first()?.value()?)?;
+    Some((guarded, safe.intersection(comparison_safe)))
+}
+
+/// The value a comparison checks, and the kinds an exact match leaves it safe for: changing the
+/// case adds no metacharacter, while trimming hides whitespace a line break can be part of.
+fn compared_subject(expr: &Expr) -> Option<(Guarded<'_>, Taint)> {
+    if let ExprKind::FunctionCall(fc) = &expr.kind {
+        let [arg] = &fc.args[..] else {
+            return None;
+        };
+        if arg.name.is_some() || arg.unpack() {
+            return None;
+        }
+        let name = fc.name.kind.name_bare()?;
+        let safe = match crate::util::php_ident_lowercase(name).as_str() {
+            "strtolower" | "strtoupper" | "mb_strtolower" | "mb_strtoupper" => Taint::ALL,
+            "trim" | "ltrim" | "rtrim" => Taint::ALL.without(Taint::HEADER | Taint::COOKIE),
+            _ => return None,
+        };
+        return Some((guarded_subject(arg.value()?)?, safe));
+    }
+    Some((guarded_subject(expr)?, Taint::ALL))
 }
 
 fn is_literal(expr: &Expr) -> bool {
@@ -591,7 +621,9 @@ fn validating_filter_safe_kinds(args: &[Arg]) -> Option<Taint> {
 fn guarded_subject(expr: &Expr) -> Option<Guarded<'_>> {
     match &expr.kind {
         ExprKind::Variable(var) => Some(Guarded::Var(var)),
-        ExprKind::Parenthesized(inner) => guarded_subject(inner),
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(CastKind::String, inner) => {
+            guarded_subject(inner)
+        }
         ExprKind::NullCoalesce(nc) => guarded_subject(&nc.left),
         ExprKind::ArrayAccess(aa) => {
             let ExprKind::Variable(var) = &aa.array.kind else {

@@ -178,11 +178,9 @@ function strictComparisonOtherBranch(): void {
 function looseComparison(): void {
     if ($_GET['a'] == 'x') {
         echo $_GET['a'];
-//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if ($_GET['n'] == 10) {
         echo $_GET['n'];
-//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         header('X-N: ' . $_GET['n']);
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
     }
@@ -223,11 +221,9 @@ function inArrayStrict(): void {
 function inArrayLoose(): void {
     if (in_array($_GET['a'], ['x', 'y'])) {
         echo $_GET['a'];
-//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
     if (in_array($_GET['n'], [1, 2, 3])) {
         echo $_GET['n'];
-//      ^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
         header('X-N: ' . $_GET['n']);
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHeader: Tainted HTTP header — possible header injection or open redirect
     }

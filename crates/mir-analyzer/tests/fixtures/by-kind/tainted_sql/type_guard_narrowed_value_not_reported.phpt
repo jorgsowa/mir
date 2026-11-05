@@ -28,7 +28,6 @@ function allowList(mysqli $db): void {
     }
     if (in_array($dir, ['ASC', 'DESC'])) {
         mysqli_query($db, "SELECT * FROM t ORDER BY id " . $dir);
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     }
 }
 

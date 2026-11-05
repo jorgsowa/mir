@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint guards accept `(string) $x`, `strtolower($x) === 'jpg'`, `trim($x) === 'a'`, `$x == 'a'` and non-strict `in_array` with literals.
 - `is_numeric` and `is_int`-style checks clear a checked array element, as `ctype_digit` does.
 - A passing `filter_var($x, FILTER_VALIDATE_*)` clears `$x` for the kinds its characters can't break, in the `!== false`, truthy and `=== false` exit forms.
 - Writing a clean value to a superglobal element (`$_POST['n'] = (int) $_POST['n']`) clears that element's taint.
