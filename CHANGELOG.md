@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--update-baseline` without a usable baseline, such as a mistyped `--baseline` or `--ignore-baseline`, exits with code 2 instead of writing an empty `mir-baseline.xml` that shadowed `psalm-baseline.xml`.
 - A failed `--set-baseline` or `--update-baseline` write exits with code 2 instead of reporting success.
 - `mir --set-baseline src/a.php` and `mir --set-baseline src` stop with exit code 2 instead of taking the path as the baseline file, which overwrote the PHP source.
 - Output and the exit code use the severity from `<issueHandlers>`, scoped `<errorLevel>` blocks and `errorLevel`: a handler that lowers an error to a warning no longer fails the run, and one that raises a warning to an error does.

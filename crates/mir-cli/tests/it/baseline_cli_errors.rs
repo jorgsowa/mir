@@ -44,3 +44,23 @@ fn a_failed_baseline_write_exits_non_zero() {
     let out = run(dir.path(), &["--set-baseline", "missing/b.xml", "src"]);
     assert_eq!(out.status.code(), Some(2));
 }
+
+#[test]
+fn update_baseline_without_a_baseline_writes_nothing() {
+    let dir = fixture();
+    let psalm = dir.path().join("psalm-baseline.xml");
+    run(dir.path(), &["--set-baseline", "psalm-baseline.xml", "src"]);
+    let before = std::fs::read_to_string(&psalm).unwrap();
+
+    for args in [
+        &["--baseline", "typo.xml", "--update-baseline", "src"][..],
+        &["--ignore-baseline", "--update-baseline", "src"][..],
+    ] {
+        let out = run(dir.path(), args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+    }
+
+    assert!(!dir.path().join("mir-baseline.xml").exists());
+    assert!(!dir.path().join("typo.xml").exists());
+    assert_eq!(std::fs::read_to_string(&psalm).unwrap(), before);
+}

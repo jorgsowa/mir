@@ -170,6 +170,12 @@ fn main() {
 
     report::check_set_baseline_target(&cli);
     let baseline = report::load_baseline(&cli, &config);
+    if cli.update_baseline && cli.set_baseline.is_none() && baseline.is_none() {
+        eprintln!(
+            "mir: --update-baseline needs an existing baseline; create one with --set-baseline"
+        );
+        process::exit(2);
+    }
 
     let (files, result, elapsed) = if let Some(ref root) = composer_root {
         analyze::run_composer_flow(&cli, &config, &config_base, root)

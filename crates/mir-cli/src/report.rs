@@ -182,12 +182,9 @@ pub fn run_output(
     };
 
     // --update-baseline: write back only the issues still present in the baseline.
-    if cli.update_baseline {
+    if let Some(path) = baseline_path.as_ref().filter(|_| cli.update_baseline) {
         new_baseline.entries.extend(unanalyzed_entries.entries);
-        let path = baseline_path
-            .clone()
-            .unwrap_or_else(|| cwd().join(BASELINE_FILE));
-        match new_baseline.write(&path) {
+        match new_baseline.write(path) {
             Ok(()) => {
                 if !cli.quiet {
                     eprintln!("mir: baseline updated at {}", path.display());
