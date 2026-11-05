@@ -37,3 +37,10 @@ fn set_baseline_refuses_a_directory() {
     let out = run(dir.path(), &["--set-baseline", "src"]);
     assert_eq!(out.status.code(), Some(2));
 }
+
+#[test]
+fn a_failed_baseline_write_exits_non_zero() {
+    let dir = fixture();
+    let out = run(dir.path(), &["--set-baseline", "missing/b.xml", "src"]);
+    assert_eq!(out.status.code(), Some(2));
+}

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A failed `--set-baseline` or `--update-baseline` write exits with code 2 instead of reporting success.
 - `mir --set-baseline src/a.php` and `mir --set-baseline src` stop with exit code 2 instead of taking the path as the baseline file, which overwrote the PHP source.
 - Output and the exit code use the severity from `<issueHandlers>`, scoped `<errorLevel>` blocks and `errorLevel`: a handler that lowers an error to a warning no longer fails the run, and one that raises a warning to an error does.
 - `filter_var`, `filter_input` and their `_array` forms read named arguments by name, so `filter_var(filter: FILTER_DEFAULT, value: $x)` keeps the taint of `$x`.

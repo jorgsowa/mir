@@ -99,7 +99,10 @@ pub fn run_output(
                     remove_psalm_baseline(cli);
                 }
             }
-            Err(e) => eprintln!("mir: failed to write baseline: {e}"),
+            Err(e) => {
+                eprintln!("mir: failed to write baseline: {e}");
+                process::exit(2);
+            }
         }
         return;
     }
@@ -190,7 +193,10 @@ pub fn run_output(
                     eprintln!("mir: baseline updated at {}", path.display());
                 }
             }
-            Err(e) => eprintln!("mir: failed to update baseline: {e}"),
+            Err(e) => {
+                eprintln!("mir: failed to update baseline: {e}");
+                process::exit(2);
+            }
         }
     }
 
