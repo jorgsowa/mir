@@ -49,7 +49,7 @@ class Holder {
     }
 }
 
-/** @mir-check (new Box)->get() is T */
+/** @mir-check (new Box)->get() is mixed */
 takeOptional(['k' => (new Box)->get()]);
 takeRequired(['k' => (new Box)->get()]);
 takeNested(['outer' => ['inner' => (new Box)->get()]]);

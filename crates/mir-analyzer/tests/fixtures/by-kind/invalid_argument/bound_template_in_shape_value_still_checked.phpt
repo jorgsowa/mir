@@ -26,6 +26,6 @@ function takeStringList(array $x): void {}
 
 takeIntOrString(['k' => (new IntBox)->get()]);
 takeString(['k' => (new IntBox)->get()]);
-//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takeString() expects 'array{'k'?: string}', got 'array{'k': T}'
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takeString() expects 'array{'k'?: string}', got 'array{'k': int}'
 takeStringList([(new IntBox)->get()]);
-//             ^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takeStringList() expects 'list<string>', got 'array{0: T}'
+//             ^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takeStringList() expects 'list<string>', got 'array{0: int}'

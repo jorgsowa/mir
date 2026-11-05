@@ -2076,11 +2076,6 @@
       <code><![CDATA[return $this->executableFinder->find('php', false, $dirs);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Process/Pipes/AbstractPipes.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->inputBuffer = $input]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Process/Process.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->cwd = getcwd()]]></code>

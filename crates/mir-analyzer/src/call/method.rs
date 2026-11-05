@@ -134,8 +134,17 @@ fn bound_unbound_class_templates(
     ret: Type,
     template_scope: &str,
     in_scope: &rustc_hash::FxHashSet<Name>,
-    native: &Type,
+    native: Option<&Type>,
 ) -> Type {
+    if !ret
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TTemplateParam { .. }))
+    {
+        return ret;
+    }
+    let mixed = Type::mixed();
+    let native = native.unwrap_or(&mixed);
     let mut out = Type::empty();
     out.possibly_undefined = ret.possibly_undefined;
     out.from_docblock = ret.from_docblock;
@@ -2020,14 +2029,12 @@ fn resolve_method_return<'a>(
             || crate::db::class_template_params(ea.db, resolved.template_scope.as_ref()),
             &ctx.template_param_names,
         );
-        if let Some(native) = &resolved.native_return {
-            return_ty = bound_unbound_class_templates(
-                return_ty,
-                &resolved.template_scope,
-                &ctx.template_param_names,
-                native,
-            );
-        }
+        return_ty = bound_unbound_class_templates(
+            return_ty,
+            &resolved.template_scope,
+            &ctx.template_param_names,
+            resolved.native_return.as_ref(),
+        );
         if let Some(self_out_ty) = fluent_self_out {
             return_ty = self_out_ty;
         }
