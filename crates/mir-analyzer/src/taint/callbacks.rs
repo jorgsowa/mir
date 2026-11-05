@@ -1,6 +1,7 @@
 use super::*;
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameResolveExt as _;
 use crate::ast_ext::{FunctionRef, FunctionRefExt as _};
 
 /// Whether a call in `expr` takes a `function () {}` literal argument.
@@ -264,6 +265,49 @@ pub(super) fn callback_function<'e>(
     }
 }
 
+/// Class and lowercase method a `[$object, 'name']`, `[A::class, 'name']` or `'A::name'` callback calls.
+fn callback_method(
+    callback: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    let lower = crate::util::php_ident_lowercase;
+    match &unwrap_parens(callback).kind {
+        ExprKind::String(name) => {
+            let (class, method) = name.as_str().split_once("::")?;
+            Some((std::sync::Arc::from(class), lower(method)))
+        }
+        ExprKind::Array(items) => {
+            let [target, method] = &items[..] else {
+                return None;
+            };
+            let ExprKind::String(method) = &method.value().kind else {
+                return None;
+            };
+            let class = match &target.value().kind {
+                ExprKind::String(class) => std::sync::Arc::from(class.as_str()),
+                ExprKind::ClassConstAccess(cca) if matches!(&cca.member.kind, ExprKind::Identifier(m) if m.eq_ignore_ascii_case("class")) =>
+                {
+                    let class = cca.class.kind.resolve_name_ref(db, file)?;
+                    match class.as_str() {
+                        "self" | "static" => ctx.self_fqcn.as_deref()?.into(),
+                        named => std::sync::Arc::from(named),
+                    }
+                }
+                ExprKind::New(new) => {
+                    std::sync::Arc::from(new.class.kind.resolve_name_ref(db, file)?)
+                }
+                _ => receiver_classes(target.value(), ctx, db, file)
+                    .into_iter()
+                    .next()?,
+            };
+            Some((class, lower(method.as_str())))
+        }
+        _ => None,
+    }
+}
+
 /// Taint of what calling `callback` returns when it receives `inputs`.
 pub(super) fn callback_result(
     callback: &Expr,
@@ -481,29 +525,45 @@ pub fn check_callback_sinks(
     let param_sinks = match &closure {
         Some(closure) => closure.summary.param_sinks.clone(),
         None => {
-            let Some(name) = callback_function(callback, ea.db, &ea.file) else {
-                return;
+            let expand = |s: TaintSummary| -> Vec<ParamSink> {
+                s.param_sinks
+                    .iter()
+                    .flat_map(|sink| {
+                        s.slot_params(sink.param)
+                            .into_iter()
+                            .map(|param| ParamSink {
+                                param,
+                                ..sink.clone()
+                            })
+                    })
+                    .collect()
             };
-            crate::db::function_param_sinks(ea.db, &ea.file, name.resolve(ea.db, &ea.file))
-                .map(|s| {
-                    s.param_sinks
-                        .iter()
-                        .flat_map(|sink| {
-                            s.slot_params(sink.param)
-                                .into_iter()
-                                .map(|param| ParamSink {
-                                    param,
-                                    ..sink.clone()
-                                })
+            if let Some(name) = callback_function(callback, ea.db, &ea.file) {
+                let mut sinks =
+                    crate::db::function_param_sinks(ea.db, &ea.file, name.resolve(ea.db, &ea.file))
+                        .map(expand)
+                        .filter(|sinks| !sinks.is_empty())
+                        .or_else(|| {
+                            callable_summary(callback, ea.db, &ea.file)
+                                .map(|builtin| builtin.summary.param_sinks.clone())
                         })
-                        .collect()
-                })
-                .filter(|sinks: &Vec<ParamSink>| !sinks.is_empty())
-                .or_else(|| {
-                    callable_summary(callback, ea.db, &ea.file)
-                        .map(|builtin| builtin.summary.param_sinks.clone())
-                })
-                .unwrap_or_default()
+                        .unwrap_or_default();
+                if let Some((_, func)) = name.find(ea.db, &ea.file) {
+                    sinks.extend(annotated_param_sinks(&func.params, &func.taint_sink_params));
+                }
+                sinks
+            } else if let Some((class, method)) = callback_method(callback, ctx, ea.db, &ea.file) {
+                let mut sinks = crate::db::method_param_sinks(ea.db, &ea.file, &class, &method)
+                    .map(expand)
+                    .unwrap_or_default();
+                let here = crate::db::Fqcn::from_str(ea.db, &class);
+                if let Some((_, def)) = crate::db::find_method_in_chain(ea.db, here, &method) {
+                    sinks.extend(annotated_param_sinks(&def.params, &def.taint_sink_params));
+                }
+                sinks
+            } else {
+                return;
+            }
         }
     };
     let mut emitted: Vec<mir_issues::IssueKind> = Vec::new();

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A method callback (`[$o, 'out']`, `[$this, 'out']`, `[A::class, 'out']`, `'A::out'`) and a function or method with a `@taint-sink` parameter report the data a callback builtin hands them.
 - Inside a `PHP_SAPI === 'cli'` or `in_array(PHP_SAPI, ['cli', 'phpdbg'], true)` check, `$_SERVER` entries aren't taint sources: they come from the process environment. This clears Symfony's httpoxy guard.
 - `HTMLPurifier::purify` clears HTML taint, and Symfony's `getDigits`, `getAlnum` and `getAlpha` bag getters clear what they filter out.
 - A user function or method that sanitizes a by-ref argument (`function s(string &$x) { $x = htmlspecialchars($x); }`) clears it at the call.

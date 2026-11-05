@@ -23,6 +23,25 @@ pub fn check_callable_target(
     }
 }
 
+/// The sinks `@taint-sink` tags name, by position of the parameter they name.
+pub(super) fn annotated_param_sinks(
+    params: &[mir_codebase::DeclaredParam],
+    sink_params: &[(std::sync::Arc<str>, std::sync::Arc<str>)],
+) -> Vec<ParamSink> {
+    sink_params
+        .iter()
+        .filter_map(|(name, kind)| {
+            Some(ParamSink {
+                param: params
+                    .iter()
+                    .position(|p| p.name.as_ref() == name.as_ref())?,
+                kinds: taint_sink_kind(kind),
+                issue: taint_sink_issue(kind),
+            })
+        })
+        .collect()
+}
+
 /// Report arguments reaching a sink inside the callee: its `@taint-sink`
 /// parameters and the sinks its inferred summary records.
 #[allow(clippy::too_many_arguments)]
@@ -37,18 +56,7 @@ pub fn check_call_sinks(
     summary: impl FnOnce(&dyn crate::db::MirDatabase, &str) -> Option<TaintSummary>,
     span: php_ast::Span,
 ) {
-    let annotated: Vec<ParamSink> = sink_params
-        .iter()
-        .filter_map(|(name, kind)| {
-            Some(ParamSink {
-                param: params
-                    .iter()
-                    .position(|p| p.name.as_ref() == name.as_ref())?,
-                kinds: taint_sink_kind(kind),
-                issue: taint_sink_issue(kind),
-            })
-        })
-        .collect();
+    let annotated = annotated_param_sinks(params, sink_params);
     let mut callee = TaintSummary::default();
     if !demanding_taint(args_value_taint(args, ctx, ea.db, &ea.file), ctx).is_empty()
         || receiver_demands_summary(receiver, ctx, ea.db, &ea.file)
