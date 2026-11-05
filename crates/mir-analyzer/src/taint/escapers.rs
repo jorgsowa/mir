@@ -70,22 +70,79 @@ pub(super) fn filter_call_taint(
     file: &str,
 ) -> Option<Taint> {
     let arg = |i: usize| args.get(i).and_then(|a| a.value());
+    let arg_taint = |i: usize| arg(i).map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file));
     let (input, filter) = match fn_name_lower {
-        "filter_var" => (
-            arg(0).map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file)),
-            arg(1),
-        ),
+        "filter_var" => (arg_taint(0), arg(1)),
         "filter_input" => (Taint::ALL, arg(2)),
-        "filter_input_array" => return Some(Taint::ALL),
+        "filter_var_array" => return Some(filter_definition_taint(arg_taint(0), arg(1))),
+        "filter_input_array" => return Some(filter_definition_taint(Taint::ALL, arg(1))),
         _ => return None,
     };
-    let Some(filter_name) = filter
-        .and_then(|f| f.kind.name_bare())
-        .map(str::to_ascii_uppercase)
-    else {
-        return Some(input);
+    let is_callback = filter.is_some_and(|f| {
+        f.kind
+            .name_bare()
+            .is_some_and(|name| name.eq_ignore_ascii_case("FILTER_CALLBACK"))
+    });
+    if is_callback {
+        let options = if fn_name_lower == "filter_var" {
+            arg(2)
+        } else {
+            arg(3)
+        };
+        return Some(input.without(callback_filter_kinds(options)));
+    }
+    Some(filter.map_or(input, |f| named_filter_taint(input, f)))
+}
+
+/// Kinds the sanitizing builtin named in `['options' => 'htmlspecialchars']` removes.
+fn callback_filter_kinds(options: Option<&Expr>) -> Taint {
+    let Some(ExprKind::Array(options)) = options.map(|o| &o.kind) else {
+        return Taint::NONE;
     };
-    Some(match filter_name.as_str() {
+    options
+        .iter()
+        .find_map(
+            |el| match (el.key.as_ref().map(|k| &k.kind), &el.value().kind) {
+                (Some(ExprKind::String(key)), ExprKind::String(name))
+                    if key.as_str() == "options" =>
+                {
+                    sanitized_kinds(&crate::util::php_ident_lowercase(name.as_str()))
+                }
+                _ => None,
+            },
+        )
+        .unwrap_or(Taint::NONE)
+}
+
+/// Taint of the `filter_*_array()` result for a definition: one filter for every element, or an
+/// array holding a filter, or `['filter' => FILTER_X, ...]`, per key.
+fn filter_definition_taint(input: Taint, definition: Option<&Expr>) -> Taint {
+    let Some(definition) = definition else {
+        return input;
+    };
+    let ExprKind::Array(entries) = &definition.kind else {
+        return named_filter_taint(input, definition);
+    };
+    entries.iter().fold(Taint::NONE, |acc, entry| {
+        let filter = match &entry.value().kind {
+            ExprKind::Array(options) => options.iter().find_map(|option| {
+                matches!(
+                    option.key.as_ref().map(|k| &k.kind),
+                    Some(ExprKind::String(key)) if key.as_str() == "filter"
+                )
+                .then(|| option.value())
+            }),
+            _ => Some(entry.value()),
+        };
+        acc | filter.map_or(input, |f| named_filter_taint(input, f))
+    })
+}
+
+fn named_filter_taint(input: Taint, filter: &Expr) -> Taint {
+    let Some(filter_name) = filter.kind.name_bare().map(str::to_ascii_uppercase) else {
+        return input;
+    };
+    let removed = match filter_name.as_str() {
         "FILTER_VALIDATE_INT"
         | "FILTER_VALIDATE_FLOAT"
         | "FILTER_VALIDATE_BOOLEAN"
@@ -93,16 +150,17 @@ pub(super) fn filter_call_taint(
         | "FILTER_VALIDATE_IP"
         | "FILTER_VALIDATE_MAC"
         | "FILTER_SANITIZE_NUMBER_INT"
-        | "FILTER_SANITIZE_NUMBER_FLOAT" => Taint::NONE,
-        "FILTER_SANITIZE_SPECIAL_CHARS" | "FILTER_SANITIZE_FULL_SPECIAL_CHARS" => {
-            input.without(Taint::HTML)
-        }
+        | "FILTER_SANITIZE_NUMBER_FLOAT" => Taint::ALL,
+        "FILTER_SANITIZE_SPECIAL_CHARS"
+        | "FILTER_SANITIZE_FULL_SPECIAL_CHARS"
         // Strips tags and encodes quotes.
-        "FILTER_SANITIZE_STRING" | "FILTER_SANITIZE_STRIPPED" => input.without(Taint::HTML),
-        "FILTER_SANITIZE_ADD_SLASHES" => input.without(sanitized_kinds("addslashes")?),
-        "FILTER_SANITIZE_ENCODED" => input.without(sanitized_kinds("urlencode")?),
-        _ => input,
-    })
+        | "FILTER_SANITIZE_STRING"
+        | "FILTER_SANITIZE_STRIPPED" => Taint::HTML,
+        "FILTER_SANITIZE_ADD_SLASHES" => sanitized_kinds("addslashes").unwrap_or(Taint::NONE),
+        "FILTER_SANITIZE_ENCODED" => sanitized_kinds("urlencode").unwrap_or(Taint::NONE),
+        _ => Taint::NONE,
+    };
+    input.without(removed)
 }
 
 /// Taint kinds a sanitizing builtin removes from its arguments' taint.
