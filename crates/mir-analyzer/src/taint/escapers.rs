@@ -136,9 +136,10 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
         }
         // Output is limited to `[A-Za-z0-9+/=]`.
         "base64_encode" => Taint::HTML | Taint::HEADER | Taint::COOKIE,
-        "md5" | "sha1" | "crc32" | "hash" | "hash_hmac" | "password_hash" | "bin2hex"
-        | "dechex" | "decbin" | "decoct" | "number_format" | "uniqid" | "abs" | "round"
-        | "floor" | "ceil" => Taint::ALL,
+        // Reversible: a kind stays so that a decoder finds the value tainted.
+        "bin2hex" => Taint::ALL.without(Taint::LLM_PROMPT),
+        "md5" | "sha1" | "crc32" | "hash" | "hash_hmac" | "password_hash" | "dechex" | "decbin"
+        | "decoct" | "number_format" | "uniqid" | "abs" | "round" | "floor" | "ceil" => Taint::ALL,
         _ => return None,
     })
 }
@@ -246,7 +247,13 @@ pub(super) fn unescaped_kinds(fn_name_lower: &str) -> Option<Taint> {
     Some(match fn_name_lower {
         "html_entity_decode" | "htmlspecialchars_decode" => Taint::HTML,
         "stripslashes" | "stripcslashes" => Taint::SQL,
-        "urldecode" | "rawurldecode" => sanitized_kinds("urlencode")?,
+        "urldecode"
+        | "rawurldecode"
+        | "base64_decode"
+        | "hex2bin"
+        | "convert_uudecode"
+        | "quoted_printable_decode"
+        | "json_decode" => Taint::ALL,
         _ => return None,
     })
 }
