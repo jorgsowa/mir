@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A tainted `CURLOPT_HTTPHEADER` value in `curl_setopt` or a literal `curl_setopt_array` reports `TaintedHeader`.
 - `new ReflectionClass`, `new ReflectionFunction` and `new ReflectionMethod` report `TaintedCallable`.
 - `print_r`, `var_export` and `highlight_string` without the return flag, and `var_dump`, report `TaintedHtml`.
 - `ldap_bind`, `ldap_add`, `ldap_modify`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace` and `ldap_rename` report `TaintedLdap` for their DN.

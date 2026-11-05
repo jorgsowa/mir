@@ -330,22 +330,23 @@ pub fn option_sink_values<'e>(
     fn_name_lower: &str,
     args: &'e [php_ast::owned::Arg],
 ) -> Vec<(&'e Expr, SinkKind)> {
-    let is_target_option =
-        |e: &Expr| matches!(e.kind.name_bare(), Some("CURLOPT_URL" | "CURLOPT_PROXY"));
+    let option_kind = |e: &Expr| match e.kind.name_bare() {
+        Some("CURLOPT_URL" | "CURLOPT_PROXY") => Some(SinkKind::Ssrf),
+        Some("CURLOPT_HTTPHEADER") => Some(SinkKind::Header),
+        _ => None,
+    };
     match fn_name_lower.trim_start_matches('\\') {
         "curl_setopt" => match (args.get(1).and_then(|a| a.value()), args.get(2)) {
-            (Some(option), Some(value)) if is_target_option(option) => value
-                .value()
+            (Some(option), Some(value)) => option_kind(option)
+                .and_then(|kind| value.value().map(|v| (v, kind)))
                 .into_iter()
-                .map(|v| (v, SinkKind::Ssrf))
                 .collect(),
             _ => Vec::new(),
         },
         "curl_setopt_array" => match args.get(1).and_then(|a| a.value()).map(|v| &v.kind) {
             Some(ExprKind::Array(elements)) => elements
                 .iter()
-                .filter(|el| el.key.as_ref().is_some_and(is_target_option))
-                .map(|el| (el.value(), SinkKind::Ssrf))
+                .filter_map(|el| Some((el.value(), option_kind(el.key.as_ref()?)?)))
                 .collect(),
             _ => Vec::new(),
         },
