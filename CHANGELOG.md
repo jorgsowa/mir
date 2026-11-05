@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fprintf` and `vfprintf` to `STDERR` are no longer reported as HTML output.
 - `unserialize` with `allowed_classes` set to `[]` or a literal class list, or with the options in a local, is no longer reported.
 - `abs`, `round`, `floor` and `ceil` clear taint: their result is a number.
 - A builtin sink named as a callback (`call_user_func('system', $x)`, `array_map('shell_exec', $_GET)`) reports its argument.

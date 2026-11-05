@@ -359,6 +359,15 @@ pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg], ctx: &FlowSta
     }
 }
 
+/// `fprintf(STDERR, ...)` writes to the error stream, not the response.
+pub fn prints_to_stderr(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
+    matches!(fn_name_lower, "fprintf" | "vfprintf")
+        && args
+            .first()
+            .and_then(|a| a.value())
+            .is_some_and(|handle| handle.kind.name_bare() == Some("STDERR"))
+}
+
 /// Return the sink kind for a *method* call on a known OOP database wrapper —
 /// `$pdo->query($sql)`, `$mysqli->prepare($sql)` — the dominant modern PHP
 /// idiom over the procedural `mysqli_query()` style `classify_sink` covers.

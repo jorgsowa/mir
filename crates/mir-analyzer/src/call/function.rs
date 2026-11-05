@@ -525,6 +525,11 @@ impl CallAnalyzer {
         let mut sink_values: Vec<(&php_ast::owned::Expr, SinkKind)> = Vec::new();
         let format_text = crate::taint::format_text_args(&fn_name_lower, &call.args);
         for param in crate::taint::builtin_sinks(&fn_name_lower) {
+            if param.kind == SinkKind::Html
+                && crate::taint::prints_to_stderr(&fn_name_lower, &call.args)
+            {
+                continue;
+            }
             if let (Some(text), SinkKind::Html) = (&format_text, param.kind) {
                 sink_values.extend(text.iter().map(|v| (*v, SinkKind::Html)));
                 continue;
