@@ -1377,7 +1377,7 @@ fn branch_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    if !has_taint_guard(condition) {
+    if !has_taint_guard(condition, crate::taint_guard::GuardScope { ctx, db, file }) {
         return expr_taint(branch, ctx, db, file);
     }
     let mut branch_ctx = ctx.clone();
@@ -1385,18 +1385,18 @@ fn branch_taint(
     expr_taint(branch, &branch_ctx, db, file)
 }
 
-fn has_taint_guard(condition: &Expr) -> bool {
-    if crate::taint_guard::guarded_when(condition, true).is_some()
-        || crate::taint_guard::guarded_when(condition, false).is_some()
+fn has_taint_guard(condition: &Expr, scope: crate::taint_guard::GuardScope<'_>) -> bool {
+    if crate::taint_guard::guarded_when(condition, true, scope).is_some()
+        || crate::taint_guard::guarded_when(condition, false, scope).is_some()
     {
         return true;
     }
     match &condition.kind {
-        ExprKind::Parenthesized(inner) => has_taint_guard(inner),
+        ExprKind::Parenthesized(inner) => has_taint_guard(inner, scope),
         ExprKind::UnaryPrefix(u) if u.op == php_ast::ast::UnaryPrefixOp::BooleanNot => {
-            has_taint_guard(&u.operand)
+            has_taint_guard(&u.operand, scope)
         }
-        ExprKind::Binary(b) => has_taint_guard(&b.left) || has_taint_guard(&b.right),
+        ExprKind::Binary(b) => has_taint_guard(&b.left, scope) || has_taint_guard(&b.right, scope),
         _ => false,
     }
 }

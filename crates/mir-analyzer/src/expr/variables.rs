@@ -2,12 +2,14 @@ use std::sync::Arc;
 
 use super::helpers::extract_simple_var;
 use super::ExpressionAnalyzer;
+use crate::ast_ext::NameResolveExt as _;
+use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::NameKind;
-use php_ast::owned::{Expr, Name};
+use php_ast::owned::{Expr, ExprKind, Name};
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_variable(
@@ -121,43 +123,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr: &Expr,
         ctx: &mut FlowState,
     ) -> Type {
-        let joined = name.as_str();
-        let namespace = self.db.file_namespace(self.file.as_ref());
-        let in_namespace = |n: &str| namespace.as_ref().map(|ns| format!("{ns}\\{n}"));
-        // Only unqualified names fall back to the global constant.
-        let exact = match name.kind {
-            NameKind::FullyQualified => Some(joined.to_string()),
-            NameKind::Relative => Some(in_namespace(joined).unwrap_or_else(|| joined.to_string())),
-            NameKind::Qualified => {
-                Some(crate::ast_ext::resolve_ast_name(name, self.db, &self.file))
-            }
-            _ => None,
-        };
-        let name_str: &str = exact.as_deref().unwrap_or(joined);
-        let ns_qualified = if exact.is_some() {
-            None
-        } else {
-            in_namespace(name_str)
-        };
-
-        let resolve_pull = |fqn: &str| -> Option<mir_types::Type> {
-            let here = crate::db::Fqcn::from_str(self.db, fqn);
-            crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
-        };
-
-        let imported = (name.kind == NameKind::Unqualified)
-            .then(|| crate::ast_ext::imported_constant(self.db, &self.file, name_str))
-            .flatten();
-
-        let resolved = imported
-            .as_deref()
-            .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
-            .or_else(|| {
-                ns_qualified
-                    .as_deref()
-                    .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
-            })
-            .or_else(|| resolve_pull(name_str).map(|ty| (name_str.to_string(), ty)));
+        let GlobalConstantLookup {
+            name_str,
+            ns_qualified,
+            resolved,
+        } = lookup_global_constant(self.db, &self.file, name);
 
         if let Some((fqn, ty)) = resolved {
             self.record_global_constant_ref(&fqn, expr.span);
@@ -167,7 +137,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ty.clone(),
             );
             ty
-        } else if ctx.defined_guards.contains(name_str)
+        } else if ctx.defined_guards.contains(name_str.as_str())
             || ns_qualified
                 .as_deref()
                 .is_some_and(|q| ctx.defined_guards.contains(q))
@@ -184,5 +154,88 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
             Type::mixed()
         }
+    }
+}
+
+struct GlobalConstantLookup {
+    name_str: String,
+    ns_qualified: Option<String>,
+    resolved: Option<(String, Type)>,
+}
+
+fn lookup_global_constant(db: &dyn MirDatabase, file: &str, name: &Name) -> GlobalConstantLookup {
+    let joined = name.as_str();
+    let namespace = db.file_namespace(file);
+    let in_namespace = |n: &str| namespace.as_ref().map(|ns| format!("{ns}\\{n}"));
+    // Only unqualified names fall back to the global constant.
+    let exact = match name.kind {
+        NameKind::FullyQualified => Some(joined.to_string()),
+        NameKind::Relative => Some(in_namespace(joined).unwrap_or_else(|| joined.to_string())),
+        NameKind::Qualified => Some(crate::ast_ext::resolve_ast_name(name, db, file)),
+        _ => None,
+    };
+    let name_str: &str = exact.as_deref().unwrap_or(joined);
+    let ns_qualified = if exact.is_some() {
+        None
+    } else {
+        in_namespace(name_str)
+    };
+
+    let resolve_pull = |fqn: &str| -> Option<mir_types::Type> {
+        let here = crate::db::Fqcn::from_str(db, fqn);
+        crate::db::find_global_constant(db, here).map(|arc_union| (*arc_union).clone())
+    };
+
+    let imported = (name.kind == NameKind::Unqualified)
+        .then(|| crate::ast_ext::imported_constant(db, file, name_str))
+        .flatten();
+
+    let resolved = imported
+        .as_deref()
+        .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
+        .or_else(|| {
+            ns_qualified
+                .as_deref()
+                .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
+        })
+        .or_else(|| resolve_pull(name_str).map(|ty| (name_str.to_string(), ty)));
+
+    GlobalConstantLookup {
+        name_str: name_str.to_string(),
+        ns_qualified,
+        resolved,
+    }
+}
+
+/// The declared value of `NAME`, `self::NAME` or `Foo::NAME`; `static::` can be overridden.
+pub(crate) fn constant_expr_type(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<Type> {
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) => constant_expr_type(inner, ctx, db, file),
+        ExprKind::Name(name) if name.kind != NameKind::Error => {
+            lookup_global_constant(db, file, name)
+                .resolved
+                .map(|(_, ty)| ty)
+        }
+        ExprKind::ClassConstAccess(cca) => {
+            let class = cca.class.kind.resolve_name_ref(db, file)?;
+            let class = match class.as_str() {
+                "self" => ctx.self_fqcn.as_deref()?,
+                "parent" => ctx.parent_fqcn.as_deref()?,
+                "static" => return None,
+                named => named,
+            };
+            let ExprKind::Identifier(member) = &cca.member.kind else {
+                return None;
+            };
+            let here = crate::db::Fqcn::from_str(db, class);
+            let (_, def) = crate::db::find_class_constant_in_chain(db, here, member)?;
+            Some(def.literal_value.unwrap_or(def.ty))
+        }
+        _ => None,
     }
 }

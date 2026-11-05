@@ -25,9 +25,10 @@ mod literals;
 mod strings;
 mod type_fn;
 
+pub(crate) use arrays::extract_haystack_type;
 use arrays::{
     array_access_base_target, extract_array_key_first_or_last_arg,
-    extract_array_key_first_or_last_static_prop_arg, extract_haystack_type,
+    extract_array_key_first_or_last_static_prop_arg,
     haystack_admits_null_loosely, in_array_loose_narrowing_is_safe, narrow_array_count_condition,
     narrow_array_emptiness_condition, narrow_array_key_exists_condition,
     narrow_array_key_first_or_last_null, narrow_container_non_null_non_false,
@@ -145,7 +146,8 @@ pub fn narrow_from_condition(
             std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&var);
         }
     }
-    if let Some((guarded, safe)) = crate::taint_guard::guarded_when(expr, is_true) {
+    let scope = crate::taint_guard::GuardScope { ctx: &*ctx, db, file };
+    if let Some((guarded, safe)) = crate::taint_guard::guarded_when(expr, is_true, scope) {
         ctx.apply_taint_guard(guarded, safe);
     }
     if let Some(var) = crate::taint::proven_object(expr, is_true) {

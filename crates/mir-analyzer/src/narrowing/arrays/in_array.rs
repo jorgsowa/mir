@@ -108,6 +108,9 @@ pub(crate) fn extract_haystack_type(
             haystack_type_from_array_type(&resolve_static_prop_current_type(ctx, &fqcn, &prop, db))
         }
         ExprKind::Parenthesized(inner) => extract_haystack_type(inner, ctx, db, file),
+        ExprKind::ClassConstAccess(_) | ExprKind::Name(_) => {
+            haystack_type_from_array_type(&crate::expr::constant_expr_type(expr, ctx, db, file)?)
+        }
         _ => None,
     }
 }

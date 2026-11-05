@@ -8,6 +8,8 @@ use crate::ast_ext::NameBareExt as _;
 use php_ast::ast::{BinaryOp, CastKind};
 use php_ast::owned::{Arg, Expr, ExprKind};
 
+use crate::db::MirDatabase;
+use crate::flow_state::FlowState;
 use crate::taint::Taint;
 
 /// A set of ASCII characters, plus whether any non-ASCII one may appear.
@@ -392,15 +394,30 @@ pub fn guarded_var(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     guard_of_call(call).map(|(guarded, safe, _)| (guarded, safe))
 }
 
+/// Where a guard's constants and maps get their types.
+#[derive(Clone, Copy)]
+pub struct GuardScope<'a> {
+    pub ctx: &'a FlowState,
+    pub db: &'a dyn MirDatabase,
+    pub file: &'a str,
+}
+
 /// What `cond` proves about a guarded value once it evaluates to `holds`: the bare call, or the
 /// call compared with the result it returns on a match (`preg_match(..) === 1`, `ctype_digit(..) !== false`).
-pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
+pub fn guarded_when<'e>(
+    cond: &'e Expr,
+    holds: bool,
+    scope: GuardScope<'_>,
+) -> Option<(Guarded<'e>, Taint)> {
     let ExprKind::Binary(b) = &cond.kind else {
         return holds
-            .then(|| guarded_var(cond).or_else(|| guarded_by_list(cond)))
+            .then(|| {
+                guarded_var(cond)
+                    .or_else(|| guarded_by_list(cond, scope))
+            })
             .flatten();
     };
-    if let Some(guard) = guarded_by_literal(b, holds) {
+    if let Some(guard) = guarded_by_literal(b, holds, scope) {
         return Some(guard);
     }
     let (call, literal, op) = match (&b.left.kind, &b.right.kind) {
@@ -420,10 +437,22 @@ pub fn guarded_when(cond: &Expr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
 
 /// `$x === 'lit'` proves the value is the program's own literal; `$x == 'lit'` as far as
 /// [`case_safe_kinds`] allows.
-fn guarded_by_literal(b: &php_ast::owned::BinaryExpr, holds: bool) -> Option<(Guarded<'_>, Taint)> {
-    let (subject, literal) = if is_literal(&b.right) {
+fn guarded_by_literal<'e>(
+    b: &'e php_ast::owned::BinaryExpr,
+    holds: bool,
+    scope: GuardScope<'_>,
+) -> Option<(Guarded<'e>, Taint)> {
+    let is_scalar_constant = |e: &Expr| {
+        crate::expr::constant_expr_type(e, scope.ctx, scope.db, scope.file).is_some_and(|ty| {
+            matches!(
+                ty.types.as_slice(),
+                [mir_types::Atomic::TLiteralString(_) | mir_types::Atomic::TLiteralInt(_)]
+            )
+        })
+    };
+    let (subject, literal) = if is_literal(&b.right) || is_scalar_constant(&b.right) {
         (&b.left, &b.right)
-    } else if is_literal(&b.left) {
+    } else if is_literal(&b.left) || is_scalar_constant(&b.left) {
         (&b.right, &b.left)
     } else {
         return None;
@@ -443,7 +472,7 @@ fn guarded_by_literal(b: &php_ast::owned::BinaryExpr, holds: bool) -> Option<(Gu
 }
 
 /// `in_array($x, ['a', 'b'], true)` proves the value is one of the listed literals.
-fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
+fn guarded_by_list<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'e>, Taint)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
@@ -457,17 +486,22 @@ fn guarded_by_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
         fc.args.get(2).and_then(|a| a.value()).map(|v| &v.kind),
         Some(ExprKind::Bool(true))
     );
-    let ExprKind::Array(items) = &fc.args.get(1)?.value()?.kind else {
-        return None;
-    };
+    let haystack = fc.args.get(1)?.value()?;
     let mut comparison_safe = Taint::ALL;
-    for item in items.iter() {
-        if item.is_spread() || item.is_by_ref() || !is_literal(item.value()) {
-            return None;
+    if let ExprKind::Array(items) = &haystack.kind {
+        for item in items.iter() {
+            if item.is_spread() || item.is_by_ref() || !is_literal(item.value()) {
+                return None;
+            }
+            if !strict {
+                comparison_safe = comparison_safe.intersection(case_safe_kinds(item.value())?);
+            }
         }
-        if !strict {
-            comparison_safe = comparison_safe.intersection(case_safe_kinds(item.value())?);
-        }
+    } else if !strict
+        || crate::narrowing::extract_haystack_type(haystack, scope.ctx, scope.db, scope.file)
+            .is_none()
+    {
+        return None;
     }
     let (guarded, safe) = compared_subject(fc.args.first()?.value()?)?;
     Some((guarded, safe.intersection(comparison_safe)))
@@ -583,7 +617,9 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
         "preg_match" => (safe_kinds(pattern_chars(string_arg(&fc.args, 0)?)?), 1),
         "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
         "is_numeric" => (padded_safe_kinds(digits().union(CharSet::of("+-.eE"))), 0),
-        "is_int" | "is_integer" | "is_long" | "is_float" | "is_double" | "is_bool" => (Taint::ALL, 0),
+        "is_int" | "is_integer" | "is_long" | "is_float" | "is_double" | "is_bool" => {
+            (Taint::ALL, 0)
+        }
         _ => return None,
     };
     let value = fc.args.get(subject)?;
@@ -610,7 +646,9 @@ fn validating_filter_safe_kinds(args: &[Arg]) -> Option<Taint> {
     Some(match filter.as_str() {
         "FILTER_VALIDATE_INT" => padded_safe_kinds(digits().union(CharSet::of("+-"))),
         "FILTER_VALIDATE_FLOAT" => padded_safe_kinds(digits().union(CharSet::of("+-.eE"))),
-        "FILTER_VALIDATE_BOOL" | "FILTER_VALIDATE_BOOLEAN" => padded_safe_kinds(letters().union(digits())),
+        "FILTER_VALIDATE_BOOL" | "FILTER_VALIDATE_BOOLEAN" => {
+            padded_safe_kinds(letters().union(digits()))
+        }
         "FILTER_VALIDATE_IP" => safe_kinds(hex_digits().union(CharSet::of(":."))),
         "FILTER_VALIDATE_MAC" => safe_kinds(hex_digits().union(CharSet::of(":-."))),
         _ => return None,

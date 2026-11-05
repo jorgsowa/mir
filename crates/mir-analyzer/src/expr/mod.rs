@@ -32,6 +32,7 @@ mod unary;
 mod variables;
 
 pub(crate) use assignment::root_receiver_var;
+pub(crate) use variables::constant_expr_type;
 pub(crate) use binary::{operand_is_definitely_zero, pipe_as_call};
 pub use helpers::{duplicate_literal_conditions, extract_simple_var};
 
@@ -749,7 +750,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Assignment -------------------------------------------------
             ExprKind::Assign(a) => {
                 let ty = self.analyze_assign(a, expr.span, ctx);
-                crate::narrowing::store_check_assignment(a, ctx);
+                crate::narrowing::store_check_assignment(a, ctx, self.db, &self.file);
                 ty
             }
 

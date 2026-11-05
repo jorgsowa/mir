@@ -711,7 +711,12 @@ pub(super) fn same_literal(a: &php_ast::owned::Expr, b: &php_ast::owned::Expr) -
 }
 
 /// Records `$is = $x instanceof C` (or `is_string($x)`, `null !== $x`) for a later `if ($is)`.
-pub(crate) fn store_check_assignment(a: &php_ast::owned::AssignExpr, ctx: &mut FlowState) {
+pub(crate) fn store_check_assignment(
+    a: &php_ast::owned::AssignExpr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
     if a.by_ref {
         if let ExprKind::Variable(subject) = &peel_parens(&a.value).kind {
             ctx.drop_stored_checks_on(subject);
@@ -724,16 +729,28 @@ pub(crate) fn store_check_assignment(a: &php_ast::owned::AssignExpr, ctx: &mut F
     let (ExprKind::Variable(var), value) = (&a.target.kind, peel_parens(&a.value)) else {
         return;
     };
-    if let Some(subject) = checked_variable(value).or_else(|| taint_guarded_variable(value)) {
+    let scope = crate::taint_guard::GuardScope {
+        ctx: &*ctx,
+        db,
+        file,
+    };
+    if let Some(subject) = checked_variable(value).or_else(|| taint_guarded_variable(value, scope))
+    {
         if subject != var.as_ref() {
             ctx.store_check(var, subject, value);
         }
     }
 }
 
-fn taint_guarded_variable(check: &php_ast::owned::Expr) -> Option<&str> {
+fn taint_guarded_variable<'e>(
+    check: &'e php_ast::owned::Expr,
+    scope: crate::taint_guard::GuardScope<'_>,
+) -> Option<&'e str> {
     use crate::taint_guard::{guarded_when, Guarded};
-    match guarded_when(check, true).or_else(|| guarded_when(check, false))?.0 {
+    match guarded_when(check, true, scope)
+        .or_else(|| guarded_when(check, false, scope))?
+        .0
+    {
         Guarded::Var(var) | Guarded::Element { var, .. } => Some(var),
     }
 }
