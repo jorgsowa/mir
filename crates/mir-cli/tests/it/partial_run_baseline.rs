@@ -120,3 +120,74 @@ fn dot_target_writes_baseline_keys_without_dot_prefix() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+const WORKDIR_KEYS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/a.php">
+    <UndefinedVariable>
+      <code><![CDATA[$missing]]></code>
+    </UndefinedVariable>
+  </file>
+  <file src="src/b.php">
+    <UndefinedVariable>
+      <code><![CDATA[$missing]]></code>
+    </UndefinedVariable>
+  </file>
+</files>
+"#;
+
+#[test]
+fn baseline_above_the_workdir_matches_workdir_relative_keys() {
+    let root = TempDir::new().expect("failed to create temp dir");
+    let proj = root.path().join("proj");
+    std::fs::create_dir_all(proj.join("src")).unwrap();
+    std::fs::write(proj.join("src/a.php"), BAD).unwrap();
+    std::fs::write(proj.join("src/b.php"), BAD).unwrap();
+    let baseline = root.path().join("b.xml");
+    std::fs::write(&baseline, WORKDIR_KEYS).unwrap();
+
+    let out = run(&proj, &["--baseline", "../b.xml", "src"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    run(&proj, &["--baseline", "../b.xml", "--update-baseline", "src"]);
+    let updated = std::fs::read_to_string(&baseline).unwrap();
+    assert_eq!(updated.matches("<code>").count(), 2, "{updated}");
+
+    let out = run(&proj, &["--baseline", "../b.xml", "src"]);
+    assert!(out.status.success(), "{updated}");
+}
+
+#[test]
+fn partial_update_keeps_workdir_relative_keys_of_a_baseline_elsewhere() {
+    let dir = fixture(false);
+    std::fs::create_dir(dir.path().join("build")).unwrap();
+    let baseline = dir.path().join("build/b.xml");
+    std::fs::write(&baseline, WORKDIR_KEYS).unwrap();
+
+    let out = run(
+        dir.path(),
+        &[
+            "--baseline",
+            "build/b.xml",
+            "--report-stale-baseline",
+            "src/a.php",
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    run(
+        dir.path(),
+        &["--baseline", "build/b.xml", "--update-baseline", "src/a.php"],
+    );
+    let updated = std::fs::read_to_string(&baseline).unwrap();
+    assert!(updated.contains(r#"<file src="src/a.php">"#), "{updated}");
+    assert!(updated.contains(r#"<file src="src/b.php">"#), "{updated}");
+}

@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A protected method is callable from an ancestor of the class that declares or overrides it, as PHP allows, instead of being reported as `UndefinedMethod`.
 - `--update-baseline` on a partial run (`mir src/Foo.php`) keeps the baseline entries of files it didn't analyze, and `--report-stale-baseline` no longer reports them as stale.
 - `mir .` writes baseline keys as `src/a.php` instead of `./src/a.php`, so it matches Psalm baselines. Existing `./`-prefixed entries still match.
+- Baseline keys are written relative to the baseline's directory when it contains the file. Keys relative to the working directory still match, and a partial `--update-baseline` keeps them, as with `--baseline ../b.xml` or `--baseline build/b.xml`.
 - `@phpstan-method`, `@phpstan-property`, `@phpstan-property-read`, `@phpstan-property-write`, `@psalm-throws` and `@phpstan-throws` are read. A prefixed `@method`/`@property` tag overrides a plain one for the same name.
 - `object{prop: T, ...}` docblock types keep their properties instead of becoming plain `object`: reading `$o->prop` gives `T`, and a shape argument missing a required property or with an incompatible property type is reported as `InvalidArgument`.
 - A loop that always runs at least once (a `foreach` over a non-empty array, `while (true)`) checks its body against the pre-loop state too, so `$x = null; foreach ($nonEmpty as $v) { if (null === $x) ...` is no longer reported as an impossible comparison.

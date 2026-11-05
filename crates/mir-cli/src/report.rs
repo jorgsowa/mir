@@ -124,7 +124,10 @@ pub fn run_output(
                     let file = file.as_str();
                     let kind = issue.kind.display_name();
                     let snippet = issue.snippet.as_deref().unwrap_or("");
-                    let matched = bl.consume(file, kind, snippet);
+                    // A baseline can also hold keys relative to the directory mir ran in.
+                    let matched = bl
+                        .consume(file, kind, snippet)
+                        .or_else(|| bl.consume(issue.location.file.as_ref(), kind, snippet));
                     if let Some(matched_kind) = matched {
                         if cli.update_baseline {
                             new_baseline
@@ -328,8 +331,12 @@ fn take_unanalyzed_entries(
         .collect();
     let mut taken = Baseline::default();
     baseline.entries.retain(|file, by_kind| {
-        let path = dir.join(file);
-        if !path.exists() || analyzed.contains(&normalize_for_compare(&path)) {
+        let existing: Vec<PathBuf> = [dir.join(file), cwd.join(file)]
+            .iter()
+            .filter(|path| path.exists())
+            .map(|path| normalize_for_compare(path))
+            .collect();
+        if existing.is_empty() || existing.iter().any(|path| analyzed.contains(path)) {
             return true;
         }
         taken.entries.insert(file.clone(), std::mem::take(by_kind));
