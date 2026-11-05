@@ -350,6 +350,20 @@ impl TaintSummary {
         }
     }
 
+    /// Forget what flows from parameter `param`, including through its object guards.
+    pub fn forget_param(&mut self, param: usize) {
+        let guards: Vec<usize> = self
+            .object_guards
+            .iter()
+            .filter(|(_, p)| *p == param)
+            .map(|(slot, _)| *slot)
+            .collect();
+        self.object_guards.retain(|(_, p)| *p != param);
+        for slot in guards.into_iter().chain([param]) {
+            self.drop_label(slot);
+        }
+    }
+
     /// Forget what flows from label slot `slot`.
     fn drop_label(&mut self, slot: usize) {
         self.returns = self.returns.without_label(slot);

@@ -400,3 +400,10 @@ pub(super) fn sanitized_method_kinds(
         && (is_a("Twig\\Environment") || is_a("Twig\\TemplateWrapper") || is_a("Twig\\Template"));
     renders_template.then_some(Taint::ALL)
 }
+
+/// Methods whose first parameter must carry a MAC keyed with the app secret, so
+/// the client can't choose what it decrypts to.
+pub fn authenticates_payload(fqcn: &str, method_lower: &str) -> bool {
+    fqcn.eq_ignore_ascii_case("Illuminate\\Encryption\\Encrypter")
+        && matches!(method_lower, "decrypt" | "decryptstring")
+}

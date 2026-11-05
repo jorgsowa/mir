@@ -1517,6 +1517,9 @@ impl<'a> BodyAnalyzer<'a> {
 
         let mut taint_summary = crate::taint::finish_summary(&mut sa.taint_summary, &ctx);
         taint_summary.prop_labels = prop_labels;
+        if crate::taint::authenticates_payload(fqcn, &method_name.to_ascii_lowercase()) {
+            taint_summary.forget_param(0);
+        }
         drop(sa);
 
         if let Some(type_envs) = type_envs {

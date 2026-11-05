@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Taint: a payload passed to Laravel's `Encrypter::decrypt()` or `decryptString()` no longer reaches `unserialize()` or the result, since the encrypter checks a keyed MAC first.
+
 ## [0.91.0] - 2026-11-05
 
 ### Added
