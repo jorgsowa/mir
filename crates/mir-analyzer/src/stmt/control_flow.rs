@@ -1063,7 +1063,7 @@ impl<'a> StatementsAnalyzer<'a> {
             } else if case
                 .value
                 .as_ref()
-                .is_some_and(|v| matches!(v.kind, ExprKind::Bool(true)) && !true_label_narrows)
+                .is_none_or(|v| matches!(v.kind, ExprKind::Bool(true)) && !true_label_narrows)
             {
                 // This label says nothing about the value, so the next body starts unnarrowed.
                 entered_by_fallthrough = true;
