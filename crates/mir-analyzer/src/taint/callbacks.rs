@@ -486,6 +486,11 @@ pub fn check_callback_sinks(
                         })
                         .collect()
                 })
+                .filter(|sinks: &Vec<ParamSink>| !sinks.is_empty())
+                .or_else(|| {
+                    callable_summary(callback, ea.db, &ea.file)
+                        .map(|builtin| builtin.summary.param_sinks.clone())
+                })
                 .unwrap_or_default()
         }
     };
