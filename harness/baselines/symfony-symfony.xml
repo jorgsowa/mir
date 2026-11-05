@@ -885,9 +885,6 @@
       <code><![CDATA[$address]]></code>
       <code><![CDATA['MATCH']]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->redis = $redis]]></code>
-    </InvalidPropertyAssignment>
     <NullableReturnStatement>
       <code><![CDATA[return $failed;]]></code>
       <code><![CDATA[return $failed;]]></code>

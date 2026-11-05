@@ -284,6 +284,16 @@ pub(super) fn narrow_instanceof_preserving_subtypes(
         }
     }
 
+    // A value that may be a plain `class_name` makes `Other&class_name` redundant.
+    if result.types.contains(&narrowed_ty) {
+        result.types.retain(|a| match a {
+            Atomic::TIntersection { parts } => {
+                !parts.iter().any(|p| p.types.contains(&narrowed_ty))
+            }
+            _ => true,
+        });
+    }
+
     // Unlike the early-return above (truly unconstrained `mixed`/empty `current`),
     // reaching here with an empty `result` means `current` had at least one real
     // atom and NONE of them survived narrowing — every atom was proven
