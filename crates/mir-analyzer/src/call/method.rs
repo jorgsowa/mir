@@ -1625,8 +1625,8 @@ fn resolve_method_return<'a>(
         // OOP database sink check (M19 parity with call/function.rs's
         // procedural classify_sink): $pdo->query($sql) etc.
         if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
-            for arg in call.args.iter() {
-                let Some(value) = arg.value() else { continue };
+            // The statement comes first; later arguments are options and bound parameters.
+            if let Some(value) = call.args.first().and_then(|arg| arg.value()) {
                 let issue = sink_kind.issue();
                 if reaches_sink(
                     value,
@@ -1638,7 +1638,6 @@ fn resolve_method_return<'a>(
                     ea.taint_summary,
                 ) {
                     ea.emit_taint(issue, span, value, sink_kind.taint(), ctx);
-                    break;
                 }
             }
         }

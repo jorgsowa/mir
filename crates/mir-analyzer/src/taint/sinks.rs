@@ -218,6 +218,8 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         | "oci_parse"
         | "db2_exec"
         | "db2_prepare" => sinks![any(Sql)],
+        "mysqli_execute_query" => sinks![at(1, "query", Sql)],
+        "sqlsrv_query" | "sqlsrv_prepare" => sinks![at(1, "sql", Sql)],
 
         "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "expect_popen" => {
             sinks![at(0, "command", Shell)]
@@ -381,7 +383,29 @@ pub fn classify_method_sink(
     let method = crate::util::php_ident_lowercase(method_name);
     if !matches!(
         method.as_str(),
-        "query" | "exec" | "prepare" | "real_query" | "multi_query" | "evaluate" | "xpath"
+        "query"
+            | "exec"
+            | "prepare"
+            | "real_query"
+            | "multi_query"
+            | "evaluate"
+            | "xpath"
+            | "execute_query"
+            | "querysingle"
+            | "executequery"
+            | "executestatement"
+            | "executeupdate"
+            | "fetchone"
+            | "fetchassociative"
+            | "fetchnumeric"
+            | "fetchallassociative"
+            | "fetchallnumeric"
+            | "fetchallkeyvalue"
+            | "fetchallassociativeindexed"
+            | "fetchfirstcolumn"
+            | "iterateassociative"
+            | "iteratenumeric"
+            | "iteratecolumn"
     ) {
         return None;
     }
@@ -395,12 +419,28 @@ pub fn classify_method_sink(
     if is_a("mysqli")
         && matches!(
             method.as_str(),
-            "query" | "prepare" | "real_query" | "multi_query"
+            "query" | "prepare" | "real_query" | "multi_query" | "execute_query"
         )
     {
         return Some(SinkKind::Sql);
     }
-    if is_a("SQLite3") && matches!(method.as_str(), "query" | "exec" | "prepare") {
+    if is_a("mysqli_stmt") && method == "prepare" {
+        return Some(SinkKind::Sql);
+    }
+    if is_a("SQLite3")
+        && matches!(
+            method.as_str(),
+            "query" | "exec" | "prepare" | "querysingle"
+        )
+    {
+        return Some(SinkKind::Sql);
+    }
+    if is_a("Doctrine\\DBAL\\Connection")
+        && !matches!(
+            method.as_str(),
+            "real_query" | "multi_query" | "evaluate" | "xpath" | "execute_query" | "querysingle"
+        )
+    {
         return Some(SinkKind::Sql);
     }
     if is_a("DOMXPath") && matches!(method.as_str(), "query" | "evaluate") {
