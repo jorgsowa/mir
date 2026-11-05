@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `abs`, `round`, `floor` and `ceil` clear taint: their result is a number.
 - A builtin sink named as a callback (`call_user_func('system', $x)`, `array_map('shell_exec', $_GET)`) reports its argument.
 - `FILTER_SANITIZE_ADD_SLASHES` clears SQL taint and `FILTER_SANITIZE_STRING` clears HTML taint.
 - `unset($a['x'])` drops that element's taint from the rest of the array.
