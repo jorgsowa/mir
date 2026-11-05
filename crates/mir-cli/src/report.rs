@@ -387,9 +387,25 @@ fn scoped_level<'a>(issue: &Issue, kind: &str, config: &'a Config) -> Option<&'a
     scopes.peek()?;
     let file = std::path::Path::new(issue.location.file.as_ref());
     let file = crate::path_util::normalize_for_compare(&cwd().join(file));
+    let symbol = issue.kind.referenced_symbol();
     scopes
-        .find(|scope| scope.resolved.iter().any(|p| file.starts_with(p)))
+        .find(|scope| {
+            scope.resolved.iter().any(|p| file.starts_with(p))
+                || symbol.as_deref().is_some_and(|symbol| {
+                    scope.referenced.iter().any(|f| symbol_matches(f, symbol))
+                })
+        })
         .map(|scope| &scope.level)
+}
+
+/// Case-insensitive, with an optional trailing `*`.
+fn symbol_matches(filter: &str, symbol: &str) -> bool {
+    let filter = filter.trim_start_matches('\\').to_ascii_lowercase();
+    let symbol = symbol.trim_start_matches('\\').to_ascii_lowercase();
+    match filter.strip_suffix('*') {
+        Some(prefix) => symbol.starts_with(prefix),
+        None => symbol == filter,
+    }
 }
 
 fn downgraded_by_psalm_level(issue: &Issue, config: &Config) -> bool {

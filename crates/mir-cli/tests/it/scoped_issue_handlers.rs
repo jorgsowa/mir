@@ -49,3 +49,48 @@ fn scoped_suppress_applies_only_inside_its_directory() {
         "issue inside the suppressed directory must be hidden, got:\n{combined}"
     );
 }
+
+#[test]
+fn referenced_filters_match_the_symbol_an_issue_names() {
+    let dir = TempDir::new().expect("failed to create temp dir");
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("src/a.php"),
+        "<?php
+new App\\Hidden();
+new App\\Shown();
+hidden_fn();
+shown_fn();
+(new stdClass())->hiddenMethod();
+",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("mir.xml"),
+        r#"<mir><issueHandlers>
+            <UndefinedClass><errorLevel type="suppress"><referencedClass name="\app\Hid*"/></errorLevel></UndefinedClass>
+            <UndefinedFunction><errorLevel type="suppress"><referencedFunction name="hidden_fn"/></errorLevel></UndefinedFunction>
+            <UndefinedMethod><errorLevel type="suppress"><referencedMethod name="stdClass::hiddenMethod"/></errorLevel></UndefinedMethod>
+        </issueHandlers></mir>"#,
+    )
+    .unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_mir"))
+        .env_clear()
+        .current_dir(root)
+        .args(["--no-cache", "--no-progress", "-c", "mir.xml", "src"])
+        .output()
+        .expect("failed to run mir binary");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    for shown in ["App\\Shown", "shown_fn"] {
+        assert!(combined.contains(shown), "{shown} hidden:\n{combined}");
+    }
+    for hidden in ["App\\Hidden", "hidden_fn", "hiddenMethod"] {
+        assert!(!combined.contains(hidden), "{hidden} shown:\n{combined}");
+    }
+}

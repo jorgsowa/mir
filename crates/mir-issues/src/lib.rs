@@ -1702,6 +1702,44 @@ impl IssueKind {
         }
     }
 
+    /// The symbol Psalm's `<referencedClass>`-style issue-handler filters match.
+    pub fn referenced_symbol(&self) -> Option<String> {
+        use IssueKind::*;
+        Some(match self {
+            UndefinedClass { name }
+            | UndefinedFunction { name }
+            | UndefinedConstant { name }
+            | UndefinedTrait { name }
+            | UnusedFunction { name }
+            | DeprecatedCall { name, .. }
+            | DeprecatedClass { name, .. }
+            | DeprecatedInterface { name, .. }
+            | DeprecatedTrait { name, .. } => name.clone(),
+            UnusedClass { class } => class.clone(),
+            UndefinedMethod { class, method }
+            | PossiblyUndefinedMethod { class, method }
+            | UnusedMethod { class, method }
+            | InternalMethod { class, method }
+            | DeprecatedMethod { class, method, .. }
+            | DeprecatedMethodCall { class, method, .. } => format!("{class}::{method}"),
+            UndefinedProperty { class, property }
+            | InaccessibleProperty { class, property }
+            | UnusedProperty { class, property }
+            | DeprecatedProperty {
+                class, property, ..
+            } => format!("{class}::${property}"),
+            InaccessibleClassConstant { class, constant }
+            | UnusedConstant { class, constant }
+            | DeprecatedConstant {
+                class, constant, ..
+            } => format!("{class}::{constant}"),
+            UndefinedVariable { name }
+            | PossiblyUndefinedVariable { name }
+            | UnusedVariable { name } => format!("${name}"),
+            _ => return None,
+        })
+    }
+
     /// Like [`IssueKind::name`], but for plugin-raised issues returns the
     /// plugin's own issue name. Use this for suppression / issue-handler
     /// matching so `@mir-suppress MyPluginIssue` works.

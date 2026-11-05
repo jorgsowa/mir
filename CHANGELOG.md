@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `<issueHandlers>` accepts Psalm's path-scoped `<errorLevel type="..."><directory/><file/></errorLevel>` blocks.
+- Scoped `<errorLevel>` blocks accept `<referencedClass>`, `<referencedFunction>`, `<referencedMethod>`, `<referencedProperty>`, `<referencedConstant>` and `<referencedVariable>` filters.
 - Release builds include an `x86_64-apple-darwin` binary again.
 
 ### Changed

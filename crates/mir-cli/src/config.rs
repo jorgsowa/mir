@@ -43,10 +43,11 @@ pub struct PsalmPluginEntry {
 pub struct ScopedIssueHandler {
     pub kind: String,
     pub level: ErrorLevel,
-    /// `<directory name>` / `<file name>` entries as written; filters such as
-    /// `<referencedClass>` are not supported and never match.
+    /// `<directory name>` / `<file name>` entries as written.
     pub dirs: Vec<String>,
     pub files: Vec<String>,
+    /// `<referencedClass name>`, `<referencedMethod name>` and similar entries.
+    pub referenced: Vec<String>,
     /// `dirs` and `files` resolved against the config directory.
     pub resolved: Vec<std::path::PathBuf>,
 }
@@ -218,6 +219,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                                 level,
                                 dirs: Vec::new(),
                                 files: Vec::new(),
+                                referenced: Vec::new(),
                                 resolved: Vec::new(),
                             });
                             config.scoped_issue_handlers.len() - 1
@@ -391,7 +393,7 @@ fn is_issue_handler_entry(path: &[String]) -> bool {
     path.len() >= 2 && path[path.len() - 2] == "issueHandlers"
 }
 
-/// Handle `<directory name>` / `<file name>` inside a scoped `<errorLevel>`.
+/// Handle `<directory name>`, `<file name>` and `<referenced* name>` inside a scoped `<errorLevel>`.
 fn collect_scoped_path(
     e: &quick_xml::events::BytesStart<'_>,
     path: &[String],
@@ -409,6 +411,7 @@ fn collect_scoped_path(
     match bytes_to_string(e.name().as_ref()).as_str() {
         "directory" => scope.dirs.push(name),
         "file" => scope.files.push(name),
+        element if element.starts_with("referenced") => scope.referenced.push(name),
         _ => {}
     }
 }
@@ -726,6 +729,7 @@ mod tests {
         assert_eq!(scope.level, ErrorLevel::Suppress);
         assert_eq!(scope.dirs, ["tests"]);
         assert_eq!(scope.files, ["src/Legacy.php"]);
+        assert_eq!(scope.referenced, ["App\\\\Foo::bar"]);
         assert_eq!(cfg.project_dirs, ["src"]);
     }
 
