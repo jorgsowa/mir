@@ -644,19 +644,9 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
     let name = fc.name.kind.name_bare()?;
     let lower = crate::util::php_ident_lowercase(name);
     let (safe, subject) = match lower.as_str() {
-        "ctype_digit" => (safe_kinds(digits()), 0),
-        "ctype_xdigit" => (safe_kinds(hex_digits()), 0),
-        "ctype_alpha" => (safe_kinds(letters()), 0),
-        "ctype_alnum" => (safe_kinds(letters().union(digits())), 0),
-        "ctype_lower" => (safe_kinds(CharSet::range('a', 'z')), 0),
-        "ctype_upper" => (safe_kinds(CharSet::range('A', 'Z')), 0),
         "preg_match" => (safe_kinds(pattern_chars(string_arg(&fc.args, 0)?)?), 1),
         "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
-        "is_numeric" => (padded_safe_kinds(digits().union(CharSet::of("+-.eE"))), 0),
-        "is_int" | "is_integer" | "is_long" | "is_float" | "is_double" | "is_bool" => {
-            (Taint::ALL, 0)
-        }
-        _ => return None,
+        _ => (value_check_safe_kinds(&lower)?, 0),
     };
     let value = fc.args.get(subject)?;
     if value.name.is_some() || value.unpack() {
@@ -664,6 +654,21 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
     }
     let guarded = guarded_subject(value.value()?)?;
     (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+}
+
+/// Kinds a value is safe for once the one-argument check `name_lower` accepted it.
+pub fn value_check_safe_kinds(name_lower: &str) -> Option<Taint> {
+    Some(match name_lower {
+        "ctype_digit" => safe_kinds(digits()),
+        "ctype_xdigit" => safe_kinds(hex_digits()),
+        "ctype_alpha" => safe_kinds(letters()),
+        "ctype_alnum" => safe_kinds(letters().union(digits())),
+        "ctype_lower" => safe_kinds(CharSet::range('a', 'z')),
+        "ctype_upper" => safe_kinds(CharSet::range('A', 'Z')),
+        "is_numeric" => padded_safe_kinds(digits().union(CharSet::of("+-.eE"))),
+        "is_int" | "is_integer" | "is_long" | "is_float" | "is_double" | "is_bool" => Taint::ALL,
+        _ => return None,
+    })
 }
 
 /// Kinds a value made of `chars`, possibly padded with whitespace, is safe for: only a line break
@@ -706,12 +711,7 @@ pub fn guarded_captures<'e>(
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
-    if !fc
-        .name
-        .kind
-        .name_bare()?
-        .eq_ignore_ascii_case("preg_match")
-    {
+    if !fc.name.kind.name_bare()?.eq_ignore_ascii_case("preg_match") {
         return None;
     }
     match &fc.args.get(2)?.value()?.kind {

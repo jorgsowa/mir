@@ -434,7 +434,19 @@ pub(super) fn callback_builtin_taint(
     };
     Some(match fn_name_lower {
         "array_map" => called(),
-        "array_filter" => arg_taint(0),
+        // Only elements the named check accepted are kept.
+        "array_filter" => {
+            let kept_safe = callback
+                .and_then(|cb| match &unwrap_parens(cb).kind {
+                    ExprKind::String(name) => crate::taint_guard::value_check_safe_kinds(
+                        &crate::util::php_ident_lowercase(name.as_str()),
+                    ),
+                    _ => None,
+                })
+                .filter(|_| args.len() == 2)
+                .unwrap_or(Taint::NONE);
+            arg_taint(0).without(kept_safe)
+        }
         "array_reduce" => arg_taint(2) | called(),
         "preg_replace_callback" => arg_taint(2) | called(),
         // A callback that isn't a literal name or closure is data the call result may carry.
