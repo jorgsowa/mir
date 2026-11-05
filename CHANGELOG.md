@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Symfony's `getClientIp`, `getClientIps` and Laravel's `ip`, `ips` aren't taint sources: they return addresses validated with `FILTER_VALIDATE_IP`.
 - `filter_var_array` and `filter_input_array` apply their definition per key, and `FILTER_CALLBACK` with a named escaper clears what that escaper does.
 - A method callback (`[$o, 'out']`, `[$this, 'out']`, `[A::class, 'out']`, `'A::out'`) and a function or method with a `@taint-sink` parameter report the data a callback builtin hands them.
 - Inside a `PHP_SAPI === 'cli'` or `in_array(PHP_SAPI, ['cli', 'phpdbg'], true)` check, `$_SERVER` entries aren't taint sources: they come from the process environment. This clears Symfony's httpoxy guard.
