@@ -749,7 +749,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Assignment -------------------------------------------------
             ExprKind::Assign(a) => {
                 let ty = self.analyze_assign(a, expr.span, ctx);
-                crate::narrowing::store_instanceof_assignment(a, ctx);
+                crate::narrowing::store_check_assignment(a, ctx);
                 ty
             }
 

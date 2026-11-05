@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A method returning a class template on a receiver with no type arguments (`Iterator::current()`) gives `mixed` instead of the raw template.
 - `pg_fetch_result()`, `pg_field_is_null()` and `pg_field_prtlen()` accept the two-argument form and a `null` row.
 - An `instanceof` result stored in a variable (`$is = $x instanceof C; if ($is)`) narrows `$x` until either variable changes.
+- A variable holding `is_*($x)` or `null === $x` narrows `$x` when tested, as one holding `$x instanceof C` does.
 - A conditional `@param-out` type resolves against the call's arguments instead of staying a raw conditional that nests on every loop pass.
 - A method returning `static` or `$this`, also nested as in `list<static>`, called on an `A&B` receiver returns `A&B` instead of only the part that declares the method.
 - `($c is class-string ? A : B)` resolves for a `Foo::class` argument and for a non-string argument.

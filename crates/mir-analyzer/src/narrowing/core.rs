@@ -3,6 +3,7 @@
 //! multiple narrowing arms.
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::FunctionRefExt as _;
+use crate::ast_ext::NameBareExt as _;
 use crate::ast_ext::NameResolveExt as _;
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
@@ -709,11 +710,11 @@ pub(super) fn same_literal(a: &php_ast::owned::Expr, b: &php_ast::owned::Expr) -
     }
 }
 
-/// Records `$is = $x instanceof C` for a later `if ($is)`.
-pub(crate) fn store_instanceof_assignment(a: &php_ast::owned::AssignExpr, ctx: &mut FlowState) {
+/// Records `$is = $x instanceof C` (or `is_string($x)`, `null !== $x`) for a later `if ($is)`.
+pub(crate) fn store_check_assignment(a: &php_ast::owned::AssignExpr, ctx: &mut FlowState) {
     if a.by_ref {
         if let ExprKind::Variable(subject) = &peel_parens(&a.value).kind {
-            ctx.drop_stored_instanceofs_on(subject);
+            ctx.drop_stored_checks_on(subject);
         }
         return;
     }
@@ -723,14 +724,33 @@ pub(crate) fn store_instanceof_assignment(a: &php_ast::owned::AssignExpr, ctx: &
     let (ExprKind::Variable(var), value) = (&a.target.kind, peel_parens(&a.value)) else {
         return;
     };
-    if let ExprKind::Binary(b) = &value.kind {
-        if let (BinaryOp::Instanceof, ExprKind::Variable(subject)) =
-            (b.op, &peel_parens(&b.left).kind)
-        {
-            if subject != var {
-                ctx.store_instanceof(var, subject, value);
+    if let Some(subject) = checked_variable(value) {
+        if subject != var.as_ref() {
+            ctx.store_check(var, subject, value);
+        }
+    }
+}
+
+fn checked_variable(check: &php_ast::owned::Expr) -> Option<&str> {
+    match &check.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+            extract_var_name(peel_parens(&b.left))
+        }
+        ExprKind::Binary(b) if matches!(b.op, BinaryOp::Identical | BinaryOp::NotIdentical) => {
+            match (&peel_parens(&b.left).kind, &peel_parens(&b.right).kind) {
+                (ExprKind::Null, _) => extract_var_name(peel_parens(&b.right)),
+                (_, ExprKind::Null) => extract_var_name(peel_parens(&b.left)),
+                _ => None,
             }
         }
+        ExprKind::FunctionCall(call) if call.args.len() == 1 => {
+            let bare = call.name.kind.name_bare()?;
+            if !bare.get(..3)?.eq_ignore_ascii_case("is_") {
+                return None;
+            }
+            extract_var_name(peel_parens(call.args[0].value()?))
+        }
+        _ => None,
     }
 }
 
