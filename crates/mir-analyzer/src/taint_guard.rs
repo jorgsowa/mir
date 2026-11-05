@@ -410,13 +410,12 @@ pub fn guarded_when<'e>(
     scope: GuardScope<'_>,
 ) -> Option<(Guarded<'e>, Taint)> {
     let ExprKind::Binary(b) = &cond.kind else {
-        return holds
-            .then(|| {
-                guarded_var(cond)
-                    .or_else(|| guarded_by_list(cond, scope))
-                    .or_else(|| guarded_by_map_key(cond, scope))
-            })
-            .flatten();
+        if !holds {
+            return guarded_by_failed_match(cond);
+        }
+        return guarded_var(cond)
+            .or_else(|| guarded_by_list(cond, scope))
+            .or_else(|| guarded_by_map_key(cond, scope));
     };
     if let Some(guard) = guarded_by_literal(b, holds, scope) {
         return Some(guard);
@@ -434,6 +433,22 @@ pub fn guarded_when<'e>(
         _ => return None,
     };
     (holds == matched_when).then_some((guarded, safe))
+}
+
+/// A failed `preg_match('/[<>]/', $x)` proves none of the class's characters occur in `$x`.
+fn guarded_by_failed_match(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
+    let ExprKind::FunctionCall(fc) = &call.kind else {
+        return None;
+    };
+    if !fc.name.kind.name_bare()?.eq_ignore_ascii_case("preg_match") {
+        return None;
+    }
+    let value = fc.args.get(1)?;
+    if value.name.is_some() || value.unpack() {
+        return None;
+    }
+    let safe = safe_kinds(survivors(string_arg(&fc.args, 0)?)?);
+    (!safe.is_empty()).then_some((guarded_subject(value.value()?)?, safe))
 }
 
 /// `$x === 'lit'` proves the value is the program's own literal; `$x == 'lit'` as far as
