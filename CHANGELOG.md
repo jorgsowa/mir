@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Writing a clean value to a superglobal element (`$_POST['n'] = (int) $_POST['n']`) clears that element's taint.
 - A value replaced on the failing path of a guard (`if (!ctype_digit($x)) { $x = '0'; } echo $x;`), or on every path of a branch, is no longer tainted after the merge.
 - `__benevolent<T>`, `closed-resource` and `properties-of<T>` (and its `public-`, `protected-`, `private-` forms) are docblock types instead of class names.
 - `@taint-source <kind>` taints the return value with that kind only, so `@psalm-taint-source shell` no longer reports at HTML sinks. A bare tag and `input` still mean every kind.

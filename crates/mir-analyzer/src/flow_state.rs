@@ -1611,11 +1611,12 @@ impl FlowState {
     /// dynamic key. `replace` overwrites the key's old taint.
     pub fn write_key_taint(&mut self, name: &str, key: Option<Name>, taint: Taint, replace: bool) {
         let sym = Name::from(name.trim_start_matches('$'));
-        let whole = self.tainted_vars.get(&sym).copied().unwrap_or_default();
         let Some(key) = key else {
             self.add_var_taint(name, taint);
             return;
         };
+        self.seed_superglobal_keys(name);
+        let whole = self.tainted_vars.get(&sym).copied().unwrap_or_default();
         if !self.tainted_keys.contains_key(&sym) && whole.is_empty() && taint.is_empty() {
             return;
         }
@@ -1725,11 +1726,11 @@ impl FlowState {
         }
     }
 
-    /// `$name[key]` passed a validation guard that makes it safe for `safe`.
-    pub fn guard_element_taint(&mut self, name: &str, key: Name, safe: Taint) {
-        let name = name.trim_start_matches('$');
-        // A superglobal read is tainted until a key says otherwise.
-        if crate::taint::is_superglobal(name) && self.key_taints(name).is_none() {
+    /// A superglobal read is tainted until a key says otherwise.
+    fn seed_superglobal_keys(&mut self, name: &str) {
+        if crate::taint::is_superglobal(name.trim_start_matches('$'))
+            && self.key_taints(name).is_none()
+        {
             self.set_key_taints(
                 name,
                 KeyTaint {
@@ -1738,6 +1739,11 @@ impl FlowState {
                 },
             );
         }
+    }
+
+    /// `$name[key]` passed a validation guard that makes it safe for `safe`.
+    pub fn guard_element_taint(&mut self, name: &str, key: Name, safe: Taint) {
+        self.seed_superglobal_keys(name);
         let remaining = self.key_taint(name, key).without(safe);
         self.write_key_taint(name, Some(key), remaining, true);
     }
