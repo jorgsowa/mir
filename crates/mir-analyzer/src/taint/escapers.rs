@@ -97,6 +97,9 @@ pub(super) fn filter_call_taint(
         "FILTER_SANITIZE_SPECIAL_CHARS" | "FILTER_SANITIZE_FULL_SPECIAL_CHARS" => {
             input.without(Taint::HTML)
         }
+        // Strips tags and encodes quotes.
+        "FILTER_SANITIZE_STRING" | "FILTER_SANITIZE_STRIPPED" => input.without(Taint::HTML),
+        "FILTER_SANITIZE_ADD_SLASHES" => input.without(sanitized_kinds("addslashes")?),
         "FILTER_SANITIZE_ENCODED" => input.without(sanitized_kinds("urlencode")?),
         _ => input,
     })
