@@ -150,6 +150,10 @@ pub fn narrow_from_condition(
     if let Some((guarded, safe)) = crate::taint_guard::guarded_when(expr, is_true, scope) {
         ctx.apply_taint_guard(guarded, safe);
     }
+    let scope = crate::taint_guard::GuardScope { ctx: &*ctx, db, file };
+    if let Some((captures, safe)) = crate::taint_guard::guarded_captures(expr, is_true, scope) {
+        ctx.apply_taint_guard(captures, safe);
+    }
     if let Some(var) = crate::taint::proven_object(expr, is_true) {
         crate::taint::guard_object(ctx, var);
     }

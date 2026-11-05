@@ -691,6 +691,35 @@ fn validating_filter_safe_kinds(args: &[Arg]) -> Option<Taint> {
     })
 }
 
+/// A passing `preg_match($pattern, $x, $m)` bounds `$m` as it bounds `$x`: captures are substrings.
+pub fn guarded_captures<'e>(
+    cond: &'e Expr,
+    holds: bool,
+    scope: GuardScope<'_>,
+) -> Option<(Guarded<'e>, Taint)> {
+    let (_, safe) = guarded_when(cond, holds, scope)?;
+    let call = match &cond.kind {
+        ExprKind::Binary(b) if matches!(b.left.kind, ExprKind::FunctionCall(_)) => &b.left,
+        ExprKind::Binary(b) => &b.right,
+        _ => cond,
+    };
+    let ExprKind::FunctionCall(fc) = &call.kind else {
+        return None;
+    };
+    if !fc
+        .name
+        .kind
+        .name_bare()?
+        .eq_ignore_ascii_case("preg_match")
+    {
+        return None;
+    }
+    match &fc.args.get(2)?.value()?.kind {
+        ExprKind::Variable(var) => Some((Guarded::Var(var), safe)),
+        _ => None,
+    }
+}
+
 /// `$x`, `$a['k']`, or either under `?? default`: when the left side is unset there is nothing to taint.
 fn guarded_subject(expr: &Expr) -> Option<Guarded<'_>> {
     match &expr.kind {

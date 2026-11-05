@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A passing anchored `preg_match($pattern, $x, $m)` clears `$m` for the kinds it clears `$x`.
 - A project's own global `request()` or `e()` is analyzed by its body instead of being treated as Laravel's helper.
 - An arm condition of `match (true)` guards that arm's body: `match (true) { ctype_digit($x) => $x }`.
 - `fprintf` and `vfprintf` to `STDERR` are no longer reported as HTML output.
