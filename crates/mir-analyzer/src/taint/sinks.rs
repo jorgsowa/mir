@@ -262,7 +262,9 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         }
         "ldap_delete" | "ldap_compare" => sinks![at(1, "dn", Ldap)],
 
-        "unserialize" => sinks![at(0, "data", Unserialize)],
+        "unserialize" | "igbinary_unserialize" | "yaml_parse" | "session_decode" => {
+            sinks![at(0, "data", Unserialize)]
+        }
 
         "call_user_func"
         | "call_user_func_array"
