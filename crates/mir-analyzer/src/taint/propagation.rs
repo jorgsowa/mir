@@ -16,6 +16,14 @@ pub(super) fn named_kinds(names: &[std::sync::Arc<str>]) -> Taint {
     })
 }
 
+/// What an `@taint-source` callee returns.
+fn source_kinds(annotations: Option<&mir_codebase::TaintAnnotations>) -> Taint {
+    match annotations {
+        Some(a) if !a.source.is_empty() => named_kinds(&a.source),
+        _ => Taint::ALL,
+    }
+}
+
 /// A return type whose values can't carry a payload into a sink.
 pub(super) fn return_drops_taint(ty: &mir_types::Type) -> bool {
     use mir_types::Atomic;
@@ -823,8 +831,8 @@ pub fn expr_taint(
                     .as_ref()
                     .map_or(name.global.unwrap_or(&name.qualified), |(n, _)| n);
                 let func = found.as_ref().map(|(_, f)| f);
-                if func.as_ref().is_some_and(|f| f.is_taint_source) {
-                    return Taint::ALL;
+                if let Some(f) = func.as_ref().filter(|f| f.is_taint_source) {
+                    return source_kinds(f.taint.as_deref());
                 }
                 if let Some(f) = func.as_ref().filter(|f| is_user_code(f.location.as_ref())) {
                     return user_call_taint(
@@ -1141,7 +1149,7 @@ pub(super) fn method_call_taint(
 ) -> Option<Taint> {
     let (owner, m) = crate::db::find_method_respecting_precedence(db, class, method_lower)?;
     if m.is_taint_source {
-        return Some(Taint::ALL);
+        return Some(source_kinds(m.taint.as_deref()));
     }
     if !is_user_code(m.location.as_ref()) && m.taint.is_none() {
         return None;

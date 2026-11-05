@@ -653,7 +653,14 @@ impl DocblockParser {
                         }
                     }
                 }
-                "taint-source" | "psalm-taint-source" => result.is_taint_source = true,
+                "taint-source" | "psalm-taint-source" => {
+                    result.is_taint_source = true;
+                    if let Some(kind) = body_text(tag.body.as_ref())
+                        .and_then(|b| b.split_whitespace().next().map(str::to_string))
+                    {
+                        result.taint_source.push(kind);
+                    }
+                }
                 "taint-escape"
                 | "psalm-taint-escape"
                 | "taint-unescape"
@@ -991,6 +998,8 @@ pub struct ParsedDocblock {
     pub taint_sinks: Vec<(String, String)>,
     /// `@taint-source` — this function/method's return value is tainted.
     pub is_taint_source: bool,
+    /// Kinds named by `@taint-source <kind>`.
+    pub taint_source: Vec<String>,
     /// `@taint-escape <kind>` — kinds the return value no longer carries.
     pub taint_escape: Vec<String>,
     /// `@taint-unescape <kind>` — kinds the return value regains.
@@ -1014,7 +1023,8 @@ pub struct ParsedDocblock {
 
 impl ParsedDocblock {
     pub fn taint_annotations(&self) -> Option<std::sync::Arc<mir_codebase::TaintAnnotations>> {
-        if self.taint_escape.is_empty()
+        if self.taint_source.is_empty()
+            && self.taint_escape.is_empty()
             && self.taint_unescape.is_empty()
             && self.taint_flow_params.is_empty()
         {
@@ -1022,6 +1032,7 @@ impl ParsedDocblock {
         }
         let arcs = |v: &[String]| v.iter().map(|s| std::sync::Arc::from(s.as_str())).collect();
         Some(std::sync::Arc::new(mir_codebase::TaintAnnotations {
+            source: arcs(&self.taint_source),
             escape: arcs(&self.taint_escape),
             unescape: arcs(&self.taint_unescape),
             flow_params: arcs(&self.taint_flow_params),

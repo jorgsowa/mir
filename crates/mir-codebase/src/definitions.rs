@@ -480,9 +480,11 @@ pub struct TagDescriptions {
     pub throws: Vec<(Arc<str>, Arc<str>)>,
 }
 
-/// `@taint-escape`, `@taint-unescape` and `@psalm-flow` on a function or method.
+/// `@taint-source`, `@taint-escape`, `@taint-unescape` and `@psalm-flow` on a function or method.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaintAnnotations {
+    /// Kinds of an `@taint-source`; none means every kind.
+    pub source: Vec<Arc<str>>,
     /// Sink kinds the return value no longer carries.
     pub escape: Vec<Arc<str>>,
     /// Sink kinds the return value regains from tainted arguments.
