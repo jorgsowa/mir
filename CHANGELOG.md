@@ -7,142 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.91.0] - 2026-11-05
+
 ### Added
 
-- `<issueHandlers>` accepts Psalm's path-scoped `<errorLevel type="..."><directory/><file/></errorLevel>` blocks.
-- Scoped `<errorLevel>` blocks accept `<referencedClass>`, `<referencedFunction>`, `<referencedMethod>`, `<referencedProperty>`, `<referencedConstant>` and `<referencedVariable>` filters.
+- `<issueHandlers>` accepts Psalm's path-scoped `<errorLevel type="..."><directory/><file/></errorLevel>` blocks, with `<referencedClass>`, `<referencedFunction>`, `<referencedMethod>`, `<referencedProperty>`, `<referencedConstant>` and `<referencedVariable>` filters.
 - Release builds include an `x86_64-apple-darwin` binary again.
+- Taint sinks. `TaintedHtml`: `print_r`, `var_export` and `highlight_string` without the return flag, `var_dump`. `TaintedSql`: `mysqli_execute_query`, `mysqli::execute_query`, `SQLite3::querySingle`, `mysqli_stmt::prepare`, `sqlsrv_query`, `sqlsrv_prepare` and Doctrine DBAL `Connection` query methods (only the first argument of a method sink counts, so bound parameters aren't reported). `TaintedSsrf`: `ftp_connect`, `ftp_ssl_connect`, `ssh2_connect`, `ldap_connect`, `socket_connect`. `TaintedLdap`, for the DN: `ldap_bind`, `ldap_add`, `ldap_modify`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace`, `ldap_rename`. `TaintedFile`: `chgrp`, `finfo_file`, `exif_read_data`, `exif_thumbnail`, `imagecreatefrom*`. `TaintedUnserialize`: `igbinary_unserialize`, `yaml_parse`, `session_decode`. `TaintedHeader`: `CURLOPT_HTTPHEADER` in `curl_setopt` or a literal `curl_setopt_array`. `mb_send_mail` headers and additional parameters are sinks, as for `mail`.
+- Taint sources: Laravel's `$request->name` and `$request['name']`, like `$request->input('name')`; `$_SERVER['REMOTE_HOST']`, `$_SERVER['REDIRECT_HTTP_*']` and `getenv('HTTP_*')`.
+- Docblocks: `__benevolent<T>`, `closed-resource` and `properties-of<T>` (and its `public-`, `protected-`, `private-` forms) are types instead of class names; `@phpstan-method`, `@phpstan-property`, `@phpstan-property-read`, `@phpstan-property-write`, `@psalm-throws` and `@phpstan-throws` are read, and a prefixed `@method`/`@property` tag overrides a plain one for the same name.
 
 ### Changed
 
 - **Breaking:** `--set-baseline` without a file name writes `mir-baseline.xml` and deletes `psalm-baseline.xml` in the current directory. Auto-discovery and `--update-baseline` prefer `mir-baseline.xml` and fall back to `psalm-baseline.xml`.
 - **Breaking:** tainted file paths, `include`/`require` paths, `eval()` code and `unserialize()` payloads report `TaintedFile` (MIR0811), `TaintedInclude` (MIR0812), `TaintedEval` (MIR0813) and `TaintedUnserialize` (MIR0814) instead of `TaintedInput`, so Psalm-named suppressions match them. So do `@taint-sink file|include|eval|unserialize` parameters. Baseline entries recorded as `TaintedInput` still match. An `<issueHandlers>` entry for `TaintedInput` doesn't cover them: add the new names.
+- **Breaking:** `mir_analyzer::cache::AnalysisCache::matches_content` is removed, and `mir_codebase::TaintAnnotations` has a new public field, `source`.
 - `ImpossibleIdenticalComparison` and `ImpossibleLooseComparison` follow Psalm's level for `TypeDoesNotContainType` (4), so `errorLevel` 5 and above report them as info.
+- Workspace and internal crate versions were updated to `0.91.0`.
 
 ### Fixed
 
-- `--update-baseline` without a usable baseline, such as a mistyped `--baseline` or `--ignore-baseline`, exits with code 2 instead of writing an empty `mir-baseline.xml` that shadowed `psalm-baseline.xml`.
-- A failed `--set-baseline` or `--update-baseline` write exits with code 2 instead of reporting success.
-- `mir --set-baseline src/a.php` and `mir --set-baseline src` stop with exit code 2 instead of taking the path as the baseline file, which overwrote the PHP source.
 - Output and the exit code use the severity from `<issueHandlers>`, scoped `<errorLevel>` blocks and `errorLevel`: a handler that lowers an error to a warning no longer fails the run, and one that raises a warning to an error does.
-- `filter_var`, `filter_input` and their `_array` forms read named arguments by name, so `filter_var(filter: FILTER_DEFAULT, value: $x)` keeps the taint of `$x`.
-- An empty `default:` falling into a `case` lets any value into that body, so the label no longer clears its taint or narrows its type.
-- `case true:` no longer narrows a subject that may hold other types to `true`, which hid its taint: any truthy value enters that arm.
-- Laravel's `$request->name` and `$request['name']` are taint sources, like `$request->input('name')`.
-- Symfony's `getClientIp`, `getClientIps` and Laravel's `ip`, `ips` aren't taint sources: they return addresses validated with `FILTER_VALIDATE_IP`.
-- `filter_var_array` and `filter_input_array` apply their definition per key, and `FILTER_CALLBACK` with a named escaper clears what that escaper does.
-- A method callback (`[$o, 'out']`, `[$this, 'out']`, `[A::class, 'out']`, `'A::out'`) and a function or method with a `@taint-sink` parameter report the data a callback builtin hands them.
-- Inside a `PHP_SAPI === 'cli'` or `in_array(PHP_SAPI, ['cli', 'phpdbg'], true)` check, `$_SERVER` entries aren't taint sources: they come from the process environment. This clears Symfony's httpoxy guard.
-- `HTMLPurifier::purify` clears HTML taint, and Symfony's `getDigits`, `getAlnum` and `getAlpha` bag getters clear what they filter out.
-- A user function or method that sanitizes a by-ref argument (`function s(string &$x) { $x = htmlspecialchars($x); }`) clears it at the call.
-- A failed `preg_match('/[<>"\']/', $x)` clears `$x` for the kinds those characters are needed for, which is how WordPress's `_wp_specialchars` returns its input. A `/u` pattern doesn't count: invalid UTF-8 makes it return `false`.
-- A tainted `CURLOPT_HTTPHEADER` value in `curl_setopt` or a literal `curl_setopt_array` reports `TaintedHeader`.
-- `print_r`, `var_export` and `highlight_string` without the return flag, and `var_dump`, report `TaintedHtml`.
-- `ldap_bind`, `ldap_add`, `ldap_modify`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace` and `ldap_rename` report `TaintedLdap` for their DN.
-- `ftp_connect`, `ftp_ssl_connect`, `ssh2_connect`, `ldap_connect` and `socket_connect` report `TaintedSsrf`.
-- `chgrp`, `finfo_file`, `exif_read_data`, `exif_thumbnail` and `imagecreatefrom*` report `TaintedFile`.
-- `igbinary_unserialize`, `yaml_parse` and `session_decode` report `TaintedUnserialize`.
-- `mb_send_mail` headers and additional parameters are sinks, as for `mail`.
-- `mysqli_execute_query`, `mysqli::execute_query`, `SQLite3::querySingle`, `mysqli_stmt::prepare`, `sqlsrv_query`, `sqlsrv_prepare` and Doctrine DBAL `Connection` query methods are SQL sinks. Only the first argument of a method sink counts, so bound parameters aren't reported.
-- `$_SERVER['REMOTE_HOST']`, `$_SERVER['REDIRECT_HTTP_*']` and `getenv('HTTP_*')` are taint sources.
-- `base64_decode`, `hex2bin`, `urldecode`, `json_decode` and similar decoders restore every kind on a tainted value, so `base64_decode(base64_encode($x))` and `urldecode(basename($x))` stay tainted.
-- `md5($x, true)` and other raw digests, the `uniqid` prefix and `number_format` separators keep the taint of the argument they copy into the result.
-- A URL whose scheme and host come from a literal local, a constant or a `sprintf` format no longer reports `TaintedSsrf` or `TaintedFile` for what is appended.
-- `array_filter($a, 'is_numeric')` and other named value checks clear the kept elements.
-- A passing anchored `preg_match($pattern, $x, $m)` clears `$m` for the kinds it clears `$x`.
-- A project's own global `request()` or `e()` is analyzed by its body instead of being treated as Laravel's helper.
-- An arm condition of `match (true)` guards that arm's body: `match (true) { ctype_digit($x) => $x }`.
-- `fprintf` and `vfprintf` to `STDERR` are no longer reported as HTML output.
-- `unserialize` with `allowed_classes` set to `[]` or a literal class list, or with the options in a local, is no longer reported.
-- `abs`, `round`, `floor` and `ceil` clear taint: their result is a number.
-- A builtin sink named as a callback (`call_user_func('system', $x)`, `array_map('shell_exec', $_GET)`) reports its argument.
-- `FILTER_SANITIZE_ADD_SLASHES` clears SQL taint and `FILTER_SANITIZE_STRING` clears HTML taint.
-- `unset($a['x'])` drops that element's taint from the rest of the array.
-- `isset($map[$x])` and `array_key_exists($x, $map)` clear `$x` when the map's keys are all literal.
-- `in_array($x, self::ALLOWED, true)`, a global `const` list and `$x === self::A` clear the taint of `$x`, as literals at the call do.
-- A taint guard stored in a variable (`$ok = ctype_digit($x); if ($ok)`) clears its subject when the variable is tested.
-- A warm LSP start keeps and serves cached results with unresolved names: registering files before the symbol index exists, or adopting them later, evicts only results missing a name those files newly declare, and neither seeding the index nor ingesting an already-indexed file marks replayed references stale.
-- Taint guards accept `(string) $x`, `strtolower($x) === 'jpg'`, `trim($x) === 'a'`, `$x == 'a'` and non-strict `in_array` with literals.
-- `is_numeric` and `is_int`-style checks clear a checked array element, as `ctype_digit` does.
-- A passing `filter_var($x, FILTER_VALIDATE_*)` clears `$x` for the kinds its characters can't break, in the `!== false`, truthy and `=== false` exit forms.
-- Writing a clean value to a superglobal element (`$_POST['n'] = (int) $_POST['n']`) clears that element's taint.
-- A value replaced on the failing path of a guard (`if (!ctype_digit($x)) { $x = '0'; } echo $x;`), or on every path of a branch, is no longer tainted after the merge.
-- `__benevolent<T>`, `closed-resource` and `properties-of<T>` (and its `public-`, `protected-`, `private-` forms) are docblock types instead of class names.
-- `@taint-source <kind>` taints the return value with that kind only, so `@psalm-taint-source shell` no longer reports at HTML sinks. A bare tag and `input` still mean every kind.
-- `@since`/`@removed` tags in vendor code are no longer read as PHP versions, so a library method tagged `@since 8.4` stays defined when targeting PHP 8.0.
-- Changing a declaration's kind with the same name (`class Foo` → `interface Foo`) no longer leaves it unresolvable in long-running sessions.
-- A closure rebound with an object as `$newScope` (`$f->bindTo($obj, $obj)`, `Closure::bind($f, $obj, $obj)`) is scoped to that object's class, so its protected and private members are no longer reported as undefined or inaccessible.
-- `!is_callable($x)` removes `Closure` from the type, so `Closure|iterable` narrows to `iterable`.
-- `parent` resolves to the parent class in a called method's return type and in declared-return checks (in a trait, to the parent of the class using it), and `self`/`parent` in an inline `@var` resolve to the enclosing class instead of staying unresolved.
-- `@return self<...>` keeps its type arguments, so Symfony Config builder chains (`->arrayPrototype()->...->end()`) return the right level. A template-typed property read or written through `$this` stays the open template instead of taking the template's default.
-- An anonymous class (`new class extends A implements I {}`) is typed as its supertypes instead of `object`, so it can be assigned to an `A`- or `I`-typed property. One that declares public members its supertypes lack stays `object`.
-- `Composer\Autoload\ClassLoader` resolves from `vendor/composer/ClassLoader.php`; Composer leaves it out of the classmap.
-- A class declared under a `class_alias()` target name (the `if (false) { class Alias {} }` IDE stub) inherits the aliased class, so its methods are no longer reported as undefined.
-- A plain `/* */` comment before a statement no longer picks up a docblock from further up, such as a property's `@var`.
-- Stubs: `IntlGregorianCalendar::__construct()` and `intlgregcal_create_instance()` take optional arguments, including a time zone and locale; `getenv()` with an `int` or `int|string` name returns `string|false`.
-- A thrown intersection type with a `Throwable` part (`A&B`, or an anonymous class extending an exception) is no longer reported as `InvalidThrow`.
-- A protected method is callable from an ancestor of the class that declares or overrides it, as PHP allows, instead of being reported as `UndefinedMethod`.
-- `--update-baseline` on a partial run (`mir src/Foo.php`) keeps the baseline entries of files it didn't analyze, and `--report-stale-baseline` no longer reports them as stale.
-- `mir .` writes baseline keys as `src/a.php` instead of `./src/a.php`, so it matches Psalm baselines. Existing `./`-prefixed entries still match.
-- Baseline keys use `/` on Windows too, so a baseline written there matches on other platforms. Existing `\`-separated entries still match on Windows.
-- Baseline keys are written relative to the baseline's directory when it contains the file. Keys relative to the working directory still match, and a partial `--update-baseline` keeps them, as with `--baseline ../b.xml` or `--baseline build/b.xml`.
-- `@phpstan-method`, `@phpstan-property`, `@phpstan-property-read`, `@phpstan-property-write`, `@psalm-throws` and `@phpstan-throws` are read. A prefixed `@method`/`@property` tag overrides a plain one for the same name.
-- `object{prop: T, ...}` docblock types keep their properties instead of becoming plain `object`: reading `$o->prop` gives `T`, and a shape argument missing a required property or with an incompatible property type is reported as `InvalidArgument`.
-- A loop that always runs at least once (a `foreach` over a non-empty array, `while (true)`) checks its body against the pre-loop state too, so `$x = null; foreach ($nonEmpty as $v) { if (null === $x) ...` is no longer reported as an impossible comparison.
-- `callable` is accepted where `string|array|object` is expected.
-- A `void` call on the left of `??` evaluates to null, so `voidCall() ?? true` is typed as `true`.
-- `UndefinedTrait` names a namespaced trait by its fully qualified name.
-- `version_compare()` with an operator returns `bool`, and without one `int`.
-- A defensive `false === hrtime()` check is no longer reported as an impossible comparison.
-- `$x === []` and `$x == []` remove object types from `$x`.
-- `($x ?? false) !== false` removes `false` from `$x` as well as `null` (likewise for any other literal fallback).
-- `if ($a['k'])` narrows the shape key's value to truthy, like `!empty($a['k'])`.
-- Negating `floor()`/`ceil()`'s integral float keeps it integral, and an integral float fits a `?int` parameter like an `int` one.
-- `|`, `&` and `^` of two integer literals fold to a literal, so `preg_match_all()` with `PREG_OFFSET_CAPTURE | PREG_SET_ORDER` types `$matches` by its flags.
-- `new $obj()` is typed as `$obj`'s class instead of `object`.
-- A parent's `@param T` no longer narrows a child parameter whose native type adds `null` (`?T`).
-- The false branch of `method_exists($mixed, ...)` stays `mixed`, since the argument may be a class name.
-- Calls and property reads on an `FFI` instance (C functions and variables bound by `FFI::cdef()`) are no longer reported as undefined.
-- `is_string($x ??= ...)` and similar checks on a `??=` assignment narrow `$x`.
-- `if ($isNew = null === $h)` narrows `$h` like `if (null === $h)`.
-- A call on an intersection `A&I` uses the method `A` declares, not an `@method` on `I` with a different signature.
-- `$array + $other` with a non-shape left operand includes the right operand's keys and values, so `explode(...) + [1 => null]` can hold `null`.
-- A `->` call or property read after `?->` in the same chain (`$a?->b()->c()`) can be null, since the chain short-circuits.
-- `++$a[$k]`, `$a[$k]++` and their `--` forms update the int element they change.
-- A `mixed` value assigned to a nullable property leaves it `mixed` instead of narrowing it to the non-null type, so a later `null ===` check on it is no longer reported as impossible.
-- `$x instanceof A || $x instanceof B` keeps the `B` case when `A` extends the type of `$x` and `B` is an unrelated interface, and keeps an intersection that already satisfies one of the classes whole.
-- `catch` and `finally` see the value a variable held after each statement of the `try` body, not just before and after it, so a `null` assigned before a call that throws is no longer lost.
-- `getenv()` with a `mixed` name returns `string|false`.
-- `array_merge()` and `array_replace()` keep the key type of arrays with `mixed` values (`array<string, mixed>`), and `array_replace()` keeps the key and value types of its arguments instead of returning bare `array`.
-- `reset()`, `end()`, `next()` and `prev()` leave the array argument's type unchanged instead of widening it to `array|object`.
-- `new` keeps a literal template argument when the template's bound admits only literals (`@template T of 'a'|'b'`), so `new TreeBuilder($n, 'array')` is a `TreeBuilder<'array'>`.
-- An array shape is checked against `array<K, V>` with the class hierarchy, so `['a' => Sub::class]` fits an `array<string, class-string<Parent>>` property.
-- A trait method that writes no property no longer clears the property narrowing of `$this` when called, the same as a class method.
-- A static method's own `@template T` is inferred from the call instead of taking the type bound to a same-named class template through `@extends`.
-- For a parameter typed with several templates (`@param T|U`), an argument binds the template whose bound accepts it, so `T of Enum` and `U of value-of<T>` no longer report `InvalidTemplateParam` for either an enum case or its value.
-- Values assigned to a by-reference `foreach` variable (`foreach ($a as &$v) { $v = ...; }`) become the element type of the iterated array or list.
-- `glob()` returns `list<string>|false`.
-- `sort()`, `rsort()`, `usort()` and `shuffle()` turn an array with unknown elements into a `list<mixed>`.
-- A method with `@psalm-this-out` and `@return $this` returns the receiver's new type, so `$x = $node->setParent($p)` gets the retyped node.
-- `instanceof C` on a value narrowed to `A&(B|C)` (e.g. after `instanceof B || instanceof C`) narrows it to `C`.
-- An omitted argument whose parameter is typed by a template binds that template to its `null`/`true`/`false` default, so `@return (T is null ? A : B)` resolves.
-- An override without `@return` inherits the parent's conditional `@return` when every branch, with method templates at their bounds, fits its native return type.
-- A conditional `@return` whose subject is a union (`($b is 0|1 ? A : B)`) resolves at the call site.
-- An omitted argument with an integer default resolves a conditional `@return` on that parameter.
-- An omitted argument defaulting to `self::CONST` binds its template and resolves conditional `@return` types, so `ContainerInterface::get($id)` returns `object`.
-- `[$string, 'method']` is accepted as a callable; a literal first element still has to name a class.
-- An open array shape passed as a `callable` isn't rejected for lacking exactly two entries.
-- A wider scalar (`int`) bound to a template with a literal-only bound (`of 1|2`) no longer reports `InvalidTemplateParam`.
-- An inline `@var` resolves `Enum::CASE` in a generic argument against the file's imports.
-- On the path that short-circuits past an assignment (`A && !$x = f()`, `A || $x = f()`), `$x` keeps its previous type.
-- `$x instanceof C` on a union with a class that may also implement `C` narrows to `C`, not `C|Other&C`.
-- A method returning a class template on a receiver with no type arguments (`Iterator::current()`) gives `mixed` instead of the raw template.
-- `pg_fetch_result()`, `pg_field_is_null()` and `pg_field_prtlen()` accept the two-argument form and a `null` row.
-- An `instanceof` result stored in a variable (`$is = $x instanceof C; if ($is)`) narrows `$x` until either variable changes.
-- A variable holding `is_*($x)` or `null === $x` narrows `$x` when tested, as one holding `$x instanceof C` does.
-- A conditional `@param-out` type resolves against the call's arguments instead of staying a raw conditional that nests on every loop pass.
-- A method returning `static` or `$this`, also nested as in `list<static>`, called on an `A&B` receiver returns `A&B` instead of only the part that declares the method.
-- `($c is class-string ? A : B)` resolves for a `Foo::class` argument and for a non-string argument.
+- Baseline commands exit with code 2 in three cases: `--update-baseline` without a usable baseline, such as a mistyped `--baseline` or `--ignore-baseline`, which wrote an empty `mir-baseline.xml` that shadowed `psalm-baseline.xml`; `--set-baseline src/a.php` or `--set-baseline src`, which overwrote the PHP source; a failed baseline write, which reported success.
+- Baseline scope: a partial `--update-baseline` (`mir src/Foo.php`) keeps the entries of files it didn't analyze, and `--report-stale-baseline` doesn't report them as stale; on a full run, entries of ignored files do go stale.
+- Baseline keys: `mir .` writes `src/a.php` instead of `./src/a.php`, matching Psalm baselines; Windows writes `/`, so a baseline matches on other platforms; keys are relative to the baseline's directory when it contains the file. Existing `./`-prefixed entries, `\`-separated entries on Windows and keys relative to the working directory (`--baseline ../b.xml`, `--baseline build/b.xml`) still match, and a partial `--update-baseline` keeps them.
+- Taint guards clear their subject in more forms: a guard stored in a variable (`$ok = ctype_digit($x); if ($ok)`); an arm condition of `match (true)`; `(string) $x`, `strtolower($x) === 'jpg'`, `trim($x) === 'a'`, `$x == 'a'` and non-strict `in_array` with literals; `in_array($x, self::ALLOWED, true)`, a global `const` list and `$x === self::A`; `isset($map[$x])` and `array_key_exists($x, $map)` when the map's keys are all literal; `is_numeric` and `is_int`-style checks on an array element; a passing `filter_var($x, FILTER_VALIDATE_*)`, for the kinds its characters can't break, in the `!== false`, truthy and `=== false` exit forms; a passing anchored `preg_match($pattern, $x, $m)`, which also clears `$m`; a failed `preg_match('/[<>"\']/', $x)`, for the kinds those characters are needed for, as in WordPress's `_wp_specialchars` (a `/u` pattern doesn't count: invalid UTF-8 makes it return `false`); inside a `PHP_SAPI === 'cli'` or `in_array(PHP_SAPI, ['cli', 'phpdbg'], true)` check, `$_SERVER` entries, which come from the process environment (this clears Symfony's httpoxy guard).
+- Taint is cleared by more operations: `abs`, `round`, `floor` and `ceil`; `FILTER_SANITIZE_ADD_SLASHES` for SQL and `FILTER_SANITIZE_STRING` for HTML; `filter_var_array` and `filter_input_array` definitions, per key; `FILTER_CALLBACK` with a named escaper; `HTMLPurifier::purify` for HTML; Symfony's `getDigits`, `getAlnum` and `getAlpha` bag getters; `array_filter($a, 'is_numeric')` and other named value checks, for the kept elements; a user function or method that sanitizes a by-ref argument (`function s(string &$x) { $x = htmlspecialchars($x); }`); `unset($a['x'])`, for that element's share of the array; a clean write to a superglobal element (`$_POST['n'] = (int) $_POST['n']`); a value replaced on the failing path of a guard (`if (!ctype_digit($x)) { $x = '0'; } echo $x;`) or on every path of a branch, after the merge.
+- Taint false positives: Symfony's `getClientIp`, `getClientIps` and Laravel's `ip`, `ips` aren't sources, since they return addresses validated with `FILTER_VALIDATE_IP`; a project's own global `request()` or `e()` is analyzed by its body instead of being treated as Laravel's helper; a URL whose scheme and host come from a literal local, a constant or a `sprintf` format doesn't report `TaintedSsrf` or `TaintedFile` for what is appended; `fprintf` and `vfprintf` to `STDERR` aren't HTML output; `unserialize` with `allowed_classes` set to `[]` or a literal class list, or with the options in a local, isn't reported; `@taint-source <kind>` taints the return value with that kind only, so `@psalm-taint-source shell` no longer reports at HTML sinks (a bare tag and `input` still mean every kind).
+- Missed taint: `filter_var`, `filter_input` and their `_array` forms read named arguments by name, so `filter_var(filter: FILTER_DEFAULT, value: $x)` keeps the taint of `$x`; an empty `default:` falling into a `case` no longer clears its taint or narrows its type in that body; `case true:` no longer narrows a subject that may hold other types to `true`; a builtin sink named as a callback (`call_user_func('system', $x)`, `array_map('shell_exec', $_GET)`), a method callback (`[$o, 'out']`, `[$this, 'out']`, `[A::class, 'out']`, `'A::out'`) and a function or method with a `@taint-sink` parameter report the data a callback builtin hands them; `base64_decode`, `hex2bin`, `urldecode`, `json_decode` and similar decoders restore every kind, so `base64_decode(base64_encode($x))` and `urldecode(basename($x))` stay tainted; `md5($x, true)` and other raw digests, the `uniqid` prefix and `number_format` separators keep the taint of the argument they copy into the result.
+- Classes and calls: a closure rebound with an object as `$newScope` (`$f->bindTo($obj, $obj)`, `Closure::bind($f, $obj, $obj)`) is scoped to that object's class; an anonymous class is typed as its supertypes instead of `object` unless it declares public members they lack; `Composer\Autoload\ClassLoader` resolves from `vendor/composer/ClassLoader.php`, which Composer leaves out of the classmap; a class declared under a `class_alias()` target name (the `if (false) { class Alias {} }` IDE stub) inherits the aliased class; a thrown intersection with a `Throwable` part (`A&B`, or an anonymous class extending an exception) isn't `InvalidThrow`; a protected method is callable from an ancestor of the class that declares or overrides it; calls and property reads on an `FFI` instance aren't undefined; a call on an intersection `A&I` uses the method `A` declares, not an `@method` on `I` with a different signature; `new $obj()` is typed as `$obj`'s class; `UndefinedTrait` names a namespaced trait by its fully qualified name.
+- Callables: `callable` is accepted where `string|array|object` is expected; `[$string, 'method']` is accepted as a callable (a literal first element still has to name a class); an open array shape isn't rejected for lacking exactly two entries.
+- Docblocks: `parent` resolves to the parent class in a called method's return type and in declared-return checks (in a trait, to the parent of the class using it); `self`/`parent` in an inline `@var` resolve to the enclosing class; an inline `@var` resolves `Enum::CASE` in a generic argument against the file's imports; `object{prop: T, ...}` keeps its properties instead of becoming plain `object`, so `$o->prop` gives `T` and a shape argument missing a required property or with an incompatible property type is `InvalidArgument`; a plain `/* */` comment before a statement no longer picks up a docblock from further up, such as a property's `@var`; `@since`/`@removed` tags in vendor code aren't read as PHP versions, so a library method tagged `@since 8.4` stays defined when targeting PHP 8.0.
+- Templates: `@return self<...>` keeps its type arguments, so Symfony Config builder chains (`->arrayPrototype()->...->end()`) return the right level; a template-typed property read or written through `$this` stays the open template; `new` keeps a literal template argument when the bound admits only literals (`new TreeBuilder($n, 'array')` is a `TreeBuilder<'array'>`); a wider scalar bound to a literal-only bound (`of 1|2`) isn't `InvalidTemplateParam`; a static method's own `@template T` is inferred from the call instead of taking the type bound to a same-named class template through `@extends`; for `@param T|U`, an argument binds the template whose bound accepts it, so `T of Enum` and `U of value-of<T>` accept an enum case or its value; a parent's `@param T` no longer narrows a child parameter whose native type adds `null` (`?T`); a method returning a class template on a receiver with no type arguments (`Iterator::current()`) gives `mixed`.
+- Conditional types: an omitted argument binds its template and resolves a conditional `@return` from a `null`/`true`/`false`, integer or `self::CONST` default, so `ContainerInterface::get($id)` returns `object`; a union subject (`($b is 0|1 ? A : B)`) resolves at the call site; `($c is class-string ? A : B)` resolves for a `Foo::class` argument and for a non-string argument; an override without `@return` inherits the parent's conditional `@return` when every branch, with method templates at their bounds, fits its native return type; a conditional `@param-out` resolves against the call's arguments instead of nesting on every loop pass.
+- `static` and `$this` returns: a method with `@psalm-this-out` and `@return $this` returns the receiver's new type; `static` or `$this`, also nested as in `list<static>`, called on an `A&B` receiver returns `A&B`.
+- Narrowing: `!is_callable($x)` removes `Closure`; `$x === []` and `$x == []` remove object types; `($x ?? false) !== false` removes the fallback literal as well as `null`; `if ($a['k'])` narrows the shape key's value to truthy; the false branch of `method_exists($mixed, ...)` stays `mixed`; `is_string($x ??= ...)` and similar checks narrow `$x`; `if ($isNew = null === $h)` narrows `$h`; a variable holding `$x instanceof C`, `is_*($x)` or `null === $x` narrows `$x` when tested, until either variable changes; `$x instanceof A || $x instanceof B` keeps the `B` case when `A` extends the type of `$x` and `B` is an unrelated interface, and keeps an intersection that already satisfies one of the classes whole; `instanceof C` narrows `A&(B|C)` to `C`, and a union with a class that may also implement `C` to `C` rather than `C|Other&C`.
+- Flow: a loop that always runs at least once (a `foreach` over a non-empty array, `while (true)`) checks its body against the pre-loop state too; `catch` and `finally` see the value a variable held after each statement of the `try` body; on the path that short-circuits past an assignment (`A && !$x = f()`, `A || $x = f()`), `$x` keeps its previous type; a `->` call or property read after `?->` in the same chain can be null; a `mixed` value assigned to a nullable property leaves it `mixed`; a trait method that writes no property no longer clears the property narrowing of `$this`, the same as a class method.
+- Expressions and arrays: a `void` call on the left of `??` evaluates to null; negating `floor()`/`ceil()`'s integral float keeps it integral, and an integral float fits a `?int` parameter; `|`, `&` and `^` of two integer literals fold to a literal, so `preg_match_all()` with `PREG_OFFSET_CAPTURE | PREG_SET_ORDER` types `$matches` by its flags; `$array + $other` with a non-shape left operand includes the right operand's keys and values; `++$a[$k]`, `$a[$k]++` and their `--` forms update the int element; values assigned to a by-reference `foreach` variable become the element type of the iterated array or list; an array shape is checked against `array<K, V>` with the class hierarchy, so `['a' => Sub::class]` fits an `array<string, class-string<Parent>>` property.
+- Builtins: `version_compare()` returns `bool` with an operator and `int` without; `glob()` returns `list<string>|false`; `getenv()` with an `int`, `int|string` or `mixed` name returns `string|false`; `IntlGregorianCalendar::__construct()` and `intlgregcal_create_instance()` take optional arguments, including a time zone and locale; `pg_fetch_result()`, `pg_field_is_null()` and `pg_field_prtlen()` accept the two-argument form and a `null` row; a defensive `false === hrtime()` check isn't an impossible comparison; `array_merge()` and `array_replace()` keep the key type of arrays with `mixed` values, and `array_replace()` keeps its arguments' key and value types; `reset()`, `end()`, `next()` and `prev()` leave the array argument's type unchanged; `sort()`, `rsort()`, `usort()` and `shuffle()` turn an array with unknown elements into a `list<mixed>`.
+- Long-running sessions: a warm LSP start keeps and serves cached results with unresolved names, evicting only results missing a name that newly registered or adopted files declare, and seeding the index or ingesting an already-indexed file doesn't mark replayed references stale; changing a declaration's kind with the same name (`class Foo` → `interface Foo`) no longer leaves it unresolvable.
 
 ## [0.90.0] - 2026-11-03
 
