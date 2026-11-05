@@ -726,6 +726,13 @@ impl<'a> StatementsAnalyzer<'a> {
         self.loop_kind_stack.push(false);
 
         let has_default = sw.body.cases.iter().any(|c| c.value.is_none());
+        // `switch` compares loosely: any truthy value enters `case true`, not just `true`.
+        let true_label_narrows = subject_ty.types.iter().all(|t| {
+            matches!(
+                t,
+                Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TNull
+            )
+        });
 
         let mut case_results: Vec<FlowState> = Vec::new();
         // Case labels immediately preceding this one whose bodies were empty
@@ -748,6 +755,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         ExprKind::String(s) => Some(Type::single(Atomic::TLiteralString(
                             Arc::from(&*s.to_text()),
                         ))),
+                        ExprKind::Bool(true) if !true_label_narrows => None,
                         ExprKind::Bool(b) => Some(Type::single(if *b {
                             Atomic::TTrue
                         } else {
@@ -970,6 +978,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             ExprKind::String(s) => {
                                 Some(Atomic::TLiteralString(Arc::from(&*s.to_text())))
                             }
+                            ExprKind::Bool(true) if !true_label_narrows => None,
                             ExprKind::Bool(b) => {
                                 Some(if *b { Atomic::TTrue } else { Atomic::TFalse })
                             }
@@ -1051,6 +1060,14 @@ impl<'a> StatementsAnalyzer<'a> {
                 entered_by_fallthrough = !case_ctx.diverges;
                 fallthrough_in = entered_by_fallthrough.then(|| case_ctx.clone());
                 pending_conditions.clear();
+            } else if case
+                .value
+                .as_ref()
+                .is_some_and(|v| matches!(v.kind, ExprKind::Bool(true)) && !true_label_narrows)
+            {
+                // This label says nothing about the value, so the next body starts unnarrowed.
+                entered_by_fallthrough = true;
+                fallthrough_in = Some(pre_ctx.branch());
             }
             case_results.push(case_ctx);
         }

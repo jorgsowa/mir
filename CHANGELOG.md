@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `case true:` no longer narrows a subject that may hold other types to `true`, which hid its taint: any truthy value enters that arm.
 - Laravel's `$request->name` and `$request['name']` are taint sources, like `$request->input('name')`.
 - Symfony's `getClientIp`, `getClientIps` and Laravel's `ip`, `ips` aren't taint sources: they return addresses validated with `FILTER_VALIDATE_IP`.
 - `filter_var_array` and `filter_input_array` apply their definition per key, and `FILTER_CALLBACK` with a named escaper clears what that escaper does.
