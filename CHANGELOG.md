@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ftp_connect`, `ftp_ssl_connect`, `ssh2_connect`, `ldap_connect` and `socket_connect` report `TaintedSsrf`.
 - `chgrp`, `finfo_file`, `exif_read_data`, `exif_thumbnail` and `imagecreatefrom*` report `TaintedFile`.
 - `igbinary_unserialize`, `yaml_parse` and `session_decode` report `TaintedUnserialize`.
 - `mb_send_mail` headers and additional parameters are sinks, as for `mail`.

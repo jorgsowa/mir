@@ -272,6 +272,10 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         "fsockopen" | "pfsockopen" => sinks![at(0, "hostname", Ssrf)],
         "get_headers" | "curl_init" => sinks![at(0, "url", Ssrf)],
         "stream_socket_client" => sinks![at(0, "address", Ssrf)],
+        "ftp_connect" | "ftp_ssl_connect" | "ssh2_connect" | "ldap_connect" => {
+            sinks![at(0, "hostname", Ssrf)]
+        }
+        "socket_connect" => sinks![at(1, "address", Ssrf)],
 
         "ldap_search" | "ldap_list" | "ldap_read" => {
             sinks![at(1, "base", Ldap), at(2, "filter", Ldap)]
