@@ -728,9 +728,17 @@ pub fn expr_taint(
             _ => expr_taint(inner, ctx, db, file),
         },
 
-        ExprKind::Match(m) => m.arms.iter().fold(Taint::NONE, |acc, arm| {
-            acc | expr_taint(&arm.body, ctx, db, file)
-        }),
+        ExprKind::Match(m) => {
+            let arms_are_conditions = matches!(unwrap_parens(&m.subject).kind, ExprKind::Bool(true));
+            m.arms.iter().fold(Taint::NONE, |acc, arm| {
+                acc | match arm.conditions.as_deref() {
+                    Some([condition]) if arms_are_conditions => {
+                        branch_taint(condition, true, &arm.body, ctx, db, file)
+                    }
+                    _ => expr_taint(&arm.body, ctx, db, file),
+                }
+            })
+        }
 
         // An element's key can carry taint just as much as its value.
         ExprKind::Array(elements) => elements.iter().fold(Taint::NONE, |acc, el| {
