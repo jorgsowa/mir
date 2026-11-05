@@ -186,7 +186,10 @@ macro_rules! sinks {
 pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
     use SinkKind::*;
     match crate::util::php_ident_lowercase(fn_name.trim_start_matches('\\')).as_str() {
-        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "vfprintf" => sinks![any(Html)],
+        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "vfprintf" | "var_dump" => {
+            sinks![any(Html)]
+        }
+        "print_r" | "var_export" | "highlight_string" => sinks![at(0, "value", Html)],
 
         "header" => sinks![at(0, "header", Header)],
         "setcookie" | "setrawcookie" => sinks![any(Cookie)],
@@ -386,13 +389,20 @@ pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg], ctx: &FlowSta
     }
 }
 
-/// `fprintf(STDERR, ...)` writes to the error stream, not the response.
-pub fn prints_to_stderr(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
-    matches!(fn_name_lower, "fprintf" | "vfprintf")
-        && args
+/// Whether a printing call stays out of the response: `fprintf(STDERR, ...)` writes to the error
+/// stream, and `print_r($x, $flag)` may hand its output back unless the flag is literally false.
+pub fn output_stays_out_of_response(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
+    let arg_kind = |index: usize| args.get(index).and_then(|a| a.value()).map(|v| &v.kind);
+    match fn_name_lower {
+        "fprintf" | "vfprintf" => args
             .first()
             .and_then(|a| a.value())
-            .is_some_and(|handle| handle.kind.name_bare() == Some("STDERR"))
+            .is_some_and(|handle| handle.kind.name_bare() == Some("STDERR")),
+        "print_r" | "var_export" | "highlight_string" => {
+            !matches!(arg_kind(1), None | Some(ExprKind::Bool(false)))
+        }
+        _ => false,
+    }
 }
 
 /// Return the sink kind for a *method* call on a known OOP database wrapper —

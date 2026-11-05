@@ -526,7 +526,7 @@ impl CallAnalyzer {
         let format_text = crate::taint::format_text_args(&fn_name_lower, &call.args);
         for param in crate::taint::builtin_sinks(&fn_name_lower) {
             if param.kind == SinkKind::Html
-                && crate::taint::prints_to_stderr(&fn_name_lower, &call.args)
+                && crate::taint::output_stays_out_of_response(&fn_name_lower, &call.args)
             {
                 continue;
             }
