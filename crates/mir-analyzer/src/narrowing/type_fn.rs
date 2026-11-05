@@ -340,11 +340,12 @@ pub(crate) fn type_fn_narrowed(
                 if t.is_object() || t.is_string() {
                     result.add_type(t.clone());
                 } else if matches!(t, Atomic::TMixed) {
-                    result.add_type(Atomic::TObject);
-                    // A class-name string without the member is just as likely.
-                    if !is_true {
-                        result.add_type(Atomic::TString);
-                    }
+                    // Failing proves little: `object|string` would reject every later typed use.
+                    result.add_type(if is_true {
+                        Atomic::TObject
+                    } else {
+                        Atomic::TMixed
+                    });
                 } else if matches!(t, Atomic::TScalar) {
                     result.add_type(Atomic::TString);
                 }
