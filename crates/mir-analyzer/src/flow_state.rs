@@ -1595,7 +1595,8 @@ impl FlowState {
         self.revoke_exact_keys(sym);
         self.clear_plain(sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
-        if keys.whole().is_empty() {
+        // Without an entry, a superglobal read counts as tainted again.
+        if keys.whole().is_empty() && !crate::taint::is_superglobal(sym.as_str()) {
             remove_entry(&mut self.tainted_keys, &sym);
         } else {
             Arc::make_mut(&mut self.tainted_keys).insert(sym, keys);
@@ -1722,6 +1723,9 @@ impl FlowState {
             }
             crate::taint_guard::Guarded::Element { var, key } => {
                 self.guard_element_taint(var, key, safe)
+            }
+            crate::taint_guard::Guarded::CliServerArray => {
+                self.set_key_taints("_SERVER", KeyTaint::default())
             }
         }
     }

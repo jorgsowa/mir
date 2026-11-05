@@ -386,7 +386,12 @@ fn string_arg(args: &[Arg], index: usize) -> Option<&str> {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Guarded<'a> {
     Var(&'a str),
-    Element { var: &'a str, key: mir_types::Name },
+    Element {
+        var: &'a str,
+        key: mir_types::Name,
+    },
+    /// Under the CLI, `$_SERVER` holds the process environment, not client data.
+    CliServerArray,
 }
 
 /// The value a passing guard call validates, and the kinds it is then safe for.
@@ -414,9 +419,13 @@ pub fn guarded_when<'e>(
             return guarded_by_failed_match(cond);
         }
         return guarded_var(cond)
+            .or_else(|| cli_sapi_list(cond))
             .or_else(|| guarded_by_list(cond, scope))
             .or_else(|| guarded_by_map_key(cond, scope));
     };
+    if let Some(guard) = guarded_by_cli_sapi(b, holds) {
+        return Some(guard);
+    }
     if let Some(guard) = guarded_by_literal(b, holds, scope) {
         return Some(guard);
     }
@@ -433,6 +442,57 @@ pub fn guarded_when<'e>(
         _ => return None,
     };
     (holds == matched_when).then_some((guarded, safe))
+}
+
+fn is_sapi_name(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Name(_) => expr.kind.name_bare() == Some("PHP_SAPI"),
+        ExprKind::FunctionCall(fc) => {
+            fc.args.is_empty()
+                && fc
+                    .name
+                    .kind
+                    .name_bare()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("php_sapi_name"))
+        }
+        _ => false,
+    }
+}
+
+fn is_cli_sapi_literal(expr: &Expr) -> bool {
+    matches!(&expr.kind, ExprKind::String(s) if matches!(s.as_str(), "cli" | "phpdbg"))
+}
+
+/// `PHP_SAPI === 'cli'`, `php_sapi_name() !== 'cli'` and their loose forms.
+fn guarded_by_cli_sapi(
+    b: &php_ast::owned::BinaryExpr,
+    holds: bool,
+) -> Option<(Guarded<'_>, Taint)> {
+    let matched_when = match b.op {
+        BinaryOp::Identical | BinaryOp::Equal => true,
+        BinaryOp::NotIdentical | BinaryOp::NotEqual => false,
+        _ => return None,
+    };
+    let names_cli = (is_sapi_name(&b.left) && is_cli_sapi_literal(&b.right))
+        || (is_sapi_name(&b.right) && is_cli_sapi_literal(&b.left));
+    (names_cli && holds == matched_when).then_some((Guarded::CliServerArray, Taint::ALL))
+}
+
+/// `in_array(PHP_SAPI, ['cli', 'phpdbg'], true)`.
+fn cli_sapi_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
+    let ExprKind::FunctionCall(fc) = &call.kind else {
+        return None;
+    };
+    if !fc.name.kind.name_bare()?.eq_ignore_ascii_case("in_array")
+        || !is_sapi_name(fc.args.first()?.value()?)
+    {
+        return None;
+    }
+    let ExprKind::Array(items) = &fc.args.get(1)?.value()?.kind else {
+        return None;
+    };
+    (!items.is_empty() && items.iter().all(|item| is_cli_sapi_literal(item.value())))
+        .then_some((Guarded::CliServerArray, Taint::ALL))
 }
 
 /// A failed `preg_match('/[<>]/', $x)` proves none of the class's characters occur in `$x`.
