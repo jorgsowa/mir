@@ -552,6 +552,8 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
         "ctype_upper" => (safe_kinds(CharSet::range('A', 'Z')), 0),
         "preg_match" => (safe_kinds(pattern_chars(string_arg(&fc.args, 0)?)?), 1),
         "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
+        "is_numeric" => (padded_safe_kinds(digits().union(CharSet::of("+-.eE"))), 0),
+        "is_int" | "is_integer" | "is_long" | "is_float" | "is_double" | "is_bool" => (Taint::ALL, 0),
         _ => return None,
     };
     let value = fc.args.get(subject)?;
