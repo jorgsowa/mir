@@ -313,6 +313,13 @@ pub fn is_request_bag_property(db: &dyn crate::db::MirDatabase, fqcn: &str, prop
             || crate::db::extends_or_implements(db, fqcn, SYMFONY_REQUEST))
 }
 
+/// `$request->name` and `$request['name']` read input through Laravel's `__get` and `offsetGet`.
+pub(super) fn is_laravel_request(db: &dyn crate::db::MirDatabase, fqcn: &str) -> bool {
+    const LARAVEL_REQUEST: &str = "Illuminate\\Http\\Request";
+    fqcn.eq_ignore_ascii_case(LARAVEL_REQUEST)
+        || crate::db::extends_or_implements(db, fqcn, LARAVEL_REQUEST)
+}
+
 /// Laravel's `request('q')` helper reads input; `request()` returns the request object.
 pub fn is_request_helper_source(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
     fn_name_lower == "request" && !args.is_empty()

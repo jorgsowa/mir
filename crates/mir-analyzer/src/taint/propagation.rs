@@ -258,7 +258,9 @@ pub fn byref_output_taint(
 ) -> Option<Taint> {
     if !db.taint_analysis()
         || CalleeBody::of(location().as_ref(), file) != CalleeBody::Summarized
-        || !(argument_tainted || reads_source() || receiver_demands_summary(receiver, ctx, db, file))
+        || !(argument_tainted
+            || reads_source()
+            || receiver_demands_summary(receiver, ctx, db, file))
     {
         return None;
     }
@@ -581,6 +583,11 @@ pub fn expr_taint(
                 Taint::ALL
             } else if let Some(var) = globals_entry(aa) {
                 crate::db::global_var_taint(db, file, var)
+            } else if matches!(&aa.array.kind, ExprKind::Variable(name)
+                if ctx.get_var(name).types.iter().any(|atom| matches!(atom,
+                    mir_types::Atomic::TNamedObject { fqcn, .. } if is_laravel_request(db, fqcn.as_ref()))))
+            {
+                Taint::ALL
             } else if let (ExprKind::Variable(name), Some(key)) = (
                 &aa.array.kind,
                 crate::expr::assignment::literal_key_name(aa.index.as_ref()),
@@ -623,6 +630,19 @@ pub fn expr_taint(
                         if is_request_bag_property(db, fqcn.as_ref(), &prop_name))
                 });
                 if is_bag {
+                    return Taint::ALL;
+                }
+                let is_magic_input = recv_ty.types.iter().any(|atom| {
+                    matches!(atom, mir_types::Atomic::TNamedObject { fqcn, .. }
+                        if is_laravel_request(db, fqcn.as_ref())
+                            && crate::db::find_property_in_chain(
+                                db,
+                                crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                                &prop_name,
+                            )
+                            .is_none())
+                });
+                if is_magic_input {
                     return Taint::ALL;
                 }
             }
