@@ -240,10 +240,12 @@ pub(super) fn user_call_taint(
     taint.without(escaped).restore(unescaped)
 }
 
-/// Taint a user callee writes into by-ref parameter `param`, beyond what its arguments carry.
+/// Taint by-ref parameter `param` holds when a user callee returns, whether it wrote source data
+/// there or sanitized the argument; `None` when no summary is worth running.
 #[allow(clippy::too_many_arguments)]
 pub fn byref_output_taint(
     param: usize,
+    argument_tainted: bool,
     location: impl FnOnce() -> Option<mir_types::Location>,
     params: &[mir_codebase::DeclaredParam],
     args: &[php_ast::owned::Arg],
@@ -253,19 +255,17 @@ pub fn byref_output_taint(
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
-) -> Taint {
+) -> Option<Taint> {
     if !db.taint_analysis()
         || CalleeBody::of(location().as_ref(), file) != CalleeBody::Summarized
-        || !(reads_source() || receiver_demands_summary(receiver, ctx, db, file))
+        || !(argument_tainted || reads_source() || receiver_demands_summary(receiver, ctx, db, file))
     {
-        return Taint::NONE;
+        return None;
     }
-    let Some(summary) = summary() else {
-        return Taint::NONE;
-    };
-    resolve_labels(summary.out_param(param), |slot| {
+    let summary = summary()?;
+    Some(resolve_labels(summary.out_param(param), |slot| {
         summary.slot_taint(slot, receiver, params, args, ctx, db, file)
-    })
+    }))
 }
 
 /// Strip any number of redundant parens (`((expr))` -> `expr`) — a call

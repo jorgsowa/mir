@@ -357,8 +357,15 @@ pub(crate) fn taint_byref_outputs(
         else {
             continue;
         };
-        let written = crate::taint::byref_output_taint(
+        let held = match &value.kind {
+            php_ast::owned::ExprKind::Variable(name) if i < crate::taint::MAX_TRACKED_PARAMS => {
+                ctx.var_taint(name.as_ref())
+            }
+            _ => crate::taint::Taint::NONE,
+        };
+        let Some(written) = crate::taint::byref_output_taint(
             i,
+            !held.is_empty(),
             &location,
             params,
             args,
@@ -368,12 +375,17 @@ pub(crate) fn taint_byref_outputs(
             ctx,
             ea.db,
             &ea.file,
-        );
-        if written.is_empty() {
+        ) else {
             continue;
-        }
+        };
         match &value.kind {
-            php_ast::owned::ExprKind::Variable(name) => ctx.taint_var(name.as_ref(), written),
+            php_ast::owned::ExprKind::Variable(name) => {
+                if held.difference(written).is_empty() {
+                    ctx.taint_var(name.as_ref(), written);
+                } else {
+                    ctx.set_var_taint(name.as_ref(), written);
+                }
+            }
             php_ast::owned::ExprKind::StaticPropertyAccess(spa) => {
                 if let Some((class, prop)) =
                     crate::expr::assignment::resolve_static_prop_target(spa, ctx, ea.db, &ea.file)
