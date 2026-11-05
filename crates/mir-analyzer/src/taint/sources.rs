@@ -16,9 +16,11 @@ pub fn is_superglobal(name: &str) -> bool {
 /// `$_SERVER` keys a client controls; the rest come from the server or environment.
 pub(super) fn is_request_server_key(key: &str) -> bool {
     key.starts_with("HTTP_")
+        || key.starts_with("REDIRECT_HTTP_")
         || matches!(
             key,
-            "REQUEST_URI"
+            "REMOTE_HOST"
+                | "REQUEST_URI"
                 | "QUERY_STRING"
                 | "PHP_SELF"
                 | "PATH_INFO"
@@ -318,6 +320,15 @@ pub fn is_request_bag_property(db: &dyn crate::db::MirDatabase, fqcn: &str, prop
 /// Laravel's `request('q')` helper reads input; `request()` returns the request object.
 pub fn is_request_helper_source(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
     fn_name_lower == "request" && !args.is_empty()
+}
+
+/// `getenv('HTTP_X')` reads a request header under CGI.
+pub fn reads_request_header_env(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
+    fn_name_lower == "getenv"
+        && args
+            .first()
+            .and_then(|a| a.value())
+            .is_some_and(starts_with_header_prefix)
 }
 
 /// Builtins whose result is request data.

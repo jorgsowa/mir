@@ -553,6 +553,7 @@ impl<'a> Scan<'a> {
                     crate::util::php_ident_lowercase(name.global.unwrap_or(&name.qualified));
                 if crate::taint::is_source_function(&lower)
                     || crate::taint::is_request_helper_source(&lower, &fc.args)
+                    || crate::taint::reads_request_header_env(&lower, &fc.args)
                 {
                     Inspect::Source
                 } else if crate::stubs::is_builtin_function(&lower) {

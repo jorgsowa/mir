@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `$_SERVER['REMOTE_HOST']`, `$_SERVER['REDIRECT_HTTP_*']` and `getenv('HTTP_*')` are taint sources.
 - `base64_decode`, `hex2bin`, `urldecode`, `json_decode` and similar decoders restore every kind on a tainted value, so `base64_decode(base64_encode($x))` and `urldecode(basename($x))` stay tainted.
 - `md5($x, true)` and other raw digests, the `uniqid` prefix and `number_format` separators keep the taint of the argument they copy into the result.
 - A URL whose scheme and host come from a literal local, a constant or a `sprintf` format no longer reports `TaintedSsrf` or `TaintedFile` for what is appended.

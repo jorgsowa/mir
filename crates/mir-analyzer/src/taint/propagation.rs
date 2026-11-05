@@ -773,6 +773,7 @@ pub fn expr_taint(
                     })
                 };
                 if reads_raw_request_body(&lower_name, &fc.args)
+                    || reads_request_header_env(&lower_name, &fc.args)
                     || (is_request_helper_source(&lower_name, &fc.args) && !is_project_function())
                 {
                     return Taint::ALL;
