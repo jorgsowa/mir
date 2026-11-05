@@ -70,6 +70,12 @@ fn digits() -> CharSet {
     CharSet::range('0', '9')
 }
 
+fn hex_digits() -> CharSet {
+    digits()
+        .union(CharSet::range('a', 'f'))
+        .union(CharSet::range('A', 'F'))
+}
+
 fn letters() -> CharSet {
     CharSet::range('a', 'z').union(CharSet::range('A', 'Z'))
 }
@@ -537,19 +543,15 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
     };
     let name = fc.name.kind.name_bare()?;
     let lower = crate::util::php_ident_lowercase(name);
-    let (allowed, subject) = match lower.as_str() {
-        "ctype_digit" => (digits(), 0),
-        "ctype_xdigit" => (
-            digits()
-                .union(CharSet::range('a', 'f'))
-                .union(CharSet::range('A', 'F')),
-            0,
-        ),
-        "ctype_alpha" => (letters(), 0),
-        "ctype_alnum" => (letters().union(digits()), 0),
-        "ctype_lower" => (CharSet::range('a', 'z'), 0),
-        "ctype_upper" => (CharSet::range('A', 'Z'), 0),
-        "preg_match" => (pattern_chars(string_arg(&fc.args, 0)?)?, 1),
+    let (safe, subject) = match lower.as_str() {
+        "ctype_digit" => (safe_kinds(digits()), 0),
+        "ctype_xdigit" => (safe_kinds(hex_digits()), 0),
+        "ctype_alpha" => (safe_kinds(letters()), 0),
+        "ctype_alnum" => (safe_kinds(letters().union(digits())), 0),
+        "ctype_lower" => (safe_kinds(CharSet::range('a', 'z')), 0),
+        "ctype_upper" => (safe_kinds(CharSet::range('A', 'Z')), 0),
+        "preg_match" => (safe_kinds(pattern_chars(string_arg(&fc.args, 0)?)?), 1),
+        "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
         _ => return None,
     };
     let value = fc.args.get(subject)?;
@@ -557,8 +559,30 @@ fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
         return None;
     }
     let guarded = guarded_subject(value.value()?)?;
-    let safe = safe_kinds(allowed);
     (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+}
+
+/// Kinds a value made of `chars`, possibly padded with whitespace, is safe for: only a line break
+/// in the padding can still do harm.
+fn padded_safe_kinds(chars: CharSet) -> Taint {
+    safe_kinds(chars).without(Taint::HEADER | Taint::COOKIE)
+}
+
+/// Kinds a value is safe for once `filter_var($x, FILTER_VALIDATE_*)` accepted it. Options can
+/// supply a default or a null failure value, so only the two-argument form proves anything.
+fn validating_filter_safe_kinds(args: &[Arg]) -> Option<Taint> {
+    if args.len() != 2 {
+        return None;
+    }
+    let filter = args[1].value()?.kind.name_bare()?.to_ascii_uppercase();
+    Some(match filter.as_str() {
+        "FILTER_VALIDATE_INT" => padded_safe_kinds(digits().union(CharSet::of("+-"))),
+        "FILTER_VALIDATE_FLOAT" => padded_safe_kinds(digits().union(CharSet::of("+-.eE"))),
+        "FILTER_VALIDATE_BOOL" | "FILTER_VALIDATE_BOOLEAN" => padded_safe_kinds(letters().union(digits())),
+        "FILTER_VALIDATE_IP" => safe_kinds(hex_digits().union(CharSet::of(":."))),
+        "FILTER_VALIDATE_MAC" => safe_kinds(hex_digits().union(CharSet::of(":-."))),
+        _ => return None,
+    })
 }
 
 /// `$x`, `$a['k']`, or either under `?? default`: when the left side is unset there is nothing to taint.
