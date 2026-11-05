@@ -507,7 +507,12 @@ fn guarded_by_failed_match(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     if value.name.is_some() || value.unpack() {
         return None;
     }
-    let safe = safe_kinds(survivors(string_arg(&fc.args, 0)?)?);
+    let pattern = string_arg(&fc.args, 0)?;
+    // Invalid UTF-8 makes a `/u` match return false whatever the value holds.
+    if split_pattern(pattern)?.1.contains('u') {
+        return None;
+    }
+    let safe = safe_kinds(survivors(pattern)?);
     (!safe.is_empty()).then_some((guarded_subject(value.value()?)?, safe))
 }
 

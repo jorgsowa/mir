@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inside a `PHP_SAPI === 'cli'` or `in_array(PHP_SAPI, ['cli', 'phpdbg'], true)` check, `$_SERVER` entries aren't taint sources: they come from the process environment. This clears Symfony's httpoxy guard.
 - `HTMLPurifier::purify` clears HTML taint, and Symfony's `getDigits`, `getAlnum` and `getAlpha` bag getters clear what they filter out.
 - A user function or method that sanitizes a by-ref argument (`function s(string &$x) { $x = htmlspecialchars($x); }`) clears it at the call.
-- A failed `preg_match('/[<>"\']/', $x)` clears `$x` for the kinds those characters are needed for, which is how WordPress's `_wp_specialchars` returns its input.
+- A failed `preg_match('/[<>"\']/', $x)` clears `$x` for the kinds those characters are needed for, which is how WordPress's `_wp_specialchars` returns its input. A `/u` pattern doesn't count: invalid UTF-8 makes it return `false`.
 - A tainted `CURLOPT_HTTPHEADER` value in `curl_setopt` or a literal `curl_setopt_array` reports `TaintedHeader`.
 - `print_r`, `var_export` and `highlight_string` without the return flag, and `var_dump`, report `TaintedHtml`.
 - `ldap_bind`, `ldap_add`, `ldap_modify`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace` and `ldap_rename` report `TaintedLdap` for their DN.
