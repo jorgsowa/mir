@@ -191,3 +191,29 @@ fn partial_update_keeps_workdir_relative_keys_of_a_baseline_elsewhere() {
     assert!(updated.contains(r#"<file src="src/a.php">"#), "{updated}");
     assert!(updated.contains(r#"<file src="src/b.php">"#), "{updated}");
 }
+
+#[test]
+fn entries_of_ignored_files_go_stale_on_a_full_run() {
+    let dir = fixture(false);
+    std::fs::write(
+        dir.path().join("mir.xml"),
+        r#"<?xml version="1.0"?>
+<psalm>
+  <projectFiles>
+    <directory name="src"/>
+    <ignoreFiles><file name="src/b.php"/></ignoreFiles>
+  </projectFiles>
+</psalm>
+"#,
+    )
+    .unwrap();
+
+    for args in [
+        &["-c", "mir.xml", "--report-stale-baseline", "src"][..],
+        &["-c", "mir.xml", "--report-stale-baseline"][..],
+    ] {
+        let out = run(dir.path(), args);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("src/b.php"), "{args:?}: {stderr}");
+    }
+}

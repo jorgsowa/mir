@@ -151,7 +151,7 @@ pub fn run_output(
     // A partial run can't tell whether entries for files it didn't analyze still apply.
     let unanalyzed_entries = baseline_data
         .as_mut()
-        .map(|bl| take_unanalyzed_entries(bl, files, baseline_dir.as_deref()))
+        .map(|bl| take_unanalyzed_entries(bl, files, &cli.paths, baseline_dir.as_deref()))
         .unwrap_or_default();
 
     let stale_baseline_entries = if cli.report_stale_baseline {
@@ -315,16 +315,21 @@ struct StaleBaselineEntry {
     snippet: String,
 }
 
-/// Removes entries for existing files outside `files`; a missing file's entries stay and go stale.
+/// Removes entries for existing files outside the targets; all others stay and can go stale.
 fn take_unanalyzed_entries(
     baseline: &mut Baseline,
     files: &[PathBuf],
+    targets: &[PathBuf],
     baseline_dir: Option<&Path>,
 ) -> Baseline {
-    let Some(dir) = baseline_dir else {
+    let Some(dir) = baseline_dir.filter(|_| !targets.is_empty()) else {
         return Baseline::default();
     };
     let cwd = cwd();
+    let targets: Vec<PathBuf> = targets
+        .iter()
+        .map(|t| normalize_for_compare(&cwd.join(t)))
+        .collect();
     let analyzed: std::collections::HashSet<PathBuf> = files
         .iter()
         .map(|f| normalize_for_compare(&cwd.join(f)))
@@ -336,7 +341,10 @@ fn take_unanalyzed_entries(
             .filter(|path| path.exists())
             .map(|path| normalize_for_compare(path))
             .collect();
-        if existing.is_empty() || existing.iter().any(|path| analyzed.contains(path)) {
+        let in_scope = |path: &PathBuf| {
+            analyzed.contains(path) || targets.iter().any(|target| path.starts_with(target))
+        };
+        if existing.is_empty() || existing.iter().any(in_scope) {
             return true;
         }
         taken.entries.insert(file.clone(), std::mem::take(by_kind));
