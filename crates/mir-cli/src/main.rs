@@ -168,6 +168,7 @@ fn main() {
 
     plugins::setup_plugins(&cli, &mut config, &config_base, composer_root.as_deref());
 
+    report::check_set_baseline_target(&cli);
     let baseline = report::load_baseline(&cli, &config);
 
     let (files, result, elapsed) = if let Some(ref root) = composer_root {

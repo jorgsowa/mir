@@ -1,5 +1,6 @@
 //! End-to-end tests share one program so cargo runs them in parallel instead of one program at a time.
 
+mod baseline_cli_errors;
 mod baseline_psalm_aliases;
 mod color_output;
 mod composer_class_loader;

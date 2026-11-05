@@ -60,6 +60,21 @@ fn remove_psalm_baseline(cli: &Cli) {
     }
 }
 
+/// `mir --set-baseline src/a.php` parses the path as the baseline file, which would overwrite it.
+pub fn check_set_baseline_target(cli: &Cli) {
+    let Some(Some(path)) = &cli.set_baseline else {
+        return;
+    };
+    let is_php = path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("php"));
+    if is_php || path.is_dir() {
+        let path = path.display();
+        eprintln!("mir: --set-baseline takes an XML file, not {path}; list paths before the flag: mir {path} --set-baseline");
+        process::exit(2);
+    }
+}
+
 pub fn run_output(
     cli: &Cli,
     config: &Config,

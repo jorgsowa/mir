@@ -69,7 +69,7 @@ src/search.php:7:4 error[MIR0801] TaintedHtml: Tainted HTML output — possible 
 |------|---------|
 | `0` | No errors found (warnings and info don't fail the run) |
 | `1` | One or more errors found, or stale baseline entries with `--report-stale-baseline` |
-| `2` | Configuration, composer or plugin loading failed |
+| `2` | Configuration, composer or plugin loading failed, or the baseline can't be written or updated |
 
 ## Examples
 
