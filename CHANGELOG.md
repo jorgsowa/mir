@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `__benevolent<T>`, `closed-resource` and `properties-of<T>` (and its `public-`, `protected-`, `private-` forms) are docblock types instead of class names.
 - `@taint-source <kind>` taints the return value with that kind only, so `@psalm-taint-source shell` no longer reports at HTML sinks. A bare tag and `input` still mean every kind.
 - `@since`/`@removed` tags in vendor code are no longer read as PHP versions, so a library method tagged `@since 8.4` stays defined when targeting PHP 8.0.
 - Changing a declaration's kind with the same name (`class Foo` → `interface Foo`) no longer leaves it unresolvable in long-running sessions.

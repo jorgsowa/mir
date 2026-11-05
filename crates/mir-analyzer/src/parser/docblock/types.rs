@@ -60,6 +60,7 @@ fn arraylike_object_type(key: Type, value: Type) -> Type {
 /// and the bare spellings are PHP keywords.
 pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "$this",
+    "__benevolent",
     "array",
     "array-key",
     "arraylike-object",
@@ -70,6 +71,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "callable-string",
     "class-string",
     "class-string-map",
+    "closed-resource",
     "double",
     "empty",
     "enum-string",
@@ -105,6 +107,10 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "object",
     "parent",
     "positive-int",
+    "private-properties-of",
+    "properties-of",
+    "protected-properties-of",
+    "public-properties-of",
     "pure-callable",
     "pure-closure",
     "resource",
@@ -479,7 +485,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             u.add_type(Atomic::TString);
             u
         }
-        "resource" => Type::mixed(), // treat as mixed
+        "resource" | "closed-resource" => Type::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
         "static" | "$this" => Type::single(Atomic::TStaticObject {
             fqcn: mir_types::Name::from(""),
@@ -679,6 +685,15 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             };
             Type::single(Atomic::TIntRange { min, max })
         }
+        // PHPStan's lenient union: the members still describe the value.
+        "__benevolent" => parse_type_string(inner.trim()),
+        "properties-of"
+        | "public-properties-of"
+        | "protected-properties-of"
+        | "private-properties-of" => Type::single(Atomic::TArray {
+            key: Box::new(Type::string()),
+            value: Box::new(Type::mixed()),
+        }),
         // `key-of<T>` — the union of array/shape key types of `T`.
         "key-of" => {
             let inner_ty = parse_type_string(inner.trim());
