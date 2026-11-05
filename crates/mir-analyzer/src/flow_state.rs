@@ -45,6 +45,7 @@ fn extend_dead_writes_dedup(dst: &mut Vec<DeadWrite>, src: Vec<DeadWrite>) {
 #[derive(Clone, Debug)]
 pub struct StoredCheck {
     subject: Name,
+    captures: Option<Name>,
     pub check: Arc<php_ast::owned::Expr>,
 }
 
@@ -1117,6 +1118,7 @@ impl FlowState {
         let subject = Name::from(subject);
         let stored = StoredCheck {
             subject,
+            captures: crate::taint_guard::match_captures(check).map(Name::from),
             check: Arc::new(check.clone()),
         };
         Arc::make_mut(&mut self.stored_checks).insert(Name::from(var), stored);
@@ -1128,14 +1130,19 @@ impl FlowState {
             return None;
         }
         let stored = self.stored_checks.get(&Name::from(var))?;
-        (!self.escaped_vars.contains_key(&stored.subject)).then(|| stored.check.clone())
+        let escaped = self.escaped_vars.contains_key(&stored.subject)
+            || stored
+                .captures
+                .is_some_and(|m| self.escaped_vars.contains_key(&m));
+        (!escaped).then(|| stored.check.clone())
     }
 
     /// `$r = &$x` lets later writes to `$r` change `$x` unseen.
     pub fn drop_stored_checks_on(&mut self, subject: &str) {
         if !self.stored_checks.is_empty() {
             let subject = Name::from(subject);
-            Arc::make_mut(&mut self.stored_checks).retain(|_, s| s.subject != subject);
+            Arc::make_mut(&mut self.stored_checks)
+                .retain(|_, s| s.subject != subject && s.captures != Some(subject));
         }
     }
 
@@ -1143,7 +1150,7 @@ impl FlowState {
     fn drop_guards_on(&mut self, name: Name) {
         if !self.stored_checks.is_empty() {
             Arc::make_mut(&mut self.stored_checks)
-                .retain(|var, stored| *var != name && stored.subject != name);
+                .retain(|var, s| *var != name && s.subject != name && s.captures != Some(name));
         }
         if self.guarded_defs.values().flatten().any(|g| g.var == name) {
             let defs = Arc::make_mut(&mut self.guarded_defs);

@@ -783,6 +783,11 @@ pub fn guarded_captures<'e>(
     scope: GuardScope<'_>,
 ) -> Option<(Guarded<'e>, Taint)> {
     let (_, safe) = guarded_when(cond, holds, scope)?;
+    Some((Guarded::Var(match_captures(cond)?), safe))
+}
+
+/// The `$m` of `preg_match($pattern, $x, $m)`, alone or in a comparison.
+pub fn match_captures(cond: &Expr) -> Option<&str> {
     let call = match &cond.kind {
         ExprKind::Binary(b) if matches!(b.left.kind, ExprKind::FunctionCall(_)) => &b.left,
         ExprKind::Binary(b) => &b.right,
@@ -795,7 +800,7 @@ pub fn guarded_captures<'e>(
         return None;
     }
     match &fc.args.get(2)?.value()?.kind {
-        ExprKind::Variable(var) => Some((Guarded::Var(var), safe)),
+        ExprKind::Variable(var) => Some(var),
         _ => None,
     }
 }
