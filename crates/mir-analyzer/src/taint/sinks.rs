@@ -323,16 +323,40 @@ pub fn option_sink_values<'e>(
     }
 }
 
-/// `unserialize($data, ['allowed_classes' => false])` can't instantiate objects.
-pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg]) -> bool {
-    let Some(ExprKind::Array(options)) = args.get(1).and_then(|a| a.value()).map(|v| &v.kind)
-    else {
+/// `unserialize($data, ['allowed_classes' => false])`, or a literal class list, can't reach a gadget.
+pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg], ctx: &FlowState) -> bool {
+    use mir_types::atomic::ArrayKey;
+    use mir_types::Atomic;
+    let Some(options) = args.get(1).and_then(|a| a.value()) else {
         return false;
     };
-    options.iter().any(|el| {
-        matches!(el.key.as_ref().map(|k| &k.kind), Some(ExprKind::String(k)) if k.as_str() == "allowed_classes")
-            && matches!(el.value().kind, ExprKind::Bool(false))
-    })
+    match &options.kind {
+        ExprKind::Array(options) => options.iter().any(|el| {
+            matches!(el.key.as_ref().map(|k| &k.kind), Some(ExprKind::String(k)) if k.as_str() == "allowed_classes")
+                && match &el.value().kind {
+                    ExprKind::Bool(false) => true,
+                    ExprKind::Array(classes) => classes.iter().all(|class| {
+                        matches!(
+                            class.value().kind,
+                            ExprKind::String(_) | ExprKind::ClassConstAccess(_)
+                        )
+                    }),
+                    _ => false,
+                }
+        }),
+        ExprKind::Variable(name) => matches!(
+            ctx.get_var(name).types.as_slice(),
+            [Atomic::TKeyedArray { properties, .. }]
+                if properties.iter().any(|(key, prop)| {
+                    matches!(key, ArrayKey::String(k) if k.as_ref() == "allowed_classes")
+                        && matches!(
+                            prop.ty.types.as_slice(),
+                            [Atomic::TFalse] | [Atomic::TKeyedArray { is_open: false, .. }]
+                        )
+                })
+        ),
+        _ => false,
+    }
 }
 
 /// Return the sink kind for a *method* call on a known OOP database wrapper —

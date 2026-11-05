@@ -530,7 +530,7 @@ impl CallAnalyzer {
                 continue;
             }
             if param.kind == SinkKind::Unserialize
-                && crate::taint::unserialize_disallows_classes(&call.args)
+                && crate::taint::unserialize_disallows_classes(&call.args, ctx)
             {
                 continue;
             }
