@@ -424,6 +424,170 @@ fn direct_input_registration_invalidates_persisted_negative_lookup() {
     ));
 }
 
+/// A flushed cache holding a negative lookup for `Mage` and the content of `/mirror/lib.php`.
+fn seed_negative_lookup(dir: &std::path::Path, consumer: &str, lib: &str) {
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    seed.upsert_source_file(
+        Arc::from("/mirror/lib.php"),
+        Arc::from(lib),
+        salsa::Durability::HIGH,
+    );
+    assert!(has_undefined_class(&mut seed, "/mirror/app.php", consumer));
+    seed.flush_analysis_cache();
+}
+
+#[test]
+fn unchanged_mirror_registration_keeps_negative_lookup_across_restart() {
+    let dir = create_temp_dir("mirror restart");
+    let consumer = "<?php\nnew Mage();\n";
+    let lib = "<?php\nclass Wizard {}\n";
+    seed_negative_lookup(dir.path(), consumer, lib);
+
+    let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let files: Vec<(Arc<str>, Arc<str>)> = vec![
+        (Arc::from("/mirror/app.php"), Arc::from(consumer)),
+        (Arc::from("/mirror/lib.php"), Arc::from(lib)),
+    ];
+    for (path, text) in &files {
+        warm.upsert_source_file(path.clone(), text.clone(), salsa::Durability::LOW);
+    }
+    assert!(warm
+        .cache()
+        .unwrap()
+        .is_valid("/mirror/app.php", &hash_content(consumer)));
+    let unresolved = warm.warm_start_files(&files);
+    assert_eq!(unresolved, vec![Arc::<str>::from("/mirror/app.php")]);
+}
+
+#[test]
+fn file_changed_between_runs_evicts_only_names_it_declares() {
+    let dir = create_temp_dir("mirror restart changed");
+    let consumer = "<?php\nnew Mage();\n";
+    seed_negative_lookup(dir.path(), consumer, "<?php\nclass Wizard {}\n");
+
+    let valid = |session: &AnalysisSession| {
+        session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/app.php", &hash_content(consumer))
+    };
+    let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    warm.upsert_source_file(
+        Arc::from("/mirror/lib.php"),
+        Arc::from("<?php\nclass Witch {}\n"),
+        salsa::Durability::HIGH,
+    );
+    assert!(valid(&warm), "a change declaring another name keeps it");
+    warm.upsert_source_file(
+        Arc::from("/mirror/lib.php"),
+        Arc::from("<?php\nclass Mage {}\n"),
+        salsa::Durability::HIGH,
+    );
+    assert!(
+        !valid(&warm),
+        "a change declaring the missing name evicts it"
+    );
+    assert!(!has_undefined_class(&mut warm, "/mirror/app.php", consumer));
+}
+
+#[test]
+fn mass_registration_of_unseen_files_evicts_negative_lookups_wholesale() {
+    let dir = create_temp_dir("mirror mass change");
+    let consumer = "<?php\nnew Mage();\n";
+    seed_negative_lookup(dir.path(), consumer, "<?php\nclass Wizard {}\n");
+
+    let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    warm.set_workspace_files((0..300).map(|i| -> (Arc<str>, Arc<str>) {
+        (
+            Arc::from(format!("/mirror/gen{i}.php")),
+            Arc::from(format!("<?php\nclass Gen{i} {{}}\n")),
+        )
+    }));
+    assert!(!warm
+        .cache()
+        .unwrap()
+        .is_valid("/mirror/app.php", &hash_content(consumer)));
+}
+
+#[test]
+fn settle_evicts_only_negative_lookups_the_new_file_declares() {
+    let dir = create_temp_dir("mirror settle");
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let consumer = "<?php\nnew Mage();\n";
+    session.set_file_text(
+        Arc::from("/mirror/seed.php"),
+        Arc::from("<?php\nclass Seed {}\n"),
+    );
+    session.rebuild_workspace_symbol_index();
+    assert!(has_undefined_class(
+        &mut session,
+        "/mirror/app.php",
+        consumer
+    ));
+    let valid = |session: &AnalysisSession| {
+        session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/app.php", &hash_content(consumer))
+    };
+
+    session.set_file_text(
+        Arc::from("/mirror/w.php"),
+        Arc::from("<?php\nclass Wizard {}\n"),
+    );
+    session.settle_workspace_index();
+    assert!(
+        valid(&session),
+        "a new declaration of another name keeps it"
+    );
+
+    session.set_file_text(
+        Arc::from("/mirror/m.php"),
+        Arc::from("<?php\nclass Mage {}\n"),
+    );
+    session.settle_workspace_index();
+    assert!(
+        !valid(&session),
+        "a new declaration of the missing name evicts it"
+    );
+}
+
+#[test]
+fn unchanged_mirror_registration_keeps_dependents_of_a_file_without_an_entry() {
+    let dir = create_temp_dir("mirror restart dependents");
+    let lib_path = "/mirror/lib.php";
+    let lib = "<?php\nclass Wizard {}\n";
+    let consumer = "<?php\nfunction uses_lib(): void {}\n";
+    {
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        seed.upsert_source_file(Arc::from(lib_path), Arc::from(lib), salsa::Durability::HIGH);
+        assert!(!has_undefined_class(&mut seed, "/mirror/app.php", consumer));
+        let mut reverse_deps = FxHashMap::default();
+        reverse_deps.insert(
+            lib_path.to_string(),
+            FxHashSet::from_iter(["/mirror/app.php".to_string()]),
+        );
+        seed.cache().unwrap().set_reverse_deps(reverse_deps);
+        seed.flush_analysis_cache();
+    }
+
+    let valid = |session: &AnalysisSession| {
+        session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/app.php", &hash_content(consumer))
+    };
+    let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    warm.upsert_source_file(Arc::from(lib_path), Arc::from(lib), salsa::Durability::HIGH);
+    assert!(valid(&warm), "unchanged content keeps dependents");
+    warm.upsert_source_file(
+        Arc::from(lib_path),
+        Arc::from("<?php\nclass Witch {}\n"),
+        salsa::Durability::HIGH,
+    );
+    assert!(!valid(&warm), "changed content evicts dependents");
+}
+
 #[test]
 fn shadowed_definition_evicts_dependents_of_old_owner() {
     let dir = create_temp_dir("mirror shadow invalidation");

@@ -284,6 +284,15 @@ impl DeclaredNames {
         self.short_names.insert(name_key(name));
     }
 
+    pub(crate) fn add_declarations(&mut self, decls: &crate::db::FileDeclarations) {
+        for decl in decls.class_like() {
+            self.add_class_like(decl.name.as_str());
+        }
+        for decl in decls.functions().chain(decls.constants()) {
+            self.add_function_or_constant(decl.name.as_str());
+        }
+    }
+
     pub fn add_slice(&mut self, slice: &mir_codebase::definitions::StubSlice) {
         for fqcn in slice
             .classes
@@ -450,21 +459,6 @@ impl AnalysisCache {
         entries
             .get(&id)
             .is_some_and(|e| e.content_hash == content_hash)
-    }
-
-    /// Check a mirror write against a persisted entry. Hash only files that
-    /// actually have a cached result; a large workspace scan may register
-    /// many files that were never analyzed.
-    pub fn matches_content(&self, file_path: &str, content: &str) -> bool {
-        let Some(id) = self.file_id_map.lock().get(file_path) else {
-            return false;
-        };
-        let stored_hash = self
-            .entries
-            .lock()
-            .get(&id)
-            .map(|entry| entry.content_hash.clone());
-        stored_hash.is_some_and(|hash| hash == hash_content(content))
     }
 
     /// Record a registered file's content and report whether it is unchanged
@@ -729,6 +723,10 @@ impl AnalysisCache {
             self.dirty.store(true, Ordering::Relaxed);
         }
         count
+    }
+
+    pub fn has_unresolved(&self) -> bool {
+        !self.unresolved_entries.lock().is_empty()
     }
 
     /// Evict results with missing workspace names. Such files have no reverse

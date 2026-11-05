@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isset($map[$x])` and `array_key_exists($x, $map)` clear `$x` when the map's keys are all literal.
 - `in_array($x, self::ALLOWED, true)`, a global `const` list and `$x === self::A` clear the taint of `$x`, as literals at the call do.
 - A taint guard stored in a variable (`$ok = ctype_digit($x); if ($ok)`) clears its subject when the variable is tested.
-- A warm LSP start keeps cached results with unresolved names: registering files before the symbol index exists, or adopting them later, evicts only results missing a name those files newly declare.
+- A warm LSP start keeps and serves cached results with unresolved names: registering files before the symbol index exists, or adopting them later, evicts only results missing a name those files newly declare, and neither seeding the index nor ingesting an already-indexed file marks replayed references stale.
 - Taint guards accept `(string) $x`, `strtolower($x) === 'jpg'`, `trim($x) === 'a'`, `$x == 'a'` and non-strict `in_array` with literals.
 - `is_numeric` and `is_int`-style checks clear a checked array element, as `ctype_digit` does.
 - A passing `filter_var($x, FILTER_VALIDATE_*)` clears `$x` for the kinds its characters can't break, in the `!== false`, truthy and `=== false` exit forms.

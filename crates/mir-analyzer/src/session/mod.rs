@@ -73,6 +73,8 @@ pub struct AnalysisSession {
     /// change makes a never-resolvable name resolvable).
     /// Bounded to `UNRESOLVABLE_CACHE_CAP`; clears on overflow.
     unresolvable_fqcns: HashMap<Arc<str>, Option<Arc<str>>>,
+    /// Unseen files parsed so far to reconcile cached missing names pre-index.
+    pre_index_declaration_scans: usize,
     /// Vendor `autoload.files` entries not yet indexed. `Some(paths)` means
     /// pending; `None` means the load has already run (idempotent). Populated
     /// by [`Self::with_psr4`]; drained by [`Self::ensure_vendor_eager_functions`],
@@ -216,6 +218,7 @@ impl AnalysisSession {
             last_ingested_symbols: HashMap::default(),
             last_structural_targets: HashMap::default(),
             unresolvable_fqcns: HashMap::default(),
+            pre_index_declaration_scans: 0,
             pending_eager_function_files: Some(Vec::new()),
             prepared_files: HashMap::default(),
             suppression_maps: HashMap::default(),

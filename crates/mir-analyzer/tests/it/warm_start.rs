@@ -144,6 +144,88 @@ fn warm_start_replay_survives_workspace_growth_when_resolved() {
     );
 }
 
+const UNRESOLVED_WIDGET: (&str, &str) = (
+    "widget.php",
+    "<?php\nclass Widget { public function spin(): void {} }\n",
+);
+const UNRESOLVED_CALLER: (&str, &str) = (
+    "caller.php",
+    "<?php\n$w = new Widget();\n$w->spin();\nnew Missing();\n",
+);
+
+/// A session warm-started from a real run in which `caller.php` left a name unresolved.
+fn warm_session_with_unresolved_replay(dir: &std::path::Path) -> AnalysisSession {
+    let files = [UNRESOLVED_WIDGET, UNRESOLVED_CALLER];
+    {
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+        seed.ensure_all_stubs();
+        for (path, text) in files {
+            seed.ingest_file(Arc::from(path), Arc::from(text));
+        }
+        let paths: Vec<Arc<str>> = files.iter().map(|(p, _)| Arc::from(*p)).collect();
+        seed.reanalyze_files_cancellable(&paths, &mir_analyzer::IndexCancel::new());
+        seed.flush_analysis_cache();
+    }
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    session.ensure_all_stubs();
+    let inputs: Vec<(Arc<str>, Arc<str>)> = files
+        .iter()
+        .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
+        .collect();
+    let unresolved = session.warm_start_files(&inputs);
+    assert_eq!(unresolved, vec![Arc::<str>::from(UNRESOLVED_CALLER.0)]);
+    assert!(session.workspace_symbol_index_ready());
+    session
+}
+
+/// Cancels after the stale-set computation, so only a query with nothing stale completes.
+fn spin_references_without_reanalysis(session: &mut AnalysisSession) -> Option<usize> {
+    let consultations = std::sync::atomic::AtomicU32::new(0);
+    let cancel_after_first =
+        || consultations.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= 1;
+    session
+        .indexed_references_to(
+            &Name::method("Widget", "spin"),
+            &[
+                Arc::from(UNRESOLVED_WIDGET.0),
+                Arc::from(UNRESOLVED_CALLER.0),
+            ],
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &cancel_after_first,
+        )
+        .map(|refs| refs.len())
+}
+
+/// Seeding the symbol index adds no file, so an unresolved replay is served as is.
+#[test]
+fn warm_start_replay_serves_unresolved_files_until_growth() {
+    let dir = create_temp_dir("warm_start_unresolved_fresh");
+    let mut session = warm_session_with_unresolved_replay(dir.path());
+    assert_eq!(spin_references_without_reanalysis(&mut session), Some(1));
+}
+
+/// A first ingest of a file the seeded index already holds adds no name.
+#[test]
+fn ingesting_an_indexed_file_keeps_unresolved_replays_fresh() {
+    let dir = create_temp_dir("warm_start_ingest_indexed");
+    let mut session = warm_session_with_unresolved_replay(dir.path());
+    session.ingest_file(
+        Arc::from(UNRESOLVED_WIDGET.0),
+        Arc::from(UNRESOLVED_WIDGET.1),
+    );
+    assert_eq!(spin_references_without_reanalysis(&mut session), Some(1));
+}
+
+/// A new file can resolve the missing name, so the replay must be re-verified.
+#[test]
+fn ingesting_a_new_file_makes_unresolved_replays_stale() {
+    let dir = create_temp_dir("warm_start_ingest_new");
+    let mut session = warm_session_with_unresolved_replay(dir.path());
+    session.ingest_file(Arc::from("later.php"), Arc::from("<?php\nclass Later {}\n"));
+    assert_eq!(spin_references_without_reanalysis(&mut session), None);
+}
+
 /// The counterpart: a replay whose cached issues include an unresolved name
 /// is re-verified once the workspace grows — live analysis of the empty
 /// class overwrites the fabricated posting.

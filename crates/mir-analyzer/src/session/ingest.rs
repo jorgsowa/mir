@@ -20,6 +20,9 @@ struct WarmStartHit {
 /// Reconciliation rounds `settle_workspace_index_cancellable` performs before handing the pending set to the next caller.
 const SETTLE_ROUNDS: usize = 4;
 
+/// Unseen files parsed pre-index to spare cached missing names; beyond this, evict them all.
+const PRE_INDEX_DECLARATION_SCAN_BUDGET: usize = 256;
+
 type ChangedInput = (Arc<str>, Arc<str>, bool);
 type IndexedSources = (Vec<crate::db::SourceFile>, Vec<ChangedInput>);
 
@@ -110,18 +113,47 @@ impl AnalysisSession {
         };
         if changed {
             self.index.clear_dependency_graph_cache();
-            if let Some(cache) = self.cache.as_deref() {
-                let invalidate_path = was_registered || !cache.matches_content(&path, &text);
-                if invalidate_path {
-                    cache.evict_files_and_dependents(&[path.to_string()]);
-                }
-                if !had_index {
-                    cache.evict_unresolved();
-                }
+            let new_content = self.evict_for_new_content(&path, &text, was_registered);
+            if new_content && !had_index {
+                self.evict_unresolved_declared_by(&[path.to_string()]);
             }
             self.evict_unresolvable_for_file(&path);
         }
         sf
+    }
+
+    /// Evict what depends on `path` unless the cache knows `text`; returns whether it was new.
+    fn evict_for_new_content(&self, path: &Arc<str>, text: &str, was_registered: bool) -> bool {
+        let Some(cache) = self.cache.as_deref() else {
+            return false;
+        };
+        let unchanged = cache.observe_dependency(path, text);
+        let new_content = was_registered || !unchanged;
+        if new_content {
+            cache.evict_files_and_dependents(&[path.to_string()]);
+        }
+        new_content
+    }
+
+    /// Pre-index mirror writes can't queue for settling, so reconcile missing names here.
+    fn evict_unresolved_declared_by(&mut self, paths: &[String]) {
+        let Some(cache) = self.cache.clone() else {
+            return;
+        };
+        if paths.is_empty() || !cache.has_unresolved() {
+            return;
+        }
+        self.pre_index_declaration_scans += paths.len();
+        if self.pre_index_declaration_scans > PRE_INDEX_DECLARATION_SCAN_BUDGET {
+            cache.evict_unresolved();
+            return;
+        }
+        let db = &self.db.salsa;
+        let mut declared = crate::cache::DeclaredNames::default();
+        for sf in paths.iter().filter_map(|p| db.lookup_source_file(p)) {
+            declared.add_declarations(crate::db::collect_file_declarations(db, sf));
+        }
+        cache.evict_unresolved_declaring(&declared);
     }
 
     /// Look up an existing [`crate::db::SourceFile`] handle by path.
@@ -240,7 +272,10 @@ impl AnalysisSession {
                 stale.remove(file.as_ref());
             }
         }
-        if !re_added.is_empty() {
+        let already_indexed = self
+            .lookup_source_file(file.as_ref())
+            .is_some_and(|sf| self.db.salsa.file_declarations_match(sf, &new_decls));
+        if !re_added.is_empty() && !already_indexed {
             // A newly-defined symbol may resolve references other files'
             // commits left unresolved; advance the workspace generation so
             // their freshness passes re-verify. New-file registration bumps
@@ -357,21 +392,10 @@ impl AnalysisSession {
             (changed, existing.is_some(), index_was_initialized)
         };
         self.index.clear_dependency_graph_cache();
-        // Before the workspace index singleton exists, mirror-only writes
-        // cannot be queued for `settle_workspace_index`. A newly registered
-        // file can nevertheless make an unresolved name in any cached
-        // analysis resolvable, so invalidate those results immediately. Once
-        // the singleton exists, reconciliation coalesces this invalidation
-        // across the pending batch.
         if changed {
-            if let Some(cache) = self.cache.as_deref() {
-                let invalidate_path = was_registered || !cache.matches_content(&file, &source);
-                if invalidate_path {
-                    cache.evict_files_and_dependents(&[file.to_string()]);
-                }
-                if !index_was_initialized {
-                    cache.evict_unresolved();
-                }
+            let new_content = self.evict_for_new_content(&file, &source, was_registered);
+            if new_content && !index_was_initialized {
+                self.evict_unresolved_declared_by(&[file.to_string()]);
             }
         }
         self.evict_unresolvable_for_file(&file);
@@ -391,31 +415,40 @@ impl AnalysisSession {
     {
         self.index.clear_transient_batch_replay();
         self.index.clear_dependency_graph_cache();
-        // One revision bump for the batch, not one per registered file.
-        let mut session = self.defer_revision_bumps();
-        let db = &mut session.db.salsa;
-        let index_was_initialized = db.workspace_symbol_index_singleton().is_some();
-        let mut changed_inputs = Vec::new();
-        for (file, source) in files {
-            let existing = db.lookup_source_file(file.as_ref());
-            if existing.is_none_or(|sf| sf.text(db).as_ref() != source.as_ref()) {
-                changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
+        let index_was_initialized = self.db.salsa.workspace_symbol_index_singleton().is_some();
+        let changed_inputs: Vec<ChangedInput> = {
+            // One revision bump for the batch, not one per registered file.
+            let mut session = self.defer_revision_bumps();
+            let db = &mut session.db.salsa;
+            let mut changed_inputs = Vec::new();
+            for (file, source) in files {
+                let existing = db.lookup_source_file(file.as_ref());
+                if existing.is_none_or(|sf| sf.text(db).as_ref() != source.as_ref()) {
+                    changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
+                }
+                db.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
             }
-            db.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
-        }
-        if let Some(cache) = session.cache.as_deref() {
-            let paths: Vec<String> = changed_inputs
-                .iter()
-                .filter(|(file, source, existed)| {
-                    let unchanged = cache.observe_dependency(file, source);
-                    *existed || !unchanged
-                })
-                .map(|(file, _, _)| file.to_string())
-                .collect();
-            cache.evict_files_and_dependents(&paths);
-            if !index_was_initialized && !changed_inputs.is_empty() {
-                cache.evict_unresolved();
-            }
+            changed_inputs
+        };
+        self.evict_for_new_inputs(&changed_inputs, index_was_initialized);
+    }
+
+    /// Bulk form of the per-file eviction in [`Self::set_file_text`].
+    fn evict_for_new_inputs(&mut self, changed_inputs: &[ChangedInput], index_exists: bool) {
+        let Some(cache) = self.cache.as_deref() else {
+            return;
+        };
+        let paths: Vec<String> = changed_inputs
+            .iter()
+            .filter(|(file, source, existed)| {
+                let unchanged = cache.observe_dependency(file, source);
+                *existed || !unchanged
+            })
+            .map(|(file, _, _)| file.to_string())
+            .collect();
+        cache.evict_files_and_dependents(&paths);
+        if !index_exists {
+            self.evict_unresolved_declared_by(&paths);
         }
     }
 
@@ -452,10 +485,10 @@ impl AnalysisSession {
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
         self.index.clear_dependency_graph_cache();
-        // One revision bump for the batch, not one per registered file.
-        let mut session = self.defer_revision_bumps();
-        let index_was_initialized = session.workspace_symbol_index_ready();
+        let index_was_initialized = self.workspace_symbol_index_ready();
         let (registered_paths, changed_inputs): (Vec<Arc<str>>, Vec<ChangedInput>) = {
+            // One revision bump for the batch, not one per registered file.
+            let mut session = self.defer_revision_bumps();
             let db = &mut session.db.salsa;
             let mut registered = Vec::new();
             let mut changed = Vec::new();
@@ -469,19 +502,9 @@ impl AnalysisSession {
             }
             (registered, changed)
         };
-        if let Some(cache) = session.cache.as_deref() {
-            let paths: Vec<String> = changed_inputs
-                .iter()
-                .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
-                .map(|(file, _, _)| file.to_string())
-                .collect();
-            cache.evict_files_and_dependents(&paths);
-            if !index_was_initialized && !changed_inputs.is_empty() {
-                cache.evict_unresolved();
-            }
-        }
-        if !registered_paths.is_empty() && session.resolver.is_some() {
-            session.evict_unresolvable_for_files(&registered_paths);
+        self.evict_for_new_inputs(&changed_inputs, index_was_initialized);
+        if !registered_paths.is_empty() && self.resolver.is_some() {
+            self.evict_unresolvable_for_files(&registered_paths);
         }
     }
 
@@ -640,12 +663,7 @@ impl AnalysisSession {
                 .collect();
             let mut declared = crate::cache::DeclaredNames::default();
             for (_, file_decls) in decls.iter().filter(|(sf, _)| changed_files.contains(sf)) {
-                for decl in file_decls.class_like() {
-                    declared.add_class_like(decl.name.as_str());
-                }
-                for decl in file_decls.functions().chain(file_decls.constants()) {
-                    declared.add_function_or_constant(decl.name.as_str());
-                }
+                declared.add_declarations(file_decls);
             }
             cache.evict_unresolved_declaring(&declared);
         }
@@ -728,8 +746,8 @@ impl AnalysisSession {
     /// Returns every file whose replayed postings carry an unresolved name
     /// (`live_analyzed: false` in `RefCommit` terms) — these are seeded, but
     /// `indexed_references_to`'s freshness pass can never treat them as
-    /// immune to growth, so the *first* query that touches one of them pays
-    /// a full `analyze_file` synchronously on the request path (measured:
+    /// immune to growth, so once the workspace grows the *first* query that
+    /// touches one of them pays a full `analyze_file` on the request path (measured:
     /// ~1.3-1.5s on a distinctive static method in a 15K-file workspace).
     /// The subset is known right here, at warm-start time — a caller with
     /// idle time between warm-start and the first live query (e.g. an LSP
@@ -775,11 +793,6 @@ impl AnalysisSession {
                 );
             }
         }
-
-        // Generation after registration: replayed postings reflect a *prior*
-        // session's workspace, so any later file/symbol add must re-verify
-        // them (the None-output mark below also disables resolved immunity).
-        let commit_gen = self.index_generation();
 
         // Phase 1: read the disk-cache slices in parallel — the actual I/O
         // cost of a warm-start replay at scale (~0.8-0.9s of a 3.9s warm boot
@@ -847,6 +860,7 @@ impl AnalysisSession {
         // Phase 2: apply — only cheap salsa input writes and map merges.
         let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
             Vec::with_capacity(hits.len());
+        let mut replayed: Vec<(crate::db::SourceFile, Arc<str>, bool)> = Vec::new();
         let mut unresolved: Vec<Arc<str>> = Vec::new();
         let mut structural_symbols: Vec<(Arc<str>, Arc<[mir_types::Name]>)> = Vec::new();
         let mut dependency_graph_changed = false;
@@ -863,8 +877,7 @@ impl AnalysisSession {
                 if let Some((locs, resolved)) = refs {
                     let file_no = db.intern_path(&file);
                     db.set_file_reference_locations(file_no, locs);
-                    self.index
-                        .mark_ref_committed(sf, &stored_text, None, commit_gen, resolved);
+                    replayed.push((sf, stored_text.clone(), resolved));
                     dependency_graph_changed = true;
                     if !resolved {
                         unresolved.push(file.clone());
@@ -882,6 +895,12 @@ impl AnalysisSession {
         }
         // Seed first: an unseeded `symbol_defining_file` runs the tracked all-files walk.
         self.seed_workspace_index_from_warm_start(seed_decls);
+        // Stamped after seeding, which moves the generation without adding a file.
+        let commit_gen = self.index_generation();
+        for (sf, text, resolved) in &replayed {
+            self.index
+                .mark_ref_committed(*sf, text, None, commit_gen, *resolved);
+        }
         for (file, symbols) in &structural_symbols {
             let targets = structural_targets(&self.db.salsa, file, symbols);
             self.last_structural_targets
@@ -1051,9 +1070,14 @@ impl AnalysisSession {
                 return false;
             }
             let db = &mut self.db.salsa;
-            let declarations_changed = decls
-                .iter()
-                .any(|(sf, decls)| !db.file_declarations_match(*sf, decls));
+            let mut declarations_changed = false;
+            let mut declared = crate::cache::DeclaredNames::default();
+            for (sf, file_decls) in &decls {
+                if !db.file_declarations_match(*sf, file_decls) {
+                    declarations_changed = true;
+                    declared.add_declarations(file_decls);
+                }
+            }
             let old_index = if declarations_changed && self.cache.is_some() {
                 db.workspace_symbol_index_singleton()
                     .map(|singleton| singleton.index(db).clone())
@@ -1083,9 +1107,7 @@ impl AnalysisSession {
             // dependency edge. Body-only edits leave these entries intact.
             if let Some(cache) = self.cache.as_deref() {
                 cache.evict_with_dependents(&displaced_owners);
-                if declarations_changed {
-                    cache.evict_unresolved();
-                }
+                cache.evict_unresolved_declaring(&declared);
             }
             claim.commit();
         }
