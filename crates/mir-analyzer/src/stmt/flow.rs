@@ -697,6 +697,12 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.expr_analyzer(ctx)
                         .check_property_readonly_write(pa, ctx, var.span, false, true);
                 } else if let php_ast::owned::ExprKind::ArrayAccess(aa) = &var.kind {
+                    if let (php_ast::owned::ExprKind::Variable(name), Some(key)) = (
+                        &aa.array.kind,
+                        crate::expr::assignment::literal_key_name(aa.index.as_ref()),
+                    ) {
+                        ctx.write_key_taint(name, Some(key), crate::taint::Taint::NONE, true);
+                    }
                     // `unset($this->arr['key'])` mutates the property's
                     // contents just as much as `unset($this->prop)` does --
                     // walk through any nested array-access layers to find a

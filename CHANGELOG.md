@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `unset($a['x'])` drops that element's taint from the rest of the array.
 - `isset($map[$x])` and `array_key_exists($x, $map)` clear `$x` when the map's keys are all literal.
 - `in_array($x, self::ALLOWED, true)`, a global `const` list and `$x === self::A` clear the taint of `$x`, as literals at the call do.
 - A taint guard stored in a variable (`$ok = ctype_digit($x); if ($ok)`) clears its subject when the variable is tested.
