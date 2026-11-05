@@ -562,7 +562,7 @@ function pg_cancel_query(#[LanguageLevelTypeAware(['8.1' => '\PgSql\Connection']
  * <b>pg_query_params</b> or <b>pg_execute</b>
  * (among others).
  * </p>
- * @param int $row <p>
+ * @param string|int|null $row <p>
  * Row number in result to fetch. Rows are numbered from 0 upwards. If omitted,
  * next row is fetched.
  * </p>
@@ -585,7 +585,7 @@ function pg_fetch_result(
     #[LanguageLevelTypeAware(['8.1' => '\PgSql\Result'], default: 'resource')] $result,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $row = 0,
     #[PhpStormStubsElementAvailable(from: '8.0')] $row,
-    string|int $field
+    string|int $field = 0
 ): string|false|null {}
 
 /**
@@ -950,7 +950,7 @@ function pg_field_type_oid(#[LanguageLevelTypeAware(['8.1' => '\PgSql\Result'], 
  * <b>pg_query_params</b> or <b>pg_execute</b>
  * (among others).
  * </p>
- * @param int $row Row number in result. Rows are numbered from 0 upwards. If omitted, current row
+ * @param string|int|null $row Row number in result. Rows are numbered from 0 upwards. If omitted, current row
  * is fetched.
  * @param mixed $field [optional]
  * @return int|false The field printed length, or <b>FALSE</b> on error.
@@ -959,7 +959,7 @@ function pg_field_prtlen(
     #[LanguageLevelTypeAware(['8.1' => '\PgSql\Result'], default: 'resource')] $result,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $row = 0,
     #[PhpStormStubsElementAvailable(from: '8.0')] $row,
-    string|int $field
+    string|int $field = 0
 ): int|false {}
 
 /**
@@ -970,7 +970,7 @@ function pg_field_prtlen(
  * <b>pg_query_params</b> or <b>pg_execute</b>
  * (among others).
  * </p>
- * @param int $row <p>
+ * @param string|int|null $row <p>
  * Row number in result to fetch. Rows are numbered from 0 upwards. If omitted,
  * current row is fetched.
  * </p>
@@ -985,7 +985,7 @@ function pg_field_is_null(
     #[LanguageLevelTypeAware(['8.1' => '\PgSql\Result'], default: 'resource')] $result,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $row = 0,
     #[PhpStormStubsElementAvailable(from: '8.0')] $row,
-    string|int $field
+    string|int $field = 0
 ): int|false {}
 
 /**

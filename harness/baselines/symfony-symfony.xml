@@ -2504,12 +2504,6 @@
       <code><![CDATA[ImageInterface]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/VarDumper/Caster/PgSqlCaster.php">
-    <NullArgument>
-      <code><![CDATA[null]]></code>
-      <code><![CDATA[null]]></code>
-    </NullArgument>
-  </file>
   <file src="src/Symfony/Component/VarDumper/Caster/ProxyManagerCaster.php">
     <UndefinedClass>
       <code><![CDATA[ProxyInterface]]></code>
