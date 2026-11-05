@@ -63,7 +63,7 @@ pub(crate) use core::{
     memoized_receiver_key, method_call_key, narrow_receiver_non_null,
     narrow_receiver_non_null_on_prop_match, promote_assignment_effects, prop_receiver_type,
     receiver_key_is_stable, resolve_prop_current_type, resolve_static_prop_current_type,
-    MatchSubject,
+    store_instanceof_assignment, MatchSubject,
 };
 use core::{
     array_access_under_prop_hops, extract_class_name, extract_null_coalesce,
@@ -150,6 +150,11 @@ pub fn narrow_from_condition(
     }
     if let Some(var) = crate::taint::proven_object(expr, is_true) {
         crate::taint::guard_object(ctx, var);
+    }
+    if let ExprKind::Variable(var) = &expr.kind {
+        if let Some(check) = ctx.stored_instanceof(var) {
+            narrow_from_condition(&check, ctx, is_true, db, file);
+        }
     }
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression

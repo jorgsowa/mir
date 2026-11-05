@@ -709,6 +709,31 @@ pub(super) fn same_literal(a: &php_ast::owned::Expr, b: &php_ast::owned::Expr) -
     }
 }
 
+/// Records `$is = $x instanceof C` for a later `if ($is)`.
+pub(crate) fn store_instanceof_assignment(a: &php_ast::owned::AssignExpr, ctx: &mut FlowState) {
+    if a.by_ref {
+        if let ExprKind::Variable(subject) = &peel_parens(&a.value).kind {
+            ctx.drop_stored_instanceofs_on(subject);
+        }
+        return;
+    }
+    if a.op != AssignOp::Assign {
+        return;
+    }
+    let (ExprKind::Variable(var), value) = (&a.target.kind, peel_parens(&a.value)) else {
+        return;
+    };
+    if let ExprKind::Binary(b) = &value.kind {
+        if let (BinaryOp::Instanceof, ExprKind::Variable(subject)) =
+            (b.op, &peel_parens(&b.left).kind)
+        {
+            if subject != var {
+                ctx.store_instanceof(var, subject, value);
+            }
+        }
+    }
+}
+
 pub(super) fn peel_parens(expr: &php_ast::owned::Expr) -> &php_ast::owned::Expr {
     match &expr.kind {
         ExprKind::Parenthesized(inner) => peel_parens(inner),

@@ -1536,9 +1536,6 @@
     <InvalidArgument>
       <code><![CDATA[$this->tempFileObject ? time() : $this->file->getMTime()]]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->tempFileObject = $isTemporaryFile ? $file : null]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/Request.php">
     <InvalidArgument>

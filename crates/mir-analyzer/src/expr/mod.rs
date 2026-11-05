@@ -747,7 +747,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             // --- Assignment -------------------------------------------------
-            ExprKind::Assign(a) => self.analyze_assign(a, expr.span, ctx),
+            ExprKind::Assign(a) => {
+                let ty = self.analyze_assign(a, expr.span, ctx);
+                crate::narrowing::store_instanceof_assignment(a, ctx);
+                ty
+            }
 
             // --- Binary operations ------------------------------------------
             ExprKind::Binary(b) => self.analyze_binary_expr(b, expr.span, ctx),

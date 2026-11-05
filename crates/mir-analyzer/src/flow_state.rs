@@ -41,6 +41,19 @@ fn extend_dead_writes_dedup(dst: &mut Vec<DeadWrite>, src: Vec<DeadWrite>) {
 // FlowState
 // ---------------------------------------------------------------------------
 
+/// An `instanceof` check on a plain variable whose result another variable holds.
+#[derive(Clone, Debug)]
+pub struct StoredInstanceof {
+    subject: Name,
+    pub check: Arc<php_ast::owned::Expr>,
+}
+
+impl PartialEq for StoredInstanceof {
+    fn eq(&self, other: &Self) -> bool {
+        self.subject == other.subject && self.check.span == other.check.span
+    }
+}
+
 /// A condition on a plain variable that guarded definitions are keyed on.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Guard {
@@ -439,6 +452,9 @@ pub struct FlowState {
     /// the same condition holds again. Key: variable, value: the guard.
     pub guarded_defs: Arc<FxHashMap<Name, Vec<Guard>>>,
 
+    /// `$is = $x instanceof C`, keyed by `$is`, so `if ($is)` can narrow `$x`.
+    pub stored_instanceofs: Arc<FxHashMap<Name, StoredInstanceof>>,
+
     /// FQCNs proven to exist in this branch via a `class_exists()` /
     /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
     /// `UndefinedClass` diagnostics inside guarded branches.
@@ -747,6 +763,7 @@ impl FlowState {
             template_param_names: Arc::new(FxHashSet::default()),
             template_typed_params: Arc::new(FxHashSet::default()),
             guarded_defs: Arc::new(FxHashMap::default()),
+            stored_instanceofs: Arc::new(FxHashMap::default()),
             class_exists_guards: FxHashSet::default(),
             class_exists_guarded_exprs: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
@@ -1096,8 +1113,38 @@ impl FlowState {
         }
     }
 
+    pub fn store_instanceof(&mut self, var: &str, subject: &str, check: &php_ast::owned::Expr) {
+        let subject = Name::from(subject);
+        let stored = StoredInstanceof {
+            subject,
+            check: Arc::new(check.clone()),
+        };
+        Arc::make_mut(&mut self.stored_instanceofs).insert(Name::from(var), stored);
+    }
+
+    /// The `instanceof` `var` holds, unless a call may have rewritten its subject.
+    pub fn stored_instanceof(&self, var: &str) -> Option<Arc<php_ast::owned::Expr>> {
+        if self.stored_instanceofs.is_empty() {
+            return None;
+        }
+        let stored = self.stored_instanceofs.get(&Name::from(var))?;
+        (!self.escaped_vars.contains_key(&stored.subject)).then(|| stored.check.clone())
+    }
+
+    /// `$r = &$x` lets later writes to `$r` change `$x` unseen.
+    pub fn drop_stored_instanceofs_on(&mut self, subject: &str) {
+        if !self.stored_instanceofs.is_empty() {
+            let subject = Name::from(subject);
+            Arc::make_mut(&mut self.stored_instanceofs).retain(|_, s| s.subject != subject);
+        }
+    }
+
     /// Drops guarded defs whose guard condition involves `name`.
     fn drop_guards_on(&mut self, name: Name) {
+        if !self.stored_instanceofs.is_empty() {
+            Arc::make_mut(&mut self.stored_instanceofs)
+                .retain(|var, stored| *var != name && stored.subject != name);
+        }
         if self.guarded_defs.values().flatten().any(|g| g.var == name) {
             let defs = Arc::make_mut(&mut self.guarded_defs);
             for guards in defs.values_mut() {
@@ -2252,6 +2299,16 @@ impl FlowState {
             }
         }
         result.guarded_defs = Arc::new(merged);
+        if !Arc::ptr_eq(&if_ctx.stored_instanceofs, &else_ctx.stored_instanceofs) {
+            result.stored_instanceofs = Arc::new(
+                if_ctx
+                    .stored_instanceofs
+                    .iter()
+                    .filter(|(var, stored)| else_ctx.stored_instanceofs.get(var) == Some(stored))
+                    .map(|(var, stored)| (*var, stored.clone()))
+                    .collect(),
+            );
+        }
         result.class_exists_guards = if_ctx
             .class_exists_guards
             .intersection(&else_ctx.class_exists_guards)
@@ -2876,6 +2933,11 @@ impl FlowState {
         );
         diff_set(&self.catch_var_names, &other.catch_var_names, &mut names);
         diff_map_keys(&self.guarded_defs, &other.guarded_defs, &mut names);
+        diff_map_keys(
+            &self.stored_instanceofs,
+            &other.stored_instanceofs,
+            &mut names,
+        );
         for (a, b) in [
             (&self.ref_aliases, &other.ref_aliases),
             (&other.ref_aliases, &self.ref_aliases),
