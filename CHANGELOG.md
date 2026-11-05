@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Output and the exit code use the severity from `<issueHandlers>`, scoped `<errorLevel>` blocks and `errorLevel`: a handler that lowers an error to a warning no longer fails the run, and one that raises a warning to an error does.
 - `filter_var`, `filter_input` and their `_array` forms read named arguments by name, so `filter_var(filter: FILTER_DEFAULT, value: $x)` keeps the taint of `$x`.
 - An empty `default:` falling into a `case` lets any value into that body, so the label no longer clears its taint or narrows its type.
 - `case true:` no longer narrows a subject that may hold other types to `true`, which hid its taint: any truthy value enters that arm.

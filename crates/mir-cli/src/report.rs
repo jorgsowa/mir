@@ -198,14 +198,17 @@ pub fn run_output(
         }
     }
 
-    let visible_issues: Vec<(&Issue, Severity)> = visible_candidates
+    // Every format and the exit code report what the config made of the issue.
+    let visible_issues: Vec<Issue> = visible_candidates
         .iter()
-        .filter_map(|(idx, issue, severity)| {
-            (!suppressed_by_baseline.contains(idx)).then_some((*issue, *severity))
+        .filter(|(idx, _, _)| !suppressed_by_baseline.contains(idx))
+        .map(|(_, issue, severity)| Issue {
+            severity: *severity,
+            ..(*issue).clone()
         })
         .collect();
 
-    let display_issues: Vec<&Issue> = visible_issues.iter().map(|(i, _)| *i).collect();
+    let display_issues: Vec<&Issue> = visible_issues.iter().collect();
 
     match cli.format {
         OutputFormat::Text => {

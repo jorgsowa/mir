@@ -5,6 +5,7 @@ mod color_output;
 mod composer_class_loader;
 mod config_outside_project_root;
 mod default_baseline_file;
+mod effective_severity;
 mod file_extensions;
 mod multiple_paths_composer_root;
 mod no_taint_flag;
