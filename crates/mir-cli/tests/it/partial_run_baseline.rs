@@ -153,7 +153,10 @@ fn baseline_above_the_workdir_matches_workdir_relative_keys() {
         String::from_utf8_lossy(&out.stdout)
     );
 
-    run(&proj, &["--baseline", "../b.xml", "--update-baseline", "src"]);
+    run(
+        &proj,
+        &["--baseline", "../b.xml", "--update-baseline", "src"],
+    );
     let updated = std::fs::read_to_string(&baseline).unwrap();
     assert_eq!(updated.matches("<code>").count(), 2, "{updated}");
 
@@ -185,7 +188,12 @@ fn partial_update_keeps_workdir_relative_keys_of_a_baseline_elsewhere() {
 
     run(
         dir.path(),
-        &["--baseline", "build/b.xml", "--update-baseline", "src/a.php"],
+        &[
+            "--baseline",
+            "build/b.xml",
+            "--update-baseline",
+            "src/a.php",
+        ],
     );
     let updated = std::fs::read_to_string(&baseline).unwrap();
     assert!(updated.contains(r#"<file src="src/a.php">"#), "{updated}");
