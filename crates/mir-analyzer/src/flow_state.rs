@@ -2309,16 +2309,19 @@ impl FlowState {
             }
         }
         result.guarded_defs = Arc::new(merged);
-        if !Arc::ptr_eq(&if_ctx.stored_checks, &else_ctx.stored_checks) {
-            result.stored_checks = Arc::new(
+        // Both branches inherit a check the condition dropped, so `pre`'s map can't stand in.
+        result.stored_checks = if Arc::ptr_eq(&if_ctx.stored_checks, &else_ctx.stored_checks) {
+            if_ctx.stored_checks.clone()
+        } else {
+            Arc::new(
                 if_ctx
                     .stored_checks
                     .iter()
                     .filter(|(var, stored)| else_ctx.stored_checks.get(var) == Some(stored))
                     .map(|(var, stored)| (*var, stored.clone()))
                     .collect(),
-            );
-        }
+            )
+        };
         result.class_exists_guards = if_ctx
             .class_exists_guards
             .intersection(&else_ctx.class_exists_guards)
