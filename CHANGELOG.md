@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `chgrp`, `finfo_file`, `exif_read_data`, `exif_thumbnail` and `imagecreatefrom*` report `TaintedFile`.
 - `igbinary_unserialize`, `yaml_parse` and `session_decode` report `TaintedUnserialize`.
 - `mb_send_mail` headers and additional parameters are sinks, as for `mail`.
 - `mysqli_execute_query`, `mysqli::execute_query`, `SQLite3::querySingle`, `mysqli_stmt::prepare`, `sqlsrv_query`, `sqlsrv_prepare` and Doctrine DBAL `Connection` query methods are SQL sinks. Only the first argument of a method sink counts, so bound parameters aren't reported.

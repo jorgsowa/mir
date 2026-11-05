@@ -244,7 +244,23 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         | "getimagesize"
         | "gzopen"
         | "gzfile"
-        | "readgzfile" => sinks![at(0, "filename", File)],
+        | "readgzfile"
+        | "chgrp"
+        | "exif_read_data"
+        | "exif_thumbnail"
+        | "imagecreatefromavif"
+        | "imagecreatefrombmp"
+        | "imagecreatefromgd"
+        | "imagecreatefromgd2"
+        | "imagecreatefromgif"
+        | "imagecreatefromjpeg"
+        | "imagecreatefrompng"
+        | "imagecreatefromtga"
+        | "imagecreatefromwbmp"
+        | "imagecreatefromwebp"
+        | "imagecreatefromxbm"
+        | "imagecreatefromxpm" => sinks![at(0, "filename", File)],
+        "finfo_file" => sinks![at(1, "filename", File)],
         "mkdir" | "rmdir" | "scandir" | "opendir" | "chdir" => sinks![at(0, "directory", File)],
         "copy" | "rename" => sinks![at(0, "from", File), at(1, "to", File)],
         "symlink" | "link" => sinks![at(0, "target", File), at(1, "link", File)],
