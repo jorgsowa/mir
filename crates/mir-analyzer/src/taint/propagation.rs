@@ -763,15 +763,23 @@ pub fn expr_taint(
                 ) {
                     return Taint::ALL;
                 }
+                // A project's own `request()` or `e()` isn't Laravel's helper: read its body instead.
+                let is_project_function = || {
+                    name.find(db, file).is_some_and(|(_, func)| {
+                        CalleeBody::of(func.location.as_ref(), file) == CalleeBody::Summarized
+                    })
+                };
                 if reads_raw_request_body(&lower_name, &fc.args)
-                    || is_request_helper_source(&lower_name, &fc.args)
+                    || (is_request_helper_source(&lower_name, &fc.args) && !is_project_function())
                 {
                     return Taint::ALL;
                 }
                 if let Some(taint) = filter_call_taint(&lower_name, &fc.args, ctx, db, file) {
                     return taint;
                 }
-                if let Some(removed) = sanitized_kinds(&lower_name) {
+                if let Some(removed) =
+                    sanitized_kinds(&lower_name).filter(|_| lower_name != "e" || !is_project_function())
+                {
                     return args_taint(&fc.args, ctx, db, file).without(removed);
                 }
                 if lower_name == "preg_replace" {
