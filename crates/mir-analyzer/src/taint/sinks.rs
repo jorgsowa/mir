@@ -280,7 +280,10 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         "ldap_search" | "ldap_list" | "ldap_read" => {
             sinks![at(1, "base", Ldap), at(2, "filter", Ldap)]
         }
-        "ldap_delete" | "ldap_compare" => sinks![at(1, "dn", Ldap)],
+        "ldap_delete" | "ldap_compare" | "ldap_bind" | "ldap_add" | "ldap_modify"
+        | "ldap_mod_add" | "ldap_mod_del" | "ldap_mod_replace" | "ldap_rename" => {
+            sinks![at(1, "dn", Ldap)]
+        }
 
         "unserialize" | "igbinary_unserialize" | "yaml_parse" | "session_decode" => {
             sinks![at(0, "data", Unserialize)]
