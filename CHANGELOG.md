@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A URL whose scheme and host come from a literal local, a constant or a `sprintf` format no longer reports `TaintedSsrf` or `TaintedFile` for what is appended.
 - `array_filter($a, 'is_numeric')` and other named value checks clear the kept elements.
 - A passing anchored `preg_match($pattern, $x, $m)` clears `$m` for the kinds it clears `$x`.
 - A project's own global `request()` or `e()` is analyzed by its body instead of being treated as Laravel's helper.

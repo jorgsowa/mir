@@ -165,12 +165,44 @@ fn is_fixed_url_origin(literal: &str) -> bool {
 }
 
 /// Whether the expression is a string that starts with a fixed `scheme://host/` origin.
-pub(super) fn starts_with_fixed_url_origin(expr: &Expr) -> bool {
+pub(super) fn starts_with_fixed_url_origin(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    let all_literals_fixed = |ty: &mir_types::Type| {
+        !ty.types.is_empty()
+            && ty.types.iter().all(
+                |a| matches!(a, mir_types::Atomic::TLiteralString(s) if is_fixed_url_origin(s)),
+            )
+    };
     match &expr.kind {
         ExprKind::String(s) => is_fixed_url_origin(s.as_str()),
-        ExprKind::Parenthesized(inner) => starts_with_fixed_url_origin(inner),
+        ExprKind::Parenthesized(inner) => starts_with_fixed_url_origin(inner, ctx, db, file),
         ExprKind::Binary(b) if matches!(b.op, php_ast::ast::BinaryOp::Concat) => {
-            starts_with_fixed_url_origin(&b.left)
+            starts_with_fixed_url_origin(&b.left, ctx, db, file)
+        }
+        ExprKind::Variable(name) => all_literals_fixed(&ctx.get_var(name)),
+        ExprKind::Name(_) | ExprKind::ClassConstAccess(_) => {
+            crate::expr::constant_expr_type(expr, ctx, db, file)
+                .is_some_and(|ty| all_literals_fixed(&ty))
+        }
+        ExprKind::FunctionCall(fc)
+            if fc
+                .name
+                .kind
+                .name_bare()
+                .is_some_and(|n| n.eq_ignore_ascii_case("sprintf")) =>
+        {
+            match fc.args.first().and_then(|a| a.value()).map(|f| &f.kind) {
+                Some(ExprKind::String(format)) => format
+                    .as_str()
+                    .split('%')
+                    .next()
+                    .is_some_and(is_fixed_url_origin),
+                _ => false,
+            }
         }
         ExprKind::InterpolatedString(_) | ExprKind::Heredoc(_) => {
             // Adjacent literal parts form one run; stop at the first interpolation.

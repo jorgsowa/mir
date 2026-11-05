@@ -674,7 +674,7 @@ pub fn expr_taint(
                 }
             };
             let taint = operand(&op.left) | operand(&op.right);
-            if concat && starts_with_fixed_url_origin(&op.left) {
+            if concat && starts_with_fixed_url_origin(&op.left, ctx, db, file) {
                 taint.without(Taint::SSRF | Taint::FILE)
             } else {
                 taint
@@ -699,7 +699,9 @@ pub fn expr_taint(
                     StringPart::Literal(_) => acc,
                     _ => acc,
                 });
-            if !matches!(expr.kind, ExprKind::ShellExec(_)) && starts_with_fixed_url_origin(expr) {
+            if !matches!(expr.kind, ExprKind::ShellExec(_))
+                && starts_with_fixed_url_origin(expr, ctx, db, file)
+            {
                 taint.without(Taint::SSRF | Taint::FILE)
             } else {
                 taint
@@ -729,7 +731,8 @@ pub fn expr_taint(
         },
 
         ExprKind::Match(m) => {
-            let arms_are_conditions = matches!(unwrap_parens(&m.subject).kind, ExprKind::Bool(true));
+            let arms_are_conditions =
+                matches!(unwrap_parens(&m.subject).kind, ExprKind::Bool(true));
             m.arms.iter().fold(Taint::NONE, |acc, arm| {
                 acc | match arm.conditions.as_deref() {
                     Some([condition]) if arms_are_conditions => {
@@ -777,8 +780,8 @@ pub fn expr_taint(
                 if let Some(taint) = filter_call_taint(&lower_name, &fc.args, ctx, db, file) {
                     return taint;
                 }
-                if let Some(removed) =
-                    sanitized_kinds(&lower_name).filter(|_| lower_name != "e" || !is_project_function())
+                if let Some(removed) = sanitized_kinds(&lower_name)
+                    .filter(|_| lower_name != "e" || !is_project_function())
                 {
                     return args_taint(&fc.args, ctx, db, file).without(removed);
                 }
@@ -793,9 +796,14 @@ pub fn expr_taint(
                     return args_taint(&fc.args, ctx, db, file).restore(restored);
                 }
                 if let Some(text) = format_text_args(&lower_name, &fc.args) {
-                    return text
+                    let taint = text
                         .into_iter()
                         .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file));
+                    return if starts_with_fixed_url_origin(expr, ctx, db, file) {
+                        taint.without(Taint::SSRF | Taint::FILE)
+                    } else {
+                        taint
+                    };
                 }
                 // `JSON_HEX_TAG` encodes `<` and `>`, so the JSON can't open a tag.
                 if lower_name == "json_encode" {
