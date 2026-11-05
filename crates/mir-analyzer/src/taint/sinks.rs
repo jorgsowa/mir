@@ -509,7 +509,6 @@ pub fn classify_constructor_sink(db: &dyn crate::db::MirDatabase, fqcn: &str) ->
         | "recursivedirectoryiterator"
         | "globiterator" => Some(SinkKind::File),
         "soapclient" => Some(SinkKind::Ssrf),
-        "reflectionclass" | "reflectionfunction" | "reflectionmethod" => Some(SinkKind::Callable),
         _ => None,
     }
 }

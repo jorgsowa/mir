@@ -30,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A user function or method that sanitizes a by-ref argument (`function s(string &$x) { $x = htmlspecialchars($x); }`) clears it at the call.
 - A failed `preg_match('/[<>"\']/', $x)` clears `$x` for the kinds those characters are needed for, which is how WordPress's `_wp_specialchars` returns its input.
 - A tainted `CURLOPT_HTTPHEADER` value in `curl_setopt` or a literal `curl_setopt_array` reports `TaintedHeader`.
-- `new ReflectionClass`, `new ReflectionFunction` and `new ReflectionMethod` report `TaintedCallable`.
 - `print_r`, `var_export` and `highlight_string` without the return flag, and `var_dump`, report `TaintedHtml`.
 - `ldap_bind`, `ldap_add`, `ldap_modify`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace` and `ldap_rename` report `TaintedLdap` for their DN.
 - `ftp_connect`, `ftp_ssl_connect`, `ssh2_connect`, `ldap_connect` and `socket_connect` report `TaintedSsrf`.
