@@ -2412,12 +2412,10 @@ impl FlowState {
                 add_taint(&mut result.key_names, *name, *taint);
             }
         }
-        // Taint: conservative union — if either branch taints a var, it stays tainted
-        for branch in [&if_ctx, &else_ctx] {
-            if Arc::ptr_eq(&branch.tainted_vars, &result.tainted_vars) {
-                continue;
-            }
-            for (name, taint) in branch.tainted_vars.iter() {
+        // A variable is tainted after the merge only if a branch left it tainted: both start from `pre`.
+        result.tainted_vars = if_ctx.tainted_vars.clone();
+        if !Arc::ptr_eq(&else_ctx.tainted_vars, &result.tainted_vars) {
+            for (name, taint) in else_ctx.tainted_vars.iter() {
                 add_taint(&mut result.tainted_vars, *name, *taint);
             }
         }
