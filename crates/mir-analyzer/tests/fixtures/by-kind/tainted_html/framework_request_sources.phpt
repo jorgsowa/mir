@@ -21,7 +21,10 @@ carry its taint.
     <InvalidReturnType errorLevel="suppress"/>
   </issueHandlers>
 </mir>
-===file===
+===file:vendor/laravel/framework/helpers.php===
+<?php
+function request(?string $key = null): mixed { return null; }
+===file:app.php===
 <?php
 namespace Symfony\Component\HttpFoundation {
     class ParameterBag {
@@ -70,7 +73,6 @@ namespace Psr\Http\Message {
 }
 
 namespace {
-    function request(?string $key = null): mixed { return null; }
     class Request {
         public static function input(string $key): mixed { return null; }
     }
