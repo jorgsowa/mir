@@ -783,7 +783,8 @@ pub fn expr_taint(
                 if let Some(removed) = sanitized_kinds(&lower_name)
                     .filter(|_| lower_name != "e" || !is_project_function())
                 {
-                    return args_taint(&fc.args, ctx, db, file).without(removed);
+                    return args_taint(&fc.args, ctx, db, file).without(removed)
+                        | args_taint(surviving_args(&lower_name, &fc.args), ctx, db, file);
                 }
                 if lower_name == "preg_replace" {
                     if let Some(safe) = crate::taint_guard::replace_safe_kinds(&fc.args) {

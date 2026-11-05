@@ -143,6 +143,28 @@ pub(super) fn sanitized_kinds(fn_name_lower: &str) -> Option<Taint> {
     })
 }
 
+/// Arguments a builtin that [`sanitized_kinds`] clears still copies into its result.
+pub(super) fn surviving_args<'e>(
+    fn_name_lower: &str,
+    args: &'e [php_ast::owned::Arg],
+) -> &'e [php_ast::owned::Arg] {
+    let raw_output = |index: usize| {
+        matches!(
+            args.get(index).and_then(|a| a.value()).map(|v| &v.kind),
+            Some(ExprKind::Bool(true))
+        )
+    };
+    let (start, end) = match fn_name_lower {
+        "md5" | "sha1" if raw_output(1) => (0, 1),
+        "hash" if raw_output(2) => (1, 2),
+        "hash_hmac" if raw_output(3) => (1, 2),
+        "uniqid" => (0, 1),
+        "number_format" => (2, 4),
+        _ => return &[],
+    };
+    &args[start.min(args.len())..end.min(args.len())]
+}
+
 /// Whether the literal text opens with `http(s)://host/` (or `ftp(s)`), fixing scheme and host
 /// so whatever is appended lands in the path or query. `host` must end at a `/`, `?` or `#`.
 fn is_fixed_url_origin(literal: &str) -> bool {

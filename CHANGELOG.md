@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `md5($x, true)` and other raw digests, the `uniqid` prefix and `number_format` separators keep the taint of the argument they copy into the result.
 - A URL whose scheme and host come from a literal local, a constant or a `sprintf` format no longer reports `TaintedSsrf` or `TaintedFile` for what is appended.
 - `array_filter($a, 'is_numeric')` and other named value checks clear the kept elements.
 - A passing anchored `preg_match($pattern, $x, $m)` clears `$m` for the kinds it clears `$x`.
