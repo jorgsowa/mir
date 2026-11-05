@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `filter_var`, `filter_input` and their `_array` forms read named arguments by name, so `filter_var(filter: FILTER_DEFAULT, value: $x)` keeps the taint of `$x`.
 - An empty `default:` falling into a `case` lets any value into that body, so the label no longer clears its taint or narrows its type.
 - `case true:` no longer narrows a subject that may hold other types to `true`, which hid its taint: any truthy value enters that arm.
 - Laravel's `$request->name` and `$request['name']` are taint sources, like `$request->input('name')`.

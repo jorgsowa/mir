@@ -69,13 +69,23 @@ pub(super) fn filter_call_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Option<Taint> {
-    let arg = |i: usize| args.get(i).and_then(|a| a.value());
-    let arg_taint = |i: usize| arg(i).map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file));
+    let arg = |i: usize, name: &str| {
+        args.iter()
+            .find(|a| a.name.as_ref().is_some_and(|n| n.last_part() == name))
+            .or_else(|| args.get(i).filter(|a| a.name.is_none()))
+            .and_then(|a| a.value())
+    };
+    let taint_of = |v: Option<&Expr>| v.map_or(Taint::NONE, |v| expr_taint(v, ctx, db, file));
     let (input, filter) = match fn_name_lower {
-        "filter_var" => (arg_taint(0), arg(1)),
-        "filter_input" => (Taint::ALL, arg(2)),
-        "filter_var_array" => return Some(filter_definition_taint(arg_taint(0), arg(1))),
-        "filter_input_array" => return Some(filter_definition_taint(Taint::ALL, arg(1))),
+        "filter_var" => (taint_of(arg(0, "value")), arg(1, "filter")),
+        "filter_input" => (Taint::ALL, arg(2, "filter")),
+        "filter_var_array" => {
+            let input = taint_of(arg(0, "array"));
+            return Some(filter_definition_taint(input, arg(1, "options")));
+        }
+        "filter_input_array" => {
+            return Some(filter_definition_taint(Taint::ALL, arg(1, "options")));
+        }
         _ => return None,
     };
     let is_callback = filter.is_some_and(|f| {
@@ -85,9 +95,9 @@ pub(super) fn filter_call_taint(
     });
     if is_callback {
         let options = if fn_name_lower == "filter_var" {
-            arg(2)
+            arg(2, "options")
         } else {
-            arg(3)
+            arg(3, "options")
         };
         return Some(input.without(callback_filter_kinds(options)));
     }
