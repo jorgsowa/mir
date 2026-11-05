@@ -1502,11 +1502,6 @@
       <code><![CDATA[$cacheControlHeader]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/HttpClient/CurlHttpClient.php">
-    <TaintedSsrf>
-      <code><![CDATA[curl_setopt($ch, \CURLOPT_PROXY, $proxy ?? '')]]></code>
-    </TaintedSsrf>
-  </file>
   <file src="src/Symfony/Component/HttpClient/GuzzleHttpHandler.php">
     <InvalidArgument>
       <code><![CDATA[$psrResponse]]></code>
