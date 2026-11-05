@@ -39,7 +39,8 @@ fn scoped_suppress_applies_only_inside_its_directory() {
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
-    );
+    )
+    .replace('\\', "/");
     assert!(
         combined.contains("src/a.php") && combined.contains("PossiblyUndefinedVariable"),
         "issue outside the scope must still be reported, got:\n{combined}"

@@ -460,18 +460,23 @@ fn baseline_dir(baseline_path: &Path) -> Option<PathBuf> {
 
 /// Baseline keys are relative to the baseline's directory; issues carry absolute or cwd-relative (`./src`) paths.
 fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
+    // `/` on every platform, so a baseline written on Windows matches elsewhere.
+    let key = |path: &Path| {
+        path.to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/")
+    };
     let path = Path::new(file);
     let Some(dir) = baseline_dir else {
-        return file.to_string();
+        return key(path);
     };
     if let Ok(rel) = path.strip_prefix(dir) {
-        return rel.to_string_lossy().into_owned();
+        return key(rel);
     }
     let normalized = normalize_for_compare(&cwd().join(path));
     if let Ok(rel) = normalized.strip_prefix(dir) {
-        return rel.to_string_lossy().into_owned();
+        return key(rel);
     }
-    file.to_string()
+    key(path)
 }
 
 /// An issue as `--format json` prints it: `taint_trace` only on taint issues.
