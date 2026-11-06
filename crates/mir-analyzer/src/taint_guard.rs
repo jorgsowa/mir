@@ -753,6 +753,7 @@ fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'
             1,
         ),
         "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
+        "str_starts_with" => (fixed_origin_prefix_safe_kinds(&fc.args, scope)?, 0),
         _ => (value_check_safe_kinds(&lower)?, 0),
     };
     let value = fc.args.get(subject)?;
@@ -761,6 +762,21 @@ fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'
     }
     let guarded = guarded_subject(value.value()?)?;
     (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+}
+
+/// `str_starts_with($u, 'https://host/')` fixes the scheme and host, as a literal prefix does.
+fn fixed_origin_prefix_safe_kinds(args: &[Arg], scope: GuardScope<'_>) -> Option<Taint> {
+    let [_, prefix] = args else {
+        return None;
+    };
+    (prefix.name.is_none()
+        && crate::taint::starts_with_fixed_url_origin(
+            prefix.value()?,
+            scope.ctx,
+            scope.db,
+            scope.file,
+        ))
+    .then_some(Taint::SSRF | Taint::FILE)
 }
 
 /// Kinds a value is safe for once the one-argument check `name_lower` accepted it.

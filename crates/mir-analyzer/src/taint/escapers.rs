@@ -256,7 +256,7 @@ fn is_fixed_url_origin(literal: &str) -> bool {
 }
 
 /// Whether the expression is a string that starts with a fixed `scheme://host/` origin.
-pub(super) fn starts_with_fixed_url_origin(
+pub fn starts_with_fixed_url_origin(
     expr: &Expr,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
