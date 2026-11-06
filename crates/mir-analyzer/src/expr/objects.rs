@@ -1596,8 +1596,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                             return Type::mixed();
                         };
                         let here = crate::db::Fqcn::from_str(self.db, self_fqcn);
+                        let uncollected = crate::flow_state::self_is_uncollected(self.db, ctx);
                         let found =
-                            crate::db::find_class_constant_in_chain(self.db, here, &const_name);
+                            crate::db::find_class_constant_in_chain(self.db, here, &const_name)
+                                .or_else(|| {
+                                    let parent =
+                                        ctx.parent_fqcn.as_deref().filter(|_| uncollected)?;
+                                    let parent = crate::db::Fqcn::from_str(self.db, parent);
+                                    crate::db::find_class_constant_in_chain(
+                                        self.db,
+                                        parent,
+                                        &const_name,
+                                    )
+                                });
                         // Inside a trait, `self::`/`static::CONST` may be
                         // defined on the using class via late static binding,
                         // not the trait itself — skip the undefined check.
@@ -1609,6 +1620,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         if found.is_none()
                             && !deferred_to_subclass
+                            && !uncollected
                             && !crate::db::has_unknown_ancestor(self.db, self_fqcn)
                             && !crate::flow_state::self_is_trait(self.db, ctx)
                         {

@@ -569,7 +569,13 @@ impl CallAnalyzer {
             }
         }
 
-        let resolved = resolve_method_from_db(ea.db, &fqcn_arc, &method_name_lower);
+        let resolved = resolve_method_from_db(ea.db, &fqcn_arc, &method_name_lower).or_else(|| {
+            let parent = ctx.parent_fqcn.as_ref().filter(|_| {
+                ctx.self_fqcn.as_deref() == Some(fqcn.as_str())
+                    && crate::flow_state::self_is_uncollected(ea.db, ctx)
+            })?;
+            resolve_method_from_db(ea.db, parent, &method_name_lower)
+        });
 
         if let Some(resolved) = resolved {
             ea.record_ref(
@@ -1508,6 +1514,8 @@ impl CallAnalyzer {
         } else if !crate::db::class_exists(ea.db, &fqcn)
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
             && !ctx.is_class_guarded(fqcn.as_str())
+            && !(ctx.self_fqcn.as_deref() == Some(fqcn.as_str())
+                && crate::flow_state::self_is_uncollected(ea.db, ctx))
         {
             // The class itself couldn't be resolved, but `fqcn` is still a
             // concrete name (e.g. an external/vendor FQCN we just have no

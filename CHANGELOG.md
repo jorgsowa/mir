@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `self::`/`static::` in an anonymous class no longer report `UndefinedConstant` or `UndefinedClass`; inherited constants and static methods resolve through the parent class.
 - Call-site variance in docblock type arguments (`Collection<int, covariant Model>`) is understood: the argument accepts any subtype of `Model` instead of being read as a class named `covariant Model`.
 - Taint: a payload passed to Laravel's `Encrypter::decrypt()` or `decryptString()` no longer reaches `unserialize()` or the result, since the encrypter checks a keyed MAC first.
 

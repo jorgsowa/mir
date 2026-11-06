@@ -2627,6 +2627,13 @@ pub(crate) fn self_is_trait(db: &dyn crate::db::MirDatabase, ctx: &FlowState) ->
         .is_some_and(|f| crate::db::class_kind(db, f).is_some_and(|k| k.is_trait))
 }
 
+/// Whether `self` is a class the codebase doesn't hold (an anonymous class), so its own members are unknown.
+pub(crate) fn self_is_uncollected(db: &dyn crate::db::MirDatabase, ctx: &FlowState) -> bool {
+    ctx.self_fqcn
+        .as_deref()
+        .is_some_and(|f| crate::db::class_kind(db, f).is_none())
+}
+
 /// One hop of a taint trail: the expression's source text and span in this file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TrailStep {

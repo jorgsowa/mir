@@ -1033,12 +1033,6 @@
       <code><![CDATA[$values($input)]]></code>
     </TooFewArguments>
   </file>
-  <file src="src/Symfony/Component/Console/Output/TestOutput.php">
-    <UndefinedConstant>
-      <code><![CDATA[self::OUTPUT_RAW]]></code>
-      <code><![CDATA[self::VERBOSITY_QUIET]]></code>
-    </UndefinedConstant>
-  </file>
   <file src="src/Symfony/Component/Console/Terminal.php">
     <NullableReturnStatement>
       <code><![CDATA[return self::$colorMode;]]></code>
@@ -2404,8 +2398,8 @@
       <code><![CDATA[Type::collection($type, $variableTypes[1], $variableTypes[0])]]></code>
       <code><![CDATA[Type::collection($type)]]></code>
       <code><![CDATA[Type::generic($type, ...$variableTypes)]]></code>
-      <code><![CDATA[Type::object($className)]]></code>
       <code><![CDATA[Type::intersection(...$types)]]></code>
+      <code><![CDATA[Type::object($className)]]></code>
     </InvalidTemplateParam>
     <TooFewArguments>
       <code><![CDATA[new Lexer()]]></code>
