@@ -77,17 +77,18 @@ pub(super) fn narrow_element(
     let current = match refined {
         Some(refined) => refined,
         None => {
-            // Shapes track their keys already; only generic arrays and lists are handled here.
+            // A literal key into a shape is narrowed by the shape itself; a variable key
+            // may name any of a closed shape's entries.
+            let variable_key = key.starts_with("[$");
             let base = prop_receiver_type(ctx, &receiver, db, file);
             let generic = !base.types.is_empty()
-                && base.types.iter().all(|a| {
-                    matches!(
-                        a,
-                        Atomic::TArray { .. }
-                            | Atomic::TNonEmptyArray { .. }
-                            | Atomic::TList { .. }
-                            | Atomic::TNonEmptyList { .. }
-                    )
+                && base.types.iter().all(|a| match a {
+                    Atomic::TArray { .. }
+                    | Atomic::TNonEmptyArray { .. }
+                    | Atomic::TList { .. }
+                    | Atomic::TNonEmptyList { .. } => true,
+                    Atomic::TKeyedArray { is_open, .. } => variable_key && !is_open,
+                    _ => false,
                 });
             match mir_types::union::eval_value_of_type(&base).filter(|_| generic) {
                 Some(value) => value,
