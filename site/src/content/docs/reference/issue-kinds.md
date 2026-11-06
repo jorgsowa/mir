@@ -50,6 +50,9 @@ All issue types mir can emit, grouped by category.
 | `InvalidNamedArgument` | A named argument does not correspond to any parameter of the callable. |
 | `InvalidPassByReference` | A by-reference parameter receives an expression that cannot be referenced. |
 | `InvalidPropertyAssignment` | A value assigned to a property is incompatible with the property's declared type. |
+| `PossiblyNullPropertyAssignmentValue` | A value assigned to a property may be `null`, which the property's type doesn't accept. |
+| `PossiblyFalsePropertyAssignmentValue` | A value assigned to a property may be `false`, which the property's type doesn't accept. |
+| `PossiblyInvalidPropertyAssignmentValue` | Only some types of a value assigned to a property match the property's type. |
 | `InvalidCast` | A cast from an array or object to a scalar type always produces a meaningless result. |
 | `InvalidOperand` | An operator is applied to incompatible types. |
 | `MismatchingDocblockReturnType` | The @return docblock type conflicts with the native return type hint. |

@@ -279,14 +279,16 @@ pub(crate) fn check_one(
     {
         // For union arg types, check if any individual atomic fits the param.
         // If some atomics fit and some don't → PossiblyInvalidArgument; otherwise → InvalidArgument.
-        let any_atomic_fits = !arg_ty.is_single()
+        let any_atomic_fits = (!arg_ty.is_single()
             && arg_ty.types.iter().any(|a| {
                 let single = Type::single(a.clone());
                 scalar_arg_fits_param(&single, param_ty)
                     || named_object_subtype(&single, param_ty, ea)
                     || array_list_compatible(&single, param_ty, ea)
                     || stringable_coercion_ok(&single, param_ty, ea)
-            });
+            }))
+            || crate::expr::helpers::without_shape_nulls(arg_ty)
+                .is_some_and(|t| scalar_arg_fits_param(&t, param_ty));
         if any_atomic_fits {
             ea.emit(
                 IssueKind::PossiblyInvalidArgument {

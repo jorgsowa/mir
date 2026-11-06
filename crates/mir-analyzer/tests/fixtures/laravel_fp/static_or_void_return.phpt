@@ -15,6 +15,7 @@ for `void` even when `void` is a union member. Fixed by adding a
     <MixedMethodCall errorLevel="suppress"/>
     <MixedReturnStatement errorLevel="suppress"/>
     <InvalidPropertyAssignment errorLevel="suppress"/>
+    <PossiblyInvalidPropertyAssignmentValue errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===

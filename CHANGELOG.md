@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A value a property accepts only in part is reported as `PossiblyNullPropertyAssignmentValue`, `PossiblyFalsePropertyAssignmentValue` or `PossiblyInvalidPropertyAssignmentValue` (info, Psalm's names) instead of `InvalidPropertyAssignment`; an `InvalidPropertyAssignment` baseline entry still matches them.
+- An array shape argument that fits once `null` is removed from its values is `PossiblyInvalidArgument` instead of `InvalidArgument`.
+
 ### Fixed
 
 - Taint: a function that iterates a parameter's keys into a sink is tainted by the argument's keys, not its values, so `f(['a' => $_GET['x']])` is no longer reported.

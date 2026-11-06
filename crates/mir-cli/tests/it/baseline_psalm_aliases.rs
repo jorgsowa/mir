@@ -194,3 +194,33 @@ fn generic_tainted_input_entries_consume_dedicated_sink_kinds() {
         .collect();
     assert_eq!(tainted, Vec::<String>::new());
 }
+
+#[test]
+fn invalid_property_assignment_entries_consume_partly_valid_assignments() {
+    let dir = TempDir::new().expect("failed to create temp dir");
+    std::fs::write(
+        dir.path().join("a.php"),
+        "<?php\nclass C {\n    public int $n = 0;\n    public function f(?int $x): void { $this->n = $x; }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("psalm-baseline.xml"),
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<files>\n  <file src=\"a.php\">\n{}  </file>\n</files>\n",
+            entry("InvalidPropertyAssignment", "$this->n = $x")
+        ),
+    )
+    .unwrap();
+
+    let out = run(
+        dir.path(),
+        &["--format", "json", "--show-info", "--report-stale-baseline"],
+    );
+
+    assert_eq!(emitted_kinds(&out), Vec::<String>::new());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}

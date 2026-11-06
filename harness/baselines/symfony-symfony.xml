@@ -1,24 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/Symfony/Bridge/Doctrine/Attribute/MapEntity.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$clone->class ??= class_exists($class ?? '') || interface_exists($class ?? '', false) ? $class : null]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Bridge/Doctrine/ContainerAwareEventManager.php">
     <InvalidReturnType>
       <code><![CDATA[return spl_object_id($listener);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Bridge/Doctrine/DependencyInjection/CompilerPass/RegisterEventListenersAndSubscribersPass.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->connections = $container->getParameter($this->connectionsParameter)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Bridge/Doctrine/Form/ChoiceList/IdReader.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->idField = current($ids)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Bridge/Doctrine/Security/RememberMe/DoctrineTokenProvider.php">
     <InvalidArgument>
@@ -435,35 +420,14 @@
     </UndefinedMethod>
   </file>
   <file src="src/Symfony/Component/AssetMapper/Compressor/BrotliCompressor.php">
-    <InvalidArgument>
-      <code><![CDATA[[$this->executable, '--best', '--force', "--output=$path.".self::FILE_EXTENSION, '--', $path]]]></code>
-    </InvalidArgument>
     <UndefinedConstant>
       <code><![CDATA[BROTLI_COMPRESS_LEVEL_MAX]]></code>
     </UndefinedConstant>
   </file>
-  <file src="src/Symfony/Component/AssetMapper/Compressor/GzipCompressor.php">
-    <InvalidArgument>
-      <code><![CDATA[[$this->executable, '--best', '--force', '--keep', '--', $path]]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/AssetMapper/Compressor/ZopfliCompressor.php">
-    <InvalidArgument>
-      <code><![CDATA[[$this->executable, '--', $path]]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/AssetMapper/Compressor/ZstandardCompressor.php">
-    <InvalidArgument>
-      <code><![CDATA[[$this->executable, '-19', '--force', '-o', "$path.".self::FILE_EXTENSION, '--', $path]]]></code>
-    </InvalidArgument>
     <UndefinedConstant>
       <code><![CDATA[\ZSTD_COMPRESS_LEVEL_MAX]]></code>
     </UndefinedConstant>
-  </file>
-  <file src="src/Symfony/Component/BrowserKit/AbstractBrowser.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->redirect = $this->internalResponse->getHeader('Location')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/BrowserKit/Test/Constraint/BrowserCookieValueSame.php">
     <UndefinedClass>
@@ -485,178 +449,10 @@
       <code><![CDATA[Constraint]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/Cache/Adapter/AbstractAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
-            static function ($key, $value, $isHit) {
-                $item = new CacheItem();
-                $item->key = $key;
-                $item->value = $value;
-                $item->isHit = $isHit;
-                $item->unpack();
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-      <code><![CDATA[self::$mergeByLifetime ??= \Closure::bind(
-            static function ($deferred, $namespace, &$expiredIds, $getId, $defaultLifetime) {
-                $byLifetime = [];
-                $now = microtime(true);
-                $expiredIds = [];
-
-                foreach ($deferred as $key => $item) {
-                    $key = (string) $key;
-                    if (null === $item->expiry) {
-                        $ttl = 0 < $defaultLifetime ? $defaultLifetime : 0;
-                    } elseif (!$item->expiry) {
-                        $ttl = 0;
-                    } elseif (0 >= $ttl = (int) (0.1 + $item->expiry - $now)) {
-                        $expiredIds[] = $getId($key);
-                        continue;
-                    }
-                    $byLifetime[$ttl][$getId($key)] = $item->pack();
-                }
-
-                return $byLifetime;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Cache/Adapter/AbstractTagAwareAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
-            static function ($key, $value, $isHit) {
-                $item = new CacheItem();
-                $item->key = $key;
-                $item->isTaggable = true;
-                // If structure does not match what we expect return item as is (no value and not a hit)
-                if (!\is_array($value) || !\array_key_exists('value', $value)) {
-                    return $item;
-                }
-                $item->isHit = $isHit;
-                // Extract value, tags and meta data from the cache value
-                $item->value = $value['value'];
-                $item->metadata[CacheItem::METADATA_TAGS] = isset($value['tags']) ? array_combine($value['tags'], $value['tags']) : [];
-                if (isset($value['meta'])) {
-                    // For compactness these values are packed, & expiry is offset to reduce size
-                    $v = unpack('Ve/Nc', $value['meta']);
-                    $item->metadata[CacheItem::METADATA_EXPIRY] = $v['e'] + CacheItem::METADATA_EXPIRY_OFFSET;
-                    $item->metadata[CacheItem::METADATA_CTIME] = $v['c'];
-                }
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-      <code><![CDATA[self::$mergeByLifetime ??= \Closure::bind(
-            static function ($deferred, &$expiredIds, $getId, $tagPrefix, $defaultLifetime, $rootNamespace) {
-                $byLifetime = [];
-                $now = microtime(true);
-                $expiredIds = [];
-
-                foreach ($deferred as $key => $item) {
-                    $key = (string) $key;
-                    if (null === $item->expiry) {
-                        $ttl = 0 < $defaultLifetime ? $defaultLifetime : 0;
-                    } elseif (!$item->expiry) {
-                        $ttl = 0;
-                    } elseif (0 >= $ttl = (int) (0.1 + $item->expiry - $now)) {
-                        $expiredIds[] = $getId($key);
-                        continue;
-                    }
-                    // Store Value and Tags on the cache value
-                    if (isset(($metadata = $item->newMetadata)[CacheItem::METADATA_TAGS])) {
-                        $value = ['value' => $item->value, 'tags' => $metadata[CacheItem::METADATA_TAGS]];
-                        unset($metadata[CacheItem::METADATA_TAGS]);
-                    } else {
-                        $value = ['value' => $item->value, 'tags' => []];
-                    }
-
-                    if ($metadata) {
-                        // For compactness, expiry and creation duration are packed, using magic numbers as separators
-                        $value['meta'] = pack('VN', (int) (0.1 + $metadata[CacheItem::METADATA_EXPIRY] - CacheItem::METADATA_EXPIRY_OFFSET), $metadata[CacheItem::METADATA_CTIME]);
-                    }
-
-                    // Extract tag changes, these should be removed from values in doSave()
-                    // All tags are added, as the item may have been removed from them since it was fetched
-                    $value['tag-operations'] = ['add' => [], 'remove' => []];
-                    $oldTags = $item->metadata[CacheItem::METADATA_TAGS] ?? [];
-                    foreach ($value['tags'] as $tag) {
-                        $value['tag-operations']['add'][] = $getId($tagPrefix.$tag, $rootNamespace);
-                    }
-                    foreach (array_diff_key($oldTags, $value['tags']) as $removedTag) {
-                        $value['tag-operations']['remove'][] = $getId($tagPrefix.$removedTag, $rootNamespace);
-                    }
-                    $value['tags'] = array_keys($value['tags']);
-
-                    $byLifetime[$ttl][$getId($key)] = $value;
-                    $item->metadata = $item->newMetadata;
-                }
-
-                return $byLifetime;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Cache/Adapter/ApcuAdapter.php">
     <NullableReturnStatement>
       <code><![CDATA[return $failed;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Cache/Adapter/ArrayAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
-            static function ($key, $value, $isHit, $tags, $expiry = null, $clock = null) {
-                $item = new CacheItem();
-                $item->key = $key;
-                $item->value = $value;
-                $item->isHit = $isHit;
-                $item->clock = $clock;
-                if (null !== $tags) {
-                    $item->metadata[CacheItem::METADATA_TAGS] = $tags;
-                }
-                if (null !== $expiry) {
-                    $item->metadata[CacheItem::METADATA_EXPIRY] = $expiry;
-                }
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Cache/Adapter/ChainAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$syncItem ??= \Closure::bind(
-            static function ($sourceItem, $item, $defaultLifetime, $sourceMetadata = null) {
-                $sourceItem->isTaggable = false;
-                $sourceMetadata ??= $sourceItem->metadata;
-
-                $item->value = $sourceItem->value;
-                $item->isHit = $sourceItem->isHit;
-                $item->metadata = $item->newMetadata = $sourceItem->metadata = $sourceMetadata;
-
-                if (isset($item->metadata[CacheItem::METADATA_EXPIRY])) {
-                    $item->expiresAt(\DateTimeImmutable::createFromFormat('U.u', \sprintf('%.6F', $item->metadata[CacheItem::METADATA_EXPIRY])));
-                } elseif (0 < $defaultLifetime) {
-                    $item->expiresAfter($defaultLifetime);
-                    $item->newMetadata[CacheItem::METADATA_EXPIRY] = $item->expiry;
-                }
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/CouchbaseCollectionAdapter.php">
     <NullableReturnStatement>
@@ -684,22 +480,6 @@
       <code><![CDATA[return $this->checkResultCode($this->getClient()->setMulti($encodedValues, $lifetime)) ? $failed : false;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Cache/Adapter/NullAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
-            static function ($key) {
-                $item = new CacheItem();
-                $item->isTaggable = true;
-                $item->key = $key;
-                $item->isHit = false;
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Cache/Adapter/ParameterNormalizer.php">
     <InvalidReturnType>
       <code><![CDATA[return $duration;]]></code>
@@ -711,57 +491,9 @@
       <code><![CDATA[return $failed;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Cache/Adapter/PhpArrayAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
-            static function ($key, $value, $isHit) {
-                $item = new CacheItem();
-                $item->key = $key;
-                $item->value = $value;
-                $item->isHit = $isHit;
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Cache/Adapter/ProxyAdapter.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->poolHash = spl_object_id($pool)]]></code>
-      <code><![CDATA[self::$createCacheItem ??= \Closure::bind(
-            static function ($key, $innerItem, $poolHash) {
-                $item = new CacheItem();
-                $item->key = $key;
-
-                if (null === $innerItem) {
-                    return $item;
-                }
-
-                $item->value = $innerItem->get();
-                $item->isHit = $innerItem->isHit();
-                $item->innerItem = $innerItem;
-                $item->poolHash = $poolHash;
-
-                if (!$item->unpack() && $innerItem instanceof CacheItem) {
-                    $item->metadata = $innerItem->metadata;
-                }
-                $innerItem->set(null);
-
-                return $item;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-      <code><![CDATA[self::$setInnerItem ??= \Closure::bind(
-            static function (CacheItemInterface $innerItem, CacheItem $item, $expiry = null) {
-                $innerItem->set($item->pack());
-                $innerItem->expiresAt(($expiry ?? $item->expiry) ? \DateTimeImmutable::createFromFormat('U.u', \sprintf('%.6F', $expiry ?? $item->expiry)) : null);
-            },
-            null,
-            CacheItem::class
-        )]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/RedisTagAwareAdapter.php">
@@ -776,72 +508,9 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/Cache/Adapter/TagAwareAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$setCacheItemTags ??= \Closure::bind(
-            static function (array $items, array $itemTags) {
-                foreach ($items as $key => $item) {
-                    $item->isTaggable = true;
-
-                    if (isset($itemTags[$key])) {
-                        $tags = array_keys($itemTags[$key]);
-                        $item->metadata[CacheItem::METADATA_TAGS] = array_combine($tags, $tags);
-                    } else {
-                        $item->value = null;
-                        $item->isHit = false;
-                        $item->metadata = [];
-                    }
-                }
-
-                return $items;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-      <code><![CDATA[self::$setTagVersions ??= \Closure::bind(
-            static function (array $items, array $tagVersions) {
-                foreach ($items as $item) {
-                    $item->newMetadata[CacheItem::METADATA_TAGS] = array_intersect_key($tagVersions, $item->newMetadata[CacheItem::METADATA_TAGS] ?? []);
-                }
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-      <code><![CDATA[self::$getTagsByKey ??= \Closure::bind(
-            static function ($deferred) {
-                $tagsByKey = [];
-                foreach ($deferred as $key => $item) {
-                    $tagsByKey[$key] = $item->newMetadata[CacheItem::METADATA_TAGS] ?? [];
-                    $item->metadata = $item->newMetadata;
-                }
-
-                return $tagsByKey;
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-      <code><![CDATA[self::$saveTags ??= \Closure::bind(
-            static function (AdapterInterface $tagsAdapter, array $tags) {
-                ksort($tags);
-
-                foreach ($tags as $v) {
-                    $v->expiry = 0;
-                    $tagsAdapter->saveDeferred($v);
-                }
-
-                return $tagsAdapter->commit();
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Cache/CacheItem.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->metadata = unpack('Vexpiry/Nctime', substr($k, 1, -1))]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Cache/Marshaller/DefaultMarshaller.php">
     <UndefinedFunction>
@@ -854,23 +523,6 @@
     <InvalidReturnType>
       <code><![CDATA[return '@' === $callback[0] ? $reverseContainer->getService(substr($callback, 1)) : $callback;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Cache/Psr16Cache.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$packCacheItem ??= \Closure::bind(
-            static function (CacheItem $item) {
-                if (!isset($item->metadata[ItemInterface::METADATA_CTIME])) {
-                    return $item->value;
-                }
-
-                $item->newMetadata = $item->metadata;
-
-                return $item->pack();
-            },
-            null,
-            CacheItem::class
-        )]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Cache/Traits/FilesystemTrait.php">
     <NullableReturnStatement>
@@ -893,11 +545,6 @@
       <code><![CDATA[RedisCluster]]></code>
       <code><![CDATA[ClusterInterface]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Component/Clock/MonotonicClock.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->sOffset = $time[1] - $offset[0]]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Config/Definition/Dumper/XmlReferenceDumper.php">
     <NullableReturnStatement>
@@ -961,12 +608,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->arguments = $input->getArguments()]]></code>
       <code><![CDATA[$this->options = $input->getOptions()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Console/Completion/CompletionInput.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->completionName = $argumentName]]></code>
-      <code><![CDATA[$this->completionName = $argumentName]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Console/Descriptor/XmlDescriptor.php">
@@ -1167,9 +808,6 @@
     </InvalidTemplateParam>
   </file>
   <file src="src/Symfony/Component/DependencyInjection/ReverseContainer.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->getServiceId = \Closure::bind(fn (object $service): ?string => array_search($service, $this->services, true) ?: array_search($service, $this->privates, true) ?: null, $serviceContainer, Container::class)]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[array_search($service, $this->services, true) ?: array_search($service, $this->privates, true) ?: null]]></code>
     </InvalidReturnType>
@@ -1187,18 +825,9 @@
     </UndefinedMethod>
   </file>
   <file src="src/Symfony/Component/DomCrawler/Field/ChoiceFormField.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->checkedRadio = array_key_last($this->options)]]></code>
-      <code><![CDATA[$this->selectedOption = array_key_last($this->options)]]></code>
-    </InvalidPropertyAssignment>
     <UndefinedMethod>
       <code><![CDATA[$option->hasAttribute('selected')]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Component/DomCrawler/Form.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->node = $node]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/DomCrawler/Test/Constraint/CrawlerAnySelectorTextContains.php">
     <UndefinedClass>
@@ -1249,14 +878,6 @@
     <InvalidArgument>
       <code><![CDATA[$throw]]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->configureException = \Closure::bind(static function ($e, $trace, $file = null, $line = null) use ($traceReflector) {
-            $traceReflector->setValue($e, $trace);
-            $e->file = $file ?? $e->file;
-            $e->line = $line ?? $e->line;
-        }, null, new class extends \Exception {
-        })]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/ErrorHandler/ErrorRenderer/HtmlErrorRenderer.php">
     <NullableReturnStatement>
@@ -1407,11 +1028,6 @@
       <code><![CDATA[return $this->listener;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="src/Symfony/Component/EventDispatcher/DependencyInjection/RegisterListenersPass.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[ExtractingEventDispatcher::$aliases = $aliases]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/EventDispatcher/GenericEvent.php">
     <InvalidReturnType>
       <code><![CDATA[return new \ArrayIterator($this->arguments);]]></code>
@@ -1426,13 +1042,6 @@
       <code><![CDATA[$token->value]]></code>
       <code><![CDATA[$token->value]]></code>
     </ImplicitFloatToIntCast>
-  </file>
-  <file src="src/Symfony/Component/Form/ChoiceList/ArrayChoiceList.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->choices = $choicesByValues]]></code>
-      <code><![CDATA[$this->originalKeys = $keysByValues]]></code>
-      <code><![CDATA[$this->structuredValues = $structuredValues]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToHtml5LocalDateTimeTransformer.php">
     <InvalidArgument>
@@ -1476,9 +1085,6 @@
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Form/Extension/Validator/Constraints/FormValidator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$fieldFormConstraint->groups = $group]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->resolvedGroups[$form];]]></code>
     </InvalidReturnType>
@@ -1518,20 +1124,10 @@
       <code><![CDATA[$psrResponse]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/HttpClient/Internal/AmpBody.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->offset = ftell($body)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/HttpClient/Internal/AmpResolver.php">
     <NullArgument>
       <code><![CDATA[$ip]]></code>
     </NullArgument>
-  </file>
-  <file src="src/Symfony/Component/HttpClient/Internal/CurlClientState.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$curlVersion ??= curl_version()]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpClient/MockHttpClient.php">
     <UndefinedMethod>
@@ -1558,11 +1154,6 @@
       <code><![CDATA[Client]]></code>
       <code><![CDATA[Client]]></code>
     </UndefinedClass>
-  </file>
-  <file src="src/Symfony/Component/HttpFoundation/Session/Storage/Proxy/SessionHandlerProxy.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->saveHandlerName = $this->wrapper || ($handler instanceof StrictSessionHandler && $handler->isWrapper()) ? \ini_get('session.save_handler') : 'user']]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/Test/Constraint/RequestAttributeValueSame.php">
     <UndefinedClass>
@@ -1629,11 +1220,6 @@
       <code><![CDATA[$this->serializer->deserialize($data, $type, $format, self::CONTEXT_DESERIALIZE + $attribute->serializationContext)]]></code>
     </InvalidTemplateParam>
   </file>
-  <file src="src/Symfony/Component/HttpKernel/DataCollector/DumpDataCollector.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->fileLinkFormat = $fileLinkFormat instanceof FileLinkFormatter && false === $fileLinkFormat->format('', 0) ? false : $fileLinkFormat]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/HttpKernel/Event/ControllerEvent.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->controller;]]></code>
@@ -1689,7 +1275,6 @@
   </file>
   <file src="src/Symfony/Component/Intl/Data/Generator/LocaleDataGenerator.php">
     <InvalidArgument>
-      <code><![CDATA[['Languages', \Locale::getPrimaryLanguage($locale)]]]></code>
       <code><![CDATA[[$extra,  $part]]]></code>
       <code><![CDATA[[$name,  $extra]]]></code>
     </InvalidArgument>
@@ -1881,18 +1466,6 @@
       <code><![CDATA[return $id;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Messenger/Bridge/Redis/Transport/RedisReceiver.php">
-    <InvalidArgument>
-      <code><![CDATA[$redisEnvelope = [
-                        'body' => \is_string($redisEnvelope['body']) ? $redisEnvelope['body'] : null,
-                        'headers' => $redisEnvelope['headers'],
-                    ]]]></code>
-      <code><![CDATA[[
-                    'body' => \is_string($redisEnvelope['body']) ? $redisEnvelope['body'] : null,
-                    'headers' => $redisEnvelope['headers'],
-                ]]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Messenger/Command/ConsumeMessagesCommand.php">
     <ImplicitFloatToIntCast>
       <code><![CDATA[$limit]]></code>
@@ -1916,11 +1489,6 @@
   <file src="src/Symfony/Component/Messenger/Transport/Serialization/Serializer.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->classToTypeMap = array_flip($this->typeToClassMap)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Mime/Crypto/SMimeSigner.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->extraCerts = $extraCerts ? realpath($extraCerts) : null]]></code>
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Mime/Header/ParameterizedHeader.php">
@@ -2030,38 +1598,12 @@
       <code><![CDATA[return $this->transports[$transport]->send($message);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/ObjectMapper/Condition/SourceClass.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->sources = \is_array($className) ? $className : [$className]]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/ObjectMapper/Condition/TargetClass.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->targets = \is_array($className) ? $className : [$className]]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/ObjectMapper/ObjectMapper.php">
     <InvalidArgument>
       <code><![CDATA[$if]]></code>
       <code><![CDATA[$if]]></code>
       <code><![CDATA[$transform]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/OptionsResolver/Debug/OptionsResolverIntrospector.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->get = \Closure::bind(function ($property, $option, $message) {
-            /** @var OptionsResolver $this */
-            if (!$this->isDefined($option)) {
-                throw new UndefinedOptionsException(\sprintf('The option "%s" does not exist.', $option));
-            }
-
-            if (!\array_key_exists($option, $this->{$property})) {
-                throw new NoConfigurationException($message);
-            }
-
-            return $this->{$property}[$option];
-        }, $optionsResolver, $optionsResolver)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/OptionsResolver/OptionsResolver.php">
     <InvalidReturnType>
@@ -2089,13 +1631,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Process/Process.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->cwd = getcwd()]]></code>
-      <code><![CDATA[$this->incrementalOutputOffset = ftell($this->stdout)]]></code>
-      <code><![CDATA[$this->incrementalOutputOffset = ftell($this->stdout)]]></code>
-      <code><![CDATA[$this->incrementalErrorOutputOffset = ftell($this->stderr)]]></code>
-      <code><![CDATA[$this->incrementalErrorOutputOffset = ftell($this->stderr)]]></code>
-    </InvalidPropertyAssignment>
     <NullableReturnStatement>
       <code><![CDATA[return $this->exitcode;]]></code>
       <code><![CDATA[return $this->starttime;]]></code>
@@ -2182,20 +1717,10 @@
       <code><![CDATA[frankenphp_handle_request($handler)]]></code>
     </UndefinedFunction>
   </file>
-  <file src="src/Symfony/Component/Scheduler/Trigger/CallbackTrigger.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->description = $description ?? spl_object_id($this->callback)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Scheduler/Trigger/CronExpressionTrigger.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->expression->getExpression();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Security/Core/Authorization/AccessDecisionManager.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$vote->voter = $voter instanceof \Stringable ? $voter : get_debug_type($voter)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Security/Core/Test/AccessDecisionStrategyTestCase.php">
     <UndefinedClass>
@@ -2279,27 +1804,11 @@
     </UnhandledMatchCondition>
   </file>
   <file src="src/Symfony/Component/String/AbstractUnicodeString.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string, $compat ? \Normalizer::NFKC : \Normalizer::NFC)]]></code>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string, \Normalizer::NFKC_CF)]]></code>
-      <code><![CDATA[$str->string = $transliterator->transliterate($str->string)]]></code>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
-      <code><![CDATA[$str->string = $transliterator->transliterate($str->string)]]></code>
-      <code><![CDATA[$str->string = $transliterator->transliterate($str->string)]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $codePoints;]]></code>
     </InvalidReturnType>
   </file>
   <file src="src/Symfony/Component/String/UnicodeString.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string)]]></code>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string, $form)]]></code>
-      <code><![CDATA[$str->string = normalizer_normalize($str->string)]]></code>
-      <code><![CDATA[$this->string = normalizer_normalize($this->string)]]></code>
-      <code><![CDATA[$this->string = normalizer_normalize($this->string)]]></code>
-    </InvalidPropertyAssignment>
     <NullableReturnStatement>
       <code><![CDATA[return grapheme_strlen($this->string);]]></code>
     </NullableReturnStatement>
@@ -2402,11 +1911,6 @@
       <code><![CDATA[new Lexer()]]></code>
     </TooFewArguments>
   </file>
-  <file src="src/Symfony/Component/Uid/Ulid.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$rand = $r]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Uid/UuidV6.php">
     <ImplicitFloatToIntCast>
       <code><![CDATA[10000 * hexdec(substr($uuid, 20, 3)) + substr($time, -4)]]></code>
@@ -2414,11 +1918,6 @@
     <InvalidArgument>
       <code><![CDATA[$ms]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Uid/UuidV7.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$rand = unpack(\PHP_INT_SIZE >= 8 ? 'L*' : 'S*', isset(self::$seed) ? random_bytes(8) : self::$seed = random_bytes(16))]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Validator/Constraints/DateValidator.php">
     <InvalidArgument>
@@ -2431,11 +1930,6 @@
     <InvalidArgument>
       <code><![CDATA[false]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Validator/Constraints/File.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->maxSize = $matches[1] * $factors[$unit = strtolower($matches[2])]]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Validator/Constraints/FileValidator.php">
     <ImplicitFloatToIntCast>
@@ -2566,25 +2060,10 @@
       <code><![CDATA[UuidInterface]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/VarDumper/Caster/XmlReaderCaster.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$info[$props]->cut = $count]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/VarDumper/Cloner/Data.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$item->type = $item->class]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/VarExporter/Internal/LazyDecoratorTrait.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->lazyObjectState->realInstance;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/WebLink/Link.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$that->href = $href]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Webhook/Client/AbstractRequestParser.php">
     <InvalidCatch>

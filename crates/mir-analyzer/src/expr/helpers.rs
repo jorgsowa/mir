@@ -1,4 +1,5 @@
 use crate::ast_ext::ByteStringExt as _;
+use mir_issues::IssueKind;
 use mir_types::{ArrayKey, Atomic, Name, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Expr, ExprKind};
@@ -1604,6 +1605,83 @@ pub(crate) fn type_refs_any_template(ty: &Type, names: &FxHashSet<Name>) -> bool
 
 fn scalar_types_compatible(value_ty: &Type, prop_ty: &Type) -> bool {
     value_ty.is_subtype_structural(prop_ty)
+}
+
+/// `ty` with `null` removed from its array shapes' values; `None` when it has none to remove.
+pub(crate) fn without_shape_nulls(ty: &Type) -> Option<Type> {
+    let mut changed = false;
+    let types = ty
+        .types
+        .iter()
+        .map(|atom| match atom {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } if properties
+                .values()
+                .any(|p| p.ty.is_nullable() && !p.ty.is_mixed()) =>
+            {
+                changed = true;
+                let mut properties = (**properties).clone();
+                for prop in properties.values_mut() {
+                    if !prop.ty.is_mixed() {
+                        prop.ty = prop.ty.remove_null();
+                    }
+                }
+                Atomic::TKeyedArray {
+                    properties: std::sync::Arc::new(properties),
+                    is_open: *is_open,
+                    is_list: *is_list,
+                }
+            }
+            other => other.clone(),
+        })
+        .collect();
+    changed.then(|| Type::from_vec(types))
+}
+
+/// The milder kind for a value the property rejects only in part: the rest fits once
+/// `null` or `false` is removed, or some of its members fit.
+pub(crate) fn partial_property_assignment(
+    value_ty: &Type,
+    prop_ty: &Type,
+    property: &str,
+    expected: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> Option<IssueKind> {
+    let fits = |t: &Type| !t.types.is_empty() && property_assign_compatible(t, prop_ty, db);
+    let (property, expected, actual) = (
+        property.to_string(),
+        expected.to_string(),
+        value_ty.to_string(),
+    );
+    if value_ty.is_nullable() && fits(&value_ty.remove_null()) {
+        return Some(IssueKind::PossiblyNullPropertyAssignmentValue {
+            property,
+            expected,
+            actual,
+        });
+    }
+    if value_ty.contains(|a| matches!(a, Atomic::TFalse)) && fits(&value_ty.remove_false()) {
+        return Some(IssueKind::PossiblyFalsePropertyAssignmentValue {
+            property,
+            expected,
+            actual,
+        });
+    }
+    let some_member_fits = !value_ty.is_single()
+        && value_ty
+            .types
+            .iter()
+            .any(|a| fits(&Type::single(a.clone())));
+    (some_member_fits || without_shape_nulls(value_ty).is_some_and(|t| fits(&t))).then_some(
+        IssueKind::PossiblyInvalidPropertyAssignmentValue {
+            property,
+            expected,
+            actual,
+        },
+    )
 }
 
 pub(crate) fn property_assign_compatible(

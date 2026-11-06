@@ -590,6 +590,10 @@ fn psalm_kind_aliases(mir_kind: &str) -> &'static [&'static str] {
             "TypeDoesNotContainType",
             "TypeDoesNotContainNull",
         ],
+        // Baselines written before partly valid assignments had their own kinds.
+        "PossiblyNullPropertyAssignmentValue"
+        | "PossiblyFalsePropertyAssignmentValue"
+        | "PossiblyInvalidPropertyAssignmentValue" => &["InvalidPropertyAssignment"],
         // Baselines written before these sinks had their own kinds.
         "TaintedFile" | "TaintedInclude" | "TaintedEval" | "TaintedUnserialize" => {
             &["TaintedInput"]

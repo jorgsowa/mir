@@ -237,6 +237,27 @@ pub enum IssueKind {
         expected: String,
         actual: String,
     },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_property_assignment/`.
+    PossiblyNullPropertyAssignmentValue {
+        property: String,
+        expected: String,
+        actual: String,
+    },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_property_assignment/`.
+    PossiblyFalsePropertyAssignmentValue {
+        property: String,
+        expected: String,
+        actual: String,
+    },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_property_assignment/`.
+    PossiblyInvalidPropertyAssignmentValue {
+        property: String,
+        expected: String,
+        actual: String,
+    },
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_cast/`.
     InvalidCast { from: String, to: String },
@@ -1108,7 +1129,10 @@ impl IssueKind {
             | IssueKind::PossiblyInvalidClone { .. }
             | IssueKind::PossiblyInvalidOperand { .. }
             | IssueKind::PossiblyNullOperand { .. }
-            | IssueKind::PossiblyRawObjectIteration { .. } => Severity::Info,
+            | IssueKind::PossiblyRawObjectIteration { .. }
+            | IssueKind::PossiblyNullPropertyAssignmentValue { .. }
+            | IssueKind::PossiblyFalsePropertyAssignmentValue { .. }
+            | IssueKind::PossiblyInvalidPropertyAssignmentValue { .. } => Severity::Info,
 
             IssueKind::RawObjectIteration { .. } => Severity::Warning,
 
@@ -1259,6 +1283,9 @@ impl IssueKind {
             IssueKind::PossiblyInvalidArrayAccess { .. } => "MIR0227",
             IssueKind::InvalidArrayAssignment { .. } => "MIR0220",
             IssueKind::InvalidPropertyAssignment { .. } => "MIR0206",
+            IssueKind::PossiblyNullPropertyAssignmentValue { .. } => "MIR0232",
+            IssueKind::PossiblyFalsePropertyAssignmentValue { .. } => "MIR0233",
+            IssueKind::PossiblyInvalidPropertyAssignmentValue { .. } => "MIR0234",
             IssueKind::InvalidCast { .. } => "MIR0207",
             IssueKind::InvalidStaticInvocation { .. } => "MIR0215",
             IssueKind::InvalidOperand { .. } => "MIR0208",
@@ -1478,16 +1505,16 @@ impl IssueKind {
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
-            | "MIR0209" | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400"
-            | "MIR0401" | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504"
-            | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0509" | "MIR0901" | "MIR1000" | "MIR1001"
-            | "MIR1002" | "MIR1003" | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008"
-            | "MIR1009" | "MIR1010" | "MIR1011" | "MIR1012" | "MIR1013" | "MIR1014" | "MIR1100"
-            | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105" | "MIR1200" | "MIR1201"
-            | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210"
-            | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1508" | "MIR1600"
-            | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407" | "MIR0902"
-            | "MIR1510" => Some(Severity::Info),
+            | "MIR0232" | "MIR0233" | "MIR0234" | "MIR0209" | "MIR0210" | "MIR0213" | "MIR0214"
+            | "MIR0221" | "MIR0223" | "MIR0400" | "MIR0401" | "MIR0402" | "MIR0403" | "MIR0501"
+            | "MIR0502" | "MIR0503" | "MIR0504" | "MIR0505" | "MIR0507" | "MIR0508" | "MIR0509"
+            | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003" | "MIR1004" | "MIR1005"
+            | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011" | "MIR1012"
+            | "MIR1013" | "MIR1014" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104"
+            | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
+            | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
+            | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
+            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1539,6 +1566,15 @@ impl IssueKind {
             IssueKind::PossiblyInvalidArrayAccess { .. } => "PossiblyInvalidArrayAccess",
             IssueKind::InvalidArrayAssignment { .. } => "InvalidArrayAssignment",
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
+            IssueKind::PossiblyNullPropertyAssignmentValue { .. } => {
+                "PossiblyNullPropertyAssignmentValue"
+            }
+            IssueKind::PossiblyFalsePropertyAssignmentValue { .. } => {
+                "PossiblyFalsePropertyAssignmentValue"
+            }
+            IssueKind::PossiblyInvalidPropertyAssignmentValue { .. } => {
+                "PossiblyInvalidPropertyAssignmentValue"
+            }
             IssueKind::InvalidCast { .. } => "InvalidCast",
             IssueKind::InvalidStaticInvocation { .. } => "InvalidStaticInvocation",
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
@@ -1925,6 +1961,27 @@ impl IssueKind {
                 actual,
             } => {
                 format!("Property ${property} expects '{expected}', cannot assign '{actual}'")
+            }
+            IssueKind::PossiblyNullPropertyAssignmentValue {
+                property,
+                expected,
+                actual,
+            } => {
+                format!("Property ${property} expects '{expected}', the assigned '{actual}' might be null")
+            }
+            IssueKind::PossiblyFalsePropertyAssignmentValue {
+                property,
+                expected,
+                actual,
+            } => {
+                format!("Property ${property} expects '{expected}', the assigned '{actual}' might be false")
+            }
+            IssueKind::PossiblyInvalidPropertyAssignmentValue {
+                property,
+                expected,
+                actual,
+            } => {
+                format!("Property ${property} expects '{expected}', the assigned '{actual}' might not match")
             }
             IssueKind::InvalidCast { from, to } => {
                 format!("Cannot cast '{from}' to '{to}'")
@@ -2903,6 +2960,21 @@ mod code_tests {
                 expected: s(),
                 actual: s(),
             },
+            IssueKind::PossiblyNullPropertyAssignmentValue {
+                property: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::PossiblyFalsePropertyAssignmentValue {
+                property: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::PossiblyInvalidPropertyAssignmentValue {
+                property: s(),
+                expected: s(),
+                actual: s(),
+            },
             IssueKind::InvalidCast { from: s(), to: s() },
             IssueKind::InvalidStaticInvocation {
                 class: s(),
@@ -3325,6 +3397,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 185);
+        assert_eq!(one_of_each().len(), 188);
     }
 }

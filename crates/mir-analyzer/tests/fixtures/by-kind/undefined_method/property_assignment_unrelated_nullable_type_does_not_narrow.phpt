@@ -23,7 +23,7 @@ class Widget {
     }
     public function load(): void {
         $this->item = $this->finder->find();
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $item expects 'Base', cannot assign 'Other|null'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidPropertyAssignmentValue: Property $item expects 'Base', the assigned 'Other|null' might not match
         $this->item->extra();
 //      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::extra() does not exist
     }

@@ -1,8 +1,9 @@
 use super::helpers::{
     as_concat_str, definite_key_state, extract_simple_var, extract_string_from_expr,
     infer_arithmetic, infer_div, infer_int_range_arithmetic, is_non_empty_when_concat,
-    is_property_type_coercion, literal_array_key_of_kind, property_assign_compatible,
-    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key, DefiniteKeyState,
+    is_property_type_coercion, literal_array_key_of_kind, partial_property_assignment,
+    property_assign_compatible, type_refs_any_template, widen_array_as_list,
+    widen_array_with_value_and_key, DefiniteKeyState,
 };
 use super::ExpressionAnalyzer;
 use crate::ast_ext::ByteStringExt as _;
@@ -2144,6 +2145,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                     Severity::Info,
                                                     span,
                                                 );
+                                            } else if let Some(kind) = partial_property_assignment(
+                                                &ty,
+                                                &compat_ty,
+                                                &prop_name,
+                                                &resolved_prop_ty,
+                                                self.db,
+                                            ) {
+                                                let severity = kind.default_severity();
+                                                self.emit(kind, severity, span);
                                             } else {
                                                 self.emit(
                                                     IssueKind::InvalidPropertyAssignment {
@@ -2381,6 +2391,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 Severity::Info,
                                                 span,
                                             );
+                                        } else if let Some(kind) = partial_property_assignment(
+                                            &ty,
+                                            &compat_ty,
+                                            &prop_name,
+                                            &resolved_prop_ty,
+                                            self.db,
+                                        ) {
+                                            let severity = kind.default_severity();
+                                            self.emit(kind, severity, span);
                                         } else {
                                             self.emit(
                                                 IssueKind::InvalidPropertyAssignment {

@@ -24,7 +24,7 @@ class Widget {
     }
     public function load(): void {
         $this->item = $this->finder->find();
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $item expects 'Base', cannot assign 'Derived|null'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullPropertyAssignmentValue: Property $item expects 'Base', the assigned 'Derived|null' might be null
         $this->item->extra();
 //      ^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method extra() on possibly null value
     }

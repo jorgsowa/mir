@@ -30,7 +30,7 @@ function test_open_shape_survives_merge(bool $cond, array $openArr, array $listA
         $arr = $listArr;
     }
     $s->x = $arr;
-//  ^^^^^^^^^^^^ InvalidPropertyAssignment: Property $x expects 'list<int>', cannot assign 'array{}|list<int>'
+//  ^^^^^^^^^^^^ PossiblyInvalidPropertyAssignmentValue: Property $x expects 'list<int>', the assigned 'array{}|list<int>' might not match
 }
 
 /**

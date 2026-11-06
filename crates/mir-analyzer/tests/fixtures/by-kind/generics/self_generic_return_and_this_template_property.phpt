@@ -39,7 +39,7 @@ class NodeDef implements ParentNode {
     /** @param NodeDef $other */
     public function copyTo(NodeDef $other, ?ParentNode $parent): void {
         $other->parent = $parent;
-//      ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $parent expects 'null', cannot assign 'ParentNode|null'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidPropertyAssignmentValue: Property $parent expects 'null', the assigned 'ParentNode|null' might not match
     }
 }
 

@@ -40,5 +40,5 @@ function rangeTooLarge(Holder $h, int $r): void {
 /** @param int<0, 1>|int<5, 5> $r */
 function unionOfRanges(Holder $h, int $r): void {
     $h->flag = $r;
-//  ^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $flag expects '0|1', cannot assign 'int<0, 1>|int<5, 5>'
+//  ^^^^^^^^^^^^^ PossiblyInvalidPropertyAssignmentValue: Property $flag expects '0|1', the assigned 'int<0, 1>|int<5, 5>' might not match
 }
