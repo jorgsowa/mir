@@ -730,6 +730,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
+        if let Some((receiver, key)) = crate::narrowing::element_access_key(expr) {
+            if let Some(refined) = ctx.get_prop_refined(&receiver, &key) {
+                return refined.clone();
+            }
+        }
         if arr_ty.is_mixed() {
             self.emit(IssueKind::MixedArrayAccess, Severity::Info, expr.span);
             return Type::mixed();

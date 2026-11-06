@@ -1727,11 +1727,6 @@
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/JsonPath/JsonCrawler.php">
-    <InvalidThrow>
-      <code><![CDATA[]]></code>
-    </InvalidThrow>
-  </file>
   <file src="src/Symfony/Component/JsonPath/Test/JsonPathAssertionsTrait.php">
     <UndefinedClass>
       <code><![CDATA[Assert]]></code>
@@ -1890,6 +1885,18 @@
     <NullableReturnStatement>
       <code><![CDATA[return $id;]]></code>
     </NullableReturnStatement>
+  </file>
+  <file src="src/Symfony/Component/Messenger/Bridge/Redis/Transport/RedisReceiver.php">
+    <InvalidArgument>
+      <code><![CDATA[$redisEnvelope = [
+                        'body' => \is_string($redisEnvelope['body']) ? $redisEnvelope['body'] : null,
+                        'headers' => $redisEnvelope['headers'],
+                    ]]]></code>
+      <code><![CDATA[[
+                    'body' => \is_string($redisEnvelope['body']) ? $redisEnvelope['body'] : null,
+                    'headers' => $redisEnvelope['headers'],
+                ]]]></code>
+    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Messenger/Command/ConsumeMessagesCommand.php">
     <ImplicitFloatToIntCast>

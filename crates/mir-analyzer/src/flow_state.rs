@@ -1060,6 +1060,25 @@ impl FlowState {
         let sym = Name::from(name.trim_start_matches('$'));
         self.unbind_closure(sym);
         self.drop_guards_on(sym);
+        self.drop_element_refinements(sym.as_str(), true);
+    }
+
+    /// Discards element refinements (`[key]` entries) read from `receiver`, or keyed by the variable `receiver`.
+    pub(crate) fn drop_element_refinements(&mut self, receiver: &str, is_var: bool) {
+        if self.prop_refined.is_empty() {
+            return;
+        }
+        let chain = format!("{receiver}->");
+        let key = format!("[${receiver}]");
+        let stale = |(obj, prop): &(Name, Name)| {
+            prop.as_str().starts_with('[')
+                && (obj.as_str() == receiver
+                    || (is_var
+                        && (obj.as_str().starts_with(chain.as_str()) || prop.as_str() == key)))
+        };
+        if self.prop_refined.keys().any(stale) {
+            Arc::make_mut(&mut self.prop_refined).retain(|k, _| !stale(k));
+        }
     }
 
     /// [`Self::set_var`] for a type refinement: the value is unchanged, so
@@ -1301,6 +1320,12 @@ impl FlowState {
 
     /// Record a narrowed/refined type for an instance property.
     pub fn set_prop_refined(&mut self, obj_var: &str, prop: &str, ty: Type) {
+        if !prop.starts_with('[') {
+            self.drop_element_refinements(
+                &format!("{}->{prop}", obj_var.trim_start_matches('$')),
+                false,
+            );
+        }
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
@@ -1312,6 +1337,10 @@ impl FlowState {
     /// Discard any narrowed type for an instance property (call on write to
     /// invalidate stale refinements from a prior guard).
     pub fn clear_prop_refined(&mut self, obj_var: &str, prop: &str) {
+        self.drop_element_refinements(
+            &format!("{}->{prop}", obj_var.trim_start_matches('$')),
+            false,
+        );
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),

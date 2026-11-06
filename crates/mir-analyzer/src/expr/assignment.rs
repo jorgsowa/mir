@@ -485,6 +485,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if rhs_ty.is_never() {
             return rhs_ty;
         }
+        crate::narrowing::forget_element_write(&a.target, ctx);
         // A closure passed as a callback has a summary only once it was analyzed.
         let rhs_taint = if crate::taint::has_closure_argument(&a.value) {
             crate::taint::expr_taint(&a.value, ctx, self.db, &self.file)

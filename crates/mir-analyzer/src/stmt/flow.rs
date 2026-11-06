@@ -685,6 +685,7 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut crate::flow_state::FlowState,
     ) {
         for var in vars.iter() {
+            crate::narrowing::forget_element_write(var, ctx);
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
                 ctx.unset_var(name.trim_start_matches('$'));
             } else {

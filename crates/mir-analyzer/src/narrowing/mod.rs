@@ -18,6 +18,7 @@ mod class_const_compare;
 mod class_introspection;
 mod core;
 mod dom;
+mod elements;
 mod enum_class;
 mod instanceof_core;
 mod instanceof_disjuncts;
@@ -71,6 +72,7 @@ use core::{
     extract_nullsafe_prop_access, extract_var_name, narrow_count_or_strlen_equality, peel_parens,
     same_literal, set_narrowed, ScalarArgTarget, UnionNarrowExt,
 };
+pub(crate) use elements::{element_access_key, forget_element_write};
 use enum_class::{
     extract_enum_value_case, narrow_prop_to_specific_class, narrow_static_prop_to_specific_class,
     narrow_var_to_literal_enum_case, narrow_var_to_specific_class,
@@ -170,6 +172,7 @@ pub fn narrow_from_condition(
             narrow_from_condition(&check, ctx, is_true, db, file);
         }
     }
+    elements::narrow_element(expr, ctx, is_true, db, file);
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {
