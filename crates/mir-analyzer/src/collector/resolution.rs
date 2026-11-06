@@ -197,13 +197,17 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
         },
         // A call-site `covariant X` comes from the parser unresolved; declared templates don't.
         Atomic::TTemplateParam {
+            name,
             as_type,
             defining_entity,
-            ..
         } if defining_entity.is_empty() => {
             let as_type = ru!(*as_type);
+            let name = match name.as_str().split_once(' ') {
+                Some((variance, _)) => Name::from(format!("{variance} {as_type}")),
+                None => name,
+            };
             Atomic::TTemplateParam {
-                name: Name::from(format!("covariant {as_type}")),
+                name,
                 as_type: Box::new(as_type),
                 defining_entity,
             }

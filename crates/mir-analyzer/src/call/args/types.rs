@@ -994,8 +994,8 @@ fn generic_type_params_compatible(
             .map(|tp| tp.variance)
             .unwrap_or(mir_types::Variance::Invariant);
 
-        if let Some(bound) = crate::subtype::call_site_bound(param_p) {
-            if !(arg_p.is_mixed() || crate::subtype::is_subtype(ea.db, arg_p, bound)) {
+        if let Some(fits) = crate::subtype::fits_call_site_variance(ea.db, arg_p, param_p) {
+            if !fits {
                 return false;
             }
             continue;

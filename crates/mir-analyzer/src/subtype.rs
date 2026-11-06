@@ -67,8 +67,8 @@ pub(crate) fn variance_compatible(
         .zip(sub_params)
         .zip(sup_params)
         .all(|((tp, sub_p), sup_p)| match tp.variance {
-            _ if call_site_bound(sup_p).is_some() => {
-                call_site_bound(sup_p).is_some_and(|bound| is_subtype(db, sub_p, bound))
+            _ if call_site_variance(sup_p).is_some() => {
+                fits_call_site_variance(db, sub_p, sup_p).unwrap_or(false)
             }
             Variance::Covariant => is_subtype(db, sub_p, sup_p),
             Variance::Contravariant => is_subtype(db, sup_p, sub_p),
@@ -233,16 +233,41 @@ fn expand_small_int_ranges(ty: &Type) -> Option<Type> {
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
 /// class-hierarchy graph (`extends` / `implements`) on top of structural
 /// matches.
-/// The bound of a call-site `covariant X` type argument, which any subtype of `X` satisfies.
-pub(crate) fn call_site_bound(ty: &Type) -> Option<&Type> {
+/// A call-site variance type argument (`covariant X`, `contravariant X`, `*`): its
+/// direction and the bound an argument is checked against.
+pub(crate) fn call_site_variance(ty: &Type) -> Option<(Variance, &Type)> {
     match ty.types.as_slice() {
         [Atomic::TTemplateParam {
+            name,
             as_type,
             defining_entity,
-            ..
-        }] if defining_entity.is_empty() => Some(as_type),
+        }] if defining_entity.is_empty() => {
+            let variance = if name.as_str().starts_with("contravariant ") {
+                Variance::Contravariant
+            } else {
+                Variance::Covariant
+            };
+            Some((variance, as_type))
+        }
         _ => None,
     }
+}
+
+/// Whether `arg` satisfies the call-site variance type argument `param`.
+pub(crate) fn fits_call_site_variance(
+    db: &dyn MirDatabase,
+    arg: &Type,
+    param: &Type,
+) -> Option<bool> {
+    let (variance, bound) = call_site_variance(param)?;
+    Some(
+        arg.is_mixed()
+            || bound.is_mixed()
+            || match variance {
+                Variance::Contravariant => is_subtype(db, bound, arg),
+                _ => is_subtype(db, arg, bound),
+            },
+    )
 }
 
 pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {

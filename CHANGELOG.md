@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A call forgets the narrowed properties of objects a closure or arrow function captured, since the call may run the closure and change them.
 - `self::`/`static::` in an anonymous class no longer report `UndefinedConstant` or `UndefinedClass`; inherited constants and static methods resolve through the parent class.
 - Call-site variance in docblock type arguments (`Collection<int, covariant Model>`) is understood: the argument accepts any subtype of `Model` instead of being read as a class named `covariant Model`.
+- `contravariant X` and `*` type arguments are understood: `contravariant X` accepts `X` or a supertype, `*` any argument, and reading through either gives the template's declared bound instead of `mixed`.
 - Taint: a payload passed to Laravel's `Encrypter::decrypt()` or `decryptString()` no longer reaches `unserialize()` or the result, since the encrypter checks a keyed MAC first.
 
 ## [0.91.0] - 2026-11-05

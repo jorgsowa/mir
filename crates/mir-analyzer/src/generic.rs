@@ -520,6 +520,19 @@ pub(crate) fn bound_unbound_class_string_templates(
     out
 }
 
+/// What reading through template `tp` yields for the type argument `ty`: a call-site
+/// `contravariant X` or `*` says nothing above the template's own bound.
+fn read_type_of_arg(tp: &TemplateParam, ty: &Type) -> Type {
+    match crate::subtype::call_site_variance(ty) {
+        Some((variance, bound))
+            if variance == mir_types::Variance::Contravariant || bound.is_mixed() =>
+        {
+            tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed)
+        }
+        _ => ty.clone(),
+    }
+}
+
 /// Build template bindings from a receiver's concrete type params.
 ///
 /// Zips `class_template_params` (e.g. `[T]` declared on the class) with
@@ -534,7 +547,7 @@ pub fn build_class_bindings(
     let mut bindings: FxHashMap<Name, Type> = class_template_params
         .iter()
         .zip(receiver_type_params.iter())
-        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
+        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), read_type_of_arg(tp, ty)))
         .collect();
 
     // A bare class ref supplies fewer type args than the class declares (most

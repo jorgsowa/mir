@@ -13,10 +13,6 @@ class Coll {
 function cov($r): void {
     $r->first()?->m();
 }
-/** @param Coll<int, contravariant U> $r */
-function contra($r): void {
-    $r->first()?->u();
-}
 /** @param Coll<int, U> $u */
 function pass($u): void {
     cov($u);
