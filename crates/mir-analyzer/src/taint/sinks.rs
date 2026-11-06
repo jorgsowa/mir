@@ -88,13 +88,8 @@ pub fn check_call_sinks(
             }
             continue;
         }
-        let guarded = labels.is_object_guard(sink.param);
         for value in labels.slot_args(sink.param, params, args, arg_types, ctx, ea.db, &ea.file) {
-            let taint = if guarded {
-                object_arg_taint(value, ctx, ea.db, &ea.file)
-            } else {
-                value_taint(value, ctx, ea.db, &ea.file)
-            };
+            let taint = labels.slot_arg_taint(sink.param, value, ctx, ea.db, &ea.file);
             ea.taint_summary
                 .record_param_sinks(taint, sink.kinds, &sink.issue);
             if taint.concrete().intersects(sink.kinds) && !emitted.contains(&sink.issue) {

@@ -84,6 +84,26 @@ pub fn label_params<'p>(ctx: &mut FlowState, names: impl Iterator<Item = &'p str
     }
 }
 
+/// Key taint of iterating `expr`: when it is a parameter itself, its label
+/// stands for the argument's key names rather than its whole value.
+pub fn param_key_labels(expr: &Expr, key_taint: Taint, ctx: &FlowState) -> Taint {
+    if !ctx.summarizing_taint {
+        return key_taint;
+    }
+    let ExprKind::Variable(var) = &unwrap_parens(expr).kind else {
+        return key_taint;
+    };
+    let parts = ctx.param_parts(var);
+    (0..MAX_TRACKED_PARAMS)
+        .filter(|param| {
+            parts.intersects(Taint::param(*param)) && !key_taint.param_kinds(*param).is_empty()
+        })
+        .fold(key_taint, |out, param| match ctx.key_label_slot(param) {
+            Some(slot) => out.without_label(param) | Taint::label(slot, out.param_kinds(param)),
+            None => out,
+        })
+}
+
 /// Hand the label slots parameters and `$this`'s properties leave free to the
 /// parameters the body proves objects (with `instanceof`, or a callee's).
 pub fn seed_object_guards(
@@ -116,7 +136,11 @@ pub fn seed_object_guards(
         }))
         .collect();
     ctx.object_guard_slots = Some(std::sync::Arc::new(std::sync::Mutex::new(
-        crate::flow_state::ObjectGuardSlots { free, assigned },
+        crate::flow_state::ObjectGuardSlots {
+            free,
+            assigned,
+            keys: Vec::new(),
+        },
     )));
 }
 
@@ -446,8 +470,9 @@ pub(super) fn split_call_parts(
         if summary.returns.param_kinds(slot).is_empty() || summary.prop_label(slot).is_some() {
             continue;
         }
-        let unchanged =
-            summary.return_parts.intersects(Taint::param(slot)) && !summary.is_object_guard(slot);
+        let unchanged = summary.return_parts.intersects(Taint::param(slot))
+            && !summary.is_object_guard(slot)
+            && !summary.is_key_label(slot);
         for param in summary.slot_params(slot) {
             for arg in param_arg_exprs(&params, args, param) {
                 let (p, c) = split_param_parts(arg, ctx, db, file);

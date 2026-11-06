@@ -301,11 +301,6 @@
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/Command/SecretsGenerateKeysCommand.php">
-    <TaintedFile>
-      <code><![CDATA[$vault->rotate($secrets)]]></code>
-    </TaintedFile>
-  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Command/TranslationDebugCommand.php">
     <InvalidReturnType>
       <code><![CDATA[return $state;]]></code>

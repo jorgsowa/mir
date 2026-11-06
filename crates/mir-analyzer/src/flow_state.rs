@@ -149,6 +149,8 @@ pub struct ObjectGuardSlots {
     pub free: Vec<usize>,
     /// `(param, slot)`, in the order the body proved them objects.
     pub assigned: Vec<(usize, usize)>,
+    /// `(param, slot)` standing for the key names of a parameter's array.
+    pub keys: Vec<(usize, usize)>,
 }
 
 /// Pending write locations of one variable. Almost always exactly one, so
@@ -1500,6 +1502,28 @@ impl FlowState {
         let slot = slots.free.remove(0);
         slots.assigned.push((param, slot));
         Some(slot)
+    }
+
+    /// The label slot standing for the key names of parameter `param`'s array, claimed on first use.
+    pub fn key_label_slot(&self, param: usize) -> Option<usize> {
+        let mut slots = self.object_guard_slots.as_ref()?.lock().ok()?;
+        if let Some((_, slot)) = slots.keys.iter().find(|(p, _)| *p == param) {
+            return Some(*slot);
+        }
+        if slots.free.is_empty() {
+            return None;
+        }
+        let slot = slots.free.remove(0);
+        slots.keys.push((param, slot));
+        Some(slot)
+    }
+
+    /// `(param, slot)` for every key label slot claimed so far.
+    pub fn key_labels(&self) -> Vec<(usize, usize)> {
+        self.object_guard_slots
+            .as_ref()
+            .and_then(|slots| slots.lock().ok().map(|slots| slots.keys.clone()))
+            .unwrap_or_default()
     }
 
     /// `(param, slot)` for every object guard slot claimed so far.

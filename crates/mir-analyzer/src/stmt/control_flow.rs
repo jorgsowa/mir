@@ -436,8 +436,11 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let pre = ctx.clone();
         let mut entry = ctx.branch();
-        let key_taint =
-            crate::taint::iteration_key_taint(&fe.expr, iterable_taint, ctx, self.db, &self.file);
+        let key_taint = crate::taint::param_key_labels(
+            &fe.expr,
+            crate::taint::iteration_key_taint(&fe.expr, iterable_taint, ctx, self.db, &self.file),
+            ctx,
+        );
         // An array's keys are ints or strings, unlike a Traversable's.
         let key_is_plain = !arr_ty.types.is_empty() && arr_ty.types.iter().all(Atomic::is_array);
 

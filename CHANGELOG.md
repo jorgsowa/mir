@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint: a function that iterates a parameter's keys into a sink is tainted by the argument's keys, not its values, so `f(['a' => $_GET['x']])` is no longer reported.
 - A check on an element of a generic array read through a variable or literal key (`$a[$k] instanceof E`, `is_string($this->m['x'])`, `$a[$k] !== null`) narrows that element until the array or the key changes.
 - A call forgets the narrowed properties of objects a closure or arrow function captured, since the call may run the closure and change them.
 - `self::`/`static::` in an anonymous class no longer report `UndefinedConstant` or `UndefinedClass`; inherited constants and static methods resolve through the parent class.

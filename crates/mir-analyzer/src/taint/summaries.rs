@@ -7,6 +7,8 @@ pub(super) enum SlotLabel {
     Prop(mir_types::Name),
     /// The parameter's own value, once proven an object.
     Guard(usize),
+    /// The key names of the parameter's array.
+    Keys(usize),
 }
 
 /// A parameter whose value reaches a sink inside the callee.
@@ -55,6 +57,9 @@ pub struct TaintSummary {
     /// `(slot, param)`: label slots past the parameters, each standing for a
     /// parameter's own value once the body proved it an object.
     pub object_guards: Vec<(usize, usize)>,
+    /// `(slot, param)`: label slots past the parameters, each standing for the
+    /// key names of a parameter's array, read by iterating it.
+    pub key_labels: Vec<(usize, usize)>,
     /// `(param, taint)`: what a by-ref parameter holds when the body exits.
     pub out_params: Vec<(usize, Taint)>,
     /// Label slots the return value carries only as (part of) the argument
@@ -162,7 +167,7 @@ impl TaintSummary {
             for (slot, reserve) in reserved.iter_mut().enumerate() {
                 *reserve |= summary.reads_slot(slot) && summary.slot_label(slot).is_none();
             }
-            for (_, param) in &summary.object_guards {
+            for (_, param) in summary.object_guards.iter().chain(&summary.key_labels) {
                 reserved[*param] = true;
             }
         }
@@ -190,14 +195,21 @@ impl TaintSummary {
             .iter()
             .filter_map(|(slot, label)| match label {
                 SlotLabel::Prop(prop) => Some((*slot, *prop)),
-                SlotLabel::Guard(_) => None,
+                SlotLabel::Guard(_) | SlotLabel::Keys(_) => None,
             })
             .collect();
         self.object_guards = placed
             .iter()
             .filter_map(|(slot, label)| match label {
                 SlotLabel::Guard(param) => Some((*slot, *param)),
-                SlotLabel::Prop(_) => None,
+                SlotLabel::Prop(_) | SlotLabel::Keys(_) => None,
+            })
+            .collect();
+        self.key_labels = placed
+            .iter()
+            .filter_map(|(slot, label)| match label {
+                SlotLabel::Keys(param) => Some((*slot, *param)),
+                SlotLabel::Prop(_) | SlotLabel::Guard(_) => None,
             })
             .collect();
         let computed = |s: &TaintSummary| s.returns.label_slots().difference(s.return_parts);
@@ -240,7 +252,7 @@ impl TaintSummary {
         for (slot, target) in moves {
             if target.is_none() {
                 match self.slot_label(*slot) {
-                    Some(SlotLabel::Guard(_)) => self.unguard(*slot),
+                    Some(SlotLabel::Guard(_) | SlotLabel::Keys(_)) => self.unguard(*slot),
                     _ => self.drop_label(*slot),
                 }
             }
@@ -282,12 +294,15 @@ impl TaintSummary {
 
     /// The property or guard label slot `slot` stands for.
     fn slot_label(&self, slot: usize) -> Option<SlotLabel> {
-        self.prop_label(slot).map(SlotLabel::Prop).or_else(|| {
-            self.object_guards
-                .iter()
-                .find(|(s, _)| *s == slot)
-                .map(|(_, param)| SlotLabel::Guard(*param))
-        })
+        self.prop_label(slot)
+            .map(SlotLabel::Prop)
+            .or_else(|| {
+                self.object_guards
+                    .iter()
+                    .find(|(s, _)| *s == slot)
+                    .map(|(_, param)| SlotLabel::Guard(*param))
+            })
+            .or_else(|| self.key_label_param(slot).map(SlotLabel::Keys))
     }
 
     fn slot_labels(&self) -> Vec<(usize, SlotLabel)> {
@@ -299,7 +314,11 @@ impl TaintSummary {
             .object_guards
             .iter()
             .map(|(slot, param)| (*slot, SlotLabel::Guard(*param)));
-        props.chain(guards).collect()
+        let keys = self
+            .key_labels
+            .iter()
+            .map(|(slot, param)| (*slot, SlotLabel::Keys(*param)));
+        props.chain(guards).chain(keys).collect()
     }
 
     /// Whether some flow of this body comes from label slot `slot`.
@@ -318,10 +337,13 @@ impl TaintSummary {
     /// Let what flows from object guard slot `slot` flow from its parameter
     /// whatever the argument holds.
     fn unguard(&mut self, slot: usize) {
-        let Some(index) = self.object_guards.iter().position(|(s, _)| *s == slot) else {
+        let param = if let Some(index) = self.object_guards.iter().position(|(s, _)| *s == slot) {
+            self.object_guards.remove(index).1
+        } else if let Some(index) = self.key_labels.iter().position(|(s, _)| *s == slot) {
+            self.key_labels.remove(index).1
+        } else {
             return;
         };
-        let (_, param) = self.object_guards.remove(index);
         let move_label =
             |taint: Taint| taint.without_label(slot) | Taint::label(param, taint.param_kinds(slot));
         self.returns = move_label(self.returns);
@@ -391,19 +413,33 @@ impl TaintSummary {
         db: &dyn crate::db::MirDatabase,
         file: &str,
     ) -> Taint {
-        let guarded = self.is_object_guard(slot);
         match self.prop_label(slot) {
             Some(prop) => receiver_prop_taint(receiver, prop, ctx, db, file),
             None => self
                 .slot_args(slot, params, args, &[], ctx, db, file)
                 .into_iter()
                 .fold(Taint::NONE, |acc, e| {
-                    acc | if guarded {
-                        object_arg_taint(e, ctx, db, file)
-                    } else {
-                        value_taint(e, ctx, db, file)
-                    }
+                    acc | self.slot_arg_taint(slot, e, ctx, db, file)
                 }),
+        }
+    }
+
+    /// Taint argument `arg` passes into label slot `slot`: its object part for an
+    /// object guard, its key names for a key label, else its value.
+    pub(super) fn slot_arg_taint(
+        &self,
+        slot: usize,
+        arg: &Expr,
+        ctx: &FlowState,
+        db: &dyn crate::db::MirDatabase,
+        file: &str,
+    ) -> Taint {
+        if self.is_object_guard(slot) {
+            object_arg_taint(arg, ctx, db, file)
+        } else if self.is_key_label(slot) {
+            iteration_key_taint(arg, value_taint(arg, ctx, db, file), ctx, db, file)
+        } else {
+            value_taint(arg, ctx, db, file)
         }
     }
 
@@ -421,6 +457,9 @@ impl TaintSummary {
         db: &dyn crate::db::MirDatabase,
         file: &str,
     ) -> Vec<&'e Expr> {
+        if let Some(param) = self.key_label_param(slot) {
+            return param_arg_exprs(params, args, param);
+        }
         if !self.is_object_guard(slot) {
             return param_arg_exprs(params, args, slot);
         }
@@ -444,6 +483,18 @@ impl TaintSummary {
         self.object_guards.iter().any(|(s, _)| *s == slot)
     }
 
+    pub fn is_key_label(&self, slot: usize) -> bool {
+        self.key_label_param(slot).is_some()
+    }
+
+    /// The parameter whose array's key names label slot `slot` stands for.
+    fn key_label_param(&self, slot: usize) -> Option<usize> {
+        self.key_labels
+            .iter()
+            .find(|(s, _)| *s == slot)
+            .map(|(_, param)| *param)
+    }
+
     /// The parameters whose value label slot `slot` stands for once proven an object.
     fn guarded_params(&self, slot: usize) -> impl Iterator<Item = usize> + '_ {
         self.object_guards
@@ -457,7 +508,7 @@ impl TaintSummary {
         if self.is_object_guard(slot) {
             self.guarded_params(slot).collect()
         } else {
-            vec![slot]
+            vec![self.key_label_param(slot).unwrap_or(slot)]
         }
     }
 
@@ -545,6 +596,15 @@ pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSumma
         .fold(summary.returns, |acc, taint| acc | *taint);
     summary.object_guards = ctx
         .object_guards()
+        .into_iter()
+        .filter(|(_, slot)| {
+            flows.intersects(Taint::param(*slot))
+                || summary.param_sinks.iter().any(|sink| sink.param == *slot)
+        })
+        .map(|(param, slot)| (slot, param))
+        .collect();
+    summary.key_labels = ctx
+        .key_labels()
         .into_iter()
         .filter(|(_, slot)| {
             flows.intersects(Taint::param(*slot))
