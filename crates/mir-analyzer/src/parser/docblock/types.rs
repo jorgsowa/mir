@@ -238,6 +238,18 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         }
     }
 
+    // Call-site variance on a type argument: `covariant Model` is "some subtype of Model".
+    if let Some(inner) = s.strip_prefix("covariant ") {
+        return Type::single(Atomic::TTemplateParam {
+            name: mir_types::Name::from(s),
+            as_type: Box::new(parse_type_string(inner)),
+            defining_entity: mir_types::Name::from(""),
+        });
+    }
+    if let Some(inner) = s.strip_prefix("contravariant ") {
+        return parse_type_string(inner);
+    }
+
     // Nullable shorthand: `?Type`
     if let Some(inner) = s.strip_prefix('?') {
         let inner_ty = parse_type_string(inner);

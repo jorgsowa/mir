@@ -786,7 +786,9 @@ fn param_contains_template_or_unknown(
 
     fn has_template_param(union: &Type, template_names: &rustc_hash::FxHashSet<&str>) -> bool {
         union.types.iter().any(|atomic| match atomic {
-            Atomic::TTemplateParam { .. } => true,
+            Atomic::TTemplateParam {
+                defining_entity, ..
+            } => !defining_entity.is_empty(),
             Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
                 has_template_param(target, template_names)
             }
@@ -814,7 +816,9 @@ fn param_contains_template_or_unknown(
         template_names: &rustc_hash::FxHashSet<&str>,
     ) -> bool {
         t.types.iter().any(|v| match v {
-            Atomic::TTemplateParam { .. } => true,
+            Atomic::TTemplateParam {
+                defining_entity, ..
+            } => !defining_entity.is_empty(),
             Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
                 contains_template_or_unknown(target, ea, template_names)
             }

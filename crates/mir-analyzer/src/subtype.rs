@@ -67,6 +67,9 @@ pub(crate) fn variance_compatible(
         .zip(sub_params)
         .zip(sup_params)
         .all(|((tp, sub_p), sup_p)| match tp.variance {
+            _ if call_site_bound(sup_p).is_some() => {
+                call_site_bound(sup_p).is_some_and(|bound| is_subtype(db, sub_p, bound))
+            }
             Variance::Covariant => is_subtype(db, sub_p, sup_p),
             Variance::Contravariant => is_subtype(db, sup_p, sub_p),
             Variance::Invariant => {
@@ -230,6 +233,18 @@ fn expand_small_int_ranges(ty: &Type) -> Option<Type> {
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
 /// class-hierarchy graph (`extends` / `implements`) on top of structural
 /// matches.
+/// The bound of a call-site `covariant X` type argument, which any subtype of `X` satisfies.
+pub(crate) fn call_site_bound(ty: &Type) -> Option<&Type> {
+    match ty.types.as_slice() {
+        [Atomic::TTemplateParam {
+            as_type,
+            defining_entity,
+            ..
+        }] if defining_entity.is_empty() => Some(as_type),
+        _ => None,
+    }
+}
+
 pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
     if sub.is_subtype_structural(sup) {
         return true;
