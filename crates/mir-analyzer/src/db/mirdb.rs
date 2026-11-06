@@ -734,16 +734,20 @@ impl MirDatabase for MirDbStorage {
         text: &str,
         version: crate::PhpVersion,
     ) -> Option<Arc<crate::recursion::GuardedParse>> {
-        let asts = self.batch_asts.read();
-        let ast = asts.get(path)?;
-        (ast.version == version && ast.source.as_ref() == text).then(|| Arc::clone(&ast.parsed))
+        let lazy = {
+            let asts = self.batch_asts.read();
+            let ast = asts.get(path)?;
+            (ast.version == version && ast.source.as_ref() == text)
+                .then(|| Arc::clone(&ast.parsed))?
+        };
+        Some(Arc::clone(lazy.get()))
     }
 }
 
 pub(crate) struct BatchAst {
     pub source: Arc<str>,
     pub version: crate::PhpVersion,
-    pub parsed: Arc<crate::recursion::GuardedParse>,
+    pub parsed: Arc<crate::recursion::LazyParse>,
 }
 
 type BatchAsts = FxHashMap<Arc<str>, BatchAst>;
@@ -1480,6 +1484,10 @@ impl MirDbStorage {
         } else {
             index.subtypes_of(fqcn, include_trait_users)
         }
+    }
+
+    pub(crate) fn user_stub_paths(&self) -> rustc_hash::FxHashSet<Arc<str>> {
+        self.user_stub_paths.read().clone()
     }
 
     /// Mark a file path as a user-provided stub so `workspace_symbol_index`

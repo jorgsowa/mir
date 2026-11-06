@@ -86,19 +86,43 @@ impl AnalysisSession {
         }
         let _t_salsa_reg = _t0.elapsed();
 
-        // ---- Definition collection from the already-parsed AST -------
+        // ---- Definition collection ------------------------------------
         // Returns (FileDefinitions, content_hash, skip_cache) so we
         // can prime the parse cache before the pre-warm loop below.
         type Pass1Entry = (FileDefinitions, [u8; 32], bool, String);
+        let analysis_cache = self.cache.as_deref();
+        let stub_cache = self.db.stub_cache.as_deref();
+        let user_stubs = self.db.salsa.user_stub_paths();
         let file_defs: Vec<Pass1Entry> = parsed_files
             .par_iter()
             .map(|parsed| {
                 let content_hash = hash_source(parsed.source());
+                // A user stub's cached slice is filtered by PHP version; this pass's isn't.
+                let stub_cache = stub_cache.filter(|_| !user_stubs.contains(&parsed.file));
+                // An unchanged file with a stored result and definitions needs no parse.
+                if let (Some(cache), Some(stubs)) = (analysis_cache, stub_cache) {
+                    let hex = blake3::Hash::from(content_hash).to_hex();
+                    if cache.is_valid(&parsed.file, hex.as_str()) {
+                        let surface = cache.surface_hash(&parsed.file).filter(|s| !s.is_empty());
+                        if let Some(surface) = surface {
+                            if let Some((mut slice, issues)) =
+                                stubs.get(&parsed.file, &content_hash, php_version.cache_byte())
+                            {
+                                crate::stub_cache::prepare_for_ingest(&mut slice);
+                                let defs = FileDefinitions {
+                                    slice: Arc::new(slice),
+                                    issues: Arc::new(issues),
+                                };
+                                return (defs, content_hash, false, surface);
+                            }
+                        }
+                    }
+                }
                 let skip_cache = crate::parser::parse_errors_block_cache(parsed.errors());
                 let mut all_issues: Vec<Issue> = crate::parser::parse_error_issues(
                     &parsed.file,
                     parsed.source(),
-                    &parsed.parsed,
+                    parsed.parsed.get(),
                     php_version,
                 );
                 let collector = crate::collector::DefinitionCollector::new_for_slice(
@@ -114,6 +138,15 @@ impl AnalysisSession {
                     issues: Arc::new(all_issues),
                 };
                 let surface_hash = surface_fingerprint(parsed.source(), parsed.owned());
+                if let (false, Some(stubs)) = (skip_cache, stub_cache) {
+                    stubs.put(
+                        &parsed.file,
+                        &content_hash,
+                        php_version.cache_byte(),
+                        &defs.slice,
+                        &defs.issues,
+                    );
+                }
                 (defs, content_hash, skip_cache, surface_hash)
             })
             .collect();
@@ -227,9 +260,21 @@ impl AnalysisSession {
         // PHP never compiles a file whose every include is gated above the target
         // version, so the syntax it gates (a polyfill's `bootstrap85.php`) isn't an error.
         let loaded_only_above = crate::include_graph::files_loaded_only_above(
-            parsed_files
-                .iter()
-                .map(|parsed| (&parsed.file, parsed.source(), parsed.owned())),
+            parsed_files.iter().map(|parsed| {
+                let parse = move || {
+                    // A cache hit stays unparsed: scan a throwaway AST instead of pinning one.
+                    if parsed.parsed.is_parsed() {
+                        Arc::clone(parsed.parsed.get())
+                    } else {
+                        Arc::new(crate::recursion::parse_for_file(
+                            &parsed.file,
+                            parsed.source(),
+                            php_version,
+                        ))
+                    }
+                };
+                (&parsed.file, parsed.source(), parse)
+            }),
             php_version.version_id(),
         );
         let mut files_with_incomplete_ast: HashSet<Arc<str>> = HashSet::default();
@@ -240,7 +285,9 @@ impl AnalysisSession {
             // each file to be individually touched by an on-demand commit path.
             let db = &self.db.salsa;
             for (parsed, (defs, _hash, _hard_err, _surface)) in parsed_files.iter().zip(file_defs) {
-                if crate::parser::blocks_body_analysis(parsed.errors()) {
+                // Unparsed means a cache hit, and hard parse errors are never cached.
+                if parsed.parsed.is_parsed() && crate::parser::blocks_body_analysis(parsed.errors())
+                {
                     files_with_incomplete_ast.insert(parsed.file.clone());
                 }
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);

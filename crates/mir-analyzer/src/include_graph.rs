@@ -71,7 +71,21 @@ pub fn include_closure(
 
 /// Cheap bailout: the (common) majority of files don't even mention require/include.
 pub(crate) fn may_include(text: &str) -> bool {
-    text.contains("require") || text.contains("include")
+    has_keyword(text, "require") || has_keyword(text, "include")
+}
+
+/// `keyword` or `keyword_once` as a whole word, so `required` and `$included` don't match.
+fn has_keyword(text: &str, keyword: &str) -> bool {
+    let is_word = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b >= 0x80;
+    let bytes = text.as_bytes();
+    text.match_indices(keyword).any(|(at, _)| {
+        if at > 0 && is_word(bytes[at - 1]) {
+            return false;
+        }
+        let rest = &text[at + keyword.len()..];
+        let rest = rest.strip_prefix("_once").unwrap_or(rest);
+        !rest.bytes().next().is_some_and(is_word)
+    })
 }
 
 /// Paths the statically resolvable `require`/`include` targets in `program`
@@ -114,14 +128,11 @@ pub(crate) fn guarded_include_paths(
 
 /// The analyzed files PHP never loads at `version_id`: every include of them
 /// among `files` sits under a `PHP_VERSION_ID` check above it.
-pub(crate) fn files_loaded_only_above<'f>(
-    files: impl Iterator<
-        Item = (
-            &'f std::sync::Arc<str>,
-            &'f str,
-            &'f php_ast::owned::Program,
-        ),
-    >,
+pub(crate) fn files_loaded_only_above<
+    'f,
+    P: Fn() -> std::sync::Arc<crate::recursion::GuardedParse>,
+>(
+    files: impl Iterator<Item = (&'f std::sync::Arc<str>, &'f str, P)>,
     version_id: u32,
 ) -> rustc_hash::FxHashSet<std::sync::Arc<str>> {
     let files: Vec<_> = files.collect();
@@ -135,7 +146,9 @@ pub(crate) fn files_loaded_only_above<'f>(
         if !may_include(source) {
             continue;
         }
-        for (path, min_version_id) in guarded_include_paths(program, Path::new(file.as_ref())) {
+        for (path, min_version_id) in
+            guarded_include_paths(&program().program, Path::new(file.as_ref()))
+        {
             if let Some(target) = by_path.get(&path) {
                 *loaded_only_above.entry(target).or_insert(true) &= min_version_id > version_id;
             }
@@ -380,6 +393,31 @@ mod tests {
     fn includes(file: &str, code: &str) -> Vec<(PathBuf, u32)> {
         let parsed = php_rs_parser::parse(code);
         guarded_include_paths(&parsed.program, Path::new(file))
+    }
+
+    #[test]
+    fn may_include_needs_the_keyword_as_a_whole_word() {
+        for text in [
+            "require 'a.php';",
+            "require_once 'a.php';",
+            "include('a.php');",
+            "include_once'a.php';",
+            "<?php\nrequire\n'a.php';",
+            "if ($x) include 'a.php';",
+        ] {
+            assert!(may_include(text), "{text}");
+        }
+        for text in [
+            "$required = 1;",
+            "$include = 1;",
+            "function _require() {}",
+            "class Includes {}",
+            "required",
+            "include_once_more",
+            "éinclude",
+        ] {
+            assert!(!may_include(text), "{text}");
+        }
     }
 
     #[test]

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A value a property accepts only in part is reported as `PossiblyNullPropertyAssignmentValue`, `PossiblyFalsePropertyAssignmentValue` or `PossiblyInvalidPropertyAssignmentValue` (info, Psalm's names) instead of `InvalidPropertyAssignment`; an `InvalidPropertyAssignment` baseline entry still matches them.
 - An array shape argument that fits once `null` is removed from its values is `PossiblyInvalidArgument` instead of `InvalidArgument`.
+- A run with a cache no longer parses unchanged files, so re-running on an unchanged Laravel tree uses about 30% less memory and CPU. The first run with an empty cache stores every file's definitions, which makes it slower and the cache larger.
 
 ### Fixed
 

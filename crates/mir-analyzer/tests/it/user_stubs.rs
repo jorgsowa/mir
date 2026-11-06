@@ -120,3 +120,43 @@ fn partial_stub_class_keeps_members_of_the_real_class() {
         "real() lives only on the real class; got: {undefined:?}"
     );
 }
+
+#[test]
+fn analyzing_a_stub_with_a_cache_keeps_its_version_filter_for_later_runs() {
+    let stubs_dir = create_temp_dir("stubs");
+    let src_dir = create_temp_dir("source");
+    let cache_dir = create_temp_dir("cache");
+
+    let stub_file = write(
+        &stubs_dir,
+        "helpers.php",
+        "<?php\n/** @removed 8.0 */\nfunction gone_fn(): void {}\n",
+    );
+    let src_file = write(&src_dir, "main.php", "<?php\ngone_fn();\n");
+    let run = |paths: &[PathBuf], cache: Option<&std::path::Path>| {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST)
+            .with_user_stubs(vec![stub_file.clone()], Vec::new());
+        if let Some(cache) = cache {
+            session = session.with_cache_dir(cache);
+        }
+        let result = session.analyze_paths(paths, &BatchOptions::new().without_symbols());
+        result
+            .issues
+            .iter()
+            .filter(|i| i.kind.name() == "UndefinedFunction")
+            .count()
+    };
+
+    assert_eq!(run(std::slice::from_ref(&src_file), None), 1);
+    run(
+        &[stub_file.clone(), src_file.clone()],
+        Some(cache_dir.path()),
+    );
+    // No stored result for this file, so its answer comes from the stub's definitions.
+    let other_file = write(&src_dir, "other.php", "<?php\ngone_fn();\n");
+    assert_eq!(
+        run(std::slice::from_ref(&other_file), Some(cache_dir.path())),
+        1,
+        "a stub's cached definitions must stay filtered by @removed"
+    );
+}

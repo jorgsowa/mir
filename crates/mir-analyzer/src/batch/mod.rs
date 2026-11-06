@@ -131,14 +131,14 @@ impl BatchOptions {
 struct ParsedProjectFile {
     file: Arc<str>,
     source: Arc<str>,
-    parsed: Arc<crate::recursion::GuardedParse>,
+    parsed: Arc<crate::recursion::LazyParse>,
 }
 
 impl ParsedProjectFile {
     fn new(file: Arc<str>, source: Arc<str>, php_version: PhpVersion) -> Self {
-        let parsed = Arc::new(crate::recursion::parse_for_file(
-            &file,
-            source.as_ref(),
+        let parsed = Arc::new(crate::recursion::LazyParse::new(
+            file.clone(),
+            source.clone(),
             php_version,
         ));
         Self {
@@ -153,15 +153,15 @@ impl ParsedProjectFile {
     }
 
     fn source_map(&self) -> &php_rs_parser::source_map::SourceMap {
-        &self.parsed.source_map
+        &self.parsed.get().source_map
     }
 
     fn errors(&self) -> &[php_rs_parser::diagnostics::ParseError] {
-        &self.parsed.errors
+        &self.parsed.get().errors
     }
 
     fn owned(&self) -> &php_ast::owned::Program {
-        &self.parsed.program
+        &self.parsed.get().program
     }
 }
 

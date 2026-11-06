@@ -68,6 +68,39 @@ pub fn parse_versioned(source: &str, version: php_ast::PhpVersion) -> GuardedPar
     )
 }
 
+/// A file's parse, run on first use so a cache hit can skip it.
+pub(crate) struct LazyParse {
+    file: std::sync::Arc<str>,
+    source: std::sync::Arc<str>,
+    version: crate::PhpVersion,
+    parsed: std::sync::OnceLock<std::sync::Arc<GuardedParse>>,
+}
+
+impl LazyParse {
+    pub(crate) fn new(
+        file: std::sync::Arc<str>,
+        source: std::sync::Arc<str>,
+        version: crate::PhpVersion,
+    ) -> Self {
+        Self {
+            file,
+            source,
+            version,
+            parsed: std::sync::OnceLock::new(),
+        }
+    }
+
+    pub(crate) fn get(&self) -> &std::sync::Arc<GuardedParse> {
+        self.parsed.get_or_init(|| {
+            std::sync::Arc::new(parse_for_file(&self.file, &self.source, self.version))
+        })
+    }
+
+    pub(crate) fn is_parsed(&self) -> bool {
+        self.parsed.get().is_some()
+    }
+}
+
 fn parse_with(source: &str, options: &php_rs_parser::ParseOptions) -> GuardedParse {
     GuardedParse(Some(ensure_phase_stack(|| {
         let arena = php_rs_parser::bumpalo::Bump::new();
