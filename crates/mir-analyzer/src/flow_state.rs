@@ -323,6 +323,9 @@ pub struct FlowState {
     /// imports (value: `None`). Consulted by [`Self::invalidate_escaped_vars`].
     pub escaped_vars: Arc<FxHashMap<Name, Option<Type>>>,
 
+    /// Variables a closure captured by value: a call may run the closure and change their objects' properties.
+    pub captured_vars: Arc<FxHashSet<Name>>,
+
     /// Local variables directly assigned from a bare `clone $expr` expression
     /// (`$clone = clone $this;`), keyed by the variable's own name. A write
     /// through such a variable (`$clone->x = $value;`, the standard immutable
@@ -747,6 +750,7 @@ impl FlowState {
             tainted_static_props: Arc::default(),
             ref_aliases: FxHashMap::default(),
             escaped_vars: Arc::default(),
+            captured_vars: Arc::default(),
             cloned_local_vars: FxHashSet::default(),
             read_vars: FxHashSet::default().into(),
             param_names: Arc::new(FxHashSet::default()),
@@ -1083,8 +1087,22 @@ impl FlowState {
         }
     }
 
-    /// Drops narrowing of escaped variables: a call may have rewritten them.
+    /// Marks `name` as captured by value in a closure; see [`Self::captured_vars`].
+    pub fn mark_captured(&mut self, name: &str) {
+        let name = Name::from(name.trim_start_matches('$'));
+        if !self.captured_vars.contains(&name) {
+            Arc::make_mut(&mut self.captured_vars).insert(name);
+        }
+    }
+
+    /// Drops narrowing of escaped variables and of captured objects' properties: a call may have changed them.
     pub fn invalidate_escaped_vars(&mut self) {
+        if !self.captured_vars.is_empty() {
+            let captured: Vec<Name> = self.captured_vars.iter().copied().collect();
+            for name in captured {
+                self.invalidate_prop_refined_receiver(name.as_str());
+            }
+        }
         if self.escaped_vars.is_empty() {
             return;
         }
@@ -2482,6 +2500,10 @@ impl FlowState {
         }
 
         for branch in [&if_ctx, &else_ctx] {
+            if !Arc::ptr_eq(&branch.captured_vars, &result.captured_vars) {
+                Arc::make_mut(&mut result.captured_vars)
+                    .extend(branch.captured_vars.iter().copied());
+            }
             if Arc::ptr_eq(&branch.escaped_vars, &result.escaped_vars) {
                 continue;
             }
@@ -2935,6 +2957,7 @@ impl FlowState {
         diff_map_keys(&self.param_parts, &other.param_parts, &mut names);
         diff_set(&self.plain_vars, &other.plain_vars, &mut names);
         diff_map_keys(&self.escaped_vars, &other.escaped_vars, &mut names);
+        diff_set(&self.captured_vars, &other.captured_vars, &mut names);
         diff_set(
             &self.cloned_local_vars,
             &other.cloned_local_vars,

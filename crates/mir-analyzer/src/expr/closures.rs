@@ -676,6 +676,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 byref_captures.push((name, inner_ty, opens_shape));
             } else {
                 closure_ctx.set_var(name, captured_ty.clone());
+                ctx.mark_captured(name);
             }
             closure_ctx.taint_var(
                 name,
@@ -1057,6 +1058,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         for name in arrow_ctx.read_vars.iter() {
             std::sync::Arc::make_mut(&mut ctx.read_vars).insert(*name);
             ctx.mark_consumed(name.as_str());
+            if name.as_str() != "this" && ctx.vars.contains_key(name) {
+                ctx.mark_captured(name.as_str());
+            }
         }
 
         // The `=> expr` body is exactly one implicit `return expr;` — check it

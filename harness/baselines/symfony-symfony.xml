@@ -2151,11 +2151,6 @@
       <code><![CDATA[$rate]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Routing/Matcher/Dumper/CompiledUrlMatcherDumper.php">
-    <NonExistentArrayOffset>
-      <code><![CDATA[0]]></code>
-    </NonExistentArrayOffset>
-  </file>
   <file src="src/Symfony/Component/Routing/Router.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->matcher = new $this->options['matcher_class']($routes, $this->context)]]></code>
