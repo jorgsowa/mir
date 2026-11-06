@@ -625,14 +625,21 @@ pub fn seed_param_labels(
         ctx.summarizing_taint = true;
         let named = named_params(params);
         label_params(ctx, named.iter().map(|p| p.name.as_ref()));
-        ctx.byref_out_slots = named
-            .iter()
-            .take(MAX_TRACKED_PARAMS)
-            .enumerate()
-            .filter(|(_, p)| p.is_byref && !p.is_variadic)
-            .map(|(slot, p)| (slot, mir_types::Name::from(p.name.as_ref())))
-            .collect();
+        ctx.byref_out_slots = byref_out_slots(named);
     }
+}
+
+/// The label slots of the by-ref parameters a summary records on exit.
+pub fn byref_out_slots(
+    params: &[mir_codebase::DeclaredParam],
+) -> std::sync::Arc<[(usize, mir_types::Name)]> {
+    params
+        .iter()
+        .take(MAX_TRACKED_PARAMS)
+        .enumerate()
+        .filter(|(_, p)| p.is_byref && !p.is_variadic)
+        .map(|(slot, p)| (slot, mir_types::Name::from(p.name.as_ref())))
+        .collect()
 }
 
 /// The parameters a body can read; the variadic standing for what

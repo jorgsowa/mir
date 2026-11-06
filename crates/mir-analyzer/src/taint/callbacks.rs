@@ -505,6 +505,34 @@ pub(super) fn callback_builtin_taint(
     })
 }
 
+/// Taint `array_walk` leaves in the array when its callback is a closure taking the value by
+/// reference: what the closure leaves in that parameter, given the array's taint.
+pub fn walked_array_taint(
+    fn_name_lower: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    if !matches!(fn_name_lower, "array_walk" | "array_walk_recursive")
+        || args.iter().any(|a| a.name.is_some() || a.unpack())
+    {
+        return None;
+    }
+    let callback = args.get(1)?.value()?;
+    let ExprKind::Closure(c) = &unwrap_parens(callback).kind else {
+        return None;
+    };
+    if !c.params.first()?.by_ref {
+        return None;
+    }
+    let closure = callee_closure(callback, ctx, db, file)?;
+    let walked = args_taint(&args[..1], ctx, db, file) | args_taint(&args[2..], ctx, db, file);
+    Some(resolve_labels(closure.summary.out_param(0), |slot| {
+        closure.capture(slot).unwrap_or(walked)
+    }))
+}
+
 /// Report data a callback builtin hands to a callback whose body reaches a sink.
 pub fn check_callback_sinks(
     ea: &mut crate::expr::ExpressionAnalyzer<'_>,

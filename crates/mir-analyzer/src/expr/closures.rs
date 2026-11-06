@@ -769,6 +769,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         closure_ctx.summarizing_taint = ctx.summarizing_taint;
         crate::taint::label_params(&mut closure_ctx, params.iter().map(|p| p.name.as_ref()));
+        closure_ctx.byref_out_slots = crate::taint::byref_out_slots(&params);
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
         ctx.record_closure(
             expr_span.start,

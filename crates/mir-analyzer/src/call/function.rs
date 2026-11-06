@@ -1089,6 +1089,19 @@ impl CallAnalyzer {
                 }
             }
 
+            if let (Some(taint), Some(ExprKind::Variable(name))) = (
+                crate::taint::walked_array_taint(
+                    &resolved_fn_name,
+                    &call.args,
+                    ctx,
+                    ea.db,
+                    &ea.file,
+                ),
+                call.args.first().and_then(|a| a.value()).map(|v| &v.kind),
+            ) {
+                ctx.set_var_taint(name.as_ref(), taint);
+            }
+
             super::taint_byref_outputs(
                 ea,
                 ctx,

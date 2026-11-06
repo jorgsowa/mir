@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint: `array_walk($a, function (&$v) { $v = (int) $v; })` leaves `$a` with what the closure writes back to its by-ref parameter, so a sanitizing callback clears it.
 - Taint: `sscanf` outputs and result elements read by a numeric conversion (`%d`, `%x`, `%f`) of a literal format are no longer tainted.
 - Taint: `str_starts_with($u, 'https://host/')` clears `$u` for URL and file sinks, as a fixed `scheme://host/` prefix in a concatenation does.
 - Taint: a `preg_match` guard reads its pattern from a class or global constant (`preg_match(self::ID, $x)`), not only from a literal.
