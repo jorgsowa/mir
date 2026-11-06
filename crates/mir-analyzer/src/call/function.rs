@@ -1049,8 +1049,16 @@ impl CallAnalyzer {
                         },
                     );
                     if param.is_variadic {
-                        for arg in call.args.iter().skip(i) {
+                        let scanned_text = resolved_fn_name
+                            .eq_ignore_ascii_case("sscanf")
+                            .then(|| crate::taint::sscanf_text_positions(&call.args))
+                            .flatten();
+                        for (output, arg) in call.args.iter().skip(i).enumerate() {
                             let Some(value) = arg.value() else { continue };
+                            let args_taint = match &scanned_text {
+                                Some(text) if !text.contains(&output) => crate::taint::Taint::NONE,
+                                _ => args_taint,
+                            };
                             if let ExprKind::Variable(name) = &value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
                                 // A plain-variable by-ref argument (`sort($items)`)

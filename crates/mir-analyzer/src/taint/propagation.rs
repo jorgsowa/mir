@@ -817,6 +817,12 @@ pub fn expr_taint(
                 if let Some(restored) = unescaped_kinds(&lower_name) {
                     return args_taint(&fc.args, ctx, db, file).restore(restored);
                 }
+                if lower_name == "sscanf"
+                    && fc.args.len() == 2
+                    && sscanf_text_positions(&fc.args).is_some_and(|p| p.is_empty())
+                {
+                    return Taint::NONE;
+                }
                 if let Some(text) = format_text_args(&lower_name, &fc.args) {
                     let taint = text
                         .into_iter()
@@ -1283,6 +1289,56 @@ pub(super) fn format_text_positions(format: &str) -> Option<Vec<usize>> {
                 | 'X' => break,
                 _ => return None,
             }
+        }
+    }
+    Some(positions)
+}
+
+/// Positions of the values a literal `sscanf` format reads as text; numeric conversions (`%d`,
+/// `%x`, `%f`) can't carry a payload. `None` when the format isn't a literal or is malformed.
+pub fn sscanf_text_positions(args: &[php_ast::owned::Arg]) -> Option<Vec<usize>> {
+    let ExprKind::String(format) = &args.get(1)?.value()?.kind else {
+        return None;
+    };
+    let mut positions = Vec::new();
+    let mut next = 0;
+    let mut chars = format.as_str().chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '%' {
+            continue;
+        }
+        if chars.next_if_eq(&'%').is_some() {
+            continue;
+        }
+        let assigned = chars.next_if_eq(&'*').is_none();
+        let mut digits = String::new();
+        while let Some(d) = chars.next_if(char::is_ascii_digit) {
+            digits.push(d);
+        }
+        let position = if chars.next_if_eq(&'$').is_some() {
+            digits.parse::<usize>().ok()?.checked_sub(1)?
+        } else {
+            while chars.next_if(char::is_ascii_digit).is_some() {}
+            next
+        };
+        while chars.next_if(|c| matches!(c, 'h' | 'l' | 'L')).is_some() {}
+        let text = match chars.next()? {
+            's' | 'c' => true,
+            '[' => {
+                chars.next_if_eq(&'^');
+                // A `]` right after the opening bracket is a member of the set.
+                chars.next_if_eq(&']');
+                while chars.next()? != ']' {}
+                true
+            }
+            'd' | 'i' | 'u' | 'x' | 'X' | 'o' | 'f' | 'e' | 'E' | 'g' | 'n' => false,
+            _ => return None,
+        };
+        if assigned {
+            if text {
+                positions.push(position);
+            }
+            next = position + 1;
         }
     }
     Some(positions)
