@@ -244,6 +244,50 @@ impl<'a> StatementsAnalyzer<'a> {
         sa.analyze_stmts(&decl.body.stmts, &mut fn_ctx);
     }
 
+    /// The constants and methods an anonymous class declares, typed from its own source.
+    fn anon_members(
+        &mut self,
+        decl: &ClassDecl,
+        fqcn: &str,
+        ctx: &mut FlowState,
+    ) -> Arc<crate::flow_state::AnonMembers> {
+        let mut members = crate::flow_state::AnonMembers {
+            interfaces: decl
+                .implements
+                .iter()
+                .map(|name| Arc::from(crate::ast_ext::resolve_ast_name(name, self.db, &self.file)))
+                .collect(),
+            ..Default::default()
+        };
+        for member in decl.body.members.iter() {
+            match &member.kind {
+                ClassMemberKind::ClassConst(c) => {
+                    let ty = match &c.type_hint {
+                        Some(hint) => crate::parser::type_from_hint_owned(hint, Some(fqcn)),
+                        None => self.expr_analyzer(ctx).analyze(&c.value, ctx),
+                    };
+                    members
+                        .constants
+                        .insert(Name::from(c.name.as_str().unwrap_or("")), ty);
+                }
+                ClassMemberKind::Method(m) => {
+                    let ty = m
+                        .return_type
+                        .as_ref()
+                        .map_or_else(mir_types::Type::mixed, |hint| {
+                            crate::parser::type_from_hint_owned(hint, Some(fqcn))
+                        });
+                    members.methods.insert(
+                        Name::from(m.name.as_str().unwrap_or("").to_ascii_lowercase().as_str()),
+                        ty,
+                    );
+                }
+                _ => {}
+            }
+        }
+        Arc::new(members)
+    }
+
     pub(crate) fn analyze_class_decl_stmt(&mut self, decl: &ClassDecl, ctx: &mut FlowState) {
         let class_name = decl
             .name
@@ -272,6 +316,11 @@ impl<'a> StatementsAnalyzer<'a> {
         param_default_ctx.self_fqcn = Some(fqcn.clone());
         param_default_ctx.parent_fqcn = parent_fqcn.clone();
         param_default_ctx.static_fqcn = Some(fqcn.clone());
+        let anon_members = decl.name.is_none().then(|| {
+            let members = self.anon_members(decl, &fqcn, &mut param_default_ctx);
+            param_default_ctx.anon_members = Some(members.clone());
+            members
+        });
 
         // Anonymous classes (and named classes declared nested inside a
         // function/if-block) are never collected into the codebase's class
@@ -451,6 +500,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 method.modifiers.is_static,
             );
             method_ctx.current_method_name = Some(Arc::from(method_name));
+            method_ctx.anon_members = anon_members.clone();
             for p in method.params.iter() {
                 if let Some(raw) = p.name.as_str() {
                     let trimmed = raw.trim_start_matches('$');

@@ -569,6 +569,19 @@ impl CallAnalyzer {
             }
         }
 
+        let anonymous_self = ctx.self_fqcn.as_deref() == Some(fqcn.as_str())
+            && crate::flow_state::self_is_uncollected(ea.db, ctx);
+        if let Some(own) = ctx
+            .anon_members
+            .as_ref()
+            .filter(|_| anonymous_self)
+            .and_then(|m| {
+                m.methods
+                    .get(&mir_types::Name::from(method_name_lower.as_str()))
+            })
+        {
+            return own.clone();
+        }
         let resolved = resolve_method_from_db(ea.db, &fqcn_arc, &method_name_lower).or_else(|| {
             let parent = ctx.parent_fqcn.as_ref().filter(|_| {
                 ctx.self_fqcn.as_deref() == Some(fqcn.as_str())

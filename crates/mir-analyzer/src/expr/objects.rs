@@ -1597,17 +1597,32 @@ impl<'a> ExpressionAnalyzer<'a> {
                         };
                         let here = crate::db::Fqcn::from_str(self.db, self_fqcn);
                         let uncollected = crate::flow_state::self_is_uncollected(self.db, ctx);
+                        if let Some(own) = ctx
+                            .anon_members
+                            .as_ref()
+                            .filter(|_| uncollected)
+                            .and_then(|m| {
+                                m.constants.get(&mir_types::Name::from(const_name.as_str()))
+                            })
+                        {
+                            return own.clone();
+                        }
                         let found =
                             crate::db::find_class_constant_in_chain(self.db, here, &const_name)
                                 .or_else(|| {
-                                    let parent =
-                                        ctx.parent_fqcn.as_deref().filter(|_| uncollected)?;
-                                    let parent = crate::db::Fqcn::from_str(self.db, parent);
-                                    crate::db::find_class_constant_in_chain(
-                                        self.db,
-                                        parent,
-                                        &const_name,
-                                    )
+                                    let anonymous =
+                                        ctx.anon_members.as_ref().filter(|_| uncollected);
+                                    ctx.parent_fqcn
+                                        .iter()
+                                        .filter(|_| uncollected)
+                                        .chain(anonymous.iter().flat_map(|m| m.interfaces.iter()))
+                                        .find_map(|ancestor| {
+                                            crate::db::find_class_constant_in_chain(
+                                                self.db,
+                                                crate::db::Fqcn::from_str(self.db, ancestor),
+                                                &const_name,
+                                            )
+                                        })
                                 });
                         // Inside a trait, `self::`/`static::CONST` may be
                         // defined on the using class via late static binding,

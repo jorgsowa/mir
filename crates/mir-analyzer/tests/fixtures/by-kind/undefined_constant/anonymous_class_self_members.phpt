@@ -8,14 +8,14 @@ class Q extends P {}
 function f(): void {
     new class extends Q {
         const E = 2;
+        public static function own(): int { return 3; }
         public function f(): int {
-            echo self::E;
-            return self::C + static::C + self::s() + static::s();
+            return self::C + static::C + self::E + self::s() + static::s() + self::own();
         }
     };
     new class implements I {
-        public function f(): void {
-            echo self::C;
+        public function f(): int {
+            return self::C;
         }
     };
 }

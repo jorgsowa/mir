@@ -142,6 +142,17 @@ impl Guard {
     }
 }
 
+/// Constants and methods an anonymous class declares itself.
+#[derive(Debug, Default)]
+pub struct AnonMembers {
+    /// Constant name to the type of its value.
+    pub constants: FxHashMap<Name, Type>,
+    /// Lowercase method name to its declared return type.
+    pub methods: FxHashMap<Name, Type>,
+    /// Interfaces it implements, which may declare constants.
+    pub interfaces: Vec<Arc<str>>,
+}
+
 /// Label slots of one body's summary for parameters proven objects.
 #[derive(Debug, Default)]
 pub struct ObjectGuardSlots {
@@ -327,6 +338,9 @@ pub struct FlowState {
 
     /// Variables a closure captured by value: a call may run the closure and change their objects' properties.
     pub captured_vars: Arc<FxHashSet<Name>>,
+
+    /// Members of the anonymous class being analyzed, which the codebase doesn't hold.
+    pub anon_members: Option<Arc<AnonMembers>>,
 
     /// Local variables directly assigned from a bare `clone $expr` expression
     /// (`$clone = clone $this;`), keyed by the variable's own name. A write
@@ -753,6 +767,7 @@ impl FlowState {
             ref_aliases: FxHashMap::default(),
             escaped_vars: Arc::default(),
             captured_vars: Arc::default(),
+            anon_members: None,
             cloned_local_vars: FxHashSet::default(),
             read_vars: FxHashSet::default().into(),
             param_names: Arc::new(FxHashSet::default()),
