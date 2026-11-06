@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A class reference without type arguments no longer takes a template's `null` default (`@template TParent of Node|null = null`), so calling a method on what it returns isn't reported as `NullMethodCall`.
 - Taint: a function that iterates a parameter's keys into a sink is tainted by the argument's keys, not its values, so `f(['a' => $_GET['x']])` is no longer reported.
 - A check on `$s[$k]` with a variable key narrows the element of a closed array shape too.
 - A check on an element of a generic array read through a variable or literal key (`$a[$k] instanceof E`, `is_string($this->m['x'])`, `$a[$k] !== null`) narrows that element until the array or the key changes.

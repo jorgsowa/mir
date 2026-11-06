@@ -564,7 +564,12 @@ pub fn build_class_bindings(
     // and `bare_subclass_extends_fixed_property_type_resolves`'s
     // `noFixedTemplateStaysRaw` case, depend on this permissiveness).
     for tp in class_template_params {
-        if let Some(default) = tp.default.as_deref() {
+        // A `null` default marks a slot a fresh instance leaves unset; a bare ref may hold a filled one.
+        if let Some(default) = tp
+            .default
+            .as_deref()
+            .filter(|d| !d.is_single() || !d.is_nullable())
+        {
             bindings
                 .entry(Name::from(tp.name.as_ref()))
                 .or_insert_with(|| default.clone());

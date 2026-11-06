@@ -409,11 +409,6 @@
       <code><![CDATA[$this->resourceLocales = array_keys($this->options['resource_files'])]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Symfony/Bundle/SecurityBundle/DependencyInjection/Security/Factory/CustomAuthenticatorFactory.php">
-    <NullMethodCall>
-      <code><![CDATA[$builder->end()->end()]]></code>
-    </NullMethodCall>
-  </file>
   <file src="src/Symfony/Bundle/TwigBundle/Command/LintCommand.php">
     <UndefinedMethod>
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
