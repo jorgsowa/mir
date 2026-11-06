@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint: a `preg_match` guard reads its pattern from a class or global constant (`preg_match(self::ID, $x)`), not only from a literal.
 - A class reference without type arguments no longer takes a template's `null` default (`@template TParent of Node|null = null`), so calling a method on what it returns isn't reported as `NullMethodCall`.
 - Taint: a function that iterates a parameter's keys into a sink is tainted by the argument's keys, not its values, so `f(['a' => $_GET['x']])` is no longer reported.
 - A check on `$s[$k]` with a variable key narrows the element of a closed array shape too.

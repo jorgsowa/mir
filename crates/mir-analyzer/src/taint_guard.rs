@@ -11,6 +11,7 @@ use php_ast::owned::{Arg, Expr, ExprKind};
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::taint::Taint;
+use std::borrow::Cow;
 
 /// A set of ASCII characters, plus whether any non-ASCII one may appear.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -382,6 +383,25 @@ fn string_arg(args: &[Arg], index: usize) -> Option<&str> {
     }
 }
 
+/// A `preg_match` pattern: a literal, or a class or global constant holding one.
+fn pattern_arg<'e>(args: &'e [Arg], scope: GuardScope<'_>) -> Option<Cow<'e, str>> {
+    if let Some(literal) = string_arg(args, 0) {
+        return Some(Cow::Borrowed(literal));
+    }
+    let pattern = args.first()?.value()?;
+    if !matches!(
+        pattern.kind,
+        ExprKind::Name(_) | ExprKind::ClassConstAccess(_)
+    ) {
+        return None;
+    }
+    let ty = crate::expr::constant_expr_type(pattern, scope.ctx, scope.db, scope.file)?;
+    match ty.types.as_slice() {
+        [mir_types::Atomic::TLiteralString(s)] => Some(Cow::Owned(s.to_string())),
+        _ => None,
+    }
+}
+
 /// What a passing guard call validated.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Guarded<'a> {
@@ -395,8 +415,8 @@ pub enum Guarded<'a> {
 }
 
 /// The value a passing guard call validates, and the kinds it is then safe for.
-pub fn guarded_var(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
-    guard_of_call(call).map(|(guarded, safe, _)| (guarded, safe))
+pub fn guarded_var<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'e>, Taint)> {
+    guard_of_call(call, scope).map(|(guarded, safe, _)| (guarded, safe))
 }
 
 /// Where a guard's constants and maps get their types.
@@ -416,9 +436,9 @@ pub fn guarded_when<'e>(
 ) -> Option<(Guarded<'e>, Taint)> {
     let ExprKind::Binary(b) = &cond.kind else {
         if !holds {
-            return guarded_by_failed_match(cond);
+            return guarded_by_failed_match(cond, scope);
         }
-        return guarded_var(cond)
+        return guarded_var(cond, scope)
             .or_else(|| cli_sapi_list(cond))
             .or_else(|| guarded_by_list(cond, scope))
             .or_else(|| guarded_by_map_key(cond, scope));
@@ -434,7 +454,7 @@ pub fn guarded_when<'e>(
         (_, ExprKind::Int(_) | ExprKind::Bool(_)) => (&b.left, &b.right.kind, b.op),
         _ => return None,
     };
-    let (guarded, safe, is_preg) = guard_of_call(call)?;
+    let (guarded, safe, is_preg) = guard_of_call(call, scope)?;
     let matched_when = match *literal {
         ExprKind::Int(n) => matched_when_int(op, n)?,
         // `preg_match()` never returns a bool on a match.
@@ -496,7 +516,10 @@ fn cli_sapi_list(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
 }
 
 /// A failed `preg_match('/[<>]/', $x)` proves none of the class's characters occur in `$x`.
-fn guarded_by_failed_match(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
+fn guarded_by_failed_match<'e>(
+    call: &'e Expr,
+    scope: GuardScope<'_>,
+) -> Option<(Guarded<'e>, Taint)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
@@ -507,7 +530,8 @@ fn guarded_by_failed_match(call: &Expr) -> Option<(Guarded<'_>, Taint)> {
     if value.name.is_some() || value.unpack() {
         return None;
     }
-    let pattern = string_arg(&fc.args, 0)?;
+    let pattern = pattern_arg(&fc.args, scope)?;
+    let pattern = pattern.as_ref();
     // Invalid UTF-8 makes a `/u` match return false whatever the value holds.
     if split_pattern(pattern)?.1.contains('u') {
         return None;
@@ -717,14 +741,17 @@ fn matched_when_bool(op: BinaryOp, value: bool) -> Option<bool> {
     }
 }
 
-fn guard_of_call(call: &Expr) -> Option<(Guarded<'_>, Taint, bool)> {
+fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'e>, Taint, bool)> {
     let ExprKind::FunctionCall(fc) = &call.kind else {
         return None;
     };
     let name = fc.name.kind.name_bare()?;
     let lower = crate::util::php_ident_lowercase(name);
     let (safe, subject) = match lower.as_str() {
-        "preg_match" => (safe_kinds(pattern_chars(string_arg(&fc.args, 0)?)?), 1),
+        "preg_match" => (
+            safe_kinds(pattern_chars(&pattern_arg(&fc.args, scope)?)?),
+            1,
+        ),
         "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
         _ => (value_check_safe_kinds(&lower)?, 0),
     };
