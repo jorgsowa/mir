@@ -412,7 +412,11 @@ impl CallAnalyzer {
                                             let var_name = name.trim_start_matches('$');
                                             ea.check_var_write_purity(var_name, ctx, value.span);
                                             ctx.set_var(var_name, output_ty);
-                                            ctx.set_var_taint(var_name, args_taint);
+                                            let written = crate::taint::closure_out_taint(
+                                                &call.name, i, &call.args, ctx, ea.db, &ea.file,
+                                            )
+                                            .unwrap_or(args_taint);
+                                            ctx.set_var_taint(var_name, written);
                                         } else {
                                             ea.check_byref_arg_purity(value, ctx, value.span);
                                         }

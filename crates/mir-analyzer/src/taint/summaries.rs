@@ -549,7 +549,16 @@ impl TaintSummary {
 
     /// Taint of a call's result, given the taint of the argument bound to each parameter.
     pub fn call_result(&self, arg_taint: impl Fn(usize) -> Taint) -> Taint {
-        resolve_labels(self.returns, |slot| {
+        self.resolve_with_args(self.returns, arg_taint)
+    }
+
+    /// Taint by-ref parameter `param` holds after a call, given the taint of each parameter's argument.
+    pub fn out_result(&self, param: usize, arg_taint: impl Fn(usize) -> Taint) -> Taint {
+        self.resolve_with_args(self.out_param(param), arg_taint)
+    }
+
+    fn resolve_with_args(&self, taint: Taint, arg_taint: impl Fn(usize) -> Taint) -> Taint {
+        resolve_labels(taint, |slot| {
             self.slot_params(slot)
                 .into_iter()
                 .fold(Taint::NONE, |acc, param| acc | arg_taint(param))

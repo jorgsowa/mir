@@ -236,13 +236,43 @@ pub(super) fn closure_call_taint(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Taint {
-    closure.summary.call_result(|slot| {
+    closure
+        .summary
+        .call_result(closure_slot_taint(closure, args, ctx, db, file))
+}
+
+/// Taint a call of the closure `callee` leaves in its by-ref parameter `param`; `None` without a summary.
+pub fn closure_out_taint(
+    callee: &Expr,
+    param: usize,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    let closure = callee_closure(callee, ctx, db, file)?;
+    Some(
+        closure
+            .summary
+            .out_result(param, closure_slot_taint(&closure, args, ctx, db, file)),
+    )
+}
+
+/// Taint flowing into each label slot of a call of `closure` with `args`.
+fn closure_slot_taint<'a>(
+    closure: &'a crate::flow_state::ClosureSummary,
+    args: &'a [php_ast::owned::Arg],
+    ctx: &'a FlowState,
+    db: &'a dyn crate::db::MirDatabase,
+    file: &'a str,
+) -> impl Fn(usize) -> Taint + 'a {
+    move |slot| {
         closure.capture(slot).unwrap_or_else(|| {
             closure_param_args(&closure.params, args, slot)
                 .into_iter()
                 .fold(Taint::NONE, |acc, e| acc | expr_taint(e, ctx, db, file))
         })
-    })
+    }
 }
 
 /// A callback named by a string (`'trim'`) or a first-class callable (`trim(...)`).
@@ -520,17 +550,24 @@ pub fn walked_array_taint(
         return None;
     }
     let callback = args.get(1)?.value()?;
-    let ExprKind::Closure(c) = &unwrap_parens(callback).kind else {
-        return None;
+    let takes_value_by_ref = match &unwrap_parens(callback).kind {
+        ExprKind::Closure(c) => c.params.first().is_some_and(|p| p.by_ref),
+        ExprKind::Variable(name) => ctx.get_var(name).types.iter().any(|a| {
+            matches!(a, mir_types::Atomic::TClosure { data }
+                if data.params.first().is_some_and(|p| p.is_byref))
+        }),
+        _ => false,
     };
-    if !c.params.first()?.by_ref {
+    if !takes_value_by_ref {
         return None;
     }
     let closure = callee_closure(callback, ctx, db, file)?;
     let walked = args_taint(&args[..1], ctx, db, file) | args_taint(&args[2..], ctx, db, file);
-    Some(resolve_labels(closure.summary.out_param(0), |slot| {
-        closure.capture(slot).unwrap_or(walked)
-    }))
+    Some(
+        closure
+            .summary
+            .out_result(0, |slot| closure.capture(slot).unwrap_or(walked)),
+    )
 }
 
 /// Report data a callback builtin hands to a callback whose body reaches a sink.
