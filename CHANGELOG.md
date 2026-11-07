@@ -7,30 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.92.0] - 2026-11-07
+
 ### Changed
 
-- A value a property accepts only in part is reported as `PossiblyNullPropertyAssignmentValue`, `PossiblyFalsePropertyAssignmentValue` or `PossiblyInvalidPropertyAssignmentValue` (info, Psalm's names) instead of `InvalidPropertyAssignment`; an `InvalidPropertyAssignment` baseline entry still matches them.
-- An array shape argument that fits once `null` is removed from its values is `PossiblyInvalidArgument` instead of `InvalidArgument`.
-- A run with a cache no longer parses unchanged files, so re-running on an unchanged Laravel tree uses about 30% less memory and CPU. The first run with an empty cache stores every file's definitions, which makes it slower and the cache larger.
-- An edit limited to comments, whitespace or the body of a function with a declared return type re-analyzes only that file. Before, it also re-analyzed every cached result reporting a missing method, property or class constant, and a comment or whitespace edit also re-analyzed the file's dependents. Docblocks and comments containing `@` still count as changes.
-- The definition cache is stored in a few pack files instead of one file per source file, so filling an empty cache no longer stalls on file creation (Laravel: about a third faster, 28% fewer instructions) and a cached run reads it with less work (17–24% fewer instructions). An existing cache in the old layout is deleted on the first run.
-- The analysis cache stores each file path and symbol name once, which makes it about a third smaller and faster to load. A cache from another mir build is discarded without being decoded.
+- A value a property accepts only in part is reported as `PossiblyNullPropertyAssignmentValue`, `PossiblyFalsePropertyAssignmentValue` or `PossiblyInvalidPropertyAssignmentValue` (info, Psalm's names) instead of `InvalidPropertyAssignment`; an `InvalidPropertyAssignment` baseline entry still matches them. An array shape argument that fits once `null` is removed from its values is `PossiblyInvalidArgument` instead of `InvalidArgument`.
+- Cache: a cached run no longer parses unchanged files, so re-running on an unchanged Laravel tree uses about 30% less memory and CPU; the first run with an empty cache stores every file's definitions, which makes it slower and the cache larger. Definitions are stored in a few pack files instead of one file per source file, so filling an empty cache no longer stalls on file creation (Laravel: about a third faster) and a cached run reads it with 17–24% fewer instructions. The analysis cache stores each file path and symbol name once, which makes it about a third smaller and faster to load. An existing cache in the old layout, or from another mir build, is discarded.
+- An edit limited to comments, whitespace or the body of a function with a declared return type re-analyzes only that file, instead of also every cached result reporting a missing method, property or class constant and, for comments and whitespace, the file's dependents. Docblocks and comments containing `@` still count as changes.
+- Workspace and internal crate versions were updated to `0.92.0`.
 
 ### Fixed
 
-- Taint: a closure call leaves in a by-ref argument what the closure writes back to that parameter, called directly (`$f($x)`) or through `array_walk($a, $f)`, so a sanitizing closure clears it.
-- Taint: `sscanf` outputs and result elements read by a numeric conversion (`%d`, `%x`, `%f`) of a literal format are no longer tainted.
-- Taint: `str_starts_with($u, 'https://host/')` clears `$u` for URL and file sinks, as a fixed `scheme://host/` prefix in a concatenation does.
-- Taint: a `preg_match` guard reads its pattern from a class or global constant (`preg_match(self::ID, $x)`), not only from a literal.
-- A class reference without type arguments no longer takes a template's `null` default (`@template TParent of Node|null = null`), so calling a method on what it returns isn't reported as `NullMethodCall`.
-- Taint: a function that iterates a parameter's keys into a sink is tainted by the argument's keys, not its values, so `f(['a' => $_GET['x']])` is no longer reported.
-- A check on `$s[$k]` with a variable key narrows the element of a closed array shape too.
-- A check on an element of a generic array read through a variable or literal key (`$a[$k] instanceof E`, `is_string($this->m['x'])`, `$a[$k] !== null`) narrows that element until the array or the key changes.
-- A call forgets the narrowed properties of objects a closure or arrow function captured, since the call may run the closure and change them.
+- Taint false positives: a sanitizing closure clears the by-ref argument it writes back to, called directly (`$f($x)`) or through `array_walk($a, $f)`; `sscanf` outputs and result elements read by a numeric conversion (`%d`, `%x`, `%f`) of a literal format aren't tainted; `str_starts_with($u, 'https://host/')` clears `$u` for URL and file sinks, as a fixed `scheme://host/` prefix in a concatenation does; a `preg_match` guard reads its pattern from a class or global constant (`preg_match(self::ID, $x)`), not only from a literal; a function that iterates a parameter's keys into a sink is tainted by the argument's keys, not its values, so `f(['a' => $_GET['x']])` isn't reported; a payload passed to Laravel's `Encrypter::decrypt()` or `decryptString()` doesn't reach `unserialize()` or the result, since the encrypter checks a keyed MAC first.
+- Narrowing: a check on an array element read through a variable or literal key (`$a[$k] instanceof E`, `is_string($this->m['x'])`, `$a[$k] !== null`) narrows that element, in a generic array or a closed shape, until the array or the key changes; a call forgets the narrowed properties of objects a closure or arrow function captured, since the call may run the closure and change them.
+- Docblock type arguments: call-site variance (`Collection<int, covariant Model>`) accepts any subtype of `Model` instead of being read as a class named `covariant Model`; `contravariant X` accepts `X` or a supertype and `*` any argument, and reading through either gives the template's declared bound instead of `mixed`; a class reference without type arguments no longer takes a template's `null` default (`@template TParent of Node|null = null`), so calling a method on what it returns isn't `NullMethodCall`.
 - `self::`/`static::` in an anonymous class no longer report `UndefinedConstant` or `UndefinedClass`: its own constants and static methods are typed from its source, and inherited ones resolve through its parent and interfaces.
-- Call-site variance in docblock type arguments (`Collection<int, covariant Model>`) is understood: the argument accepts any subtype of `Model` instead of being read as a class named `covariant Model`.
-- `contravariant X` and `*` type arguments are understood: `contravariant X` accepts `X` or a supertype, `*` any argument, and reading through either gives the template's declared bound instead of `mixed`.
-- Taint: a payload passed to Laravel's `Encrypter::decrypt()` or `decryptString()` no longer reaches `unserialize()` or the result, since the encrypter checks a keyed MAC first.
 
 ## [0.91.0] - 2026-11-05
 
