@@ -7,18 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-11-08
+
+### Changed
+
+- Dependencies were updated.
+- Workspace and internal crate versions were updated to `0.93.0`.
+
 ### Fixed
 
 - `AnalysisSession::flush_analysis_cache` also writes the definition cache's pending pack, so an LSP host that keeps its session for the whole process persists definitions again; since 0.92.0 they reached disk only when a pack filled up or the session was dropped, and the next launch re-parsed every file.
-- Taint: `fprintf()`/`vfprintf()` to a handle `fopen()` opened on a literal file path (not `php://` or `/dev/`) on every path isn't `TaintedHtml`.
-- Taint: output after `header('Content-Type: application/json')` (or `text/plain`, `text/csv`, `application/octet-stream`, `+json`) on every path isn't `TaintedHtml`; a later HTML or unknown `header()` restores it.
-- Taint: `in_array($x, $this->allowed, true)` and `self::$allowed` clear `$x` when the private property's default is a list of literals and nothing in the class can change it.
-- Taint: a guard on an object variable's property (`if (ctype_digit($this->x)) echo $this->x;`) clears it until a call may change the object, and a property written in the current flow no longer takes the taint other methods store in it.
-- Taint: a user function or static method whose body is `return <guard>;` on a parameter (`return ctype_digit($v);`, `return preg_match(self::ID, $v) === 1;`) guards the argument passed for it, as the check itself would. One whose body is `if (!<guard>) { throw ...; }` guards the argument once the call returns.
-- Taint: `hash_equals(hash_hmac($algo, $p, $key), $mac)` with an untainted key clears `$p` for `unserialize()`, as a guard or an early exit.
-- Taint: a known sanitizer method (`HTMLPurifier::purify()`, Laminas `Escaper`, `PDO::quote()`) clears its argument when called on an object built in place, as in `(new HTMLPurifier())->purify($x)`.
-- Taint: only the name and value of `setcookie()`/`setrawcookie()` are cookie sinks; PHP rejects separators in the path and domain.
-- Taint: a method without taint annotations takes the `@psalm-taint-escape`, `@taint-source` and `@psalm-flow` annotations of the parent or interface method it overrides, so an escaper declared on an interface clears its implementation's result.
+- Taint guards clear their subject in more forms: a user function or static method whose body is `return <guard>;` on a parameter (`return ctype_digit($v);`, `return preg_match(self::ID, $v) === 1;`) guards the argument passed for it, and one whose body is `if (!<guard>) { throw ...; }` guards it once the call returns; a guard on an object variable's property (`if (ctype_digit($this->x)) echo $this->x;`) clears it until a call may change the object; `in_array($x, $this->allowed, true)` and `self::$allowed` clear `$x` when the private property's default is a list of literals and nothing in the class can change it; `hash_equals(hash_hmac($algo, $p, $key), $mac)` with an untainted key clears `$p` for `unserialize()`, as a guard or an early exit.
+- Taint false positives: output after `header('Content-Type: application/json')` (or `text/plain`, `text/csv`, `application/octet-stream`, `+json`) on every path isn't `TaintedHtml` until a later HTML or unknown `header()`; nor is `fprintf()`/`vfprintf()` to a handle `fopen()` opened on a literal file path (not `php://` or `/dev/`) on every path; a known sanitizer method (`HTMLPurifier::purify()`, Laminas `Escaper`, `PDO::quote()`) clears its argument when called on an object built in place, as in `(new HTMLPurifier())->purify($x)`; only the name and value of `setcookie()`/`setrawcookie()` are cookie sinks, since PHP rejects separators in the path and domain; a property written in the current flow no longer takes the taint other methods store in it.
+- Taint annotations: a method without its own takes the `@psalm-taint-escape`, `@taint-source` and `@psalm-flow` annotations of the parent or interface method it overrides, so an escaper declared on an interface clears its implementation's result.
 
 ## [0.92.0] - 2026-11-07
 
