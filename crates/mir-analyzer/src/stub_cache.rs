@@ -79,7 +79,7 @@ fn mir_version_hash() -> u64 {
     })
 }
 
-/// One queued disk write for the background writer thread.
+/// One queued disk write for a background writer thread.
 struct WriteJob {
     entry_path: PathBuf,
     header: Header,
@@ -89,25 +89,28 @@ struct WriteJob {
 }
 
 /// Persistent definition cache. Thread-safe. Reads go straight to the
-/// filesystem; writes are handed to a lazily-spawned background thread so a
+/// filesystem; writes are handed to lazily-spawned background threads so a
 /// whole-workspace definition walk never serializes 15K slice files on its
 /// own (query-latency) critical path. Reads-after-write in the same session
 /// are served by Salsa's memos, not this cache, so the write delay is
 /// unobservable except across sessions — and [`Self::flush`]/`Drop` join the
-/// writer, so a clean shutdown loses nothing.
+/// writers, so a clean shutdown loses nothing.
 pub struct StubSliceCache {
     root: PathBuf,
     hits: AtomicU64,
     misses: AtomicU64,
     writes: AtomicU64,
     enabled: bool,
-    writer: std::sync::Mutex<
-        Option<(
-            std::sync::mpsc::Sender<WriteJob>,
-            std::thread::JoinHandle<()>,
-        )>,
-    >,
+    writers: std::sync::Mutex<Vec<Writer>>,
 }
+
+type Writer = (
+    std::sync::mpsc::Sender<WriteJob>,
+    std::thread::JoinHandle<()>,
+);
+
+/// Writer threads; each entry costs a few filesystem calls, so one thread can't keep up.
+const WRITER_THREADS: usize = 4;
 
 impl StubSliceCache {
     /// Open (or create) the cache under `<cache_dir>/stubs/`. The directory
@@ -122,7 +125,7 @@ impl StubSliceCache {
             misses: AtomicU64::new(0),
             writes: AtomicU64::new(0),
             enabled,
-            writer: std::sync::Mutex::new(None),
+            writers: std::sync::Mutex::new(Vec::new()),
         }
     }
 
@@ -216,6 +219,8 @@ impl StubSliceCache {
         if !self.enabled {
             return;
         }
+        // A path always goes to the same writer, so its writes land in order.
+        let writer = blake3::hash(path.as_bytes()).as_bytes()[0] as usize % WRITER_THREADS;
         let job = WriteJob {
             entry_path: self.shard_path(path),
             header: Header {
@@ -229,40 +234,43 @@ impl StubSliceCache {
             issues: std::sync::Arc::clone(issues),
             seq: self.writes.fetch_add(1, Ordering::Relaxed),
         };
-        let mut guard = self.writer.lock().unwrap();
-        if guard.is_none() {
-            let (tx, rx) = std::sync::mpsc::channel::<WriteJob>();
-            let handle = std::thread::Builder::new()
-                .name("mir-stub-cache-writer".into())
-                .spawn(move || {
-                    for job in rx {
-                        write_entry(job);
-                    }
-                })
-                .ok();
-            match handle {
-                Some(h) => *guard = Some((tx, h)),
-                // Can't spawn: degrade to a synchronous write.
-                None => {
-                    drop(guard);
-                    write_entry(job);
-                    return;
+        let mut writers = self.writers.lock().unwrap();
+        if writers.is_empty() {
+            for _ in 0..WRITER_THREADS {
+                let (tx, rx) = std::sync::mpsc::channel::<WriteJob>();
+                let handle = std::thread::Builder::new()
+                    .name("mir-stub-cache-writer".into())
+                    .spawn(move || {
+                        for job in rx {
+                            write_entry(job);
+                        }
+                    });
+                match handle {
+                    Ok(handle) => writers.push((tx, handle)),
+                    Err(_) => break,
                 }
             }
         }
-        if let Some((tx, _)) = guard.as_ref() {
+        match writers.get(writer).or_else(|| writers.first()) {
             // A send can only fail if the writer thread died; the entry is
             // then simply not cached — same contract as any other I/O error.
-            let _ = tx.send(job);
+            Some((tx, _)) => {
+                let _ = tx.send(job);
+            }
+            // Can't spawn: degrade to a synchronous write.
+            None => {
+                drop(writers);
+                write_entry(job);
+            }
         }
     }
 
-    /// Join the background writer, guaranteeing every queued entry is on
-    /// disk. The next [`Self::put`] respawns it. Called by `Drop`, so a
+    /// Join the background writers, guaranteeing every queued entry is on
+    /// disk. The next [`Self::put`] respawns them. Called by `Drop`, so a
     /// clean session shutdown never loses queued writes.
     pub fn flush(&self) {
-        let taken = self.writer.lock().unwrap().take();
-        if let Some((tx, handle)) = taken {
+        let taken = std::mem::take(&mut *self.writers.lock().unwrap());
+        for (tx, handle) in taken {
             drop(tx);
             let _ = handle.join();
         }

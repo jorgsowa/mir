@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An array shape argument that fits once `null` is removed from its values is `PossiblyInvalidArgument` instead of `InvalidArgument`.
 - A run with a cache no longer parses unchanged files, so re-running on an unchanged Laravel tree uses about 30% less memory and CPU. The first run with an empty cache stores every file's definitions, which makes it slower and the cache larger.
 - An edit limited to comments, whitespace or the body of a function with a declared return type re-analyzes only that file. Before, it also re-analyzed every cached result reporting a missing method, property or class constant, and a comment or whitespace edit also re-analyzed the file's dependents. Docblocks and comments containing `@` still count as changes.
+- The definition cache is written by four threads instead of one, so a run filling an empty cache no longer spends about half its time waiting for those writes at exit (Laravel: about 30% faster).
 
 ### Fixed
 
