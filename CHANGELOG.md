@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint: only the name and value of `setcookie()`/`setrawcookie()` are cookie sinks; PHP rejects separators in the path and domain.
 - Taint: a method without taint annotations takes the `@psalm-taint-escape`, `@taint-source` and `@psalm-flow` annotations of the parent or interface method it overrides, so an escaper declared on an interface clears its implementation's result.
 
 ## [0.92.0] - 2026-11-07
