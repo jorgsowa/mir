@@ -747,6 +747,10 @@ fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'
     };
     let name = fc.name.kind.name_bare()?;
     let lower = crate::util::php_ident_lowercase(name);
+    if lower == "hash_equals" {
+        let payload = mac_checked_payload(&fc.args, scope)?;
+        return Some((guarded_subject(payload)?, Taint::UNSERIALIZE, false));
+    }
     let (safe, subject) = match lower.as_str() {
         "preg_match" => (
             safe_kinds(pattern_chars(&pattern_arg(&fc.args, scope)?)?),
@@ -762,6 +766,28 @@ fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'
     }
     let guarded = guarded_subject(value.value()?)?;
     (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+}
+
+/// The data of a `hash_hmac` side of `hash_equals`: matching proves whoever holds the key made it.
+fn mac_checked_payload<'e>(args: &'e [Arg], scope: GuardScope<'_>) -> Option<&'e Expr> {
+    let [known, user] = args else {
+        return None;
+    };
+    [known, user].into_iter().find_map(|arg| {
+        let ExprKind::FunctionCall(fc) = &arg.value()?.kind else {
+            return None;
+        };
+        let [_, data, key, ..] = &fc.args[..] else {
+            return None;
+        };
+        let untainted_key = key.name.is_none()
+            && crate::taint::expr_taint(key.value()?, scope.ctx, scope.db, scope.file).is_empty();
+        (fc.name.kind.name_bare()?.eq_ignore_ascii_case("hash_hmac")
+            && data.name.is_none()
+            && untainted_key)
+            .then(|| data.value())
+            .flatten()
+    })
 }
 
 /// `str_starts_with($u, 'https://host/')` fixes the scheme and host, as a literal prefix does.
