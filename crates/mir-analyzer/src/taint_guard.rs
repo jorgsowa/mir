@@ -608,13 +608,57 @@ fn guarded_by_list<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded
             }
         }
     } else if !strict
-        || crate::narrowing::extract_haystack_type(haystack, scope.ctx, scope.db, scope.file)
+        || (crate::narrowing::extract_haystack_type(haystack, scope.ctx, scope.db, scope.file)
             .is_none()
+            && !is_fixed_literal_list(haystack, scope))
     {
         return None;
     }
     let (guarded, safe) = compared_subject(fc.args.first()?.value()?)?;
     Some((guarded, safe.intersection(comparison_safe)))
+}
+
+/// `$this->p` or `self::$p` for a private property whose literal-list default nothing changes.
+fn is_fixed_literal_list(haystack: &Expr, scope: GuardScope<'_>) -> bool {
+    let (prop, is_static) = match &haystack.kind {
+        ExprKind::PropertyAccess(pa) if matches!(&pa.object.kind, ExprKind::Variable(v) if v.as_str() == "this") => {
+            match &pa.property.kind {
+                ExprKind::Identifier(name) => (name.as_str(), false),
+                _ => return false,
+            }
+        }
+        ExprKind::StaticPropertyAccess(spa) if matches!(spa.class.kind.name_bare(), Some(c) if c.eq_ignore_ascii_case("self") || c.eq_ignore_ascii_case("static")) => {
+            match &spa.member.kind {
+                ExprKind::Variable(name) | ExprKind::Identifier(name) => {
+                    (name.trim_start_matches('$'), true)
+                }
+                _ => return false,
+            }
+        }
+        _ => return false,
+    };
+    let Some(class) = scope.ctx.self_fqcn.as_deref() else {
+        return false;
+    };
+    let Some(def) = crate::db::find_property_in_class(
+        scope.db,
+        crate::db::Fqcn::from_str(scope.db, class),
+        prop,
+    ) else {
+        return false;
+    };
+    let Some(location) = def.location.as_ref() else {
+        return false;
+    };
+    scope
+        .db
+        .lookup_source_file(location.file.as_ref())
+        .is_some_and(|file| {
+            crate::db::fixed_props::file_fixed_private_props(scope.db, file).contains(&(
+                Name::new(class),
+                crate::db::taint_sources::prop_key(prop, is_static),
+            ))
+        })
 }
 
 /// The value a comparison checks, and the kinds an exact match leaves it safe for: changing the

@@ -315,6 +315,7 @@ pub(crate) mod class_mention_index;
 mod deps;
 mod file_slab;
 mod find_queries;
+pub(crate) mod fixed_props;
 mod inferred_types;
 mod mirdb;
 mod nodes;
