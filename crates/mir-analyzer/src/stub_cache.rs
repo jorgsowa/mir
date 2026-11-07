@@ -385,18 +385,18 @@ impl StubSliceCache {
         }
         let mut packs = self.packs.lock();
         let total: u64 = packs.iter().map(|p| p.payload_bytes).sum();
-        let mut live: Vec<([u8; 32], Slot)> = self
-            .index
-            .read()
-            .iter()
-            .map(|(key, slot)| (*key, slot.clone()))
-            .collect();
-        let live_bytes: u64 = live.iter().map(|(_, s)| u64::from(s.len)).sum();
+        let index = self.index.read();
+        let live_bytes: u64 = index.values().map(|s| u64::from(s.len)).sum();
         let superseded = total.saturating_sub(live_bytes);
         let too_many = packs.len() > MAX_PACKS;
         if !too_many && (superseded <= live_bytes || superseded < MIN_RECLAIM_BYTES) {
             return;
         }
+        let mut live: Vec<([u8; 32], Slot)> = index
+            .iter()
+            .map(|(key, slot)| (*key, slot.clone()))
+            .collect();
+        drop(index);
         // Group reads by pack and offset so the copy reads each pack in order.
         live.sort_by(|(_, a), (_, b)| {
             (Arc::as_ptr(&a.pack), a.offset).cmp(&(Arc::as_ptr(&b.pack), b.offset))

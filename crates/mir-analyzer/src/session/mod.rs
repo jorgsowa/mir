@@ -342,15 +342,18 @@ impl AnalysisSession {
         self.query_snapshot(|snap| snap.files_mentioning_any(files, needles))
     }
 
-    /// Persist the attached [`AnalysisCache`] to disk. No-op without an
-    /// attached cache or when nothing changed since the last flush.
-    /// Reference postings committed by session sweeps and on-demand query
-    /// freshness passes reach disk only here — a host should call this after
-    /// its warm sweep completes and on shutdown so the next launch's
-    /// [`Self::warm_start_files`] finds them.
+    /// Persist the attached [`AnalysisCache`] and the definition cache's
+    /// pending pack to disk. No-op without an attached cache or when nothing
+    /// changed since the last flush. Reference postings and definitions
+    /// written since the last flush reach later sessions only here — a host
+    /// should call this after its warm sweep completes and on shutdown so the
+    /// next launch's [`Self::warm_start_files`] finds them.
     pub fn flush_analysis_cache(&self) {
         if let Some(cache) = &self.cache {
             cache.flush();
+        }
+        if let Some(stubs) = self.db.stub_cache.as_deref() {
+            stubs.flush();
         }
     }
 
@@ -358,9 +361,6 @@ impl AnalysisSession {
     /// freeing the database and its ASTs is pure overhead.
     pub fn finish_for_exit(self) {
         self.flush_analysis_cache();
-        if let Some(stubs) = self.db.stub_cache.as_deref() {
-            stubs.flush();
-        }
         std::mem::forget(self);
     }
 

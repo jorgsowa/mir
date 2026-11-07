@@ -93,6 +93,31 @@ fn warm_start_files_replays_subtype_edges_from_disk_definition_cache() {
     );
 }
 
+/// A host keeps its session alive for the whole process, so definitions must
+/// reach disk through `flush_analysis_cache`, not only when the session drops.
+#[test]
+fn flush_analysis_cache_persists_definitions_of_a_live_session() {
+    let dir = create_temp_dir("warm_start_live_flush");
+    let file = (
+        Arc::<str>::from("widget.php"),
+        Arc::<str>::from("<?php\nclass Widget {}\n"),
+    );
+
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    seed.ensure_all_stubs();
+    seed.ingest_file(file.0.clone(), file.1.clone());
+    seed.flush_analysis_cache();
+
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.ensure_all_stubs();
+    session.warm_start_files(&[file]);
+    assert!(
+        session.workspace_symbol_index_ready(),
+        "the flushed definitions must seed the next session's symbol index"
+    );
+    drop(seed);
+}
+
 /// A warm-started file whose cached issue set shows full resolution keeps
 /// its replayed postings across workspace growth: registrations and lazy
 /// loads that follow warm-up must not force a re-analysis of the replayed

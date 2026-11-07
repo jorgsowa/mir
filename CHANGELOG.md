@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `AnalysisSession::flush_analysis_cache` also writes the definition cache's pending pack, so an LSP host that keeps its session for the whole process persists definitions again; since 0.92.0 they reached disk only when a pack filled up or the session was dropped, and the next launch re-parsed every file.
 - Taint: `fprintf()`/`vfprintf()` to a handle `fopen()` opened on a literal file path (not `php://` or `/dev/`) on every path isn't `TaintedHtml`.
 - Taint: output after `header('Content-Type: application/json')` (or `text/plain`, `text/csv`, `application/octet-stream`, `+json`) on every path isn't `TaintedHtml`; a later HTML or unknown `header()` restores it.
 - Taint: `in_array($x, $this->allowed, true)` and `self::$allowed` clear `$x` when the private property's default is a list of literals and nothing in the class can change it.
