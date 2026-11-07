@@ -768,9 +768,9 @@ fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'
             None => {
                 let function = fc.name.kind.function_ref(scope.db, scope.file)?;
                 let (fqn, f) = function.find(scope.db, scope.file)?;
-                let (index, safe) =
-                    helper_guard(f.location.as_ref()?, (Name::new(fqn), None), scope)?;
-                (safe, index)
+                let guard = helper_guard(f.location.as_ref()?, (Name::new(fqn), None), scope)
+                    .filter(|g| !g.on_return)?;
+                (guard.safe, guard.param)
             }
         },
     };
@@ -803,20 +803,20 @@ fn static_helper_guard<'e>(
         &method,
     )?;
     let key = (Name::new(&owner), Some(Name::new(&method)));
-    let (index, safe) = helper_guard(m.location.as_ref()?, key, scope)?;
+    let guard = helper_guard(m.location.as_ref()?, key, scope).filter(|g| !g.on_return)?;
     Some((
-        guarded_subject(positional_arg(&smc.args, index)?)?,
-        safe,
+        guarded_subject(positional_arg(&smc.args, guard.param)?)?,
+        guard.safe,
         false,
     ))
 }
 
-/// The parameter a user helper's body guards, and the kinds a passing call leaves it safe for.
+/// The guard a user helper's body applies to one of its parameters.
 fn helper_guard(
     location: &mir_types::Location,
     key: (Name, Option<Name>),
     scope: GuardScope<'_>,
-) -> Option<(usize, Taint)> {
+) -> Option<HelperGuard> {
     if crate::stubs::is_stub_path(location.file.as_ref()) {
         return None;
     }
@@ -836,26 +836,99 @@ fn positional_arg(args: &[Arg], index: usize) -> Option<&Expr> {
     .flatten()
 }
 
-/// The parameter a body consisting of `return <guard>;` checks, and the kinds it proves safe.
-pub(crate) fn returned_param_guard(
+/// What a user helper's body proves about a parameter: `return <guard>;` once a call is truthy,
+/// `if (<failed guard>) { throw ...; }` once a call returns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct HelperGuard {
+    pub param: usize,
+    pub safe: Taint,
+    pub on_return: bool,
+}
+
+pub(crate) fn helper_body_guard(
     params: &[php_ast::owned::Param],
     stmts: &[php_ast::owned::Stmt],
     scope: GuardScope<'_>,
-) -> Option<(usize, Taint)> {
+) -> Option<HelperGuard> {
+    use php_ast::owned::StmtKind;
     let [stmt] = stmts else {
         return None;
     };
-    let php_ast::owned::StmtKind::Return(Some(cond)) = &stmt.kind else {
+    let ((guarded, safe), on_return) = match &stmt.kind {
+        StmtKind::Return(Some(cond)) => (guarded_unless_negated(cond, true, scope)?, false),
+        StmtKind::If(i) if i.elseif_branches.is_empty() && i.else_branch.is_none() => {
+            if !always_leaves(&i.then_branch) {
+                return None;
+            }
+            (guarded_unless_negated(&i.condition, false, scope)?, true)
+        }
+        _ => return None,
+    };
+    let Guarded::Var(var) = guarded else {
         return None;
     };
-    let (Guarded::Var(var), safe) = guarded_when(cond, true, scope)? else {
-        return None;
-    };
-    let index = params
+    let param = params
         .iter()
         .position(|p| p.name.as_str() == Some(var.trim_start_matches('$')))?;
-    let param = &params[index];
-    (!param.by_ref && !param.variadic).then_some((index, safe))
+    (!params[param].by_ref && !params[param].variadic).then_some(HelperGuard {
+        param,
+        safe,
+        on_return,
+    })
+}
+
+/// [`guarded_when`] through any `!` and parentheses around the check.
+fn guarded_unless_negated<'e>(
+    cond: &'e Expr,
+    holds: bool,
+    scope: GuardScope<'_>,
+) -> Option<(Guarded<'e>, Taint)> {
+    match &cond.kind {
+        ExprKind::Parenthesized(inner) => guarded_unless_negated(inner, holds, scope),
+        ExprKind::UnaryPrefix(u) if u.op == php_ast::ast::UnaryPrefixOp::BooleanNot => {
+            guarded_unless_negated(&u.operand, !holds, scope)
+        }
+        _ => guarded_when(cond, holds, scope),
+    }
+}
+
+/// A branch consisting of a `throw` or `exit`.
+fn always_leaves(stmt: &php_ast::owned::Stmt) -> bool {
+    use php_ast::owned::StmtKind;
+    match &stmt.kind {
+        StmtKind::Block(b) => matches!(&b.stmts[..], [only] if always_leaves(only)),
+        StmtKind::Throw(_) => true,
+        StmtKind::Expression(e) => matches!(e.kind, ExprKind::Throw(_) | ExprKind::Exit(_)),
+        _ => false,
+    }
+}
+
+/// After a call returns from a helper that throws unless a parameter passes a guard, apply it.
+pub fn apply_asserting_helper(
+    ctx: &mut FlowState,
+    location: impl FnOnce() -> Option<mir_types::Location>,
+    key: (Name, Option<Name>),
+    args: &[Arg],
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    if !db.taint_analysis() {
+        return;
+    }
+    let Some(location) = location() else {
+        return;
+    };
+    let scope = GuardScope {
+        ctx: &*ctx,
+        db,
+        file,
+    };
+    let Some(guard) = helper_guard(&location, key, scope).filter(|g| g.on_return) else {
+        return;
+    };
+    if let Some(guarded) = positional_arg(args, guard.param).and_then(guarded_subject) {
+        ctx.apply_taint_guard(guarded, guard.safe);
+    }
 }
 
 /// The data of a `hash_hmac` side of `hash_equals`: matching proves whoever holds the key made it.

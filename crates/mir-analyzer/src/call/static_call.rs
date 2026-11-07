@@ -1302,6 +1302,25 @@ impl CallAnalyzer {
                 },
             );
 
+            crate::taint_guard::apply_asserting_helper(
+                ctx,
+                || {
+                    crate::db::find_method_respecting_precedence(
+                        ea.db,
+                        crate::db::Fqcn::from_str(ea.db, resolved.owner_fqcn.as_ref()),
+                        &method_name_lower,
+                    )
+                    .and_then(|(_, m)| m.location.clone())
+                },
+                (
+                    mir_types::Name::new(&resolved.owner_fqcn),
+                    Some(mir_types::Name::new(&method_name_lower)),
+                ),
+                &call.args,
+                ea.db,
+                &ea.file,
+            );
+
             // Bare-statement `@psalm-assert` — the static-call counterpart
             // of `call/function.rs`'s unconditional-assert block and
             // `call/method.rs`'s instance-call one. Reuses the exact

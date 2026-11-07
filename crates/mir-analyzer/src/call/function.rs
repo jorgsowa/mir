@@ -1142,6 +1142,15 @@ impl CallAnalyzer {
                 );
             }
 
+            crate::taint_guard::apply_asserting_helper(
+                ctx,
+                || resolved.location.clone(),
+                (mir_types::Name::new(&resolved.fqn), None),
+                &call.args,
+                ea.db,
+                &ea.file,
+            );
+
             let return_ty = match &template_bindings {
                 Some(bindings) => return_ty_raw.substitute_templates(bindings),
                 None => return_ty_raw,

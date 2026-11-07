@@ -187,10 +187,9 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
     Arc::new(facts)
 }
 
-type GuardHelpers = Arc<FxHashMap<DeclKey, (usize, crate::taint::Taint)>>;
+type GuardHelpers = Arc<FxHashMap<DeclKey, crate::taint_guard::HelperGuard>>;
 
-/// Helpers whose body is `return <guard on a parameter>;`, keyed like the facts, with the
-/// parameter's index and the kinds a passing call leaves it safe for.
+/// Helpers whose body guards a parameter, keyed like the facts.
 #[salsa::tracked(cycle_fn = guard_helpers_cycle, cycle_initial = guard_helpers_initial)]
 pub(crate) fn file_guard_helpers(db: &dyn MirDatabase, file: SourceFile) -> GuardHelpers {
     let path = Arc::clone(file.path(db));
@@ -215,7 +214,7 @@ pub(crate) fn file_guard_helpers(db: &dyn MirDatabase, file: SourceFile) -> Guar
                 db,
                 file: &path,
             };
-            if let Some(guard) = crate::taint_guard::returned_param_guard(params, stmts, scope) {
+            if let Some(guard) = crate::taint_guard::helper_body_guard(params, stmts, scope) {
                 helpers.insert(key, guard);
             }
         };

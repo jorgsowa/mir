@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Taint: a user function or static method whose body is `return <guard>;` on a parameter (`return ctype_digit($v);`, `return preg_match(self::ID, $v) === 1;`) guards the argument passed for it, as the check itself would.
+- Taint: a user function or static method whose body is `return <guard>;` on a parameter (`return ctype_digit($v);`, `return preg_match(self::ID, $v) === 1;`) guards the argument passed for it, as the check itself would. One whose body is `if (!<guard>) { throw ...; }` guards the argument once the call returns.
 - Taint: `hash_equals(hash_hmac($algo, $p, $key), $mac)` with an untainted key clears `$p` for `unserialize()`, as a guard or an early exit.
 - Taint: a known sanitizer method (`HTMLPurifier::purify()`, Laminas `Escaper`, `PDO::quote()`) clears its argument when called on an object built in place, as in `(new HTMLPurifier())->purify($x)`.
 - Taint: only the name and value of `setcookie()`/`setrawcookie()` are cookie sinks; PHP rejects separators in the path and domain.
