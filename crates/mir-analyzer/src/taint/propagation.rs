@@ -1186,6 +1186,30 @@ pub fn is_dependency_of(callee_path: &str, from: &str) -> bool {
     vendor_package(callee_path).is_some_and(|package| vendor_package(from) != Some(package))
 }
 
+/// The declaration whose taint annotations apply to `m`: its own, else the nearest overridden one's.
+fn annotated_declaration(
+    db: &dyn crate::db::MirDatabase,
+    owner: &str,
+    method_lower: &str,
+    m: &std::sync::Arc<mir_codebase::definitions::MethodDef>,
+) -> std::sync::Arc<mir_codebase::definitions::MethodDef> {
+    if m.is_taint_source || m.taint.is_some() {
+        return m.clone();
+    }
+    crate::db::class_ancestors_by_fqcn(db, crate::db::Fqcn::from_str(db, owner))
+        .iter()
+        .skip(1)
+        .find_map(|ancestor| {
+            crate::db::find_method_in_class(
+                db,
+                crate::db::Fqcn::from_str(db, ancestor),
+                method_lower,
+            )
+            .filter(|d| d.is_taint_source || d.taint.is_some())
+        })
+        .unwrap_or_else(|| m.clone())
+}
+
 /// Taint of a call to `method_lower` on `class`, or `None` when the method is
 /// unknown; `dispatched` when the call names an abstract method `class` implements.
 #[allow(clippy::too_many_arguments)]
@@ -1200,13 +1224,14 @@ pub(super) fn method_call_taint(
     file: &str,
 ) -> Option<Taint> {
     let (owner, m) = crate::db::find_method_respecting_precedence(db, class, method_lower)?;
-    if m.is_taint_source {
-        return Some(source_kinds(m.taint.as_deref()));
+    let annotated = annotated_declaration(db, &owner, method_lower, &m);
+    if annotated.is_taint_source {
+        return Some(source_kinds(annotated.taint.as_deref()));
     }
-    if !is_user_code(m.location.as_ref()) && m.taint.is_none() {
+    if !is_user_code(m.location.as_ref()) && annotated.taint.is_none() {
         return None;
     }
-    if m.taint.is_none() {
+    if annotated.taint.is_none() {
         let implementations = crate::db::taint_sources::method_implementations(
             db,
             class.name(db).as_str(),
@@ -1234,7 +1259,7 @@ pub(super) fn method_call_taint(
         &m.params,
         args,
         m.return_type.as_deref(),
-        m.taint.as_deref(),
+        annotated.taint.as_deref(),
         body,
         receiver,
         || crate::db::taint_sources::method_returns_param(db, file, owner.as_ref(), method_lower),
