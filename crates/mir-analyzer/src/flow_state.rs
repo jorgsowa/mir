@@ -418,6 +418,9 @@ pub struct FlowState {
     /// like `has_dynamic_var_def`, for the same reason.
     pub has_dynamic_tainted_var_def: bool,
 
+    /// A `header()` call on every path here set a literal content type HTML can't run in.
+    pub non_html_response: bool,
+
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: Arc<FxHashMap<Name, (u32, u16, u32, u16)>>,
@@ -740,6 +743,7 @@ impl FlowState {
             has_dynamic_var_def: false,
             has_dynamic_var_read: false,
             has_dynamic_tainted_var_def: false,
+            non_html_response: false,
             inside_finally: false,
             is_generator: false,
             inside_constructor: false,
@@ -2653,6 +2657,7 @@ impl FlowState {
         result.has_dynamic_var_read = dynamic_var_read;
         result.this_escaped_to_call = this_escaped;
         result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
+        result.non_html_response = if_ctx.non_html_response && else_ctx.non_html_response;
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx
@@ -3046,6 +3051,7 @@ impl FlowState {
             has_dynamic_var_def,
             has_dynamic_var_read,
             has_dynamic_tainted_var_def,
+            non_html_response,
             template_param_names,
             template_typed_params,
             class_exists_guards,

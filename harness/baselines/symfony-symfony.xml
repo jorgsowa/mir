@@ -2093,11 +2093,6 @@
       <code><![CDATA[header('Location: '.$location, true, 302)]]></code>
       <code><![CDATA[header($header)]]></code>
     </TaintedHeader>
-    <TaintedHtml>
-      <code><![CDATA[echo $output;]]></code>
-      <code><![CDATA[echo json_encode([]]></code>
-      <code><![CDATA[echo $json;]]></code>
-    </TaintedHtml>
   </file>
   <file src="src/Symfony/Contracts/HttpClient/Test/HttpClientTestCase.php">
     <InvalidArgument>

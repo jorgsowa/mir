@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint: output after `header('Content-Type: application/json')` (or `text/plain`, `text/csv`, `application/octet-stream`, `+json`) on every path isn't `TaintedHtml`; a later HTML or unknown `header()` restores it.
 - Taint: `in_array($x, $this->allowed, true)` and `self::$allowed` clear `$x` when the private property's default is a list of literals and nothing in the class can change it.
 - Taint: a guard on an object variable's property (`if (ctype_digit($this->x)) echo $this->x;`) clears it until a call may change the object, and a property written in the current flow no longer takes the taint other methods store in it.
 - Taint: a user function or static method whose body is `return <guard>;` on a parameter (`return ctype_digit($v);`, `return preg_match(self::ID, $v) === 1;`) guards the argument passed for it, as the check itself would. One whose body is `if (!<guard>) { throw ...; }` guards the argument once the call returns.

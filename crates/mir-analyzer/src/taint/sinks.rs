@@ -1,4 +1,5 @@
 use super::*;
+use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 
@@ -566,7 +567,52 @@ pub fn reaches_sink(
     file: &str,
     summary: &mut TaintSummary,
 ) -> bool {
+    let sink = if ctx.non_html_response {
+        sink.without(Taint::HTML)
+    } else {
+        sink
+    };
     let taint = stringified_taint(expr, ctx, db, file);
     summary.record_param_sinks(taint, sink, issue);
     taint.concrete().intersects(sink)
+}
+
+/// What a `header()` call makes of the response type: `Some(true)` for a literal content type
+/// HTML can't run in, `Some(false)` for any other content type or an unknown header, `None` for
+/// another named header.
+pub fn header_sets_non_html(args: &[php_ast::owned::Arg]) -> Option<bool> {
+    let Some(value) = args.first().filter(|a| !a.unpack()).and_then(|a| a.value()) else {
+        return Some(false);
+    };
+    let mut prefix = value;
+    while let ExprKind::Binary(b) = &prefix.kind {
+        if b.op != php_ast::ast::BinaryOp::Concat {
+            break;
+        }
+        prefix = &b.left;
+    }
+    let (text, complete) = match &prefix.kind {
+        ExprKind::String(s) => (s.as_str(), std::ptr::eq(prefix, value)),
+        ExprKind::InterpolatedString(parts) => match parts.first() {
+            Some(php_ast::owned::StringPart::Literal(s)) => (s.as_str(), false),
+            _ => return Some(false),
+        },
+        _ => return Some(false),
+    };
+    let text = text.to_ascii_lowercase();
+    let Some(media) = text.strip_prefix("content-type:") else {
+        return (!text.contains(':')).then_some(false);
+    };
+    let media = match media.split_once(';') {
+        Some((media, _)) => media,
+        None if complete => media,
+        None => return Some(false),
+    };
+    let media = media.trim();
+    Some(
+        matches!(
+            media,
+            "application/json" | "text/plain" | "text/csv" | "application/octet-stream"
+        ) || (media.starts_with("application/") && media.ends_with("+json")),
+    )
 }

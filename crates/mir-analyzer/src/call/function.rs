@@ -578,6 +578,12 @@ impl CallAnalyzer {
             }
         }
 
+        if fn_name_lower == "header" {
+            if let Some(non_html) = crate::taint::header_sets_non_html(&call.args) {
+                ctx.non_html_response = non_html;
+            }
+        }
+
         // Pre-mark by-reference parameter variables as defined BEFORE evaluating args
         if let Some(ref resolved) = resolved {
             super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
