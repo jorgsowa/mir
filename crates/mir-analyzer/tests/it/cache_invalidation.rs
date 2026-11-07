@@ -401,11 +401,9 @@ fn index_batch_registration_evicts_negative_but_keeps_unrelated_cache() {
 fn direct_input_registration_invalidates_persisted_negative_lookup() {
     let dir = create_temp_dir("mirror direct input invalidation");
     let consumer = "<?php\nnew Mage();\n";
-    {
-        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
-        assert!(has_undefined_class(&mut seed, "/mirror/app.php", consumer));
-        seed.flush_analysis_cache();
-    }
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    assert!(has_undefined_class(&mut seed, "/mirror/app.php", consumer));
+    seed.flush_analysis_cache();
 
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.upsert_source_file(
@@ -424,8 +422,10 @@ fn direct_input_registration_invalidates_persisted_negative_lookup() {
     ));
 }
 
-/// A flushed cache holding a negative lookup for `Mage` and the content of `/mirror/lib.php`.
-fn seed_negative_lookup(dir: &std::path::Path, consumer: &str, lib: &str) {
+/// A flushed cache holding a negative lookup for `Mage` and the content of `/mirror/lib.php`,
+/// with the seed session that wrote it still open, as a host keeps it.
+#[must_use]
+fn seed_negative_lookup(dir: &std::path::Path, consumer: &str, lib: &str) -> AnalysisSession {
     let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
     seed.upsert_source_file(
         Arc::from("/mirror/lib.php"),
@@ -434,6 +434,7 @@ fn seed_negative_lookup(dir: &std::path::Path, consumer: &str, lib: &str) {
     );
     assert!(has_undefined_class(&mut seed, "/mirror/app.php", consumer));
     seed.flush_analysis_cache();
+    seed
 }
 
 #[test]
@@ -441,7 +442,7 @@ fn unchanged_mirror_registration_keeps_negative_lookup_across_restart() {
     let dir = create_temp_dir("mirror restart");
     let consumer = "<?php\nnew Mage();\n";
     let lib = "<?php\nclass Wizard {}\n";
-    seed_negative_lookup(dir.path(), consumer, lib);
+    let _seed = seed_negative_lookup(dir.path(), consumer, lib);
 
     let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let files: Vec<(Arc<str>, Arc<str>)> = vec![
@@ -463,7 +464,7 @@ fn unchanged_mirror_registration_keeps_negative_lookup_across_restart() {
 fn file_changed_between_runs_evicts_only_names_it_declares() {
     let dir = create_temp_dir("mirror restart changed");
     let consumer = "<?php\nnew Mage();\n";
-    seed_negative_lookup(dir.path(), consumer, "<?php\nclass Wizard {}\n");
+    let _seed = seed_negative_lookup(dir.path(), consumer, "<?php\nclass Wizard {}\n");
 
     let valid = |session: &AnalysisSession| {
         session
@@ -494,7 +495,7 @@ fn file_changed_between_runs_evicts_only_names_it_declares() {
 fn mass_registration_of_unseen_files_evicts_negative_lookups_wholesale() {
     let dir = create_temp_dir("mirror mass change");
     let consumer = "<?php\nnew Mage();\n";
-    seed_negative_lookup(dir.path(), consumer, "<?php\nclass Wizard {}\n");
+    let _seed = seed_negative_lookup(dir.path(), consumer, "<?php\nclass Wizard {}\n");
 
     let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     warm.set_workspace_files((0..300).map(|i| -> (Arc<str>, Arc<str>) {
@@ -558,18 +559,16 @@ fn unchanged_mirror_registration_keeps_dependents_of_a_file_without_an_entry() {
     let lib_path = "/mirror/lib.php";
     let lib = "<?php\nclass Wizard {}\n";
     let consumer = "<?php\nfunction uses_lib(): void {}\n";
-    {
-        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
-        seed.upsert_source_file(Arc::from(lib_path), Arc::from(lib), salsa::Durability::HIGH);
-        assert!(!has_undefined_class(&mut seed, "/mirror/app.php", consumer));
-        let mut reverse_deps = FxHashMap::default();
-        reverse_deps.insert(
-            lib_path.to_string(),
-            FxHashSet::from_iter(["/mirror/app.php".to_string()]),
-        );
-        seed.cache().unwrap().set_reverse_deps(reverse_deps);
-        seed.flush_analysis_cache();
-    }
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    seed.upsert_source_file(Arc::from(lib_path), Arc::from(lib), salsa::Durability::HIGH);
+    assert!(!has_undefined_class(&mut seed, "/mirror/app.php", consumer));
+    let mut reverse_deps = FxHashMap::default();
+    reverse_deps.insert(
+        lib_path.to_string(),
+        FxHashSet::from_iter(["/mirror/app.php".to_string()]),
+    );
+    seed.cache().unwrap().set_reverse_deps(reverse_deps);
+    seed.flush_analysis_cache();
 
     let valid = |session: &AnalysisSession| {
         session
@@ -634,13 +633,11 @@ fn matching_warm_cache_entries_survive_bulk_registration() {
         ("/mirror/one.php", "<?php function one(): void {}"),
         ("/mirror/two.php", "<?php function two(): void {}"),
     ];
-    {
-        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
-        for (path, source) in files {
-            assert!(!has_undefined_class(&mut seed, path, source));
-        }
-        seed.flush_analysis_cache();
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    for (path, source) in files {
+        assert!(!has_undefined_class(&mut seed, path, source));
     }
+    seed.flush_analysis_cache();
     let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     warm.set_workspace_files(
         files

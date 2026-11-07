@@ -178,19 +178,20 @@ const UNRESOLVED_CALLER: (&str, &str) = (
     "<?php\n$w = new Widget();\n$w->spin();\nnew Missing();\n",
 );
 
-/// A session warm-started from a real run in which `caller.php` left a name unresolved.
-fn warm_session_with_unresolved_replay(dir: &std::path::Path) -> AnalysisSession {
+/// The still-open seed session and a session warm-started from its run, in which
+/// `caller.php` left a name unresolved.
+fn warm_session_with_unresolved_replay(
+    dir: &std::path::Path,
+) -> (AnalysisSession, AnalysisSession) {
     let files = [UNRESOLVED_WIDGET, UNRESOLVED_CALLER];
-    {
-        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
-        seed.ensure_all_stubs();
-        for (path, text) in files {
-            seed.ingest_file(Arc::from(path), Arc::from(text));
-        }
-        let paths: Vec<Arc<str>> = files.iter().map(|(p, _)| Arc::from(*p)).collect();
-        seed.reanalyze_files_cancellable(&paths, &mir_analyzer::IndexCancel::new());
-        seed.flush_analysis_cache();
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    seed.ensure_all_stubs();
+    for (path, text) in files {
+        seed.ingest_file(Arc::from(path), Arc::from(text));
     }
+    let paths: Vec<Arc<str>> = files.iter().map(|(p, _)| Arc::from(*p)).collect();
+    seed.reanalyze_files_cancellable(&paths, &mir_analyzer::IndexCancel::new());
+    seed.flush_analysis_cache();
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
     session.ensure_all_stubs();
     let inputs: Vec<(Arc<str>, Arc<str>)> = files
@@ -200,7 +201,7 @@ fn warm_session_with_unresolved_replay(dir: &std::path::Path) -> AnalysisSession
     let unresolved = session.warm_start_files(&inputs);
     assert_eq!(unresolved, vec![Arc::<str>::from(UNRESOLVED_CALLER.0)]);
     assert!(session.workspace_symbol_index_ready());
-    session
+    (seed, session)
 }
 
 /// Cancels after the stale-set computation, so only a query with nothing stale completes.
@@ -226,7 +227,7 @@ fn spin_references_without_reanalysis(session: &mut AnalysisSession) -> Option<u
 #[test]
 fn warm_start_replay_serves_unresolved_files_until_growth() {
     let dir = create_temp_dir("warm_start_unresolved_fresh");
-    let mut session = warm_session_with_unresolved_replay(dir.path());
+    let (_seed, mut session) = warm_session_with_unresolved_replay(dir.path());
     assert_eq!(spin_references_without_reanalysis(&mut session), Some(1));
 }
 
@@ -234,7 +235,7 @@ fn warm_start_replay_serves_unresolved_files_until_growth() {
 #[test]
 fn ingesting_an_indexed_file_keeps_unresolved_replays_fresh() {
     let dir = create_temp_dir("warm_start_ingest_indexed");
-    let mut session = warm_session_with_unresolved_replay(dir.path());
+    let (_seed, mut session) = warm_session_with_unresolved_replay(dir.path());
     session.ingest_file(
         Arc::from(UNRESOLVED_WIDGET.0),
         Arc::from(UNRESOLVED_WIDGET.1),
@@ -246,7 +247,7 @@ fn ingesting_an_indexed_file_keeps_unresolved_replays_fresh() {
 #[test]
 fn ingesting_a_new_file_makes_unresolved_replays_stale() {
     let dir = create_temp_dir("warm_start_ingest_new");
-    let mut session = warm_session_with_unresolved_replay(dir.path());
+    let (_seed, mut session) = warm_session_with_unresolved_replay(dir.path());
     session.ingest_file(Arc::from("later.php"), Arc::from("<?php\nclass Later {}\n"));
     assert_eq!(spin_references_without_reanalysis(&mut session), None);
 }
@@ -375,17 +376,15 @@ fn session_sweep_persists_postings_for_next_launch() {
     let caller_path = "caller.php";
     let caller_text = "<?php\n$w = new Widget();\n$w->spin();\n";
 
-    {
-        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
-        seed.ensure_all_stubs();
-        seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
-        seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
-        seed.reanalyze_files_cancellable(
-            &[Arc::from(widget_path), Arc::from(caller_path)],
-            &mir_analyzer::IndexCancel::new(),
-        );
-        seed.flush_analysis_cache();
-    }
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    seed.ensure_all_stubs();
+    seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
+    seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
+    seed.reanalyze_files_cancellable(
+        &[Arc::from(widget_path), Arc::from(caller_path)],
+        &mir_analyzer::IndexCancel::new(),
+    );
+    seed.flush_analysis_cache();
 
     // The write hook itself: the sweep must have stored caller.php's postings
     // keyed by its content hash.
@@ -435,24 +434,22 @@ fn on_demand_query_commit_persists_postings_for_next_launch() {
     let caller_path = "caller.php";
     let caller_text = "<?php\n$w = new Widget();\n$w->spin();\n";
 
-    {
-        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
-        seed.ensure_all_stubs();
-        seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
-        seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
-        // No sweep: the query's own freshness pass analyzes and commits.
-        let refs = seed
-            .indexed_references_to(
-                &Name::method("Widget", "spin"),
-                &[Arc::from(widget_path), Arc::from(caller_path)],
-                false,
-                mir_analyzer::ReferenceIncludes::Plain,
-                &|| false,
-            )
-            .expect("not cancelled");
-        assert_eq!(refs.len(), 1, "sanity: live query finds the call site");
-        seed.flush_analysis_cache();
-    }
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    seed.ensure_all_stubs();
+    seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
+    seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
+    // No sweep: the query's own freshness pass analyzes and commits.
+    let refs = seed
+        .indexed_references_to(
+            &Name::method("Widget", "spin"),
+            &[Arc::from(widget_path), Arc::from(caller_path)],
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(refs.len(), 1, "sanity: live query finds the call site");
+    seed.flush_analysis_cache();
 
     let php_v = PhpVersion::LATEST.cache_byte();
     let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
@@ -537,15 +534,17 @@ fn warm_start_files_is_a_no_op_without_a_cache() {
 // tracked O(all-files) workspace_symbol_index walk.
 // ---------------------------------------------------------------------------
 
-/// Simulated "session 1": ingest files against a cache dir so their
-/// StubSlices land on disk, then drop the session.
-fn seed_disk_caches(dir: &std::path::Path, files: &[(&str, &str)]) {
+/// Simulated "session 1": ingest files against a cache dir and flush. The
+/// caller keeps the returned session open, as a host would.
+#[must_use]
+fn seed_disk_caches(dir: &std::path::Path, files: &[(&str, &str)]) -> AnalysisSession {
     let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
     seed.ensure_all_stubs();
     for (path, text) in files {
         seed.ingest_file(Arc::from(*path), Arc::from(*text));
     }
     seed.flush_analysis_cache();
+    seed
 }
 
 #[test]
@@ -561,7 +560,7 @@ fn warm_start_seeds_workspace_symbol_index_without_tracked_walk() {
             "<?php\nnamespace App;\nclass Caller { public function go(): void { Service::run(); } }\n",
         ),
     ];
-    seed_disk_caches(dir.path(), &files);
+    let _seed = seed_disk_caches(dir.path(), &files);
 
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let warm: Vec<(Arc<str>, Arc<str>)> = files
@@ -609,7 +608,7 @@ fn warm_start_with_structural_deps_runs_no_tracked_walk() {
             "<?php\nnamespace App;\nclass Child extends Base implements Shape {}\n",
         ),
     ];
-    seed_disk_caches(dir.path(), &files);
+    let _seed = seed_disk_caches(dir.path(), &files);
 
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let warm: Vec<(Arc<str>, Arc<str>)> = files
@@ -673,7 +672,7 @@ fn mirror_only_new_file_is_visible_after_settle() {
         "base.php",
         "<?php\nnamespace App;\nclass Base { public static function ping(): void {} }\n",
     )];
-    seed_disk_caches(dir.path(), &files);
+    let _seed = seed_disk_caches(dir.path(), &files);
 
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.warm_start_files(&[(Arc::from("base.php"), Arc::from(files[0].1))]);
@@ -724,7 +723,7 @@ fn mirror_only_class_rename_updates_index_after_settle() {
             "<?php\nnamespace App;\nclass User { public function go(): void { OldShape::draw(); } }\n",
         ),
     ];
-    seed_disk_caches(dir.path(), &files);
+    let _seed = seed_disk_caches(dir.path(), &files);
 
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let warm: Vec<(Arc<str>, Arc<str>)> = files
@@ -782,7 +781,7 @@ fn cancelled_settle_keeps_mirror_writes_pending() {
             "<?php\nnamespace App;\nclass User { public function go(): void { NewShape::draw(); } }\n",
         ),
     ];
-    seed_disk_caches(dir.path(), &files);
+    let _seed = seed_disk_caches(dir.path(), &files);
     let warm: Vec<(Arc<str>, Arc<str>)> = files
         .iter()
         .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
