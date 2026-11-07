@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A run with a cache no longer parses unchanged files, so re-running on an unchanged Laravel tree uses about 30% less memory and CPU. The first run with an empty cache stores every file's definitions, which makes it slower and the cache larger.
 - An edit limited to comments, whitespace or the body of a function with a declared return type re-analyzes only that file. Before, it also re-analyzed every cached result reporting a missing method, property or class constant, and a comment or whitespace edit also re-analyzed the file's dependents. Docblocks and comments containing `@` still count as changes.
 - The definition cache is stored in a few pack files instead of one file per source file, so filling an empty cache no longer stalls on file creation (Laravel: about a third faster, 28% fewer instructions) and a cached run reads it with less work (17–24% fewer instructions). An existing cache in the old layout is deleted on the first run.
+- The analysis cache stores each file path and symbol name once, which makes it about a third smaller and faster to load. A cache from another mir build is discarded without being decoded.
 
 ### Fixed
 

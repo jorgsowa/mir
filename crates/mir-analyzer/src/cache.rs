@@ -214,7 +214,7 @@ fn cache_epoch(php_version: u8, user_stub_fp: u64) -> u64 {
 // CacheEntry
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct CacheEntry {
     content_hash: String,
     /// Arc-shared so `get` hands out the stored slice without deep-cloning
@@ -223,14 +223,11 @@ struct CacheEntry {
     /// Reference locations recorded during body analysis. Stored so that cache
     /// hits can replay symbol_reference_locations without re-running
     /// analyze_bodies. Arc-shared for the same reason as `issues`.
-    #[serde(default)]
     reference_locations: std::sync::Arc<[CachedRefLoc]>,
     /// Digest of this file's cross-file surface (see [`surface_fingerprint`]).
     /// Dependents are evicted only when this changes between runs — a body-only
-    /// edit to a declared-return callable leaves it untouched. Empty for entries
-    /// written before this field existed; an empty stored value is treated as
-    /// "unknown" and conservatively cascades.
-    #[serde(default)]
+    /// edit to a declared-return callable leaves it untouched. An empty value
+    /// is treated as "unknown" and conservatively cascades.
     surface_hash: String,
 }
 
@@ -238,38 +235,67 @@ struct CacheEntry {
 // AnalysisCache
 // ---------------------------------------------------------------------------
 
-/// Serialized form of the full cache file.
-#[derive(Debug, Default, Serialize, Deserialize)]
+/// On-disk form of `cache.bin`. Every path and reference symbol is stored
+/// once in `strings` and referenced by index, since the same few thousand
+/// symbols recur across every file's reference locations and every path
+/// recurs across the reverse-dependency sets.
+#[derive(Deserialize)]
 struct CacheFile {
     /// Analyzer epoch the entries were written under (see [`cache_epoch`]).
-    /// `load` discards the whole file when this doesn't match the running
-    /// binary's epoch. Defaults to 0 for legacy files written before this
-    /// field existed — 0 never matches a real epoch, so they're discarded
-    /// (the safe choice). Kept first so a bincode read of a legacy layout
-    /// reinterprets its leading bytes here rather than mid-struct.
-    #[serde(default)]
-    version: u64,
-    #[serde(default)]
-    entries: HashMap<String, CacheEntry>,
-    /// Reverse dependency graph: defining_file → [files that depend on it].
-    /// Persisted so that the next run can invalidate dependents before definition collection.
-    #[serde(default)]
-    reverse_deps: HashMap<String, HashSet<String>>,
+    /// Kept first: `load` compares the leading 8 bytes before decoding the rest.
+    _version: u64,
+    strings: Vec<std::sync::Arc<str>>,
+    entries: Vec<DiskEntry>,
+    /// Defining file → files that depend on it.
+    reverse_deps: Vec<(u32, Vec<u32>)>,
     /// Content digests of registered files without an entry of their own
     /// (vendor files that are indexed, never analyzed).
-    #[serde(default)]
-    dep_hashes: HashMap<String, DepHash>,
+    dep_hashes: Vec<(u32, DepHash)>,
 }
 
-/// View for serializing cache data without cloning. Generic so `flush` can
-/// pass maps of borrowed keys/entries — bincode encodes `&str`/`&CacheEntry`
-/// identically to their owned counterparts in [`CacheFile`].
+#[derive(Deserialize)]
+struct DiskEntry {
+    path: u32,
+    content_hash: String,
+    surface_hash: String,
+    issues: Vec<Issue>,
+    /// `(symbol, line, col_start, col_end)`, the symbol an index into `strings`.
+    refs: Vec<(u32, u32, u16, u16)>,
+}
+
+/// Borrowing counterpart of [`CacheFile`] for `flush`; bincode encodes it
+/// identically.
 #[derive(Serialize)]
-struct CacheFileView<E: Serialize, R: Serialize, D: Serialize> {
+struct CacheFileView<'a> {
     version: u64,
-    entries: E,
-    reverse_deps: R,
-    dep_hashes: D,
+    strings: Vec<&'a str>,
+    entries: Vec<DiskEntryView<'a>>,
+    reverse_deps: Vec<(u32, Vec<u32>)>,
+    dep_hashes: Vec<(u32, &'a DepHash)>,
+}
+
+#[derive(Serialize)]
+struct DiskEntryView<'a> {
+    path: u32,
+    content_hash: &'a str,
+    surface_hash: &'a str,
+    issues: &'a [Issue],
+    refs: Vec<(u32, u32, u16, u16)>,
+}
+
+#[derive(Default)]
+struct StringTable<'a> {
+    ids: HashMap<&'a str, u32>,
+    strings: Vec<&'a str>,
+}
+
+impl<'a> StringTable<'a> {
+    fn id(&mut self, s: &'a str) -> u32 {
+        *self.ids.entry(s).or_insert_with(|| {
+            self.strings.push(s);
+            (self.strings.len() - 1) as u32
+        })
+    }
 }
 
 /// Truncated BLAKE3 digest of a dependency-only file's content.
@@ -402,27 +428,47 @@ impl AnalysisCache {
         let epoch = cache_epoch(php_version, user_stub_fp);
         let disk = Self::load(cache_dir, epoch);
 
-        // Build a FileIdMap from the on-disk path strings, then convert both
-        // maps to use FileId keys for O(1) u32-hash lookups at runtime.
+        // Map on-disk string indices to FileIds for O(1) u32-hash lookups at
+        // runtime; a path recurs in many reverse-dependency sets.
         let mut id_map = FileIdMap::new();
-        let entries: HashMap<FileId, CacheEntry> = disk
-            .entries
-            .into_iter()
-            .map(|(path, entry)| (id_map.assign_or_get(&path), entry))
-            .collect();
+        let mut file_ids: Vec<Option<FileId>> = vec![None; disk.strings.len()];
+        let strings = &disk.strings;
+        let mut file_id = |index: u32| -> Option<FileId> {
+            let slot = file_ids.get_mut(index as usize)?;
+            Some(*slot.get_or_insert_with(|| id_map.assign_or_get(&strings[index as usize])))
+        };
+        let mut entries: HashMap<FileId, CacheEntry> = HashMap::default();
+        for e in disk.entries {
+            let Some(id) = file_id(e.path) else { continue };
+            let reference_locations = e
+                .refs
+                .iter()
+                .filter_map(|&(sym, line, start, end)| {
+                    Some((strings.get(sym as usize)?.clone(), line, start, end))
+                })
+                .collect();
+            entries.insert(
+                id,
+                CacheEntry {
+                    content_hash: e.content_hash,
+                    issues: e.issues.into(),
+                    reference_locations,
+                    surface_hash: e.surface_hash,
+                },
+            );
+        }
         let reverse_deps: HashMap<FileId, HashSet<FileId>> = disk
             .reverse_deps
-            .into_iter()
-            .map(|(path, dep_paths)| {
-                let id = id_map.assign_or_get(&path);
-                let dep_ids = dep_paths.iter().map(|p| id_map.assign_or_get(p)).collect();
-                (id, dep_ids)
+            .iter()
+            .filter_map(|(path, deps)| {
+                let id = file_id(*path)?;
+                Some((id, deps.iter().filter_map(|&d| file_id(d)).collect()))
             })
             .collect();
         let dep_hashes: HashMap<FileId, DepHash> = disk
             .dep_hashes
-            .into_iter()
-            .map(|(path, hash)| (id_map.assign_or_get(&path), hash))
+            .iter()
+            .filter_map(|(path, hash)| Some((file_id(*path)?, *hash)))
             .collect();
 
         let unresolved_entries = entries
@@ -586,36 +632,50 @@ impl AnalysisCache {
         let entries_guard = self.entries.lock();
         let deps_guard = self.reverse_deps.lock();
 
-        // Resolve FileIds back to path strings for the on-disk format,
-        // borrowing paths and entries rather than cloning them.
-        let entries: HashMap<&str, &CacheEntry> = entries_guard
+        let mut table = StringTable::default();
+        let entries: Vec<DiskEntryView> = entries_guard
             .iter()
-            .filter_map(|(&id, entry)| id_map.path(id).map(|p| (p, entry)))
+            .filter_map(|(&id, entry)| {
+                let path = table.id(id_map.path(id)?);
+                let refs = entry
+                    .reference_locations
+                    .iter()
+                    .map(|(sym, line, start, end)| (table.id(sym), *line, *start, *end))
+                    .collect();
+                Some(DiskEntryView {
+                    path,
+                    content_hash: &entry.content_hash,
+                    surface_hash: &entry.surface_hash,
+                    issues: &entry.issues,
+                    refs,
+                })
+            })
             .collect();
-        let reverse_deps: HashMap<&str, HashSet<&str>> = deps_guard
+        let reverse_deps: Vec<(u32, Vec<u32>)> = deps_guard
             .iter()
             .filter_map(|(&id, dep_ids)| {
-                let path = id_map.path(id)?;
-                let dep_paths: HashSet<&str> = dep_ids
+                let path = table.id(id_map.path(id)?);
+                let deps = dep_ids
                     .iter()
-                    .filter_map(|&dep_id| id_map.path(dep_id))
+                    .filter_map(|&dep| Some(table.id(id_map.path(dep)?)))
                     .collect();
-                Some((path, dep_paths))
+                Some((path, deps))
             })
             .collect();
         // An entry already records its file's content.
         let dep_hashes_guard = self.dep_hashes.lock();
-        let dep_hashes: HashMap<&str, &DepHash> = dep_hashes_guard
+        let dep_hashes: Vec<(u32, &DepHash)> = dep_hashes_guard
             .iter()
             .filter(|(id, _)| !entries_guard.contains_key(id))
-            .filter_map(|(&id, hash)| id_map.path(id).map(|p| (p, hash)))
+            .filter_map(|(&id, hash)| Some((table.id(id_map.path(id)?), hash)))
             .collect();
 
         let view = CacheFileView {
             version: self.epoch,
-            entries: &entries,
-            reverse_deps: &reverse_deps,
-            dep_hashes: &dep_hashes,
+            strings: table.strings,
+            entries,
+            reverse_deps,
+            dep_hashes,
         };
         if let Ok(bytes) = bincode::serialize(&view) {
             // Tempfile in the same directory so the rename is atomic on every
@@ -850,40 +910,30 @@ impl AnalysisCache {
     // -----------------------------------------------------------------------
 
     fn load(cache_dir: &Path, epoch: u64) -> CacheFile {
-        // A file whose epoch doesn't match the running analyzer/stub set/PHP
-        // version may hold stale results (content hashes still match, but the
-        // analysis that produced them changed). Discard it rather than serve
-        // stale entries.
-        let fresh = |file: CacheFile| {
-            if file.version == epoch {
-                file
-            } else {
-                CacheFile::default()
-            }
+        let empty = || CacheFile {
+            _version: epoch,
+            strings: Vec::new(),
+            entries: Vec::new(),
+            reverse_deps: Vec::new(),
+            dep_hashes: Vec::new(),
         };
-        // Primary: bincode format
-        if let Ok(bytes) = std::fs::read(cache_dir.join("cache.bin")) {
-            // Bound the read to the file's own size: an incompatible or
-            // bit-flipped cache.bin can desync bincode's length-prefixed
-            // decoding into reading a bogus multi-gigabyte collection length
-            // from garbage bytes, which otherwise tries to allocate that much
-            // before deserialize() gets a chance to return an error. `config()`
-            // (not the newer `options()`) is required here: it's the fixint
-            // encoding this file is written with, while `options()`'s
-            // `DefaultOptions` defaults to varint and silently misreads it.
-            #[allow(deprecated)]
-            let cfg = bincode::config().limit(bytes.len() as u64).clone();
-            if let Ok(file) = cfg.deserialize::<CacheFile>(&bytes) {
-                return fresh(file);
-            }
+        let Ok(bytes) = std::fs::read(cache_dir.join("cache.bin")) else {
+            return empty();
+        };
+        // A file from another analyzer/stub set/PHP version may hold stale
+        // results whose content hashes still match; skip it undecoded.
+        if bytes.get(..8) != Some(&epoch.to_le_bytes()[..]) {
+            return empty();
         }
-        // Fallback: legacy JSON format (migrate on next flush)
-        if let Ok(bytes) = std::fs::read(cache_dir.join("cache.json")) {
-            if let Ok(file) = serde_json::from_slice::<CacheFile>(&bytes) {
-                return fresh(file);
-            }
-        }
-        CacheFile::default()
+        // Bound the read to the file's own size: a bit-flipped cache.bin can
+        // desync bincode's length-prefixed decoding into a bogus multi-gigabyte
+        // collection length, allocated before deserialize() can fail. `config()`
+        // (not `options()`) matches the fixint encoding `serialize` writes;
+        // `options()` defaults to varint and silently misreads it.
+        #[allow(deprecated)]
+        let cfg = bincode::config().limit(bytes.len() as u64).clone();
+        cfg.deserialize::<CacheFile>(&bytes)
+            .unwrap_or_else(|_| empty())
     }
 }
 
@@ -1123,35 +1173,6 @@ mod tests {
     }
 
     #[test]
-    fn cache_entry_without_reference_locations_deserializes_to_empty() {
-        // A cache entry that predates the reference_locations field must still
-        // be readable as long as its epoch matches (a same-epoch file simply
-        // missing the newer field). The #[serde(default)] attribute covers this,
-        // but we verify it explicitly so a future refactor can't silently break it.
-        let dir = TempDir::new().unwrap();
-        let cache_file = dir.path().join("cache.json");
-
-        // Old entry shape (no reference_locations), but with the *current* epoch
-        // so the file isn't discarded as stale.
-        let json = format!(
-            r#"{{"version":{},"entries":{{"a.php":{{"content_hash":"abc","issues":[]}}}},"reverse_deps":{{}}}}"#,
-            cache_epoch(TEST_PHP_V, 0)
-        );
-        std::fs::write(&cache_file, json).unwrap();
-
-        let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
-        let hit = cache
-            .get("a.php", "abc")
-            .expect("same-epoch cache entry should deserialize successfully");
-
-        assert!(hit.0.is_empty(), "no issues");
-        assert!(
-            hit.1.is_empty(),
-            "reference_locations should default to empty vec, not fail"
-        );
-    }
-
-    #[test]
     fn flush_writes_atomically_leaving_no_tmp_file() {
         // flush() must go through tempfile-in-same-dir + rename, not a plain
         // in-place fs::write: a crash mid-write must leave the prior
@@ -1211,38 +1232,23 @@ mod tests {
 
     #[test]
     fn stale_epoch_discards_entire_cache() {
-        // A cache.bin written under a different analyzer/stub epoch (e.g. before
-        // an extension stub was vendored) must be discarded on load, even though
-        // the per-file content hash still matches. This is the regression guard
-        // for stale `UndefinedClass` diagnostics surviving a stub-set change.
+        // A cache.bin written under a different analyzer/stub epoch must be
+        // discarded on load even though the per-file content hash still
+        // matches: the guard for stale `UndefinedClass` after a stub-set change.
         let dir = TempDir::new().unwrap();
-
-        let mut entries: HashMap<String, CacheEntry> = HashMap::default();
-        entries.insert(
-            "a.php".to_string(),
-            CacheEntry {
-                content_hash: "h1".to_string(),
-                issues: [].into(),
-                reference_locations: [].into(),
-                surface_hash: String::new(),
-            },
-        );
-        let reverse_deps: HashMap<String, HashSet<String>> = HashMap::default();
-        let view = CacheFileView {
-            version: cache_epoch(TEST_PHP_V, 0).wrapping_add(1), // deliberately wrong epoch
-            entries: &entries,
-            reverse_deps: &reverse_deps,
-            dep_hashes: HashMap::<String, DepHash>::default(),
-        };
-        std::fs::write(
-            dir.path().join("cache.bin"),
-            bincode::serialize(&view).unwrap(),
-        )
-        .unwrap();
+        {
+            let cache = make_cache(&dir);
+            seed(&cache, "a.php");
+            cache.flush();
+        }
+        let path = dir.path().join("cache.bin");
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[0] ^= 1;
+        std::fs::write(&path, bytes).unwrap();
 
         let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
         assert!(
-            cache.get("a.php", "h1").is_none(),
+            cache.get("a.php", "hash").is_none(),
             "entry from a mismatched epoch must not be served despite a matching content hash"
         );
     }
@@ -1307,34 +1313,71 @@ mod tests {
     }
 
     #[test]
-    fn legacy_versionless_cache_bin_is_discarded_not_paniced() {
-        // A cache.bin written by a pre-`version` binary has the old 2-field
-        // bincode layout (entries, reverse_deps). Reading it into the new
-        // struct must NOT panic or OOM on the misaligned bytes — it must fall
-        // through to an empty cache. We reproduce the old layout by serializing
-        // a (entries, reverse_deps) tuple, which bincode encodes identically to
-        // the old struct.
+    fn truncated_or_garbled_cache_bin_is_discarded_not_paniced() {
         let dir = TempDir::new().unwrap();
-        let mut entries: HashMap<String, CacheEntry> = HashMap::default();
-        entries.insert(
-            "a.php".to_string(),
-            CacheEntry {
-                content_hash: "h1".to_string(),
-                issues: [].into(),
-                reference_locations: [].into(),
-                surface_hash: String::new(),
-            },
-        );
-        let reverse_deps: HashMap<String, HashSet<String>> = HashMap::default();
-        let legacy_bytes = bincode::serialize(&(&entries, &reverse_deps)).unwrap();
-        std::fs::write(dir.path().join("cache.bin"), legacy_bytes).unwrap();
+        {
+            let cache = make_cache(&dir);
+            seed(&cache, "a.php");
+            cache.flush();
+        }
+        let path = dir.path().join("cache.bin");
+        let bytes = std::fs::read(&path).unwrap();
+        let mut garbled = bytes.clone();
+        garbled[8..16].copy_from_slice(&u64::MAX.to_le_bytes());
+        for broken in [bytes[..bytes.len() - 1].to_vec(), garbled] {
+            std::fs::write(&path, broken).unwrap();
+            let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
+            assert!(cache.get("a.php", "hash").is_none());
+        }
+    }
 
-        // Must not panic.
+    #[test]
+    fn reopen_restores_reference_locations_issues_and_reverse_deps() {
+        let dir = TempDir::new().unwrap();
+        {
+            let cache = make_cache(&dir);
+            let sym: std::sync::Arc<str> = std::sync::Arc::from("cls:Foo");
+            let issue = Issue::new(
+                mir_issues::IssueKind::UndefinedClass {
+                    name: "Foo".to_string(),
+                },
+                mir_types::Location {
+                    file: std::sync::Arc::from("a.php"),
+                    line: 3,
+                    line_end: 3,
+                    col_start: 1,
+                    col_end: 4,
+                },
+            );
+            cache.put(
+                "a.php",
+                "h1".to_string(),
+                "s1".to_string(),
+                vec![issue].into(),
+                vec![(sym.clone(), 3, 1, 4), (sym, 9, 2, 5)].into(),
+            );
+            let mut deps: HashMap<String, HashSet<String>> = HashMap::default();
+            deps.insert("b.php".into(), ["a.php".to_string()].into_iter().collect());
+            cache.set_reverse_deps(deps);
+            cache.observe_content("vendor/v.php", &"ab".repeat(32));
+            cache.flush();
+        }
         let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
-        assert!(
-            cache.get("a.php", "h1").is_none(),
-            "legacy versionless entries must be discarded, not served"
+        let (issues, refs) = cache.get("a.php", "h1").expect("hit");
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].location.line, 3);
+        assert_eq!(refs.len(), 2);
+        assert_eq!(
+            (refs[1].0.as_ref(), refs[1].1, refs[1].2, refs[1].3),
+            ("cls:Foo", 9, 2, 5)
         );
+        assert!(
+            std::sync::Arc::ptr_eq(&refs[0].0, &refs[1].0),
+            "a symbol is decoded once and shared"
+        );
+        assert_eq!(cache.surface_hash("a.php").as_deref(), Some("s1"));
+        assert!(cache.observe_content("vendor/v.php", &"ab".repeat(32)));
+        assert_eq!(cache.evict_with_dependents(&["b.php".to_string()]), 1);
     }
 
     #[test]
