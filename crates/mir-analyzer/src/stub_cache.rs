@@ -164,7 +164,7 @@ impl PackWriter {
 
 /// Persistent definition cache. Thread-safe. Entries are appended to this
 /// session's pack as they arrive; the pack becomes visible to later sessions
-/// when it is finished — on reaching [`PACK_BYTES`], or by [`Self::flush`] /
+/// when it is finished — on reaching the pack size limit, or by [`Self::flush`] /
 /// `Drop`, so a clean shutdown loses nothing. Reads-after-write in the same
 /// session are served by Salsa's memos, not this cache.
 pub struct StubSliceCache {
