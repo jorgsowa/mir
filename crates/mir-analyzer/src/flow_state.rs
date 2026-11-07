@@ -308,6 +308,10 @@ pub struct FlowState {
     /// so a later `$obj->prop` access is recognized as tainted.
     pub tainted_props: Arc<FxHashMap<(Name, Name), Taint>>,
 
+    /// Properties whose taint `tainted_props` holds in full: written or guarded on every path since
+    /// the last call that may change their object, so what other methods store doesn't apply.
+    pub local_props: Arc<FxHashSet<(Name, Name)>>,
+
     /// Variables that may hold the same object, each mapped to its group's root variable.
     pub object_aliases: Arc<FxHashMap<Name, Name>>,
 
@@ -762,6 +766,7 @@ impl FlowState {
             plain_vars: Arc::default(),
             object_guard_slots: None,
             tainted_props: Arc::default(),
+            local_props: Arc::default(),
             object_aliases: Arc::default(),
             tainted_static_props: Arc::default(),
             ref_aliases: FxHashMap::default(),
@@ -1431,6 +1436,7 @@ impl FlowState {
             self.mark_this_escaped_to_call();
         }
         let receiver = Name::from(stripped);
+        self.forget_local_props(receiver);
         // A 2-hop chained receiver key (`chained_prop_receiver_key`) encodes
         // as `"{receiver}->{prop}"` — an entry keyed this way is also stale
         // once `receiver` itself may have been reassigned by an opaque call,
@@ -1808,6 +1814,8 @@ impl FlowState {
         &mut self,
         guarded: crate::taint_guard::Guarded<'_>,
         safe: Taint,
+        db: &dyn crate::db::MirDatabase,
+        file: &str,
     ) {
         match guarded {
             crate::taint_guard::Guarded::Var(var) => {
@@ -1819,6 +1827,19 @@ impl FlowState {
             }
             crate::taint_guard::Guarded::CliServerArray => {
                 self.set_key_taints("_SERVER", KeyTaint::default())
+            }
+            crate::taint_guard::Guarded::Prop(access) => {
+                let php_ast::owned::ExprKind::PropertyAccess(pa) = &access.kind else {
+                    return;
+                };
+                let (php_ast::owned::ExprKind::Variable(obj), Some(prop)) = (
+                    &pa.object.kind,
+                    crate::expr::helpers::extract_string_from_expr(&pa.property),
+                ) else {
+                    return;
+                };
+                let taint = crate::taint::expr_taint(access, self, db, file).without(safe);
+                self.set_local_prop_taint(obj, &prop, taint);
             }
         }
     }
@@ -1869,6 +1890,7 @@ impl FlowState {
     /// Forget the property taint of the object `obj_var` held.
     pub fn clear_prop_taints(&mut self, obj_var: &str) {
         let obj = Name::from(obj_var.trim_start_matches('$'));
+        self.forget_local_props(obj);
         if self.tainted_props.keys().any(|(o, _)| *o == obj) {
             Arc::make_mut(&mut self.tainted_props).retain(|(o, _), _| *o != obj);
         }
@@ -1947,6 +1969,32 @@ impl FlowState {
         self.clear_prop_taints(to.as_str());
         for (prop, taint) in inherited {
             self.set_prop_taint(to.as_str(), prop.as_str(), taint);
+        }
+    }
+
+    /// Record that `prop` of `obj_var` holds exactly `taint` on this path.
+    pub fn set_local_prop_taint(&mut self, obj_var: &str, prop: &str, taint: Taint) {
+        self.set_prop_taint(obj_var, prop, taint);
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        if !self.local_props.contains(&key) {
+            Arc::make_mut(&mut self.local_props).insert(key);
+        }
+    }
+
+    pub fn is_local_prop(&self, obj_var: &str, prop: &str) -> bool {
+        !self.local_props.is_empty()
+            && self.local_props.contains(&(
+                Name::from(obj_var.trim_start_matches('$')),
+                Name::from(prop),
+            ))
+    }
+
+    fn forget_local_props(&mut self, obj: Name) {
+        if self.local_props.iter().any(|(o, _)| *o == obj) {
+            Arc::make_mut(&mut self.local_props).retain(|(o, _)| *o != obj);
         }
     }
 
@@ -2479,6 +2527,14 @@ impl FlowState {
                 .collect(),
         );
 
+        result.local_props = Arc::new(
+            if_ctx
+                .local_props
+                .intersection(&else_ctx.local_props)
+                .copied()
+                .collect(),
+        );
+
         // Property refinements: keep only keys present in BOTH branches with the
         // union of their types.  A refinement present in only one branch cannot
         // be relied upon after the merge (the other path didn't narrow it).
@@ -3002,6 +3058,7 @@ impl FlowState {
             extension_loaded_guards,
             readonly_initialized,
             assigned_this_props,
+            local_props,
             this_escaped_to_call,
             self_ref_closure_hint,
         );

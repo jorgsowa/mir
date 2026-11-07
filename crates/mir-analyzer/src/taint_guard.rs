@@ -406,7 +406,7 @@ fn pattern_arg<'e>(args: &'e [Arg], scope: GuardScope<'_>) -> Option<Cow<'e, str
 }
 
 /// What a passing guard call validated.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum Guarded<'a> {
     Var(&'a str),
     Element {
@@ -415,6 +415,8 @@ pub enum Guarded<'a> {
     },
     /// Under the CLI, `$_SERVER` holds the process environment, not client data.
     CliServerArray,
+    /// A property of an object variable, `$this->x`.
+    Prop(&'a Expr),
 }
 
 /// The value a passing guard call validates, and the kinds it is then safe for.
@@ -927,7 +929,7 @@ pub fn apply_asserting_helper(
         return;
     };
     if let Some(guarded) = positional_arg(args, guard.param).and_then(guarded_subject) {
-        ctx.apply_taint_guard(guarded, guard.safe);
+        ctx.apply_taint_guard(guarded, guard.safe, db, file);
     }
 }
 
@@ -1045,6 +1047,12 @@ fn guarded_subject(expr: &Expr) -> Option<Guarded<'_>> {
             guarded_subject(inner)
         }
         ExprKind::NullCoalesce(nc) => guarded_subject(&nc.left),
+        ExprKind::PropertyAccess(pa)
+            if matches!(pa.object.kind, ExprKind::Variable(_))
+                && crate::expr::helpers::extract_string_from_expr(&pa.property).is_some() =>
+        {
+            Some(Guarded::Prop(expr))
+        }
         ExprKind::ArrayAccess(aa) => {
             let ExprKind::Variable(var) = &aa.array.kind else {
                 return None;

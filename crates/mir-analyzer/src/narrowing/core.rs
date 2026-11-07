@@ -752,7 +752,7 @@ fn taint_guarded_variable<'e>(
         .0
     {
         Guarded::Var(var) | Guarded::Element { var, .. } => Some(var),
-        Guarded::CliServerArray => None,
+        Guarded::CliServerArray | Guarded::Prop(_) => None,
     }
 }
 

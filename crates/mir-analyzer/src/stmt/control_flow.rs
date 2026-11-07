@@ -856,7 +856,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some((guarded, safe)) =
                     crate::taint_guard::switch_guard(&sw.expr, &pending_conditions)
                 {
-                    case_ctx.apply_taint_guard(guarded, safe);
+                    case_ctx.apply_taint_guard(guarded, safe, self.db, &self.file);
                 }
             }
 

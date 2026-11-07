@@ -648,6 +648,10 @@ pub fn expr_taint(
             }
             // A property of a tainted object (`json_decode($_GET['j'])->name`) is tainted too.
             let own = match &unwrap_parens(&pa.object).kind {
+                ExprKind::Variable(obj_var) if ctx.is_local_prop(obj_var, &prop_name) => {
+                    return ctx.prop_taint(obj_var, &prop_name)
+                        | expr_taint(&pa.object, ctx, db, file);
+                }
                 ExprKind::Variable(obj_var) => {
                     ctx.prop_taint(obj_var.trim_start_matches('$'), &prop_name)
                 }

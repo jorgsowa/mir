@@ -681,6 +681,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     rhs_taint
                                 };
                                 ctx.set_prop_taint_through_aliases(obj_var, &prop_name, stored);
+                                if !a.by_ref {
+                                    ctx.set_local_prop_taint(obj_var, &prop_name, stored);
+                                }
                                 let value = crate::taint::unwrap_parens(&a.value);
                                 let closure =
                                     crate::taint::assigned_closure(value, ctx, self.db, &self.file)
