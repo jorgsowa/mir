@@ -187,6 +187,80 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
     Arc::new(facts)
 }
 
+type GuardHelpers = Arc<FxHashMap<DeclKey, (usize, crate::taint::Taint)>>;
+
+/// Helpers whose body is `return <guard on a parameter>;`, keyed like the facts, with the
+/// parameter's index and the kinds a passing call leaves it safe for.
+#[salsa::tracked(cycle_fn = guard_helpers_cycle, cycle_initial = guard_helpers_initial)]
+pub(crate) fn file_guard_helpers(db: &dyn MirDatabase, file: SourceFile) -> GuardHelpers {
+    let path = Arc::clone(file.path(db));
+    let version = crate::db::queries::db_php_version(db);
+    let text = file.text(db);
+    let parsed = db.batch_parse(&path, text, version).unwrap_or_else(|| {
+        Arc::new(crate::recursion::parse_for_file(
+            &path,
+            text.as_ref(),
+            version,
+        ))
+    });
+    let mut helpers = FxHashMap::default();
+    crate::body_analysis::for_each_file_scope_decl(&parsed.program.stmts, &mut |stmt| {
+        let _scope = crate::db::ns_scope::enter(db, &path, stmt.span.start);
+        let resolve = |name: &str| Name::new(&crate::db::prefix_file_namespace(db, &path, name));
+        let mut add = |key: DeclKey, class: Option<Name>, params, stmts| {
+            let mut ctx = crate::flow_state::FlowState::new();
+            ctx.self_fqcn = class.map(|c| Arc::from(c.as_str()));
+            let scope = crate::taint_guard::GuardScope {
+                ctx: &ctx,
+                db,
+                file: &path,
+            };
+            if let Some(guard) = crate::taint_guard::returned_param_guard(params, stmts, scope) {
+                helpers.insert(key, guard);
+            }
+        };
+        match &stmt.kind {
+            StmtKind::Function(decl) => {
+                let fqn = resolve(decl.name.as_str().unwrap_or(""));
+                add((fqn, None), None, &decl.params, &decl.body.stmts);
+            }
+            StmtKind::Class(decl) => {
+                let Some(name) = decl.name.as_ref().and_then(|n| n.as_str()) else {
+                    return;
+                };
+                let fqcn = resolve(name);
+                for member in decl.body.members.iter() {
+                    if let ClassMemberKind::Method(m) = &member.kind {
+                        if let (true, Some(body)) = (m.modifiers.is_static, m.body.as_ref()) {
+                            let method = crate::util::php_ident_lowercase(
+                                m.name.as_str().unwrap_or_default(),
+                            );
+                            let key = (fqcn, Some(Name::new(&method)));
+                            add(key, Some(fqcn), &m.params, &body.stmts);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    });
+    Arc::new(helpers)
+}
+
+fn guard_helpers_initial(_db: &dyn MirDatabase, _id: salsa::Id, _file: SourceFile) -> GuardHelpers {
+    Arc::default()
+}
+
+fn guard_helpers_cycle(
+    _db: &dyn MirDatabase,
+    _cycle: &salsa::Cycle,
+    _last: &GuardHelpers,
+    value: GuardHelpers,
+    _file: SourceFile,
+) -> GuardHelpers {
+    value
+}
+
 fn scan_top_level(scan: &mut Scan<'_>, stmts: &[php_ast::owned::Stmt]) {
     for stmt in stmts {
         let _scope = crate::db::ns_scope::enter(scan.db, scan.path, stmt.span.start);

@@ -4,7 +4,10 @@
 
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::FunctionRefExt as _;
 use crate::ast_ext::NameBareExt as _;
+use crate::ast_ext::NameResolveExt as _;
+use mir_types::Name;
 use php_ast::ast::{BinaryOp, CastKind};
 use php_ast::owned::{Arg, Expr, ExprKind};
 
@@ -742,8 +745,10 @@ fn matched_when_bool(op: BinaryOp, value: bool) -> Option<bool> {
 }
 
 fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'e>, Taint, bool)> {
-    let ExprKind::FunctionCall(fc) = &call.kind else {
-        return None;
+    let fc = match &call.kind {
+        ExprKind::FunctionCall(fc) => fc,
+        ExprKind::StaticMethodCall(smc) => return static_helper_guard(smc, scope),
+        _ => return None,
     };
     let name = fc.name.kind.name_bare()?;
     let lower = crate::util::php_ident_lowercase(name);
@@ -758,14 +763,99 @@ fn guard_of_call<'e>(call: &'e Expr, scope: GuardScope<'_>) -> Option<(Guarded<'
         ),
         "filter_var" => (validating_filter_safe_kinds(&fc.args)?, 0),
         "str_starts_with" => (fixed_origin_prefix_safe_kinds(&fc.args, scope)?, 0),
-        _ => (value_check_safe_kinds(&lower)?, 0),
+        _ => match value_check_safe_kinds(&lower) {
+            Some(safe) => (safe, 0),
+            None => {
+                let function = fc.name.kind.function_ref(scope.db, scope.file)?;
+                let (fqn, f) = function.find(scope.db, scope.file)?;
+                let (index, safe) =
+                    helper_guard(f.location.as_ref()?, (Name::new(fqn), None), scope)?;
+                (safe, index)
+            }
+        },
     };
-    let value = fc.args.get(subject)?;
-    if value.name.is_some() || value.unpack() {
+    let guarded = guarded_subject(positional_arg(&fc.args, subject)?)?;
+    (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+}
+
+/// A call to `Class::helper($x)` whose body returns a guard on that parameter.
+fn static_helper_guard<'e>(
+    smc: &'e php_ast::owned::StaticMethodCallExpr,
+    scope: GuardScope<'_>,
+) -> Option<(Guarded<'e>, Taint, bool)> {
+    let class = match smc
+        .class
+        .kind
+        .resolve_name_ref(scope.db, scope.file)?
+        .as_str()
+    {
+        "self" | "static" => scope.ctx.self_fqcn.as_deref()?.to_string(),
+        "parent" => scope.ctx.parent_fqcn.as_deref()?.to_string(),
+        name => name.to_string(),
+    };
+    let ExprKind::Identifier(method) = &smc.method.kind else {
+        return None;
+    };
+    let method = crate::util::php_ident_lowercase(method);
+    let (owner, m) = crate::db::find_method_respecting_precedence(
+        scope.db,
+        crate::db::Fqcn::from_str(scope.db, &class),
+        &method,
+    )?;
+    let key = (Name::new(&owner), Some(Name::new(&method)));
+    let (index, safe) = helper_guard(m.location.as_ref()?, key, scope)?;
+    Some((
+        guarded_subject(positional_arg(&smc.args, index)?)?,
+        safe,
+        false,
+    ))
+}
+
+/// The parameter a user helper's body guards, and the kinds a passing call leaves it safe for.
+fn helper_guard(
+    location: &mir_types::Location,
+    key: (Name, Option<Name>),
+    scope: GuardScope<'_>,
+) -> Option<(usize, Taint)> {
+    if crate::stubs::is_stub_path(location.file.as_ref()) {
         return None;
     }
-    let guarded = guarded_subject(value.value()?)?;
-    (!safe.is_empty()).then_some((guarded, safe, lower == "preg_match"))
+    let file = scope.db.lookup_source_file(location.file.as_ref())?;
+    crate::db::taint_sources::file_guard_helpers(scope.db, file)
+        .get(&key)
+        .copied()
+}
+
+/// The argument bound to parameter `index` when no earlier argument is named or spread.
+fn positional_arg(args: &[Arg], index: usize) -> Option<&Expr> {
+    let arg = args.get(index)?;
+    (!args[..=index]
+        .iter()
+        .any(|a| a.name.is_some() || a.unpack()))
+    .then(|| arg.value())
+    .flatten()
+}
+
+/// The parameter a body consisting of `return <guard>;` checks, and the kinds it proves safe.
+pub(crate) fn returned_param_guard(
+    params: &[php_ast::owned::Param],
+    stmts: &[php_ast::owned::Stmt],
+    scope: GuardScope<'_>,
+) -> Option<(usize, Taint)> {
+    let [stmt] = stmts else {
+        return None;
+    };
+    let php_ast::owned::StmtKind::Return(Some(cond)) = &stmt.kind else {
+        return None;
+    };
+    let (Guarded::Var(var), safe) = guarded_when(cond, true, scope)? else {
+        return None;
+    };
+    let index = params
+        .iter()
+        .position(|p| p.name.as_str() == Some(var.trim_start_matches('$')))?;
+    let param = &params[index];
+    (!param.by_ref && !param.variadic).then_some((index, safe))
 }
 
 /// The data of a `hash_hmac` side of `hash_equals`: matching proves whoever holds the key made it.
