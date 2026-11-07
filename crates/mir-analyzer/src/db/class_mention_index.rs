@@ -209,6 +209,9 @@ pub struct MentionQuery {
     added_epoch: u64,
     /// The needle's [`word_key`] when the word set answers it.
     word: Option<u32>,
+    /// For a bounded qualified needle (`A\B\C`), the [`word_key`] of its last
+    /// segment: a text lacking that word can't mention the needle.
+    last_segment: Option<u32>,
 }
 
 /// Size/coverage counters for memory validation and host metrics.
@@ -369,10 +372,16 @@ impl ClassMentionIndex {
         let name = Name::new(needle).ascii_lowercase();
         let entry = *self.universe.lock().names.get(&name)?;
         let word = (!is_pattern(&name, entry.raw)).then(|| word_key(name.as_str().as_bytes()));
+        let last_segment = name
+            .as_str()
+            .rsplit_once('\\')
+            .filter(|(_, last)| !entry.raw && is_word(last))
+            .map(|(_, last)| word_key(last.as_bytes()));
         Some(MentionQuery {
             name,
             added_epoch: entry.epoch,
             word,
+            last_segment,
         })
     }
 
@@ -387,8 +396,15 @@ impl ClassMentionIndex {
         current_text: &Arc<str>,
     ) -> Option<bool> {
         let e = self.by_file.get(&file)?;
-        if !Arc::ptr_eq(&e.text, current_text) || (q.word.is_none() && e.epoch < q.added_epoch) {
+        if !Arc::ptr_eq(&e.text, current_text) {
             return None;
+        }
+        if q.word.is_none() && e.epoch < q.added_epoch {
+            // Scanned before the needle existed, but its words still rule most files out.
+            let absent = q
+                .last_segment
+                .is_some_and(|key| e.scan.words.binary_search(&key).is_err());
+            return absent.then_some(false);
         }
         Some(e.scan.contains(q))
     }
@@ -568,6 +584,31 @@ mod tests {
         let s2 = scanner_for(&idx);
         idx.set_file(file, text.clone(), s2.epoch(), s2.scan(&text));
         assert_eq!(idx.answer(file, &q_beta, &text), Some(true));
+    }
+
+    #[test]
+    fn qualified_needles_added_after_the_scan_rule_out_files_missing_the_short_name() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("Alpha")]);
+        let s1 = scanner_for(&idx);
+        let without: Arc<str> = Arc::from("use App\\Other; new Alpha();");
+        let with: Arc<str> = Arc::from("use App\\Target; // target");
+        let raw_file: Arc<str> = Arc::from("$x->go();");
+        idx.set_file(0, without.clone(), s1.epoch(), s1.scan(&without));
+        idx.set_file(1, with.clone(), s1.epoch(), s1.scan(&with));
+        idx.set_file(2, raw_file.clone(), s1.epoch(), s1.scan(&raw_file));
+
+        idx.add_names([lc("App\\Target")]);
+        idx.add_raw_names([lc("->go")]);
+        let q = idx.prepare_query("App\\Target").unwrap();
+        assert_eq!(idx.answer(0, &q, &without), Some(false));
+        assert_eq!(
+            idx.answer(1, &q, &with),
+            None,
+            "a file holding the short name still needs a scan"
+        );
+        let raw = idx.prepare_query("->go").unwrap();
+        assert_eq!(idx.answer(2, &raw, &raw_file), None);
     }
 
     #[test]
