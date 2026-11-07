@@ -964,6 +964,14 @@ pub fn expr_taint(
                 crate::expr::assignment::resolve_chained_receiver_type(&mc.object, ctx, db, file)
             else {
                 let produced = produced_object_classes(&mc.object, db, file);
+                let removed = produced
+                    .iter()
+                    .map(|class| sanitized_method_kinds(db, class, &method_lower))
+                    .reduce(|a, b| Some(a?.intersection(b?)))
+                    .flatten();
+                if let Some(removed) = removed {
+                    return args_taint(&mc.args, ctx, db, file).without(removed);
+                }
                 if !produced.is_empty()
                     && produced
                         .iter()
