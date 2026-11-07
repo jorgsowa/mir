@@ -43,7 +43,7 @@ rayon      = "1"
 stacker    = "0.1"
 boxcar     = "0.2"
 dashmap    = "6"
-parking_lot = "0.12"
+parking_lot = "0.13"
 mimalloc   = { version = "0.1", default-features = false }
 
 # Serialization
