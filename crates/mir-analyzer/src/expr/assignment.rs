@@ -622,12 +622,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if rhs_plain {
                             ctx.mark_plain(name.as_ref());
                         }
+                        if !a.by_ref && crate::taint::opens_file_handle(&a.value) {
+                            ctx.mark_file_handle(name.as_ref());
+                        }
                         if a.by_ref {
                             ctx.alias_var(name.as_ref());
                         }
                         if let (true, ExprKind::Variable(source)) = (a.by_ref, &a.value.kind) {
                             ctx.alias_var(source.as_ref());
-                            ctx.clear_plain(mir_types::Name::from(source.trim_start_matches('$')));
+                            ctx.clear_value_marks(mir_types::Name::from(
+                                source.trim_start_matches('$'),
+                            ));
                         }
                         let value = crate::taint::unwrap_parens(&a.value);
                         let closure =

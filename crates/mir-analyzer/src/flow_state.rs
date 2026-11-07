@@ -297,6 +297,9 @@ pub struct FlowState {
     /// Variables last assigned data no object can be part of; see `taint::value_may_hold_object`.
     pub plain_vars: Arc<FxHashSet<Name>>,
 
+    /// Variables last assigned a handle `fopen()` opened on a literal file path.
+    pub file_handle_vars: Arc<FxHashSet<Name>>,
+
     /// Label slots standing for parameters the body proves objects, shared by
     /// every branch of the body; see `taint::seed_object_guards`.
     pub object_guard_slots: Option<Arc<std::sync::Mutex<ObjectGuardSlots>>>,
@@ -768,6 +771,7 @@ impl FlowState {
             byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
+            file_handle_vars: Arc::default(),
             object_guard_slots: None,
             tainted_props: Arc::default(),
             local_props: Arc::default(),
@@ -1499,7 +1503,7 @@ impl FlowState {
         }
         add_taint(&mut self.tainted_vars, sym, taint);
         self.drop_param_parts(sym, taint);
-        self.clear_plain(sym);
+        self.clear_value_marks(sym);
     }
 
     /// [`Self::taint_var`], where `parts` of `taint`'s label slots arrive as
@@ -1616,7 +1620,7 @@ impl FlowState {
         self.revoke_exact_keys(sym);
         remove_entry(&mut self.taint_trails, &sym);
         self.unbind_closure(sym);
-        self.clear_plain(sym);
+        self.clear_value_marks(sym);
         set_taint(&mut self.tainted_vars, sym, taint);
     }
 
@@ -1632,10 +1636,24 @@ impl FlowState {
                 .contains(&Name::from(name.trim_start_matches('$')))
     }
 
-    pub fn clear_plain(&mut self, sym: Name) {
+    pub fn clear_value_marks(&mut self, sym: Name) {
         if self.plain_vars.contains(&sym) {
             Arc::make_mut(&mut self.plain_vars).remove(&sym);
         }
+        if self.file_handle_vars.contains(&sym) {
+            Arc::make_mut(&mut self.file_handle_vars).remove(&sym);
+        }
+    }
+
+    pub fn mark_file_handle(&mut self, name: &str) {
+        Arc::make_mut(&mut self.file_handle_vars).insert(Name::from(name.trim_start_matches('$')));
+    }
+
+    pub fn is_file_handle(&self, name: &str) -> bool {
+        !self.file_handle_vars.is_empty()
+            && self
+                .file_handle_vars
+                .contains(&Name::from(name.trim_start_matches('$')))
     }
 
     fn unbind_closure(&mut self, sym: Name) {
@@ -1696,7 +1714,7 @@ impl FlowState {
         remove_entry(&mut self.param_parts, &sym);
         remove_entry(&mut self.key_names, &sym);
         self.revoke_exact_keys(sym);
-        self.clear_plain(sym);
+        self.clear_value_marks(sym);
         set_taint(&mut self.tainted_vars, sym, keys.whole());
         // Without an entry, a superglobal read counts as tainted again.
         if keys.whole().is_empty() && !crate::taint::is_superglobal(sym.as_str()) {
@@ -1740,7 +1758,7 @@ impl FlowState {
         let whole = keys.whole();
         set_taint(&mut self.tainted_vars, sym, whole);
         self.drop_param_parts(sym, added);
-        self.clear_plain(sym);
+        self.clear_value_marks(sym);
     }
 
     /// Record that `$name` was written under a key carrying `taint`.
@@ -2595,6 +2613,15 @@ impl FlowState {
                     .collect(),
             );
         }
+        if !(if_ctx.file_handle_vars.is_empty() && else_ctx.file_handle_vars.is_empty()) {
+            result.file_handle_vars = Arc::new(
+                if_ctx
+                    .file_handle_vars
+                    .intersection(&else_ctx.file_handle_vars)
+                    .copied()
+                    .collect(),
+            );
+        }
         for branch in [&if_ctx, &else_ctx] {
             if !Arc::ptr_eq(&branch.tainted_props, &result.tainted_props) {
                 for (key, taint) in branch.tainted_props.iter() {
@@ -3087,6 +3114,7 @@ impl FlowState {
         diff_map_keys(&self.taint_trails, &other.taint_trails, &mut names);
         diff_map_keys(&self.param_parts, &other.param_parts, &mut names);
         diff_set(&self.plain_vars, &other.plain_vars, &mut names);
+        diff_set(&self.file_handle_vars, &other.file_handle_vars, &mut names);
         diff_map_keys(&self.escaped_vars, &other.escaped_vars, &mut names);
         diff_set(&self.captured_vars, &other.captured_vars, &mut names);
         diff_set(

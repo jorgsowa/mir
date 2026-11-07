@@ -395,14 +395,20 @@ pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg], ctx: &FlowSta
 }
 
 /// Whether a printing call stays out of the response: `fprintf(STDERR, ...)` writes to the error
-/// stream, and `print_r($x, $flag)` may hand its output back unless the flag is literally false.
-pub fn output_stays_out_of_response(fn_name_lower: &str, args: &[php_ast::owned::Arg]) -> bool {
+/// stream, as `fprintf($h, ...)` does to a file `$h = fopen('log.txt', 'a')` opened, and
+/// `print_r($x, $flag)` may hand its output back unless the flag is literally false.
+pub fn output_stays_out_of_response(
+    fn_name_lower: &str,
+    args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+) -> bool {
     let arg_kind = |index: usize| args.get(index).and_then(|a| a.value()).map(|v| &v.kind);
     match fn_name_lower {
-        "fprintf" | "vfprintf" => args
-            .first()
-            .and_then(|a| a.value())
-            .is_some_and(|handle| handle.kind.name_bare() == Some("STDERR")),
+        "fprintf" | "vfprintf" => match arg_kind(0) {
+            Some(ExprKind::Variable(handle)) => ctx.is_file_handle(handle),
+            Some(handle) => handle.name_bare() == Some("STDERR"),
+            None => false,
+        },
         "print_r" | "var_export" | "highlight_string" => {
             !matches!(arg_kind(1), None | Some(ExprKind::Bool(false)))
         }
@@ -575,6 +581,30 @@ pub fn reaches_sink(
     let taint = stringified_taint(expr, ctx, db, file);
     summary.record_param_sinks(taint, sink, issue);
     taint.concrete().intersects(sink)
+}
+
+/// `fopen()` on a literal path naming a file, not an output stream like `php://output`.
+pub fn opens_file_handle(value: &Expr) -> bool {
+    let mut value = unwrap_parens(value);
+    while let ExprKind::ErrorSuppress(inner) = &value.kind {
+        value = unwrap_parens(inner);
+    }
+    let ExprKind::FunctionCall(fc) = &value.kind else {
+        return false;
+    };
+    let path = fc
+        .args
+        .first()
+        .filter(|a| a.name.is_none() && !a.unpack())
+        .and_then(|a| a.value());
+    fc.name
+        .kind
+        .name_bare()
+        .is_some_and(|n| n.eq_ignore_ascii_case("fopen"))
+        && matches!(path.map(|p| &p.kind), Some(ExprKind::String(path)) if {
+            let path = path.as_str().to_ascii_lowercase();
+            !path.contains("php://") && !path.starts_with("/dev/")
+        })
 }
 
 /// What a `header()` call makes of the response type: `Some(true)` for a literal content type

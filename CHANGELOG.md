@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Taint: `fprintf()`/`vfprintf()` to a handle `fopen()` opened on a literal file path (not `php://` or `/dev/`) on every path isn't `TaintedHtml`.
 - Taint: output after `header('Content-Type: application/json')` (or `text/plain`, `text/csv`, `application/octet-stream`, `+json`) on every path isn't `TaintedHtml`; a later HTML or unknown `header()` restores it.
 - Taint: `in_array($x, $this->allowed, true)` and `self::$allowed` clear `$x` when the private property's default is a list of literals and nothing in the class can change it.
 - Taint: a guard on an object variable's property (`if (ctype_digit($this->x)) echo $this->x;`) clears it until a call may change the object, and a property written in the current flow no longer takes the taint other methods store in it.
