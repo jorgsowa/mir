@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Performance: a union folds a generic array or list into one of the same kind once it holds eight, as it already did for array shapes. A loop writing `$a[$k]['x']` under a run of `if`s forked the element type on every branch, so analysis grew about 15× per branch; PHP_CodeSniffer's `GetMethodParametersTest` (11 branches) never finished and now takes 0.1s.
+
 ## [0.93.0] - 2026-11-08
 
 ### Changed

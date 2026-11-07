@@ -109,6 +109,43 @@ fn bounds_contain(outer: IntBounds, inner: IntBounds) -> bool {
 /// them, and a key set on only some paths reads without `null`.
 const MAX_KEYED_SHAPES: usize = 8;
 
+/// The same limit for generic arrays and lists of one kind: a loop writing
+/// `$a[$k]['x']` under a run of `if`s forks the element type on every branch.
+const MAX_GENERIC_ARRAYS: usize = 8;
+
+/// `array<K1|K2, V1|V2>` for two generic arrays (or lists) of the same kind.
+fn combine_generic_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
+    let union = |x: &Type, y: &Type| {
+        let mut t = x.clone();
+        t.merge_with(y);
+        Box::new(t)
+    };
+    Some(match (a, b) {
+        (Atomic::TArray { key: ka, value: va }, Atomic::TArray { key: kb, value: vb }) => {
+            Atomic::TArray {
+                key: union(ka, kb),
+                value: union(va, vb),
+            }
+        }
+        (
+            Atomic::TNonEmptyArray { key: ka, value: va },
+            Atomic::TNonEmptyArray { key: kb, value: vb },
+        ) => Atomic::TNonEmptyArray {
+            key: union(ka, kb),
+            value: union(va, vb),
+        },
+        (Atomic::TList { value: va }, Atomic::TList { value: vb }) => Atomic::TList {
+            value: union(va, vb),
+        },
+        (Atomic::TNonEmptyList { value: va }, Atomic::TNonEmptyList { value: vb }) => {
+            Atomic::TNonEmptyList {
+                value: union(va, vb),
+            }
+        }
+        _ => return None,
+    })
+}
+
 /// One shape covering `a | b`: keys of both, with those set on one side only
 /// made optional and value types unioned. `None` when the shapes disagree on
 /// openness, list-ness or emptiness — folding `array{} | array{0: X}` to
@@ -431,6 +468,33 @@ impl Type {
                 .iter()
                 .enumerate()
                 .find_map(|(i, t)| combine_keyed_arrays(t, &atomic).map(|c| (i, c)))
+            {
+                self.types.remove(idx);
+                if self.types.contains(&combined) {
+                    return;
+                }
+                atomic = combined;
+            }
+        }
+
+        if matches!(
+            atomic,
+            Atomic::TArray { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+        ) && self
+            .types
+            .iter()
+            .filter(|t| std::mem::discriminant(*t) == std::mem::discriminant(&atomic))
+            .count()
+            >= MAX_GENERIC_ARRAYS
+        {
+            if let Some((idx, combined)) = self
+                .types
+                .iter()
+                .enumerate()
+                .find_map(|(i, t)| combine_generic_arrays(t, &atomic).map(|c| (i, c)))
             {
                 self.types.remove(idx);
                 if self.types.contains(&combined) {
@@ -4042,6 +4106,24 @@ mod tests {
             assert!(ty.types.iter().any(|t| matches!(
                 t,
                 Atomic::TKeyedArray { properties, .. } if properties.contains_key(&key)
+            )));
+        }
+    }
+
+    #[test]
+    fn add_type_folds_generic_arrays_past_the_limit() {
+        let mut ty = Type::empty();
+        for i in 0..32 {
+            ty.add_type(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TInt)),
+                value: Box::new(Type::single(Atomic::TLiteralInt(i))),
+            });
+        }
+        assert!(ty.types.len() <= MAX_GENERIC_ARRAYS);
+        for i in 0..32 {
+            assert!(ty.types.iter().any(|t| matches!(
+                t,
+                Atomic::TArray { value, .. } if value.types.contains(&Atomic::TLiteralInt(i))
             )));
         }
     }
