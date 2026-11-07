@@ -56,6 +56,9 @@ pub fn digest_hex(digest: &[u8; 32]) -> String {
 /// body that could have been stripped only ever over-cascades (re-analyzes a
 /// dependent needlessly) — never serves a stale result — so this is sound by
 /// construction even if a future callable form is missed here.
+///
+/// Whitespace and comments are ignored too, except docblocks and any comment
+/// mentioning `@`, which can carry annotations.
 pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> String {
     use php_ast::owned::visitor::{walk_owned_class_member, walk_owned_program, OwnedVisitor};
     use php_ast::owned::{ClassMember, ClassMemberKind, Stmt, StmtKind};
@@ -94,21 +97,40 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
     let _ = walk_owned_program(&mut collector, program);
     collector.spans.sort_unstable();
 
-    let bytes = source.as_bytes();
+    let mut bodies = collector.spans.into_iter().peekable();
+    let mut lexer = php_lexer::Lexer::new(source);
     let mut hasher = blake3::Hasher::new();
-    let mut cursor = 0usize;
-    for (start, end) in collector.spans {
-        let start = (start as usize).min(bytes.len());
-        let end = (end as usize).min(bytes.len());
-        // Skip malformed or nested (already-covered) spans; never walk backwards.
-        if start < cursor || end < start {
+    let mut in_body = false;
+    loop {
+        let token = lexer.next_token();
+        if token.kind == php_lexer::TokenKind::Eof {
+            break;
+        }
+        let start = token.span.start;
+        while bodies.next_if(|&(_, end)| end <= start).is_some() {}
+        if bodies.peek().is_some_and(|&(body, _)| body <= start) {
+            if !in_body {
+                hasher.update(b"\x00body\x00");
+                in_body = true;
+            }
             continue;
         }
-        hasher.update(&bytes[cursor..start]);
-        hasher.update(b"\x00body\x00");
-        cursor = end;
+        in_body = false;
+        let text = lexer.token_text(&token);
+        let plain_comment = matches!(
+            token.kind,
+            php_lexer::TokenKind::LineComment
+                | php_lexer::TokenKind::HashComment
+                | php_lexer::TokenKind::BlockComment
+        ) && !text.contains('@');
+        if !plain_comment {
+            hasher.update(text.as_bytes());
+            hasher.update(b"\x00");
+        }
     }
-    hasher.update(&bytes[cursor..]);
+    if !lexer.errors().is_empty() {
+        return hash_content(source);
+    }
     hasher.finalize().to_hex().to_string()
 }
 
@@ -915,6 +937,68 @@ mod tests {
         let a = "<?php\nfunction f(): int { return 1; }\nfunction g(): int { return 2; }\n";
         let b = "<?php\nfunction f(): int {\n    $a = 0;\n    $b = 1;\n    return $a + $b;\n}\nfunction g(): int { return 2; }\n";
         assert_eq!(surface(a), surface(b));
+    }
+
+    #[test]
+    fn surface_stable_across_comment_and_whitespace_edits() {
+        let base = surface("<?php\nclass C { public function f() { return 1; } }\n");
+        for edited in [
+            "<?php\nclass C { public function f() { return 1; } }\n// note\n",
+            "<?php\n# note\nclass C { public function f() { return 1; } }\n",
+            "<?php\n/* note */\nclass C { public function f() { return 1; } }\n",
+            "<?php\nclass C { public function f() { /* note */ return 1; } }\n",
+            "<?php\n\n\nclass C {\n    public function f() {\n        return 1;\n    }\n}\n",
+        ] {
+            assert_eq!(base, surface(edited), "{edited}");
+        }
+    }
+
+    #[test]
+    fn surface_changes_on_annotations_and_literal_text() {
+        let pairs = [
+            (
+                "<?php\n/** @return int */\nfunction f() {}",
+                "<?php\n/** @return string */\nfunction f() {}",
+            ),
+            (
+                "<?php\n/** Old. */\nfunction f() {}",
+                "<?php\n/** New. */\nfunction f() {}",
+            ),
+            (
+                "<?php\n/* @var int */\nfunction f() {}",
+                "<?php\n/* @var string */\nfunction f() {}",
+            ),
+            (
+                "<?php\n#[A]\nfunction f() {}",
+                "<?php\n#[B]\nfunction f() {}",
+            ),
+            ("<?php\nconst A = 'x // y';", "<?php\nconst A = 'x // z';"),
+            ("<?php\nconst A = 'a  b';", "<?php\nconst A = 'a b';"),
+            (
+                "<?php\nconst A = <<<T\n a\nT;",
+                "<?php\nconst A = <<<T\n b\nT;",
+            ),
+            (
+                "<?php\nconst A = <<<'T'\n a // x\nT;",
+                "<?php\nconst A = <<<'T'\n a // y\nT;",
+            ),
+            (
+                "<?php\nfunction f() { return \"$a b\"; }",
+                "<?php\nfunction f() { return \"$a c\"; }",
+            ),
+            ("a <?php function f() {}", "b <?php function f() {}"),
+            ("<?php function f() {} ?> a", "<?php function f() {} ?> b"),
+        ];
+        for (a, b) in pairs {
+            assert_ne!(surface(a), surface(b), "{a} / {b}");
+        }
+    }
+
+    #[test]
+    fn surface_of_an_unlexable_file_hashes_every_byte() {
+        let a = "<?php\n/* unterminated\nfunction f() {}\n";
+        let b = "<?php\n/* unterminated\nfunction g() {}\n";
+        assert_ne!(surface(a), surface(b));
     }
 
     #[test]

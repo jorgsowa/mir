@@ -137,7 +137,11 @@ impl AnalysisSession {
                     slice: Arc::new(slice),
                     issues: Arc::new(all_issues),
                 };
-                let surface_hash = surface_fingerprint(parsed.source(), parsed.owned());
+                let surface_hash = if analysis_cache.is_some() {
+                    surface_fingerprint(parsed.source(), parsed.owned())
+                } else {
+                    String::new()
+                };
                 if let (false, Some(stubs)) = (skip_cache, stub_cache) {
                     stubs.put(
                         &parsed.file,
@@ -195,11 +199,17 @@ impl AnalysisSession {
             // A new or edited file may declare a name a cached result reported
             // missing; that result has no dependency edge to it.
             let mut declared = crate::cache::DeclaredNames::default();
-            for (parsed, (defs, _, _, _)) in parsed_files.iter().zip(file_defs.iter()) {
+            for (parsed, (defs, _, _, surface)) in parsed_files.iter().zip(file_defs.iter()) {
                 let seen = content_hexes
                     .get(&parsed.file)
                     .is_some_and(|h| cache.observe_content(&parsed.file, h));
-                if seen {
+                // An unchanged surface declares the names it did before.
+                let same_surface = || {
+                    cache
+                        .surface_hash(&parsed.file)
+                        .is_some_and(|stored| !stored.is_empty() && stored == *surface)
+                };
+                if seen || same_surface() {
                     continue;
                 }
                 declared.add_slice(&defs.slice);

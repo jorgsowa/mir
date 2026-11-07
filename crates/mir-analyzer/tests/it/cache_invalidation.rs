@@ -788,3 +788,70 @@ fn unchanged_rerun_keeps_result_with_bareword_constant_named_like_a_function() {
         "an unchanged second run must replay the cached result"
     );
 }
+
+#[test]
+fn comment_edit_keeps_dependents_and_results_with_a_missing_member() {
+    let src_dir = create_temp_dir("cache_invalidation: source files");
+    let cache_dir = create_temp_dir("cache_invalidation: cache");
+    let base = write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\nclass Base {\n    public function foo() { return 1; }\n}\n",
+    );
+    let child = write_file(
+        &src_dir,
+        "Child.php",
+        "<?php\nclass Child extends Base {}\n",
+    );
+    let consumer = write_file(
+        &src_dir,
+        "Consumer.php",
+        "<?php\nfunction consume(Child $c): void { $c->missing(); }\n",
+    );
+    let paths = [base, child, consumer];
+    assert_eq!(reanalyzed_count(cache_dir.path(), &paths), 3);
+
+    write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\n// A note.\n\nclass Base {\n    public function foo() { /* note */ return 1; }\n}\n",
+    );
+    assert_eq!(
+        reanalyzed_count(cache_dir.path(), &paths),
+        1,
+        "only the edited file should be re-analyzed"
+    );
+}
+
+#[test]
+fn typed_body_newly_declaring_a_class_reanalyzes_cached_consumer() {
+    let src_dir = create_temp_dir("cache_invalidation: source files");
+    let cache_dir = create_temp_dir("cache_invalidation: cache");
+    let host = write_file(
+        &src_dir,
+        "host.php",
+        "<?php\nfunction host(): int { return 1; }\n",
+    );
+    let consumer = write_file(&src_dir, "consumer.php", "<?php\nnew LateClass();\n");
+    let paths = [host, consumer];
+    let undefined = |cache: Option<&std::path::Path>| {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        if let Some(cache) = cache {
+            session = session.with_cache_dir(cache);
+        }
+        session
+            .analyze_paths(&paths, &BatchOptions::new().without_symbols())
+            .issues
+            .iter()
+            .filter(|i| i.kind.name() == "UndefinedClass")
+            .count()
+    };
+    assert_eq!(undefined(Some(cache_dir.path())), 1);
+
+    write_file(
+        &src_dir,
+        "host.php",
+        "<?php\nfunction host(): int { class LateClass {} return 1; }\n",
+    );
+    assert_eq!(undefined(Some(cache_dir.path())), undefined(None));
+}
