@@ -1915,7 +1915,11 @@ fn validate_callable_type(
                     for obj_atomic in &obj_prop.ty.types {
                         let resolved_class = match obj_atomic {
                             Atomic::TNamedObject { fqcn, .. } => {
-                                Some(crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref()))
+                                Some(if crate::db::class_exists(ea.db, fqcn) {
+                                    fqcn.to_string()
+                                } else {
+                                    crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref())
+                                })
                             }
                             Atomic::TClassString(Some(_)) => {
                                 ctx.class_string_target(obj_atomic).map(str::to_string)
@@ -1927,7 +1931,10 @@ fn validate_callable_type(
                                 ea.db,
                                 Name::from(resolved_class.as_str()),
                             );
-                            if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
+                            // An unknown class is reported where it's named, not on each method.
+                            if crate::db::find_method_in_chain(ea.db, here, method_name).is_none()
+                                && crate::db::class_exists(ea.db, &resolved_class)
+                            {
                                 // A `method_exists(receiver, 'method')` guard on the
                                 // callable's own receiver proves the method at
                                 // runtime — the direct-call twin of the suppression

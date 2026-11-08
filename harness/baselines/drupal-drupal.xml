@@ -21,9 +21,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $item;]]></code>
     </InvalidReturnType>
-    <UndefinedMethod>
-      <code><![CDATA[array($this->lexer, 'getLiteral')]]></code>
-    </UndefinedMethod>
   </file>
   <file src="core/lib/Drupal/Component/Annotation/Doctrine/SimpleAnnotationReader.php">
     <InvalidArgument>

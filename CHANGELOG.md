@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A later `match (true)` arm sees the earlier arms' boolean conditions as false, so `!isset($v) => …` guards `$v` in the arms after it.
 - A constant of a class proven only by `class_exists()` is no longer `UndefinedConstant`.
 - The falsy branch of `empty($mixed)` or `!$mixed` includes `"0"`, so comparing with `'0'` there isn't `ImpossibleIdenticalComparison`.
+- A callable array checks the method on the receiver's own class instead of a namespace-prefixed name, and skips an unknown class.
 
 ## [0.94.0] - 2026-11-08
 
