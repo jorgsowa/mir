@@ -171,6 +171,7 @@ const ISSUE_DOCS = Object.fromEntries(
       </div>
     </div>
 
+    <div id="pg-tip" class="pg-tip" role="tooltip" hidden></div>
     <div id="pg-summary" class="pg-summary" aria-live="polite"></div>
     <div id="pg-diag" class="pg-diag"></div>
   </div>
@@ -616,8 +617,10 @@ const ISSUE_DOCS = Object.fromEntries(
     const padLeft  = parseFloat(computed.paddingLeft) || 16;
     const cw       = getCharWidth();
     const lines    = input.value.split('\n');
+    markSegs = [];
     marks.innerHTML = issues.map((issue, idx) =>
       issueSegments(issue, lines).map(({ ln, from, to }) => {
+        markSegs.push({ idx, ln, from, to: Math.max(to, from + 1) });
         const top   = padTop + ln * lineH - 3;
         const left  = padLeft + from * cw;
         const width = Math.max(cw, (to - from) * cw);
@@ -627,6 +630,52 @@ const ISSUE_DOCS = Object.fromEntries(
     ).join('');
     syncMarksScroll();
   }
+
+  // ── Hover tooltip over marked code ────────────────────────────────────────
+  const tip = document.getElementById('pg-tip');
+  let markSegs = [];
+  let tipKey = '';
+
+  function hideTip() { tip.hidden = true; tipKey = ''; setActive(null); }
+
+  function issuesAt(clientX, clientY) {
+    const rect     = input.getBoundingClientRect();
+    const computed = getComputedStyle(input);
+    const lineH    = parseFloat(computed.lineHeight) || 22;
+    const ln   = Math.floor((clientY - rect.top - parseFloat(computed.paddingTop)) / lineH) + 1;
+    const vcol = (clientX - rect.left - parseFloat(computed.paddingLeft) + input.scrollLeft) / getCharWidth();
+    const hits = new Set();
+    for (const seg of markSegs) {
+      if (seg.ln === ln && vcol >= seg.from && vcol < seg.to) hits.add(seg.idx);
+    }
+    return { ln, hits: [...hits] };
+  }
+
+  input.addEventListener('mousemove', e => {
+    if (e.buttons) return;
+    const { ln, hits } = issuesAt(e.clientX, e.clientY);
+    if (!hits.length) { if (!tip.hidden) hideTip(); return; }
+    const key = hits.join(',');
+    if (key !== tipKey) {
+      tipKey = key;
+      tip.innerHTML = hits.map(idx => {
+        const i = issues[idx];
+        return `<div class="pg-tip-row pg-tip-row--${i.severity.toLowerCase()}">
+          <span class="pg-dot"></span><b>${esc(i.name)}</b> ${esc(i.message)}</div>`;
+      }).join('');
+      tip.hidden = false;
+      setActive(hits[0]);
+    }
+    const rootRect = root.getBoundingClientRect();
+    const lineH = parseFloat(getComputedStyle(input).lineHeight) || 22;
+    const lineBottom = input.getBoundingClientRect().top + parseFloat(getComputedStyle(input).paddingTop) + ln * lineH;
+    const left = Math.min(e.clientX - rootRect.left, rootRect.width - tip.offsetWidth);
+    tip.style.left = `${Math.max(0, left)}px`;
+    tip.style.top  = `${lineBottom - rootRect.top + 6}px`;
+  });
+  input.addEventListener('mouseleave', hideTip);
+  input.addEventListener('keydown', hideTip);
+  editor.addEventListener('scroll', hideTip);
 
   function syncMarksScroll() {
     marks.style.transform = `translateX(${-input.scrollLeft}px)`;
@@ -641,6 +690,7 @@ const ISSUE_DOCS = Object.fromEntries(
   input.addEventListener('scroll', () => {
     highlight.scrollLeft = input.scrollLeft;
     syncMarksScroll();
+    hideTip();
   });
 
   diag.addEventListener('mouseover', e => {
@@ -713,6 +763,7 @@ const ISSUE_DOCS = Object.fromEntries(
     updateHighlight();
     // Stale marks would point at shifted text until the next analysis.
     marks.innerHTML = '';
+    markSegs = [];
     exBtn.querySelector('.pg-drop-val').textContent = 'Examples…';
     clearTimeout(debounce);
     debounce = setTimeout(runAnalysis, 400);

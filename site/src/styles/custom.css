@@ -1066,7 +1066,34 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
+  position: relative;
 }
+
+.pg-tip {
+  position: absolute;
+  z-index: 10;
+  max-width: min(36rem, 100%);
+  padding: 0.45rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--sl-color-gray-2);
+  background: var(--mir-panel-raised);
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 28%, transparent);
+  border-radius: 2px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.pg-tip[hidden] { display: none; }
+
+.pg-tip-row { display: flex; align-items: baseline; gap: 0.45rem; }
+.pg-tip-row b { color: var(--sl-color-white); font-weight: 600; }
+.pg-tip-row .pg-dot { align-self: center; background: var(--mir-error); }
+.pg-tip-row--warning .pg-dot { background: var(--mir-warning); }
+.pg-tip-row--info .pg-dot    { background: var(--mir-gold); }
 
 .pg-toolbar {
   display: flex;
