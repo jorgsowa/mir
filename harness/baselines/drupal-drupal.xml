@@ -5082,11 +5082,6 @@
       <code><![CDATA[user_logout()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/modules/user/src/Form/EntityPermissionsForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $permissions_by_provider;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/user/src/Form/UserCancelForm.php">
     <InvalidReturnType>
       <code><![CDATA[return '';]]></code>
@@ -5129,7 +5124,6 @@
     </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->roleStorage->loadMultipleOverrideFree();]]></code>
-      <code><![CDATA[return $permissions_by_provider;]]></code>
     </InvalidReturnType>
     <UndefinedFunction>
       <code><![CDATA[system_admin_compact_mode()]]></code>

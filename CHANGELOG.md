@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The falsy branch of `empty($mixed)` or `!$mixed` includes `"0"`, so comparing with `'0'` there isn't `ImpossibleIdenticalComparison`.
 - A callable array checks the method on the receiver's own class instead of a namespace-prefixed name, and skips an unknown class.
 - A method's native `void` return is no longer replaced by a parent's docblock `@return` under `{@inheritdoc}`.
+- `@psalm-import-type`/`@phpstan-import-type` may name the source class on the next docblock line.
 
 ## [0.94.0] - 2026-11-08
 

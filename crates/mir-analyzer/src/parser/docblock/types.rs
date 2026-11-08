@@ -1365,25 +1365,18 @@ pub(super) fn split_type_alias_decl(body: &str) -> Option<(&str, &str)> {
 /// - `AliasName from SourceClass`
 /// - `AliasName as LocalAlias from SourceClass`
 pub(super) fn parse_import_type(body: &str) -> Option<DocImportType> {
-    // Split on " from " (with spaces to avoid matching partial words)
-    let (before_from, from_class_raw) = body.split_once(" from ")?;
-    let from_class = from_class_raw.trim().to_string();
-    if from_class.is_empty() {
-        return None;
-    }
-    // Check for " as " in before_from
-    let (original, local) = if let Some((orig, loc)) = before_from.split_once(" as ") {
-        (orig.trim().to_string(), loc.trim().to_string())
-    } else {
-        let name = before_from.trim().to_string();
-        (name.clone(), name)
+    // Token-based, so the `from` clause may continue on the next docblock line.
+    let tokens: Vec<&str> = body.split_whitespace().collect();
+    let from = tokens.iter().position(|t| *t == "from")?;
+    let from_class = tokens.get(from + 1)?.to_string();
+    let (original, local) = match tokens[..from] {
+        [name] => (name, name),
+        [original, "as", local] => (original, local),
+        _ => return None,
     };
-    if original.is_empty() || local.is_empty() {
-        return None;
-    }
     Some(DocImportType {
-        original,
-        local,
+        original: original.to_string(),
+        local: local.to_string(),
         from_class,
     })
 }
