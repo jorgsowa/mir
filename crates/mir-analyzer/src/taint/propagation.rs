@@ -380,7 +380,7 @@ pub fn args_value_taint(
 /// Argument positions whose data a builtin's result is built from; `None` when any argument may contribute.
 fn carrying_positions(lower_name: &str) -> Option<&'static [usize]> {
     Some(match lower_name {
-        "get_debug_type" | "gettype" | "range" | "random_bytes" => &[],
+        "get_debug_type" | "gettype" | "get_class" | "range" | "random_bytes" => &[],
         // Only the first array contributes values; the rest are compared by key.
         "array_intersect_key"
         | "array_diff_key"

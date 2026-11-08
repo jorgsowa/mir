@@ -2219,11 +2219,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Theme/ThemePreprocess.php">
-    <TaintedCallable>
-      <code><![CDATA[new Attribute($cell)]]></code>
-      <code><![CDATA[new Attribute($row_attributes)]]></code>
-      <code><![CDATA[new Attribute($cell_attributes)]]></code>
-    </TaintedCallable>
     <UndefinedConstant>
       <code><![CDATA[RESPONSIVE_PRIORITY_MEDIUM]]></code>
       <code><![CDATA[RESPONSIVE_PRIORITY_MEDIUM]]></code>
@@ -5831,11 +5826,7 @@
   <file src="core/modules/views/src/Hook/ViewsThemeHooks.php">
     <TaintedCallable>
       <code><![CDATA[$argument->globalTokenReplace($base_path, $tokens)]]></code>
-      <code><![CDATA[new Attribute($variables['rows'][$id]->attributes)]]></code>
       <code><![CDATA[$argument->globalTokenReplace($base_path, $tokens)]]></code>
-      <code><![CDATA[new Attribute($variables['rows'][$id]->attributes)]]></code>
-      <code><![CDATA[new Attribute($column_reference['attributes'])]]></code>
-      <code><![CDATA[new Attribute($variables['rows'][$num]['attributes'])]]></code>
     </TaintedCallable>
     <TaintedInclude>
       <code><![CDATA[require_once $include]]></code>
