@@ -338,6 +338,10 @@ pub struct FlowState {
     /// the last call that may change their object, so what other methods store doesn't apply.
     pub local_props: Arc<FxHashSet<(Name, Name)>>,
 
+    /// Exact taint of elements `$obj->prop['key']` written since the last write to the whole
+    /// property or call that may change the object. Key: `(object_var, prop_name, key)`.
+    pub local_prop_keys: Arc<FxHashMap<(Name, Name, Name), Taint>>,
+
     /// Variables that may hold the same object, each mapped to its group's root variable.
     pub object_aliases: Arc<FxHashMap<Name, Name>>,
 
@@ -798,6 +802,7 @@ impl FlowState {
             object_guard_slots: None,
             tainted_props: Arc::default(),
             local_props: Arc::default(),
+            local_prop_keys: Arc::default(),
             object_aliases: Arc::default(),
             tainted_static_props: Arc::default(),
             ref_aliases: FxHashMap::default(),
@@ -1938,6 +1943,7 @@ impl FlowState {
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
         );
+        self.forget_local_prop_keys(key.0, Some(key.1));
         add_taint(&mut self.tainted_props, key, taint);
     }
 
@@ -1946,7 +1952,56 @@ impl FlowState {
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
         );
+        self.forget_local_prop_keys(key.0, Some(key.1));
         set_taint(&mut self.tainted_props, key, taint);
+    }
+
+    /// Record a write of `taint` to `$obj->prop[key]`; `replace` overwrites the element.
+    pub fn write_prop_key_taint(
+        &mut self,
+        obj_var: &str,
+        prop: &str,
+        key: Name,
+        taint: Taint,
+        replace: bool,
+    ) {
+        let (obj, prop) = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        add_taint(&mut self.tainted_props, (obj, prop), taint);
+        let element = (obj, prop, key);
+        let held = self.local_prop_keys.get(&element).copied();
+        let written = if replace {
+            Some(taint)
+        } else {
+            held.map(|held| held | taint)
+        };
+        if let Some(written) = written.filter(|w| held != Some(*w)) {
+            Arc::make_mut(&mut self.local_prop_keys).insert(element, written);
+        }
+    }
+
+    /// Taint of `$obj->prop[key]` when it was written on this path.
+    pub fn local_prop_key_taint(&self, obj_var: &str, prop: &str, key: Name) -> Option<Taint> {
+        if self.local_prop_keys.is_empty() {
+            return None;
+        }
+        self.local_prop_keys
+            .get(&(
+                Name::from(obj_var.trim_start_matches('$')),
+                Name::from(prop),
+                key,
+            ))
+            .copied()
+    }
+
+    fn forget_local_prop_keys(&mut self, obj: Name, prop: Option<Name>) {
+        let stale =
+            |(o, p, _): &(Name, Name, Name)| *o == obj && prop.is_none_or(|prop| *p == prop);
+        if self.local_prop_keys.keys().any(stale) {
+            Arc::make_mut(&mut self.local_prop_keys).retain(|element, _| !stale(element));
+        }
     }
 
     /// Forget the property taint of the object `obj_var` held.
@@ -2058,6 +2113,7 @@ impl FlowState {
         if self.local_props.iter().any(|(o, _)| *o == obj) {
             Arc::make_mut(&mut self.local_props).retain(|(o, _)| *o != obj);
         }
+        self.forget_local_prop_keys(obj, None);
     }
 
     pub fn prop_taint(&self, obj_var: &str, prop: &str) -> Taint {
@@ -2599,6 +2655,21 @@ impl FlowState {
                 .copied()
                 .collect(),
         );
+        result.local_prop_keys = if Arc::ptr_eq(&if_ctx.local_prop_keys, &else_ctx.local_prop_keys)
+        {
+            if_ctx.local_prop_keys.clone()
+        } else {
+            Arc::new(
+                if_ctx
+                    .local_prop_keys
+                    .iter()
+                    .filter_map(|(element, taint)| {
+                        let other = else_ctx.local_prop_keys.get(element)?;
+                        Some((*element, *taint | *other))
+                    })
+                    .collect(),
+            )
+        };
 
         // Property refinements: keep only keys present in BOTH branches with the
         // union of their types.  A refinement present in only one branch cannot
@@ -3134,6 +3205,7 @@ impl FlowState {
             readonly_initialized,
             assigned_this_props,
             local_props,
+            local_prop_keys,
             this_escaped_to_call,
             self_ref_closure_hint,
         );

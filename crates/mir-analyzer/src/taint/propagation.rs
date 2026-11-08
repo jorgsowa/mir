@@ -516,6 +516,25 @@ fn to_string_taint(
         .fold(Taint::NONE, |acc, taint| acc | taint)
 }
 
+/// `$obj->prop['key']` written on this path holds what was written, plus the object's own taint.
+fn local_prop_element_taint(
+    aa: &php_ast::owned::ArrayAccessExpr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    let ExprKind::PropertyAccess(pa) = &aa.array.kind else {
+        return None;
+    };
+    let ExprKind::Variable(obj_var) = &pa.object.kind else {
+        return None;
+    };
+    let prop = crate::expr::helpers::extract_string_from_expr(&pa.property)?;
+    let key = crate::expr::assignment::literal_key_name(aa.index.as_ref())?;
+    let held = ctx.local_prop_key_taint(obj_var, &prop, key)?;
+    Some(held | expr_taint(&pa.object, ctx, db, file))
+}
+
 /// The kinds of attacker-controlled data the expression could carry, given the
 /// current `FlowState` taint state.
 ///
@@ -604,6 +623,8 @@ pub fn expr_taint(
                 } else {
                     ctx.key_taint(n, key)
                 }
+            } else if let Some(taint) = local_prop_element_taint(aa, ctx, db, file) {
+                taint
             } else {
                 expr_taint(&aa.array, ctx, db, file)
             }

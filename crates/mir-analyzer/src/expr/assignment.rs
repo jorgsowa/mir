@@ -186,6 +186,18 @@ fn taint_array_element_write(
             }
             _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
         },
+        ExprKind::PropertyAccess(pa) => {
+            match (
+                &pa.object.kind,
+                extract_string_from_expr(&pa.property),
+                literal_key_name(aa.index.as_ref()),
+            ) {
+                (ExprKind::Variable(obj_var), Some(prop), Some(key)) => {
+                    ctx.write_prop_key_taint(obj_var, &prop, key, taint, replace)
+                }
+                _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
+            }
+        }
         _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
     }
 }
