@@ -865,7 +865,7 @@ pub(crate) fn enum_backing_values(db: &dyn MirDatabase, target: &Type) -> Option
     (!result.types.is_empty()).then_some(result)
 }
 
-/// Union of the constant types a docblock `Cls::NAME` / `Cls::PREFIX*` names. `None` for enums
+/// Union of the constant types a docblock `Cls::NAME` / `Cls::PREFIX*` / `Cls::*_SUFFIX` names. `None` for enums
 /// (their cases are handled separately) and when no constant matches.
 fn class_constant_ref_type(db: &dyn MirDatabase, name: &str) -> Option<Type> {
     let (class_name, pattern) = name.split_once("::")?;
@@ -876,7 +876,6 @@ fn class_constant_ref_type(db: &dyn MirDatabase, name: &str) -> Option<Type> {
     ) {
         return None;
     }
-    let prefix = pattern.strip_suffix('*');
     let mut seen: Vec<std::sync::Arc<str>> = Vec::new();
     let mut result = Type::empty();
     for ancestor in crate::db::class_ancestors_by_fqcn(db, fqcn).iter() {
@@ -885,10 +884,9 @@ fn class_constant_ref_type(db: &dyn MirDatabase, name: &str) -> Option<Type> {
             continue;
         };
         for (const_name, def) in class.own_constants().iter() {
-            let matches = prefix.map_or(const_name.as_ref() == pattern, |p| {
-                const_name.starts_with(p)
-            });
-            if matches && !seen.contains(const_name) {
+            if crate::parser::docblock::constant_glob_matches(pattern, const_name)
+                && !seen.contains(const_name)
+            {
                 seen.push(const_name.clone());
                 for a in def.ty.types.iter() {
                     result.add_type(a.clone());

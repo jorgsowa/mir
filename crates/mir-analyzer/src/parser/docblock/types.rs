@@ -977,7 +977,7 @@ fn self_constant_values(class_ref: &str, pattern: &str) -> Option<Vec<Atomic>> {
 }
 
 /// `*` matches any run of characters: `PREFIX_*`, `*_SUFFIX`, `A_*_B`, `*`.
-fn constant_glob_matches(pattern: &str, name: &str) -> bool {
+pub(crate) fn constant_glob_matches(pattern: &str, name: &str) -> bool {
     let mut parts = pattern.split('*');
     let first = parts.next().unwrap_or_default();
     let Some(mut rest) = name.strip_prefix(first) else {
