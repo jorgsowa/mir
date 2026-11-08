@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `curl_share_setopt()` accepts any `$value`, so a lock-data constant isn't `InvalidArgument` under `strict_types`.
 - A `PharData` offset is a `PharFileInfo`, so calling `getContent()` on it isn't `UndefinedMethod`.
 - `Phar::setStub()` and `PharData::setStub()` accept a single argument, as `$length` is optional.
 - A strict `in_array($x, $haystack, true)` with a variable haystack of non-null values removes `null` from `$x` in the true branch.

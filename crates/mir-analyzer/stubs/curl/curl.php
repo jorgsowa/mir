@@ -2208,7 +2208,7 @@ function curl_share_init() {}
  * </tbody>
  *
  * </table>
- * @param string $value <p><table>
+ * @param mixed $value <p><table>
  *
  * <thead>
  * <tr>
