@@ -21,7 +21,7 @@ use crate::flow_state::FlowState;
 /// is an object / class-string / string and whose second element is a string.
 /// PHP accepts this anywhere a `callable` is expected, including the `is_list`
 /// shape produced by an `[$this, 'm']` literal.
-pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
+pub(crate) fn is_callable_array_pair(arg: &Type, db: &dyn MirDatabase) -> bool {
     arg.types.iter().any(|a| {
         let Atomic::TKeyedArray { properties, .. } = a else {
             return false;
@@ -34,12 +34,12 @@ pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
         let (Some(first), Some(second)) = (first, second) else {
             return false;
         };
-        // The first element must be an object (`[$this, 'm']`), a class-string or
-        // a non-literal string. A literal string is NOT accepted here: a literal
-        // like `["one", "two"]` is only callable if "one" names a real class,
-        // which this db-less predicate can't verify — leave that to the regular
-        // checks so a non-class string pair is still rejected.
+        // The first element must be an object (`[$this, 'm']`), a class-string,
+        // a non-literal string or a literal naming a class (`["one", "two"]` is not callable).
         let first_ok = first.ty.contains(|t| {
+            if let Atomic::TLiteralString(name) = t {
+                return crate::db::class_exists(db, crate::util::runtime_class_name(name));
+            }
             matches!(
                 t,
                 Atomic::TNamedObject { .. }
@@ -142,7 +142,7 @@ pub(crate) fn check_array_map_callback(
     let callback_ty = &arg_types[0];
     let callback_span = arg_spans[0];
 
-    if !super::callable::is_valid_callable_type(callback_ty) {
+    if !super::callable::is_valid_callable_type(callback_ty, ea.db) {
         ea.emit(
             IssueKind::InvalidArgument {
                 param: "callback".to_string(),
@@ -217,7 +217,7 @@ pub(crate) fn check_array_filter_callback(
     let callback_ty = &arg_types[1];
     let callback_span = arg_spans[1];
 
-    if !super::callable::is_valid_callable_type(callback_ty) {
+    if !super::callable::is_valid_callable_type(callback_ty, ea.db) {
         ea.emit(
             IssueKind::InvalidArgument {
                 param: "callback".to_string(),

@@ -254,7 +254,7 @@ pub(crate) fn extract_callable_params(
 /// - TClosure, TCallable, TString, TLiteralString, TNull
 /// - TKeyedArray NOT marked as is_list (could be [$obj, 'method'] form)
 /// - Unknown/other types
-pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
+pub(crate) fn is_valid_callable_type(union: &Type, db: &dyn crate::db::MirDatabase) -> bool {
     for atomic in &union.types {
         match atomic {
             Atomic::TClosure { .. }
@@ -269,7 +269,7 @@ pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
                 // A numeric-keyed list is only callable in the `[$obj, 'method']`
                 // / `['Class', 'method']` 2-element form.
                 if *is_list {
-                    return super::array_builtins::is_callable_array_pair(union);
+                    return super::array_builtins::is_callable_array_pair(union, db);
                 }
                 // Otherwise it could be [obj, 'method'] form, accept it
                 return true;
@@ -936,7 +936,7 @@ pub(crate) fn check_max_arity_callback(
     let callback_ty = &arg_types[callback_idx];
     let callback_span = arg_spans[callback_idx];
 
-    if !is_valid_callable_type(callback_ty) {
+    if !is_valid_callable_type(callback_ty, ea.db) {
         ea.emit(
             IssueKind::InvalidArgument {
                 param: "callback".to_string(),

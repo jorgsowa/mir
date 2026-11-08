@@ -830,9 +830,6 @@
     </InvalidTemplateParam>
   </file>
   <file src="core/lib/Drupal/Core/Entity/EntityReferenceSelection/SelectionPluginManager.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $plugin_id;]]></code>
     </NullableReturnStatement>
@@ -1194,11 +1191,6 @@
       <code><![CDATA[$values]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/lib/Drupal/Core/Field/FormatterPluginManager.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldFormatter/EntityReferenceEntityFormatter.php">
     <InvalidArgument>
       <code><![CDATA[$delta]]></code>
@@ -1210,12 +1202,6 @@
       <code><![CDATA[$delta]]></code>
       <code><![CDATA[$delta]]></code>
       <code><![CDATA[$delta]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldFormatter/NumericFormatterBase.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Core\Field\FieldFilteredMarkup', 'create']]]></code>
-      <code><![CDATA[['Drupal\Core\Field\FieldFilteredMarkup', 'create']]]></code>
     </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldType/DecimalItem.php">
@@ -1241,11 +1227,6 @@
       <code><![CDATA[$form_state->getStorage()]]></code>
       <code><![CDATA[$form_state->getStorage()]]></code>
     </InvalidPassByReference>
-  </file>
-  <file src="core/lib/Drupal/Core/Field/WidgetPluginManager.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/File/FileSystem.php">
     <ImpossibleIdenticalComparison>
@@ -2284,11 +2265,6 @@
       <code><![CDATA[return $this->t($this->pluginDefinition['label'], [], ['context' => 'breakpoint']);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/breakpoint/src/BreakpointManager.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/modules/ckeditor5/src/Controller/CKEditor5ImageController.php">
     <TaintedFile>
       <code><![CDATA[$this->fileUploadHandler->handleFileUpload($uploadedFile, $validators, $destination, FileExists::Rename)]]></code>
@@ -2301,11 +2277,6 @@
     <TaintedFile>
       <code><![CDATA[$this->getMediaImageSourceFieldName($media)]]></code>
     </TaintedFile>
-  </file>
-  <file src="core/modules/ckeditor5/src/Controller/EntityLinkSuggestionsController.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
   </file>
   <file src="core/modules/ckeditor5/src/HTMLRestrictions.php">
     <InvalidReturnType>
@@ -2734,9 +2705,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/field_ui/src/Element/FieldUiTable.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
     <UndefinedFunction>
       <code><![CDATA[drupal_attach_tabledrag($elements, $options)]]></code>
     </UndefinedFunction>
@@ -4810,9 +4778,6 @@
     </InvalidArgument>
   </file>
   <file src="core/modules/shortcut/src/Entity/ShortcutSet.php">
-    <InvalidArgument>
-      <code><![CDATA[['\Drupal\shortcut\Entity\Shortcut', 'sort']]]></code>
-    </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return $shortcuts;]]></code>
     </InvalidReturnType>
@@ -4897,11 +4862,6 @@
     <ImplicitToStringCast>
       <code><![CDATA[Url::fromRoute('<front>')->setAbsolute()->toString()]]></code>
     </ImplicitToStringCast>
-  </file>
-  <file src="core/modules/system/src/Controller/AdminController.php">
-    <InvalidArgument>
-      <code><![CDATA[['\Drupal\Component\Utility\SortArray', 'sortByTitleElement']]]></code>
-    </InvalidArgument>
   </file>
   <file src="core/modules/system/src/Controller/AssetControllerBase.php">
     <TaintedFile>
@@ -4991,9 +4951,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/system/src/Form/ModulesListForm.php">
-    <InvalidArgument>
-      <code><![CDATA[['\Drupal\Component\Utility\SortArray', 'sortByTitleProperty']]]></code>
-    </InvalidArgument>
     <TaintedCallable>
       <code><![CDATA[$this->moduleInstaller->install(array_keys($modules['install']))]]></code>
     </TaintedCallable>
@@ -5146,9 +5103,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/taxonomy/src/Form/OverviewTerms.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
     <InvalidPassByReference>
       <code><![CDATA[$form_state->getValue('terms')]]></code>
     </InvalidPassByReference>
@@ -5198,11 +5152,6 @@
       <code><![CDATA[toolbar_get_rendered_subtrees()]]></code>
       <code><![CDATA[_toolbar_get_subtrees_hash()]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/toolbar/src/Element/Toolbar.php">
-    <InvalidArgument>
-      <code><![CDATA[['\Drupal\Component\Utility\SortArray', 'sortByWeightProperty']]]></code>
-    </InvalidArgument>
   </file>
   <file src="core/modules/toolbar/src/Hook/ToolbarHooks.php">
     <UndefinedFunction>
@@ -5835,9 +5784,6 @@
     </TaintedCallable>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/FilterPluginBase.php">
-    <InvalidArgument>
-      <code><![CDATA[['Drupal\Component\Utility\SortArray', 'sortByWeightElement']]]></code>
-    </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return $error;]]></code>
     </InvalidReturnType>

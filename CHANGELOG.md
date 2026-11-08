@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A top-level `class_alias()` with literal class names defines the alias, so code using it isn't `UndefinedClass`.
 - `!empty($this->p)` proves an undeclared property is set, as `isset()` does, so reading it in the guarded branch isn't `UndefinedProperty`.
 - Without `strict_types`, assigning a `Stringable` object to a `string` property isn't `InvalidPropertyAssignment`, matching `string` parameters.
+- `['Ns\Class', 'method']` is accepted as a callable when the string names an existing class, as `[Ns\Class::class, 'method']` already was.
 
 ## [0.94.0] - 2026-11-08
 
