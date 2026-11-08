@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reading an undeclared property of an `#[\AllowDynamicProperties]` class, its subclass, or a `stdClass` subclass is no longer `UndefinedProperty`.
 - `range()` returns a non-empty list, so a `foreach` over it isn't treated as possibly running zero times.
 - A top-level `class_alias()` with literal class names defines the alias, so code using it isn't `UndefinedClass`.
+- `!empty($this->p)` proves an undeclared property is set, as `isset()` does, so reading it in the guarded branch isn't `UndefinedProperty`.
 
 ## [0.94.0] - 2026-11-08
 

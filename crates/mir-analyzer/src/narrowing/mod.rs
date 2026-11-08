@@ -2198,6 +2198,12 @@ pub fn narrow_from_condition(
                     // receiver was non-null too — a null receiver's ->/?->
                     // access is itself falsy, so `empty()` would be true.
                     narrow_receiver_non_null_on_prop_match(ctx, &obj_var, !is_true);
+                    if !is_true {
+                        ctx.property_exists_guards.insert((
+                            std::sync::Arc::from(obj_var.as_str()),
+                            std::sync::Arc::from(prop.as_str()),
+                        ));
+                    }
                 } else if let Some((fqcn, prop)) =
                     extract_static_prop_access(var_expr, ctx, db, file)
                 {

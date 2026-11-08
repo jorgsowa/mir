@@ -3576,11 +3576,6 @@
       <code><![CDATA[return $this->entityTypeManager->getStorage('entity_view_display')->load($route_parameters['entity_type_id'] . '.' . $route_parameters['bundle'] . '.' . $route_parameters['view_mode_name']);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/layout_builder/src/Form/LayoutRebuildConfirmFormBase.php">
-    <UndefinedProperty>
-      <code><![CDATA[uuid]]></code>
-    </UndefinedProperty>
-  </file>
   <file src="core/modules/layout_builder/src/Form/MoveBlockForm.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->t('Move the @block_label block', ['@block_label' => $block_label]);]]></code>
