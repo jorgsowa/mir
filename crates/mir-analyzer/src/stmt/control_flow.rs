@@ -1095,6 +1095,10 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut diverging_consumed: rustc_hash::FxHashSet<(mir_types::Name, (u32, u16, u32, u16))> =
             rustc_hash::FxHashSet::default();
         for (i, case_ctx) in case_results.into_iter().enumerate() {
+            // An empty case only falls into the next one; it never leaves the switch.
+            if i + 1 < n && sw.body.cases[i].body.is_empty() {
+                continue;
+            }
             if effective_diverges[i] {
                 diverging_reads.extend(case_ctx.read_vars.iter().copied());
                 diverging_consumed.extend(case_ctx.consumed_write_locs.iter().copied());

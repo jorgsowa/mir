@@ -3429,11 +3429,6 @@
       <code><![CDATA[return $this->getEntity()->label();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/link/src/Plugin/Field/FieldWidget/LinkWidget.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$error_message]]></code>
-    </PossiblyUndefinedVariable>
-  </file>
   <file src="core/modules/link/src/Plugin/Validation/Constraint/LinkTypeConstraintValidator.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$url]]></code>
