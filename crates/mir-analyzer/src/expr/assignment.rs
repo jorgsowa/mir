@@ -530,9 +530,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // var-receiver property) is tracked.
                 if a.by_ref {
                     if let ExprKind::Variable(target_name) = &a.target.kind {
-                        // Writes through a reference alias mutate the referent.
+                        // Writes to either side of a reference are seen through the other.
                         ctx.foreach_byref_var_names
                             .insert(mir_types::Name::from(target_name.as_ref()));
+                        if let ExprKind::Variable(source) = &a.value.kind {
+                            ctx.foreach_byref_var_names
+                                .insert(mir_types::Name::from(source.as_ref()));
+                        }
                         if let ExprKind::PropertyAccess(pa) = &a.value.kind {
                             if let ExprKind::Variable(recv_name) = &pa.object.kind {
                                 if let Some(prop_name) = extract_string_from_expr(&pa.property) {

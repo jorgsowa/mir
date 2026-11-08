@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance: a reference or reachability query for a qualified name (`App\Foo\Bar`) new to the session answers "no mention" from each file's recorded words when the file lacks the last segment, instead of rescanning every file's text. On a 50k-file workspace each first query of a class no longer pays about 2 s of CPU.
 - Taint: after `$this->d['p'] = 'c'`, reading `$this->d['p']` carries only what was written there, not the taint of other elements such as `$this->d['q']`.
 - Taint: a plain write to one side of a `$a = &$b` binding gives the other side the same taint, so `$b = 'c'; echo $a;` is no longer reported after `$b` held request data.
+- `UnusedVariable` is no longer reported for a write to `$b` after `$a = &$b` when `$a` is read later.
 
 ## [0.93.0] - 2026-11-08
 

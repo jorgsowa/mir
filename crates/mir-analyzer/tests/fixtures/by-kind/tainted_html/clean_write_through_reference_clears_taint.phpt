@@ -5,7 +5,6 @@ A clean write to either side of a `=&` binding clears the other side's taint.
   <issueHandlers>
     <MixedArrayAccess errorLevel="suppress"/>
     <MixedAssignment errorLevel="suppress"/>
-    <UnusedVariable errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===

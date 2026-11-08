@@ -5,7 +5,6 @@ A variable rebound by `=&` or `unset` no longer takes writes to its old referenc
   <issueHandlers>
     <MixedArrayAccess errorLevel="suppress"/>
     <MixedAssignment errorLevel="suppress"/>
-    <UnusedVariable errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===
