@@ -182,6 +182,14 @@ fn bare_native_object_fqcn(native: &Type) -> Option<&mir_types::Name> {
     }
 }
 
+/// False for a known class-like whose ancestry declares no `@template`, so no
+/// inferred type of it can carry type arguments worth refining to.
+fn may_take_type_args(db: &dyn crate::db::MirDatabase, fqcn: &mir_types::Name) -> bool {
+    let here = crate::db::Fqcn::interned(db, *fqcn);
+    *crate::db::ancestry_declares_templates(db, here)
+        || crate::db::find_class_like_ref(db, here).is_none()
+}
+
 fn inferred_refines_bare_object(native_fqcn: &mir_types::Name, inferred: &Type) -> bool {
     matches!(
         inferred.types.as_slice(),
@@ -334,6 +342,7 @@ pub(crate) fn resolve_method_from_db(
             Some(parent_return)
         } else if let Some(native) = own_return {
             let refined = bare_native_object_fqcn(&native)
+                .filter(|fqcn| may_take_type_args(db, fqcn))
                 .and_then(|fqcn| inferred().filter(|t| inferred_refines_bare_object(fqcn, t)))
                 .or_else(|| {
                     // Not overridable, so the body's literals are the full result set.
