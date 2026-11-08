@@ -691,6 +691,7 @@ impl<'a> DefinitionCollector<'a> {
             attribute_flags: parse_attribute_flags(&decl.attributes),
             allows_dynamic_properties: self
                 .has_attribute(&decl.attributes, "AllowDynamicProperties"),
+            is_alias: false,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             type_aliases: Self::stored_type_aliases(&type_aliases),
             pending_import_types: class_doc

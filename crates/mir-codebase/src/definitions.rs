@@ -719,7 +719,7 @@ pub struct ConstantDef {
 // ClassDef
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ClassDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
@@ -765,6 +765,9 @@ pub struct ClassDef {
     /// Declared with `#[AllowDynamicProperties]`; subclasses inherit it.
     #[serde(default)]
     pub allows_dynamic_properties: bool,
+    /// Stands for a `class_alias()` call, not a declaration: no class-level checks.
+    #[serde(default)]
+    pub is_alias: bool,
     pub location: Option<Location>,
     /// Per-`use` statement locations for each used trait: `(fqcn, location)` in
     /// declaration order, parallel to `traits`.  Absent from older serialized

@@ -940,8 +940,8 @@ pub struct DefinitionCollector<'a> {
     static_writes: literal_types::StaticWrites,
     /// Constants of the class-like being collected, for `self::X` in constant initializers.
     own_constants: Option<OwnConstants>,
-    /// `class_alias(original, alias)` calls with literal names: lowercase alias → original.
-    class_aliases: FxHashMap<String, Arc<str>>,
+    /// `class_alias(original, alias)` calls with literal names: lowercase alias → (original, alias, call site).
+    class_aliases: FxHashMap<String, (Arc<str>, Arc<str>, Location)>,
 }
 
 pub(super) struct OwnConstants {
@@ -1082,16 +1082,32 @@ impl<'a> DefinitionCollector<'a> {
     fn finalize_slice(&mut self) {
         // A class declared under an alias's name is an IDE stub (`if (false) { class X {} }`):
         // at runtime the alias is the original class.
-        if !self.class_aliases.is_empty() {
-            for class in &mut self.slice.classes {
-                let Some(original) = self.class_aliases.get(&class.fqcn.to_ascii_lowercase())
-                else {
-                    continue;
-                };
-                if class.parent.is_none() && !original.eq_ignore_ascii_case(&class.fqcn) {
-                    Arc::make_mut(class).parent = Some(original.clone());
-                }
+        for (alias_lower, (original, alias, location)) in std::mem::take(&mut self.class_aliases) {
+            if original.eq_ignore_ascii_case(alias.as_ref()) {
+                continue;
             }
+            if let Some(class) = self
+                .slice
+                .classes
+                .iter_mut()
+                .find(|c| c.fqcn.eq_ignore_ascii_case(&alias_lower))
+            {
+                if class.parent.is_none() {
+                    Arc::make_mut(class).parent = Some(original);
+                }
+                continue;
+            }
+            // A subclass resolves the alias's name and members.
+            self.slice
+                .classes
+                .push(Arc::new(mir_codebase::definitions::ClassDef {
+                    short_name: alias.rsplit('\\').next().unwrap_or(&alias).into(),
+                    fqcn: alias,
+                    parent: Some(original),
+                    is_alias: true,
+                    location: Some(location),
+                    ..Default::default()
+                }));
         }
         if self.ns_blocks.len() >= 2 {
             let builders = std::mem::take(&mut self.ns_blocks);
@@ -2236,8 +2252,15 @@ impl<'a> DefinitionCollector<'a> {
         ) else {
             return;
         };
-        self.class_aliases
-            .insert(alias.to_ascii_lowercase(), Arc::from(original.as_str()));
+        let location = self.location(expr.span.start, expr.span.end);
+        self.class_aliases.insert(
+            alias.to_ascii_lowercase(),
+            (
+                Arc::from(original.as_str()),
+                Arc::from(alias.as_str()),
+                location,
+            ),
+        );
     }
 
     fn try_collect_define(&mut self, stmt: &php_ast::owned::Stmt, expr: &php_ast::owned::Expr) {

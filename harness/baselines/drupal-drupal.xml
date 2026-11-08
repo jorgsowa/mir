@@ -473,12 +473,6 @@
       <code><![CDATA['']]></code>
     </InvalidArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Config/ConfigManager.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
-  </file>
   <file src="core/lib/Drupal/Core/Config/Entity/ConfigEntityBase.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->id();]]></code>
@@ -512,10 +506,6 @@
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
     </InvalidReturnType>
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
   </file>
   <file src="core/lib/Drupal/Core/Config/MemoryStorage.php">
     <InvalidReturnType>
@@ -677,11 +667,6 @@
       <code><![CDATA[$form_state->getValues()]]></code>
     </InvalidPassByReference>
   </file>
-  <file src="core/lib/Drupal/Core/DefaultContent/ExportResult.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
-  </file>
   <file src="core/lib/Drupal/Core/DefaultContent/Finder.php">
     <UnhandledMatchCondition>
       <code><![CDATA[match ($file->getExtension()) {
@@ -708,14 +693,6 @@
       <code><![CDATA[return $content;]]></code>
       <code><![CDATA[return new ServiceClosureArgument($argument);]]></code>
     </InvalidReturnType>
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="core/lib/Drupal/Core/Discovery/YamlDiscovery.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
   </file>
   <file src="core/lib/Drupal/Core/DrupalKernel.php">
     <ImpossibleIdenticalComparison>
@@ -1137,11 +1114,6 @@
       <code><![CDATA[FileCacheFactory::getPrefix() !== NULL]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="core/lib/Drupal/Core/Extension/InfoParserDynamic.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
-  </file>
   <file src="core/lib/Drupal/Core/Extension/ModuleHandler.php">
     <InvalidTemplateParam>
       <code><![CDATA[array_keys($modules_by_identifier)]]></code>
@@ -1155,9 +1127,6 @@
       <code><![CDATA[$this->connection = $container->get('database')]]></code>
       <code><![CDATA[$this->updateRegistry = $container->get('update.update_hook_registry')]]></code>
     </InvalidPropertyAssignment>
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
     <UndefinedFunction>
       <code><![CDATA[module_config_sort(array_merge(
         array_fill_keys($module_list, 0),
@@ -1995,10 +1964,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/lib/Drupal/Core/Test/FunctionalTestSetupTrait.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
     <UndefinedFunction>
       <code><![CDATA[drupal_flush_all_caches()]]></code>
       <code><![CDATA[install_drupal($this->classLoader, $parameters)]]></code>
@@ -2489,25 +2454,11 @@
       <code><![CDATA[namespaces]]></code>
     </UndefinedProperty>
   </file>
-  <file src="core/modules/config/src/Controller/ConfigController.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="core/modules/config/src/Form/ConfigSingleExportForm.php">
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
-  </file>
   <file src="core/modules/config/src/Form/ConfigSingleImportForm.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$data]]></code>
       <code><![CDATA[$data]]></code>
     </PossiblyUndefinedVariable>
-    <UndefinedClass>
-      <code><![CDATA[Yaml]]></code>
-    </UndefinedClass>
     <UndefinedFunction>
       <code><![CDATA[batch_set($batch_builder->toArray())]]></code>
     </UndefinedFunction>

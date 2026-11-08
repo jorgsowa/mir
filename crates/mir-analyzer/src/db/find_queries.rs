@@ -937,13 +937,15 @@ pub fn analyzed_class_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
 ) -> Vec<(Arc<str>, ClassLike)> {
-    collect_analyzed_defs(
+    let mut classes = collect_analyzed_defs(
         db,
         analyzed_files,
         |slice| &slice.classes,
         ClassLike::Class,
         |class| &class.fqcn,
-    )
+    );
+    classes.retain(|(_, class)| !matches!(class, ClassLike::Class(c) if c.is_alias));
+    classes
 }
 
 /// Like [`analyzed_class_defs`] but returns interface definitions from
@@ -995,6 +997,7 @@ pub fn analyzed_class_likes(
             slice
                 .classes
                 .iter()
+                .filter(|d| !d.is_alias)
                 .map(|d| (d.fqcn.clone(), ClassLike::Class(d.clone()))),
         );
         out.extend(
