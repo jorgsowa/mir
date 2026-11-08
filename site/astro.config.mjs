@@ -206,6 +206,7 @@ export default defineConfig({
         },
       },
       title: 'mir',
+      favicon: '/favicon.png',
       description: 'A fast, incremental PHP static analyzer written in Rust.',
       logo: {
         src: './src/assets/logo-hero.png',
