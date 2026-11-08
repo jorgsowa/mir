@@ -383,9 +383,6 @@
     </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Command/CacheRebuildCommand.php">
-    <TaintedInclude>
-      <code><![CDATA[Settings::initialize(DRUPAL_ROOT, DrupalKernel::findSitePath($request), $this->classLoader)]]></code>
-    </TaintedInclude>
     <UndefinedFunction>
       <code><![CDATA[drupal_rebuild($this->classLoader, $request)]]></code>
     </UndefinedFunction>
@@ -394,31 +391,16 @@
     <InvalidReturnType>
       <code><![CDATA[return $default_commands;]]></code>
     </InvalidReturnType>
-    <TaintedInclude>
-      <code><![CDATA[Settings::initialize($kernel->getAppRoot(), $kernel->getSitePath(), $this->classloader)]]></code>
-    </TaintedInclude>
   </file>
   <file src="core/lib/Drupal/Core/Command/GenerateTheme.php">
     <TaintedCallable>
       <code><![CDATA[$generator_classname::postProcess($tmpDir, $destination_theme, $theme_label)]]></code>
     </TaintedCallable>
-    <TaintedFile>
-      <code><![CDATA[self::loadStarterKitConfig(
-        $starterkit,
-        $starterkit_version,
-        $theme_label,
-        $input->getOption('description')
-      )]]></code>
-      <code><![CDATA[(new InfoParser($this->root))->parse($theme->getPathname())]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/Command/InstallCommand.php">
     <NullableReturnStatement>
       <code><![CDATA[return key($profiles);]]></code>
     </NullableReturnStatement>
-    <TaintedFile>
-      <code><![CDATA[$info_parser->parse($profile->getPathname())]]></code>
-    </TaintedFile>
     <UndefinedFunction>
       <code><![CDATA[drupal_install_profile_distribution_name()]]></code>
       <code><![CDATA[install_tasks($install_state)]]></code>
@@ -496,11 +478,6 @@
     <InvalidArgument>
       <code><![CDATA['']]></code>
     </InvalidArgument>
-    <TaintedFile>
-      <code><![CDATA[$storage->readMultiple($list)]]></code>
-      <code><![CDATA[$profile_storage->readMultiple($list)]]></code>
-      <code><![CDATA[$storage->readMultiple($config_to_install)]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/Config/ConfigManager.php">
     <UndefinedClass>
@@ -536,11 +513,6 @@
     <PossiblyUndefinedVariable>
       <code><![CDATA[$theme_list]]></code>
     </PossiblyUndefinedVariable>
-    <TaintedFile>
-      <code><![CDATA[$this->getComponentNames($module_list)]]></code>
-      <code><![CDATA[$this->getComponentNames($theme_list)]]></code>
-      <code><![CDATA[$this->getComponentNames([$profile_list[$this->installProfile]])]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/Config/FileStorage.php">
     <InvalidReturnType>
@@ -550,13 +522,6 @@
       <code><![CDATA[Yaml]]></code>
       <code><![CDATA[Yaml]]></code>
     </UndefinedClass>
-  </file>
-  <file src="core/lib/Drupal/Core/Config/InstallStorage.php">
-    <TaintedFile>
-      <code><![CDATA[$this->getComponentNames([$profile_list[$profile]])]]></code>
-      <code><![CDATA[$this->getComponentNames($listing->scan('module'))]]></code>
-      <code><![CDATA[$this->getComponentNames($listing->scan('theme'))]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/Config/MemoryStorage.php">
     <InvalidReturnType>
@@ -773,9 +738,6 @@
       <code><![CDATA[$container]]></code>
       <code><![CDATA[$container_definition]]></code>
     </PossiblyUndefinedVariable>
-    <TaintedInclude>
-      <code><![CDATA[Settings::initialize($this->root, $site_path, $this->classLoader)]]></code>
-    </TaintedInclude>
     <UndefinedConstant>
       <code><![CDATA[DrupalInstalled::VERSIONS_HASH]]></code>
     </UndefinedConstant>
@@ -1180,19 +1142,11 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Extension/ExtensionDiscovery.php">
-    <TaintedFile>
-      <code><![CDATA[$this->scanDirectory($dir, $include_tests)]]></code>
-    </TaintedFile>
     <UndefinedProperty>
       <code><![CDATA[subpath]]></code>
       <code><![CDATA[subpath]]></code>
       <code><![CDATA[origin]]></code>
     </UndefinedProperty>
-  </file>
-  <file src="core/lib/Drupal/Core/Extension/ExtensionList.php">
-    <TaintedFile>
-      <code><![CDATA[$this->createExtensionInfo($extension)]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/Extension/ExtensionVersion.php">
     <ImpossibleIdenticalComparison>
@@ -1636,10 +1590,6 @@
       <code><![CDATA[]]></code>
       <code><![CDATA[return $profile;]]></code>
     </InvalidReturnType>
-    <TaintedFile>
-      <code><![CDATA[$info_parser->parse($themes[$theme]->getPathname())]]></code>
-      <code><![CDATA[$info_parser->parse($themes[$base_theme]->getPathname())]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/KeyValueStore/NullStorageExpirable.php">
     <InvalidReturnType>
@@ -1928,11 +1878,6 @@
       <code><![CDATA[drupal_attach_tabledrag($element, $options)]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/lib/Drupal/Core/Render/ElementInfoManager.php">
-    <TaintedFile>
-      <code><![CDATA[$this->cacheBackend->deleteMultiple($cids)]]></code>
-    </TaintedFile>
-  </file>
   <file src="core/lib/Drupal/Core/Render/HtmlResponseAttachmentsProcessor.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->fileUrlGenerator = \Drupal::service('file_url_generator')]]></code>
@@ -2089,10 +2034,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/lib/Drupal/Core/Test/FunctionalTestSetupTrait.php">
-    <TaintedFile>
-      <code><![CDATA[copy($settings_testing_file, $directory . '/settings.testing.php')]]></code>
-      <code><![CDATA[file_get_contents($settings_services_file)]]></code>
-    </TaintedFile>
     <UndefinedClass>
       <code><![CDATA[Yaml]]></code>
       <code><![CDATA[Yaml]]></code>
@@ -2154,9 +2095,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$doc_comment === NULL]]></code>
     </ImpossibleIdenticalComparison>
-    <TaintedFile>
-      <code><![CDATA[static::scanDirectory($namespace, $path)]]></code>
-    </TaintedFile>
   </file>
   <file src="core/lib/Drupal/Core/Test/TestKernel.php">
     <NullArgument>
@@ -2179,20 +2117,6 @@
     <TaintedFile>
       <code><![CDATA[$this->extractIdsFromXml($file['absolute_path'] ?? '')]]></code>
     </TaintedFile>
-  </file>
-  <file src="core/lib/Drupal/Core/Theme/Registry.php">
-    <TaintedFile>
-      <code><![CDATA[$this->cache->deleteMultiple($cids)]]></code>
-      <code><![CDATA[$this->runtimeCache->deleteMultiple($cids)]]></code>
-    </TaintedFile>
-    <TaintedInclude>
-      <code><![CDATA[$this->processExtension($cache, 'system', 'install', 'system', $this->moduleList->getPath('system'))]]></code>
-      <code><![CDATA[$this->processExtension($cache, $module, 'module', $module, $this->moduleList->getPath($module))]]></code>
-      <code><![CDATA[$this->processExtension($cache, $this->theme->getEngine(), 'base_theme_engine', $base->getName(), $base_path)]]></code>
-      <code><![CDATA[$this->processExtension($cache, $base->getName(), 'base_theme', $base->getName(), $base_path)]]></code>
-      <code><![CDATA[$this->processExtension($cache, $this->theme->getEngine(), 'theme_engine', $this->theme->getName(), $this->theme->getPath())]]></code>
-      <code><![CDATA[$this->processExtension($cache, $this->theme->getName(), 'theme', $this->theme->getName(), $this->theme->getPath())]]></code>
-    </TaintedInclude>
   </file>
   <file src="core/lib/Drupal/Core/Theme/ThemeCommonElements.php">
     <UndefinedConstant>
@@ -2300,9 +2224,6 @@
       <code><![CDATA[$this->enabledExtensions = array_merge(array_keys($module_list), array_keys($theme_handler->listInfo()))]]></code>
       <code><![CDATA[$this->enabledExtensions = $new_extension_list]]></code>
     </InvalidPropertyAssignment>
-    <TaintedInclude>
-      <code><![CDATA[$this->loadUpdateFiles($extensions)]]></code>
-    </TaintedInclude>
   </file>
   <file src="core/lib/Drupal/Core/Updater/Updater.php">
     <InvalidReturnType>
@@ -2482,11 +2403,6 @@
       <code><![CDATA[return $allowed;]]></code>
       <code><![CDATA[return array_keys(Elements::$html5);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/ckeditor5/src/Hook/Ckeditor5Hooks.php">
-    <TaintedFile>
-      <code><![CDATA[scandir("{$dir}/translations")]]></code>
-    </TaintedFile>
   </file>
   <file src="core/modules/ckeditor5/src/Plugin/CKEditor5Plugin/Media.php">
     <UndefinedProperty>
@@ -5218,9 +5134,6 @@
     <TaintedCallable>
       <code><![CDATA[$this->moduleInstaller->install(array_keys($modules['install']))]]></code>
     </TaintedCallable>
-    <TaintedInclude>
-      <code><![CDATA[$this->moduleInstaller->install(array_keys($modules['install']))]]></code>
-    </TaintedInclude>
     <UndefinedFunction>
       <code><![CDATA[drupal_install_profile_distribution_name()]]></code>
       <code><![CDATA[drupal_check_module($module)]]></code>
@@ -5286,9 +5199,6 @@
     <TaintedCallable>
       <code><![CDATA[$function($form, $form_state)]]></code>
     </TaintedCallable>
-    <TaintedInclude>
-      <code><![CDATA[require_once $filename]]></code>
-    </TaintedInclude>
     <UndefinedFunction>
       <code><![CDATA[user_picture_enabled()]]></code>
       <code><![CDATA[_file_save_upload_from_form($form['logo']['settings']['logo_upload'], $form_state, 0)]]></code>
@@ -5828,9 +5738,6 @@
       <code><![CDATA[$argument->globalTokenReplace($base_path, $tokens)]]></code>
       <code><![CDATA[$argument->globalTokenReplace($base_path, $tokens)]]></code>
     </TaintedCallable>
-    <TaintedInclude>
-      <code><![CDATA[require_once $include]]></code>
-    </TaintedInclude>
   </file>
   <file src="core/modules/views/src/Plugin/Block/ViewsBlock.php">
     <TaintedCallable>

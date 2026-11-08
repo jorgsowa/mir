@@ -247,6 +247,15 @@ pub fn is_framework_request_source(
     server_request_accessor && is_a("Psr\\Http\\Message\\ServerRequestInterface")
 }
 
+/// Kinds a request accessor's result can't carry.
+pub(super) fn request_source_safe_kinds(method_lower: &str) -> Taint {
+    match method_lower {
+        // Symfony rejects hosts with characters outside `[-a-zA-Z0-9_.:\[\]]`, so no `/`.
+        "gethost" | "gethttphost" => Taint::FILE,
+        _ => Taint::NONE,
+    }
+}
+
 /// A branch merge can leave `Sub|Base` in a union; `Sub` adds nothing over `Base`.
 pub(super) fn absorbed_by_supertype(
     db: &dyn crate::db::MirDatabase,

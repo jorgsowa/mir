@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - When the analyzed paths sit under a nested `composer.json` with no `vendor/` directory (Drupal's `core/`), the nearest ancestor project with an installed `vendor/` is used as the Composer root, so its dependencies and `autoload.files` are found. Analyzing `core/lib` in a Drupal checkout reported every Symfony class as undefined.
 - Taint: `get_class()` no longer carries its argument's taint, since it returns the name of a loaded class, so `new (get_class($v))` isn't `TaintedCallable`.
+- Taint: `Request::getHost()` and `getHttpHost()` no longer reach file and include sinks, since Symfony rejects a host containing `/`; other sinks still see them.
 
 ## [0.94.0] - 2026-11-08
 

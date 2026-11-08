@@ -1042,7 +1042,7 @@ pub fn expr_taint(
                     && is_framework_request_source(db, fqcn.as_ref(), &method_lower)
                     && !absorbed_by_supertype(db, fqcn.as_ref(), &recv_ty)
                 {
-                    return Taint::ALL;
+                    return Taint::ALL.without(request_source_safe_kinds(&method_lower));
                 }
                 if let Some(removed) = sanitized_method_kinds(db, fqcn.as_ref(), &method_lower) {
                     return args_taint(&mc.args, ctx, db, file).without(removed);
