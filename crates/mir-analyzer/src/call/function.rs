@@ -1305,8 +1305,12 @@ impl CallAnalyzer {
                 "array_column" => {
                     super::array_builtins::array_column_return_type(ea.db, &arg_types)
                 }
-                // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
-                "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
+                // range() always includes `$start`; literal int bounds give non-empty-list<int<min,max>>.
+                "range" => super::callable::range_return_type(&arg_types).unwrap_or_else(|| {
+                    Type::single(Atomic::TNonEmptyList {
+                        value: Box::new(Type::mixed()),
+                    })
+                }),
                 // array_key_first/array_key_last: non-null for non-empty input; int for lists.
                 "array_key_first" | "array_key_last" => {
                     super::array_builtins::array_key_first_last_return(&arg_types)

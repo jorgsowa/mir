@@ -5217,11 +5217,6 @@
       <code><![CDATA[EntityAutocomplete::getEntityLabels($terms)]]></code>
     </TaintedCallable>
   </file>
-  <file src="core/modules/taxonomy/src/TaxonomyIndexDepthQueryTrait.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$inner_count]]></code>
-    </PossiblyUndefinedVariable>
-  </file>
   <file src="core/modules/taxonomy/src/TermForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>

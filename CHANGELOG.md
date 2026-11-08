@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Taint: `get_class()` no longer carries its argument's taint, since it returns the name of a loaded class, so `new (get_class($v))` isn't `TaintedCallable`.
 - Taint: `Request::getHost()` and `getHttpHost()` no longer reach file and include sinks, since Symfony rejects a host containing `/`; other sinks still see them.
 - Reading an undeclared property of an `#[\AllowDynamicProperties]` class, its subclass, or a `stdClass` subclass is no longer `UndefinedProperty`.
+- `range()` returns a non-empty list, so a `foreach` over it isn't treated as possibly running zero times.
 
 ## [0.94.0] - 2026-11-08
 
