@@ -113,6 +113,11 @@ const MAX_KEYED_SHAPES: usize = 8;
 /// `$a[$k]['x']` under a run of `if`s forks the element type on every branch.
 const MAX_GENERIC_ARRAYS: usize = 8;
 
+/// String literals a union keeps before widening to `string`. Unions are
+/// scanned linearly on every merge, so a list built from thousands of
+/// literal-valued appends (a PHPStan baseline) went cubic.
+const MAX_LITERAL_STRINGS: usize = 128;
+
 /// `array<K1|K2, V1|V2>` for two generic arrays (or lists) of the same kind.
 fn combine_generic_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
     let union = |x: &Type, y: &Type| {
@@ -521,6 +526,14 @@ impl Type {
         if let Atomic::TLiteralString(_) = &atomic {
             if self.types.iter().any(|t| matches!(t, Atomic::TString)) {
                 return;
+            }
+            let literals = self
+                .types
+                .iter()
+                .filter(|t| matches!(t, Atomic::TLiteralString(_)))
+                .count();
+            if literals >= MAX_LITERAL_STRINGS {
+                atomic = Atomic::TString;
             }
         }
         // TNonEmptyString is subsumed by TString.
@@ -4127,6 +4140,19 @@ mod tests {
                 Atomic::TArray { value, .. } if value.types.contains(&Atomic::TLiteralInt(i))
             )));
         }
+    }
+
+    #[test]
+    fn add_type_widens_string_literals_past_the_limit() {
+        let mut ty = Type::empty();
+        for i in 0..MAX_LITERAL_STRINGS {
+            ty.add_type(Atomic::TLiteralString(format!("s{i}").into()));
+        }
+        assert_eq!(ty.types.len(), MAX_LITERAL_STRINGS);
+        ty.add_type(Atomic::TLiteralString("one more".into()));
+        assert_eq!(ty.types.as_slice(), &[Atomic::TString]);
+        ty.add_type(Atomic::TLiteralString("after".into()));
+        assert_eq!(ty.types.as_slice(), &[Atomic::TString]);
     }
 
     #[test]

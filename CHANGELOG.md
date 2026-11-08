@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A method's native `void` return is no longer replaced by a parent's docblock `@return` under `{@inheritdoc}`.
 - `@psalm-import-type`/`@phpstan-import-type` may name the source class on the next docblock line.
 - A `@var` or `@param` type that the native type rules out (another scalar type or `null` for a non-null scalar, an object for an array, an array for a class) is ignored in favour of the native type; `@var` on a typed property now gets the same handling as on a promoted one.
+- Performance: a union widens to `string` once it holds 128 string literals. A list built by thousands of `$a[] = ['message' => '…', …]` appends kept every literal and rescanned them on each append; Drupal's 7,189-entry `core/.phpstan-baseline.php` didn't finish in 300 s and now takes 0.4 s.
 
 ## [0.94.0] - 2026-11-08
 
