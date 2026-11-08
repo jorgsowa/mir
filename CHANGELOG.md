@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A parent's `@param key-of<C::CONST>` (or another class-constant reference) no longer makes a child's wider native `string` param a `MethodSignatureMismatch`.
 - A `@method` tag naming a final parent method isn't `FinalMethodOverridden`, since the tag declares nothing at runtime.
 - `curl_share_setopt()` accepts any `$value`, so a lock-data constant isn't `InvalidArgument` under `strict_types`.
 - A `PharData` offset is a `PharFileInfo`, so calling `getContent()` on it isn't `UndefinedMethod`.

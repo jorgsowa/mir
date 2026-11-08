@@ -842,6 +842,9 @@ impl<'a> ClassAnalyzer<'a> {
                             false
                         }
                     } else {
+                        // Resolve `key-of<C::K>`, `C::PREFIX_*` and enum-case references.
+                        let parent_ty = &*crate::subtype::canonical_enum_cases(self.db, parent_ty);
+                        let child_ty = &*crate::subtype::canonical_enum_cases(self.db, child_ty);
                         // A docblock narrowing of an array param keeps the same native `array` hint.
                         let docblock_array_refinement = (parent_ty.from_docblock
                             || child_ty.from_docblock)
