@@ -697,9 +697,6 @@
       <code><![CDATA[$container]]></code>
       <code><![CDATA[$container_definition]]></code>
     </PossiblyUndefinedVariable>
-    <UndefinedConstant>
-      <code><![CDATA[DrupalInstalled::VERSIONS_HASH]]></code>
-    </UndefinedConstant>
   </file>
   <file src="core/lib/Drupal/Core/Entity/ContentEntityBase.php">
     <InvalidReturnType>
@@ -1741,10 +1738,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[self::$instance === NULL]]></code>
     </ImpossibleIdenticalComparison>
-    <UndefinedConstant>
-      <code><![CDATA[DrupalInstalled::VERSIONS_HASH]]></code>
-      <code><![CDATA[DrupalInstalled::VERSIONS_HASH]]></code>
-    </UndefinedConstant>
   </file>
   <file src="core/lib/Drupal/Core/Site/SettingsEditor.php">
     <PossiblyUndefinedVariable>

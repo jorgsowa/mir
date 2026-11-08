@@ -1780,12 +1780,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => return Type::mixed(),
         };
 
-        if !crate::db::class_exists(self.db, &fqcn) && !ctx.is_class_guarded(fqcn.as_str()) {
-            self.emit(
-                IssueKind::UndefinedClass { name: fqcn },
-                Severity::Error,
-                cca.class.span,
-            );
+        if !crate::db::class_exists(self.db, &fqcn) {
+            // A `class_exists()` guard proves the class at runtime, but its constants stay unknown.
+            if !ctx.is_class_guarded(fqcn.as_str()) {
+                self.emit(
+                    IssueKind::UndefinedClass { name: fqcn },
+                    Severity::Error,
+                    cca.class.span,
+                );
+            }
             return Type::mixed();
         }
 
