@@ -801,8 +801,7 @@ impl CallAnalyzer {
         if fn_name == "compact" {
             for arg in call.args.iter() {
                 if let Some(ExprKind::String(name)) = arg.value().map(|v| &v.kind) {
-                    std::sync::Arc::make_mut(&mut ctx.read_vars)
-                        .insert(mir_types::Name::from(name.as_str()));
+                    ctx.mark_read(mir_types::Name::from(name.as_str()));
                     ctx.mark_consumed(name.as_str());
                 } else {
                     ctx.has_dynamic_var_read = true;

@@ -609,8 +609,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         // Not a write: a `@var` for a name never otherwise defined must not
                         // surface as UnusedVariable.
                         if !ctx.var_is_defined(name) {
-                            std::sync::Arc::make_mut(&mut ctx.read_vars)
-                                .insert(mir_types::Name::from(name.as_str()));
+                            ctx.mark_read(mir_types::Name::from(name.as_str()));
                         }
                         ctx.set_var(name.as_str(), ann.ty.clone());
                     }

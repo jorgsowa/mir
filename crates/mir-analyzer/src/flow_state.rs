@@ -1113,13 +1113,19 @@ impl FlowState {
         if self.prop_refined.is_empty() {
             return;
         }
-        let chain = format!("{receiver}->");
-        let key = format!("[${receiver}]");
+        let chained = |obj: &str| {
+            obj.strip_prefix(receiver)
+                .is_some_and(|rest| rest.starts_with("->"))
+        };
+        let keyed_by_var = |prop: &str| {
+            prop.strip_prefix("[$")
+                .and_then(|rest| rest.strip_suffix(']'))
+                == Some(receiver)
+        };
         let stale = |(obj, prop): &(Name, Name)| {
             prop.as_str().starts_with('[')
                 && (obj.as_str() == receiver
-                    || (is_var
-                        && (obj.as_str().starts_with(chain.as_str()) || prop.as_str() == key)))
+                    || (is_var && (chained(obj.as_str()) || keyed_by_var(prop.as_str()))))
         };
         if self.prop_refined.keys().any(stale) {
             Arc::make_mut(&mut self.prop_refined).retain(|k, _| !stale(k));
@@ -1131,7 +1137,9 @@ impl FlowState {
     pub fn narrow_var(&mut self, name: &str, ty: Type) {
         let name = Name::from(name.trim_start_matches('$'));
         Arc::make_mut(&mut self.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
-        Arc::make_mut(&mut self.assigned_vars).insert(name);
+        if !self.assigned_vars.contains(&name) {
+            Arc::make_mut(&mut self.assigned_vars).insert(name);
+        }
     }
 
     /// Marks `name` as rewritable by any later call; see [`Self::escaped_vars`].
@@ -1148,6 +1156,13 @@ impl FlowState {
             (None, widest) => {
                 escaped.insert(name, widest);
             }
+        }
+    }
+
+    /// Records a read of `name`; see [`Self::read_vars`].
+    pub fn mark_read(&mut self, name: Name) {
+        if !self.read_vars.contains(&name) {
+            Arc::make_mut(&mut self.read_vars).insert(name);
         }
     }
 

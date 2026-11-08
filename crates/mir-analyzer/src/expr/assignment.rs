@@ -1717,7 +1717,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     // Byref/global write: mark as read (externally observable) and clear
                     // any pending dead-write entry rather than creating a new one.
-                    std::sync::Arc::make_mut(&mut ctx.read_vars).insert(name_sym);
+                    ctx.mark_read(name_sym);
                     ctx.mark_consumed(&name_str);
                 } else if ctx.static_var_names.contains(&name_sym) {
                     // A `static $n;` write mutates the persistent cross-call
@@ -2535,8 +2535,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .byref_param_names
                                 .contains(&mir_types::Name::from(name_str))
                             {
-                                std::sync::Arc::make_mut(&mut ctx.read_vars)
-                                    .insert(mir_types::Name::from(name_str));
+                                ctx.mark_read(mir_types::Name::from(name_str));
                                 ctx.mark_consumed(name_str);
                             }
                             // Base key: innermost index in the chain (closest to $arr).
@@ -2599,8 +2598,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 // An offset write on an object goes through its handle
                                 // (`offsetSet`), so it uses the variable like `$obj->p = v`.
                                 if current.types.iter().any(Atomic::is_object) {
-                                    std::sync::Arc::make_mut(&mut ctx.read_vars)
-                                        .insert(mir_types::Name::from(name_str));
+                                    ctx.mark_read(mir_types::Name::from(name_str));
                                     ctx.mark_consumed(name_str);
                                 }
                                 // `$obj[$k] = $v` on an ArrayAccess-implementing receiver
@@ -2890,8 +2888,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // variables may be consumed by name elsewhere.
                 let mut names_known = false;
                 if let Some(var_name) = extract_simple_var(inner) {
-                    std::sync::Arc::make_mut(&mut ctx.read_vars)
-                        .insert(mir_types::Name::from(var_name));
+                    ctx.mark_read(mir_types::Name::from(var_name));
                     ctx.mark_consumed(var_name);
                     let var_ty = ctx.get_var(var_name);
                     names_known = matches!(var_ty.types.as_slice(), [Atomic::TLiteralString(_)]);

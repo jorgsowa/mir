@@ -1400,7 +1400,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // so that the save-restore pattern (assign before try, restore in finally)
             // is not falsely flagged as UnusedVariable.
             for name in finally_ctx.read_vars.iter() {
-                std::sync::Arc::make_mut(&mut result.read_vars).insert(*name);
+                result.mark_read(*name);
                 // If the try body overwrote this variable (making its pre-try write appear
                 // dead), that pre-try write is NOT dead on the exception path (where the
                 // overwrite never happened). Mark any pre-try writes as consumed so they

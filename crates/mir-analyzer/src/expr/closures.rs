@@ -704,7 +704,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             // Mark the captured variable as read in the parent context, and
             // consume its pending write so it isn't reported as a dead write.
-            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(mir_types::Name::from(name));
+            ctx.mark_read(mir_types::Name::from(name));
             ctx.mark_consumed(name);
         }
 
@@ -825,7 +825,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // mark that variable as read in the outer context to suppress false UnusedParam.
         for name in closure_ctx.read_vars.iter() {
             if ctx.var_is_defined(name) || ctx.var_possibly_defined(name) {
-                std::sync::Arc::make_mut(&mut ctx.read_vars).insert(*name);
+                ctx.mark_read(*name);
                 ctx.mark_consumed(name.as_str());
             }
         }
@@ -1057,7 +1057,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Arrow functions capture the whole outer scope by value: any variable
         // the body reads is a read (and consumed write) in the outer context.
         for name in arrow_ctx.read_vars.iter() {
-            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(*name);
+            ctx.mark_read(*name);
             ctx.mark_consumed(name.as_str());
             if name.as_str() != "this" && ctx.vars.contains_key(name) {
                 ctx.mark_captured(name.as_str());

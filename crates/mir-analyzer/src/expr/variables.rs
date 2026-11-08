@@ -76,9 +76,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 expr.span,
             );
         }
-        if !ctx.read_vars.contains(&sym) {
-            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(sym);
-        }
+        ctx.mark_read(sym);
         ctx.mark_consumed_sym(sym);
         let ty = if name_str == "this" && !ctx.var_is_defined_sym(sym) {
             Type::never()
@@ -103,11 +101,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         // genuinely unknown.
         let mut result = Type::empty();
         if let Some(var_name) = extract_simple_var(inner) {
-            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(mir_types::Name::from(var_name));
+            ctx.mark_read(mir_types::Name::from(var_name));
             for atomic in &inner_ty.types {
                 if let Atomic::TLiteralString(accessed_var_name) = atomic {
-                    std::sync::Arc::make_mut(&mut ctx.read_vars)
-                        .insert(mir_types::Name::from(accessed_var_name.as_ref()));
+                    ctx.mark_read(mir_types::Name::from(accessed_var_name.as_ref()));
                     result.merge_with(&ctx.get_var(accessed_var_name.as_ref()));
                 }
             }

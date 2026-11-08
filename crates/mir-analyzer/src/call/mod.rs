@@ -241,7 +241,7 @@ pub(crate) fn consume_arg_assignment(
     if let php_ast::owned::ExprKind::Assign(a) = &expr.kind {
         if let php_ast::owned::ExprKind::Variable(name) = &a.target.kind {
             let n = name.trim_start_matches('$');
-            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(mir_types::Name::from(n));
+            ctx.mark_read(mir_types::Name::from(n));
             ctx.mark_consumed(n);
         }
     }
