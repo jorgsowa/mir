@@ -784,12 +784,16 @@ where
         edges.push((symbol_key, ref_file));
     }
 
-    let mut lookups: Vec<&str> = edges
+    let keyed: Vec<(&str, &Arc<str>)> = edges
         .iter()
-        .map(|(symbol, _)| crate::defining_file_lookup_key(symbol))
+        .map(|(symbol, file)| (crate::defining_file_lookup_key(symbol), file))
         .collect();
-    lookups.sort_unstable();
-    lookups.dedup();
+    let lookups: Vec<&str> = keyed
+        .iter()
+        .map(|(lookup, _)| *lookup)
+        .collect::<HashSet<&str>>()
+        .into_iter()
+        .collect();
     let defining_files: HashMap<&str, Arc<str>> = lookups
         .into_par_iter()
         .map_with(db.clone(), |db, lookup| {
@@ -799,8 +803,7 @@ where
         .collect();
 
     let mut reverse: HashMap<String, HashSet<String>> = HashMap::default();
-    for (symbol, dependent_file) in &edges {
-        let lookup = crate::defining_file_lookup_key(symbol);
+    for (lookup, dependent_file) in keyed {
         let Some(def) = defining_files.get(lookup) else {
             continue;
         };
