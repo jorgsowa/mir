@@ -5,56 +5,68 @@ description: Crate layout and analysis pipeline internals.
 
 ## Analysis pipeline
 
+A CLI run goes through these phases. Steps marked *parallel* run on every core
+with rayon.
+
+```text
+[1] File discovery
+    composer.json autoload sections, or the paths given on the command line,
+    minus <ignoreFiles>
+        │
+[2] Built-in stubs
+    PHP functions, classes and constants for the target version, plus the
+    vendor files Composer always loads (autoload.files)
+        │
+[3] Read and hash files                                       (parallel)
+    BLAKE3 content hash per file; files deleted since the last run are evicted
+        │
+[4] Definition collection                                     (parallel)
+    parse, then record classes, functions, constants and imports;
+    unchanged files reuse cached definitions without parsing
+        │
+[5] Invalidation
+    a file whose declarations changed evicts the cached results of the files
+    that depend on it; a body-only edit doesn't
+        │
+[6] On-demand vendor loading
+    classes not found yet are resolved through PSR-4 and loaded
+        │
+[7] Class-level checks
+    inheritance, signatures, abstract and interface compliance, readonly, enums
+        │
+[8] Body analysis                                             (parallel)
+    type inference, narrowing, call checking, taint tracking;
+    largest files first, cached results replayed for unchanged files
+        │
+[9] Dead code and reporting
+    unused symbols, plugin hooks, suppressions, baseline, error levels,
+    output format
+        │
+[10] Cache write
+    per-file results and the dependency graph in .mir/cache
 ```
-Source Files
-    │
-    ▼
-[1] File Discovery  (recursive .php glob, skips vendor/.git/node_modules)
-    │
-    ▼
-[2] Stubs Load  (two layers — see below)
-    │
-    ▼
-[3] Parsing  (php-parser-rs → normalized AST)
-    │
-    ▼
-[4] Pass 1 — Definition Collection  (sequential)
-    │  Classes, interfaces, traits, enums, functions, constants, use/namespace maps
-    ▼
-[5] Codebase Finalization
-    │  Resolve inheritance chains, build method dispatch tables, validate abstract impls
-    ▼
-[6] Class-level Checks
-    │  Signature compatibility, final enforcement, readonly
-    ▼
-[7] Pass 2 — Body Analysis  (parallel per file via rayon)
-    │  Type inference, narrowing, call checking, branch merging, taint tracking
-    ▼
-[8] Dead Code Detection
-    │  Private unreferenced methods/properties/functions
-    ▼
-[9] Issue Collection & Reporting
-    │  Deduplicate, filter by severity, format output
-    ▼
-[10] Cache Write  (optional)
-     Persist per-file issue list keyed by SHA-256 content hash
-```
+
+The incremental engine behind these phases is
+[salsa](https://github.com/salsa-rs/salsa). In a long-lived session (an editor,
+the playground) the same queries re-run only for the file that changed and the
+files that depend on its declarations.
 
 ## Stubs
 
-PHP built-in definitions (functions, classes, interfaces, constants) are loaded in two layers before any user code is analysed.
+PHP built-in definitions come from
+[JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs), vendored
+in `crates/mir-analyzer/stubs/` with one directory per extension: 77
+extensions, including `standard`, `Core`, `SPL`, `date`, `intl`, `mbstring`,
+`PDO`, `curl`, `dom`, `redis`, `mongodb` and `xdebug`. A few files carry local
+type fixes, and extensions missing upstream are written for mir.
 
-### Layer 1 — phpstorm-stubs (authoritative)
+`build.rs` embeds every stub file in the binary and builds a name index from
+`PhpStormStubsMap.php`. Stubs are parsed with the same parser as user code, and
+symbols are filtered by their `@since` and `@removed` tags for the target PHP
+version.
 
-PHP built-in definitions are sourced from [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs), vendored at `crates/mir-analyzer/phpstorm-stubs/` as a git submodule. Selected extensions are copied to `crates/mir-analyzer/stubs/`. At compile time, `build.rs` walks all 57 extension directories under `stubs/` and embeds every `.php` stub file as a string literal via `include_str!()`. At startup, each embedded file is parsed through the normal PHP parser + definition collector, populating the codebase with PHP built-ins.
-
-Extensions covered: `apcu`, `bcmath`, `calendar`, `Core`, `ctype`, `curl`, `date`, `dom`, `exif`, `FFI`, `fileinfo`, `filter`, `ftp`, `gd`, `gettext`, `gmp`, `hash`, `iconv`, `intl`, `json`, `libxml`, `mbstring`, `mysqli`, `openssl`, `pcntl`, `pcre`, `PDO`, `pgsql`, `Phar`, `posix`, `random`, `readline`, `Reflection`, `session`, `shmop`, `SimpleXML`, `soap`, `sockets`, `sodium`, `SPL`, `SQLite`, `sqlite3`, `standard`, `sysvmsg`, `sysvsem`, `sysvshm`, `tidy`, `tokenizer`, `uuid`, `xml`, `xmlreader`, `xmlwriter`, `xsl`, `yaml`, `Zend OPcache`, `zip`, `zlib`.
-
-This provides 500+ functions, 100+ classes, 20+ interfaces, and 200+ constants.
-
-### Layer 2 — hand-written supplements
-
-A smaller set of Rust-coded stubs in `crates/mir-analyzer/src/stubs.rs` runs after phpstorm-stubs and overrides or extends where precise parameter shapes matter (e.g. by-reference variadic params on `sscanf`, PHPUnit assertion helpers).
+User stubs from `<stubs>` in `mir.xml` take precedence over built-in and vendor
+definitions.
 
 ## Column encoding convention
 
@@ -80,9 +92,9 @@ PHP 8 allows any Unicode letter in identifiers, so the distinction matters for c
 |-------|---------|
 | `mir-types` | `Union`, `Atomic`, type operations (merge, narrow, subtype, template substitution) |
 | `mir-issues` | `IssueKind`, `Severity`, `Issue`, `IssueBuffer`, display/serialization |
-| `mir-codebase` | `Codebase` — thread-safe DashMap registry of all symbols |
-| `mir-analyzer` | `ExpressionAnalyzer`, `StatementsAnalyzer`, `CallAnalyzer`, `ClassAnalyzer`, `DeadCodeAnalyzer`, `ProjectAnalyzer`, stubs loader, `build.rs` code-gen |
+| `mir-codebase` | Definition types for classes, functions, constants and stub slices |
+| `mir-analyzer` | Parsing adapters, definition collection, salsa database, body analysis, narrowing, taint, dead code, batch runs and incremental sessions, embedded stubs |
 | `mir-cli` | `clap` binary — flags, progress bar, output formatters, config/baseline loading |
-| `mir-plugin` | Plugin API (`MirPlugin`, `PluginRegistry`), dylib loading and the Psalm plugin bridge |
+| `mir-plugin` | Plugin API (`MirPlugin`, `PluginRegistry`), shared-library loading and the PHP plugin bridge |
 | `mir-plugin-example` | Example Rust plugin built as a `cdylib` |
 | `mir-wasm` | WebAssembly bindings used by the playground |

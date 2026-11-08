@@ -1,26 +1,26 @@
 # Contributing to mir stubs
 
-## Two-layer architecture
+## Layout
 
-Stubs load in order — later layers override earlier ones:
+Each directory under `stubs/` holds the stubs for one PHP extension. Most are
+copied from [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs);
+directories with a `stub.toml` are written for mir.
 
-1. **phpstorm-stubs** (`crates/mir-analyzer/phpstorm-stubs/`) — the authoritative
-   JetBrains community stubs. Covers the full PHP standard library.
-2. **Custom stubs** (`stubs/{ext}/*.php`) — precise type overrides for functions
-   where phpstorm-stubs is too broad (e.g. wrong return type, missing by-ref param).
+At compile time `build.rs` embeds every `.php` file under `stubs/` and reads
+`PhpStormStubsMap.php`, which maps each function, class and constant to the
+file that declares it. Name lookups go through that map, so every new symbol
+needs an entry there.
 
-## When to add to STUB_DIRS vs. write custom stubs
+## Changing stubs
 
 | Situation | Action |
 |---|---|
-| Extension exists in phpstorm-stubs submodule | Add directory name to `STUB_DIRS` in `crates/mir-analyzer/build.rs` |
-| Extension is absent from phpstorm-stubs, or types are imprecise | Write custom stubs under `stubs/{ext}/` |
+| Upstream type is wrong or too broad | Edit the vendored file in place; keep the change minimal so upstream syncs stay easy |
+| Extension exists upstream but isn't vendored | Copy its directory from phpstorm-stubs |
+| Extension is absent upstream | Add a directory with a `stub.toml` and add its symbols to `PhpStormStubsMap.php` |
 
-Check whether the directory exists before adding to `STUB_DIRS`:
-
-```sh
-ls crates/mir-analyzer/phpstorm-stubs/
-```
+When syncing with upstream, compare symbols per file rather than text: most
+text differences are intentional local fixes.
 
 ## stub.toml format
 
@@ -61,26 +61,15 @@ Example docblock:
 function array_is_list(array $array): bool {}
 ```
 
-## Writing a .phpt fixture test
+## Testing
 
-Fixture tests live in `crates/mir-analyzer/tests/fixtures/{category}/`.
-Each file is a plain-text `.phpt` with sections separated by `---`:
-
-```
---TEST--
-Custom stub function is recognized
-
---FILE--
-<?php
-$result = apcu_store('key', 'value');
-
---EXPECT--
-```
-
-Run all tests with:
+Add a fixture under `crates/mir-analyzer/tests/fixtures/` that uses the
+changed symbol; a fixture without issue annotations asserts the code is clean.
+The format is described in the repository's
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#writing-a-fixture-test).
 
 ```sh
-cargo test -p mir-analyzer
+cargo test -p mir-analyzer --test fixtures
 ```
 
 ## Rebuilding

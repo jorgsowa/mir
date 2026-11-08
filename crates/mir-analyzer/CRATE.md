@@ -1,9 +1,9 @@
 # mir-analyzer — crate guide
 
-Static analyzer for PHP source: parses files (via `mir-parser`/`php-ast`),
+Static analyzer for PHP source: parses files (via `php-rs-parser`/`php-ast`),
 collects definitions into salsa-tracked stubs, then runs incremental
 type inference, call-site checking, and narrowing over function bodies.
-Downstream consumers are `mir-plugin` (LSP), `mir-cli`, and `mir-wasm`;
+Downstream consumers are `mir-cli`, `mir-wasm` and the php-lsp editor server;
 the type system lives in `mir-types`, diagnostics in `mir-issues`, and
 this crate is deliberately workspace-internal: most modules are
 `pub(crate)`, with only the entry points exposed.
@@ -24,7 +24,7 @@ Everything else (`collector`, `body_analysis`, `call`, `narrowing`,
 
 ## 2. Parser (`parser/`)
 
-`parser/mod.rs` adapts `mir-parser` output: converts parse diagnostics
+`parser/mod.rs` adapts `php-rs-parser` output: converts parse diagnostics
 to `mir_issues::Issue` with precise source-map locations and re-exports
 the docblock parser and hint helpers.
 

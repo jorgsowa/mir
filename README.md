@@ -119,7 +119,7 @@ Use the [mir GitHub Action](https://github.com/jorgsowa/mir-action):
 | [`mir-php`](crates/mir-cli) | The `mir` command-line tool |
 | [`mir-analyzer`](crates/mir-analyzer) | Analysis engine: batch and incremental (salsa) analysis sessions |
 | [`mir-types`](crates/mir-types) | Type representation and operations |
-| [`mir-codebase`](crates/mir-codebase) | Symbol storage for classes, functions and constants |
+| [`mir-codebase`](crates/mir-codebase) | Definition types for classes, functions and constants |
 | [`mir-issues`](crates/mir-issues) | Issue kinds, codes and severities |
 | [`mir-plugin`](crates/mir-plugin) | Plugin API and plugin loading |
 | [`mir-plugin-example`](crates/mir-plugin-example) | Example Rust plugin |

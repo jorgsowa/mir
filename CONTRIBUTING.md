@@ -4,25 +4,14 @@ Thank you for taking the time to contribute!
 
 ## Prerequisites
 
-- Rust (stable, 1.75+)
-- PHP is **not** required — stubs are embedded at compile time
+- Rust 1.98 or newer (`rust-toolchain.toml` pins the version CI uses)
+- PHP is **not** required: stubs for PHP built-ins are embedded at compile time
 
 ## Getting the source
 
 ```bash
-git clone --recurse-submodules https://github.com/jorgsowa/mir.git
+git clone https://github.com/jorgsowa/mir.git
 cd mir
-```
-
-The `--recurse-submodules` flag initialises the
-[phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) submodule at
-`crates/mir-analyzer/phpstorm-stubs`. The build succeeds without it but PHP
-built-in functions, classes, and constants will not be recognised.
-
-If you already cloned without the flag:
-
-```bash
-git submodule update --init
 ```
 
 ## Building
@@ -118,24 +107,14 @@ UPDATE_FIXTURES=1 cargo test -p mir-analyzer --test fixtures <fixture name>
 
 ## Built-in stubs
 
-PHP built-ins are provided in two layers:
+PHP built-ins come from [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs),
+copied into `crates/mir-analyzer/stubs/`, one directory per extension. At
+compile time `build.rs` embeds every `.php` file under that directory and
+indexes `PhpStormStubsMap.php` for lookups by name.
 
-1. **phpstorm-stubs** (authoritative) — the git submodule at
-   `crates/mir-analyzer/phpstorm-stubs`. At compile time, `build.rs` embeds
-   selected `.php` files via `include_str!()`. To add coverage for a new PHP
-   extension, add its directory name to `STUB_DIRS` in `build.rs`.
-
-2. **Hand-written supplements** — `crates/mir-analyzer/src/stubs.rs`. Use
-   these only when phpstorm-stubs lacks the required precision (e.g.
-   by-reference variadic parameters, PHPUnit helpers).
-
-To update phpstorm-stubs to the latest upstream:
-
-```bash
-git submodule update --remote crates/mir-analyzer/phpstorm-stubs
-git add crates/mir-analyzer/phpstorm-stubs
-git commit -m "chore(stubs): update phpstorm-stubs to latest"
-```
+Some vendored files carry local type fixes, and extensions missing upstream
+have mir-authored directories with a `stub.toml`. See
+[`crates/mir-analyzer/stubs/CONTRIBUTING.md`](crates/mir-analyzer/stubs/CONTRIBUTING.md).
 
 ## Code style
 
