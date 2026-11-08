@@ -367,8 +367,11 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- a. Cannot override a final method -------------------------
-            if let Some((final_parent_fqcn, _)) =
-                all_parent_methods.iter().find(|(_, p)| p.is_final)
+            // A `@method` tag declares nothing at runtime, so it can't override.
+            if let Some((final_parent_fqcn, _)) = all_parent_methods
+                .iter()
+                .find(|(_, p)| p.is_final)
+                .filter(|_| !own.is_virtual)
             {
                 let final_owner = member_owner(final_parent_fqcn);
                 let mut issue = Issue::new(
