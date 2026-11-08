@@ -246,7 +246,7 @@ export default defineConfig({
             {
               label: 'Issues',
               items: [
-                { label: 'Overview', link: '/reference/issues/' },
+                { label: 'All issues', link: '/reference/issues/' },
                 { label: 'Error codes', link: '/reference/issues/codes/' },
               ],
             },

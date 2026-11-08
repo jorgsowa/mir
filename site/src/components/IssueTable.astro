@@ -1,0 +1,74 @@
+---
+import { getCollection } from 'astro:content';
+
+const CATEGORIES: Record<string, string> = {
+  undefined: 'Undefined',
+  nullability: 'Nullability',
+  'type-mismatches': 'Type mismatches',
+  array: 'Array',
+  redundancy: 'Redundancy',
+  'dead-code': 'Dead code',
+  inheritance: 'Inheritance',
+  security: 'Security',
+  generics: 'Generics',
+  attributes: 'Attributes and duplicates',
+  other: 'Other',
+};
+
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Descriptions use only inline code and emphasis.
+const inlineMarkdown = (text: string) =>
+  escapeHtml(text)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pages = (await getCollection('docs', ({ id, data }) =>
+  id.startsWith('reference/issues/') && Boolean(data.code),
+)).map((entry) => {
+  const category = entry.id.split('/')[2];
+  return {
+    category,
+    code: entry.data.code as string,
+    title: entry.data.title,
+    description: entry.data.description ?? '',
+    href: `${base}/${entry.id}/`,
+  };
+});
+
+const unknown = [...new Set(pages.map((p) => p.category))].filter((c) => !(c in CATEGORIES));
+if (unknown.length) {
+  throw new Error(`IssueTable: add a label for issue categories ${unknown.join(', ')}`);
+}
+
+const groups = Object.entries(CATEGORIES)
+  .map(([slug, label]) => ({
+    slug,
+    label,
+    issues: pages.filter((p) => p.category === slug).sort((a, b) => a.code.localeCompare(b.code)),
+  }))
+  .filter((g) => g.issues.length > 0);
+---
+
+<p>mir reports {pages.length} kinds of issues.</p>
+
+{groups.map((group) => (
+  <>
+    <h2 id={group.slug}>{group.label}</h2>
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Issue</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        {group.issues.map((issue) => (
+          <tr>
+            <td><code>{issue.code}</code></td>
+            <td><a href={issue.href}>{issue.title}</a></td>
+            <td set:html={inlineMarkdown(issue.description)} />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </>
+))}

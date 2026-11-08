@@ -1,72 +1,21 @@
 ---
-title: Issue Kinds
-description: All issue types mir can emit, grouped by category.
+title: Issues
+description: Every issue mir reports, grouped by category, with its code and a link to examples and fixes.
 sidebar:
   order: 0
 ---
 
-import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+import IssueTable from '../../../../components/IssueTable.astro';
 
-All 144 issue types mir can emit, grouped by category. Each issue has a stable
-`MIR####` code that appears in CLI output and JSON/SARIF — see
-[Error codes](./codes/) for the full numeric index.
+Each issue has a stable `MIR####` code that appears in CLI, JSON and SARIF
+output. Codes are never reused, so they're safe to reference in suppressions,
+baselines and CI filters. [Error codes](./codes/) lists them in numeric order.
 
-Select a category to drill into individual issues.
+Every issue page shows an example and how to fix it. Some issues need to be
+turned on:
 
-<CardGrid>
-  <LinkCard
-    title="Undefined"
-    href="./undefined/undefined-variable/"
-    description="UndefinedVariable · PossiblyUndefinedVariable · UndefinedFunction · UndefinedMethod · UndefinedClass · UndefinedProperty · UndefinedConstant · ParentNotFound · InaccessibleClassConstant · InaccessibleProperty"
-  />
-  <LinkCard
-    title="Nullability"
-    href="./nullability/null-argument/"
-    description="NullArgument · NullPropertyFetch · NullMethodCall · NullArrayAccess · PossiblyNull* · PossiblyInvalidArgument · NullableReturnStatement"
-  />
-  <LinkCard
-    title="Type Mismatches"
-    href="./type-mismatches/invalid-return-type/"
-    description="InvalidReturnType · InvalidArgument · TooFewArguments · TooManyArguments · InvalidNamedArgument · InvalidPassByReference · InvalidPropertyAssignment · InvalidCast · InvalidOperand · MismatchingDocblock(Return|Param)Type · InvalidStringClass · PossiblyInvalidOperand · PossiblyNullOperand · InvalidStaticInvocation · NonStaticSelfCall · DirectConstructorCall · InvalidPropertyFetch · InvalidMethodCall · InvalidArrayAccess · InvalidArrayAssignment"
-  />
-  <LinkCard
-    title="Array"
-    href="./array/invalid-array-offset/"
-    description="InvalidArrayOffset · NonExistentArrayOffset · PossiblyInvalidArrayOffset"
-  />
-  <LinkCard
-    title="Redundancy"
-    href="./redundancy/redundant-condition/"
-    description="RedundantCondition · RedundantCast · UnnecessaryVarAnnotation · TypeDoesNotContainType · ParadoxicalCondition"
-  />
-  <LinkCard
-    title="Dead Code"
-    href="./dead-code/unused-variable/"
-    description="UnusedVariable · UnusedParam · UnusedMethod · UnusedProperty · UnusedFunction · UnreachableCode · UnusedForeachValue"
-  />
-  <LinkCard
-    title="Inheritance"
-    href="./inheritance/unimplemented-abstract-method/"
-    description="UnimplementedAbstractMethod · UnimplementedInterfaceMethod · MethodSignatureMismatch · OverriddenMethodAccess · InvalidExtendClass · FinalMethodOverridden · AbstractInstantiation · CircularInheritance · InvalidOverride · InterfaceInstantiation · OverriddenPropertyAccess"
-  />
-  <LinkCard
-    title="Security"
-    href="./security/tainted-html/"
-    description="TaintedInput · TaintedHtml · TaintedSql · TaintedShell"
-  />
-  <LinkCard
-    title="Generics"
-    href="./generics/invalid-template-param/"
-    description="InvalidTemplateParam · ShadowedTemplateParam"
-  />
-  <LinkCard
-    title="Other"
-    href="./other/deprecated-method/"
-    description="Deprecated* · InternalMethod · WrongCase* · Missing(Return|Param)Type · Mixed* · InvalidClone · PossiblyInvalidClone · InvalidToString · InvalidThrow · InvalidCatch · MissingThrowsDocblock · ReadonlyPropertyAssignment · ParseError · CompileError · InvalidDocblock · InvalidTraitUse · Implicit*Cast"
-  />
-  <LinkCard
-    title="Attributes"
-    href="./attributes/invalid-attribute/"
-    description="InvalidAttribute · UndefinedAttributeClass · DuplicateClass"
-  />
-</CardGrid>
+- Unused classes, functions, methods, properties and constants: `--find-dead-code`.
+- Unused variables and foreach values: `--find-dead-code` or `<findUnusedVariables>`.
+- Info-level issues, mostly redundancies: `--show-info`.
+
+<IssueTable />
