@@ -232,12 +232,14 @@ export default defineConfig({
       },
       sidebar: [
         { label: 'Introduction', link: '/' },
+        { label: 'Why mir?', link: '/why/' },
         { label: 'Playground', link: '/playground/' },
         {
           label: 'Guides',
           items: [
             { label: 'Getting Started', link: '/guides/getting-started/' },
             { label: 'Configuration', link: '/guides/configuration/' },
+            { label: 'Migrating to mir', link: '/guides/migrating/' },
           ],
         },
         {

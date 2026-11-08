@@ -19,12 +19,12 @@ Paths default to the current directory when omitted.
 | `--show-info` | off | Include info-level issues (redundancies, style) |
 | `-j, --threads <N>` | CPU count | Parallelism |
 | `--php-version <X.Y>` | `8.5` | Target PHP version (e.g. `7.4`, `8.2`). Supported range: `7.4`–`8.6`. Overrides `<phpVersion>`. |
-| `-c, --config <FILE>` | auto | Config file (`mir.xml` / `psalm.xml` auto-discovered) |
-| `--error-level <1-8>` | — | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient) |
+| `-c, --config <FILE>` | auto | Config file (`mir.xml` auto-discovered) |
+| `--error-level <1-8>` | — | Strictness, 1 (strictest) to 8 (most lenient). See [error levels](/mir/guides/configuration/#error-levels). |
 | `--find-dead-code` | off | Report unused code (`UnusedClass`, `UnusedMethod`, `UnusedVariable`, …) |
 | `--no-taint` | off | Skip taint analysis (no `Tainted*` issues) |
-| `--baseline <FILE>` | auto | Suppress issues listed in a baseline XML. Auto-discovers `mir-baseline.xml`, then `psalm-baseline.xml`. |
-| `--set-baseline [FILE]` | `mir-baseline.xml` | Write all current issues to a baseline file and exit; without `FILE`, also deletes `psalm-baseline.xml` |
+| `--baseline <FILE>` | auto | Suppress issues listed in a baseline XML. Auto-discovers `mir-baseline.xml`. |
+| `--set-baseline [FILE]` | `mir-baseline.xml` | Write all current issues to a baseline file and exit |
 | `--update-baseline` | off | Remove resolved issues from the baseline |
 | `--report-stale-baseline` | off | Report baseline entries that no longer match an issue, and exit with `1` if there are any |
 | `--ignore-baseline` | off | Report all issues, ignoring the baseline |

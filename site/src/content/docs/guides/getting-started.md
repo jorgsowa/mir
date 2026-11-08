@@ -63,7 +63,7 @@ You can pass multiple paths:
 mir application/library application/module public/
 ```
 
-mir will recursively scan all `.php` files under the given paths and print any issues to stdout.
+mir recursively scans all `.php` files under the given paths and prints any issues to stdout.
 
 When the project has a `composer.json`, mir reads its autoload sections to find
 the project files and loads vendor classes on demand, so you can run plain `mir`
@@ -125,17 +125,23 @@ The most common issue kinds you will encounter:
 | `PossiblyInvalidArrayAccess` | Array access on a value that may be `false` or `null` |
 | `NullableReturnStatement` | A nullable value returned from a non-nullable return type |
 
-See [Issue Kinds](/mir/reference/issues/) for the full list.
+See [Issues](/mir/reference/issues/) for the full list.
 
 ## Next steps
 
 ### Use a configuration file
 
-mir auto-discovers `mir.xml` or `psalm.xml` in the project root. You can also specify a config file explicitly:
+mir works without a config file. To set the PHP version, the source directories
+or per-issue severities, add a `mir.xml` to the project root; mir finds it in the
+current directory or any parent. You can also pass one explicitly:
 
 ```bash
-mir -c psalm.xml src/
+mir -c config/mir.xml src/
 ```
+
+See the [Configuration guide](/mir/guides/configuration/). Coming from another
+analyzer? [Migrating to mir](/mir/guides/migrating/) covers existing configs,
+baselines and annotations.
 
 ### Find dead code
 
@@ -157,7 +163,7 @@ On large projects you may want to introduce mir without fixing every pre-existin
 mir src/ --set-baseline
 ```
 
-This writes `mir-baseline.xml` and deletes an existing `psalm-baseline.xml`. On subsequent runs, mir picks the baseline up from the current directory and only reports new issues:
+This writes `mir-baseline.xml`. On subsequent runs, mir picks the baseline up from the current directory and only reports new issues:
 
 ```bash
 mir src/

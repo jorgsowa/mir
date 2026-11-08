@@ -12,7 +12,9 @@
 
 **[Try the Playground →](https://jorgsowa.github.io/mir/playground)**
 
-A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](https://psalm.dev).
+A fast, incremental PHP static analyzer written in Rust. It finds type errors,
+undefined symbols, dead code, injection vulnerabilities and many, many more
+without running your code. [Why mir?](https://jorgsowa.github.io/mir/why/)
 
 ```text
 $ mir src/
@@ -24,8 +26,7 @@ src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL 
 
 ## Features
 
-- **Psalm compatibility:** reads `psalm.xml` (`errorLevel` 1–8, `<issueHandlers>`), `psalm-baseline.xml`, `@psalm-*` annotations and suppressions, and runs existing Psalm plugins.
-- **189 diagnostic rules** with stable codes (`MIR0201`): type errors, undefined symbols, nullability, arrays, generics, purity, dead code, taint and more. See the [issue reference](https://jorgsowa.github.io/mir/reference/issues/).
+- **196 diagnostic rules** with stable codes (`MIR0201`): type errors, undefined symbols, nullability, arrays, generics, purity, dead code, taint and more. See the [issue reference](https://jorgsowa.github.io/mir/reference/issues/).
 - **Type system:** scalars, objects, generics and templates, unions, intersections, literals, array shapes, `class-string<T>`, conditional return types, `never`, `void`.
 - **Inference and narrowing:** return types, literal narrowing, `if` / `match` / `switch` / `instanceof` / `is_*()` / `isset()` guards, assertion annotations, and functions whose body is an `instanceof` check.
 - **Call checking:** argument count, types, named arguments and by-reference parameters for user code and built-ins.
@@ -38,6 +39,7 @@ src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL 
 - **Plugins:** native Rust plugins loaded as shared libraries.
 - **Built-in coverage:** bundled [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) for 77 extensions (2,500+ functions, 500+ classes), filtered by PHP version.
 - **CI output formats:** `text`, `json`, `github-actions`, `junit` and `sarif`.
+- **Works with existing code:** reads `@psalm-*` and `@phpstan-*` annotations and suppressions as they are, plus Psalm config files, baselines and plugins. See [Migrating to mir](https://jorgsowa.github.io/mir/guides/migrating/).
 
 ## Installation
 
@@ -99,7 +101,7 @@ mir src/ --update-baseline    # drop entries for issues you fixed
 ### Suppressing issues inline
 
 Use `@mir-ignore`, `@mir-ignore-next-line`, or `@mir-ignore-file` to suppress a
-false positive directly in source. `@phpstan-ignore-*` aliases
+false positive directly in source. `@psalm-suppress` and `@phpstan-ignore-*`
 are accepted too. See the [suppression reference](https://jorgsowa.github.io/mir/reference/suppressions/).
 
 ### GitHub Actions

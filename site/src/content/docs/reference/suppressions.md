@@ -21,7 +21,8 @@ codebase.
 
 ## Third-party aliases
 
-mir accepts these for drop-in compatibility with Psalm and PHPStan:
+mir also accepts the directives used by other PHP analyzers, so existing
+suppressions keep working:
 
 | Directive | Scope / kinds |
 |-----------|---------------|
@@ -48,7 +49,7 @@ $obj = new LegacyClass();
 // @mir-ignore MIR0001, MIR0002
 doSomething();
 
-/** @psalm-suppress InvalidArgument */
+/** @mir-ignore InvalidArgument */
 $result = takesInt("string");
 
 $x = mystery(); // @mir-ignore-line
@@ -57,4 +58,5 @@ $x = mystery(); // @mir-ignore-line
 ## Unused suppressions
 
 mir reports `UnusedSuppress` when a named suppression does not match any
-issue on its target line, helping you remove stale annotations after a fix.
+issue on its target line, helping you remove stale annotations after a fix. It's
+an info-level issue, shown with `--show-info`.
