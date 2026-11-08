@@ -216,7 +216,13 @@ pub(super) fn user_call_taint(
     };
     let mut taint = match body {
         CalleeBody::Summarized if worth_summary() => summary().map_or(Taint::NONE, |s| {
-            resolve_labels(s.returns, |slot| {
+            // A spread may leave out or bind any parameter.
+            let spread = args.iter().any(|a| a.unpack());
+            let ruled_out = s.sources_ruled_out(|param| {
+                let bound = param_arg_exprs(params, args, param);
+                !spread && !bound.is_empty() && bound.iter().all(|e| arg_is_non_null(e, ctx))
+            });
+            resolve_labels(s.returns.difference(ruled_out), |slot| {
                 s.slot_taint(slot, receiver, params, args, ctx, db, file)
             })
         }),

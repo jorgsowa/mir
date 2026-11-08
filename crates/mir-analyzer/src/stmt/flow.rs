@@ -182,10 +182,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     .record_return_keys(Some(crate::taint::Taint::NONE));
             } else {
                 let returned = crate::taint::expr_taint(expr, ctx, self.db, &self.file);
-                self.taint_summary.record_return(
-                    returned,
-                    crate::taint::param_parts(expr, ctx, self.db, &self.file),
-                );
+                let parts = crate::taint::param_parts(expr, ctx, self.db, &self.file);
+                match crate::taint::source_if_param_null(expr, ctx, self.db, &self.file) {
+                    Some((param, if_null)) => self
+                        .taint_summary
+                        .record_return_if_null(returned, parts, param, if_null),
+                    None => self.taint_summary.record_return(returned, parts),
+                }
                 let keys =
                     crate::taint::exact_key_names(expr, ctx, self.db, &self.file).or_else(|| {
                         (returned | crate::taint::key_names_taint(expr, ctx))

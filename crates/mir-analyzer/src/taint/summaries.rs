@@ -67,6 +67,10 @@ pub struct TaintSummary {
     pub return_parts: Taint,
     /// Label slots some `return` carries otherwise, while the body is analyzed.
     pub(super) returned_computed: Taint,
+    /// `(param, taint)`: source taint returned only when that parameter's argument is null or omitted.
+    pub source_if_null: Vec<(usize, Taint)>,
+    /// Source taint some `return` carries whatever the arguments, while the body is analyzed.
+    pub(super) returned_source: Taint,
     /// Taint of the values a generator body yields; a generator's result stands for them.
     pub(super) yields: Taint,
     /// Properties of `$this` set by a plain assignment while the body is analyzed:
@@ -107,9 +111,38 @@ impl TaintSummary {
     /// Record a `return` of a value with `taint`, `parts` of whose label slots
     /// are (part of) an argument itself.
     pub fn record_return(&mut self, taint: Taint, parts: Taint) {
+        self.returned_source |= taint.concrete();
         self.returns |= taint;
         self.return_parts |= parts;
         self.returned_computed |= taint.label_slots().difference(parts);
+    }
+
+    /// Record a `return` like [`Self::record_return`], whose `if_null` source taint comes
+    /// back only when parameter `param`'s argument is null.
+    pub fn record_return_if_null(
+        &mut self,
+        taint: Taint,
+        parts: Taint,
+        param: usize,
+        if_null: Taint,
+    ) {
+        let returned_source = self.returned_source;
+        self.record_return(taint, parts);
+        self.returned_source = returned_source | taint.concrete().difference(if_null);
+        self.source_if_null.push((param, if_null));
+    }
+
+    /// Source taint a call doesn't get back because its argument for the parameter is non-null.
+    pub fn sources_ruled_out(&self, arg_non_null: impl Fn(usize) -> bool) -> Taint {
+        let (mut ruled_out, mut kept) = (Taint::NONE, Taint::NONE);
+        for (param, taint) in &self.source_if_null {
+            if arg_non_null(*param) {
+                ruled_out |= *taint;
+            } else {
+                kept |= *taint;
+            }
+        }
+        ruled_out.difference(kept)
     }
 
     /// Record the key names of a `return`ed array, `None` when they are not known exactly.
@@ -160,6 +193,7 @@ impl TaintSummary {
 
     /// Combine with another body's summary, for a call that may run either.
     pub fn merge(&mut self, mut other: TaintSummary) {
+        self.source_if_null.clear();
         // Parameters keep their slots, which line up with a call's arguments;
         // a guard's parameter stays free for its flows to fall back to.
         let mut reserved = [false; MAX_TRACKED_PARAMS];
@@ -593,6 +627,16 @@ pub fn finish_summary(summary: &mut TaintSummary, ctx: &FlowState) -> TaintSumma
         summary.return_parts = Taint::NONE;
     }
     summary.yields = Taint::NONE;
+    let returned_source = std::mem::take(&mut summary.returned_source);
+    if ctx.is_generator {
+        summary.source_if_null.clear();
+    }
+    for (_, taint) in &mut summary.source_if_null {
+        *taint = taint.difference(returned_source);
+    }
+    summary
+        .source_if_null
+        .retain(|(_, taint)| !taint.is_empty());
     summary.return_parts = summary
         .return_parts
         .intersection(summary.returns.label_slots())
@@ -738,4 +782,50 @@ fn called_method_props(
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// `return $param ?? <expr>`: the parameter's slot and the source taint only the right side adds.
+pub fn source_if_param_null(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<(usize, Taint)> {
+    let ExprKind::NullCoalesce(nc) = &unwrap_parens(expr).kind else {
+        return None;
+    };
+    let ExprKind::Variable(name) = &nc.left.kind else {
+        return None;
+    };
+    if !ctx
+        .param_names
+        .contains(&mir_types::Name::from(name.trim_start_matches('$')))
+        || ctx.written_after_declaration(name)
+    {
+        return None;
+    }
+    let parts = ctx.param_parts(name);
+    let param = (0..MAX_TRACKED_PARAMS).find(|&slot| parts.param_kinds(slot) == Taint::ALL)?;
+    let if_null = expr_taint(&nc.right, ctx, db, file)
+        .concrete()
+        .difference(expr_taint(&nc.left, ctx, db, file).concrete());
+    (!if_null.is_empty()).then_some((param, if_null))
+}
+
+/// An argument expression that can't evaluate to null.
+pub(super) fn arg_is_non_null(expr: &Expr, ctx: &FlowState) -> bool {
+    match &unwrap_parens(expr).kind {
+        ExprKind::String(_)
+        | ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Array(_)
+        | ExprKind::InterpolatedString(_)
+        | ExprKind::Heredoc(_) => true,
+        ExprKind::Variable(name) => {
+            let ty = ctx.get_var(name);
+            !ty.types.is_empty() && !ty.is_nullable() && !ty.is_mixed() && !ty.possibly_undefined
+        }
+        _ => false,
+    }
 }

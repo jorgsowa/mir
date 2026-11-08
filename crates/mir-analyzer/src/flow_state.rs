@@ -2264,6 +2264,25 @@ impl FlowState {
         );
     }
 
+    /// Whether anything but its declaration wrote the variable on some path to here.
+    pub fn written_after_declaration(&self, name: &str) -> bool {
+        let sym = Name::from(name.trim_start_matches('$'));
+        let Some(&declared) = self.var_locations.get(&sym) else {
+            return true;
+        };
+        self.last_write_locs
+            .get(&sym)
+            .is_some_and(|locs| locs.iter().any(|loc| *loc != declared))
+            || self
+                .consumed_write_locs
+                .iter()
+                .any(|(var, loc)| *var == sym && *loc != declared)
+            || self
+                .dead_writes
+                .iter()
+                .any(|(var, l, c, le, ce)| *var == sym && (*l, *c, *le, *ce) != declared)
+    }
+
     /// Mark a variable as consumed by an r-value read.
     ///
     /// This clears the pending write entry so the write is no longer considered
