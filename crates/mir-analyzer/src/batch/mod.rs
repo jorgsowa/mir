@@ -577,26 +577,55 @@ pub(crate) fn collect_php_files(
     out: &mut Vec<PathBuf>,
     extensions: &PhpFileExtensions,
 ) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            if entry.file_type().map(|ft| ft.is_symlink()).unwrap_or(false) {
+    enum Entry {
+        File(PathBuf),
+        Dir(PathBuf),
+    }
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries = Vec::new();
+    let mut has_dirs = false;
+    for entry in read.flatten() {
+        // The readdir entry type avoids a stat per entry; symlinks are skipped.
+        let is_dir = match entry.file_type() {
+            Ok(ft) if ft.is_symlink() => continue,
+            Ok(ft) => ft.is_dir(),
+            Err(_) => entry.path().is_dir(),
+        };
+        let path = entry.path();
+        if is_dir {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if matches!(
+                name,
+                "vendor" | ".git" | "node_modules" | ".cache" | ".pnpm-store"
+            ) {
                 continue;
             }
-            let path = entry.path();
-            if path.is_dir() {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if matches!(
-                    name,
-                    "vendor" | ".git" | "node_modules" | ".cache" | ".pnpm-store"
-                ) {
-                    continue;
-                }
-                collect_php_files(&path, out, extensions);
-            } else if extensions.is_php_source(&path) {
-                out.push(path);
-            }
+            has_dirs = true;
+            entries.push(Entry::Dir(path));
+        } else if extensions.is_php_source(&path) {
+            entries.push(Entry::File(path));
         }
     }
+    if !has_dirs {
+        out.extend(entries.into_iter().map(|e| match e {
+            Entry::File(p) | Entry::Dir(p) => p,
+        }));
+        return;
+    }
+    let parts: Vec<Vec<PathBuf>> = entries
+        .into_par_iter()
+        .map(|entry| match entry {
+            Entry::File(path) => vec![path],
+            Entry::Dir(path) => {
+                let mut sub = Vec::new();
+                collect_php_files(&path, &mut sub, extensions);
+                sub
+            }
+        })
+        .collect();
+    out.extend(parts.into_iter().flatten());
 }
 
 // ---------------------------------------------------------------------------

@@ -11,31 +11,37 @@ impl AnalysisSession {
         let mut loaded: HashSet<String> = HashSet::default();
         let mut scanned: HashSet<Arc<str>> = HashSet::default();
 
+        // The filesystem doesn't change during a run, so each name resolves once.
+        let mut resolved: HashMap<String, Option<PathBuf>> = HashMap::default();
+
         for _ in 0..max_depth {
             let mut to_load: Vec<(String, PathBuf)> = Vec::new();
-
-            let mut try_queue = |fqcn: &str| {
-                if !self.type_exists(fqcn) && !loaded.contains(fqcn) {
-                    if let Some(path) = psr4.resolve(fqcn) {
-                        to_load.push((fqcn.to_string(), path));
-                    }
-                }
-            };
 
             let mut candidates: Vec<String> = Vec::new();
             let import_candidates = {
                 let db_owned = self.snapshot_db();
                 let db = &db_owned;
-                for fqcn in crate::db::workspace_classes(db).iter() {
-                    if scanned.contains(fqcn.as_str()) {
-                        continue;
+                let pending: Vec<_> = crate::db::workspace_classes(db)
+                    .iter()
+                    .filter(|fqcn| !scanned.contains(fqcn.as_str()))
+                    .cloned()
+                    .collect();
+                // Looking a class up may parse its file; do that on all threads.
+                let referenced: Vec<Option<Vec<String>>> = pending
+                    .par_iter()
+                    .map_with(self.snapshot_db(), |db, fqcn| {
+                        let here = crate::db::Fqcn::from_str(&*db, fqcn.as_str());
+                        let class = crate::db::find_class_like(&*db, here)?;
+                        let mut out = Vec::new();
+                        collect_class_referenced_fqcns(&class, &mut out);
+                        Some(out)
+                    })
+                    .collect();
+                for (fqcn, refs) in pending.iter().zip(referenced) {
+                    if let Some(refs) = refs {
+                        scanned.insert(Arc::from(fqcn.as_str()));
+                        candidates.extend(refs);
                     }
-                    let here = crate::db::Fqcn::from_str(db, fqcn.as_str());
-                    let Some(class) = crate::db::find_class_like(db, here) else {
-                        continue;
-                    };
-                    scanned.insert(Arc::from(fqcn.as_str()));
-                    collect_class_referenced_fqcns(&class, &mut candidates);
                 }
                 db.file_import_snapshots()
                     .into_iter()
@@ -48,31 +54,57 @@ impl AnalysisSession {
                     })
                     .collect::<Vec<_>>()
             };
+            let mut seen: HashSet<String> = HashSet::default();
+            let unique: Vec<String> = candidates
+                .into_iter()
+                .chain(import_candidates)
+                .filter(|fqcn| !seen.contains(fqcn.as_str()) && seen.insert(fqcn.clone()))
+                .collect();
+            let unresolved: Vec<&String> = unique
+                .iter()
+                .filter(|fqcn| !resolved.contains_key(fqcn.as_str()))
+                .collect();
+            let paths: Vec<Option<PathBuf>> = unresolved
+                .par_iter()
+                .map(|fqcn| psr4.resolve(fqcn))
+                .collect();
+            for (fqcn, path) in unresolved.into_iter().zip(paths) {
+                resolved.insert(fqcn.clone(), path);
+            }
             let provider = {
                 use crate::db::MirDatabase as _;
                 self.snapshot_db().source_provider()
             };
             if let Some(provider) = provider.as_ref() {
-                let mut seen: HashSet<&str> = HashSet::default();
                 let db = self.snapshot_db();
-                let paths: Vec<String> = candidates
+                let paths: Vec<String> = unique
                     .iter()
-                    .chain(import_candidates.iter())
-                    .filter(|fqcn| seen.insert(fqcn.as_str()))
                     .filter(|fqcn| {
                         !crate::db::class_like_indexed(&db, crate::db::Fqcn::from_str(&db, fqcn))
                     })
-                    .filter_map(|fqcn| psr4.resolve(fqcn))
+                    .filter_map(|fqcn| resolved[fqcn.as_str()].as_ref())
                     .map(|path| path.to_string_lossy().into_owned())
                     .filter(|path| self.db.lookup_source_file(path).is_none())
                     .collect();
                 provider.prefetch(&paths);
             }
-            for fqcn in candidates {
-                try_queue(&fqcn);
-            }
-            for fqcn in import_candidates {
-                try_queue(&fqcn);
+            {
+                // A lookup may load the class on demand, which parses its file.
+                let exists: Vec<bool> = unique
+                    .par_iter()
+                    .map_with(self.snapshot_db(), |db, fqcn| {
+                        loaded.contains(fqcn) || crate::db::class_exists(&*db, fqcn)
+                    })
+                    .collect();
+                for (fqcn, exists) in unique.into_iter().zip(exists) {
+                    if exists {
+                        continue;
+                    }
+                    if let Some(path) = &resolved[fqcn.as_str()] {
+                        let path = path.clone();
+                        to_load.push((fqcn, path));
+                    }
+                }
             }
             if let Some(provider) = provider.as_ref() {
                 provider.clear_prefetch();

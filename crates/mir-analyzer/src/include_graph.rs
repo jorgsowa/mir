@@ -130,28 +130,29 @@ pub(crate) fn guarded_include_paths(
 /// among `files` sits under a `PHP_VERSION_ID` check above it.
 pub(crate) fn files_loaded_only_above<
     'f,
-    P: Fn() -> std::sync::Arc<crate::recursion::GuardedParse>,
+    P: Fn() -> std::sync::Arc<crate::recursion::GuardedParse> + Sync,
 >(
     files: impl Iterator<Item = (&'f std::sync::Arc<str>, &'f str, P)>,
     version_id: u32,
 ) -> rustc_hash::FxHashSet<std::sync::Arc<str>> {
+    use rayon::prelude::*;
     let files: Vec<_> = files.collect();
     let by_path: rustc_hash::FxHashMap<PathBuf, &std::sync::Arc<str>> = files
         .iter()
         .map(|(file, _, _)| (lexically_normalize(Path::new(file.as_ref())), *file))
         .collect();
+    let includes: Vec<Vec<(PathBuf, u32)>> = files
+        .par_iter()
+        .filter(|(_, source, _)| may_include(source))
+        .map(|(file, _, program)| {
+            guarded_include_paths(&program().program, Path::new(file.as_ref()))
+        })
+        .collect();
     let mut loaded_only_above: rustc_hash::FxHashMap<&std::sync::Arc<str>, bool> =
         Default::default();
-    for (file, source, program) in &files {
-        if !may_include(source) {
-            continue;
-        }
-        for (path, min_version_id) in
-            guarded_include_paths(&program().program, Path::new(file.as_ref()))
-        {
-            if let Some(target) = by_path.get(&path) {
-                *loaded_only_above.entry(target).or_insert(true) &= min_version_id > version_id;
-            }
+    for (path, min_version_id) in includes.into_iter().flatten() {
+        if let Some(target) = by_path.get(&path) {
+            *loaded_only_above.entry(target).or_insert(true) &= min_version_id > version_id;
         }
     }
     loaded_only_above
