@@ -689,7 +689,7 @@ class Phar extends RecursiveDirectoryIterator implements RecursiveIterator, Seek
     #[TentativeType]
     public function setStub(
         $stub,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $length
+        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $length = -1
     ) {}
 
     /**
@@ -1746,7 +1746,7 @@ class PharData extends RecursiveDirectoryIterator implements Countable, ArrayAcc
     #[LanguageLevelTypeAware(['8.4' => 'true'], default: 'bool')]
     public function setStub(
         $stub,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $length
+        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $length = -1
     ) {}
 
     /**
