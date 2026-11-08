@@ -2258,10 +2258,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                         "__get",
                     );
-                    // `stdClass` permits arbitrary dynamic properties at
-                    // runtime (json_decode results, DB rows, casts), so any
-                    // `->prop` access is valid — never an UndefinedProperty.
-                    let allows_dynamic = fqcn.as_ref().eq_ignore_ascii_case("stdClass");
+                    let allows_dynamic =
+                        crate::db::allows_dynamic_properties(self.db, fqcn.as_ref());
                     if get_method.is_none()
                         && !allows_dynamic
                         && !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())

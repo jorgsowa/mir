@@ -591,6 +591,21 @@ pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
         .any(|ancestor| !class_exists(db, ancestor))
 }
 
+/// Instances accept undeclared properties: `stdClass` and `#[AllowDynamicProperties]` classes.
+pub fn allows_dynamic_properties(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let here = crate::db::Fqcn::from_str(db, fqcn);
+    crate::db::class_ancestors_by_fqcn(db, here)
+        .iter()
+        .any(|ancestor| {
+            ancestor.eq_ignore_ascii_case("stdClass")
+                || ancestor.eq_ignore_ascii_case("__PHP_Incomplete_Class")
+                || matches!(
+                    crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, ancestor)),
+                    Some(crate::db::ClassLike::Class(c)) if c.allows_dynamic_properties
+                )
+        })
+}
+
 /// Declaration site of the class member `symbol` names; the lookup is kind-specific
 /// because a class may declare a method and a property with the same name.
 pub fn member_location(db: &dyn MirDatabase, symbol: &crate::Name) -> Option<Location> {

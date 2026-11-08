@@ -467,12 +467,6 @@
     <TaintedCallable>
       <code><![CDATA[$this->processExtension($operation['type'], $operation['op'], $operation['name'])]]></code>
     </TaintedCallable>
-    <UndefinedProperty>
-      <code><![CDATA[sort]]></code>
-      <code><![CDATA[sort]]></code>
-      <code><![CDATA[sort]]></code>
-      <code><![CDATA[sort]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/lib/Drupal/Core/Config/ConfigInstaller.php">
     <InvalidArgument>
@@ -1085,17 +1079,6 @@
       <code><![CDATA[$node->setAttribute('aria-current', 'page')]]></code>
     </UndefinedMethod>
   </file>
-  <file src="core/lib/Drupal/Core/EventSubscriber/ConfigImportSubscriber.php">
-    <UndefinedProperty>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[required_by]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[module_dependencies]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[required_by]]></code>
-      <code><![CDATA[status]]></code>
-    </UndefinedProperty>
-  </file>
   <file src="core/lib/Drupal/Core/EventSubscriber/ExcludedModulesEventSubscriber.php">
     <UndefinedFunction>
       <code><![CDATA[module_config_sort($modules)]]></code>
@@ -1140,13 +1123,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $this->constraintString;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Extension/ExtensionDiscovery.php">
-    <UndefinedProperty>
-      <code><![CDATA[subpath]]></code>
-      <code><![CDATA[subpath]]></code>
-      <code><![CDATA[origin]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/lib/Drupal/Core/Extension/ExtensionVersion.php">
     <ImpossibleIdenticalComparison>
@@ -1209,12 +1185,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->kernel = \Drupal::service('kernel')]]></code>
     </InvalidPropertyAssignment>
-    <UndefinedProperty>
-      <code><![CDATA[module_dependencies]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[sort]]></code>
-      <code><![CDATA[sub_themes]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/lib/Drupal/Core/Extension/module.api.php">
     <InvalidReturnType>
@@ -1839,15 +1809,6 @@
       <code><![CDATA[$this->modules = array_keys($modules)]]></code>
       <code><![CDATA[$this->themes = array_keys($themes)]]></code>
     </InvalidPropertyAssignment>
-    <UndefinedProperty>
-      <code><![CDATA[module_dependencies]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[sort]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[module_dependencies]]></code>
-      <code><![CDATA[sort]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/lib/Drupal/Core/Recipe/RecipeRunner.php">
     <InvalidReturnType>
@@ -2123,13 +2084,6 @@
       <code><![CDATA[MARK_NEW]]></code>
     </UndefinedConstant>
   </file>
-  <file src="core/lib/Drupal/Core/Theme/ThemeInitialization.php">
-    <UndefinedProperty>
-      <code><![CDATA[base_theme]]></code>
-      <code><![CDATA[libraries]]></code>
-      <code><![CDATA[libraries]]></code>
-    </UndefinedProperty>
-  </file>
   <file src="core/lib/Drupal/Core/Theme/ThemeManager.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->keyValueFactory = \Drupal::service('keyvalue')]]></code>
@@ -2244,11 +2198,6 @@
       <code><![CDATA[return new FormattableMarkup(Error::DEFAULT_ERROR_MESSAGE . ' <pre class="backtrace">@backtrace</pre>', $decode);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Utility/ProjectInfo.php">
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-    </UndefinedProperty>
-  </file>
   <file src="core/lib/Drupal/Core/Validation/DrupalTranslator.php">
     <InvalidReturnType>
       <code><![CDATA[return new TranslatableMarkup($id, $this->processParameters($parameters), $this->getOptions($domain, $locale));]]></code>
@@ -2326,11 +2275,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->conditionPluginManager = \Drupal::service('plugin.manager.condition')]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="core/modules/block/src/Hook/BlockHooks.php">
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/block/src/Plugin/ConfigAction/PlaceBlockDeriver.php">
     <InvalidOperand>
@@ -4187,13 +4131,6 @@
       <code><![CDATA[$form_state->getUserInput()]]></code>
     </InvalidPassByReference>
   </file>
-  <file src="core/modules/media_library/src/Plugin/views/field/MediaLibrarySelectForm.php">
-    <UndefinedProperty>
-      <code><![CDATA[mid]]></code>
-      <code><![CDATA[mid]]></code>
-      <code><![CDATA[mid]]></code>
-    </UndefinedProperty>
-  </file>
   <file src="core/modules/menu_link_content/src/Form/MenuLinkContentForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -5074,22 +5011,6 @@
     <NullArgument>
       <code><![CDATA[NULL]]></code>
     </NullArgument>
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[base_themes]]></code>
-      <code><![CDATA[base_themes]]></code>
-      <code><![CDATA[base_themes]]></code>
-      <code><![CDATA[module_dependencies]]></code>
-      <code><![CDATA[module_dependencies]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[incompatible_php]]></code>
-      <code><![CDATA[incompatible_base]]></code>
-      <code><![CDATA[incompatible_engine]]></code>
-      <code><![CDATA[incompatible_module]]></code>
-      <code><![CDATA[required_by]]></code>
-      <code><![CDATA[status]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Controller/ThemeController.php">
     <UndefinedFunction>
@@ -5098,10 +5019,6 @@
       <code><![CDATA[batch_get()]]></code>
       <code><![CDATA[batch_process(Url::fromRoute('system.themes_page'))]]></code>
     </UndefinedFunction>
-    <UndefinedProperty>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[status]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/EventSubscriber/AccessRouteAlterSubscriber.php">
     <InvalidReturnType>
@@ -5138,39 +5055,16 @@
       <code><![CDATA[drupal_install_profile_distribution_name()]]></code>
       <code><![CDATA[drupal_check_module($module)]]></code>
     </UndefinedFunction>
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[required_by]]></code>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[requires]]></code>
-      <code><![CDATA[required_by]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Form/ModulesListNonStableConfirmForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-    <UndefinedProperty>
-      <code><![CDATA[origin]]></code>
-      <code><![CDATA[origin]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Form/ModulesUninstallConfirmForm.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->redirect('system.modules_uninstall');]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/system/src/Form/ModulesUninstallForm.php">
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[required_by]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Form/PrepareModulesEntityUninstallForm.php">
     <UndefinedFunction>
@@ -5186,9 +5080,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $this->redirect('system.themes_page');]]></code>
     </InvalidReturnType>
-    <UndefinedProperty>
-      <code><![CDATA[requires]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Form/ThemeSettingsForm.php">
     <PossiblyUndefinedVariable>
@@ -5205,11 +5096,6 @@
       <code><![CDATA[_file_save_upload_from_form($form['favicon']['settings']['favicon_upload'], $form_state, 0)]]></code>
       <code><![CDATA[theme_settings_convert_to_config($values, $config)]]></code>
     </UndefinedFunction>
-    <UndefinedProperty>
-      <code><![CDATA[prefix]]></code>
-      <code><![CDATA[prefix]]></code>
-      <code><![CDATA[base_themes]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Form/ThemeUninstallConfirmForm.php">
     <InvalidReturnType>
@@ -5218,9 +5104,6 @@
       <code><![CDATA[return new RedirectResponse($this->getCancelUrl()->toString());]]></code>
       <code><![CDATA[return new RedirectResponse($this->getCancelUrl()->toString());]]></code>
     </InvalidReturnType>
-    <UndefinedProperty>
-      <code><![CDATA[sub_themes]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Hook/SystemHooks.php">
     <InvalidArgument>
@@ -5246,10 +5129,6 @@
       <code><![CDATA[drupal_verify_install_file($site_path, FILE_NOT_WRITABLE, 'dir')]]></code>
       <code><![CDATA[drupal_verify_install_file($full_path, FILE_EXIST | FILE_READABLE | FILE_NOT_WRITABLE, 'file', !Settings::get('skip_permissions_hardening'))]]></code>
     </UndefinedFunction>
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-      <code><![CDATA[requires]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/system/src/Hook/SystemThemeHooks.php">
     <UndefinedFunction>
@@ -5319,9 +5198,6 @@
     <UndefinedFunction>
       <code><![CDATA[system_admin_compact_mode()]]></code>
     </UndefinedFunction>
-    <UndefinedProperty>
-      <code><![CDATA[status]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/taxonomy/src/Form/OverviewTerms.php">
     <InvalidArgument>
@@ -5891,9 +5767,6 @@
       <code><![CDATA[$this->view->displayHandlers->get($display_id)]]></code>
       <code><![CDATA[$this->view->displayHandlers->get($display_id)]]></code>
     </TaintedCallable>
-    <UndefinedProperty>
-      <code><![CDATA[temporary_options]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/views/src/Plugin/views/display/EntityReference.php">
     <TooManyArguments>
@@ -6271,9 +6144,6 @@
       <code><![CDATA[return View::loadMultiple($ids);]]></code>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-    <UndefinedProperty>
-      <code><![CDATA[execute_time]]></code>
-    </UndefinedProperty>
   </file>
   <file src="core/modules/workflows/src/Form/WorkflowEditForm.php">
     <InvalidReturnType>

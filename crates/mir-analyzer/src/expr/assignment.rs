@@ -1255,14 +1255,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         if ancestor_classes().any(|c| !c.mixins.is_empty()) {
             return true;
         }
-        let allows_dynamic = || {
-            ancestors.iter().any(|ancestor| {
-                ancestor.eq_ignore_ascii_case("stdClass")
-                    || ancestor.eq_ignore_ascii_case("__PHP_Incomplete_Class")
-            }) || ancestor_classes().any(|c| c.allows_dynamic_properties)
-        };
         if !fatal
-            && (self.php_version < crate::php_version::PhpVersion::new(8, 2) || allows_dynamic())
+            && (self.php_version < crate::php_version::PhpVersion::new(8, 2)
+                || crate::db::allows_dynamic_properties(self.db, fqcn))
         {
             return true;
         }
