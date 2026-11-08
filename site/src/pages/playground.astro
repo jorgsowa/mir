@@ -179,7 +179,7 @@ const ISSUE_DOCS = Object.fromEntries(
 <script is:inline>
   const root      = document.querySelector('.playground');
   const BASE      = root.dataset.base;
-  const WASM_JS   = `${BASE}/wasm/mir_wasm.js`;
+  const WORKER_JS = `${BASE}/playground-worker.js`;
   const EXAMPLES  = JSON.parse(root.dataset.examples);
   const ISSUE_DOCS = JSON.parse(root.dataset.issueDocs);
   const DRAFT_KEY = 'mir-playground-draft';
@@ -204,7 +204,8 @@ const ISSUE_DOCS = Object.fromEntries(
 
   let pgVersion = verList.querySelector('.pg-drop-opt--selected')?.dataset.value ?? '8.5';
 
-  let playground = null;
+  let worker     = null;
+  let ready      = false;
   let debounce   = null;
   let issues     = [];
 
@@ -508,20 +509,65 @@ const ISSUE_DOCS = Object.fromEntries(
     runAnalysis();
   });
 
-  // ── WASM ──────────────────────────────────────────────────────────────────
-  async function loadWasm() {
-    try {
-      const mod = await import(WASM_JS);
-      await mod.default();
-      playground = new mod.Playground();
+  // ── Analyzer worker ───────────────────────────────────────────────────────
+  // One request in flight; newer requests replace the queued one.
+  let seq       = 0;
+  let inFlight  = null;
+  let queued    = null;
+  let busyTimer = null;
+
+  function loadFailed(message) {
+    status.textContent = 'Failed to load analyzer.';
+    btn.textContent = 'Unavailable';
+    btn.disabled = true;
+    console.error(message);
+  }
+
+  function send(req) {
+    inFlight = req;
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(() => { status.textContent = 'Analyzing…'; }, 150);
+    worker.postMessage(req);
+  }
+
+  function onWorkerMessage({ data }) {
+    if (data.type === 'ready') {
+      ready = true;
       btn.textContent = 'Analyze';
       btn.disabled = false;
       runAnalysis();
-    } catch (e) {
-      status.textContent = 'Failed to load analyzer.';
-      btn.textContent = 'Unavailable';
-      console.error(e);
+      return;
     }
+    if (data.type === 'load-error') { loadFailed(data.message); return; }
+
+    inFlight = null;
+    if (queued) { const next = queued; queued = null; send(next); }
+    else { clearTimeout(busyTimer); status.textContent = ''; }
+
+    // Results for superseded text would mark the wrong ranges.
+    if (data.id !== seq) return;
+    if (data.type === 'result') {
+      issues = data.issues.sort((a, b) =>
+        a.line - b.line || a.col_start - b.col_start ||
+        SEV_RANK[a.severity.toLowerCase()] - SEV_RANK[b.severity.toLowerCase()]);
+      renderSummary(data.ms, data.php);
+      renderIssues();
+    } else {
+      issues = [];
+      summary.innerHTML = '<span class="pg-sum pg-sum--error">Analysis error — see console</span>';
+      diag.innerHTML = '';
+      console.error(data.message);
+    }
+    updateGutter();
+    renderMarks();
+  }
+
+  function loadWorker() {
+    try {
+      worker = new Worker(WORKER_JS, { type: 'module' });
+    } catch (e) { loadFailed(e); return; }
+    worker.addEventListener('message', onWorkerMessage);
+    worker.addEventListener('error', e => loadFailed(e.message || e));
   }
 
   function esc(s) {
@@ -619,7 +665,7 @@ const ISSUE_DOCS = Object.fromEntries(
 
   function plural(n, word) { return `${n} ${word}${n === 1 ? '' : 's'}`; }
 
-  function renderSummary(ms) {
+  function renderSummary(ms, php) {
     const count = s => issues.filter(i => i.severity.toLowerCase() === s).length;
     const parts = [];
     const e = count('error'), w = count('warning'), n = count('info');
@@ -627,7 +673,7 @@ const ISSUE_DOCS = Object.fromEntries(
     if (w) parts.push(`<span class="pg-sum pg-sum--warning">${plural(w, 'warning')}</span>`);
     if (n) parts.push(`<span class="pg-sum pg-sum--info">${n} info</span>`);
     if (!parts.length) parts.push('<span class="pg-sum pg-sum--ok">No issues</span>');
-    summary.innerHTML = `${parts.join('')}<span class="pg-sum-time">${ms < 1 ? '&lt;1' : ms.toFixed(0)}&nbsp;ms · PHP&nbsp;${esc(pgVersion)}</span>`;
+    summary.innerHTML = `${parts.join('')}<span class="pg-sum-time">${ms < 1 ? '&lt;1' : ms.toFixed(0)}&nbsp;ms · PHP&nbsp;${esc(php)}</span>`;
   }
 
   function renderIssues() {
@@ -654,29 +700,16 @@ const ISSUE_DOCS = Object.fromEntries(
   }
 
   function runAnalysis() {
+    clearTimeout(debounce);
     saveDraft();
-    if (!playground) return;
-    try {
-      const t0 = performance.now();
-      const raw = playground.analyze(input.value, pgVersion);
-      const ms = performance.now() - t0;
-      issues = JSON.parse(raw).sort((a, b) =>
-        a.line - b.line || a.col_start - b.col_start ||
-        SEV_RANK[a.severity.toLowerCase()] - SEV_RANK[b.severity.toLowerCase()]);
-      renderSummary(ms);
-      renderIssues();
-    } catch (e) {
-      issues = [];
-      summary.innerHTML = '<span class="pg-sum pg-sum--error">Analysis error — see console</span>';
-      diag.innerHTML = '';
-      console.error(e);
-    }
-    updateGutter();
-    renderMarks();
+    if (!ready) return;
+    const req = { id: ++seq, code: input.value, php: pgVersion };
+    if (inFlight) queued = req; else send(req);
   }
 
   btn.addEventListener('click', runAnalysis);
   input.addEventListener('input', () => {
+    seq++;
     updateHighlight();
     // Stale marks would point at shifted text until the next analysis.
     marks.innerHTML = '';
@@ -687,5 +720,5 @@ const ISSUE_DOCS = Object.fromEntries(
   window.addEventListener('resize', () => { charW = null; renderMarks(); });
 
   updateHighlight();
-  loadWasm();
+  loadWorker();
 </script>
