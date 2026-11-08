@@ -622,8 +622,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if rhs_plain {
                             ctx.mark_plain(name.as_ref());
                         }
-                        if !a.by_ref && crate::taint::opens_file_handle(&a.value) {
-                            ctx.mark_file_handle(name.as_ref());
+                        if let Some(origin) =
+                            crate::taint::assigned_value_origin(&a.value).filter(|_| !a.by_ref)
+                        {
+                            ctx.mark_value_origin(name.as_ref(), origin);
                         }
                         if a.by_ref {
                             ctx.alias_var(name.as_ref());

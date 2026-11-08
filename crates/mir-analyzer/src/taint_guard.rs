@@ -999,19 +999,23 @@ fn mac_checked_payload<'e>(args: &'e [Arg], scope: GuardScope<'_>) -> Option<&'e
     })
 }
 
-/// `str_starts_with($u, 'https://host/')` fixes the scheme and host, as a literal prefix does.
+/// `str_starts_with($u, 'https://host/')` fixes the scheme and host, as a literal prefix does;
+/// `str_starts_with($p, $dir)` keeps a `realpath()` result `$p` inside a trusted directory.
 fn fixed_origin_prefix_safe_kinds(args: &[Arg], scope: GuardScope<'_>) -> Option<Taint> {
-    let [_, prefix] = args else {
+    let [subject, prefix] = args else {
         return None;
     };
-    (prefix.name.is_none()
-        && crate::taint::starts_with_fixed_url_origin(
-            prefix.value()?,
-            scope.ctx,
-            scope.db,
-            scope.file,
-        ))
-    .then_some(Taint::SSRF | Taint::FILE)
+    let prefix = prefix.name.is_none().then(|| prefix.value()).flatten()?;
+    if crate::taint::starts_with_fixed_url_origin(prefix, scope.ctx, scope.db, scope.file) {
+        return Some(Taint::SSRF | Taint::FILE);
+    }
+    let canonical = matches!(&subject.value()?.kind, ExprKind::Variable(name)
+        if scope.ctx.has_value_origin(name, crate::flow_state::ValueOrigin::CanonicalPath));
+    let trivial = matches!(&prefix.kind, ExprKind::String(s) if s.as_str().len() < 2);
+    (canonical
+        && !trivial
+        && crate::taint::expr_taint(prefix, scope.ctx, scope.db, scope.file).is_empty())
+    .then_some(Taint::FILE)
 }
 
 /// Kinds a value is safe for once the one-argument check `name_lower` accepted it.

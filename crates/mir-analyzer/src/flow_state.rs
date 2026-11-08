@@ -79,6 +79,14 @@ pub struct Guard {
     pub from_flag: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueOrigin {
+    /// A handle `fopen()` opened on a literal file path.
+    FileHandle,
+    /// A `realpath()` result: canonical, with no `..` or symlink left.
+    CanonicalPath,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GuardKind {
     /// `$v`, `!empty($v)`
@@ -312,8 +320,8 @@ pub struct FlowState {
     /// Variables last assigned data no object can be part of; see `taint::value_may_hold_object`.
     pub plain_vars: Arc<FxHashSet<Name>>,
 
-    /// Variables last assigned a handle `fopen()` opened on a literal file path.
-    pub file_handle_vars: Arc<FxHashSet<Name>>,
+    /// Variables whose last assigned value has a known origin.
+    pub value_origins: Arc<FxHashMap<Name, ValueOrigin>>,
 
     /// Label slots standing for parameters the body proves objects, shared by
     /// every branch of the body; see `taint::seed_object_guards`.
@@ -786,7 +794,7 @@ impl FlowState {
             byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
-            file_handle_vars: Arc::default(),
+            value_origins: Arc::default(),
             object_guard_slots: None,
             tainted_props: Arc::default(),
             local_props: Arc::default(),
@@ -1670,20 +1678,22 @@ impl FlowState {
         if self.plain_vars.contains(&sym) {
             Arc::make_mut(&mut self.plain_vars).remove(&sym);
         }
-        if self.file_handle_vars.contains(&sym) {
-            Arc::make_mut(&mut self.file_handle_vars).remove(&sym);
+        if self.value_origins.contains_key(&sym) {
+            Arc::make_mut(&mut self.value_origins).remove(&sym);
         }
     }
 
-    pub fn mark_file_handle(&mut self, name: &str) {
-        Arc::make_mut(&mut self.file_handle_vars).insert(Name::from(name.trim_start_matches('$')));
+    pub fn mark_value_origin(&mut self, name: &str, origin: ValueOrigin) {
+        Arc::make_mut(&mut self.value_origins)
+            .insert(Name::from(name.trim_start_matches('$')), origin);
     }
 
-    pub fn is_file_handle(&self, name: &str) -> bool {
-        !self.file_handle_vars.is_empty()
+    pub fn has_value_origin(&self, name: &str, origin: ValueOrigin) -> bool {
+        !self.value_origins.is_empty()
             && self
-                .file_handle_vars
-                .contains(&Name::from(name.trim_start_matches('$')))
+                .value_origins
+                .get(&Name::from(name.trim_start_matches('$')))
+                == Some(&origin)
     }
 
     fn unbind_closure(&mut self, sym: Name) {
@@ -2646,12 +2656,13 @@ impl FlowState {
                     .collect(),
             );
         }
-        if !(if_ctx.file_handle_vars.is_empty() && else_ctx.file_handle_vars.is_empty()) {
-            result.file_handle_vars = Arc::new(
+        if !(if_ctx.value_origins.is_empty() && else_ctx.value_origins.is_empty()) {
+            result.value_origins = Arc::new(
                 if_ctx
-                    .file_handle_vars
-                    .intersection(&else_ctx.file_handle_vars)
-                    .copied()
+                    .value_origins
+                    .iter()
+                    .filter(|(name, origin)| else_ctx.value_origins.get(name) == Some(origin))
+                    .map(|(name, origin)| (*name, *origin))
                     .collect(),
             );
         }
@@ -3145,7 +3156,7 @@ impl FlowState {
         diff_map_keys(&self.taint_trails, &other.taint_trails, &mut names);
         diff_map_keys(&self.param_parts, &other.param_parts, &mut names);
         diff_set(&self.plain_vars, &other.plain_vars, &mut names);
-        diff_set(&self.file_handle_vars, &other.file_handle_vars, &mut names);
+        diff_map_keys(&self.value_origins, &other.value_origins, &mut names);
         diff_map_keys(&self.escaped_vars, &other.escaped_vars, &mut names);
         diff_set(&self.captured_vars, &other.captured_vars, &mut names);
         diff_set(

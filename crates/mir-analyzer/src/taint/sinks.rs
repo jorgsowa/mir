@@ -2,6 +2,7 @@ use super::*;
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
+use crate::flow_state::ValueOrigin;
 
 /// Report a call target or class name chosen by user input (`$_GET['f']()`).
 pub fn check_callable_target(
@@ -405,7 +406,9 @@ pub fn output_stays_out_of_response(
     let arg_kind = |index: usize| args.get(index).and_then(|a| a.value()).map(|v| &v.kind);
     match fn_name_lower {
         "fprintf" | "vfprintf" => match arg_kind(0) {
-            Some(ExprKind::Variable(handle)) => ctx.is_file_handle(handle),
+            Some(ExprKind::Variable(handle)) => {
+                ctx.has_value_origin(handle, ValueOrigin::FileHandle)
+            }
             Some(handle) => handle.name_bare() == Some("STDERR"),
             None => false,
         },
@@ -583,28 +586,31 @@ pub fn reaches_sink(
     taint.concrete().intersects(sink)
 }
 
-/// `fopen()` on a literal path naming a file, not an output stream like `php://output`.
-pub fn opens_file_handle(value: &Expr) -> bool {
+/// The origin a value has, if it is `fopen()` on a literal path naming a file (not an output
+/// stream like `php://output`) or a `realpath()` result.
+pub fn assigned_value_origin(value: &Expr) -> Option<ValueOrigin> {
     let mut value = unwrap_parens(value);
     while let ExprKind::ErrorSuppress(inner) = &value.kind {
         value = unwrap_parens(inner);
     }
     let ExprKind::FunctionCall(fc) = &value.kind else {
-        return false;
+        return None;
     };
+    let name = fc.name.kind.name_bare()?;
+    if name.eq_ignore_ascii_case("realpath") {
+        return Some(ValueOrigin::CanonicalPath);
+    }
     let path = fc
         .args
         .first()
         .filter(|a| a.name.is_none() && !a.unpack())
         .and_then(|a| a.value());
-    fc.name
-        .kind
-        .name_bare()
-        .is_some_and(|n| n.eq_ignore_ascii_case("fopen"))
+    (name.eq_ignore_ascii_case("fopen")
         && matches!(path.map(|p| &p.kind), Some(ExprKind::String(path)) if {
             let path = path.as_str().to_ascii_lowercase();
             !path.contains("php://") && !path.starts_with("/dev/")
-        })
+        }))
+    .then_some(ValueOrigin::FileHandle)
 }
 
 /// What a `header()` call makes of the response type: `Some(true)` for a literal content type
