@@ -38,6 +38,9 @@ pub(crate) fn taint_destructured_targets(
         match &elem.value().kind {
             ExprKind::Variable(name) => {
                 ctx.clear_prop_taints(name);
+                if elem.is_by_ref() {
+                    ctx.unbind_ref(name);
+                }
                 if !taint.is_empty() {
                     ctx.taint_var_with_parts(name.as_ref(), taint, parts);
                 }
@@ -642,11 +645,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if a.by_ref {
                             ctx.alias_var(name.as_ref());
                         }
-                        if let (true, ExprKind::Variable(source)) = (a.by_ref, &a.value.kind) {
-                            ctx.alias_var(source.as_ref());
-                            ctx.clear_value_marks(mir_types::Name::from(
-                                source.trim_start_matches('$'),
-                            ));
+                        match (a.by_ref, &a.value.kind) {
+                            (true, ExprKind::Variable(source)) => {
+                                ctx.alias_var(source.as_ref());
+                                ctx.clear_value_marks(mir_types::Name::from(
+                                    source.trim_start_matches('$'),
+                                ));
+                                ctx.bind_ref(name, source);
+                            }
+                            (true, _) => ctx.unbind_ref(name),
+                            (false, _) => {}
                         }
                         let value = crate::taint::unwrap_parens(&a.value);
                         let closure =
@@ -686,6 +694,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 mir_types::Name::from(name.trim_start_matches('$')),
                                 crate::taint::extend_trail(trail, &a.target, self.source),
                             );
+                        }
+                        if !a.by_ref {
+                            ctx.copy_taint_to_refs(name);
                         }
                     }
                     ExprKind::PropertyAccess(pa) => {

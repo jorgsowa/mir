@@ -345,6 +345,9 @@ pub struct FlowState {
     /// Variables that may hold the same object, each mapped to its group's root variable.
     pub object_aliases: Arc<FxHashMap<Name, Name>>,
 
+    /// Variables bound to one value by `=&`, each mapped to its group's root variable.
+    pub var_refs: Arc<FxHashMap<Name, Name>>,
+
     /// Static properties that carry tainted (user-controlled) values at this
     /// point. Key: `(fqcn, prop_name)`, mirroring how `prop_refined`'s static
     /// counterpart is keyed by FQCN instead of a receiver variable name (a
@@ -804,6 +807,7 @@ impl FlowState {
             local_props: Arc::default(),
             local_prop_keys: Arc::default(),
             object_aliases: Arc::default(),
+            var_refs: Arc::default(),
             tainted_static_props: Arc::default(),
             ref_aliases: FxHashMap::default(),
             escaped_vars: Arc::default(),
@@ -2011,18 +2015,48 @@ impl FlowState {
         if self.tainted_props.keys().any(|(o, _)| *o == obj) {
             Arc::make_mut(&mut self.tainted_props).retain(|(o, _), _| *o != obj);
         }
-        if self.object_aliases.contains_key(&obj) {
-            let aliases = Arc::make_mut(&mut self.object_aliases);
-            aliases.remove(&obj);
-            let heirs: Vec<Name> = aliases
-                .iter()
-                .filter(|(_, root)| **root == obj)
-                .map(|(var, _)| *var)
-                .collect();
-            if let Some(&new_root) = heirs.first() {
-                for var in heirs {
-                    aliases.insert(var, new_root);
-                }
+        leave_group(&mut self.object_aliases, obj);
+    }
+
+    /// `$a = &$b`: `$a` leaves its old reference group and joins `$b`'s.
+    pub fn bind_ref(&mut self, a: &str, b: &str) {
+        let (a, b) = (
+            Name::from(a.trim_start_matches('$')),
+            Name::from(b.trim_start_matches('$')),
+        );
+        leave_group(&mut self.var_refs, a);
+        if a == b {
+            return;
+        }
+        let root = self.var_refs.get(&b).copied().unwrap_or(b);
+        let refs = Arc::make_mut(&mut self.var_refs);
+        refs.insert(a, root);
+        refs.insert(b, root);
+    }
+
+    /// `$name` is rebound, so it no longer shares a value with its reference group.
+    pub fn unbind_ref(&mut self, name: &str) {
+        leave_group(&mut self.var_refs, Name::from(name.trim_start_matches('$')));
+    }
+
+    /// Give every variable bound by reference to `$name` its current taint.
+    pub fn copy_taint_to_refs(&mut self, name: &str) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        let Some(root) = self.var_refs.get(&sym).copied() else {
+            return;
+        };
+        let peers: Vec<Name> = self
+            .var_refs
+            .iter()
+            .filter(|(var, group)| **group == root && **var != sym)
+            .map(|(var, _)| *var)
+            .collect();
+        let taint = self.var_taint(name);
+        let trail = self.taint_trails.get(&sym).cloned();
+        for peer in peers {
+            self.set_var_taint(peer.as_str(), taint);
+            if let Some(trail) = &trail {
+                Arc::make_mut(&mut self.taint_trails).insert(peer, trail.clone());
             }
         }
     }
@@ -2280,6 +2314,7 @@ impl FlowState {
         Arc::make_mut(&mut self.possibly_assigned_vars).remove(&sym);
         self.drop_guarded_defs_of(sym);
         self.clear_prop_taints(name);
+        leave_group(&mut self.var_refs, sym);
     }
 
     /// Clone this context to analyze a conditional branch (`if`, `elseif`,
@@ -2762,6 +2797,20 @@ impl FlowState {
             }
         }
 
+        // A reference binding survives only where both branches made the same one.
+        result.var_refs = if Arc::ptr_eq(&if_ctx.var_refs, &else_ctx.var_refs) {
+            if_ctx.var_refs.clone()
+        } else {
+            Arc::new(
+                if_ctx
+                    .var_refs
+                    .iter()
+                    .filter(|(var, root)| else_ctx.var_refs.get(*var) == Some(*root))
+                    .map(|(var, root)| (*var, *root))
+                    .collect(),
+            )
+        };
+
         // Same conservative union for ref-aliases — once either branch
         // records `$x =& $this->prop;`, later code on the merged path must
         // still treat writes to `$x` as writes to the property.
@@ -2990,6 +3039,25 @@ fn merge_closures(a: &Arc<ClosureSummaries>, b: &Arc<ClosureSummaries>) -> Arc<C
 pub struct KeyTracking {
     pub exact: FxHashSet<Name>,
     pub aliased: FxHashSet<Name>,
+}
+
+/// Remove `sym` from its alias group, re-rooting the rest of the group if `sym` was its root.
+fn leave_group(aliases: &mut Arc<FxHashMap<Name, Name>>, sym: Name) {
+    if !aliases.contains_key(&sym) {
+        return;
+    }
+    let aliases = Arc::make_mut(aliases);
+    aliases.remove(&sym);
+    let heirs: Vec<Name> = aliases
+        .iter()
+        .filter(|(_, root)| **root == sym)
+        .map(|(var, _)| *var)
+        .collect();
+    if let Some(&new_root) = heirs.first() {
+        for var in heirs {
+            aliases.insert(var, new_root);
+        }
+    }
 }
 
 /// Exact only where both sides are, aliased where either is.
@@ -3269,6 +3337,8 @@ impl FlowState {
         for (a, b) in [
             (&self.object_aliases, &other.object_aliases),
             (&other.object_aliases, &self.object_aliases),
+            (&self.var_refs, &other.var_refs),
+            (&other.var_refs, &self.var_refs),
         ] {
             for (name, target) in a.iter() {
                 if b.get(name) != Some(target) {

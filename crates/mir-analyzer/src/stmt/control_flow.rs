@@ -488,6 +488,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 );
             }
             if value_is_by_ref {
+                entry.unbind_ref(vname);
                 // By-reference iteration: writes to this variable always mutate
                 // the source array through the reference, so they are never dead.
                 entry.foreach_byref_var_names.insert(Name::from(vname));

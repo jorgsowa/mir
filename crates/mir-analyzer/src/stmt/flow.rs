@@ -862,6 +862,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.record_symbol_for_var(sv.name.span, name, ty.clone());
             ctx.set_var(name, ty);
             ctx.alias_var(name);
+            ctx.unbind_ref(name);
             std::sync::Arc::make_mut(&mut ctx.static_var_names).insert(mir_types::Name::from(name));
             let (line, col_start) = self.offset_to_line_col(sv.span.start);
             let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
@@ -918,6 +919,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.record_symbol_for_var(var.span, var_name, ty.clone());
                 ctx.set_var(var_name, ty);
                 ctx.alias_var(var_name);
+                ctx.unbind_ref(var_name);
                 ctx.mark_escaped(var_name, None);
                 ctx.set_var_taint(
                     var_name,
