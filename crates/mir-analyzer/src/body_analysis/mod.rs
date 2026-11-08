@@ -215,11 +215,11 @@ fn method_chain_signature(
             &storage,
         );
 
+        // A native `void` can't be refined by a parent's docblock.
         let own_has_docblock_return = storage
             .return_type
             .as_deref()
-            .map(|t| t.from_docblock)
-            .unwrap_or(false);
+            .is_some_and(|t| t.from_docblock || t.is_void());
         let return_type = if own_has_docblock_return {
             storage.return_type.as_deref().cloned()
         } else {

@@ -1376,7 +1376,6 @@
   </file>
   <file src="core/lib/Drupal/Core/Installer/InstallerKernel.php">
     <InvalidReturnType>
-      <code><![CDATA[]]></code>
       <code><![CDATA[return $profile;]]></code>
     </InvalidReturnType>
   </file>
