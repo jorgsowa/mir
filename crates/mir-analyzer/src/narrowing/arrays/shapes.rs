@@ -156,7 +156,19 @@ pub(crate) fn narrow_isset_shape_key(
         return;
     };
     let current = resolve_shape_base_current_type(ctx, &base, db, file);
-    if let Some(narrowed) = narrow_shape_path(&current, &path) {
+    let narrowed = narrow_shape_path(&current, &path).or_else(|| match path.as_slice() {
+        // Every member is a sealed shape without the key, so the declared shape is too narrow.
+        [key]
+            if current.types.iter().all(|a| {
+                matches!(a, Atomic::TKeyedArray { properties, is_open: false, .. }
+                    if !properties.contains_key(key))
+            }) =>
+        {
+            Some(super::key_exists::add_key_to_sealed_shapes(&current, key))
+        }
+        _ => None,
+    });
+    if let Some(narrowed) = narrowed {
         set_shape_base_narrowed(ctx, &base, current, narrowed);
     }
 }

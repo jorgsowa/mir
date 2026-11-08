@@ -5734,14 +5734,10 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/views_ui/src/ViewEditForm.php">
-    <InvalidArrayOffset>
-      <code><![CDATA[$bucket['column']]]></code>
-    </InvalidArrayOffset>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
     <NonExistentArrayOffset>
-      <code><![CDATA['column']]></code>
       <code><![CDATA['title']]></code>
     </NonExistentArrayOffset>
     <PossiblyUndefinedVariable>
