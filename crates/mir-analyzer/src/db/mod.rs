@@ -263,9 +263,9 @@ pub use self::find_queries::{
     find_class_like, find_class_like_ref, find_function, find_function_from, find_global_constant,
     find_implicit_doc_parent, find_inheritdoc_parent, find_method_in_chain, find_method_in_class,
     find_method_respecting_precedence, find_property_in_chain, find_property_in_class,
-    function_in_file, global_constant_in_file, has_method_in_chain, interface_in_file,
-    is_method_concretely_implemented, method_is_pure_in_chain, property_in_own_composition,
-    trait_in_file, ClassLike, ClassLikeRef,
+    function_in_file, global_constant_in_file, has_method_in_chain, inheritdoc_param,
+    interface_in_file, is_method_concretely_implemented, method_is_pure_in_chain,
+    property_in_own_composition, trait_in_file, ClassLike, ClassLikeRef,
 };
 pub(crate) use self::find_queries::{
     class_like_loc, constant_loc, function_loc, function_loc_from, indexed_symbol_loc, symbol_loc,

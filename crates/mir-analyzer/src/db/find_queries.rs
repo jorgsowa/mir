@@ -1757,6 +1757,21 @@ pub fn find_inheritdoc_parent<'db>(
     first_any
 }
 
+/// The parent param `own[i]` inherits under `@inheritDoc`: the same-named one, else the one
+/// at the same position unless that name moved elsewhere in `own` (an inserted param).
+pub fn inheritdoc_param<'p>(
+    parent: &'p [mir_codebase::definitions::DeclaredParam],
+    own: &[mir_codebase::definitions::DeclaredParam],
+    i: usize,
+) -> Option<&'p mir_codebase::definitions::DeclaredParam> {
+    let name = &own.get(i)?.name;
+    parent.iter().find(|p| p.name == *name).or_else(|| {
+        parent
+            .get(i)
+            .filter(|p| !own.iter().any(|o| o.name == p.name))
+    })
+}
+
 /// Docblock parent of an override that declares no docblock types of its own
 /// (no `@inheritDoc`): the nearest ancestor method whose docblock `@return`
 /// refines the same bare class the override returns natively

@@ -1381,86 +1381,6 @@
       <code><![CDATA[return $this->getRequest()->headers->get('HX-Trigger-Name', '');]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableAccessDeniedHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableBadRequestHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableConflictHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableGoneHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$statusCode]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableLengthRequiredHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableMethodNotAllowedHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableNotAcceptableHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableNotFoundHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheablePreconditionFailedHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheablePreconditionRequiredHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableServiceUnavailableHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableTooManyRequestsHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableUnauthorizedHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableUnprocessableEntityHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Http/Exception/CacheableUnsupportedMediaTypeHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/lib/Drupal/Core/Image/ImageFactory.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$this->toolkitId === NULL]]></code>
@@ -1828,11 +1748,6 @@
   <file src="core/lib/Drupal/Core/Routing/ContentTypeHeaderMatcher.php">
     <InvalidArgument>
       <code><![CDATA[FALSE]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Routing/Exception/CacheableResourceNotFoundException.php">
-    <InvalidArgument>
-      <code><![CDATA[$code]]></code>
     </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/Routing/LazyRouteCollection.php">
@@ -3346,12 +3261,6 @@
     <UndefinedMethod>
       <code><![CDATA[$response->getCacheableMetadata()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="core/modules/jsonapi/src/Exception/EntityAccessDeniedHttpException.php">
-    <InvalidArgument>
-      <code><![CDATA[$message]]></code>
-      <code><![CDATA[$code]]></code>
-    </InvalidArgument>
   </file>
   <file src="core/modules/jsonapi/src/JsonApiResource/LinkCollection.php">
     <InvalidArgument>

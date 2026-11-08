@@ -375,7 +375,7 @@ pub(crate) fn resolve_method_from_db(
                         own.ty.as_deref().map(|t| t.from_docblock).unwrap_or(false);
                     let own_is_mixed_or_absent =
                         own.ty.as_deref().map(|t| t.is_mixed()).unwrap_or(true);
-                    let parent_param = p.params.get(i);
+                    let parent_param = crate::db::inheritdoc_param(&p.params, &storage.params, i);
                     // A docblock callable signature (`Closure(T): U`) refines a
                     // bare native `Closure`/`callable` hint, so it is inherited.
                     let parent_refines_own = |parent_ty: &Type| {

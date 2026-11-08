@@ -248,7 +248,9 @@ fn method_chain_signature(
                     let own_is_mixed_or_absent =
                         own.ty.as_deref().map(|t| t.is_mixed()).unwrap_or(true);
                     if !own_ty_is_docblock && own_is_mixed_or_absent {
-                        if let Some(parent_param) = p.params.get(i) {
+                        if let Some(parent_param) =
+                            crate::db::inheritdoc_param(&p.params, &storage.params, i)
+                        {
                             if parent_param.ty.is_some() {
                                 return mir_codebase::definitions::DeclaredParam {
                                     ty: parent_param.ty.clone(),
