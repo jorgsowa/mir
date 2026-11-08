@@ -2162,6 +2162,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         };
                                         if !skip
                                             && !property_assign_compatible(&ty, &compat_ty, self.db)
+                                            && !crate::call::stringable_coercion_ok(
+                                                &ty,
+                                                &resolved_prop_ty,
+                                                self,
+                                            )
                                         {
                                             if is_property_type_coercion(
                                                 &ty,

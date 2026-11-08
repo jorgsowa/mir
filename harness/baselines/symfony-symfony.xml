@@ -579,16 +579,6 @@
       <code><![CDATA[$helpCommand->setCommand($command)]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Component/Console/Attribute/Argument.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$self->name = (new UnicodeString($name))->kebab()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Console/Attribute/Option.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$self->name = (new UnicodeString($name))->kebab()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Console/Command/DumpCompletionCommand.php">
     <InvalidArgument>
       <code><![CDATA[$this->getSupportedShells(...)]]></code>

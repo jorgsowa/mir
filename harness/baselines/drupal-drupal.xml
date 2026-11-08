@@ -5451,11 +5451,6 @@
       <code><![CDATA[]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/user/src/Plugin/views/filter/Current.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->value_value = $this->t('Is the logged in user')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/modules/user/src/ProfileForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -5827,17 +5822,9 @@
     <InvalidOperand>
       <code><![CDATA[['All' => $this->t('- Any -')] + $form['value']['#options']]]></code>
     </InvalidOperand>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->value_value = $this->t('True')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $options;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/views/src/Plugin/views/filter/Bundle.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->valueTitle = $this->t('@entity types', ['@entity' => $this->entityType->getLabel()])]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/EntityReference.php">
     <NullableReturnStatement>
@@ -5856,17 +5843,9 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/InOperator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->valueTitle = $this->t('Options')]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$source]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/modules/views/src/Plugin/views/filter/LanguageFilter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->valueTitle = $this->t('Language')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/NumericFilter.php">
     <PossiblyUndefinedVariable>

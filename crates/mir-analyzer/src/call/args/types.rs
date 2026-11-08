@@ -370,7 +370,11 @@ pub(crate) fn check_one(
 /// Scope: only fires when `param` contains a `string` atomic and `arg` is a
 /// named-object type that implements `\Stringable`. Other parameter types
 /// (int, array, …) are deliberately excluded.
-fn stringable_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+pub(crate) fn stringable_coercion_ok(
+    arg: &Type,
+    param: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+) -> bool {
     use mir_types::Atomic;
 
     // Under strict_types=1, PHP does NOT coerce objects to string even when
