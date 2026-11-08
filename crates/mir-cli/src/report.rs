@@ -421,8 +421,21 @@ fn scoped_level<'a>(issue: &Issue, kind: &str, config: &'a Config) -> Option<&'a
         .filter(|scope| scope.kind == kind)
         .peekable();
     scopes.peek()?;
-    let file = std::path::Path::new(issue.location.file.as_ref());
-    let file = crate::path_util::normalize_for_compare(&cwd().join(file));
+    thread_local! {
+        static NORMALIZED: std::cell::RefCell<std::collections::HashMap<std::sync::Arc<str>, PathBuf>> =
+            Default::default();
+    }
+    // Canonicalizing is a realpath per call, and a file usually has several issues.
+    let file = NORMALIZED.with(|cache| {
+        cache
+            .borrow_mut()
+            .entry(issue.location.file.clone())
+            .or_insert_with(|| {
+                let file = std::path::Path::new(issue.location.file.as_ref());
+                crate::path_util::normalize_for_compare(&cwd().join(file))
+            })
+            .clone()
+    });
     let symbol = issue.kind.referenced_symbol();
     scopes
         .find(|scope| {
