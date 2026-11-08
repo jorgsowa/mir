@@ -27,17 +27,19 @@ if (!is_executable($mirBin)) {
  */
 function runMir(array $args, string $cwd): array
 {
-    $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    // stderr goes to a file: a large stale-baseline report fills a pipe while stdout is being read.
+    $stderrFile = tempnam(sys_get_temp_dir(), 'mir-harness');
+    $descriptors = [1 => ['pipe', 'w'], 2 => ['file', $stderrFile, 'w']];
     $proc = proc_open($args, $descriptors, $pipes, $cwd);
     if (!is_resource($proc)) {
         fwrite(STDERR, 'failed to start: ' . implode(' ', $args) . "\n");
         exit(2);
     }
     $stdout = stream_get_contents($pipes[1]);
-    $stderr = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
-    fclose($pipes[2]);
     $exitCode = proc_close($proc);
+    $stderr = (string) file_get_contents($stderrFile);
+    unlink($stderrFile);
     return [$stdout, $stderr, $exitCode];
 }
 
@@ -46,12 +48,28 @@ function countBaselineEntries(string $baselineFile): int
     return substr_count((string) file_get_contents($baselineFile), '<code>');
 }
 
+/**
+ * @param list<string> $patterns glob patterns relative to the fixture
+ * @return list<string>
+ */
+function analyzedPaths(array $patterns, string $fixtureDir): array
+{
+    $paths = [];
+    foreach ($patterns as $pattern) {
+        foreach (glob($fixtureDir . '/' . $pattern, GLOB_ONLYDIR) ?: [] as $dir) {
+            $paths[] = substr($dir, strlen($fixtureDir) + 1);
+        }
+    }
+    return $paths;
+}
+
 $overallStatus = 0;
 
 foreach (require $here . '/packages.php' as $package) {
     $slug = $package['slug'];
     $fixtureDir = $fixturesDir . '/' . $slug;
     $baselineFile = $baselinesDir . '/' . $slug . '.xml';
+    $paths = analyzedPaths($package['paths'] ?? ['src'], $fixtureDir);
 
     echo "== $slug\n";
 
@@ -63,7 +81,7 @@ foreach (require $here . '/packages.php' as $package) {
 
     if ($update) {
         [, $stderr, $code] = runMir(
-            [$mirBin, 'src', '--baseline', $baselineFile, '--update-baseline', '--no-progress', '-q'],
+            [$mirBin, ...$paths, '--baseline', $baselineFile, '--update-baseline', '--no-progress', '-q'],
             $fixtureDir
         );
         if ($code !== 0) {
@@ -76,7 +94,7 @@ foreach (require $here . '/packages.php' as $package) {
     }
 
     [$stdout, $stderr] = runMir(
-        [$mirBin, 'src', '--baseline', $baselineFile, '--report-stale-baseline', '--format', 'json', '--no-progress', '-q'],
+        [$mirBin, ...$paths, '--baseline', $baselineFile, '--report-stale-baseline', '--format', 'json', '--no-progress', '-q'],
         $fixtureDir
     );
 

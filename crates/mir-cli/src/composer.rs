@@ -28,10 +28,16 @@ pub fn find_composer_root_for_path(path: &Path) -> Option<PathBuf> {
     // Known limitation: if vendor/ is a symlink, canonicalize() resolves it and
     // the resulting path may not contain a "vendor" component at all, causing
     // the walk to stop at the package's own composer.json.
-    start
+    let mut manifests = start
         .ancestors()
-        .find(|dir| dir.join("composer.json").exists() && !is_vendor_package_dir(dir))
-        .map(PathBuf::from)
+        .filter(|dir| dir.join("composer.json").exists() && !is_vendor_package_dir(dir));
+    let nearest = manifests.next()?;
+    if nearest.join("vendor").is_dir() {
+        return Some(nearest.to_path_buf());
+    }
+    // A subpackage of an installed project (Drupal's `core/`) has a manifest but no vendor/.
+    let installed = manifests.find(|dir| dir.join("vendor").is_dir());
+    Some(installed.unwrap_or(nearest).to_path_buf())
 }
 
 #[cfg(test)]
@@ -161,6 +167,35 @@ mod tests {
         let found = find_composer_root_for_path(&src.join("Support.php"));
 
         assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn composer_root_prefers_installed_project_over_nested_package_manifest() {
+        let root = temp_project("nested_package");
+        let lib = root.join("core/lib");
+        fs::create_dir_all(&lib).unwrap();
+        fs::create_dir_all(root.join("vendor")).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(root.join("core/composer.json"), "{}").unwrap();
+
+        let found = find_composer_root_for_path(&lib);
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn composer_root_keeps_nearest_manifest_when_nothing_is_installed() {
+        let root = temp_project("nested_uninstalled");
+        let lib = root.join("core/lib");
+        fs::create_dir_all(&lib).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(root.join("core/composer.json"), "{}").unwrap();
+
+        let found = find_composer_root_for_path(&lib);
+
+        assert_eq!(found, Some(root.join("core").canonicalize().unwrap()));
         let _ = fs::remove_dir_all(root);
     }
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Pinned tags so every machine analyzes the same source.
+// Pinned tags so every machine analyzes the same source. `paths` are globs analyzed instead of `src`.
 return [
     ['slug' => 'phpunit-phpunit', 'url' => 'https://github.com/sebastianbergmann/phpunit.git', 'tag' => '13.2.6'],
     ['slug' => 'guzzlehttp-guzzle', 'url' => 'https://github.com/guzzle/guzzle.git', 'tag' => '7.15.2'],
@@ -14,4 +14,5 @@ return [
     ['slug' => 'egulias-email-validator', 'url' => 'https://github.com/egulias/EmailValidator.git', 'tag' => '4.0.4'],
     ['slug' => 'vlucas-phpdotenv', 'url' => 'https://github.com/vlucas/phpdotenv.git', 'tag' => 'v5.6.4'],
     ['slug' => 'symfony-symfony', 'url' => 'https://github.com/symfony/symfony.git', 'tag' => 'v8.1.11'],
+    ['slug' => 'drupal-drupal', 'url' => 'https://github.com/drupal/drupal.git', 'tag' => '11.4.12', 'paths' => ['core/lib', 'core/modules/*/src']],
 ];
