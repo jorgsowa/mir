@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `{@inheritdoc}`, a parameter takes the parent's type for the parameter of the same name, so a parameter inserted before it no longer shifts the inherited types.
 - The result of a method declared `function &m()` can be passed to a by-reference parameter without `InvalidPassByReference`.
 - An empty `case` before `default` no longer leaves the switch with the pre-switch state, so a variable every body assigns isn't `PossiblyUndefinedVariable` after it.
+- A switch with a `case` for every value of a literal-union subject is treated as always entering a case, like one with `default`.
 
 ## [0.94.0] - 2026-11-08
 

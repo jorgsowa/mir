@@ -641,10 +641,6 @@
       <code><![CDATA[return $string;]]></code>
       <code><![CDATA[return $output;]]></code>
     </InvalidReturnType>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$interval_output]]></code>
-      <code><![CDATA[$interval_output]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Datetime/DateHelper.php">
     <InvalidReturnType>
@@ -4705,9 +4701,6 @@
     <InvalidArgument>
       <code><![CDATA[$severity]]></code>
     </InvalidArgument>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$updates]]></code>
-    </PossiblyUndefinedVariable>
     <UndefinedFunction>
       <code><![CDATA[drupal_load_updates()]]></code>
       <code><![CDATA[update_check_requirements()]]></code>

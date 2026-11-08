@@ -1114,7 +1114,23 @@ impl<'a> StatementsAnalyzer<'a> {
         // With a default arm, some arm ALWAYS runs — the "fell past every case"
         // path doesn't exist, so don't seed the merge with pre_ctx (it would
         // keep pre-switch pending writes alive that every arm overwrote).
-        let mut merged: Option<FlowState> = if has_default {
+        // A literal-union subject with a `case` for every value always enters one too.
+        let always_enters = has_default
+            || (!subject_ty.types.is_empty()
+                && subject_ty.types.iter().all(|t| {
+                    sw.body
+                        .cases
+                        .iter()
+                        .filter_map(|c| c.value.as_ref())
+                        .any(|v| match (t, &v.kind) {
+                            (Atomic::TLiteralString(s), ExprKind::String(c)) => {
+                                s.as_ref() == &*c.to_text()
+                            }
+                            (Atomic::TLiteralInt(n), ExprKind::Int(c)) => n == c,
+                            _ => false,
+                        })
+                }));
+        let mut merged: Option<FlowState> = if always_enters {
             None
         } else {
             Some(pre_ctx.clone())
