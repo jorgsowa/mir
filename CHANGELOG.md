@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Without `strict_types`, assigning a `Stringable` object to a `string` property isn't `InvalidPropertyAssignment`, matching `string` parameters.
 - `['Ns\Class', 'method']` is accepted as a callable when the string names an existing class, as `[Ns\Class::class, 'method']` already was.
 - With `{@inheritdoc}`, a parameter takes the parent's type for the parameter of the same name, so a parameter inserted before it no longer shifts the inherited types.
+- The result of a method declared `function &m()` can be passed to a by-reference parameter without `InvalidPassByReference`.
 
 ## [0.94.0] - 2026-11-08
 

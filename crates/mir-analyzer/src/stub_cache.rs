@@ -44,7 +44,7 @@ const MAGIC: u32 = 0x5052_494D;
 /// struct or definition-collection behavior changes (e.g.
 /// `inferred_return_type: Option<Type>` → `Option<Arc<Type>>`), so stale
 /// entries are rejected.
-const FORMAT_VERSION: u32 = 37;
+const FORMAT_VERSION: u32 = 38;
 
 /// magic: u32, format version: u32, mir version hash: u64.
 const HEADER_LEN: u64 = 16;

@@ -42,10 +42,9 @@ use arrays::{
 pub(crate) use arrays::{
     narrow_shape_path_to_asserted, resolve_shape_base_current_type, set_shape_base_narrowed,
 };
-pub(crate) use assertions::apply_one_assertion;
-use assertions::{
-    apply_docblock_assertions, apply_method_docblock_assertions, method_call_receiver_fqcn,
-    resolve_static_call_class_fqcn,
+use assertions::{apply_docblock_assertions, apply_method_docblock_assertions};
+pub(crate) use assertions::{
+    apply_one_assertion, method_call_receiver_fqcn, resolve_static_call_class_fqcn,
 };
 use class_const_compare::narrow_from_static_or_class_const_comparison;
 pub(crate) use class_const_compare::narrow_match_arm_from_dynamic_class_const;

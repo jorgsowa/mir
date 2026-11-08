@@ -658,6 +658,40 @@ pub(crate) fn expr_can_be_passed_by_reference_owned(expr: &php_ast::owned::Expr)
     )
 }
 
+/// A method call whose callee is declared `function &name()`, so its result binds by reference.
+fn call_returns_by_ref(
+    ea: &ExpressionAnalyzer<'_>,
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+) -> bool {
+    use php_ast::owned::ExprKind;
+    let (fqcn, method) = match &expr.kind {
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            let ExprKind::Identifier(name) = &mc.method.kind else {
+                return false;
+            };
+            let method = crate::util::php_ident_lowercase(name);
+            let fqcn = crate::narrowing::method_call_receiver_fqcn(
+                &mc.object, ctx, ea.db, &ea.file, &method,
+            );
+            (fqcn, method)
+        }
+        ExprKind::StaticMethodCall(smc) => {
+            let ExprKind::Identifier(name) = &smc.method.kind else {
+                return false;
+            };
+            let fqcn =
+                crate::narrowing::resolve_static_call_class_fqcn(&smc.class, ctx, ea.db, &ea.file);
+            (fqcn, crate::util::php_ident_lowercase(name))
+        }
+        _ => return false,
+    };
+    fqcn.and_then(|fqcn| {
+        crate::db::find_method_in_chain(ea.db, crate::db::Fqcn::from_str(ea.db, &fqcn), &method)
+    })
+    .is_some_and(|(_, m)| m.returns_by_ref)
+}
+
 // ---------------------------------------------------------------------------
 // Orchestrator
 // ---------------------------------------------------------------------------
@@ -708,7 +742,13 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
 
         let param = &params[*param_idx];
 
-        if param.is_byref && !arg_can_be_byref.get(*arg_idx).copied().unwrap_or(false) {
+        if param.is_byref
+            && !arg_can_be_byref.get(*arg_idx).copied().unwrap_or(false)
+            && !args
+                .get(*arg_idx)
+                .and_then(|a| a.value())
+                .is_some_and(|e| call_returns_by_ref(ea, e, ctx))
+        {
             ea.emit(
                 IssueKind::InvalidPassByReference {
                     fn_name: fn_name.to_string(),

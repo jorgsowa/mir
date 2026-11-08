@@ -442,7 +442,7 @@ pub(crate) fn compute_assertion_template_bindings(
 /// deeper property chain, an array-index hop, or a method-call hop
 /// (`$h->getValidator()->isInt($p)`). An unresolved receiver no-ops the
 /// whole assertion.
-pub(super) fn method_call_receiver_fqcn(
+pub(crate) fn method_call_receiver_fqcn(
     object: &php_ast::owned::Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,
@@ -516,7 +516,7 @@ pub(super) fn method_call_receiver_fqcn(
 /// this one matches a `StaticMethodCall`'s). `extract_class_fqcn_from_expr`
 /// is the wrong tool here: it resolves `Foo::class`/a string literal, not a
 /// bare class-name identifier used directly as a call target.
-pub(super) fn resolve_static_call_class_fqcn(
+pub(crate) fn resolve_static_call_class_fqcn(
     class_expr: &php_ast::owned::Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,

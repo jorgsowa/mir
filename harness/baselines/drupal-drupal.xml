@@ -658,14 +658,6 @@
       <code><![CDATA[$year]]></code>
       <code><![CDATA[$month]]></code>
     </InvalidArgument>
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-    </InvalidPassByReference>
-  </file>
-  <file src="core/lib/Drupal/Core/Datetime/Element/Datetime.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-    </InvalidPassByReference>
   </file>
   <file src="core/lib/Drupal/Core/DefaultContent/Finder.php">
     <UnhandledMatchCondition>
@@ -1220,14 +1212,6 @@
       <code><![CDATA[return $this->t('- None -');]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Field/WidgetBase.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[$form_state->getCompleteForm()]]></code>
-      <code><![CDATA[$form_state->getStorage()]]></code>
-      <code><![CDATA[$form_state->getStorage()]]></code>
-    </InvalidPassByReference>
-  </file>
   <file src="core/lib/Drupal/Core/File/FileSystem.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$real_source === FALSE]]></code>
@@ -1285,10 +1269,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/lib/Drupal/Core/Form/FormBuilder.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-    </InvalidPassByReference>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
@@ -1299,21 +1279,9 @@
     </UndefinedFunction>
   </file>
   <file src="core/lib/Drupal/Core/Form/FormState.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$this->getValues()]]></code>
-    </InvalidPassByReference>
     <NullableReturnStatement>
       <code><![CDATA[return $this->input;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/lib/Drupal/Core/Form/FormStateValuesTrait.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$this->getValues()]]></code>
-      <code><![CDATA[$this->getValues()]]></code>
-      <code><![CDATA[$this->getValues()]]></code>
-      <code><![CDATA[$this->getValues()]]></code>
-      <code><![CDATA[$this->getValues()]]></code>
-    </InvalidPassByReference>
   </file>
   <file src="core/lib/Drupal/Core/Form/FormSubmitter.php">
     <UndefinedFunction>
@@ -1322,10 +1290,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/lib/Drupal/Core/Form/FormValidator.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[$form_state->getValues()]]></code>
-    </InvalidPassByReference>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
@@ -1334,11 +1298,6 @@
       <code><![CDATA[$is_empty_string]]></code>
       <code><![CDATA[$is_empty_null]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/lib/Drupal/Core/Form/SubformState.php">
-    <InvalidPassByReference>
-      <code><![CDATA[parent::getValues()]]></code>
-    </InvalidPassByReference>
   </file>
   <file src="core/lib/Drupal/Core/Form/form.api.php">
     <UndefinedFunction>
@@ -1692,12 +1651,6 @@
     <TaintedCallable>
       <code><![CDATA[$link_generator->generate($element['#title'], $element['#url']->setOptions($options))]]></code>
     </TaintedCallable>
-  </file>
-  <file src="core/lib/Drupal/Core/Render/Element/MachineName.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getCompleteForm()]]></code>
-      <code><![CDATA[$form_state->getCompleteForm()]]></code>
-    </InvalidPassByReference>
   </file>
   <file src="core/lib/Drupal/Core/Render/Element/SystemCompactLink.php">
     <UndefinedFunction>
@@ -2206,9 +2159,6 @@
     </UndefinedProperty>
   </file>
   <file src="core/modules/ckeditor5/src/Plugin/Editor/CKEditor5.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-    </InvalidPassByReference>
     <UndefinedProperty>
       <code><![CDATA[status]]></code>
     </UndefinedProperty>
@@ -2668,9 +2618,6 @@
     </UndefinedConstant>
   </file>
   <file src="core/modules/field_ui/src/Form/FieldConfigEditForm.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getCompleteForm()]]></code>
-    </InvalidPassByReference>
     <InvalidReturnType>
       <code><![CDATA[return;]]></code>
       <code><![CDATA[]]></code>
@@ -2695,10 +2642,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/file/src/Element/ManagedFile.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-    </InvalidPassByReference>
     <UndefinedFunction>
       <code><![CDATA[file_managed_file_save_upload($element, $form_state)]]></code>
     </UndefinedFunction>
@@ -2724,16 +2667,6 @@
       <code><![CDATA[return;]]></code>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/file/src/Plugin/Field/FieldWidget/FileWidget.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[NestedArray::getValue($form, $array_parents)]]></code>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[$form_state->getValues()]]></code>
-    </InvalidPassByReference>
   </file>
   <file src="core/modules/file/src/Plugin/Validation/Constraint/FileImageDimensionsConstraintValidator.php">
     <InvalidArgument>
@@ -3468,12 +3401,6 @@
       <code><![CDATA[return $permissions;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/layout_builder/src/Plugin/Block/FieldBlock.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-    </InvalidPassByReference>
-  </file>
   <file src="core/modules/layout_builder/src/Plugin/ConfigAction/Deriver/AddComponentDeriver.php">
     <InvalidOperand>
       <code><![CDATA[$base_plugin_definition + [
@@ -3946,14 +3873,6 @@
       <code><![CDATA[return $view_executable->buildRenderable($display_id, [], FALSE);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/media_library/src/Plugin/Field/FieldWidget/MediaLibraryWidget.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-      <code><![CDATA[$form_state->getValues()]]></code>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-    </InvalidPassByReference>
-  </file>
   <file src="core/modules/menu_link_content/src/Form/MenuLinkContentForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -3979,9 +3898,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/menu_ui/src/MenuForm.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getUserInput()]]></code>
-    </InvalidPassByReference>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
@@ -5011,11 +4927,6 @@
       <code><![CDATA[system_admin_compact_mode()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/modules/taxonomy/src/Form/OverviewTerms.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValue('terms')]]></code>
-    </InvalidPassByReference>
-  </file>
   <file src="core/modules/taxonomy/src/Plugin/migrate/source/d7/TermTranslation.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -5727,9 +5638,6 @@
     <InvalidArgument>
       <code><![CDATA[$entities]]></code>
     </InvalidArgument>
-    <InvalidPassByReference>
-      <code><![CDATA[$form_state->getValues()]]></code>
-    </InvalidPassByReference>
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
       <code><![CDATA[return FALSE;]]></code>
@@ -5846,11 +5754,6 @@
       <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($query);]]></code>
       <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($query);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/views/src/ViewsFormAjaxHelperTrait.php">
-    <InvalidPassByReference>
-      <code><![CDATA[$formState->getCompleteForm()]]></code>
-    </InvalidPassByReference>
   </file>
   <file src="core/modules/views_ui/src/Form/AdvancedSettingsForm.php">
     <UndefinedFunction>
