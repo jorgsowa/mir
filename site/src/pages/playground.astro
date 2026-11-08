@@ -100,6 +100,15 @@ identity("not an int");
 };
 
 const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
+
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, '');
+const issueDocs = import.meta.glob('../content/docs/reference/issues/*/*.md', { eager: true });
+const ISSUE_DOCS = Object.fromEntries(
+  Object.entries(issueDocs).map(([path, mod]: [string, any]) => {
+    const slug = path.replace(/^.*\/reference\/issues\//, '').replace(/\.md$/, '');
+    return [mod.frontmatter.title, { code: mod.frontmatter.code, url: `${BASE_URL}/reference/issues/${slug}/` }];
+  }),
+);
 ---
 
 <StarlightPage
@@ -113,6 +122,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     class="playground not-content"
     data-base={import.meta.env.BASE_URL.replace(/\/$/, '')}
     data-examples={JSON.stringify(EXAMPLES)}
+    data-issue-docs={JSON.stringify(ISSUE_DOCS)}
   >
     <div class="pg-toolbar">
       <div class="pg-drop" id="pg-example-wrap">
@@ -137,14 +147,14 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
           ))}
         </ul>
       </div>
-      <button id="pg-btn" class="pg-btn" disabled>Loading…</button>
+      <button id="pg-btn" class="pg-btn" disabled title="Analyze (⌘/Ctrl+Enter)">Loading…</button>
       <button id="pg-share" class="pg-btn pg-btn--ghost" type="button" title="Copy shareable link">Share</button>
       <span id="pg-status" class="pg-status"></span>
       <span class="pg-meta">mir&nbsp;v{version}&nbsp;·&nbsp;{commit}</span>
     </div>
 
     <div class="pg-editor">
-      <pre id="pg-gutter" class="pg-gutter" aria-hidden="true">1</pre>
+      <div id="pg-gutter" class="pg-gutter" aria-hidden="true">1</div>
       <div class="pg-input-wrap">
         <pre id="pg-highlight" class="pg-highlight" aria-hidden="true"></pre>
         <textarea
@@ -156,12 +166,13 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
           autocapitalize="off"
         >{DEFAULT_CODE}</textarea>
         <div id="pg-overlay" class="pg-overlay" aria-hidden="true">
-          <div id="pg-underline" class="pg-underline" style="display:none"></div>
+          <div id="pg-marks" class="pg-marks"></div>
         </div>
       </div>
     </div>
 
-    <div id="pg-diag" class="pg-diag" aria-live="polite"></div>
+    <div id="pg-summary" class="pg-summary" aria-live="polite"></div>
+    <div id="pg-diag" class="pg-diag"></div>
   </div>
 </StarlightPage>
 
@@ -170,6 +181,8 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   const BASE      = root.dataset.base;
   const WASM_JS   = `${BASE}/wasm/mir_wasm.js`;
   const EXAMPLES  = JSON.parse(root.dataset.examples);
+  const ISSUE_DOCS = JSON.parse(root.dataset.issueDocs);
+  const DRAFT_KEY = 'mir-playground-draft';
 
   const btn       = document.getElementById('pg-btn');
   const shareBtn  = document.getElementById('pg-share');
@@ -179,6 +192,8 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   const editor    = document.querySelector('.pg-editor');
   const diag      = document.getElementById('pg-diag');
   const status    = document.getElementById('pg-status');
+  const summary   = document.getElementById('pg-summary');
+  const marks     = document.getElementById('pg-marks');
 
   const verWrap  = document.getElementById('pg-version-wrap');
   const verBtn   = verWrap.querySelector('.pg-drop-btn');
@@ -191,6 +206,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
 
   let playground = null;
   let debounce   = null;
+  let issues     = [];
 
   // ── PHP syntax highlighting ───────────────────────────────────────────────
   function highlightPhp(src) {
@@ -343,16 +359,32 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     });
   }
 
+  function hasVersion(v) {
+    return [...verList.querySelectorAll('[role="option"]')].some(o => o.dataset.value === v);
+  }
+
+  function loadDraft() {
+    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null'); } catch { return null; }
+  }
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ code: input.value, php: pgVersion })); } catch {}
+  }
+
+  // A shared link wins over the local draft.
   function readHash() {
     const h = new URLSearchParams(location.hash.slice(1));
     const code = h.get('code');
     const php  = h.get('php');
-    if (code) {
-      const decoded = decodeCode(code);
-      if (decoded != null) input.value = decoded;
+    const decoded = code ? decodeCode(code) : null;
+    if (decoded != null) {
+      input.value = decoded;
+      if (php && hasVersion(php)) setVersion(php);
+      return;
     }
-    if (php && [...verList.querySelectorAll('[role="option"]')].some(o => o.dataset.value === php)) {
-      setVersion(php);
+    const draft = loadDraft();
+    if (draft && typeof draft.code === 'string') {
+      input.value = draft.code;
+      if (hasVersion(draft.php)) setVersion(draft.php);
     }
   }
   readHash();
@@ -373,9 +405,20 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   });
 
   // ── Line numbers + textarea height ───────────────────────────────────────
+  const SEV_RANK = { error: 0, warning: 1, info: 2 };
+
   function updateGutter() {
     const n = input.value.split('\n').length;
-    gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
+    const worst = new Map();
+    for (const i of issues) {
+      const s = i.severity.toLowerCase();
+      const prev = worst.get(i.line);
+      if (prev === undefined || SEV_RANK[s] < SEV_RANK[prev]) worst.set(i.line, s);
+    }
+    gutter.innerHTML = Array.from({ length: n }, (_, k) => {
+      const s = worst.get(k + 1);
+      return `<div class="pg-ln${s ? ` pg-ln--${s}` : ''}">${k + 1}</div>`;
+    }).join('');
   }
 
   function updateInputHeight() {
@@ -387,6 +430,48 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   input.addEventListener('input', () => { updateGutter(); updateInputHeight(); });
   updateGutter();
   updateInputHeight();
+
+  // ── Keyboard: Tab indents, Cmd/Ctrl+Enter analyzes ───────────────────────
+  const INDENT = '    ';
+  function replaceRange(start, end, text, selStart, selEnd) {
+    input.setSelectionRange(start, end);
+    // execCommand keeps the native undo stack; fall back where it's unsupported.
+    if (!document.execCommand('insertText', false, text)) {
+      input.setRangeText(text, start, end);
+      input.dispatchEvent(new Event('input'));
+    }
+    input.setSelectionRange(selStart, selEnd);
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      clearTimeout(debounce);
+      runAnalysis();
+      return;
+    }
+    if (e.key !== 'Tab' || e.altKey || e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    const v = input.value;
+    const { selectionStart: s, selectionEnd: t } = input;
+    if (!e.shiftKey && s === t) {
+      replaceRange(s, t, INDENT, s + INDENT.length, s + INDENT.length);
+      return;
+    }
+    const lineStart = v.lastIndexOf('\n', s - 1) + 1;
+    const blockEnd  = t > s && v[t - 1] === '\n' ? t - 1 : t;
+    const lines = v.slice(lineStart, blockEnd).split('\n');
+    let firstDelta = 0;
+    const changed = lines.map((l, idx) => {
+      if (!e.shiftKey) { if (idx === 0) firstDelta = INDENT.length; return INDENT + l; }
+      const n = l.match(/^( {1,4}|\t)/)?.[0].length ?? 0;
+      if (idx === 0) firstDelta = -n;
+      return l.slice(n);
+    }).join('\n');
+    const total = changed.length - (blockEnd - lineStart);
+    replaceRange(lineStart, blockEnd, changed,
+      Math.max(lineStart, s + firstDelta), t + total);
+  });
 
   // ── Custom dropdowns ──────────────────────────────────────────────────────
   function setupDrop(dropBtn, dropList) {
@@ -415,7 +500,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     const ex = EXAMPLES[opt.dataset.value];
     if (!ex) return;
     input.value = ex.code;
-    exBtn.querySelector('.pg-drop-val').textContent = 'Examples…';
+    exBtn.querySelector('.pg-drop-val').textContent = ex.label;
     closeEx();
     updateGutter();
     updateInputHeight();
@@ -434,6 +519,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
       runAnalysis();
     } catch (e) {
       status.textContent = 'Failed to load analyzer.';
+      btn.textContent = 'Unavailable';
       console.error(e);
     }
   }
@@ -442,10 +528,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // ── Overlay highlight ─────────────────────────────────────────────────────
-  const overlay    = document.getElementById('pg-overlay');
-  const underline  = document.getElementById('pg-underline');
-
+  // ── Inline issue marks ────────────────────────────────────────────────────
   let charW = null;
   function getCharWidth() {
     if (charW) return charW;
@@ -456,74 +539,114 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     return charW;
   }
 
-  function positionUnderline() {
-    if (!underline._issue) return;
-    const { line, colStart, colEnd, sev } = underline._issue;
-    const computed  = getComputedStyle(input);
-    const lineH     = parseFloat(computed.lineHeight) || 22;
-    const padTop    = parseFloat(computed.paddingTop)  || 16;
-    const padLeft   = parseFloat(computed.paddingLeft) || 16;
-    const cw        = getCharWidth();
-    const lineText  = input.value.split('\n')[line - 1] ?? '';
-    const endCol    = colEnd > 0 ? colEnd : lineText.length;
+  // Visual column of a 0-based code-point column, expanding tabs.
+  function visualCol(text, col) {
+    const chars = [...text];
+    let v = 0;
+    for (let k = 0; k < col && k < chars.length; k++) {
+      v = chars[k] === '\t' ? v + 4 - (v % 4) : v + 1;
+    }
+    return v + Math.max(0, col - chars.length);
+  }
 
-    const top   = padTop + (line - 1) * lineH + lineH - 4 - input.scrollTop;
-    const left  = padLeft + (colStart - 1) * cw - input.scrollLeft;
-    const width = Math.max(cw * 2, (endCol - colStart) * cw);
+  // One segment per covered line; columns are 0-based code points with an exclusive end.
+  function issueSegments(issue, lines) {
+    const last = Math.max(issue.line, issue.line_end || issue.line);
+    const segs = [];
+    for (let ln = issue.line; ln <= last && ln <= lines.length; ln++) {
+      const text  = lines[ln - 1];
+      const len   = [...text].length;
+      const start = ln === issue.line ? issue.col_start : text.match(/^\s*/)[0].length;
+      const end   = ln === last && issue.col_end > start ? issue.col_end : len;
+      segs.push({ ln, from: visualCol(text, start), to: visualCol(text, end) });
+    }
+    return segs;
+  }
 
-    const colors = { error: 'var(--mir-error)', warning: 'var(--mir-warning)', info: 'var(--mir-gold)' };
-    underline.style.cssText = `display:block; top:${top}px; left:${left}px; width:${width}px; border-color:${colors[sev] ?? colors.error};`;
-    overlay.scrollTop  = input.scrollTop;
-    overlay.scrollLeft = input.scrollLeft;
+  function renderMarks() {
+    const computed = getComputedStyle(input);
+    const lineH    = parseFloat(computed.lineHeight) || 22;
+    const padTop   = parseFloat(computed.paddingTop)  || 16;
+    const padLeft  = parseFloat(computed.paddingLeft) || 16;
+    const cw       = getCharWidth();
+    const lines    = input.value.split('\n');
+    marks.innerHTML = issues.map((issue, idx) =>
+      issueSegments(issue, lines).map(({ ln, from, to }) => {
+        const top   = padTop + ln * lineH - 3;
+        const left  = padLeft + from * cw;
+        const width = Math.max(cw, (to - from) * cw);
+        return `<div class="pg-mark pg-mark--${issue.severity.toLowerCase()}" data-idx="${idx}"
+          style="top:${top}px;left:${left}px;width:${width}px"></div>`;
+      }).join('')
+    ).join('');
+    syncMarksScroll();
+  }
+
+  function syncMarksScroll() {
+    marks.style.transform = `translateX(${-input.scrollLeft}px)`;
+  }
+
+  function setActive(idx) {
+    marks.querySelectorAll('.pg-mark--active').forEach(m => m.classList.remove('pg-mark--active'));
+    if (idx == null) return;
+    marks.querySelectorAll(`[data-idx="${idx}"]`).forEach(m => m.classList.add('pg-mark--active'));
   }
 
   input.addEventListener('scroll', () => {
     highlight.scrollLeft = input.scrollLeft;
-    positionUnderline();
+    syncMarksScroll();
   });
 
-  function paintFromCard(card) {
-    const sev = card.classList.contains('pg-issue--error') ? 'error'
-              : card.classList.contains('pg-issue--warning') ? 'warning' : 'info';
-    underline._issue = {
-      line: +card.dataset.line, lineEnd: +card.dataset.lineEnd,
-      colStart: +card.dataset.colStart, colEnd: +card.dataset.colEnd, sev,
-    };
-    positionUnderline();
-  }
-
-  // Hover: paint underline only (no scroll). Click: also scroll the textarea.
   diag.addEventListener('mouseover', e => {
     const card = e.target.closest('.pg-issue');
-    if (card) paintFromCard(card);
+    setActive(card ? card.dataset.idx : null);
   });
+  diag.addEventListener('mouseleave', () => setActive(null));
   diag.addEventListener('click', e => {
+    if (e.target.closest('a')) return;
     const card = e.target.closest('.pg-issue');
     if (!card) return;
-    paintFromCard(card);
+    const issue = issues[+card.dataset.idx];
+    const lines = input.value.split('\n');
     const lineH = parseFloat(getComputedStyle(input).lineHeight) || 22;
-    editor.scrollTop = Math.max(0, (+card.dataset.line - 1) * lineH - editor.clientHeight / 3);
-    input.focus();
-  });
-  diag.addEventListener('mouseleave', () => {
-    underline._issue = null;
-    underline.style.display = 'none';
+    editor.scrollTop = Math.max(0, (issue.line - 1) * lineH - editor.clientHeight / 3);
+    const offset = lines.slice(0, issue.line - 1).reduce((n, l) => n + l.length + 1, 0);
+    const lineText = lines[issue.line - 1] ?? '';
+    const pos = offset + [...lineText].slice(0, issue.col_start).join('').length;
+    input.focus({ preventScroll: true });
+    input.setSelectionRange(pos, pos);
   });
 
-  function renderIssues(issues) {
+  function plural(n, word) { return `${n} ${word}${n === 1 ? '' : 's'}`; }
+
+  function renderSummary(ms) {
+    const count = s => issues.filter(i => i.severity.toLowerCase() === s).length;
+    const parts = [];
+    const e = count('error'), w = count('warning'), n = count('info');
+    if (e) parts.push(`<span class="pg-sum pg-sum--error">${plural(e, 'error')}</span>`);
+    if (w) parts.push(`<span class="pg-sum pg-sum--warning">${plural(w, 'warning')}</span>`);
+    if (n) parts.push(`<span class="pg-sum pg-sum--info">${n} info</span>`);
+    if (!parts.length) parts.push('<span class="pg-sum pg-sum--ok">No issues</span>');
+    summary.innerHTML = `${parts.join('')}<span class="pg-sum-time">${ms < 1 ? '&lt;1' : ms.toFixed(0)}&nbsp;ms · PHP&nbsp;${esc(pgVersion)}</span>`;
+  }
+
+  function renderIssues() {
     if (!issues.length) {
-      diag.innerHTML = '<p class="pg-empty">No issues found.</p>';
+      diag.innerHTML = '';
       return;
     }
-    diag.innerHTML = issues.map(i => {
+    diag.innerHTML = issues.map((i, idx) => {
       const s = i.severity.toLowerCase();
-      return `<div class="pg-issue pg-issue--${s}"
-          data-line="${i.line}" data-line-end="${i.line_end}"
-          data-col-start="${i.col_start}" data-col-end="${i.col_end}">
+      const doc = ISSUE_DOCS[i.name];
+      const name = doc
+        ? `<a class="pg-issue-name" href="${doc.url}" target="_blank" rel="noopener" title="Open ${esc(i.name)} docs">${esc(i.name)}</a>`
+        : `<span class="pg-issue-name">${esc(i.name)}</span>`;
+      const code = doc?.code ? `<span class="pg-issue-code">${esc(doc.code)}</span>` : '';
+      return `<div class="pg-issue pg-issue--${s}" data-idx="${idx}">
         <div class="pg-issue-head">
           <span class="pg-dot"></span>
-          <span class="pg-issue-name">${esc(i.name)}</span>
-          <span class="pg-issue-loc">line&nbsp;${i.line}:${i.col_start}</span>
+          ${name}${code}
+          <span class="pg-issue-loc">line&nbsp;${i.line}:${i.col_start + 1}</span>
         </div>
         <div class="pg-issue-msg">${esc(i.message)}</div>
       </div>`;
@@ -531,21 +654,37 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   }
 
   function runAnalysis() {
+    saveDraft();
     if (!playground) return;
     try {
-      renderIssues(JSON.parse(playground.analyze(input.value, pgVersion)));
+      const t0 = performance.now();
+      const raw = playground.analyze(input.value, pgVersion);
+      const ms = performance.now() - t0;
+      issues = JSON.parse(raw).sort((a, b) =>
+        a.line - b.line || a.col_start - b.col_start ||
+        SEV_RANK[a.severity.toLowerCase()] - SEV_RANK[b.severity.toLowerCase()]);
+      renderSummary(ms);
+      renderIssues();
     } catch (e) {
-      diag.innerHTML = '<p class="pg-empty">Analysis error.</p>';
+      issues = [];
+      summary.innerHTML = '<span class="pg-sum pg-sum--error">Analysis error — see console</span>';
+      diag.innerHTML = '';
       console.error(e);
     }
+    updateGutter();
+    renderMarks();
   }
 
   btn.addEventListener('click', runAnalysis);
   input.addEventListener('input', () => {
     updateHighlight();
+    // Stale marks would point at shifted text until the next analysis.
+    marks.innerHTML = '';
+    exBtn.querySelector('.pg-drop-val').textContent = 'Examples…';
     clearTimeout(debounce);
     debounce = setTimeout(runAnalysis, 400);
   });
+  window.addEventListener('resize', () => { charW = null; renderMarks(); });
 
   updateHighlight();
   loadWasm();

@@ -1262,15 +1262,73 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   z-index: 2;
 }
 
-.pg-underline {
+.pg-marks {
   position: absolute;
-  height: 0;
-  border-bottom: 2px dashed;
-  border-radius: 1px;
+  inset: 0;
+}
+
+.pg-mark {
+  position: absolute;
+  height: 3px;
+  --pg-mark-color: var(--mir-error);
+  background:
+    radial-gradient(circle at 50% 100%, transparent 1.6px, var(--pg-mark-color) 1.7px, var(--pg-mark-color) 2.4px, transparent 2.5px) 0 0 / 6px 3px repeat-x;
+  opacity: 0.85;
+  transition: opacity 0.12s;
+}
+
+.pg-mark--warning { --pg-mark-color: var(--mir-warning); }
+.pg-mark--info    { --pg-mark-color: var(--mir-gold); }
+
+.pg-mark--active {
+  opacity: 1;
+  height: 2px;
+  background: var(--pg-mark-color);
+  box-shadow: 0 0 6px var(--pg-mark-color);
+}
+
+.pg-ln { position: relative; }
+
+.pg-ln--error, .pg-ln--warning, .pg-ln--info { color: var(--sl-color-white); }
+
+.pg-ln--error::before, .pg-ln--warning::before, .pg-ln--info::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -0.75rem;
+  top: 50%;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-top: -0.2rem;
+  border-radius: 50%;
+  background: var(--mir-error);
+}
+
+.pg-ln--warning::before { background: var(--mir-warning); }
+.pg-ln--info::before    { background: var(--mir-gold); }
+
+.pg-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 1.2rem;
+  font-size: 0.72rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.pg-sum { font-weight: 600; }
+.pg-sum--error   { color: var(--mir-error); }
+.pg-sum--warning { color: var(--mir-warning); }
+.pg-sum--info    { color: var(--mir-gold); }
+.pg-sum--ok      { color: var(--mir-phosphor); }
+
+.pg-sum-time {
+  margin-inline-start: auto;
+  color: var(--sl-color-gray-4);
 }
 
 .pg-gutter {
-  padding: 1rem 0.625rem;
+  padding: 1rem 0.625rem 1rem 1rem;
   font: 0.875rem/1.6 'IBM Plex Mono', ui-monospace, monospace;
   text-align: right;
   color: rgba(200, 168, 75, 0.5);
@@ -1372,7 +1430,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   border-inline-start-width: 3px;
   padding: 0.5rem 0.875rem;
   background: var(--mir-panel);
-  cursor: default;
+  cursor: pointer;
   transition: background 0.12s, box-shadow 0.12s, border-color 0.12s;
 }
 
@@ -1418,6 +1476,22 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--sl-color-white);
+}
+
+a.pg-issue-name {
+  text-decoration: none;
+  border-bottom: 1px dotted color-mix(in srgb, var(--mir-gold) 45%, transparent);
+}
+
+a.pg-issue-name:hover {
+  color: var(--mir-gold) !important;
+  border-bottom-color: var(--mir-gold);
+}
+
+.pg-issue-code {
+  font-size: 0.67rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--sl-color-gray-4);
 }
 
 .pg-issue-loc {

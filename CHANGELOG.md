@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Playground: every issue is underlined in the editor and marked in the gutter, each issue shows its `MIR####` code and links to its docs page, and a summary line counts issues by severity. Tab and Shift+Tab indent, ⌘/Ctrl+Enter analyzes, and the draft survives a reload.
+
 ### Fixed
+
+- Playground: underlines and `line:col` labels are no longer one column to the left of the reported span.
 
 - Performance: a union folds a generic array or list into one of the same kind once it holds eight, as it already did for array shapes. A loop writing `$a[$k]['x']` under a run of `if`s forked the element type on every branch, so analysis grew about 15× per branch; PHP_CodeSniffer's `GetMethodParametersTest` (11 branches) never finished and now takes 0.1s.
 - Performance: a reference or reachability query for a qualified name (`App\Foo\Bar`) new to the session answers "no mention" from each file's recorded words when the file lacks the last segment, instead of rescanning every file's text. On a 50k-file workspace each first query of a class no longer pays about 2 s of CPU.
