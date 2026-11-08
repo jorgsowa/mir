@@ -445,6 +445,44 @@ const ISSUE_DOCS = Object.fromEntries(
     input.setSelectionRange(selStart, selEnd);
   }
 
+  const PAIRS   = { '{': '}', '[': ']', '(': ')' };
+  const CLOSERS = new Set(Object.values(PAIRS));
+
+  function newlineWithIndent() {
+    const v = input.value;
+    const { selectionStart: s, selectionEnd: t } = input;
+    const lineStart = v.lastIndexOf('\n', s - 1) + 1;
+    const indent = v.slice(lineStart, s).match(/^[ \t]*/)[0];
+    const opener = v.slice(lineStart, s).trimEnd().slice(-1);
+    if (!PAIRS[opener]) {
+      replaceRange(s, t, '\n' + indent, s + 1 + indent.length, s + 1 + indent.length);
+      return;
+    }
+    const inner = '\n' + indent + INDENT;
+    const caret = s + inner.length;
+    // Between a bracket pair, put the closer on its own line below the caret.
+    const gap = v.slice(t).match(/^[ \t]*/)[0].length;
+    if (v[t + gap] === PAIRS[opener]) {
+      replaceRange(s, t + gap, inner + '\n' + indent, caret, caret);
+    } else {
+      replaceRange(s, t, inner, caret, caret);
+    }
+  }
+
+  // Typing a closer on a whitespace-only line removes one indent level first.
+  function dedentForCloser(ch) {
+    const v = input.value;
+    const { selectionStart: s, selectionEnd: t } = input;
+    if (s !== t) return false;
+    const lineStart = v.lastIndexOf('\n', s - 1) + 1;
+    const before = v.slice(lineStart, s);
+    if (!before || !/^[ \t]+$/.test(before)) return false;
+    const cut = before.endsWith('\t') ? 1 : Math.min(INDENT.length, before.length - before.trimEnd().length);
+    const start = s - cut;
+    replaceRange(start, s, ch, start + 1, start + 1);
+    return true;
+  }
+
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -452,7 +490,10 @@ const ISSUE_DOCS = Object.fromEntries(
       runAnalysis();
       return;
     }
-    if (e.key !== 'Tab' || e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.isComposing || e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); newlineWithIndent(); return; }
+    if (CLOSERS.has(e.key) && dedentForCloser(e.key)) { e.preventDefault(); return; }
+    if (e.key !== 'Tab') return;
     e.preventDefault();
     const v = input.value;
     const { selectionStart: s, selectionEnd: t } = input;

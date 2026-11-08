@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Playground: every issue is underlined in the editor and marked in the gutter, each issue shows its `MIR####` code and links to its docs page, and a summary line counts issues by severity. Tab and Shift+Tab indent, ⌘/Ctrl+Enter analyzes, and the draft survives a reload.
+- Playground: every issue is underlined in the editor and marked in the gutter, hovering an underline shows its message, each issue shows its `MIR####` code and links to its docs page, and a summary line counts issues by severity. Analysis runs in a Web Worker, so loading stubs or switching PHP versions no longer freezes the page. Enter keeps the indentation, Tab and Shift+Tab indent, ⌘/Ctrl+Enter analyzes, and the draft survives a reload.
 
 ### Fixed
 
