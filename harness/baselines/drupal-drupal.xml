@@ -3999,9 +3999,6 @@
     </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$patterns]]></code>
-      <code><![CDATA[$version_string]]></code>
-      <code><![CDATA[$version_string]]></code>
-      <code><![CDATA[$version_string]]></code>
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/migrate_drupal/src/MigrationPluginManager.php">

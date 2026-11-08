@@ -177,8 +177,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             let mut arm_ctx = cond_ctx.branch();
             let mut arm_ty = Type::empty();
             if let Some(conditions) = &arm.conditions {
+                let mut bool_conds = Vec::new();
                 for cond in conditions.iter() {
                     let cond_ty = self.analyze(cond, &mut arm_ctx);
+                    if cond_ty
+                        .types
+                        .iter()
+                        .all(|t| matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse))
+                    {
+                        bool_conds.push(cond);
+                    }
                     arm_ty.merge_with(&cond_ty);
                 }
                 // Only new variables carry over; narrowing inside a condition does not.
@@ -186,6 +194,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 for (name, ty) in cond_ctx.vars.iter() {
                     if cond_ctx.var_is_defined(name.as_str()) {
                         std::sync::Arc::make_mut(&mut next.vars).insert(*name, ty.clone());
+                    }
+                }
+                // `match (true)` reaches a later arm only when this arm's bool conditions were false.
+                if matches!(m.subject.kind, ExprKind::Bool(true))
+                    && bool_conds.len() == conditions.len()
+                {
+                    for cond in bool_conds {
+                        crate::narrowing::narrow_from_condition(
+                            cond, &mut next, false, self.db, &self.file,
+                        );
                     }
                 }
                 cond_ctx = next;
