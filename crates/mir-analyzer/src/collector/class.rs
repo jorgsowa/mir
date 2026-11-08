@@ -195,7 +195,7 @@ impl<'a> DefinitionCollector<'a> {
                                 let ty = match resolve_doc() {
                                     Some(doc_ty) => {
                                         if native_ty.as_ref().is_some_and(|n| {
-                                            super::native_hint_wins_over_docblock_scalar(n, &doc_ty)
+                                            super::docblock_contradicts_native(n, &doc_ty)
                                         }) {
                                             native_ty
                                         } else {
@@ -301,7 +301,13 @@ impl<'a> DefinitionCollector<'a> {
                         // nullability — same fix point as the
                         // promoted-property/param docblock paths.
                         match hint_ty.as_ref() {
-                            Some(n) => super::preserve_native_nullability(n, resolved),
+                            Some(n) if super::docblock_contradicts_native(n, &resolved) => {
+                                n.clone()
+                            }
+                            Some(n) => super::preserve_native_nullability(
+                                n,
+                                super::resolve_docblock_scalar_conflict(n, resolved),
+                            ),
                             None => resolved,
                         }
                     });

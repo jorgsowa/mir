@@ -1244,11 +1244,6 @@
       <code><![CDATA[return $this->chroot;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Form/ConfigFormBase.php">
-    <InvalidArgument>
-      <code><![CDATA[$violations]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/lib/Drupal/Core/Form/FormBase.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->configFactory = $this->container()->get('config.factory')]]></code>
@@ -1613,14 +1608,6 @@
     <TaintedCallable>
       <code><![CDATA[call_user_func_array($step[0], array_merge($step[1], [&$context]))]]></code>
     </TaintedCallable>
-  </file>
-  <file src="core/lib/Drupal/Core/Recipe/InputConfigurator.php">
-    <InvalidArgument>
-      <code><![CDATA[$definition]]></code>
-    </InvalidArgument>
-    <InvalidMethodCall>
-      <code><![CDATA[$definition->getSetting('default')]]></code>
-    </InvalidMethodCall>
   </file>
   <file src="core/lib/Drupal/Core/Recipe/InstallConfigurator.php">
     <InvalidPropertyAssignment>
@@ -3637,10 +3624,6 @@
     </ImpossibleIdenticalComparison>
   </file>
   <file src="core/modules/locale/src/LocaleSource.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$data->last_checked = $request_time]]></code>
-      <code><![CDATA[$project_sources[$langcode]->last_checked = $data->last_checked]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
     </InvalidReturnType>
@@ -5013,9 +4996,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/update/src/UpdateSettingsForm.php">
-    <InvalidArgument>
-      <code><![CDATA[$violations]]></code>
-    </InvalidArgument>
     <UndefinedFunction>
       <code><![CDATA[update_storage_clear()]]></code>
     </UndefinedFunction>

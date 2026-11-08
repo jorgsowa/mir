@@ -1451,7 +1451,7 @@ pub(crate) fn return_ty_for_body_check(
     if hint_ty.is_mixed() {
         return Some(doc_ty);
     }
-    if crate::collector::native_hint_wins_over_docblock_scalar(&hint_ty, &doc_ty) {
+    if crate::collector::docblock_contradicts_native(&hint_ty, &doc_ty) {
         return Some(hint_ty);
     }
     Some(crate::collector::resolve_docblock_scalar_conflict(

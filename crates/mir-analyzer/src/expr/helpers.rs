@@ -1412,7 +1412,9 @@ pub(crate) fn apply_doc_param_types(
             defining_entity,
         );
         if let Some(native_ty) = param.ty.as_deref() {
-            if crate::collector::native_hint_wins_over_docblock_scalar(native_ty, &doc_ty) {
+            if !param.is_variadic
+                && crate::collector::docblock_contradicts_native(native_ty, &doc_ty)
+            {
                 continue;
             }
             // Partial conflict: strip atoms foreign to the native hint's

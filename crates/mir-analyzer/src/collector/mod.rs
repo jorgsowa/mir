@@ -212,18 +212,41 @@ fn hook_bit(kind: php_ast::ast::PropertyHookKind) -> u8 {
     }
 }
 
-pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
+/// The docblock type describes only values the native hint rules out, so the hint wins:
+/// another scalar family or `null` for a non-null scalar, an object for an array, or vice versa.
+pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
     if doc.types.is_empty() {
         return false;
+    }
+    let is_array = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TArray { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }
+        )
+    };
+    let is_object = |a: &Atomic| match a {
+        Atomic::TNamedObject { fqcn, .. } => !fqcn.starts_with(IMPORT_PLACEHOLDER_PREFIX),
+        a => matches!(a, Atomic::TObject),
+    };
+    match native.types.as_slice() {
+        [n] if is_array(n) => return doc.types.iter().all(is_object),
+        [n] if is_object(n) => return doc.types.iter().all(is_array),
+        _ => {}
     }
     let Some(family_check) = native_scalar_family(native) else {
         return false;
     };
-    // Docblock must contain ONLY scalar atoms from other families (no mixed/null/object that
-    // could be a union refinement, and none from the hint's own family).
-    doc.types
-        .iter()
-        .all(|a| is_any_scalar_family(a) && !family_check(a))
+    // Docblock must contain ONLY scalar atoms from other families or null (no mixed/object
+    // that could be a union refinement, and none from the hint's own family).
+    doc.types.iter().any(is_any_scalar_family)
+        && doc
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TNull) || (is_any_scalar_family(a) && !family_check(a)))
 }
 
 /// When `native` is a concrete scalar and `doc` contains scalar atoms from a
@@ -2701,9 +2724,10 @@ impl<'a> DefinitionCollector<'a> {
                 // When the native hint is a concrete scalar and the docblock has only
                 // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
                 // the PHP type hint is the runtime truth — prefer it over the docblock.
-                if native_ty
-                    .as_ref()
-                    .is_some_and(|n| native_hint_wins_over_docblock_scalar(n, &doc_ty))
+                if !p.variadic
+                    && native_ty
+                        .as_ref()
+                        .is_some_and(|n| docblock_contradicts_native(n, &doc_ty))
                 {
                     return native_ty.clone().unwrap();
                 }

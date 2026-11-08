@@ -160,9 +160,10 @@ impl DefinitionCollector<'_> {
                 // When the native hint is a concrete scalar and the docblock has only
                 // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
                 // the PHP type hint is the runtime truth — prefer it over the docblock.
-                if native_ty
-                    .as_ref()
-                    .is_some_and(|n| super::native_hint_wins_over_docblock_scalar(n, &doc_ty))
+                if !p.variadic
+                    && native_ty
+                        .as_ref()
+                        .is_some_and(|n| super::docblock_contradicts_native(n, &doc_ty))
                 {
                     return native_ty.clone().unwrap();
                 }
