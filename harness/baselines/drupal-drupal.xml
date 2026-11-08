@@ -4414,10 +4414,6 @@
     <InvalidReturnType>
       <code><![CDATA[return NULL;]]></code>
     </InvalidReturnType>
-    <NullableReturnStatement>
-      <code><![CDATA[return $requested_format;]]></code>
-      <code><![CDATA[return $content_type_format;]]></code>
-    </NullableReturnStatement>
     <UndefinedProperty>
       <code><![CDATA[headers]]></code>
       <code><![CDATA[headers]]></code>

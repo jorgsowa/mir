@@ -66,6 +66,28 @@ fn haystack_type_from_array_type(var_ty: &Type) -> Option<Type> {
     }
 }
 
+/// A variable haystack whose values are known and never null, so a strict match isn't null.
+fn haystack_values_exclude_null(expr: &php_ast::owned::Expr, ctx: &FlowState) -> bool {
+    let Some(name) = extract_var_name(expr) else {
+        return false;
+    };
+    let known_non_null = |t: &Type| !t.types.is_empty() && !t.is_mixed() && !t.is_nullable();
+    let ty = ctx.get_var(name);
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| match a {
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => known_non_null(value),
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => !is_open && properties.values().all(|p| known_non_null(&p.ty)),
+            _ => false,
+        })
+}
+
 /// Extract a union Type from an `in_array` haystack argument.
 /// Supports:
 /// - Literal arrays: `['a', 'b', 1]` → union of `TLiteralString` / `TLiteralInt`
@@ -267,6 +289,11 @@ pub(crate) fn narrow_in_array_condition(
                             ctx.set_var(var_name, narrowed);
                         }
                     }
+                }
+            } else if strict && is_true && haystack_values_exclude_null(haystack_value, ctx) {
+                let current = ctx.get_var(var_name);
+                if current.is_nullable() {
+                    ctx.set_var(var_name, current.remove_null());
                 }
             }
         } else if let Some((obj, prop)) = extract_any_prop_access(needle_value) {
