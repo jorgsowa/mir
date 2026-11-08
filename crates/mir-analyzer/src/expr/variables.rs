@@ -76,7 +76,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 expr.span,
             );
         }
-        std::sync::Arc::make_mut(&mut ctx.read_vars).insert(sym);
+        if !ctx.read_vars.contains(&sym) {
+            std::sync::Arc::make_mut(&mut ctx.read_vars).insert(sym);
+        }
         ctx.mark_consumed_sym(sym);
         let ty = if name_str == "this" && !ctx.var_is_defined_sym(sym) {
             Type::never()
