@@ -1179,9 +1179,15 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   transition: background 0.1s, color 0.1s;
 }
 
-.pg-drop-opt:hover {
+.pg-drop-opt:hover,
+.pg-drop-opt:focus {
   background: var(--mir-gold-dim);
   color: var(--mir-gold);
+  outline: none;
+}
+
+.pg-drop-opt:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--mir-gold);
 }
 
 .pg-drop-opt--selected {

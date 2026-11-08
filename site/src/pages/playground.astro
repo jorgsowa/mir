@@ -132,7 +132,7 @@ const ISSUE_DOCS = Object.fromEntries(
         </button>
         <ul class="pg-drop-list" role="listbox" aria-label="Example" hidden>
           {Object.entries(EXAMPLES).map(([k, v]) => (
-            <li class="pg-drop-opt" role="option" data-value={k}>{v.label}</li>
+            <li class="pg-drop-opt" role="option" tabindex="-1" data-value={k}>{v.label}</li>
           ))}
         </ul>
       </div>
@@ -143,7 +143,7 @@ const ISSUE_DOCS = Object.fromEntries(
         </button>
         <ul class="pg-drop-list" role="listbox" aria-label="PHP version" hidden>
           {PHP_VERSIONS.map(v => (
-            <li class={`pg-drop-opt${v === DEFAULT_PHP ? ' pg-drop-opt--selected' : ''}`} role="option" data-value={v} aria-selected={v === DEFAULT_PHP ? 'true' : 'false'}>{`PHP ${v}`}</li>
+            <li class={`pg-drop-opt${v === DEFAULT_PHP ? ' pg-drop-opt--selected' : ''}`} role="option" tabindex="-1" data-value={v} aria-selected={v === DEFAULT_PHP ? 'true' : 'false'}>{`PHP ${v}`}</li>
           ))}
         </ul>
       </div>
@@ -517,12 +517,41 @@ const ISSUE_DOCS = Object.fromEntries(
   });
 
   // ── Custom dropdowns ──────────────────────────────────────────────────────
+  const drops = [];
   function setupDrop(dropBtn, dropList) {
+    const options = () => [...dropList.querySelectorAll('[role="option"]')];
     const close = () => { dropList.hidden = true; dropBtn.setAttribute('aria-expanded', 'false'); };
-    const open  = () => { dropList.hidden = false; dropBtn.setAttribute('aria-expanded', 'true'); };
-    dropBtn.addEventListener('click', e => { e.stopPropagation(); dropList.hidden ? open() : close(); });
+    const open  = (focusOption) => {
+      drops.forEach(d => d !== close && d());
+      dropList.hidden = false;
+      dropBtn.setAttribute('aria-expanded', 'true');
+      if (focusOption) (dropList.querySelector('.pg-drop-opt--selected') ?? options()[0])?.focus();
+    };
+    drops.push(close);
+    dropBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      // detail === 0 means the click came from Enter/Space, not the mouse.
+      dropList.hidden ? open(e.detail === 0) : close();
+    });
+    dropBtn.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(true); }
+    });
+    dropList.addEventListener('keydown', e => {
+      const opts = options();
+      const at = opts.indexOf(document.activeElement);
+      const moveTo = k => { e.preventDefault(); opts[(k + opts.length) % opts.length].focus(); };
+      if (e.key === 'ArrowDown') moveTo(at + 1);
+      else if (e.key === 'ArrowUp') moveTo(at - 1);
+      else if (e.key === 'Home') moveTo(0);
+      else if (e.key === 'End') moveTo(opts.length - 1);
+      else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        document.activeElement.click();
+        dropBtn.focus();
+      } else if (e.key === 'Escape') { e.preventDefault(); close(); dropBtn.focus(); }
+      else if (e.key === 'Tab') close();
+    });
     document.addEventListener('click', close);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
     return close;
   }
   const closeVer = setupDrop(verBtn, verList);
