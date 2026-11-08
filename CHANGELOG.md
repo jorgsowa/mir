@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `PharData` offset is a `PharFileInfo`, so calling `getContent()` on it isn't `UndefinedMethod`.
 - `Phar::setStub()` and `PharData::setStub()` accept a single argument, as `$length` is optional.
 - A strict `in_array($x, $haystack, true)` with a variable haystack of non-null values removes `null` from `$x` in the true branch.
 - When the analyzed paths sit under a nested `composer.json` with no `vendor/` directory (Drupal's `core/`), the nearest ancestor project with an installed `vendor/` is used as the Composer root, so its dependencies and `autoload.files` are found. Analyzing `core/lib` in a Drupal checkout reported every Symfony class as undefined.

@@ -1097,7 +1097,7 @@ class PharData extends RecursiveDirectoryIterator implements Countable, ArrayAcc
 
     /**
      * @param string $localName
-     * @return SplFileInfo
+     * @return PharFileInfo
      */
     #[TentativeType]
     public function offsetGet($localName): SplFileInfo {}
