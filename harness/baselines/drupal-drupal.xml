@@ -3958,11 +3958,6 @@
       <code><![CDATA[return $query->execute();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/migrate/src/Plugin/migrate/process/FormatDate.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$value !== '0']]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/modules/migrate/src/Plugin/migrate/process/MakeUniqueEntityField.php">
     <InvalidReturnType>
       <code><![CDATA[return $query->count()->execute();]]></code>

@@ -731,6 +731,7 @@ impl Type {
                 Atomic::TFalse,
                 Atomic::TLiteralInt(0),
                 Atomic::TLiteralString("".into()),
+                Atomic::TLiteralString("0".into()),
             ]);
         }
         let mut result = Type::empty();
