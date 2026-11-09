@@ -701,6 +701,9 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.expr_analyzer(ctx)
                         .check_property_readonly_write(pa, ctx, var.span, false, true);
                 } else if let php_ast::owned::ExprKind::ArrayAccess(aa) = &var.kind {
+                    if let Some(root) = crate::expr::root_receiver_var(var) {
+                        ctx.drop_guards_on(mir_types::Name::from(root.trim_start_matches('$')));
+                    }
                     if let (php_ast::owned::ExprKind::Variable(name), Some(key)) = (
                         &aa.array.kind,
                         crate::expr::assignment::literal_key_name(aa.index.as_ref()),

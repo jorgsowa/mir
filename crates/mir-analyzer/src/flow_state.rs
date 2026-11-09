@@ -1288,15 +1288,22 @@ impl FlowState {
     }
 
     /// Drops guarded defs whose guard condition involves `name`.
-    fn drop_guards_on(&mut self, name: Name) {
+    pub(crate) fn drop_guards_on(&mut self, name: Name) {
         if !self.stored_checks.is_empty() {
             Arc::make_mut(&mut self.stored_checks)
                 .retain(|var, s| *var != name && s.subject != name && s.captures != Some(name));
         }
-        if self.guarded_defs.values().flatten().any(|g| g.var == name) {
+        let on_name = |g: &Guard| {
+            g.var == name
+                || g.var
+                    .as_str()
+                    .strip_prefix(name.as_str())
+                    .is_some_and(|rest| rest.starts_with('['))
+        };
+        if self.guarded_defs.values().flatten().any(on_name) {
             let defs = Arc::make_mut(&mut self.guarded_defs);
             for guards in defs.values_mut() {
-                guards.retain(|g| g.var != name);
+                guards.retain(|g| !on_name(g));
             }
             defs.retain(|_, guards| !guards.is_empty());
         }

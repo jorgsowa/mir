@@ -541,8 +541,16 @@ pub(super) fn array_access_under_prop_hops(
 
 /// The guard that holds when `expr` evaluates to `is_true`, for conditions on a plain variable.
 pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> Option<Guard> {
+    // An element with a literal key is keyed as `a[k]`, which a write to `$a` drops.
     let plain_var = |e: &php_ast::owned::Expr| match &strip_parens(e).kind {
         ExprKind::Variable(v) => Some(Name::from(&**v)),
+        ExprKind::ArrayAccess(aa) => {
+            let ExprKind::Variable(base) = &aa.array.kind else {
+                return None;
+            };
+            let key = crate::expr::literal_key_name(aa.index.as_ref())?;
+            Some(Name::from(format!("{base}[{key}]").as_str()))
+        }
         _ => None,
     };
     let (truthiness, falsiness) = if is_true {
@@ -555,7 +563,7 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
             return established_guard(&u.operand, !is_true)
         }
-        ExprKind::Variable(_) => (plain_var(expr)?, truthiness),
+        ExprKind::Variable(_) | ExprKind::ArrayAccess(_) => (plain_var(expr)?, truthiness),
         ExprKind::Empty(inner) => (plain_var(inner)?, falsiness),
         ExprKind::Assign(a) if a.op == AssignOp::Assign && !a.by_ref => {
             (plain_var(&a.target)?, truthiness)
@@ -567,8 +575,8 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
             let holds = (b.op == BinaryOp::NotIdentical) != is_true;
             let (var_side, lit_side) =
                 match (&strip_parens(&b.left).kind, &strip_parens(&b.right).kind) {
-                    (ExprKind::Variable(_), _) => (&b.left, &b.right),
-                    (_, ExprKind::Variable(_)) => (&b.right, &b.left),
+                    (ExprKind::Variable(_) | ExprKind::ArrayAccess(_), _) => (&b.left, &b.right),
+                    (_, ExprKind::Variable(_) | ExprKind::ArrayAccess(_)) => (&b.right, &b.left),
                     _ => return None,
                 };
             let kind = match &strip_parens(lit_side).kind {

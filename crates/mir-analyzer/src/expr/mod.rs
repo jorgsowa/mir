@@ -31,7 +31,7 @@ mod objects;
 mod unary;
 mod variables;
 
-pub(crate) use assignment::root_receiver_var;
+pub(crate) use assignment::{literal_key_name, root_receiver_var};
 pub(crate) use binary::{operand_is_definitely_zero, pipe_as_call};
 pub use helpers::{duplicate_literal_conditions, extract_simple_var};
 pub(crate) use variables::constant_expr_type;
