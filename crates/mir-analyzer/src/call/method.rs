@@ -1420,14 +1420,26 @@ fn resolve_method_return<'a>(
                 );
             }
         }
-        check_method_visibility(
-            ea,
-            resolved.visibility,
-            &resolved.owner_fqcn,
-            &resolved.name,
-            ctx,
-            span,
-        );
+        // An inherited method that implements a trait's abstract one is what runs.
+        let implementing = resolved
+            .is_abstract
+            .then(|| crate::db::class_kind(ea.db, &resolved.owner_fqcn))
+            .flatten()
+            .filter(|k| k.is_trait)
+            .and_then(|_| crate::db::find_class_like(ea.db, crate::db::Fqcn::from_str(ea.db, fqcn)))
+            .and_then(|class| {
+                crate::db::find_method_respecting_precedence(
+                    ea.db,
+                    crate::db::Fqcn::from_str(ea.db, class.parent()?),
+                    method_name,
+                )
+            })
+            .filter(|(_, m)| !m.is_abstract);
+        let (visibility, owner) = match &implementing {
+            Some((owner, m)) => (m.visibility, owner),
+            None => (resolved.visibility, &resolved.owner_fqcn),
+        };
+        check_method_visibility(ea, visibility, owner, &resolved.name, ctx, span);
 
         let mut arg_names: Vec<Option<String>> = call
             .args

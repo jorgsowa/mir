@@ -4515,11 +4515,6 @@
       <code><![CDATA[return array_keys($serialized_columns);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/serialization/src/Normalizer/TimestampNormalizer.php">
-    <OverriddenMethodAccess>
-      <code><![CDATA[use SchematicNormalizerTrait;]]></code>
-    </OverriddenMethodAccess>
-  </file>
   <file src="core/modules/settings_tray/src/Access/BlockHasOverridesAccessCheck.php">
     <UndefinedFunction>
       <code><![CDATA[_settings_tray_has_block_overrides($block)]]></code>

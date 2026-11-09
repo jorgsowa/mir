@@ -476,8 +476,11 @@ impl<'a> ClassAnalyzer<'a> {
             // with a `protected`/`private` method raises no error — unlike the
             // same abstract method declared on an interface or an abstract
             // class, which does enforce the normal never-narrower rule.
+            // Nor is a trait's abstract method that an inherited method implements an override.
+            let own_is_trait_requirement = own.is_abstract && trait_origins.contains_key(&key);
             if let Some((parent_fqcn, parent)) = all_parent_methods.iter().find(|(anc, p)| {
-                !(p.is_abstract && own_traits.contains(anc))
+                !own_is_trait_requirement
+                    && !(p.is_abstract && own_traits.contains(anc))
                     && visibility_reduced(own.visibility, p.visibility)
             }) {
                 let mut issue = Issue::new(
