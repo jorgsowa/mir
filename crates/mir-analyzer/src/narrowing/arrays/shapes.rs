@@ -153,6 +153,7 @@ pub(crate) fn narrow_isset_shape_key(
     file: &str,
 ) {
     let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
+        crate::narrowing::elements::narrow_isset_element_shape(var_expr, ctx, db, file);
         return;
     };
     let current = resolve_shape_base_current_type(ctx, &base, db, file);
@@ -414,7 +415,7 @@ pub(crate) fn get_shape_path_type(ty: &Type, path: &[mir_types::atomic::ArrayKey
 /// clears `optional`/`null` at `path[0]`, then recurses into that key's own
 /// value type for `path[1..]`. Returns `None` when nothing changed (e.g. no
 /// union member is a `TKeyedArray` carrying the key at all).
-fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<Type> {
+pub(crate) fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<Type> {
     let (key, rest) = path.split_first()?;
     let mut changed = false;
     let mut result = Type::empty();

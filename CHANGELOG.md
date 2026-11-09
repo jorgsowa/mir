@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `is_callable([$obj, 'm'])` or `is_callable($cb)` (also `is_callable($cb = [$obj, 'm'])`) proves the callable in the true branch, so passing it to a `callable` parameter there isn't `UndefinedMethod`.
 - A variable passed to an untyped by-reference parameter of a method, static method or constructor is `mixed` after the call, as it already was for functions, instead of keeping its old type.
+- `isset($a[$i]['k'])` (also under `assert()`) proves the optional key `k` of the element read through a variable key, so reading `$a[$i]['k']` there isn't nullable.
 
 ## [0.95.0] - 2026-11-09
 

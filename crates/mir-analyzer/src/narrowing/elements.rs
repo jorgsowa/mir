@@ -72,29 +72,8 @@ pub(super) fn narrow_element(
     let Some((receiver, key)) = element_access_key(subject) else {
         return;
     };
-    let refined = ctx.get_prop_refined(&receiver, &key).cloned();
-    let present = refined.is_some();
-    let current = match refined {
-        Some(refined) => refined,
-        None => {
-            // A literal key into a shape is narrowed by the shape itself; a variable key
-            // may name any of a closed shape's entries.
-            let variable_key = key.starts_with("[$");
-            let base = prop_receiver_type(ctx, &receiver, db, file);
-            let generic = !base.types.is_empty()
-                && base.types.iter().all(|a| match a {
-                    Atomic::TArray { .. }
-                    | Atomic::TNonEmptyArray { .. }
-                    | Atomic::TList { .. }
-                    | Atomic::TNonEmptyList { .. } => true,
-                    Atomic::TKeyedArray { is_open, .. } => variable_key && !is_open,
-                    _ => false,
-                });
-            match mir_types::union::eval_value_of_type(&base).filter(|_| generic) {
-                Some(value) => value,
-                None => return,
-            }
-        }
+    let Some((current, present)) = element_current_type(ctx, &receiver, &key, db, file) else {
+        return;
     };
     // A missing key reads as `null`, so until a check rules `null` out the element may be absent.
     let mut possible = current.clone();
@@ -109,6 +88,71 @@ pub(super) fn narrow_element(
     ctx.unset_var(STAND_IN);
     ctx.diverges = diverges;
     if !narrowed.is_empty() && (present || !narrowed.is_nullable()) && narrowed != current {
+        ctx.set_prop_refined(&receiver, &key, narrowed);
+    }
+}
+
+/// Current type of the element `receiver[key]` read from a generic array, and whether a
+/// refinement already holds it.
+fn element_current_type(
+    ctx: &mut FlowState,
+    receiver: &str,
+    key: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(mir_types::Type, bool)> {
+    if let Some(refined) = ctx.get_prop_refined(receiver, key) {
+        return Some((refined.clone(), true));
+    }
+    // A literal key into a shape is narrowed by the shape itself; a variable key
+    // may name any of a closed shape's entries.
+    let variable_key = key.starts_with("[$");
+    let base = prop_receiver_type(ctx, receiver, db, file);
+    let generic = !base.types.is_empty()
+        && base.types.iter().all(|a| match a {
+            Atomic::TArray { .. }
+            | Atomic::TNonEmptyArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TNonEmptyList { .. } => true,
+            Atomic::TKeyedArray { is_open, .. } => variable_key && !is_open,
+            _ => false,
+        });
+    let value = mir_types::union::eval_value_of_type(&base).filter(|_| generic)?;
+    Some((value, false))
+}
+
+/// `isset($a[$k]['x']['y'])` on a generic array: narrows the shape of the element `$a[$k]`
+/// along the literal keys that follow it.
+pub(crate) fn narrow_isset_element_shape(
+    expr: &Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let mut path = Vec::new();
+    let mut element = peel_parens(expr);
+    while let ExprKind::ArrayAccess(aa) = &element.kind {
+        let key = match aa.index.as_ref().map(|i| &peel_parens(i).kind) {
+            Some(ExprKind::String(s)) => {
+                mir_types::atomic::ArrayKey::String(std::sync::Arc::from(&*s.to_text()))
+            }
+            Some(ExprKind::Int(i)) => mir_types::atomic::ArrayKey::Int(*i),
+            _ => break,
+        };
+        path.push(key);
+        element = peel_parens(&aa.array);
+    }
+    if path.is_empty() {
+        return;
+    }
+    path.reverse();
+    let Some((receiver, key)) = element_access_key(element) else {
+        return;
+    };
+    let Some((current, _)) = element_current_type(ctx, &receiver, &key, db, file) else {
+        return;
+    };
+    if let Some(narrowed) = super::arrays::shapes::narrow_shape_path(&current, &path) {
         ctx.set_prop_refined(&receiver, &key, narrowed);
     }
 }

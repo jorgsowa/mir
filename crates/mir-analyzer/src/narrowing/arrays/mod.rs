@@ -11,7 +11,7 @@
 mod count;
 mod in_array;
 mod key_exists;
-mod shapes;
+pub(super) mod shapes;
 
 pub(super) use count::{
     extract_array_key_first_or_last_arg, extract_array_key_first_or_last_static_prop_arg,
