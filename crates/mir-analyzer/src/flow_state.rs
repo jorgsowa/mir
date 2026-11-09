@@ -91,10 +91,14 @@ pub enum ValueOrigin {
 pub enum GuardKind {
     /// `$v`, `!empty($v)`
     Truthy,
+    /// `!$v`, `empty($v)`
+    Falsy,
     /// `isset($v)`, `$v !== null`
     NotNull,
     /// `$v === 'x'`, `$v === 1`, `$v === true`
     Identical(FlagValue),
+    /// `$v !== 'x'`, `$v !== 1`
+    NotIdentical(FlagValue),
 }
 
 /// A literal a flag variable is compared against or assigned.
@@ -134,13 +138,15 @@ impl Guard {
                     GuardKind::Identical(v) => {
                         self.kind == GuardKind::NotNull
                             || (self.kind == GuardKind::Truthy && v.is_truthy())
+                            || matches!(self.kind, GuardKind::NotIdentical(other) if other != v)
                     }
-                    GuardKind::NotNull => false,
+                    GuardKind::NotNull | GuardKind::Falsy | GuardKind::NotIdentical(_) => false,
                 })
     }
 
     fn excludes(self, atom: &Atomic) -> bool {
         match (self.kind, atom) {
+            (GuardKind::Falsy | GuardKind::NotIdentical(_), _) => false,
             (_, Atomic::TNull) => true,
             (GuardKind::NotNull, _) => false,
             (GuardKind::Truthy, Atomic::TFalse | Atomic::TLiteralInt(0)) => true,

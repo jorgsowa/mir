@@ -5492,16 +5492,11 @@
   <file src="core/modules/views/src/Plugin/views/filter/NumericFilter.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$source]]></code>
-      <code><![CDATA[$identifier]]></code>
-      <code><![CDATA[$identifier]]></code>
       <code><![CDATA[$source]]></code>
-      <code><![CDATA[$identifier]]></code>
-      <code><![CDATA[$identifier]]></code>
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/StringFilter.php">
     <PossiblyUndefinedVariable>
-      <code><![CDATA[$identifier]]></code>
       <code><![CDATA[$source]]></code>
     </PossiblyUndefinedVariable>
   </file>

@@ -545,13 +545,21 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
         ExprKind::Variable(v) => Some(Name::from(&**v)),
         _ => None,
     };
+    let (truthiness, falsiness) = if is_true {
+        (GuardKind::Truthy, GuardKind::Falsy)
+    } else {
+        (GuardKind::Falsy, GuardKind::Truthy)
+    };
     let (var, kind) = match &expr.kind {
         ExprKind::Parenthesized(inner) => return established_guard(inner, is_true),
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
             return established_guard(&u.operand, !is_true)
         }
-        ExprKind::Variable(_) if is_true => (plain_var(expr)?, GuardKind::Truthy),
-        ExprKind::Empty(inner) if !is_true => (plain_var(inner)?, GuardKind::Truthy),
+        ExprKind::Variable(_) => (plain_var(expr)?, truthiness),
+        ExprKind::Empty(inner) => (plain_var(inner)?, falsiness),
+        ExprKind::Assign(a) if a.op == AssignOp::Assign && !a.by_ref => {
+            (plain_var(&a.target)?, truthiness)
+        }
         ExprKind::Isset(vars) if is_true && vars.len() == 1 => {
             (plain_var(&vars[0])?, GuardKind::NotNull)
         }
@@ -568,7 +576,11 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
                 ExprKind::String(s) if holds => {
                     GuardKind::Identical(FlagValue::Str(Name::from(&*s.to_text())))
                 }
+                ExprKind::String(s) => {
+                    GuardKind::NotIdentical(FlagValue::Str(Name::from(&*s.to_text())))
+                }
                 ExprKind::Int(n) if holds => GuardKind::Identical(FlagValue::Int(*n)),
+                ExprKind::Int(n) => GuardKind::NotIdentical(FlagValue::Int(*n)),
                 ExprKind::Bool(true) if holds => GuardKind::Identical(FlagValue::True),
                 _ => return None,
             };
