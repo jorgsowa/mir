@@ -185,6 +185,20 @@ impl<'a> ClassAnalyzer<'a> {
                         {
                             return None;
                         }
+                        // A class's own method replaces the copy from a trait it uses.
+                        if !own_traits.contains(anc) {
+                            let user = member_owner(anc);
+                            if user != *anc
+                                && crate::db::find_method_in_class(
+                                    self.db,
+                                    crate::db::Fqcn::from_str(self.db, user.as_ref()),
+                                    method_name_lower.as_ref(),
+                                )
+                                .is_some()
+                            {
+                                return None;
+                            }
+                        }
                         let here2 = crate::db::Fqcn::from_str(self.db, anc.as_ref());
                         if let Some(m) = crate::db::find_method_in_class(
                             self.db,

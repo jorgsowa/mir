@@ -2321,11 +2321,6 @@
       <code><![CDATA[return $title;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/content_moderation/src/Entity/ContentModerationState.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[getfieldstoskipfromtranslationchangescheck]]></code>
-    </MethodSignatureMismatch>
-  </file>
   <file src="core/modules/content_moderation/src/ModerationInformation.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>

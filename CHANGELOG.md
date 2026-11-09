@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `is_object()` and other type checks on a shape element that can never pass (the element is narrowed to `null`) make the branch unreachable, as they do for a variable, so code in it isn't reported.
 - A `catch` or `finally` block doesn't see the state before the `try` when its first statement assigns a literal (`$a = 'x';`), which can't throw, so that variable isn't `PossiblyUndefinedVariable` there.
 - A trait's abstract `protected` method implemented by a `public` parent method isn't `OverriddenMethodAccess`, and calling it from outside isn't `UndefinedMethod`.
+- A trait method that the class using the trait replaces with its own (for example next to `use T { m as traitM; }`) isn't checked as a parent of a subclass's `m()`, so it isn't `MethodSignatureMismatch`.
 
 ## [0.95.0] - 2026-11-09
 
