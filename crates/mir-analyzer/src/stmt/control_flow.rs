@@ -168,6 +168,9 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
         let guard_unwritten = guard_unwritten && else_unwritten;
+        if if_stmt.else_branch.is_some() && if_stmt.elseif_branches.is_empty() {
+            else_ctx.record_flag_guarded_defs(&pre_ctx, &[&then_ctx]);
+        }
         let else_guard_unwritten =
             else_guard.is_some() && if_stmt.else_branch.is_some() && else_unwritten;
 

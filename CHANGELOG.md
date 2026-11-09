@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A flag set to `false` beside a definition proves it wherever `!$flag` or `$flag === false` holds again, and a branch that defines the variable outright keeps such a proof from the other branch, so the variable isn't `PossiblyUndefinedVariable` there.
 - A condition on an array element with a literal key (`isset($a['k'])`, `!empty($a['k'])`, `$a['k'] === 'x'`) guards the variables defined under it like a condition on a variable, so `if (!empty($a['k'])) { $t = 1; } if (empty($a['k'])) { $t = 2; } echo $t;` isn't `PossiblyUndefinedVariable`.
 - A condition guards a variable only when its branch defines it on every path, so `if ($g) { if (rand()) { $x = 1; } } if ($g) { echo $x; }` is `PossiblyUndefinedVariable`; it also guards a variable that may already be defined, as on a later loop iteration.
+- A flag the `then` branch sets and the `else` branch may leave at its other value proves the variables the `else` branch defines (`$required = false; if (...) { $required = true; } else { $words = ...; } if ($required) { return; }` then reading `$words`), so they aren't `PossiblyUndefinedVariable`.
 
 ## [0.95.0] - 2026-11-09
 

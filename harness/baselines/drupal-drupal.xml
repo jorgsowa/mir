@@ -4396,9 +4396,6 @@
     <InvalidMethodCall>
       <code><![CDATA[$conditions->conditions()]]></code>
     </InvalidMethodCall>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$words]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/search/src/Plugin/views/field/Score.php">
     <InvalidReturnType>
@@ -4409,9 +4406,6 @@
     <InvalidMethodCall>
       <code><![CDATA[$conditions->conditions()]]></code>
     </InvalidMethodCall>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$words]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/search/src/SearchIndex.php">
     <InvalidReturnType>
