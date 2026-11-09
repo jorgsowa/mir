@@ -953,11 +953,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     short_circuits(&mc.object),
                 );
                 ctx.invalidate_escaped_vars();
-                self.expose_props_to_call(&mc.object, &mc.args, ctx);
-                self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);
-                self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
-                self.store_static_call_props(&mc.object, &mc.method, &mc.args, ctx);
-                self.taint_array_container(&mc.object, &mc.method, &mc.args, ctx);
+                if self.db.taint_analysis() {
+                    self.expose_props_to_call(&mc.object, &mc.args, ctx);
+                    self.store_own_call_props(&mc.object, &mc.method, &mc.args, ctx);
+                    self.store_receiver_call_props(&mc.object, &mc.method, &mc.args, ctx);
+                    self.store_static_call_props(&mc.object, &mc.method, &mc.args, ctx);
+                    self.taint_array_container(&mc.object, &mc.method, &mc.args, ctx);
+                }
                 partial_application_type(&mc.args, ty, || {
                     self.method_call_closure(&mc.object, &mc.method, ctx)
                 })
@@ -967,7 +969,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let ty =
                     crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true);
                 ctx.invalidate_escaped_vars();
-                self.expose_props_to_call(&mc.object, &mc.args, ctx);
+                if self.db.taint_analysis() {
+                    self.expose_props_to_call(&mc.object, &mc.args, ctx);
+                }
                 if is_partial_application(&mc.args) {
                     Type::nullable(partial_closure(&mc.args, || {
                         self.method_call_closure(&mc.object, &mc.method, ctx)
@@ -982,9 +986,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self, smc, ctx, expr.span,
                 );
                 ctx.invalidate_escaped_vars();
-                self.expose_props_to_call(&smc.class, &smc.args, ctx);
-                self.store_own_call_props(&smc.class, &smc.method, &smc.args, ctx);
-                self.store_static_call_props(&smc.class, &smc.method, &smc.args, ctx);
+                if self.db.taint_analysis() {
+                    self.expose_props_to_call(&smc.class, &smc.args, ctx);
+                    self.store_own_call_props(&smc.class, &smc.method, &smc.args, ctx);
+                    self.store_static_call_props(&smc.class, &smc.method, &smc.args, ctx);
+                }
                 partial_application_type(&smc.args, ty, || {
                     self.static_call_closure(&smc.class, &smc.method, ctx)
                 })
