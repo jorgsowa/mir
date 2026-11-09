@@ -399,15 +399,16 @@ pub(crate) fn taint_byref_outputs(
 }
 
 /// Type a by-ref argument holds after the call: `@param-out`, else the declared
-/// param type (the callee may have written anything the type admits).
+/// param type (the callee may have written anything the type admits), else mixed.
 pub(crate) fn byref_written_type(
     param: &mir_codebase::definitions::DeclaredParam,
-) -> Option<&std::sync::Arc<mir_types::Type>> {
-    param.out_ty.as_ref().or(if param.is_byref {
-        param.ty.as_ref()
-    } else {
-        None
-    })
+) -> Option<mir_types::Type> {
+    match (&param.out_ty, &param.ty) {
+        (Some(out), _) => Some((**out).clone()),
+        (None, _) if !param.is_byref => None,
+        (None, Some(ty)) => Some((**ty).clone()),
+        (None, None) => Some(mir_types::Type::mixed()),
+    }
 }
 
 /// True when `ty` still names an unbound template param.

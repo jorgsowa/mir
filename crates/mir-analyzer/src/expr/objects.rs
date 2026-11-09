@@ -355,10 +355,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         args: &[php_ast::owned::Arg],
         ctx: &mut FlowState,
     ) {
-        if !params
-            .iter()
-            .any(|p| crate::call::byref_written_type(p).is_some())
-        {
+        if !params.iter().any(|p| p.is_byref || p.out_ty.is_some()) {
             return;
         }
         let args_taint = crate::taint::args_taint(args, ctx, self.db, &self.file);
@@ -366,12 +363,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             let Some(out_ty) = crate::call::byref_written_type(param) else {
                 return;
             };
-            if crate::call::has_unbound_template(out_ty) {
+            if crate::call::has_unbound_template(&out_ty) {
                 return;
             }
             if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
                 let var_name = name.as_ref().trim_start_matches('$');
-                ctx.set_var(var_name, (**out_ty).clone());
+                ctx.set_var(var_name, out_ty);
                 ctx.set_var_taint(var_name, args_taint);
             }
         });

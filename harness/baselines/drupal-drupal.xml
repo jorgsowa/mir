@@ -5737,9 +5737,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-    <NonExistentArrayOffset>
-      <code><![CDATA['title']]></code>
-    </NonExistentArrayOffset>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$group_info]]></code>
       <code><![CDATA[$group_info]]></code>

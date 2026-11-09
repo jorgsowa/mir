@@ -1870,8 +1870,7 @@ fn resolve_method_return<'a>(
             };
             // `@param-out self`/`@param-out static` must resolve to the receiver's
             // concrete class, the same way `@return static` already does.
-            let out_ty =
-                substitute_static_in_return(ea.db, (**out_ty).clone(), fqcn, receiver_type_params);
+            let out_ty = substitute_static_in_return(ea.db, out_ty, fqcn, receiver_type_params);
             let out_ty = if bindings.is_empty() {
                 out_ty
             } else {

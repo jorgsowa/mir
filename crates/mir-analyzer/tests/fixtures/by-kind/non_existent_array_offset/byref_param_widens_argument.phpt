@@ -54,11 +54,11 @@ class Collector {
         return $path[0]['id'];
     }
 
-    public function untypedKeepsCallerType(): void {
+    public function untypedWidensToMixed(): void {
         $path = [];
         $this->untyped($path);
-        /** @mir-check $path is array{} */
-        $_ = $path;
+        /** @mir-check $path is mixed */
+        echo 1;
     }
 
     public function noCallStaysEmpty(): int {
