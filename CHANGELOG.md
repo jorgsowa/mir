@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A variable passed to an untyped by-reference parameter of a method, static method or constructor is `mixed` after the call, as it already was for functions, instead of keeping its old type.
 - `isset($a[$i]['k'])` (also under `assert()`) proves the optional key `k` of the element read through a variable key, so reading `$a[$i]['k']` there isn't nullable.
 - A `break` or `continue` in unreachable code (after an if/else that returns on both branches) no longer adds a path out of its loop or switch, so variables set on every live path aren't `PossiblyUndefinedVariable` after it.
+- An offset write (`$this->p['k'] = $v`) to a nullable array property removes `null` from the property, as the write creates the array, also when a call on the right-hand side dropped an earlier narrowing.
 
 ## [0.95.0] - 2026-11-09
 

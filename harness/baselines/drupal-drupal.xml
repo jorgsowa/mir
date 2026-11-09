@@ -1875,9 +1875,6 @@
       <code><![CDATA[$this->keyValueFactory = \Drupal::service('keyvalue')]]></code>
       <code><![CDATA[$this->cache = \Drupal::service('cache.bootstrap')]]></code>
     </InvalidPropertyAssignment>
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->defaultVariables;]]></code>
-    </NullableReturnStatement>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$candidate]]></code>
     </PossiblyUndefinedVariable>

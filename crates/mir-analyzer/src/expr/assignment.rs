@@ -1036,6 +1036,31 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// After `$obj->prop[...] = $v` on a nullable array property, the write created the array.
+    fn refine_property_vivified(
+        &self,
+        pa: &php_ast::owned::PropertyAccessExpr,
+        ctx: &mut FlowState,
+    ) {
+        let (Some(obj_key), Some(prop_name)) = (
+            crate::narrowing::chained_prop_receiver_key(&pa.object)
+                .filter(|k| crate::narrowing::receiver_key_is_stable(ctx, k, self.db)),
+            extract_string_from_expr(&pa.property),
+        ) else {
+            return;
+        };
+        let current = crate::narrowing::resolve_prop_current_type(
+            ctx, &obj_key, &prop_name, self.db, &self.file,
+        );
+        if !current.is_nullable() {
+            return;
+        }
+        let array_ty = current.remove_null();
+        if !array_ty.types.is_empty() && array_ty.types.iter().all(Atomic::is_array) {
+            ctx.set_prop_refined(&obj_key, &prop_name, array_ty);
+        }
+    }
+
     pub(crate) fn check_property_write_purity(
         &mut self,
         pa: &php_ast::owned::PropertyAccessExpr,
@@ -2843,6 +2868,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             {
                                 self.refine_property_shape_write(pa, &prop_ty, key, &ty, ctx);
                             }
+                            self.refine_property_vivified(pa, ctx);
                             break;
                         }
                         ExprKind::StaticPropertyAccess(spa) => {
