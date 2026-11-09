@@ -284,14 +284,23 @@ pub(crate) fn named_object_return_compatible(
 
             // `file` may not be where the declared type was written (an inherited
             // docblock), so keep whichever spelling of each name is the related class.
-            let Some((related_actual, related_declared)) = [
+            // A spelling naming no class only relates through its short name, which
+            // `is_subtype` below doesn't fall back to, so prefer one that exists.
+            let pairs = [
                 (actual_fqcn.as_ref(), resolved_declared.as_str()),
                 (actual_fqcn.as_ref(), declared_fqcn.as_ref()),
                 (resolved_actual.as_str(), resolved_declared.as_str()),
                 (resolved_actual.as_str(), declared_fqcn.as_ref()),
-            ]
-            .into_iter()
-            .find(|(a, d)| extends_or_implements(db, a, d)) else {
+            ];
+            let Some((related_actual, related_declared)) = pairs
+                .into_iter()
+                .find(|(a, d)| crate::db::class_exists(db, d) && extends_or_implements(db, a, d))
+                .or_else(|| {
+                    pairs
+                        .into_iter()
+                        .find(|(a, d)| extends_or_implements(db, a, d))
+                })
+            else {
                 return false;
             };
 

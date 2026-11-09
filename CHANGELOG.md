@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache: when a class reported missing becomes autoloadable (for example after `composer install`), every cached result reporting it is re-analyzed, not only the first, so stale `UndefinedClass` results don't survive.
 - An `array_filter()` callback whose body is `$x instanceof C` narrows the kept values to `C`.
 - A variable assigned in only one branch of an `if`/`else` is defined wherever that branch's condition holds again (`if ($x !== null) { $y = 1; } else { ... } if ($x !== null) { echo $y; }`), as it already was without an `else`.
+- Inside a namespace, an override returning a subclass of a global generic class (`ArrayIterator<K, V>` for `Traversable<K, V>`) isn't `MethodSignatureMismatch` because the parent's class name was looked up under the namespace.
 
 ## [0.95.0] - 2026-11-09
 

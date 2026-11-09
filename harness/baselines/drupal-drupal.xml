@@ -694,9 +694,6 @@
     <InvalidReturnType>
       <code><![CDATA[return new \ArrayIterator($this->getFields());]]></code>
     </InvalidReturnType>
-    <MethodSignatureMismatch>
-      <code><![CDATA[getiterator]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="core/lib/Drupal/Core/Entity/ContentEntityConfirmFormBase.php">
     <InvalidReturnType>
@@ -895,9 +892,6 @@
       <code><![CDATA[$this->typedConfigManager = \Drupal::service('config.typed')]]></code>
       <code><![CDATA[$this->typedDataManager = \Drupal::service('config.typed')]]></code>
     </InvalidPropertyAssignment>
-    <MethodSignatureMismatch>
-      <code><![CDATA[getiterator]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Plugin/DataType/Deriver/EntityDeriver.php">
     <InvalidOperand>
