@@ -247,7 +247,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -584,9 +584,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
 name = "js-sys"
@@ -891,18 +891,18 @@ dependencies = [
 
 [[package]]
 name = "php-ast"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "264846a7f7319b982e395bd1496f8ceec225021e11ee5d98beff162a71e95cca"
+checksum = "1c9d606e296846b52a97571d7892d8b7a28173fc58716380fcf1d7260654d839"
 dependencies = [
  "bumpalo",
 ]
 
 [[package]]
 name = "php-lexer"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f67f73ceb17379ecccdcdffdd89beb0b54d436ec5b3b403c413a6a36126258cb"
+checksum = "191bb6819707287b8d1d2133d5ba27b7b659b4160b2a80365100f8a9de6acfee"
 dependencies = [
  "memchr",
  "php-ast",
@@ -910,9 +910,9 @@ dependencies = [
 
 [[package]]
 name = "php-rs-parser"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47bd21e59038ba3d9589dfa8548128665785280925f07e27ac50661c4fa4eba9"
+checksum = "d9c059c11608cb760b9d0f121bd9a2a1e4ee974377b785626d417f45d009bf58"
 dependencies = [
  "bumpalo",
  "memchr",
@@ -923,9 +923,9 @@ dependencies = [
 
 [[package]]
 name = "phpdoc-parser"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8366a1302b6311dac13a3bb30be9b9388403c94a27c4555389e6227e8aef1a6a"
+checksum = "215a8221f5e3ef1fdd34a729afdf041780d701d71a210beff444aac3520a22ba"
 dependencies = [
  "php-ast",
 ]
@@ -1145,7 +1145,7 @@ checksum = "69dd77f86ec10e72e314f4ddf7c44c8d349e73cdff1aad524ba9668603fb0549"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1190,7 +1190,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1278,9 +1278,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.9"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1323,7 +1323,7 @@ checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1445,7 +1445,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
  "wasm-bindgen-shared",
 ]
 
