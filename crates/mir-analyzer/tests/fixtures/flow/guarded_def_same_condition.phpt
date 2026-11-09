@@ -58,7 +58,6 @@ function variableReassigned(bool $flag): void {
 function withElseBranch(bool $flag): void {
     if ($flag) { $x = compute(); } else { echo 'no'; }
     if ($flag && $x > 0) { echo $x; }
-//               ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function negatedGuard(bool $flag): void {

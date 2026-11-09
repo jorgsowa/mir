@@ -4725,11 +4725,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/system/src/Form/ThemeSettingsForm.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$features]]></code>
-      <code><![CDATA[$features]]></code>
-      <code><![CDATA[$features]]></code>
-    </PossiblyUndefinedVariable>
     <TaintedCallable>
       <code><![CDATA[$function($form, $form_state)]]></code>
     </TaintedCallable>

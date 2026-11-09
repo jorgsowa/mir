@@ -111,7 +111,6 @@ function guardReassignedInBranch(?string $g): void {
 function withElseBranch(?string $g): void {
     if (!empty($g)) { $x = compute(); } else { echo 'no'; }
     if (!empty($g)) { echo $x; }
-//                         ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function assignmentInCondition(): void {

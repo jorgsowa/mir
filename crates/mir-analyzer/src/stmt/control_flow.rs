@@ -143,13 +143,31 @@ impl<'a> StatementsAnalyzer<'a> {
         // chained through the loop above, including any assignments made in
         // an elseif's own condition.
         let mut else_ctx = running_ctx;
+        let else_guard = if_stmt
+            .elseif_branches
+            .is_empty()
+            .then(|| established_guard(&if_stmt.condition, false))
+            .flatten();
+        // Both guards test the same variable; a write to it in the else branch voids either.
+        let mut else_unwritten = true;
         if let Some(else_branch) = &if_stmt.else_branch {
+            let sentinel = else_guard.or(guard);
+            if let Some(g) = sentinel {
+                else_ctx.add_guarded_def(g.var, g);
+            }
             if !else_ctx.diverges {
                 self.analyze_stmt(else_branch, &mut else_ctx);
             } else if !pre_diverges {
                 self.analyze_impossible_branch(else_branch, ctx);
             }
+            if let Some(g) = sentinel {
+                else_unwritten = else_ctx.has_guarded_def(g.var, g);
+                else_ctx.drop_guarded_def(g.var);
+            }
         }
+        let guard_unwritten = guard_unwritten && else_unwritten;
+        let else_guard_unwritten =
+            else_guard.is_some() && if_stmt.else_branch.is_some() && else_unwritten;
 
         if !pre_diverges && (then_unreachable_from_narrowing || else_unreachable_from_narrowing) {
             self.emit_redundant_condition(
@@ -165,12 +183,21 @@ impl<'a> StatementsAnalyzer<'a> {
             );
         }
 
+        // A variable only one branch of a plain if/else defines is defined where its condition holds again.
+        let branch_guards = (if_stmt.elseif_branches.is_empty()
+            && (guard_unwritten || else_guard_unwritten))
+            .then(|| (then_ctx.clone(), else_ctx.clone()));
         *ctx = FlowState::merge_branches(&pre_ctx, then_ctx, Some(else_ctx));
         for ec in elseif_ctxs {
             *ctx = FlowState::merge_branches(&pre_ctx, ec, Some(ctx.clone()));
         }
-        if guard_unwritten {
-            record_guarded_defs(&pre_ctx, if_stmt, ctx);
+        if let Some((then_ctx, else_ctx)) = branch_guards {
+            if let Some(g) = guard.filter(|_| guard_unwritten) {
+                record_guarded_defs(&pre_ctx, g, &else_ctx, ctx);
+            }
+            if let Some(g) = else_guard.filter(|_| else_guard_unwritten) {
+                record_guarded_defs(&pre_ctx, g, &then_ctx, ctx);
+            }
         }
     }
 
@@ -1468,19 +1495,22 @@ fn is_always_true_literal(condition: &php_ast::owned::Expr) -> bool {
     matches!(cond.kind, ExprKind::Bool(true)) || matches!(cond.kind, ExprKind::Int(n) if n != 0)
 }
 
-/// After `if (<guard>) { $x = ...; }` (no else/elseif), `$x` is defined wherever
-/// the same guard holds again.
-fn record_guarded_defs(pre: &FlowState, if_stmt: &IfStmt, post: &mut FlowState) {
-    if !if_stmt.elseif_branches.is_empty() || if_stmt.else_branch.is_some() {
-        return;
-    }
-    let Some(guard) = established_guard(&if_stmt.condition, true) else {
-        return;
-    };
+/// After `if (<guard>) { $x = ...; }`, `$x` is defined wherever the same guard
+/// holds again, unless the `other` branch (else, or the then for a negated guard) defines it too.
+fn record_guarded_defs(
+    pre: &FlowState,
+    guard: crate::flow_state::Guard,
+    other: &FlowState,
+    post: &mut FlowState,
+) {
     let newly_possible: Vec<Name> = post
         .possibly_assigned_vars
         .iter()
-        .filter(|v| !pre.var_possibly_defined_sym(**v) && **v != guard.var)
+        .filter(|v| {
+            !pre.var_possibly_defined_sym(**v)
+                && !other.var_possibly_defined_sym(**v)
+                && **v != guard.var
+        })
         .copied()
         .collect();
     for var in newly_possible {
