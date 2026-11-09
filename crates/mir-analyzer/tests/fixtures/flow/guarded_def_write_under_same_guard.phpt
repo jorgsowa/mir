@@ -67,10 +67,17 @@ function unsetUnderGuard(): void {
 //                        ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }
 
-function guardReassignedWhileWriting(): void {
+function guardReassignedWhereDefined(): void {
     $on = rand(0, 1) === 1;
     if ($on) { $items = [1]; }
     if ($on) { $on = rand(0, 1) === 1; $items = [2]; }
+    if ($on) { echo count($items); }
+}
+
+function guardReassignedWhereUndefined(): void {
+    $on = rand(0, 1) === 1;
+    if ($on) { $items = [1]; }
+    if (rand(0, 1) === 1) { $on = true; }
     if ($on) { echo count($items); }
 //                        ^^^^^^ PossiblyUndefinedVariable: Variable $items might not be defined
 }

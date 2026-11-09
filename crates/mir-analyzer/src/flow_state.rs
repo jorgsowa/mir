@@ -107,16 +107,26 @@ pub enum FlagValue {
     Str(Name),
     Int(i64),
     True,
+    False,
 }
 
 impl FlagValue {
     fn values_of_type(ty: &Type) -> impl Iterator<Item = Self> + '_ {
-        ty.types.iter().filter_map(|atom| match atom {
-            Atomic::TLiteralString(s) => Some(Self::Str(Name::from(s.as_ref()))),
-            Atomic::TLiteralInt(n) => Some(Self::Int(*n)),
-            Atomic::TTrue | Atomic::TBool => Some(Self::True),
-            _ => None,
-        })
+        ty.types
+            .iter()
+            .filter_map(|atom| match atom {
+                Atomic::TLiteralString(s) => Some(Self::Str(Name::from(s.as_ref()))),
+                Atomic::TLiteralInt(n) => Some(Self::Int(*n)),
+                Atomic::TTrue => Some(Self::True),
+                Atomic::TFalse => Some(Self::False),
+                _ => None,
+            })
+            .chain(
+                ty.types
+                    .iter()
+                    .filter(|atom| matches!(atom, Atomic::TBool))
+                    .flat_map(|_| [Self::True, Self::False]),
+            )
     }
 
     fn is_truthy(self) -> bool {
@@ -124,6 +134,7 @@ impl FlagValue {
             Self::Str(s) => !matches!(s.as_ref(), "" | "0"),
             Self::Int(n) => n != 0,
             Self::True => true,
+            Self::False => false,
         }
     }
 }
@@ -146,12 +157,13 @@ impl Guard {
 
     fn excludes(self, atom: &Atomic) -> bool {
         match (self.kind, atom) {
-            (GuardKind::Falsy | GuardKind::NotIdentical(_), _) => false,
+            (GuardKind::Falsy, atom) => is_always_truthy(atom),
+            (GuardKind::NotIdentical(_), _) => false,
             (_, Atomic::TNull) => true,
             (GuardKind::NotNull, _) => false,
             (GuardKind::Truthy, Atomic::TFalse | Atomic::TLiteralInt(0)) => true,
             (GuardKind::Truthy, Atomic::TLiteralString(s)) => matches!(s.as_ref(), "" | "0"),
-            (GuardKind::Identical(v), Atomic::TFalse) => v != FlagValue::True,
+            (GuardKind::Identical(v), Atomic::TFalse) => v != FlagValue::False,
             (GuardKind::Identical(v), Atomic::TTrue) => v != FlagValue::True,
             (GuardKind::Identical(v), Atomic::TLiteralInt(n)) => v != FlagValue::Int(*n),
             (GuardKind::Identical(v), Atomic::TLiteralString(s)) => {
@@ -168,6 +180,15 @@ impl Guard {
                 .vars
                 .get(&self.var)
                 .is_none_or(|ty| ty.types.iter().all(|a| self.excludes(a)))
+    }
+}
+
+fn is_always_truthy(atom: &Atomic) -> bool {
+    match atom {
+        Atomic::TTrue | Atomic::TNamedObject { .. } | Atomic::TObject => true,
+        Atomic::TLiteralInt(n) => *n != 0,
+        Atomic::TLiteralString(s) => !matches!(s.as_ref(), "" | "0"),
+        _ => false,
     }
 }
 
@@ -1340,6 +1361,7 @@ impl FlowState {
                     [
                         (GuardKind::NotNull, true),
                         (GuardKind::Truthy, value.is_truthy()),
+                        (GuardKind::Falsy, !value.is_truthy()),
                         (GuardKind::Identical(*value), true),
                     ]
                     .into_iter()
@@ -2621,7 +2643,11 @@ impl FlowState {
             from.guarded_defs
                 .iter()
                 .flat_map(|(var, guards)| guards.iter().map(move |g| (*var, *g)))
-                .filter(|(var, g)| other.has_guarded_def(*var, *g) || g.vacuous_in(other))
+                .filter(|(var, g)| {
+                    other.has_guarded_def(*var, *g)
+                        || g.vacuous_in(other)
+                        || other.var_is_defined_sym(*var)
+                })
                 .collect::<Vec<_>>()
         };
         let mut merged = FxHashMap::default();

@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A flag that every `catch` block sets to another value (`$ok = true; try { $u = f(); } catch (E) { $ok = false; }`) proves the variables the `try` body defines wherever the flag still holds, so `if ($ok) { echo $u; }` isn't `PossiblyUndefinedVariable`.
 - `array_map()` over a sealed shape returns the same keys with the callback's return type, so mapping `['west', 'south', 'east', 'north']` matches a declared `array{0: float, 1: float, 2: float, 3: float}` instead of being `InvalidReturnType`.
 - A `for` loop whose init assigns int literals that its condition then compares, such as `for ($i = 0; $i < 50; $i++)`, runs its body at least once, so a variable the body assigns isn't `PossiblyUndefinedVariable` after it. A union also drops a generic array or list that another member of the same kind covers (`list<0> | list<int>` is `list<int>`).
+- A flag set to `false` beside a definition proves it wherever `!$flag` or `$flag === false` holds again, and a branch that defines the variable outright keeps such a proof from the other branch, so the variable isn't `PossiblyUndefinedVariable` there.
 
 ## [0.95.0] - 2026-11-09
 

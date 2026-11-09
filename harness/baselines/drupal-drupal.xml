@@ -1584,9 +1584,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $query->execute();]]></code>
     </NullableReturnStatement>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$id]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Recipe/Command/RecipeCommand.php">
     <TaintedCallable>
@@ -4742,11 +4739,6 @@
       <code><![CDATA[theme_get_suggestions($path_args, 'html')]]></code>
       <code><![CDATA[theme_get_suggestions($path_args, 'page')]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/system/src/Install/Requirements/SystemRequirements.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$pdo_message]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/system/src/PathBasedBreadcrumbBuilder.php">
     <InvalidReturnType>

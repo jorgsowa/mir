@@ -582,6 +582,7 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
                 ExprKind::Int(n) if holds => GuardKind::Identical(FlagValue::Int(*n)),
                 ExprKind::Int(n) => GuardKind::NotIdentical(FlagValue::Int(*n)),
                 ExprKind::Bool(true) if holds => GuardKind::Identical(FlagValue::True),
+                ExprKind::Bool(false) if holds => GuardKind::Identical(FlagValue::False),
                 _ => return None,
             };
             (plain_var(var_side)?, kind)
