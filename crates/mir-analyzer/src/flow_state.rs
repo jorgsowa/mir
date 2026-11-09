@@ -1313,9 +1313,9 @@ impl FlowState {
             .is_some_and(|guards| guards.contains(&guard))
     }
 
-    /// For a branch of `pre` that sets a flag to a literal, records the variables it newly
-    /// defines as guarded by that flag, when only this branch can give the flag that value.
-    pub fn record_flag_guarded_defs(&mut self, pre: &FlowState) {
+    /// For a branch of `pre` that holds a flag at a literal, records the variables it newly
+    /// defines as guarded by that flag, when none of the `others` paths can give the flag that value.
+    pub fn record_flag_guarded_defs(&mut self, pre: &FlowState, others: &[&FlowState]) {
         if self.diverges {
             return;
         }
@@ -1350,7 +1350,11 @@ impl FlowState {
                         from_flag: true,
                     })
                 })
-                .filter(|g| g.vacuous_in(pre) || pre.has_guarded_def(def, *g))
+                .filter(|g| {
+                    others
+                        .iter()
+                        .all(|other| g.vacuous_in(other) || other.has_guarded_def(def, *g))
+                })
                 .collect();
             for guard in guards {
                 self.add_guarded_def(def, guard);

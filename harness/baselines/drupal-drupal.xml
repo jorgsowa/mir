@@ -3364,12 +3364,6 @@
       <code><![CDATA[return $this->getEntity()->label();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/link/src/Plugin/Validation/Constraint/LinkTypeConstraintValidator.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$url]]></code>
-      <code><![CDATA[$url]]></code>
-    </PossiblyUndefinedVariable>
-  </file>
   <file src="core/modules/locale/src/Controller/LocaleController.php">
     <UndefinedFunction>
       <code><![CDATA[batch_get()]]></code>

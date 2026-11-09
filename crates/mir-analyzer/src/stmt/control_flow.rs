@@ -40,7 +40,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(g) = guard {
             then_ctx.drop_guarded_def(g.var);
         }
-        then_ctx.record_flag_guarded_defs(&pre_ctx);
+        then_ctx.record_flag_guarded_defs(&pre_ctx, &[&pre_ctx]);
 
         // Chained "every condition seen so far evaluated false" state, threaded
         // through the whole elseif ladder (and reused below for the final
@@ -1382,6 +1382,8 @@ impl<'a> StatementsAnalyzer<'a> {
         // onto the surviving state (see its `if_ctx.diverges`/`else_ctx.diverges`
         // arms), so folding every catch through it — including diverging ones —
         // is what makes a diverging catch's reads still count as uses.
+        let live_catches: Vec<&FlowState> = all_catches.iter().filter(|c| !c.diverges).collect();
+        try_ctx.record_flag_guarded_defs(&pre_ctx, &live_catches);
         let mut result = try_ctx;
         for catch_ctx in all_catches {
             result = FlowState::merge_branches(&pre_ctx, result, Some(catch_ctx));

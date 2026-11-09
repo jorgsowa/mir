@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `proc_open()` with an array command runs the program without a shell, so its arguments aren't `TaintedShell`; a string command still is.
 - A flag assigned in both branches of an `if`/`else` without an earlier initialisation, or set in a nested `if` (so it holds `bool`), proves the variables defined beside it wherever the flag holds, so they aren't `PossiblyUndefinedVariable`.
 - A variable assigned under `!$g`, `empty($g)`, `$g = f()` or `$g !== 'literal'` is defined wherever the same condition holds again, so reading it there isn't `PossiblyUndefinedVariable`.
+- A flag that every `catch` block sets to another value (`$ok = true; try { $u = f(); } catch (E) { $ok = false; }`) proves the variables the `try` body defines wherever the flag still holds, so `if ($ok) { echo $u; }` isn't `PossiblyUndefinedVariable`.
 
 ## [0.95.0] - 2026-11-09
 
