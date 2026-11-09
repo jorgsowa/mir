@@ -845,7 +845,7 @@ impl AnalysisSession {
                 _ => true,
             };
             if surface_changed {
-                cache.evict_with_dependents(&[file_path.to_string()]);
+                self.invalidate_dependents(&[file_path.to_string()], false);
             }
             let db = self.snapshot_db();
             let ref_locs = extract_reference_locations(&db, &file);
@@ -856,6 +856,8 @@ impl AnalysisSession {
                 all_issues.as_slice().into(),
                 ref_locs,
             );
+            drop(db);
+            self.update_reverse_deps_for(file_path);
         }
 
         opts.apply(&mut all_issues);

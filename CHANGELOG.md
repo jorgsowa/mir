@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AnalysisSession::reference_postings_fresh(file)` reports whether a file's reference postings are exact for its current text, and `Work::FileAnalysis` counts `analyze_file` runs.
+
+### Changed
+
+- `AnalysisSnapshot::warm_files` skips files whose reference postings are already fresh for their current text, such as unchanged disk-cache replays. It still records their class edges and class-mention scans when those are missing. `reanalyze_files` still analyzes every file it's given.
+
 ### Fixed
+
+- Language-server hosts that register files with `upsert_source_file` no longer replay stale reference postings on the next launch. The cache now records each analyzed file's dependencies, so when a file changes, is deleted, or loses a declaration between sessions, its dependents are re-analyzed instead of being replayed by `warm_start_files`.
+- An edit to a file (`upsert_source_file`, `set_file_text`, `ingest_file`, `invalidate_file`) marks the postings of every file that depends on it as stale. The next reference query or `warm_files` pass re-analyzes them, including dependents that have no analysis in memory.
 
 - `is_callable([$obj, 'm'])` or `is_callable($cb)` (also `is_callable($cb = [$obj, 'm'])`) proves the callable in the true branch, so passing it to a `callable` parameter there isn't `UndefinedMethod`.
 - A variable passed to an untyped by-reference parameter of a method, static method or constructor is `mixed` after the call, as it already was for functions, instead of keeping its old type.

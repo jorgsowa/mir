@@ -413,6 +413,23 @@ impl IndexState {
         self.ref_committed.remove(file);
     }
 
+    /// Make `file`'s commit [`RefFreshness::Stale`] while its postings stay
+    /// in place: a file it depends on changed, which neither its text nor a
+    /// memo it may not have can show.
+    pub(crate) fn demote_ref_committed(&self, file: SourceFile) {
+        let demoted = self.ref_committed.read(file, |c| RefCommit {
+            text: c.text.clone(),
+            out: std::sync::Weak::new(),
+            generation: u64::MAX,
+            resolved: false,
+            live_analyzed: false,
+            replayed_postings: None,
+        });
+        if let Some(commit) = demoted {
+            self.ref_committed.set(file, commit);
+        }
+    }
+
     /// Whether `file`'s subtype-index class edges were committed from exactly
     /// `current_text`.
     pub(crate) fn is_defs_committed(&self, file: SourceFile, current_text: &Arc<str>) -> bool {
@@ -567,6 +584,78 @@ impl IndexState {
         })
     }
 
+    /// [`Self::stage_analyzed`], or with `fresh_at` set, only what a file
+    /// whose postings are [`RefFreshness::Fresh`] at that generation still
+    /// lacks: its class edges and mention scan.
+    pub(crate) fn stage_warm_file(
+        &self,
+        db: &MirDbStorage,
+        cache: Option<&AnalysisCache>,
+        mention_scanner: Option<&crate::db::class_mention_index::MentionScanner>,
+        path: &Arc<str>,
+        fresh_at: Option<u64>,
+    ) -> Option<StagedFile> {
+        if let Some(generation) = fresh_at {
+            let sf = db.lookup_source_file(path.as_ref())?;
+            let text = sf.text(db as &dyn MirDatabase).clone();
+            if self.ref_freshness(sf, &text, generation) == RefFreshness::Fresh {
+                let entries = (!self.is_defs_committed(sf, &text)).then(|| {
+                    let defs = crate::db::collect_file_definitions(db as &dyn MirDatabase, sf);
+                    crate::db::subtype_index::entries_from_slice(&defs.slice)
+                });
+                let mentions = mention_scanner.and_then(|s| {
+                    (!db.class_mentions_current(path.as_ref(), &text, s.epoch()))
+                        .then(|| s.scan(&text))
+                });
+                return Some(StagedFile::Fresh(FreshFile {
+                    file: path.clone(),
+                    sf,
+                    text,
+                    entries,
+                    mentions,
+                }));
+            }
+        }
+        self.stage_analyzed(db, cache, mention_scanner, path)
+            .map(StagedFile::Analyzed)
+    }
+
+    /// Commit what [`Self::stage_warm_file`] staged for already-fresh files.
+    pub(crate) fn commit_fresh(
+        &self,
+        db: &MirDbStorage,
+        mention_scanner: Option<&crate::db::class_mention_index::MentionScanner>,
+        fresh: &mut [FreshFile],
+        stamp: ViewStamp,
+    ) -> Result<(), Cancelled> {
+        let mut dependency_graph_changed = false;
+        let mut refused = Ok(());
+        for f in fresh.iter_mut() {
+            if f.entries.is_none() && f.mentions.is_none() {
+                continue;
+            }
+            let commit = self.begin_commit();
+            if let Err(cancelled) = commit.admit(&f.file, stamp.retire_epoch) {
+                refused = Err(cancelled);
+                continue;
+            }
+            if let (Some(s), Some(m)) = (mention_scanner, f.mentions.take()) {
+                db.set_file_class_mentions(&f.file, &f.text, s.epoch(), m);
+            }
+            if let Some(entries) = f.entries.take() {
+                let file_no = db.intern_path(&f.file);
+                db.set_file_class_edges(file_no, entries);
+                self.mark_defs_committed(f.sf, &f.text);
+                dependency_graph_changed = true;
+            }
+            drop(commit);
+        }
+        if dependency_graph_changed {
+            self.clear_dependency_graph_cache();
+        }
+        refused
+    }
+
     /// Serial commit of staged analyses into both inverted indexes and their
     /// freshness marks. Each output is the file's complete reference set, so
     /// postings are replaced, not appended; unchanged files (same text, and
@@ -610,6 +699,7 @@ impl IndexState {
                     a.out.issues.clone(),
                     put.ref_locs,
                 );
+                cache.set_file_dependencies(&a.file, put.dependencies.iter().map(|d| d.as_ref()));
             }
             self.mark_ref_committed(
                 a.sf,
@@ -669,12 +759,29 @@ pub(crate) struct AnalyzedFile {
     replay_match: Option<PostingDigest>,
 }
 
+pub(crate) enum StagedFile {
+    Analyzed(AnalyzedFile),
+    Fresh(FreshFile),
+}
+
+/// A file [`IndexState::stage_warm_file`] skipped as fresh, with the class
+/// edges and mention scan it was still missing.
+pub(crate) struct FreshFile {
+    file: Arc<str>,
+    sf: SourceFile,
+    text: Arc<str>,
+    entries: Option<Vec<crate::db::SubtypeEntry>>,
+    mentions: Option<crate::db::FileScan>,
+}
+
 /// A staged [`AnalysisCache`] write for one file's postings, prepared in the
 /// parallel analysis phase and applied during the serial commit.
 struct RefCachePut {
     content_hash: String,
     surface_hash: String,
     ref_locs: Arc<[crate::cache::CachedRefLoc]>,
+    /// Files the entry's analysis depends on, for the cache's reverse edges.
+    dependencies: Vec<Arc<str>>,
 }
 
 /// `None` when the stored entry already matches this content — batch-written
@@ -698,10 +805,12 @@ fn stage_ref_cache_put(
         .iter()
         .map(|r| (Arc::clone(&r.symbol_key), r.line, r.col_start, r.col_end))
         .collect();
+    let dependencies = super::analyzed_file_dependencies(db, file, sf, &out.ref_locs);
     Some(RefCachePut {
         content_hash,
         surface_hash,
         ref_locs,
+        dependencies,
     })
 }
 

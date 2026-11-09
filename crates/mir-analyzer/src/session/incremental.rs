@@ -268,7 +268,7 @@ impl AnalysisSession {
 
     /// Persist `file`'s outgoing dependency edges to the disk cache's
     /// reverse-dep graph, if one is attached.
-    pub(super) fn update_reverse_deps_for(&self, file: &str) {
+    pub(crate) fn update_reverse_deps_for(&self, file: &str) {
         if let Some(cache) = self.cache.as_deref() {
             let db = self.snapshot_db();
             let targets = file_outgoing_dependencies(&db, file, true);

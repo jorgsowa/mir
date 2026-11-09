@@ -906,3 +906,160 @@ fn live_analysis_differing_from_replayed_postings_rewrites_them() {
     assert!(locks > 0, "differing replayed postings were kept");
     assert_eq!(process_refs(&mut session, &files), 1);
 }
+
+const RUNNER_A: &str = "<?php\nclass A { public function run(): void {} }\n";
+const RUNNER_B: &str = "<?php\nclass B { public function run(): void {} }\n";
+const FACTORY_OF_A: &str =
+    "<?php\nclass Factory { public function make(): A { return new A(); } }\n";
+const FACTORY_OF_B: &str =
+    "<?php\nclass Factory { public function make(): B { return new B(); } }\n";
+const FACTORY_CALLER: &str = "<?php\nfunction go(Factory $f): void { $f->make()->run(); }\n";
+
+fn factory_workspace(factory: &str) -> Vec<(Arc<str>, Arc<str>)> {
+    [
+        ("a.php", RUNNER_A),
+        ("b.php", RUNNER_B),
+        ("factory.php", factory),
+        ("caller.php", FACTORY_CALLER),
+    ]
+    .into_iter()
+    .map(|(path, text)| (Arc::from(path), Arc::from(text)))
+    .collect()
+}
+
+/// A language server's launch: mirror every file, then replay the cache.
+fn lsp_boot(dir: &std::path::Path, files: &[(Arc<str>, Arc<str>)]) -> AnalysisSession {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    session.ensure_all_stubs();
+    for (path, text) in files {
+        session.upsert_source_file(path.clone(), text.clone(), salsa::Durability::LOW);
+    }
+    session.warm_start_files(files);
+    if !session.workspace_symbol_index_ready() {
+        session.rebuild_workspace_symbol_index();
+    }
+    session.prepare_for_query(None);
+    session
+}
+
+fn paths_of(files: &[(Arc<str>, Arc<str>)]) -> Vec<Arc<str>> {
+    files.iter().map(|(path, _)| path.clone()).collect()
+}
+
+/// Whole-file analyses a background `warm_files` pass over `files` runs.
+fn warm_sweep(session: &mut AnalysisSession, files: &[(Arc<str>, Arc<str>)]) -> u64 {
+    session.prepare_for_query(None);
+    let before = session.work_count(mir_analyzer::db::Work::FileAnalysis);
+    let warmed = session
+        .snapshot()
+        .warm_files(&paths_of(files), &mir_analyzer::IndexCancel::new())
+        .expect("not cancelled");
+    assert!(warmed);
+    session.work_count(mir_analyzer::db::Work::FileAnalysis) - before
+}
+
+fn run_refs(
+    session: &mut AnalysisSession,
+    class: &str,
+    files: &[(Arc<str>, Arc<str>)],
+) -> Vec<String> {
+    session
+        .indexed_references_to(
+            &Name::method(class, "run"),
+            &paths_of(files),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
+        .expect("not cancelled")
+        .into_iter()
+        .map(|(file, _)| file.to_string())
+        .collect()
+}
+
+fn seed_factory_cache(dir: &std::path::Path) {
+    let files = factory_workspace(FACTORY_OF_A);
+    let mut seed = lsp_boot(dir, &files);
+    warm_sweep(&mut seed, &files);
+    assert_eq!(run_refs(&mut seed, "A", &files), ["caller.php"]);
+    seed.flush_analysis_cache();
+}
+
+#[test]
+fn changed_dependency_between_sessions_evicts_replayed_dependent() {
+    let dir = create_temp_dir("warm_start_changed_dependency");
+    seed_factory_cache(dir.path());
+
+    let files = factory_workspace(FACTORY_OF_B);
+    let mut session = lsp_boot(dir.path(), &files);
+    assert!(session.reference_postings_fresh("a.php"));
+    assert!(!session.reference_postings_fresh("caller.php"));
+    assert_eq!(run_refs(&mut session, "B", &files), ["caller.php"]);
+    assert!(run_refs(&mut session, "A", &files).is_empty());
+}
+
+#[test]
+fn deleted_dependency_between_sessions_evicts_replayed_dependent() {
+    let dir = create_temp_dir("warm_start_deleted_dependency");
+    seed_factory_cache(dir.path());
+
+    let files: Vec<_> = factory_workspace(FACTORY_OF_A)
+        .into_iter()
+        .filter(|(path, _)| path.as_ref() != "factory.php")
+        .collect();
+    let session = lsp_boot(dir.path(), &files);
+    assert!(session.reference_postings_fresh("a.php"));
+    assert!(!session.reference_postings_fresh("caller.php"));
+}
+
+#[test]
+fn warm_pass_skips_fresh_replays_but_records_their_mentions() {
+    let dir = create_temp_dir("warm_start_skip_fresh");
+    seed_factory_cache(dir.path());
+
+    let files = factory_workspace(FACTORY_OF_A);
+    let mut session = lsp_boot(dir.path(), &files);
+    assert_eq!(warm_sweep(&mut session, &files), 0);
+
+    let db = session.snapshot_db();
+    let scanner = db
+        .class_mention_scanner_reusing_cached()
+        .expect("mention scanner");
+    for (path, _) in &files {
+        let sf = session.lookup_source_file(path).expect("registered");
+        assert!(
+            db.class_mentions_current(path, sf.text(&db), scanner.epoch()),
+            "{path} has no mention scan"
+        );
+    }
+    drop(db);
+    assert_eq!(run_refs(&mut session, "A", &files), ["caller.php"]);
+}
+
+#[test]
+fn in_session_edit_demotes_unmemoized_dependents() {
+    let dir = create_temp_dir("warm_start_in_session_edit");
+    seed_factory_cache(dir.path());
+
+    let files = factory_workspace(FACTORY_OF_A);
+    let mut session = lsp_boot(dir.path(), &files);
+    assert!(session.reference_postings_fresh("caller.php"));
+
+    session.upsert_source_file(
+        Arc::from("factory.php"),
+        Arc::from(FACTORY_OF_B),
+        salsa::Durability::LOW,
+    );
+    assert!(session.reference_postings_fresh("a.php"));
+    assert!(!session.reference_postings_fresh("caller.php"));
+
+    let edited = factory_workspace(FACTORY_OF_B);
+    assert_eq!(
+        warm_sweep(&mut session, &edited),
+        2,
+        "factory.php and caller.php"
+    );
+    assert!(session.reference_postings_fresh("caller.php"));
+    assert_eq!(run_refs(&mut session, "B", &edited), ["caller.php"]);
+    assert!(run_refs(&mut session, "A", &edited).is_empty());
+}

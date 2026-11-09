@@ -130,9 +130,55 @@ impl AnalysisSession {
         let unchanged = cache.observe_dependency(path, text);
         let new_content = was_registered || !unchanged;
         if new_content {
-            cache.evict_files_and_dependents(&[path.to_string()]);
+            self.invalidate_dependents(&[path.to_string()], true);
         }
         new_content
+    }
+
+    /// Evict the cached results of every transitive dependent of `changed`
+    /// (and of `changed` itself when `include_changed`), and demote the
+    /// dependents' committed postings to stale so the next reference query
+    /// or warm pass re-analyzes them.
+    pub(crate) fn invalidate_dependents(&self, changed: &[String], include_changed: bool) {
+        let Some(cache) = self.cache.as_deref() else {
+            return;
+        };
+        if changed.is_empty() {
+            return;
+        }
+        let db = &self.db.salsa;
+        for dependent in cache.evict_reporting_dependents(changed, include_changed) {
+            if let Some(sf) = db.lookup_source_file(&dependent) {
+                self.index.demote_ref_committed(sf);
+            }
+        }
+    }
+
+    /// Dependents of files a previous run recorded that are neither
+    /// registered nor on disk any more, so their cached results are stale.
+    fn invalidate_deleted_files(&self) {
+        let Some(cache) = self.cache.as_deref() else {
+            return;
+        };
+        let db = &self.db.salsa;
+        let provider = db.source_provider();
+        // Hosts may key files by URI, which only their provider can resolve.
+        let gone = |f: &str| {
+            !std::path::Path::new(f).exists()
+                && provider.as_ref().is_none_or(|p| p.read(f).is_none())
+        };
+        let deleted: Vec<String> = cache
+            .known_files()
+            .into_iter()
+            .filter(|f| db.lookup_source_file(f).is_none() && gone(f))
+            .collect();
+        if deleted.is_empty() {
+            return;
+        }
+        self.invalidate_dependents(&deleted, true);
+        for file in &deleted {
+            cache.set_file_dependencies(file, []);
+        }
     }
 
     /// Pre-index mirror writes can't queue for settling, so reconcile missing names here.
@@ -298,15 +344,12 @@ impl AnalysisSession {
             self.index.clear_dependency_graph_cache();
         }
 
-        self.update_reverse_deps_for(&file);
-        // Evict cached analysis results for files that depend on this one so
-        // that the next re_analyze_file call re-analyses them rather than
-        // replaying a stale cache entry. Mirrors the eviction in
-        // `re_analyze_file` (batch.rs) but applies to the ingest path used by
-        // LSP servers that edit a single file without re-analysing it.
-        if let Some(cache) = self.cache.as_deref() {
-            cache.evict_with_dependents(&[file.to_string()]);
+        // Dependents are found through the edges recorded before this edit,
+        // which still reach files that used a symbol it no longer declares.
+        if !text_unchanged {
+            self.invalidate_dependents(&[file.to_string()], false);
         }
+        self.update_reverse_deps_for(&file);
         // Only evict cache entries whose resolver-mapped path equals this
         // file. FQCNs the resolver can't map (psr4 miss) stay cached — no
         // ingest could change their fate. Avoids the per-keystroke storm
@@ -446,7 +489,7 @@ impl AnalysisSession {
             })
             .map(|(file, _, _)| file.to_string())
             .collect();
-        cache.evict_files_and_dependents(&paths);
+        self.invalidate_dependents(&paths, true);
         if !index_exists {
             self.evict_unresolved_declared_by(&paths);
         }
@@ -610,9 +653,7 @@ impl AnalysisSession {
                 .collect(),
             None => Vec::new(),
         };
-        if let Some(cache) = self.cache.as_deref() {
-            cache.evict_files_and_dependents(&unseen_paths);
-        }
+        self.invalidate_dependents(&unseen_paths, true);
 
         if cancel.is_cancelled() {
             if let Some(cache) = self.cache.as_deref() {
@@ -700,9 +741,7 @@ impl AnalysisSession {
                 .map(|(old, candidates)| displaced_cache_owners(db, &old, &candidates))
                 .unwrap_or_default()
         };
-        if let Some(cache) = self.cache.as_deref() {
-            cache.evict_with_dependents(&displaced_owners);
-        }
+        self.invalidate_dependents(&displaced_owners, false);
 
         crate::IndexBatchOutcome {
             registered,
@@ -742,6 +781,11 @@ impl AnalysisSession {
     /// [`Self::index_batch`]) if not already registered. Safe to call
     /// alongside `index_batch` in any order; both merge into the same
     /// maintained indexes.
+    ///
+    /// Register every workspace file first (mirror writes or `files` itself):
+    /// a cached result is not replayed when a file it depends on has content
+    /// new to the cache, or was recorded by an earlier run and is now neither
+    /// registered nor on disk.
     ///
     /// Returns every file whose replayed postings carry an unresolved name
     /// (`live_analyzed: false` in `RefCommit` terms) — these are seeded, but
@@ -783,16 +827,27 @@ impl AnalysisSession {
         // `index_batch`.
         self.ensure_all_stubs();
 
-        {
+        let index_was_initialized = self.workspace_symbol_index_ready();
+        let changed_inputs: Vec<ChangedInput> = {
             let db = &mut self.db.salsa;
+            let mut changed_inputs = Vec::new();
             for (file, text) in files {
+                let existing = db.lookup_source_file(file.as_ref());
+                if existing.is_none_or(|sf| sf.text(db).as_ref() != text.as_ref()) {
+                    changed_inputs.push((file.clone(), text.clone(), existing.is_some()));
+                }
                 db.upsert_source_file_with_durability(
                     file.clone(),
                     text.clone(),
                     salsa::Durability::HIGH,
                 );
             }
-        }
+            changed_inputs
+        };
+        // Before the replay reads: a dependent of new content or of a deleted
+        // file must not replay postings computed against the old one.
+        self.evict_for_new_inputs(&changed_inputs, index_was_initialized);
+        self.invalidate_deleted_files();
 
         // Phase 1: read the disk-cache slices in parallel — the actual I/O
         // cost of a warm-start replay at scale (~0.8-0.9s of a 3.9s warm boot
@@ -1111,8 +1166,8 @@ impl AnalysisSession {
 
             // New declarations can satisfy negative lookups with no reverse
             // dependency edge. Body-only edits leave these entries intact.
+            self.invalidate_dependents(&displaced_owners, false);
             if let Some(cache) = self.cache.as_deref() {
-                cache.evict_with_dependents(&displaced_owners);
                 cache.evict_unresolved_declaring(&declared);
             }
             claim.commit();
@@ -1144,9 +1199,9 @@ impl AnalysisSession {
         // now need their warm-up re-run to lazy-load replacements.
         self.forget_prepared(file);
         self.bump_prepare_generation();
+        self.invalidate_dependents(&[file.to_string()], false);
         if let Some(cache) = &self.cache {
-            cache.update_reverse_deps_for_file(file, &HashSet::default());
-            cache.evict_with_dependents(&[file.to_string()]);
+            cache.set_file_dependencies(file, []);
         }
         // The file is gone; cache entries that previously mapped to it stay
         // unresolvable until the file (or another with matching symbols) is

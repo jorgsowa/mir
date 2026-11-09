@@ -395,6 +395,28 @@ fn name_key(name: &str) -> String {
         .to_ascii_lowercase()
 }
 
+#[derive(Default)]
+struct DepGraph {
+    /// file → files that depend on it.
+    dependents: HashMap<FileId, HashSet<FileId>>,
+    /// file → files it depends on (sorted): the inverse of `dependents`,
+    /// built on the first per-file update so batch runs never pay for it.
+    dependencies: Option<HashMap<FileId, Vec<FileId>>>,
+}
+
+fn invert(dependents: &HashMap<FileId, HashSet<FileId>>) -> HashMap<FileId, Vec<FileId>> {
+    let mut dependencies: HashMap<FileId, Vec<FileId>> = HashMap::default();
+    for (&target, sources) in dependents {
+        for &source in sources {
+            dependencies.entry(source).or_default().push(target);
+        }
+    }
+    for targets in dependencies.values_mut() {
+        targets.sort_unstable();
+    }
+    dependencies
+}
+
 /// Thread-safe, disk-backed cache for per-file analysis results.
 pub struct AnalysisCache {
     cache_dir: PathBuf,
@@ -405,8 +427,8 @@ pub struct AnalysisCache {
     /// Entries whose diagnostics contain a workspace-resolvable missing name.
     /// Kept separately so workspace growth invalidates only this small set.
     unresolved_entries: Mutex<HashSet<FileId>>,
-    /// Reverse dependency graph loaded from disk (from the previous run).
-    reverse_deps: Mutex<HashMap<FileId, HashSet<FileId>>>,
+    /// Reverse dependency graph, loaded from disk and maintained per file.
+    reverse_deps: Mutex<DepGraph>,
     dep_hashes: Mutex<HashMap<FileId, DepHash>>,
     /// Content hashes of entries evicted this session, so an evicted file is
     /// not mistaken for an edited one.
@@ -483,7 +505,10 @@ impl AnalysisCache {
             file_id_map: Mutex::new(id_map),
             entries: Mutex::new(entries),
             unresolved_entries: Mutex::new(unresolved_entries),
-            reverse_deps: Mutex::new(reverse_deps),
+            reverse_deps: Mutex::new(DepGraph {
+                dependents: reverse_deps,
+                dependencies: None,
+            }),
             dep_hashes: Mutex::new(dep_hashes),
             evicted_hashes: Mutex::new(HashMap::default()),
             epoch,
@@ -652,6 +677,7 @@ impl AnalysisCache {
             })
             .collect();
         let reverse_deps: Vec<(u32, Vec<u32>)> = deps_guard
+            .dependents
             .iter()
             .filter_map(|(&id, dep_ids)| {
                 let path = table.id(id_map.path(id)?);
@@ -702,7 +728,10 @@ impl AnalysisCache {
             })
             .collect();
         drop(id_map);
-        *self.reverse_deps.lock() = converted;
+        *self.reverse_deps.lock() = DepGraph {
+            dependents: converted,
+            dependencies: None,
+        };
         self.dirty.store(true, Ordering::Relaxed);
     }
 
@@ -710,33 +739,57 @@ impl AnalysisCache {
     ///
     /// `new_targets` is the set of files `file` depends on (its imports'
     /// defining files plus parent / interfaces / traits' defining files).
-    /// This removes `file` from every existing dependent set, then inserts it
-    /// into each of `new_targets`' dependent sets — preserving the invariant
-    /// that the graph reflects the file's *current* outgoing edges.
-    ///
-    /// Used by `AnalysisSession::ingest_file` to keep cross-file invalidation
-    /// correct without rebuilding the whole graph on every edit.
+    /// This replaces `file`'s outgoing edges, keeping the graph's other edges.
     pub fn update_reverse_deps_for_file(&self, file: &str, new_targets: &HashSet<String>) {
-        let file_id = self.file_id_map.lock().assign_or_get(file);
-        let target_ids: Vec<FileId> = {
-            let mut id_map = self.file_id_map.lock();
-            new_targets
-                .iter()
-                .map(|t| id_map.assign_or_get(t))
-                .collect()
-        };
+        self.set_file_dependencies(file, new_targets.iter().map(String::as_str));
+    }
 
-        let mut deps = self.reverse_deps.lock();
-        for dependents in deps.values_mut() {
-            dependents.remove(&file_id);
+    /// Replace `file`'s outgoing edges with `targets`; costs `file`'s old and
+    /// new degree, not the graph's size.
+    pub(crate) fn set_file_dependencies<'a>(
+        &self,
+        file: &str,
+        targets: impl IntoIterator<Item = &'a str>,
+    ) {
+        let (file_id, mut target_ids) = {
+            let mut id_map = self.file_id_map.lock();
+            let file_id = id_map.assign_or_get(file);
+            let target_ids: Vec<FileId> = targets
+                .into_iter()
+                .map(|t| id_map.assign_or_get(t))
+                .filter(|&t| t != file_id)
+                .collect();
+            (file_id, target_ids)
+        };
+        target_ids.sort_unstable();
+        target_ids.dedup();
+
+        let mut graph = self.reverse_deps.lock();
+        let DepGraph {
+            dependents,
+            dependencies,
+        } = &mut *graph;
+        let dependencies = dependencies.get_or_insert_with(|| invert(dependents));
+        let old = if target_ids.is_empty() {
+            dependencies.remove(&file_id)
+        } else {
+            dependencies.insert(file_id, target_ids.clone())
         }
-        deps.retain(|_, dependents| !dependents.is_empty());
-        for target_id in target_ids {
-            if target_id != file_id {
-                deps.entry(target_id).or_default().insert(file_id);
+        .unwrap_or_default();
+        if old == target_ids {
+            return;
+        }
+        for target in old {
+            if let Some(set) = dependents.get_mut(&target) {
+                set.remove(&file_id);
+                if set.is_empty() {
+                    dependents.remove(&target);
+                }
             }
         }
-
+        for target in target_ids {
+            dependents.entry(target).or_default().insert(file_id);
+        }
         self.dirty.store(true, Ordering::Relaxed);
     }
 
@@ -755,29 +808,52 @@ impl AnalysisCache {
     }
 
     fn evict_reachable(&self, changed_files: &[String], include_changed: bool) -> usize {
+        self.evict_reachable_ids(changed_files, include_changed).1
+    }
+
+    /// [`Self::evict_files_and_dependents`] (or, without `include_changed`,
+    /// [`Self::evict_with_dependents`]), returning every transitive dependent
+    /// reached, whether or not it still had an entry.
+    pub(crate) fn evict_reporting_dependents(
+        &self,
+        changed_files: &[String],
+        include_changed: bool,
+    ) -> Vec<String> {
+        let (dependents, _) = self.evict_reachable_ids(changed_files, include_changed);
+        if dependents.is_empty() {
+            return Vec::new();
+        }
+        let id_map = self.file_id_map.lock();
+        dependents
+            .iter()
+            .filter_map(|&id| id_map.path(id).map(str::to_string))
+            .collect()
+    }
+
+    /// `(dependents reached, entries evicted)`.
+    fn evict_reachable_ids(
+        &self,
+        changed_files: &[String],
+        include_changed: bool,
+    ) -> (Vec<FileId>, usize) {
         // Resolve paths to FileIds; skip unknown files (no cache entry → nothing to evict).
         let seed_ids: Vec<FileId> = {
             let id_map = self.file_id_map.lock();
             changed_files.iter().filter_map(|p| id_map.get(p)).collect()
         };
         if seed_ids.is_empty() {
-            return 0;
+            return (Vec::new(), 0);
         }
 
-        // Phase 1: collect all dependents to evict via BFS (lock held only here).
-        let to_evict: Vec<FileId> = {
-            let deps = self.reverse_deps.lock();
+        // Phase 1: collect all dependents via BFS (lock held only here).
+        let dependents: Vec<FileId> = {
+            let graph = self.reverse_deps.lock();
             let mut visited: HashSet<FileId> = seed_ids.iter().copied().collect();
             let mut queue: std::collections::VecDeque<FileId> = seed_ids.iter().copied().collect();
-            let mut result = if include_changed {
-                seed_ids.clone()
-            } else {
-                Vec::new()
-            };
-
+            let mut result = Vec::new();
             while let Some(id) = queue.pop_front() {
-                if let Some(dependents) = deps.get(&id) {
-                    for &dep_id in dependents {
+                if let Some(next) = graph.dependents.get(&id) {
+                    for &dep_id in next {
                         if visited.insert(dep_id) {
                             queue.push_back(dep_id);
                             result.push(dep_id);
@@ -787,16 +863,17 @@ impl AnalysisCache {
             }
             result
         };
+        let seeds = if include_changed { &seed_ids[..] } else { &[] };
+        let to_evict = || seeds.iter().chain(&dependents);
 
-        // Phase 2: evict (reverse_deps lock released above, entries lock taken per file).
+        // Phase 2: evict (reverse_deps lock released above).
         let mut entries = self.entries.lock();
-        let evicted: Vec<(FileId, CacheEntry)> = to_evict
-            .iter()
+        let evicted: Vec<(FileId, CacheEntry)> = to_evict()
             .filter_map(|id| entries.remove(id).map(|e| (*id, e)))
             .collect();
         let count = evicted.len();
         let mut unresolved = self.unresolved_entries.lock();
-        for id in &to_evict {
+        for id in to_evict() {
             unresolved.remove(id);
         }
         drop((entries, unresolved));
@@ -804,7 +881,20 @@ impl AnalysisCache {
         if count > 0 {
             self.dirty.store(true, Ordering::Relaxed);
         }
-        count
+        (dependents, count)
+    }
+
+    /// Files this cache holds a result for or records as a dependency
+    /// target, for spotting ones deleted since the run that recorded them.
+    pub(crate) fn known_files(&self) -> Vec<String> {
+        let id_map = self.file_id_map.lock();
+        let entries = self.entries.lock();
+        let graph = self.reverse_deps.lock();
+        let mut ids: HashSet<FileId> = entries.keys().copied().collect();
+        ids.extend(graph.dependents.keys().copied());
+        ids.into_iter()
+            .filter_map(|id| id_map.path(id).map(str::to_string))
+            .collect()
     }
 
     pub fn has_unresolved(&self) -> bool {
@@ -1080,6 +1170,30 @@ mod tests {
         let a = "<?php\nclass C { public function __construct() { $this->x = 1; } }\n";
         let b = "<?php\nclass C { public function __construct() { $this->x = 2; } }\n";
         assert_ne!(surface(a), surface(b));
+    }
+
+    #[test]
+    fn per_file_dependencies_replace_old_edges_and_persist() {
+        let dir = TempDir::new().unwrap();
+        {
+            let cache = make_cache(&dir);
+            for f in ["a", "b", "caller"] {
+                seed(&cache, f);
+            }
+            cache.set_file_dependencies("caller", ["a"]);
+            cache.set_file_dependencies("caller", ["b"]);
+            cache.flush();
+        }
+        let cache = make_cache(&dir);
+        assert!(cache
+            .evict_reporting_dependents(&["a".to_string()], false)
+            .is_empty());
+        assert_eq!(
+            cache.evict_reporting_dependents(&["b".to_string()], true),
+            ["caller"]
+        );
+        assert!(cache.get("caller", "hash").is_none());
+        assert!(cache.get("a", "hash").is_some());
     }
 
     #[test]

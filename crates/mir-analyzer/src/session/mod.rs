@@ -289,6 +289,17 @@ impl AnalysisSession {
         self.db.salsa.ref_index_lock_count()
     }
 
+    /// Whether `file`'s committed reference postings are exact for its
+    /// current text, so a warm pass skips it. Diagnostic only.
+    pub fn reference_postings_fresh(&self, file: &str) -> bool {
+        let db = &self.db.salsa;
+        db.lookup_source_file(file).is_some_and(|sf| {
+            self.index
+                .ref_freshness(sf, sf.text(db), self.index_generation())
+                == index_state::RefFreshness::Fresh
+        })
+    }
+
     pub(crate) fn transient_batch_replay(
         &self,
         php_version: u8,
@@ -575,6 +586,31 @@ fn file_outgoing_dependencies(
         }
     }
 
+    targets
+}
+
+/// [`file_outgoing_dependencies`] for an analysis output not yet committed
+/// to the reference index.
+fn analyzed_file_dependencies(
+    db: &dyn MirDatabase,
+    file: &str,
+    sf: crate::db::SourceFile,
+    ref_locs: &[RefLoc],
+) -> Vec<Arc<str>> {
+    let structural = crate::db::file_structural_symbols(db, sf);
+    let lookups: HashSet<&str> = ref_locs
+        .iter()
+        .map(|loc| loc.symbol_key.as_ref())
+        .chain(structural.iter().map(|symbol| symbol.as_str()))
+        .map(crate::defining_file_lookup_key)
+        .collect();
+    let mut targets: Vec<Arc<str>> = lookups
+        .into_iter()
+        .filter_map(|lookup| db.symbol_defining_file(lookup))
+        .filter(|target| target.as_ref() != file)
+        .collect();
+    targets.sort_unstable();
+    targets.dedup();
     targets
 }
 

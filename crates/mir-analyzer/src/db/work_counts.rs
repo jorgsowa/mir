@@ -19,9 +19,11 @@ pub enum Work {
     SymbolAtCompact,
     /// `symbol_at` fell back to a symbol walk.
     SymbolAtFallback,
+    /// `analyze_file` executed (not served from its memo).
+    FileAnalysis,
 }
 
-const WORK_KINDS: usize = Work::SymbolAtFallback as usize + 1;
+const WORK_KINDS: usize = Work::FileAnalysis as usize + 1;
 
 /// Always-on counters, shared by every clone of one database. Unlike the
 /// process-global [`crate::metrics`], concurrent sessions never see each

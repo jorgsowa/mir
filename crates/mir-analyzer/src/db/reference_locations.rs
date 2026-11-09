@@ -149,6 +149,7 @@ pub(crate) fn missing_name_declaring_file(
 /// per-scope merge on next read.
 #[salsa::tracked(lru = 16384)]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
+    db.note_work(super::Work::FileAnalysis, 1);
     let prepared = super::queries::prepare_analysis_file(db, file);
     let parsed = prepared.parse_result();
     let mut issues: Vec<Issue> = crate::parser::parse_error_issues(
