@@ -543,6 +543,12 @@ impl CallAnalyzer {
             {
                 continue;
             }
+            if param.kind == SinkKind::Shell
+                && fn_name_lower == "proc_open"
+                && crate::taint::proc_open_bypasses_shell(&call.args, ctx)
+            {
+                continue;
+            }
             let matches_param = |position: usize, arg: &php_ast::owned::Arg| match &arg.name {
                 Some(name) => crate::parser::name_to_string_owned(name) == param.name,
                 None => param.index.is_none_or(|index| index == position),

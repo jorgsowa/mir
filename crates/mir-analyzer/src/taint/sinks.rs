@@ -359,6 +359,21 @@ pub fn option_sink_values<'e>(
     }
 }
 
+/// `proc_open([...])` runs the program directly, so its arguments can't inject shell syntax.
+pub fn proc_open_bypasses_shell(args: &[php_ast::owned::Arg], ctx: &FlowState) -> bool {
+    let Some(command) = args.first().and_then(|a| a.value()) else {
+        return false;
+    };
+    match &command.kind {
+        ExprKind::Array(_) => true,
+        ExprKind::Variable(name) => {
+            let ty = ctx.get_var(name.trim_start_matches('$'));
+            !ty.types.is_empty() && ty.types.iter().all(|a| a.is_array())
+        }
+        _ => false,
+    }
+}
+
 /// `unserialize($data, ['allowed_classes' => false])`, or a literal class list, can't reach a gadget.
 pub fn unserialize_disallows_classes(args: &[php_ast::owned::Arg], ctx: &FlowState) -> bool {
     use mir_types::atomic::ArrayKey;
