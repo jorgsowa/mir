@@ -342,9 +342,14 @@ impl AnalysisSession {
         // declared by a seen file stay as they are.
         if let Some(cache) = &self.cache {
             let db = self.snapshot_db();
+            // Observing records the file, so remember each answer for the other results.
+            let new_files =
+                std::cell::RefCell::new(HashMap::<crate::db::SourceFile, bool>::default());
             let stale = cache.evict_unresolved_where(|issue| {
                 crate::db::missing_name_declaring_file(&db, issue).is_some_and(|file| {
-                    !cache.observe_dependency(file.path(&db).as_ref(), file.text(&db).as_ref())
+                    *new_files.borrow_mut().entry(file).or_insert_with(|| {
+                        !cache.observe_dependency(file.path(&db).as_ref(), file.text(&db).as_ref())
+                    })
                 })
             });
             if !stale.is_empty() {

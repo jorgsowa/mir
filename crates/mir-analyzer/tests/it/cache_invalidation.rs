@@ -852,3 +852,44 @@ fn typed_body_newly_declaring_a_class_reanalyzes_cached_consumer() {
     );
     assert_eq!(undefined(Some(cache_dir.path())), undefined(None));
 }
+
+#[test]
+fn autoloadable_new_class_reanalyzes_every_cached_consumer() {
+    let root = create_temp_dir("autoloaded declaration: project");
+    let cache_dir = create_temp_dir("autoloaded declaration: cache");
+    write_file(
+        &root,
+        "composer.json",
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    );
+    let source = "<?php\nfunction f(): void { new \\App\\Foo(); }\n";
+    let consumers = [
+        write_file(&root, "a.php", source),
+        write_file(&root, "b.php", source),
+    ];
+    let opts = BatchOptions::new().without_symbols();
+    let run = || {
+        let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).unwrap();
+        AnalysisSession::new(PhpVersion::LATEST)
+            .with_cache_dir(cache_dir.path())
+            .with_psr4(Arc::new(psr4))
+            .analyze_paths(&consumers, &opts)
+            .issues
+            .iter()
+            .filter(|i| i.kind.name() == "UndefinedClass")
+            .count()
+    };
+
+    assert_eq!(run(), 2);
+    std::fs::create_dir_all(root.path().join("src")).unwrap();
+    write_file(
+        &root,
+        "src/Foo.php",
+        "<?php\nnamespace App;\nclass Foo {}\n",
+    );
+    assert_eq!(
+        run(),
+        0,
+        "no cached UndefinedClass survives the class becoming loadable"
+    );
+}
