@@ -7,37 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.95.0] - 2026-11-09
+
+### Changed
+
+- Workspace and internal crate versions were updated to `0.95.0`.
+
 ### Fixed
 
-- `isset($a['k'])` on a lone sealed shape without `k` adds the key, so guarded reads aren't `NonExistentArrayOffset`.
-- A docblock class-constant pattern with `*` anywhere (`J::*_SCHEMA`) matches the constants of a class declared in another file, not only a trailing `*`.
+- When the analyzed paths sit under a nested `composer.json` with no `vendor/` directory (Drupal's `core/`), the nearest ancestor project with an installed `vendor/` is used as the Composer root, so its dependencies and `autoload.files` are found. Analyzing `core/lib` in a Drupal checkout no longer reports every Symfony class as undefined.
+- A union widens to `string` once it holds 128 string literals. A list built by thousands of `$a[] = ['message' => '…', …]` appends kept every literal and rescanned them on each append; Drupal's 7,189-entry `core/.phpstan-baseline.php` didn't finish in 300 s and now takes 0.4 s.
+- A `@var` or `@param` type that the native type rules out (another scalar type or `null` for a non-null scalar, an object for an array, an array for a class) is ignored in favour of the native type, on typed properties as well as promoted ones.
+- With `{@inheritdoc}`, a parameter takes the parent's type for the parameter of the same name, so a parameter inserted before it doesn't shift the inherited types, and a method's native `void` return isn't replaced by the parent's `@return`.
 - A parent's `@param key-of<C::CONST>` (or another class-constant reference) no longer makes a child's wider native `string` param a `MethodSignatureMismatch`.
+- A docblock class-constant pattern with `*` anywhere (`J::*_SCHEMA`) matches the constants of a class declared in another file, not only a trailing `*`.
+- `@psalm-import-type`/`@phpstan-import-type` may name the source class on the next docblock line.
 - A `@method` tag naming a final parent method isn't `FinalMethodOverridden`, since the tag declares nothing at runtime.
-- `curl_share_setopt()` accepts any `$value`, so a lock-data constant isn't `InvalidArgument` under `strict_types`.
-- A `PharData` offset is a `PharFileInfo`, so calling `getContent()` on it isn't `UndefinedMethod`.
-- `Phar::setStub()` and `PharData::setStub()` accept a single argument, as `$length` is optional.
-- A strict `in_array($x, $haystack, true)` with a variable haystack of non-null values removes `null` from `$x` in the true branch.
-- When the analyzed paths sit under a nested `composer.json` with no `vendor/` directory (Drupal's `core/`), the nearest ancestor project with an installed `vendor/` is used as the Composer root, so its dependencies and `autoload.files` are found. Analyzing `core/lib` in a Drupal checkout reported every Symfony class as undefined.
-- Taint: `get_class()` no longer carries its argument's taint, since it returns the name of a loaded class, so `new (get_class($v))` isn't `TaintedCallable`.
-- Taint: `Request::getHost()` and `getHttpHost()` no longer reach file and include sinks, since Symfony rejects a host containing `/`; other sinks still see them.
-- Reading an undeclared property of an `#[\AllowDynamicProperties]` class, its subclass, or a `stdClass` subclass is no longer `UndefinedProperty`.
-- `range()` returns a non-empty list, so a `foreach` over it isn't treated as possibly running zero times.
-- A top-level `class_alias()` with literal class names defines the alias, so code using it isn't `UndefinedClass`.
+- `isset($a['k'])` on a lone sealed shape without `k` adds the key, so guarded reads aren't `NonExistentArrayOffset`.
 - `!empty($this->p)` proves an undeclared property is set, as `isset()` does, so reading it in the guarded branch isn't `UndefinedProperty`.
-- Without `strict_types`, assigning a `Stringable` object to a `string` property isn't `InvalidPropertyAssignment`, matching `string` parameters.
-- `['Ns\Class', 'method']` is accepted as a callable when the string names an existing class, as `[Ns\Class::class, 'method']` already was.
-- With `{@inheritdoc}`, a parameter takes the parent's type for the parameter of the same name, so a parameter inserted before it no longer shifts the inherited types.
-- The result of a method declared `function &m()` can be passed to a by-reference parameter without `InvalidPassByReference`.
+- The falsy branch of `empty($mixed)` or `!$mixed` includes `"0"`, so comparing with `'0'` there isn't `ImpossibleIdenticalComparison`.
+- A strict `in_array($x, $haystack, true)` with a variable haystack of non-null values removes `null` from `$x` in the true branch.
 - An empty `case` before `default` no longer leaves the switch with the pre-switch state, so a variable every body assigns isn't `PossiblyUndefinedVariable` after it.
 - A switch with a `case` for every value of a literal-union subject is treated as always entering a case, like one with `default`.
 - A later `match (true)` arm sees the earlier arms' boolean conditions as false, so `!isset($v) => …` guards `$v` in the arms after it.
 - A constant of a class proven only by `class_exists()` is no longer `UndefinedConstant`.
-- The falsy branch of `empty($mixed)` or `!$mixed` includes `"0"`, so comparing with `'0'` there isn't `ImpossibleIdenticalComparison`.
-- A callable array checks the method on the receiver's own class instead of a namespace-prefixed name, and skips an unknown class.
-- A method's native `void` return is no longer replaced by a parent's docblock `@return` under `{@inheritdoc}`.
-- `@psalm-import-type`/`@phpstan-import-type` may name the source class on the next docblock line.
-- A `@var` or `@param` type that the native type rules out (another scalar type or `null` for a non-null scalar, an object for an array, an array for a class) is ignored in favour of the native type; `@var` on a typed property now gets the same handling as on a promoted one.
-- Performance: a union widens to `string` once it holds 128 string literals. A list built by thousands of `$a[] = ['message' => '…', …]` appends kept every literal and rescanned them on each append; Drupal's 7,189-entry `core/.phpstan-baseline.php` didn't finish in 300 s and now takes 0.4 s.
+- A top-level `class_alias()` with literal class names defines the alias, so code using it isn't `UndefinedClass`.
+- Reading an undeclared property of an `#[\AllowDynamicProperties]` class, its subclass, or a `stdClass` subclass is no longer `UndefinedProperty`.
+- Without `strict_types`, assigning a `Stringable` object to a `string` property isn't `InvalidPropertyAssignment`, matching `string` parameters.
+- `['Ns\Class', 'method']` is accepted as a callable when the string names an existing class, as `[Ns\Class::class, 'method']` already was. A callable array checks the method on the receiver's own class instead of a namespace-prefixed name, and skips an unknown class.
+- The result of a method declared `function &m()` can be passed to a by-reference parameter without `InvalidPassByReference`.
+- `range()` returns a non-empty list, so a `foreach` over it isn't treated as possibly running zero times.
+- Stubs: a `PharData` offset is a `PharFileInfo`, so calling `getContent()` on it isn't `UndefinedMethod`; `Phar::setStub()` and `PharData::setStub()` accept a single argument; `curl_share_setopt()` accepts any `$value`, so a lock-data constant isn't `InvalidArgument` under `strict_types`.
+- Taint: `get_class()` no longer carries its argument's taint, since it returns the name of a loaded class, so `new (get_class($v))` isn't `TaintedCallable`.
+- Taint: `Request::getHost()` and `getHttpHost()` no longer reach file and include sinks, since Symfony rejects a host containing `/`; other sinks still see them.
 
 ## [0.94.0] - 2026-11-08
 
