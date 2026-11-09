@@ -478,6 +478,99 @@ nav.sidebar-pane a {
   color: var(--sl-color-white);
 }
 
+/* ── Splash: numbered adoption steps ─────────────────────────────────── */
+.mir-steps {
+  list-style: none;
+  counter-reset: mir-step;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 0;
+}
+.mir-steps > li {
+  counter-increment: mir-step;
+  margin: 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 2px;
+  background: var(--mir-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+/* Starlight spaces every markdown sibling; grid cells must start level. */
+.sl-markdown-content .mir-steps > li { margin-top: 0; }
+.mir-steps > li::before {
+  content: counter(mir-step, decimal-leading-zero);
+  font-size: 0.75rem;
+  color: var(--mir-gold);
+  letter-spacing: 0.08em;
+}
+.mir-steps p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--sl-color-gray-2);
+}
+.mir-steps .mir-step-title {
+  font-family: var(--mir-font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+.mir-steps > li > code {
+  margin-top: auto;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 50rem) {
+  .mir-steps { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Splash: closing call to action ──────────────────────────────────── */
+.mir-closing {
+  margin-top: 4rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  border-top: 1px solid color-mix(in srgb, var(--mir-gold) 22%, transparent);
+}
+.mir-closing-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--mir-font-display);
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  font-weight: 700;
+  color: var(--sl-color-white);
+}
+.mir-closing-sub {
+  max-width: 52ch;
+  margin: 0 auto 1.5rem;
+  font-size: 0.85rem;
+  color: var(--sl-color-gray-2);
+}
+.mir-closing-actions { opacity: 1; animation: none; }
+.mir-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem 2.5rem;
+  margin: 2.25rem 0 0;
+}
+.mir-stats > div { margin: 0; }
+.mir-stats dt {
+  font-family: var(--mir-font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--mir-gold);
+}
+.mir-stats dd {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+
 /* ── Cards ───────────────────────────────────────────────────────────── */
 .sl-link-card {
   border-radius: 2px !important;

@@ -9,6 +9,7 @@ head:
 
 import { CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
 import heroLogo from '../../assets/logo-hero.png';
+import Playground from '../../components/Playground.astro';
 
 <div class="mir-hero">
   <img src={heroLogo.src} alt="mir" class="mir-hero-logo" />
@@ -21,6 +22,30 @@ import heroLogo from '../../assets/logo-hero.png';
     <a href="https://github.com/jorgsowa/mir" class="mir-btn mir-btn--ghost">GitHub</a>
   </div>
 </div>
+
+## See it in action
+
+<Playground embedded initial="controller" />
+
+## Adopt it today. Fix issues over time.
+
+<ol class="mir-steps">
+  <li>
+    <p class="mir-step-title">Install</p>
+    <p>Add it as a Composer dev dependency. The prebuilt binary for your platform is downloaded and its checksum verified.</p>
+    <code>{'composer require --dev miropen/mir-php'}</code>
+  </li>
+  <li>
+    <p class="mir-step-title">Record a baseline</p>
+    <p>Save today's issues so only new ones are reported. Existing <code>{'@psalm-*'}</code> and <code>{'@phpstan-*'}</code> annotations are read as they are.</p>
+    <code>{'vendor/bin/mir --set-baseline'}</code>
+  </li>
+  <li>
+    <p class="mir-step-title">Gate every pull request</p>
+    <p>Report new issues as inline annotations in CI. Exit code <code>1</code> fails the build.</p>
+    <code>{'vendor/bin/mir --format github-actions'}</code>
+  </li>
+</ol>
 
 ## Install
 
@@ -45,15 +70,6 @@ import heroLogo from '../../assets/logo-hero.png';
     ```
   </TabItem>
 </Tabs>
-
-## What mir reports
-
-```text title="$ mir src/"
-src/demo.php:16:6 error[MIR0201] InvalidArgument: Argument $s of greet() expects 'string', got '42'
-src/demo.php:18:0 error[MIR0004] UndefinedMethod: Method User::getName() does not exist
-src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL injection
-  = taint flow: $_GET['q'] (line 20) → $q (line 20)
-```
 
 ## Browse by category
 
@@ -80,3 +96,18 @@ src/demo.php:21:0 error[MIR0802] TaintedSql: Tainted SQL query — possible SQL 
   <LinkCard title="CLI Reference" href="/mir/reference/cli/" description="Every flag, output format, exit code." />
   <LinkCard title="Issues" href="/mir/reference/issues/" description="Every issue mir reports, with examples and fixes." />
 </CardGrid>
+
+<div class="mir-closing not-content">
+  <p class="mir-closing-title">Run it on your code.</p>
+  <p class="mir-closing-sub">No sign-up and no config file needed. Paste a snippet into the playground, or point the binary at your <code>src/</code>.</p>
+  <div class="mir-hero-actions mir-closing-actions">
+    <a href="/mir/guides/getting-started/" class="mir-btn mir-btn--primary">Get Started</a>
+    <a href="https://github.com/jorgsowa/mir" class="mir-btn mir-btn--secondary">Star on GitHub</a>
+  </div>
+  <dl class="mir-stats">
+    <div><dt>196</dt><dd>documented issues</dd></div>
+    <div><dt>7.4–8.6</dt><dd>PHP versions</dd></div>
+    <div><dt>5</dt><dd>output formats</dd></div>
+    <div><dt>MIT</dt><dd>license</dd></div>
+  </dl>
+</div>
