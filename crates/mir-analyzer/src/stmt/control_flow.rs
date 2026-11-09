@@ -1,6 +1,8 @@
 use crate::ast_ext::ByteStringExt as _;
 use std::sync::Arc;
 
+use php_ast::ast::{AssignOp, BinaryOp};
+
 use php_ast::owned::{
     DoWhileStmt, ExprKind, ForStmt, ForeachStmt, IfStmt, Stmt, SwitchStmt, TryCatchStmt, WhileStmt,
 };
@@ -374,6 +376,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Only the last condition decides whether the loop continues.
         let is_infinite = f.condition.last().is_none_or(is_always_true_literal);
+        let enters = is_infinite || (!pre_diverges && first_check_holds(f));
         let full = self.mode == crate::body_analysis::AnalysisMode::Full;
         let head: Vec<&php_ast::owned::Expr> = f.condition.iter().collect();
         let mut post = self.analyze_loop_widened(
@@ -398,7 +401,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     sa.expr_analyzer(iter).analyze(cond, iter);
                 }
             },
-            is_infinite,
+            enters,
             is_infinite,
             f.condition.last(),
             (!full).then_some(&|first: &FlowState, second: &FlowState| {
@@ -1485,6 +1488,51 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         *ctx = result;
+    }
+}
+
+/// `for ($i = 0; $i < 10; …)`: every init assigns an int literal and the condition
+/// compares one of those variables with an int literal, so the first check is decided.
+fn first_check_holds(f: &ForStmt) -> bool {
+    let mut starts: Vec<(&str, i64)> = Vec::new();
+    for init in f.init.iter() {
+        let ExprKind::Assign(a) = &init.kind else {
+            return false;
+        };
+        match (&a.target.kind, &a.value.kind) {
+            (ExprKind::Variable(name), ExprKind::Int(n))
+                if a.op == AssignOp::Assign && !a.by_ref =>
+            {
+                starts.push((name.as_ref(), *n));
+            }
+            _ => return false,
+        }
+    }
+    // An earlier comma-separated condition could reassign the counter.
+    let [cond] = &*f.condition else {
+        return false;
+    };
+    let ExprKind::Binary(b) = &cond.kind else {
+        return false;
+    };
+    let start = |e: &php_ast::owned::Expr| match &e.kind {
+        ExprKind::Variable(name) => starts
+            .iter()
+            .rev()
+            .find(|(v, _)| *v == name.as_ref())
+            .map(|(_, n)| *n),
+        ExprKind::Int(n) => Some(*n),
+        _ => None,
+    };
+    let (Some(l), Some(r)) = (start(&b.left), start(&b.right)) else {
+        return false;
+    };
+    match b.op {
+        BinaryOp::Less => l < r,
+        BinaryOp::LessOrEqual => l <= r,
+        BinaryOp::Greater => l > r,
+        BinaryOp::GreaterOrEqual => l >= r,
+        _ => false,
     }
 }
 

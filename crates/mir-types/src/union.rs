@@ -151,6 +151,39 @@ fn combine_generic_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
     })
 }
 
+/// Whether generic array `sub` adds nothing to `sup` of the same kind: its key and
+/// value fit. `mixed` and templates fit anything structurally, so they never count.
+fn generic_array_covered(sub: &Atomic, sup: &Atomic) -> bool {
+    fn parts(a: &Atomic) -> Option<(Option<&Type>, &Type)> {
+        match a {
+            Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+                Some((Some(key), value))
+            }
+            Atomic::TList { value } | Atomic::TNonEmptyList { value } => Some((None, value)),
+            _ => None,
+        }
+    }
+    let opaque = |t: &Type| {
+        t.types
+            .iter()
+            .any(|a| matches!(a, Atomic::TMixed | Atomic::TTemplateParam { .. }))
+    };
+    let fits = |x: &Type, y: &Type| !opaque(x) && !opaque(y) && x.is_subtype_structural(y);
+    if std::mem::discriminant(sub) != std::mem::discriminant(sup) {
+        return false;
+    }
+    match (parts(sub), parts(sup)) {
+        (Some((sub_key, sub_value)), Some((sup_key, sup_value))) => {
+            fits(sub_value, sup_value)
+                && match (sub_key, sup_key) {
+                    (Some(a), Some(b)) => fits(a, b),
+                    _ => true,
+                }
+        }
+        _ => false,
+    }
+}
+
 /// One shape covering `a | b`: keys of both, with those set on one side only
 /// made optional and value types unioned. `None` when the shapes disagree on
 /// openness, list-ness or emptiness — folding `array{} | array{0: X}` to
@@ -481,6 +514,13 @@ impl Type {
                 atomic = combined;
             }
         }
+
+        // A generic array covered by another of its kind adds nothing; one it
+        // covers is dropped (`list<0> | list<int>` is `list<int>`).
+        if self.types.iter().any(|t| generic_array_covered(&atomic, t)) {
+            return;
+        }
+        self.types.retain(|t| !generic_array_covered(t, &atomic));
 
         if matches!(
             atomic,
@@ -4168,6 +4208,28 @@ mod tests {
         assert_eq!(ty.types.as_slice(), &[Atomic::TString]);
         ty.add_type(Atomic::TLiteralString("after".into()));
         assert_eq!(ty.types.as_slice(), &[Atomic::TString]);
+    }
+
+    #[test]
+    fn add_type_drops_generic_arrays_another_covers() {
+        let list = |value: Atomic| Atomic::TList {
+            value: Box::new(Type::single(value)),
+        };
+        let mut ty = Type::single(list(Atomic::TLiteralInt(0)));
+        ty.add_type(list(Atomic::TInt));
+        assert_eq!(ty.types.as_slice(), &[list(Atomic::TInt)]);
+        ty.add_type(list(Atomic::TLiteralInt(1)));
+        assert_eq!(ty.types.as_slice(), &[list(Atomic::TInt)]);
+
+        let mut opaque = Type::single(list(Atomic::TMixed));
+        opaque.add_type(list(Atomic::TInt));
+        assert_eq!(opaque.types.len(), 2);
+
+        let mut kinds = Type::single(Atomic::TNonEmptyList {
+            value: Box::new(Type::single(Atomic::TInt)),
+        });
+        kinds.add_type(list(Atomic::TInt));
+        assert_eq!(kinds.types.len(), 2);
     }
 
     #[test]
