@@ -7,44 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.0] - 2026-11-09
+
 ### Added
 
 - `AnalysisSession::reference_postings_fresh(file)` reports whether a file's reference postings are exact for its current text, and `Work::FileAnalysis` counts `analyze_file` runs.
 
 ### Changed
 
+- Workspace and internal crate versions were updated to `0.96.0`.
 - `AnalysisSnapshot::warm_files` skips files whose reference postings are already fresh for their current text, such as unchanged disk-cache replays. It still records their class edges and class-mention scans when those are missing. `reanalyze_files` still analyzes every file it's given.
 
 ### Fixed
 
-- Language-server hosts that register files with `upsert_source_file` no longer replay stale reference postings on the next launch. The cache now records each analyzed file's dependencies, so when a file changes, is deleted, or loses a declaration between sessions, its dependents are re-analyzed instead of being replayed by `warm_start_files`.
+- Language-server hosts that register files with `upsert_source_file` no longer replay stale reference postings on the next launch. The cache records each analyzed file's dependencies, so when a file changes, is deleted, or loses a declaration between sessions, its dependents are re-analyzed instead of being replayed by `warm_start_files`.
 - An edit to a file (`upsert_source_file`, `set_file_text`, `ingest_file`, `invalidate_file`) marks the postings of every file that depends on it as stale. The next reference query or `warm_files` pass re-analyzes them, including dependents that have no analysis in memory.
-
-- `is_callable([$obj, 'm'])` or `is_callable($cb)` (also `is_callable($cb = [$obj, 'm'])`) proves the callable in the true branch, so passing it to a `callable` parameter there isn't `UndefinedMethod`.
-- A variable passed to an untyped by-reference parameter of a method, static method or constructor is `mixed` after the call, as it already was for functions, instead of keeping its old type.
-- `isset($a[$i]['k'])` (also under `assert()`) proves the optional key `k` of the element read through a variable key, so reading `$a[$i]['k']` there isn't nullable.
+- Cache: when a class reported missing becomes autoloadable (for example after `composer install`), every cached result reporting it is re-analyzed, not only the first, so stale `UndefinedClass` results don't survive.
+- A variable defined in only one branch of an `if`/`else` (or of an `if` without `else`) is defined wherever that branch's condition holds again, so reading it there isn't `PossiblyUndefinedVariable`. This covers conditions on `$v`, `!$v`, `empty($v)`, `$v = f()`, `$v !== 'literal'` and on array elements with a literal key (`isset($a['k'])`, `!empty($a['k'])`, `$a['k'] === 'x'`).
+- A flag set beside a definition proves the variable wherever the flag holds again: a flag assigned in both branches without an earlier initialisation, set in a nested `if`, set to `false` (checked with `!$flag` or `$flag === false`), set by the `then` branch while the `else` branch defines the variable, or changed by every `catch` block of the `try` that defines it (`$ok = true; try { $u = f(); } catch (E) { $ok = false; } if ($ok) { echo $u; }`).
+- A condition guards a variable only when its branch defines it on every path, so `if ($g) { if (rand()) { $x = 1; } } if ($g) { echo $x; }` is `PossiblyUndefinedVariable`; it also guards a variable that may already be defined, as on a later loop iteration.
+- A `for` loop whose init assigns int literals that its condition then compares, such as `for ($i = 0; $i < 50; $i++)`, runs its body at least once, so a variable the body assigns isn't `PossiblyUndefinedVariable` after it.
 - A `break` or `continue` in unreachable code (after an if/else that returns on both branches) no longer adds a path out of its loop or switch, so variables set on every live path aren't `PossiblyUndefinedVariable` after it.
-- An offset write (`$this->p['k'] = $v`) to a nullable array property removes `null` from the property, as the write creates the array, also when a call on the right-hand side dropped an earlier narrowing.
-- `is_object()` and other type checks on a shape element that can never pass (the element is narrowed to `null`) make the branch unreachable, as they do for a variable, so code in it isn't reported.
 - A `catch` or `finally` block doesn't see the state before the `try` when its first statement assigns a literal (`$a = 'x';`), which can't throw, so that variable isn't `PossiblyUndefinedVariable` there.
-- A trait's abstract `protected` method implemented by a `public` parent method isn't `OverriddenMethodAccess`, and calling it from outside isn't `UndefinedMethod`.
-- A trait method that the class using the trait replaces with its own (for example next to `use T { m as traitM; }`) isn't checked as a parent of a subclass's `m()`, so it isn't `MethodSignatureMismatch`.
+- `is_callable([$obj, 'm'])` or `is_callable($cb)` (also `is_callable($cb = [$obj, 'm'])`) proves the callable in the true branch, so passing it to a `callable` parameter there isn't `UndefinedMethod`.
+- `isset($a[$i]['k'])` (also under `assert()`) proves the optional key `k` of the element read through a variable key, so reading `$a[$i]['k']` there isn't nullable.
+- `is_object()` and other type checks on a shape element that can never pass (the element is narrowed to `null`) make the branch unreachable, as they do for a variable, so code in it isn't reported.
+- An `array_filter()` callback whose body is `$x instanceof C` narrows the kept values to `C`.
+- `array_map()` over a sealed shape returns the same keys with the callback's return type, so mapping `['west', 'south', 'east', 'north']` matches a declared `array{0: float, 1: float, 2: float, 3: float}` instead of being `InvalidReturnType`.
+- A union drops a generic array or list that another member of the same kind covers (`list<0> | list<int>` is `list<int>`).
+- A variable passed to an untyped by-reference parameter of a method, static method or constructor is `mixed` after the call, as it already was for functions, instead of keeping its old type.
+- An offset write (`$this->p['k'] = $v`) to a nullable array property removes `null` from the property, as the write creates the array, also when a call on the right-hand side dropped an earlier narrowing.
 - A conditional `@param` type (`($flags is X ? A : B)`) is resolved from the other arguments or their defaults before the argument is checked, so `composer/pcre`'s `Preg::replaceCallback()` callback isn't `InvalidArgument`.
 - `(T is void ? null : T)` resolves to `T`'s binding when `T` is bound to a type that can't be `void`, so a `react/promise` `then()` callback isn't `InvalidArgument`.
-- Cache: when a class reported missing becomes autoloadable (for example after `composer install`), every cached result reporting it is re-analyzed, not only the first, so stale `UndefinedClass` results don't survive.
-- An `array_filter()` callback whose body is `$x instanceof C` narrows the kept values to `C`.
-- A variable assigned in only one branch of an `if`/`else` is defined wherever that branch's condition holds again (`if ($x !== null) { $y = 1; } else { ... } if ($x !== null) { echo $y; }`), as it already was without an `else`.
+- A trait's abstract `protected` method implemented by a `public` parent method isn't `OverriddenMethodAccess`, and calling it from outside isn't `UndefinedMethod`.
+- A trait method that the class using the trait replaces with its own (for example next to `use T { m as traitM; }`) isn't checked as a parent of a subclass's `m()`, so it isn't `MethodSignatureMismatch`.
 - Inside a namespace, an override returning a subclass of a global generic class (`ArrayIterator<K, V>` for `Traversable<K, V>`) isn't `MethodSignatureMismatch` because the parent's class name was looked up under the namespace.
-- `proc_open()` with an array command runs the program without a shell, so its arguments aren't `TaintedShell`; a string command still is.
-- A flag assigned in both branches of an `if`/`else` without an earlier initialisation, or set in a nested `if` (so it holds `bool`), proves the variables defined beside it wherever the flag holds, so they aren't `PossiblyUndefinedVariable`.
-- A variable assigned under `!$g`, `empty($g)`, `$g = f()` or `$g !== 'literal'` is defined wherever the same condition holds again, so reading it there isn't `PossiblyUndefinedVariable`.
-- A flag that every `catch` block sets to another value (`$ok = true; try { $u = f(); } catch (E) { $ok = false; }`) proves the variables the `try` body defines wherever the flag still holds, so `if ($ok) { echo $u; }` isn't `PossiblyUndefinedVariable`.
-- `array_map()` over a sealed shape returns the same keys with the callback's return type, so mapping `['west', 'south', 'east', 'north']` matches a declared `array{0: float, 1: float, 2: float, 3: float}` instead of being `InvalidReturnType`.
-- A `for` loop whose init assigns int literals that its condition then compares, such as `for ($i = 0; $i < 50; $i++)`, runs its body at least once, so a variable the body assigns isn't `PossiblyUndefinedVariable` after it. A union also drops a generic array or list that another member of the same kind covers (`list<0> | list<int>` is `list<int>`).
-- A flag set to `false` beside a definition proves it wherever `!$flag` or `$flag === false` holds again, and a branch that defines the variable outright keeps such a proof from the other branch, so the variable isn't `PossiblyUndefinedVariable` there.
-- A condition on an array element with a literal key (`isset($a['k'])`, `!empty($a['k'])`, `$a['k'] === 'x'`) guards the variables defined under it like a condition on a variable, so `if (!empty($a['k'])) { $t = 1; } if (empty($a['k'])) { $t = 2; } echo $t;` isn't `PossiblyUndefinedVariable`.
-- A condition guards a variable only when its branch defines it on every path, so `if ($g) { if (rand()) { $x = 1; } } if ($g) { echo $x; }` is `PossiblyUndefinedVariable`; it also guards a variable that may already be defined, as on a later loop iteration.
-- A flag the `then` branch sets and the `else` branch may leave at its other value proves the variables the `else` branch defines (`$required = false; if (...) { $required = true; } else { $words = ...; } if ($required) { return; }` then reading `$words`), so they aren't `PossiblyUndefinedVariable`.
+- Taint: `proc_open()` with an array command runs the program without a shell, so its arguments aren't `TaintedShell`; a string command still is.
 
 ## [0.95.0] - 2026-11-09
 
