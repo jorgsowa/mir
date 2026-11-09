@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A variable assigned in only one branch of an `if`/`else` is defined wherever that branch's condition holds again (`if ($x !== null) { $y = 1; } else { ... } if ($x !== null) { echo $y; }`), as it already was without an `else`.
 - Inside a namespace, an override returning a subclass of a global generic class (`ArrayIterator<K, V>` for `Traversable<K, V>`) isn't `MethodSignatureMismatch` because the parent's class name was looked up under the namespace.
 - `proc_open()` with an array command runs the program without a shell, so its arguments aren't `TaintedShell`; a string command still is.
+- A flag assigned in both branches of an `if`/`else` without an earlier initialisation, or set in a nested `if` (so it holds `bool`), proves the variables defined beside it wherever the flag holds, so they aren't `PossiblyUndefinedVariable`.
 
 ## [0.95.0] - 2026-11-09
 

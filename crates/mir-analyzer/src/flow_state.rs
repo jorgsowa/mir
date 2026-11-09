@@ -106,13 +106,13 @@ pub enum FlagValue {
 }
 
 impl FlagValue {
-    fn of_type(ty: &Type) -> Option<Self> {
-        match ty.types.as_slice() {
-            [Atomic::TLiteralString(s)] => Some(Self::Str(Name::from(s.as_ref()))),
-            [Atomic::TLiteralInt(n)] => Some(Self::Int(*n)),
-            [Atomic::TTrue] => Some(Self::True),
+    fn values_of_type(ty: &Type) -> impl Iterator<Item = Self> + '_ {
+        ty.types.iter().filter_map(|atom| match atom {
+            Atomic::TLiteralString(s) => Some(Self::Str(Name::from(s.as_ref()))),
+            Atomic::TLiteralInt(n) => Some(Self::Int(*n)),
+            Atomic::TTrue | Atomic::TBool => Some(Self::True),
             _ => None,
-        }
+        })
     }
 
     fn is_truthy(self) -> bool {
@@ -1322,8 +1322,8 @@ impl FlowState {
         let mut flags: Vec<(Name, FlagValue)> = self
             .assigned_vars
             .iter()
-            .filter(|v| pre.var_possibly_defined_sym(**v))
-            .filter_map(|v| Some((*v, FlagValue::of_type(self.vars.get(v)?)?)))
+            .filter_map(|v| Some((*v, self.vars.get(v)?)))
+            .flat_map(|(v, ty)| FlagValue::values_of_type(ty).map(move |value| (v, value)))
             .collect();
         flags.sort_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()));
         for def in defs {

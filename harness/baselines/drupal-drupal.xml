@@ -1267,11 +1267,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$is_empty_multiple]]></code>
-      <code><![CDATA[$is_empty_string]]></code>
-      <code><![CDATA[$is_empty_null]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Form/form.api.php">
     <UndefinedFunction>
@@ -3062,9 +3057,6 @@
     </UndefinedConstant>
   </file>
   <file src="core/modules/image/src/Controller/ImageStyleDownloadController.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$lock_name]]></code>
-    </PossiblyUndefinedVariable>
     <TaintedFile>
       <code><![CDATA[$image_style->createDerivative($image_uri, $derivative_uri)]]></code>
     </TaintedFile>
@@ -3889,7 +3881,6 @@
   <file src="core/modules/migrate/src/Plugin/migrate/destination/EntityConfigBase.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$id_keys]]></code>
-      <code><![CDATA[$config]]></code>
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/migrate/src/Plugin/migrate/id_map/NullIdMap.php">
@@ -4281,16 +4272,6 @@
     <UndefinedFunction>
       <code><![CDATA[drupal_flush_all_caches()]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/package_manager/src/Validator/ComposerPatchesValidator.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$plugin_installed_in_stage]]></code>
-      <code><![CDATA[$plugin_installed_in_stage]]></code>
-      <code><![CDATA[$plugin_installed_in_stage]]></code>
-      <code><![CDATA[$is_stage_root_requirement]]></code>
-      <code><![CDATA[$plugin_installed_in_stage]]></code>
-      <code><![CDATA[$stage_configuration_ok]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/package_manager/src/Validator/PendingUpdatesValidator.php">
     <UndefinedFunction>
@@ -5693,10 +5674,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$group_info]]></code>
-      <code><![CDATA[$group_info]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/views_ui/src/ViewListBuilder.php">
     <InvalidReturnType>
