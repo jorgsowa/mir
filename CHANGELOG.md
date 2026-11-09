@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `catch` or `finally` block doesn't see the state before the `try` when its first statement assigns a literal (`$a = 'x';`), which can't throw, so that variable isn't `PossiblyUndefinedVariable` there.
 - A trait's abstract `protected` method implemented by a `public` parent method isn't `OverriddenMethodAccess`, and calling it from outside isn't `UndefinedMethod`.
 - A trait method that the class using the trait replaces with its own (for example next to `use T { m as traitM; }`) isn't checked as a parent of a subclass's `m()`, so it isn't `MethodSignatureMismatch`.
+- A conditional `@param` type (`($flags is X ? A : B)`) is resolved from the other arguments or their defaults before the argument is checked, so `composer/pcre`'s `Preg::replaceCallback()` callback isn't `InvalidArgument`.
 
 ## [0.95.0] - 2026-11-09
 

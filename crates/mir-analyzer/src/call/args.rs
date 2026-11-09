@@ -772,6 +772,22 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 raw_param_ty
             };
 
+            // A conditional type (`($flags is X ? A : B)`) picks its branch from the other arguments.
+            let resolved_conditional;
+            let param_ty = if param_ty
+                .types
+                .iter()
+                .any(|a| matches!(a, Atomic::TConditional { .. }))
+            {
+                resolved_conditional =
+                    super::resolve_conditional_return(param_ty.clone(), ea.db, None, |name| {
+                        super::conditional_param_type(ea.db, None, params, args, arg_types, name)
+                    });
+                &resolved_conditional
+            } else {
+                param_ty
+            };
+
             // `= null` makes the parameter implicitly nullable, whatever its docblock says.
             let nullable_by_default;
             let param_ty = if !param_ty.is_nullable()
