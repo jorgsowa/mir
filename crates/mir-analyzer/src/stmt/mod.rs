@@ -389,8 +389,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let issues = self.issues.issue_count();
         let returns = self.return_types.len();
         let yields = self.yielded_types.len();
-        let breaks: Vec<usize> = self.break_ctx_stack.iter().map(Vec::len).collect();
-        let continues: Vec<usize> = self.continue_ctx_stack.iter().map(Vec::len).collect();
+        let loop_exits = self.loop_exit_marks();
         let taint_summary = self.taint_summary.clone();
         let mut dead_ctx = pre_narrowing.branch();
         dead_ctx.diverges = false;
@@ -398,13 +397,26 @@ impl<'a> StatementsAnalyzer<'a> {
         self.issues.truncate_to(issues);
         self.return_types.truncate(returns);
         self.yielded_types.truncate(yields);
+        self.truncate_loop_exits(loop_exits);
+        self.taint_summary = taint_summary;
+    }
+
+    /// Current depth of every `break`/`continue` frame, for [`Self::truncate_loop_exits`].
+    fn loop_exit_marks(&self) -> (Vec<usize>, Vec<usize>) {
+        (
+            self.break_ctx_stack.iter().map(Vec::len).collect(),
+            self.continue_ctx_stack.iter().map(Vec::len).collect(),
+        )
+    }
+
+    /// Drops the `break`/`continue` states dead code recorded since `marks`.
+    fn truncate_loop_exits(&mut self, (breaks, continues): (Vec<usize>, Vec<usize>)) {
         for (frame, len) in self.break_ctx_stack.iter_mut().zip(breaks) {
             frame.truncate(len);
         }
         for (frame, len) in self.continue_ctx_stack.iter_mut().zip(continues) {
             frame.truncate(len);
         }
-        self.taint_summary = taint_summary;
     }
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
@@ -448,11 +460,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 // not report issues or count as a usage of any member.
                 let mark = self.issues.issue_count();
                 let records_refs = std::mem::replace(&mut self.record_reference_locations, false);
+                let loop_exits = self.loop_exit_marks();
                 let mut dead_ctx = ctx.clone();
                 dead_ctx.diverges = false;
                 self.analyze_stmts(&stmts[i..], &mut dead_ctx);
                 self.record_reference_locations = records_refs;
                 self.issues.truncate_to(mark);
+                self.truncate_loop_exits(loop_exits);
                 break;
             }
 

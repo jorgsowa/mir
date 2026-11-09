@@ -4178,11 +4178,6 @@
     ]);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/node/src/NodeTypeAccessControlHandler.php">
-    <InvalidReturnType>
-      <code><![CDATA[]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/node/src/NodeTypeListBuilder.php">
     <UndefinedConstant>
       <code><![CDATA[RESPONSIVE_PRIORITY_MEDIUM]]></code>
