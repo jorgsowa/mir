@@ -1495,17 +1495,8 @@ pub fn narrow_from_condition(
             if let Some(bare) = call.name.kind.name_bare() {
                 let lower = bare.to_ascii_lowercase();
                 if is_true && bare.eq_ignore_ascii_case("is_callable") {
-                    if let Some(ExprKind::Variable(var)) = call
-                        .args
-                        .first()
-                        .and_then(|arg| arg.value())
-                        .map(|v| &v.kind)
-                    {
-                        ctx.function_exists_guards
-                            .insert(std::sync::Arc::from(format!(
-                                "${}",
-                                var.trim_start_matches('$')
-                            )));
+                    if let Some(arg_value) = call.args.first().and_then(|arg| arg.value()) {
+                        record_is_callable_guards(arg_value, ctx, db, file);
                     }
                 }
                 if matches!(
@@ -2769,4 +2760,49 @@ fn narrow_static_prop_loose_bool(
     // mark_diverges=false: matches narrow_prop_loose_bool's rationale — a
     // separate contradiction pass already owns flagging an always-true/false compare.
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+}
+
+/// `is_callable($cb)` proves the callable held in `$cb` (also `$cb = [...]`); for
+/// an array literal `[$recv, 'm']` it also proves `m` on `$recv`, as `method_exists()` does.
+fn record_is_callable_guards(
+    arg: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    if let Some(var) = extract_var_name(arg) {
+        ctx.function_exists_guards.insert(std::sync::Arc::from(format!(
+            "${}",
+            var.trim_start_matches('$')
+        )));
+    }
+    let mut value = arg;
+    loop {
+        match &value.kind {
+            ExprKind::Parenthesized(inner) => value = inner,
+            ExprKind::Assign(a) if a.op == AssignOp::Assign => value = &a.value,
+            _ => break,
+        }
+    }
+    let ExprKind::Array(items) = &value.kind else {
+        return;
+    };
+    let [receiver, method] = &items[..] else {
+        return;
+    };
+    let positional = |e: &php_ast::owned::ArrayElement| {
+        e.key.is_none() && !matches!(e.kind, php_ast::owned::ArrayElementKind::Spread(_))
+    };
+    if !positional(receiver) || !positional(method) {
+        return;
+    }
+    let ExprKind::String(method_name) = &method.value().kind else {
+        return;
+    };
+    if let Some(key) = extract_expr_guard_key(receiver.value(), ctx, db, file) {
+        ctx.method_exists_guards.insert((
+            key,
+            std::sync::Arc::from(crate::util::php_ident_lowercase(method_name.as_str())),
+        ));
+    }
 }

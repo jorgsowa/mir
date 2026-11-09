@@ -1577,6 +1577,15 @@ fn method_exists_guarded(ctx: &FlowState, guard_key: &Arc<str>, method_name: &st
     ))
 }
 
+/// True when the argument is a variable an `is_callable($var)` guard proved callable.
+fn is_callable_guarded_variable(ctx: &FlowState, arg_expr: Option<&Expr>) -> bool {
+    let Some(ExprKind::Variable(var)) = arg_expr.map(|e| &e.kind) else {
+        return false;
+    };
+    ctx.function_exists_guards
+        .contains(format!("${}", var.trim_start_matches('$')).as_str())
+}
+
 /// True when a `method_exists($var, 'method')` guard is active for a plain
 /// variable currently typed as `class` — the receiver of a callable held in a
 /// variable (`$cb = [$var, 'method']`), whose array literal is out of sight.
@@ -1944,15 +1953,16 @@ fn validate_callable_type(
                                 let guarded =
                                     array_callable_guard_key(ea, ctx, arg_expr).is_some_and(
                                         |key| method_exists_guarded(ctx, &key, method_name),
-                                    ) || (!matches!(
-                                        arg_expr.map(|e| &e.kind),
-                                        Some(ExprKind::Array(_))
-                                    ) && guarded_receiver_variable(
-                                        ea,
-                                        ctx,
-                                        &resolved_class,
-                                        method_name,
-                                    ));
+                                    ) || is_callable_guarded_variable(ctx, arg_expr)
+                                        || (!matches!(
+                                            arg_expr.map(|e| &e.kind),
+                                            Some(ExprKind::Array(_))
+                                        ) && guarded_receiver_variable(
+                                            ea,
+                                            ctx,
+                                            &resolved_class,
+                                            method_name,
+                                        ));
                                 if !guarded {
                                     ea.emit(
                                         IssueKind::UndefinedMethod {
