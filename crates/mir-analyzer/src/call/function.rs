@@ -1193,6 +1193,7 @@ impl CallAnalyzer {
                         &arg_types,
                         callback_expr,
                         ea.db,
+                        &ea.file,
                     )
                     .unwrap_or(return_ty)
                 }

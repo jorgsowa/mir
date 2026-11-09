@@ -110,6 +110,26 @@ use type_fn::{narrow_from_type_fn, narrow_prop_from_type_fn, narrow_static_prop_
 /// `narrowing` (e.g. `call::array_builtins`'s `array_filter` element-type
 /// narrowing) — see `type_fn::classify_var_predicate`'s doc comment.
 pub(crate) use literals::int_comparison_predicate_narrowed;
+
+/// `$param instanceof C` as a callback predicate body: `value` narrowed to `C`.
+pub(crate) fn instanceof_predicate_narrowed(
+    value: &mir_types::Type,
+    body: &php_ast::owned::Expr,
+    param_name: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<mir_types::Type> {
+    let ExprKind::Binary(b) = &body.kind else {
+        return None;
+    };
+    if b.op != BinaryOp::Instanceof || extract_var_name(&b.left)? != param_name {
+        return None;
+    }
+    let class_name = extract_class_name(&b.right, None, None, db, file)?;
+    let narrowed =
+        narrow_instanceof_preserving_subtypes(value, &class_name, db, &Default::default());
+    (!narrowed.is_empty()).then_some(narrowed)
+}
 pub(crate) use type_fn::{classify_var_predicate, type_fn_narrowed};
 
 // ---------------------------------------------------------------------------
@@ -2771,10 +2791,11 @@ fn record_is_callable_guards(
     file: &str,
 ) {
     if let Some(var) = extract_var_name(arg) {
-        ctx.function_exists_guards.insert(std::sync::Arc::from(format!(
-            "${}",
-            var.trim_start_matches('$')
-        )));
+        ctx.function_exists_guards
+            .insert(std::sync::Arc::from(format!(
+                "${}",
+                var.trim_start_matches('$')
+            )));
     }
     let mut value = arg;
     loop {

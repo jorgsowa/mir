@@ -657,6 +657,7 @@ pub(crate) fn infer_array_filter_return(
     arg_types: &[Type],
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) -> Option<Type> {
     let source = arg_types.first()?;
     if source.is_mixed() {
@@ -668,7 +669,8 @@ pub(crate) fn infer_array_filter_return(
     let truthy_only = arg_types
         .get(1)
         .is_none_or(|t| t.types.iter().all(|a| matches!(a, Atomic::TNull)));
-    if let Some(shape) = filtered_keyed_shape(source, default_mode, truthy_only, callback_expr, db)
+    if let Some(shape) =
+        filtered_keyed_shape(source, default_mode, truthy_only, callback_expr, db, file)
     {
         return Some(shape);
     }
@@ -676,7 +678,7 @@ pub(crate) fn infer_array_filter_return(
     if key.is_mixed() && value.is_mixed() {
         return None;
     }
-    let value = filtered_value(value, default_mode, truthy_only, callback_expr, db);
+    let value = filtered_value(value, default_mode, truthy_only, callback_expr, db, file);
     Some(Type::single(Atomic::TArray {
         key: Box::new(key),
         value: Box::new(value),
@@ -691,6 +693,7 @@ fn filtered_keyed_shape(
     truthy_only: bool,
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) -> Option<Type> {
     let [Atomic::TKeyedArray {
         properties,
@@ -709,6 +712,7 @@ fn filtered_keyed_shape(
             truthy_only,
             callback_expr,
             db,
+            file,
         );
     }
     Some(Type::single(Atomic::TKeyedArray {
@@ -726,13 +730,14 @@ fn filtered_value(
     truthy_only: bool,
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) -> Type {
     if truthy_only {
         let truthy = value.narrow_to_truthy();
         return if truthy.is_empty() { value } else { truthy };
     }
     if default_mode {
-        return callback_predicate_narrowed(&value, callback_expr, db).unwrap_or(value);
+        return callback_predicate_narrowed(&value, callback_expr, db, file).unwrap_or(value);
     }
     value
 }
@@ -748,6 +753,7 @@ fn callback_predicate_narrowed(
     value: &Type,
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
+    file: &str,
 ) -> Option<Type> {
     let callback_expr = callback_expr?;
     if let Some(fn_name) = type_guard_callable_name(callback_expr) {
@@ -757,7 +763,9 @@ fn callback_predicate_narrowed(
     if let Some((fn_name, is_true)) = crate::narrowing::classify_var_predicate(body, param_name) {
         return crate::narrowing::type_fn_narrowed(value, fn_name.as_ref(), db, is_true);
     }
-    crate::narrowing::int_comparison_predicate_narrowed(value, body, param_name)
+    crate::narrowing::int_comparison_predicate_narrowed(value, body, param_name).or_else(|| {
+        crate::narrowing::instanceof_predicate_narrowed(value, body, param_name, db, file)
+    })
 }
 
 /// The global single-argument type guard named by a `'is_string'` string

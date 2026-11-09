@@ -1799,11 +1799,6 @@
       <code><![CDATA[PhpUnitTestCaseJUnitResult]]></code>
     </UndefinedClass>
   </file>
-  <file src="core/lib/Drupal/Core/Test/MailerCaptureTrait.php">
-    <InvalidReturnType>
-      <code><![CDATA[return array_filter($messages, fn (RawMessage $m) => $m instanceof Email);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Test/PhpUnitTestDiscovery.php">
     <InternalMethod>
       <code><![CDATA[$test->valueObjectForEvents()]]></code>
@@ -2534,11 +2529,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/field_ui/src/EntityDisplayModeListBuilder.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $entities;]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/field_ui/src/FieldConfigListBuilder.php">
     <InvalidReturnType>
       <code><![CDATA[return $entities;]]></code>
     </InvalidReturnType>

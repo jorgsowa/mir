@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A conditional `@param` type (`($flags is X ? A : B)`) is resolved from the other arguments or their defaults before the argument is checked, so `composer/pcre`'s `Preg::replaceCallback()` callback isn't `InvalidArgument`.
 - `(T is void ? null : T)` resolves to `T`'s binding when `T` is bound to a type that can't be `void`, so a `react/promise` `then()` callback isn't `InvalidArgument`.
 - Cache: when a class reported missing becomes autoloadable (for example after `composer install`), every cached result reporting it is re-analyzed, not only the first, so stale `UndefinedClass` results don't survive.
+- An `array_filter()` callback whose body is `$x instanceof C` narrows the kept values to `C`.
 
 ## [0.95.0] - 2026-11-09
 
