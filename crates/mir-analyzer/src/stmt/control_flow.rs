@@ -1193,6 +1193,7 @@ impl<'a> StatementsAnalyzer<'a> {
             });
         });
         let catch_base = match throw_points {
+            Some(states) if tc.body.stmts.first().is_some_and(assigns_literal) => states,
             Some(states) => FlowState::merge_branches(&pre_ctx, states, None),
             None => pre_ctx.clone(),
         };
@@ -1524,4 +1525,25 @@ fn with_element_type(arr: &mir_types::Type, value: &mir_types::Type) -> Option<m
         });
     }
     Some(out)
+}
+
+/// `$x = <scalar literal>;`, a statement that can't throw.
+fn assigns_literal(stmt: &Stmt) -> bool {
+    let php_ast::owned::StmtKind::Expression(expr) = &stmt.kind else {
+        return false;
+    };
+    let ExprKind::Assign(a) = &expr.kind else {
+        return false;
+    };
+    a.op == php_ast::ast::AssignOp::Assign
+        && !a.by_ref
+        && matches!(a.target.kind, ExprKind::Variable(_))
+        && matches!(
+            a.value.kind,
+            ExprKind::Int(_)
+                | ExprKind::Float(_)
+                | ExprKind::String(_)
+                | ExprKind::Bool(_)
+                | ExprKind::Null
+        )
 }

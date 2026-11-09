@@ -31,7 +31,7 @@ final class Kernel
 function thrown(): string
 {
     try {
-        $step = 'parse';
+        $step = strtolower('parse');
         throw new \RuntimeException('x');
     } catch (\RuntimeException $e) {
         return $step;

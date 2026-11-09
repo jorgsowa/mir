@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `break` or `continue` in unreachable code (after an if/else that returns on both branches) no longer adds a path out of its loop or switch, so variables set on every live path aren't `PossiblyUndefinedVariable` after it.
 - An offset write (`$this->p['k'] = $v`) to a nullable array property removes `null` from the property, as the write creates the array, also when a call on the right-hand side dropped an earlier narrowing.
 - `is_object()` and other type checks on a shape element that can never pass (the element is narrowed to `null`) make the branch unreachable, as they do for a variable, so code in it isn't reported.
+- A `catch` or `finally` block doesn't see the state before the `try` when its first statement assigns a literal (`$a = 'x';`), which can't throw, so that variable isn't `PossiblyUndefinedVariable` there.
 
 ## [0.95.0] - 2026-11-09
 
