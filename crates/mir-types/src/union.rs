@@ -1931,10 +1931,25 @@ fn resolve_conditional_branch(
     if_true: &Type,
     if_false: &Type,
 ) -> Option<Type> {
-    if subject.types.is_empty() || !subject.types.iter().all(subject_is_decidable) {
+    if arg_ty.types.is_empty() {
         return None;
     }
-    if arg_ty.types.is_empty() {
+    // `T is void`: only `void` itself matches; a known non-void value never does.
+    if let [Atomic::TVoid] = subject.types.as_slice() {
+        return match arg_ty.types.as_slice() {
+            [Atomic::TVoid] => Some(if_true.clone()),
+            types
+                if types.iter().all(|a| {
+                    !matches!(a, Atomic::TVoid | Atomic::TMixed | Atomic::TNull)
+                        && !value_classes(a).is_empty()
+                }) =>
+            {
+                Some(if_false.clone())
+            }
+            _ => None,
+        };
+    }
+    if subject.types.is_empty() || !subject.types.iter().all(subject_is_decidable) {
         return None;
     }
     let subject_classes: Vec<ValueClass> = subject.types.iter().flat_map(value_classes).collect();
