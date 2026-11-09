@@ -664,6 +664,7 @@ impl AnalysisSnapshot {
         let resolved = !crate::db::issues_have_unresolved_names(&analysis.issues);
         self.index().commit_file_refs(
             &db,
+            self.analysis_cache(),
             &file,
             text,
             db.take_pending_ref_locs(),

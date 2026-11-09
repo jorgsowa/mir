@@ -517,17 +517,25 @@ impl IndexState {
     /// outside the memoized `analyze_file` query (the open-file analysis
     /// path) by the view at `stamp`. No memo to record, so the empty weak
     /// handle makes the next sweep recommit once — the safe direction.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn commit_file_refs(
         &self,
         db: &MirDbStorage,
+        cache: Option<&AnalysisCache>,
         file: &Arc<str>,
         text: Option<Arc<str>>,
         locs: Vec<crate::db::RefLoc>,
         resolved: bool,
         stamp: ViewStamp,
     ) -> Result<(), Cancelled> {
+        let dependencies = cache
+            .zip(db.lookup_source_file(file))
+            .map(|(_, sf)| super::analyzed_file_dependencies(db, file, sf, &locs));
         let commit = self.begin_commit();
         commit.admit(file, stamp.retire_epoch)?;
+        if let (Some(cache), Some(deps)) = (cache, &dependencies) {
+            cache.set_file_dependencies(file, deps.iter().map(|d| d.as_ref()));
+        }
         self.clear_transient_batch_replay();
         let file_no = db.intern_path(file);
         db.set_file_reference_locations(file_no, locs);
@@ -562,11 +570,13 @@ impl IndexState {
         // Stage the disk-cache write only when the commit will rewrite
         // postings — a no-op re-sweep adds no hashing or parse-walk cost. A
         // matching replay came from a cache entry for this very content.
-        let cache_put = if current || replay_match.is_some() {
-            None
-        } else {
-            cache.and_then(|cache| stage_ref_cache_put(cache, db, sf, path.as_ref(), &text, &out))
-        };
+        let rewrites = !current && replay_match.is_none();
+        let cache_put = cache
+            .filter(|_| rewrites)
+            .and_then(|cache| stage_ref_cache_put(cache, db, sf, path.as_ref(), &text, &out));
+        let dependencies = cache
+            .filter(|_| rewrites)
+            .map(|_| super::analyzed_file_dependencies(db, path, sf, &out.ref_locs));
         // Mention scan piggybacks on the analysis pass, skipped when the file
         // already holds a current scan.
         let mentions = mention_scanner.and_then(|s| {
@@ -579,6 +589,7 @@ impl IndexState {
             out,
             entries,
             cache_put,
+            dependencies,
             mentions,
             replay_match,
         })
@@ -699,7 +710,9 @@ impl IndexState {
                     a.out.issues.clone(),
                     put.ref_locs,
                 );
-                cache.set_file_dependencies(&a.file, put.dependencies.iter().map(|d| d.as_ref()));
+            }
+            if let (Some(cache), Some(deps)) = (cache, a.dependencies.take()) {
+                cache.set_file_dependencies(&a.file, deps.iter().map(|d| d.as_ref()));
             }
             self.mark_ref_committed(
                 a.sf,
@@ -754,6 +767,8 @@ pub(crate) struct AnalyzedFile {
     pub(crate) out: Arc<crate::db::AnalyzeOutput>,
     entries: Vec<crate::db::SubtypeEntry>,
     cache_put: Option<RefCachePut>,
+    /// Files the rewritten postings depend on, for the cache's reverse edges.
+    dependencies: Option<Vec<Arc<str>>>,
     mentions: Option<crate::db::FileScan>,
     /// The replayed postings this analysis reproduced, re-checked at commit.
     replay_match: Option<PostingDigest>,
@@ -780,8 +795,6 @@ struct RefCachePut {
     content_hash: String,
     surface_hash: String,
     ref_locs: Arc<[crate::cache::CachedRefLoc]>,
-    /// Files the entry's analysis depends on, for the cache's reverse edges.
-    dependencies: Vec<Arc<str>>,
 }
 
 /// `None` when the stored entry already matches this content — batch-written
@@ -805,12 +818,10 @@ fn stage_ref_cache_put(
         .iter()
         .map(|r| (Arc::clone(&r.symbol_key), r.line, r.col_start, r.col_end))
         .collect();
-    let dependencies = super::analyzed_file_dependencies(db, file, sf, &out.ref_locs);
     Some(RefCachePut {
         content_hash,
         surface_hash,
         ref_locs,
-        dependencies,
     })
 }
 

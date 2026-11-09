@@ -1063,3 +1063,45 @@ fn in_session_edit_demotes_unmemoized_dependents() {
     assert_eq!(run_refs(&mut session, "B", &edited), ["caller.php"]);
     assert!(run_refs(&mut session, "A", &edited).is_empty());
 }
+
+#[test]
+fn warm_pass_without_cache_reanalyzes_dependents_of_an_edit() {
+    let files = factory_workspace(FACTORY_OF_A);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    for (path, text) in &files {
+        session.upsert_source_file(path.clone(), text.clone(), salsa::Durability::LOW);
+    }
+    session.rebuild_workspace_symbol_index();
+    warm_sweep(&mut session, &files);
+
+    session.upsert_source_file(
+        Arc::from("factory.php"),
+        Arc::from(FACTORY_OF_B),
+        salsa::Durability::LOW,
+    );
+    let edited = factory_workspace(FACTORY_OF_B);
+    warm_sweep(&mut session, &edited);
+    assert_eq!(run_refs(&mut session, "B", &edited), ["caller.php"]);
+}
+
+#[test]
+fn open_file_analysis_records_dependencies_of_its_commit() {
+    let dir = create_temp_dir("warm_start_open_file_edges");
+    seed_factory_cache(dir.path());
+
+    // Only the body names Factory, so no structural edge reaches it.
+    let late_text = "<?php\nfunction late(): void { (new Factory())->make()->run(); }\n";
+    let mut files = factory_workspace(FACTORY_OF_A);
+    files.push((Arc::from("late.php"), Arc::from(late_text)));
+    let mut session = lsp_boot(dir.path(), &files);
+    session.analyze_file_diagnostics("late.php", late_text);
+    assert!(session.reference_postings_fresh("late.php"));
+
+    session.upsert_source_file(
+        Arc::from("factory.php"),
+        Arc::from(FACTORY_OF_B),
+        salsa::Durability::LOW,
+    );
+    assert!(!session.reference_postings_fresh("late.php"));
+}

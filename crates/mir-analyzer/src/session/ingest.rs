@@ -346,10 +346,19 @@ impl AnalysisSession {
 
         // Dependents are found through the edges recorded before this edit,
         // which still reach files that used a symbol it no longer declares.
-        if !text_unchanged {
+        if text_unchanged {
+            self.update_reverse_deps_for(&file);
+        } else {
             self.invalidate_dependents(&[file.to_string()], false);
+            // The retired postings held the body edges, so keep the old ones
+            // until the next analysis commit replaces them.
+            if let Some(cache) = self.cache.as_deref() {
+                cache.add_file_dependencies(
+                    &file,
+                    new_structural_targets.iter().map(String::as_str),
+                );
+            }
         }
-        self.update_reverse_deps_for(&file);
         // Only evict cache entries whose resolver-mapped path equals this
         // file. FQCNs the resolver can't map (psr4 miss) stay cached — no
         // ingest could change their fate. Avoids the per-keystroke storm

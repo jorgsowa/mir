@@ -751,6 +751,24 @@ impl AnalysisCache {
         file: &str,
         targets: impl IntoIterator<Item = &'a str>,
     ) {
+        self.update_file_dependencies(file, targets, false);
+    }
+
+    /// Add `targets` to `file`'s outgoing edges, keeping the existing ones.
+    pub(crate) fn add_file_dependencies<'a>(
+        &self,
+        file: &str,
+        targets: impl IntoIterator<Item = &'a str>,
+    ) {
+        self.update_file_dependencies(file, targets, true);
+    }
+
+    fn update_file_dependencies<'a>(
+        &self,
+        file: &str,
+        targets: impl IntoIterator<Item = &'a str>,
+        keep_old: bool,
+    ) {
         let (file_id, mut target_ids) = {
             let mut id_map = self.file_id_map.lock();
             let file_id = id_map.assign_or_get(file);
@@ -770,6 +788,13 @@ impl AnalysisCache {
             dependencies,
         } = &mut *graph;
         let dependencies = dependencies.get_or_insert_with(|| invert(dependents));
+        if keep_old {
+            if let Some(old) = dependencies.get(&file_id) {
+                target_ids.extend_from_slice(old);
+                target_ids.sort_unstable();
+                target_ids.dedup();
+            }
+        }
         let old = if target_ids.is_empty() {
             dependencies.remove(&file_id)
         } else {

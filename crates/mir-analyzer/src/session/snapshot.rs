@@ -232,6 +232,10 @@ impl AnalysisSnapshot {
         self.php_version
     }
 
+    pub(crate) fn analysis_cache(&self) -> Option<&AnalysisCache> {
+        self.cache.as_deref()
+    }
+
     /// See [`super::AnalysisSession::index_generation`].
     pub fn index_generation(&self) -> u64 {
         self.index_generation
@@ -754,7 +758,8 @@ impl AnalysisSnapshot {
             let cache = self.cache.as_deref();
             let index = &self.index;
             let scanner = mention_scanner.as_deref();
-            let fresh_at = skip_fresh.then_some(self.index_generation);
+            // Without a cache no dependency edges exist to demote a skipped file.
+            let fresh_at = (skip_fresh && cache.is_some()).then_some(self.index_generation);
             let stage = |db: &MirDbStorage, path: &Arc<str>| {
                 index.stage_warm_file(db, cache, scanner, path, fresh_at)
             };
