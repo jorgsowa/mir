@@ -542,6 +542,31 @@ pub(crate) fn infer_array_map_return(
     // Multi-array (zip) mode: always produces array<int, T>.
     if arg_types.len() == 2 {
         let source = &arg_types[1];
+        // Keys are preserved, so a sealed shape maps to the same shape.
+        if let [Atomic::TKeyedArray {
+            properties,
+            is_open: false,
+            is_list,
+        }] = source.types.as_slice()
+        {
+            let mapped = properties
+                .iter()
+                .map(|(key, prop)| {
+                    (
+                        key.clone(),
+                        mir_types::atomic::KeyedProperty {
+                            ty: value.clone(),
+                            optional: prop.optional,
+                        },
+                    )
+                })
+                .collect();
+            return Some(Type::single(Atomic::TKeyedArray {
+                properties: Arc::new(mapped),
+                is_open: false,
+                is_list: *is_list,
+            }));
+        }
         // A literal array (`[1, 2, 3]`) is represented as a `TKeyedArray` with
         // `is_list: true`, not as `TList`/`TNonEmptyList` — without this arm,
         // `array_map` over a literal list lost its list-ness/non-emptiness and

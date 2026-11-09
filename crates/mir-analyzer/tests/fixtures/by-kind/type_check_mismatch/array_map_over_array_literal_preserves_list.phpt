@@ -16,5 +16,5 @@ $arr = [1, 2, 3];
 $mapped = array_map(function (int $x) {
     return $x * 2;
 }, $arr);
-/** @mir-check $mapped is non-empty-list<int> */
+/** @mir-check $mapped is array{0: int, 1: int, 2: int} */
 $_ = $mapped;

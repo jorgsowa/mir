@@ -29,7 +29,7 @@ from this cross-file fact, infers the correct element type for its
 
 function process(int $mode, callable $cb): array {
     $result = array_map($cb, [1, 2, 3]);
-    /** @mir-check $result is non-empty-list<int> */
+    /** @mir-check $result is array{0: int, 1: int, 2: int} */
     return $result;
 }
 
