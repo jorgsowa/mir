@@ -2372,9 +2372,7 @@
   </file>
   <file src="core/modules/content_translation/src/Controller/ContentTranslationController.php">
     <PossiblyUndefinedVariable>
-      <code><![CDATA[$row_title]]></code>
       <code><![CDATA[$source_name]]></code>
-      <code><![CDATA[$row_title]]></code>
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/content_translation/src/FieldTranslationSynchronizer.php">

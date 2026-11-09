@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `for` loop whose init assigns int literals that its condition then compares, such as `for ($i = 0; $i < 50; $i++)`, runs its body at least once, so a variable the body assigns isn't `PossiblyUndefinedVariable` after it. A union also drops a generic array or list that another member of the same kind covers (`list<0> | list<int>` is `list<int>`).
 - A flag set to `false` beside a definition proves it wherever `!$flag` or `$flag === false` holds again, and a branch that defines the variable outright keeps such a proof from the other branch, so the variable isn't `PossiblyUndefinedVariable` there.
 - A condition on an array element with a literal key (`isset($a['k'])`, `!empty($a['k'])`, `$a['k'] === 'x'`) guards the variables defined under it like a condition on a variable, so `if (!empty($a['k'])) { $t = 1; } if (empty($a['k'])) { $t = 2; } echo $t;` isn't `PossiblyUndefinedVariable`.
+- A condition guards a variable only when its branch defines it on every path, so `if ($g) { if (rand()) { $x = 1; } } if ($g) { echo $x; }` is `PossiblyUndefinedVariable`; it also guards a variable that may already be defined, as on a later loop iteration.
 
 ## [0.95.0] - 2026-11-09
 

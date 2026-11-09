@@ -195,10 +195,10 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         if let Some((then_ctx, else_ctx)) = branch_guards {
             if let Some(g) = guard.filter(|_| guard_unwritten) {
-                record_guarded_defs(&pre_ctx, g, &else_ctx, ctx);
+                record_guarded_defs(g, &then_ctx, ctx);
             }
             if let Some(g) = else_guard.filter(|_| else_guard_unwritten) {
-                record_guarded_defs(&pre_ctx, g, &then_ctx, ctx);
+                record_guarded_defs(g, &else_ctx, ctx);
             }
         }
     }
@@ -1546,21 +1546,16 @@ fn is_always_true_literal(condition: &php_ast::owned::Expr) -> bool {
 }
 
 /// After `if (<guard>) { $x = ...; }`, `$x` is defined wherever the same guard
-/// holds again, unless the `other` branch (else, or the then for a negated guard) defines it too.
+/// holds again, when the `defining` branch (then, or else for a negated guard) defines it on every path.
 fn record_guarded_defs(
-    pre: &FlowState,
     guard: crate::flow_state::Guard,
-    other: &FlowState,
+    defining: &FlowState,
     post: &mut FlowState,
 ) {
     let newly_possible: Vec<Name> = post
         .possibly_assigned_vars
         .iter()
-        .filter(|v| {
-            !pre.var_possibly_defined_sym(**v)
-                && !other.var_possibly_defined_sym(**v)
-                && **v != guard.var
-        })
+        .filter(|v| defining.var_is_defined_sym(**v) && **v != guard.var)
         .copied()
         .collect();
     for var in newly_possible {
