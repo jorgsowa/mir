@@ -698,8 +698,10 @@ pub(crate) fn narrow_offset_type_fn_by_path(
         return;
     };
     let current = resolve_shape_base_current_type(ctx, &base, db, file);
-    if let Some(narrowed) = narrow_shape_path_type_fn(&current, &path, fn_name, db, is_true) {
-        set_shape_base_narrowed(ctx, &base, current, narrowed);
+    match narrow_shape_path_type_fn(&current, &path, fn_name, db, is_true) {
+        Some(narrowed) if narrowed.is_empty() => ctx.diverges |= !current.is_mixed(),
+        Some(narrowed) => set_shape_base_narrowed(ctx, &base, current, narrowed),
+        None => {}
     }
 }
 
@@ -763,6 +765,10 @@ fn narrow_shape_path_type_fn(
                 } else if let Some(deeper) =
                     narrow_shape_path_type_fn(&prop.ty, rest, fn_name, db, is_true)
                 {
+                    changed = true;
+                    if deeper.is_empty() {
+                        continue;
+                    }
                     let mut new_props = mir_types::KeyedProperties::clone(properties);
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = deeper;
@@ -780,11 +786,8 @@ fn narrow_shape_path_type_fn(
             _ => result.add_type(atomic.clone()),
         }
     }
-    if changed && !result.types.is_empty() {
-        Some(result)
-    } else {
-        None
-    }
+    // An empty result means no member can satisfy the check: the branch is dead.
+    changed.then_some(result)
 }
 
 /// False-branch counterpart of `narrow_isset_shape_key`, for

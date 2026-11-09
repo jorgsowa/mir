@@ -5,11 +5,6 @@
       <code><![CDATA[return static::getContainer()->getParameter('app.root');]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Component/Annotation/Doctrine/Annotation/Target.php">
-    <NullArgument>
-      <code><![CDATA[$values['value']]]></code>
-    </NullArgument>
-  </file>
   <file src="core/lib/Drupal/Component/Annotation/Doctrine/DocParser.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[self::$metadataParser === null]]></code>

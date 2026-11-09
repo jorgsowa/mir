@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isset($a[$i]['k'])` (also under `assert()`) proves the optional key `k` of the element read through a variable key, so reading `$a[$i]['k']` there isn't nullable.
 - A `break` or `continue` in unreachable code (after an if/else that returns on both branches) no longer adds a path out of its loop or switch, so variables set on every live path aren't `PossiblyUndefinedVariable` after it.
 - An offset write (`$this->p['k'] = $v`) to a nullable array property removes `null` from the property, as the write creates the array, also when a call on the right-hand side dropped an earlier narrowing.
+- `is_object()` and other type checks on a shape element that can never pass (the element is narrowed to `null`) make the branch unreachable, as they do for a variable, so code in it isn't reported.
 
 ## [0.95.0] - 2026-11-09
 
