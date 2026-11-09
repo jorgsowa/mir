@@ -261,6 +261,11 @@ impl AnalysisSession {
                 }
                 reanalysis_ref_locs.extend(ref_locs);
             }
+            for file in &files_to_reanalyze {
+                if let Some(sf) = self.db.salsa.lookup_source_file(file) {
+                    self.index.forget_replayed_postings(sf);
+                }
+            }
             self.db
                 .salsa
                 .commit_reference_locations_batch(reanalysis_ref_locs);

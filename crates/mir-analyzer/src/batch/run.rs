@@ -610,6 +610,9 @@ impl AnalysisSession {
                 all_symbols.extend(symbols);
                 let file_no = db.intern_path(&file);
                 db.set_file_reference_locations(file_no, ref_locs);
+                if let Some(sf) = db.lookup_source_file(&file) {
+                    self.index.forget_replayed_postings(sf);
+                }
             }
         }
 

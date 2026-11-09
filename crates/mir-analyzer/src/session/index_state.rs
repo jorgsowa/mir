@@ -158,6 +158,50 @@ struct RefCommit {
     /// commit's are only as trustworthy as the cache entry, so it always
     /// re-verifies via full re-analysis instead of the cheaper gate.
     live_analyzed: bool,
+    /// [`PostingDigest`] of a replayed commit's postings, so the first live
+    /// analysis that reproduces them skips the index rewrite.
+    replayed_postings: Option<PostingDigest>,
+}
+
+/// Order-insensitive digest of one file's posting set: the wrapping sum of
+/// two independently seeded hashes per posting, plus the count. A differing
+/// duplicate count only makes two equal sets look different, which costs a
+/// rewrite, never a stale posting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PostingDigest {
+    sums: (u64, u64),
+    len: usize,
+}
+
+impl PostingDigest {
+    pub(crate) fn of_ref_locs(locs: &[crate::db::RefLoc]) -> Self {
+        use std::hash::Hasher as _;
+        let hash = |seed: usize, loc: &crate::db::RefLoc| {
+            let mut h = rustc_hash::FxHasher::with_seed(seed);
+            h.write(loc.symbol_key.as_bytes());
+            h.write_u8(0xff);
+            h.write_u32(loc.line);
+            h.write_u16(loc.col_start);
+            h.write_u16(loc.col_end);
+            // murmur3 fmix64: decorrelates similar postings before they are summed.
+            let mut x = h.finish();
+            x ^= x >> 33;
+            x = x.wrapping_mul(0xff51_afd7_ed55_8ccd);
+            x ^= x >> 33;
+            x = x.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+            x ^ (x >> 33)
+        };
+        let sums = locs.iter().fold((0u64, 0u64), |(a, b), loc| {
+            (
+                a.wrapping_add(hash(0x9e37_79b9, loc)),
+                b.wrapping_add(hash(0x85eb_ca6b, loc)),
+            )
+        });
+        Self {
+            sums,
+            len: locs.len(),
+        }
+    }
 }
 
 /// How a reference-freshness scan treats one candidate.
@@ -285,6 +329,60 @@ impl IndexState {
             .unwrap_or(false)
     }
 
+    /// The digest of `file`'s replayed postings while they are still the
+    /// stored ones for exactly `current_text`.
+    fn replayed_postings(
+        &self,
+        file: SourceFile,
+        current_text: &Arc<str>,
+    ) -> Option<PostingDigest> {
+        self.ref_committed
+            .read(file, |c| {
+                c.replayed_postings
+                    .filter(|_| Arc::ptr_eq(&c.text, current_text))
+            })
+            .flatten()
+    }
+
+    /// Postings for `file` were written outside the commit path, so its
+    /// replay digest no longer describes them.
+    pub(crate) fn forget_replayed_postings(&self, file: SourceFile) {
+        let rewritten = self.ref_committed.read(file, |c| {
+            c.replayed_postings.map(|_| RefCommit {
+                text: c.text.clone(),
+                out: c.out.clone(),
+                generation: c.generation,
+                resolved: c.resolved,
+                live_analyzed: c.live_analyzed,
+                replayed_postings: None,
+            })
+        });
+        if let Some(Some(commit)) = rewritten {
+            self.ref_committed.set(file, commit);
+        }
+    }
+
+    /// Record a disk-cache replay of `postings` for `text`; see
+    /// [`Self::mark_ref_committed`] for `generation` and `resolved`.
+    pub(crate) fn mark_ref_replayed(
+        &self,
+        file: SourceFile,
+        text: &Arc<str>,
+        generation: u64,
+        resolved: bool,
+        postings: PostingDigest,
+    ) {
+        let commit = RefCommit {
+            text: text.clone(),
+            out: std::sync::Weak::new(),
+            generation,
+            resolved,
+            live_analyzed: false,
+            replayed_postings: Some(postings),
+        };
+        self.ref_committed.set(file, commit);
+    }
+
     /// Record a commit computed against the workspace state at `generation`
     /// — captured by the caller *before* its analysis snapshot, so a file
     /// add racing the analysis leaves the commit stale (re-verified on the
@@ -306,6 +404,7 @@ impl IndexState {
             generation,
             resolved,
             live_analyzed: out.is_some(),
+            replayed_postings: None,
         };
         self.ref_committed.set(file, commit);
     }
@@ -437,9 +536,16 @@ impl IndexState {
         let out = crate::db::analyze_file(db as &dyn MirDatabase, sf).clone();
         let defs = crate::db::collect_file_definitions(db as &dyn MirDatabase, sf);
         let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
+        let current = self.ref_commit_is_current(sf, &text, &out);
+        // Digested here, in the parallel phase, so the serial commit only compares.
+        let replay_match = (!current)
+            .then(|| self.replayed_postings(sf, &text))
+            .flatten()
+            .filter(|replayed| *replayed == PostingDigest::of_ref_locs(&out.ref_locs));
         // Stage the disk-cache write only when the commit will rewrite
-        // postings — a no-op re-sweep adds no hashing or parse-walk cost.
-        let cache_put = if self.ref_commit_is_current(sf, &text, &out) {
+        // postings — a no-op re-sweep adds no hashing or parse-walk cost. A
+        // matching replay came from a cache entry for this very content.
+        let cache_put = if current || replay_match.is_some() {
             None
         } else {
             cache.and_then(|cache| stage_ref_cache_put(cache, db, sf, path.as_ref(), &text, &out))
@@ -457,13 +563,15 @@ impl IndexState {
             entries,
             cache_put,
             mentions,
+            replay_match,
         })
     }
 
     /// Serial commit of staged analyses into both inverted indexes and their
     /// freshness marks. Each output is the file's complete reference set, so
-    /// postings are replaced, not appended; unchanged files (same text, same
-    /// memo) skip the rewrite and only re-stamp the mark.
+    /// postings are replaced, not appended; unchanged files (same text, and
+    /// the same memo or the replayed postings it reproduces) skip the rewrite
+    /// and only re-stamp the mark.
     ///
     /// `Err` when a file was retired after `stamp`; every other file is still
     /// committed.
@@ -483,7 +591,10 @@ impl IndexState {
                 refused = Err(cancelled);
                 continue;
             }
-            if !self.ref_commit_is_current(a.sf, &a.text, &a.out) {
+            let unchanged = self.ref_commit_is_current(a.sf, &a.text, &a.out)
+                || a.replay_match.is_some()
+                    && self.replayed_postings(a.sf, &a.text) == a.replay_match;
+            if !unchanged {
                 let file_no = db.intern_path(&a.file);
                 db.set_file_reference_locations(file_no, a.out.ref_locs.to_vec());
                 dependency_graph_changed = true;
@@ -554,6 +665,8 @@ pub(crate) struct AnalyzedFile {
     entries: Vec<crate::db::SubtypeEntry>,
     cache_put: Option<RefCachePut>,
     mentions: Option<crate::db::FileScan>,
+    /// The replayed postings this analysis reproduced, re-checked at commit.
+    replay_match: Option<PostingDigest>,
 }
 
 /// A staged [`AnalysisCache`] write for one file's postings, prepared in the

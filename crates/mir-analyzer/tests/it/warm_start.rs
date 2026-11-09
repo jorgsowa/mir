@@ -828,3 +828,81 @@ fn cancelled_settle_keeps_mirror_writes_pending() {
     }
     assert!(cancelled_runs > 1, "sweep never cancelled mid-query");
 }
+
+fn caller_workspace() -> Vec<(Arc<str>, Arc<str>)> {
+    vec![
+        (
+            Arc::from("target.php"),
+            Arc::from("<?php\nclass Target { public function process(): void {} }\n"),
+        ),
+        (
+            Arc::from("caller.php"),
+            Arc::from("<?php\nfunction run(Target $t): void { $t->process(); }\n"),
+        ),
+    ]
+}
+
+fn sweep_after_warm_start(
+    dir: &std::path::Path,
+    files: &[(Arc<str>, Arc<str>)],
+) -> (AnalysisSession, u64) {
+    let paths: Vec<Arc<str>> = files.iter().map(|(p, _)| p.clone()).collect();
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    session.ensure_all_stubs();
+    session.warm_start_files(files);
+    let before = session.ref_index_lock_count();
+    session.reanalyze_files_cancellable(&paths, &mir_analyzer::IndexCancel::new());
+    let locks = session.ref_index_lock_count() - before;
+    (session, locks)
+}
+
+fn process_refs(session: &mut AnalysisSession, files: &[(Arc<str>, Arc<str>)]) -> usize {
+    let paths: Vec<Arc<str>> = files.iter().map(|(p, _)| p.clone()).collect();
+    session
+        .indexed_references_to(
+            &Name::method("Target", "process"),
+            &paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
+        .expect("not cancelled")
+        .len()
+}
+
+#[test]
+fn live_analysis_reproducing_replayed_postings_skips_the_rewrite() {
+    let dir = create_temp_dir("warm_start_same_postings");
+    let files = caller_workspace();
+    let (seed, _) = sweep_after_warm_start(dir.path(), &files);
+    seed.flush_analysis_cache();
+
+    let (mut session, locks) = sweep_after_warm_start(dir.path(), &files);
+    assert_eq!(locks, 0, "identical replayed postings were rewritten");
+    assert_eq!(process_refs(&mut session, &files), 1);
+}
+
+#[test]
+fn live_analysis_differing_from_replayed_postings_rewrites_them() {
+    let dir = create_temp_dir("warm_start_stale_postings");
+    let files = caller_workspace();
+    {
+        let disk_cache = AnalysisCache::open(dir.path(), PhpVersion::LATEST.cache_byte(), 0);
+        for (path, text) in &files {
+            let fabricated: Arc<[mir_analyzer::cache::CachedRefLoc]> =
+                Arc::from(vec![(Arc::from("meth:Other::bogus"), 2, 0, 5)]);
+            disk_cache.put(
+                path,
+                hash_content(text),
+                String::new(),
+                Arc::from(Vec::new()),
+                fabricated,
+            );
+        }
+        disk_cache.flush();
+    }
+
+    let (mut session, locks) = sweep_after_warm_start(dir.path(), &files);
+    assert!(locks > 0, "differing replayed postings were kept");
+    assert_eq!(process_refs(&mut session, &files), 1);
+}

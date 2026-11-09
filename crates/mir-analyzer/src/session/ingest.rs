@@ -7,8 +7,8 @@ struct WarmStartHit {
     file: Arc<str>,
     sf: crate::db::SourceFile,
     stored_text: Arc<str>,
-    /// `(reference locations, resolved)` from a cached `AnalysisCache` hit.
-    refs: Option<(Vec<RefLoc>, bool)>,
+    /// `(reference locations, resolved, their digest)` from a cached `AnalysisCache` hit.
+    refs: Option<(Vec<RefLoc>, bool, super::index_state::PostingDigest)>,
     /// `(subtype edges, declarations, structural symbols)` from a cached stub-slice hit.
     stub: Option<(
         Vec<crate::db::subtype_index::SubtypeEntry>,
@@ -832,7 +832,8 @@ impl AnalysisSession {
                         // follow warm-up instead of being invalidated by the
                         // first generation bump.
                         let resolved = !crate::db::issues_have_unresolved_names(&issues);
-                        (locs, resolved)
+                        let digest = super::index_state::PostingDigest::of_ref_locs(&locs);
+                        (locs, resolved, digest)
                     });
 
                     let stub = stub_cache.as_ref().and_then(|stub_cache| {
@@ -860,7 +861,12 @@ impl AnalysisSession {
         // Phase 2: apply — only cheap salsa input writes and map merges.
         let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
             Vec::with_capacity(hits.len());
-        let mut replayed: Vec<(crate::db::SourceFile, Arc<str>, bool)> = Vec::new();
+        let mut replayed: Vec<(
+            crate::db::SourceFile,
+            Arc<str>,
+            bool,
+            super::index_state::PostingDigest,
+        )> = Vec::new();
         let mut unresolved: Vec<Arc<str>> = Vec::new();
         let mut structural_symbols: Vec<(Arc<str>, Arc<[mir_types::Name]>)> = Vec::new();
         let mut dependency_graph_changed = false;
@@ -874,10 +880,10 @@ impl AnalysisSession {
                     refs,
                     stub,
                 } = hit;
-                if let Some((locs, resolved)) = refs {
+                if let Some((locs, resolved, digest)) = refs {
                     let file_no = db.intern_path(&file);
                     db.set_file_reference_locations(file_no, locs);
-                    replayed.push((sf, stored_text.clone(), resolved));
+                    replayed.push((sf, stored_text.clone(), resolved, digest));
                     dependency_graph_changed = true;
                     if !resolved {
                         unresolved.push(file.clone());
@@ -897,9 +903,9 @@ impl AnalysisSession {
         self.seed_workspace_index_from_warm_start(seed_decls);
         // Stamped after seeding, which moves the generation without adding a file.
         let commit_gen = self.index_generation();
-        for (sf, text, resolved) in &replayed {
+        for (sf, text, resolved, digest) in &replayed {
             self.index
-                .mark_ref_committed(*sf, text, None, commit_gen, *resolved);
+                .mark_ref_replayed(*sf, text, commit_gen, *resolved, *digest);
         }
         for (file, symbols) in &structural_symbols {
             let targets = structural_targets(&self.db.salsa, file, symbols);
