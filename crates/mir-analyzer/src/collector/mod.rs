@@ -324,7 +324,15 @@ pub(crate) fn refine_version_attr_type(
     doc: Option<Type>,
     template_params: &[TemplateParam],
 ) -> Type {
-    let Some(doc) = doc else { return attr };
+    let Some(mut doc) = doc else { return attr };
+    // A docblock's `|false` that the attribute's version dropped (PHP 8 throws instead).
+    if !attr
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TFalse | Atomic::TBool | Atomic::TMixed))
+    {
+        doc.types.retain(|a| !matches!(a, Atomic::TFalse));
+    }
     if doc.is_empty() || doc.types.iter().any(|a| matches!(a, Atomic::TMixed)) {
         return attr;
     }
@@ -342,7 +350,9 @@ pub(crate) fn refine_version_attr_type(
         .iter()
         .all(|a| matches!(a, Atomic::TNull) || erased.types.iter().any(|d| atomic_subtype(d, a)));
     // A docblock that only restates the attribute type stays native, like a hint.
-    let restates_attr = erased == doc && attr.is_subtype_structural(&doc);
+    let restates_attr = erased == doc
+        && doc.types.len() == attr.types.len()
+        && doc.types.iter().all(|d| attr.types.contains(d));
     if covers_attr && !restates_attr && erased.is_subtype_structural(&attr) {
         preserve_native_nullability(&attr, doc)
     } else {
@@ -2878,10 +2888,14 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
-        // phpstorm-stubs `#[LanguageLevelTypeAware]` return type wins, routed
-        // through the same resolution + self/static/parent filling.
+        // phpstorm-stubs `#[LanguageLevelTypeAware]` return type wins unless the docblock
+        // refines it, routed through the same resolution + self/static/parent filling.
         let attr_return = self.version_attr_type_string(&m.attributes).map(|s| {
-            let mut ty = crate::parser::docblock::parse_type_string(&s);
+            let mut ty = refine_version_attr_type(
+                crate::parser::docblock::parse_type_string(&s),
+                doc.return_type.clone(),
+                template_params_for_resolve,
+            );
             ty.from_docblock = true;
             ty
         });

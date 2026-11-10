@@ -296,9 +296,13 @@ impl DefinitionCollector<'_> {
         }
 
         // phpstorm-stubs `#[LanguageLevelTypeAware]` return type wins over the
-        // declared/docblock return type, routed through the same resolution.
+        // declared return type, and over the docblock unless the docblock refines it.
         let return_type = if let Some(s) = self.version_attr_type_string(&decl.attributes) {
-            let mut ty = crate::parser::docblock::parse_type_string(&s);
+            let mut ty = super::refine_version_attr_type(
+                crate::parser::docblock::parse_type_string(&s),
+                doc.return_type.clone(),
+                &template_params,
+            );
             ty.from_docblock = true;
             let expanded = expand_aliases_only(ty, &type_aliases);
             Some(self.resolve_union_doc_with_templates(
