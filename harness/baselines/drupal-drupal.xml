@@ -5494,12 +5494,6 @@
       <code><![CDATA[return FALSE;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/views/src/Plugin/views/relationship/GroupwiseMax.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$sort_table]]></code>
-      <code><![CDATA[$sort_field]]></code>
-    </PossiblyUndefinedVariable>
-  </file>
   <file src="core/modules/views/src/Plugin/views/row/RssFields.php">
     <UndefinedProperty>
       <code><![CDATA[namespaces]]></code>

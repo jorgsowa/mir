@@ -122,7 +122,8 @@ pub(crate) fn narrow_container_non_null_non_false(
     match target {
         ShapeBase::Var(name) => {
             let current = ctx.get_var(name);
-            ctx.set_var(name, current.remove_null().remove_false());
+            // Same value, narrowed: element refinements on it stay valid.
+            ctx.narrow_var(name, current.remove_null().remove_false());
         }
         ShapeBase::Prop(obj, prop) => {
             let current = resolve_prop_current_type(ctx, obj, prop, db, file);

@@ -107,7 +107,8 @@ fn element_current_type(
     // A literal key into a shape is narrowed by the shape itself; a variable key
     // may name any of a closed shape's entries.
     let variable_key = key.starts_with("[$");
-    let base = prop_receiver_type(ctx, receiver, db, file);
+    // An element read from `null` is `null` too, which the check itself rules in or out.
+    let base = prop_receiver_type(ctx, receiver, db, file).remove_null();
     let generic = !base.types.is_empty()
         && base.types.iter().all(|a| match a {
             Atomic::TArray { .. }
