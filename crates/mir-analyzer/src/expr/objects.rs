@@ -1047,7 +1047,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         if prop_name == "<dynamic>" {
-            self.analyze(&pa.property, ctx);
+            let name_ty = self.analyze(&pa.property, ctx);
+            self.check_dynamic_member_name(&name_ty, false, pa.property.span);
             self.record_dynamic_member_access(&obj_ty, pa.property.span);
             return Type::mixed();
         }
@@ -1132,7 +1133,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
         if prop_name == "<dynamic>" {
-            self.analyze(&pa.property, ctx);
+            let name_ty = self.analyze(&pa.property, ctx);
+            self.check_dynamic_member_name(&name_ty, false, pa.property.span);
             self.record_dynamic_member_access(&obj_ty, pa.property.span);
             return Type::mixed();
         }

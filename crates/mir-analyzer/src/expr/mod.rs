@@ -1252,7 +1252,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let method_name = match &method.kind {
                     ExprKind::Identifier(name) => name.clone(),
                     _ => {
-                        self.analyze(method, ctx);
+                        let name_ty = self.analyze(method, ctx);
+                        self.check_dynamic_member_name(&name_ty, true, method.span);
                         // Method name isn't statically known — same coarse
                         // exemption the ordinary `$obj->$name(...)` dynamic call
                         // gets, or a private method reachable only via
@@ -1871,6 +1872,39 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.record_dynamic_member_ref(fqcn, span);
             }
         }
+    }
+
+    /// An object as `$obj->{$name}` must be `Stringable`; as `$obj->{$name}()` it is never valid.
+    pub(crate) fn check_dynamic_member_name(
+        &mut self,
+        name_ty: &Type,
+        is_method: bool,
+        span: php_ast::Span,
+    ) {
+        if name_ty.types.is_empty() || name_ty.is_mixed() {
+            return;
+        }
+        let invalid = name_ty.types.iter().all(|atomic| match atomic {
+            Atomic::TObject | Atomic::TClosure { .. } => true,
+            Atomic::TNamedObject { fqcn, .. } => {
+                is_method
+                    || (crate::db::class_exists(self.db, fqcn)
+                        && !crate::db::extends_or_implements(self.db, fqcn, "Stringable")
+                        && !crate::db::has_method_in_chain(self.db, fqcn, "__toString"))
+            }
+            _ => false,
+        });
+        if !invalid || (!is_method && name_ty.contains(|t| matches!(t, Atomic::TObject))) {
+            return;
+        }
+        self.emit(
+            IssueKind::InvalidMemberName {
+                member: if is_method { "method" } else { "property" }.to_string(),
+                ty: name_ty.to_string(),
+            },
+            Severity::Error,
+            span,
+        );
     }
 
     /// `'App\\Handlers\\' . $name` builds a class name: record the namespace

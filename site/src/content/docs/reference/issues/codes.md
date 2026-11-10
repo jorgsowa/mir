@@ -103,6 +103,7 @@ issues keep their code.
 | MIR0232  | PossiblyNullPropertyAssignmentValue | [type-mismatches/possibly-null-property-assignment-value](../type-mismatches/possibly-null-property-assignment-value/) |
 | MIR0233  | PossiblyFalsePropertyAssignmentValue | [type-mismatches/possibly-false-property-assignment-value](../type-mismatches/possibly-false-property-assignment-value/) |
 | MIR0234  | PossiblyInvalidPropertyAssignmentValue | [type-mismatches/possibly-invalid-property-assignment-value](../type-mismatches/possibly-invalid-property-assignment-value/) |
+| MIR0235  | InvalidMemberName             | [type-mismatches/invalid-member-name](../type-mismatches/invalid-member-name/) |
 | MIR0300  | InvalidArrayOffset            | [array/invalid-array-offset](../array/invalid-array-offset/) |
 | MIR0301  | NonExistentArrayOffset        | [array/non-existent-array-offset](../array/non-existent-array-offset/) |
 | MIR0302  | PossiblyInvalidArrayOffset    | [array/possibly-invalid-array-offset](../array/possibly-invalid-array-offset/) |

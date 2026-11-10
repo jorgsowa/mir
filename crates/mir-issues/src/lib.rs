@@ -215,6 +215,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_method_call/`.
     InvalidMethodCall { method: String, ty: String },
+    /// Emitted by `mir-analyzer/src/expr/mod.rs` for an object used as `$obj->{$name}`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_member_name/`.
+    InvalidMemberName { member: String, ty: String },
     /// Emitted by `mir-analyzer/src/call/args.rs` for `f(...$x)` with a scalar or `null`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_unpack/`.
     InvalidUnpack {
@@ -1069,6 +1072,7 @@ impl IssueKind {
             | IssueKind::BackedEnumCaseTypeMismatch { .. }
             | IssueKind::DuplicateEnumCaseValue { .. }
             | IssueKind::DivisionByZero { .. }
+            | IssueKind::InvalidMemberName { .. }
             | IssueKind::ParentNotFound => Severity::Error,
             IssueKind::Trace { .. } => Severity::Info,
 
@@ -1293,6 +1297,7 @@ impl IssueKind {
             IssueKind::PossiblyNullOperand { .. } => "MIR0214",
             IssueKind::DivisionByZero { .. } => "MIR0229",
             IssueKind::InvalidMethodCall { .. } => "MIR0230",
+            IssueKind::InvalidMemberName { .. } => "MIR0235",
             IssueKind::InvalidUnpack { .. } => "MIR0231",
             IssueKind::RawObjectIteration { .. } => "MIR0222",
             IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
@@ -1483,7 +1488,7 @@ impl IssueKind {
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0016" | "MIR0200"
             | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215"
-            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0600" | "MIR0601" | "MIR0700"
+            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0235" | "MIR0600" | "MIR0601" | "MIR0700"
             | "MIR0701" | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
             | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714"
             | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228"
@@ -1561,6 +1566,7 @@ impl IssueKind {
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
             IssueKind::InvalidMethodCall { .. } => "InvalidMethodCall",
+            IssueKind::InvalidMemberName { .. } => "InvalidMemberName",
             IssueKind::InvalidUnpack { .. } => "InvalidUnpack",
             IssueKind::InvalidArrayAccess { .. } => "InvalidArrayAccess",
             IssueKind::PossiblyInvalidArrayAccess { .. } => "PossiblyInvalidArrayAccess",
@@ -1939,6 +1945,12 @@ impl IssueKind {
             }
             IssueKind::InvalidMethodCall { method, ty } => {
                 format!("Cannot call method {method}() on non-object type '{ty}'")
+            }
+            IssueKind::InvalidMemberName { member, ty } if member == "method" => {
+                format!("Method name must be a string, '{ty}' given")
+            }
+            IssueKind::InvalidMemberName { member, ty } => {
+                format!("Object of type '{ty}' cannot be converted to a {member} name")
             }
             IssueKind::InvalidUnpack { ty } if ty.is_empty() => {
                 "Only arrays and Traversables can be unpacked".to_string()
@@ -2951,6 +2963,10 @@ mod code_tests {
                 method: s(),
                 ty: s(),
             },
+            IssueKind::InvalidMemberName {
+                member: s(),
+                ty: s(),
+            },
             IssueKind::InvalidUnpack { ty: s() },
             IssueKind::InvalidArrayAccess { ty: s() },
             IssueKind::PossiblyInvalidArrayAccess { ty: s() },
@@ -3397,6 +3413,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 188);
+        assert_eq!(one_of_each().len(), 189);
     }
 }
