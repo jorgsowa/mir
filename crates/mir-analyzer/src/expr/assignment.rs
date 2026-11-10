@@ -1920,6 +1920,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if elem.key.is_none() {
                         next_int_key += 1;
                     }
+                    if let Some(expected) = key
+                        .as_ref()
+                        .and_then(|k| super::arrays::string_keys_reject(&ty, k))
+                    {
+                        let actual = match &key {
+                            Some(mir_types::atomic::ArrayKey::Int(i)) => i.to_string(),
+                            _ => String::new(),
+                        };
+                        self.emit(
+                            IssueKind::InvalidArrayOffset { expected, actual },
+                            Severity::Warning,
+                            elem.value().span,
+                        );
+                    }
                     let elem_ty = key
                         .as_ref()
                         .and_then(|k| {

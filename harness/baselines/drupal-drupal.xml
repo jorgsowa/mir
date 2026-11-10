@@ -1926,6 +1926,12 @@
     </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/Update/UpdateHookRegistry.php">
+    <InvalidArrayOffset>
+      <code><![CDATA[$module]]></code>
+      <code><![CDATA[$module]]></code>
+      <code><![CDATA[$ran_update_number]]></code>
+      <code><![CDATA[$version]]></code>
+    </InvalidArrayOffset>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->enabledModules = array_keys($module_list)]]></code>
     </InvalidPropertyAssignment>

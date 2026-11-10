@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An array literal's keys are checked against an array parameter: an int key passed to `array<string, V>`, or a string key or out-of-order int keys (`[1 => 'x', 0 => 'y']`) passed to `list<V>` or a list shape, is `InvalidArgument`.
 - `bool` passed to a parameter that takes `false` or `true` but not both is `PossiblyInvalidArgument` instead of being accepted.
 - `clone($obj, ['prop' => $value])` checks each literal key like `$copy->prop = $value`: a mistyped value is `InvalidPropertyAssignment` and an undeclared property `DynamicPropertyCreation`. The property array's expression is analyzed too.
+- An int offset read or positionally destructured from an array whose keys are only non-numeric strings (`$m[0]` or `[$a, $b] = $m` on `array<string, int>`) is `InvalidArrayOffset`.
 - Analysis through `AnalysisSession` no longer gives some builtin functions another function's signature (`mkdir()` reporting `rename()`'s parameters, `str_replace()` expecting 2 arguments) on some runs: a bundled or user stub ingested as a file is filtered by PHP version like a stub loaded by the analyzer.
 
 ## [0.96.0] - 2026-11-09

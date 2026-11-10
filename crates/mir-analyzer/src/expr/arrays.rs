@@ -149,6 +149,37 @@ fn literal_key_matches_declared_key_type(
     })
 }
 
+/// The key type of a generic array that only holds non-numeric string keys, when `key` is an int.
+pub(crate) fn string_keys_reject(arr_ty: &Type, key: &mir_types::atomic::ArrayKey) -> Option<String> {
+    if !matches!(key, mir_types::atomic::ArrayKey::Int(_)) || arr_ty.types.is_empty() {
+        return None;
+    }
+    let mut expected = None;
+    for atomic in &arr_ty.types {
+        let (Atomic::TArray { key: key_ty, .. } | Atomic::TNonEmptyArray { key: key_ty, .. }) =
+            atomic
+        else {
+            return None;
+        };
+        let string_only = !key_ty.types.is_empty()
+            && key_ty.types.iter().all(|k| match k {
+                Atomic::TLiteralString(s) => s.parse::<i64>().is_err(),
+                Atomic::TString
+                | Atomic::TNonEmptyString
+                | Atomic::TClassString(_)
+                | Atomic::TInterfaceString(_)
+                | Atomic::TEnumString
+                | Atomic::TTraitString => true,
+                _ => false,
+            });
+        if !string_only {
+            return None;
+        }
+        expected.get_or_insert_with(|| key_ty.to_string());
+    }
+    expected
+}
+
 /// Whether `fqcn` implements `ArrayAccess`, directly or via an ancestor
 /// class/interface — `$obj[$idx]` on such a receiver is governed by the
 /// class's own `offsetGet`/`offsetSet`/`offsetExists` signatures, not the
@@ -817,6 +848,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         });
 
         let idx_span = aa.index.as_ref().map(|i| i.span).unwrap_or(expr.span);
+        if let Some(expected) = literal_key
+            .as_ref()
+            .filter(|_| !self.in_existence_check)
+            .and_then(|k| string_keys_reject(&arr_ty, k))
+        {
+            self.emit(
+                IssueKind::InvalidArrayOffset {
+                    expected,
+                    actual: analyzed_index_ty
+                        .as_ref()
+                        .map_or_else(String::new, |t| t.to_string()),
+                },
+                Severity::Warning,
+                idx_span,
+            );
+        }
 
         // When every atomic in the union is a shape and the index is a
         // literal key, merge the key's type across every union member
