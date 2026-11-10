@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A by-reference capture of the variable a call's result is assigned to (`$prev = set_error_handler(function () use (&$prev) {…})`) may be null inside the closure, so testing it is no longer `RedundantCondition`. A closure assigned directly to the captured variable is still callable.
 - A shape whose keys are all optional (`array{page?: int}`, the result of `array_filter()` on a literal array) may be empty, so testing it is no longer `RedundantCondition`.
+- After `array_push($list, ...$more)` the array may still be empty, since a spread argument can unpack to nothing.
 
 ## [0.97.0] - 2026-11-10
 

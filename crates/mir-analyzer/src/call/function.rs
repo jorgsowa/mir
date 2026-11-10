@@ -1602,11 +1602,15 @@ impl CallAnalyzer {
                     if let Some(ExprKind::Variable(name)) = arr_arg.value().map(|v| &v.kind) {
                         let var_name = name.as_ref().trim_start_matches('$');
                         let push_types: Vec<Type> = arg_types.iter().skip(1).cloned().collect();
-                        let new_type = super::array_builtins::array_push_unshift_byref_type(
+                        let mut new_type = super::array_builtins::array_push_unshift_byref_type(
                             original_arr,
                             &push_types,
                             ctx.inside_loop,
                         );
+                        // A spread argument may unpack to nothing.
+                        if call.args.iter().skip(1).any(|a| a.unpack()) {
+                            new_type.merge_with(original_arr);
+                        }
                         ctx.set_var(var_name, new_type);
                     }
                 }
