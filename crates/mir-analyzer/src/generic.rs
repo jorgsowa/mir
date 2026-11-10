@@ -318,6 +318,8 @@ pub fn check_template_bounds_with_inheritance<'a>(
     fn is_unresolved(ty: &Type, template_params: &[TemplateParam]) -> bool {
         ty.types.iter().any(|a| match a {
             Atomic::TTemplateParam { .. }
+            | Atomic::TKeyOf { .. }
+            | Atomic::TValueOf { .. }
             | Atomic::TSelf { .. }
             | Atomic::TStaticObject { .. }
             | Atomic::TParent { .. } => true,

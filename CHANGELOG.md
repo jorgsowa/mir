@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `is_string()`, `is_int()`, `is_float()` and `is_bool()` on the key or value of a template-typed array (`@template T of array`) keep the type undecided instead of ruling the check out.
 - `pcntl_signal_get_handler()` returns `callable|int` instead of `bool|resource`.
 - A write to a variable after a closure captured it by reference (`$prev = set_error_handler(function () use (&$prev) {…})`) is not `UnusedVariable`: the closure reads it through the reference.
+- The key or value of a template-typed array passed back to the same template (`resolve($item)` inside `foreach ($value as $item)`) is no longer `InvalidTemplateParam`.
 
 ## [0.97.0] - 2026-11-10
 
