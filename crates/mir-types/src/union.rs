@@ -860,7 +860,7 @@ impl Type {
     /// operations see a usable type instead of reporting `Mixed*`.
     pub fn narrow_to_string(&self) -> Type {
         self.filter_replacing(
-            |t| t.is_string() || matches!(t, Atomic::TTemplateParam { .. }),
+            |t| t.is_string() || t.is_deferred(),
             |t| matches!(t, Atomic::TMixed | Atomic::TScalar),
             Atomic::TString,
         )
@@ -870,7 +870,7 @@ impl Type {
     /// Narrow as if `is_int($x)` is true.
     pub fn narrow_to_int(&self) -> Type {
         self.filter_replacing(
-            |t| t.is_int() || matches!(t, Atomic::TTemplateParam { .. }),
+            |t| t.is_int() || t.is_deferred(),
             |t| matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric),
             Atomic::TInt,
         )
@@ -882,11 +882,8 @@ impl Type {
             |t| {
                 matches!(
                     t,
-                    Atomic::TFloat
-                        | Atomic::TIntegralFloat
-                        | Atomic::TLiteralFloat(..)
-                        | Atomic::TTemplateParam { .. }
-                )
+                    Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+                ) || matches!(t, Atomic::TTemplateParam { .. } | Atomic::TValueOf { .. })
             },
             |t| matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric),
             Atomic::TFloat,
@@ -899,7 +896,11 @@ impl Type {
             |t| {
                 matches!(
                     t,
-                    Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TTemplateParam { .. }
+                    Atomic::TBool
+                        | Atomic::TTrue
+                        | Atomic::TFalse
+                        | Atomic::TTemplateParam { .. }
+                        | Atomic::TValueOf { .. }
                 )
             },
             |t| matches!(t, Atomic::TMixed | Atomic::TScalar),

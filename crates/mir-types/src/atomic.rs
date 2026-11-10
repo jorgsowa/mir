@@ -432,6 +432,14 @@ impl Atomic {
         }
     }
 
+    /// A template parameter or a `key-of`/`value-of` over one: its concrete type is unknown here.
+    pub fn is_deferred(&self) -> bool {
+        matches!(
+            self,
+            Atomic::TTemplateParam { .. } | Atomic::TKeyOf { .. } | Atomic::TValueOf { .. }
+        )
+    }
+
     /// Whether this atomic type can ever evaluate to a truthy value.
     pub fn can_be_truthy(&self) -> bool {
         match self {
