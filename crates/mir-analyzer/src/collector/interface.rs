@@ -83,7 +83,7 @@ impl<'a> DefinitionCollector<'a> {
         // interface templates in their return types don't get them wrongly namespace-qualified.
         let iface_template_params = template_params.clone();
 
-        let extends: Vec<Arc<str>> = decl
+        let mut extends: Vec<Arc<str>> = decl
             .extends
             .iter()
             .map(|n| self.resolve_ast_name(n).into())
@@ -322,6 +322,7 @@ impl<'a> DefinitionCollector<'a> {
             &template_params,
         );
         let seal_properties = iface_doc.seal_properties;
+        super::add_implicit_stringable(&mut extends, &own_methods, &fqcn);
 
         self.slice
             .interfaces

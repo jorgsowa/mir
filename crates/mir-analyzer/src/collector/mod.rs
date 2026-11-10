@@ -164,6 +164,24 @@ fn native_scalar_family(native: &Type) -> Option<fn(&mir_types::atomic::Atomic) 
 /// the property is then virtual (no backing storage, never assignable), so
 /// it can never be "left uninitialized" by a constructor. A `set` hook (with
 /// or without `get`) means the property is backed and can still be.
+/// PHP 8 makes every class or interface declaring `__toString()` implement `Stringable`.
+pub(crate) fn add_implicit_stringable(
+    supertypes: &mut Vec<Arc<str>>,
+    own_methods: &mir_codebase::definitions::MemberMap<Arc<mir_codebase::definitions::MethodDef>>,
+    fqcn: &str,
+) {
+    if own_methods.get("__tostring").is_none()
+        || fqcn.eq_ignore_ascii_case("Stringable")
+        || supertypes.iter().any(|s| {
+            s.trim_start_matches('\\')
+                .eq_ignore_ascii_case("Stringable")
+        })
+    {
+        return;
+    }
+    supertypes.push(Arc::from("Stringable"));
+}
+
 pub(crate) fn is_get_only_hook(hooks: &[php_ast::owned::PropertyHook]) -> bool {
     use php_ast::ast::PropertyHookKind;
     !hooks.is_empty()

@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Parser crates updated to 0.29: parsing takes about 19% less CPU time, and `C::public(set)` from PHP 8.4, `readonly` used as an expression from 8.1 and `readonly::class` are reported as `ParseError`s as PHP rejects them.
 
+### Fixed
+
+- A class or interface declaring `__toString()` implements `Stringable`, as PHP 8 adds it implicitly, so passing it to a `Stringable` parameter isn't `InvalidArgument`, and a non-public `__toString()` is `OverriddenMethodAccess`.
+
 ## [0.96.0] - 2026-11-09
 
 ### Added

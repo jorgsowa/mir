@@ -24,6 +24,7 @@ class Magic {
     private function __serialize(): array { return []; }
     private function __unserialize(array $data): void {}
     private function __toString(): string { return ''; }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Access level to Magic::__toString() must be public (as in class Stringable)
     private function __invoke(): void {}
     private function __clone(): void {}
     private function __debugInfo(): array { return []; }

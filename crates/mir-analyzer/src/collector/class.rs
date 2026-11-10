@@ -27,7 +27,7 @@ impl<'a> DefinitionCollector<'a> {
             .extends
             .as_ref()
             .map(|n| self.resolve_ast_name(n).into());
-        let interfaces: Vec<Arc<str>> = decl
+        let mut interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
             .map(|n| self.resolve_ast_name(n).into())
@@ -648,6 +648,8 @@ impl<'a> DefinitionCollector<'a> {
                 }
             })
             .collect();
+
+        super::add_implicit_stringable(&mut interfaces, &own_methods, &fqcn);
 
         let storage = ClassDef {
             fqcn: fqcn.clone().into(),
