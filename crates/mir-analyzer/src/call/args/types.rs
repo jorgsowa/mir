@@ -167,6 +167,15 @@ pub(crate) fn check_one(
         return;
     }
 
+    let arg_display = arg_ty.to_string();
+    let split_bool;
+    let arg_ty = if let Some(t) = split_bool_for_single_literal_param(arg_ty, param_ty) {
+        split_bool = t;
+        &split_bool
+    } else {
+        arg_ty
+    };
+
     let param_accepts_false = param_ty.contains(|t| matches!(t, Atomic::TFalse | Atomic::TBool));
     if !param_accepts_false
         && !param_ty.is_mixed()
@@ -188,7 +197,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: format!("{arg_ty}"),
+                    actual: arg_display.clone(),
                 },
                 Severity::Info,
                 arg_span,
@@ -295,7 +304,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: format!("{arg_ty}"),
+                    actual: arg_display.clone(),
                 },
                 Severity::Info,
                 arg_span,
@@ -313,7 +322,7 @@ pub(crate) fn check_one(
                     param: param_name.to_string(),
                     fn_name: fn_name.to_string(),
                     expected: format!("{param_ty}"),
-                    actual: format!("{arg_ty}"),
+                    actual: arg_display.clone(),
                 },
                 Severity::Info,
                 arg_span,
@@ -346,7 +355,7 @@ pub(crate) fn check_one(
                 param: param_name.to_string(),
                 fn_name: fn_name.to_string(),
                 expected: format!("{param_ty}"),
-                actual: format!("{arg_ty}"),
+                actual: arg_display.clone(),
             },
             Severity::Info,
             arg_span,
@@ -440,6 +449,26 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
 
 /// Non-strict mode coerces any numeric string to a `float` param (so `int|float` too).
 /// Int-only params stay flagged: `"1.5"` is a fractional-int deprecation.
+/// `bool` passed where only one of `true`/`false` is accepted: split it so the
+/// matching half counts as a partial fit instead of a widening.
+fn split_bool_for_single_literal_param(arg: &Type, param: &Type) -> Option<Type> {
+    let accepts_true = param.contains(|t| matches!(t, Atomic::TTrue));
+    let accepts_false = param.contains(|t| matches!(t, Atomic::TFalse));
+    if accepts_true == accepts_false
+        || param.contains(|t| matches!(t, Atomic::TBool | Atomic::TScalar))
+        || !arg.contains(|t| matches!(t, Atomic::TBool))
+    {
+        return None;
+    }
+    let mut split = arg.clone();
+    split.types.retain(|t| !matches!(t, Atomic::TBool));
+    split.types.retain(|t| !matches!(t, Atomic::TTrue | Atomic::TFalse));
+    // Pushed directly: `add_type` would merge the pair back into `bool`.
+    split.types.push(Atomic::TTrue);
+    split.types.push(Atomic::TFalse);
+    Some(split)
+}
+
 fn numeric_string_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     if ea.strict_types || !param.contains(|p| matches!(p, Atomic::TFloat)) {
         return false;

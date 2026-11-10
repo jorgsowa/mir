@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new ArrayObject($array)` binds the key type from the array too (`ArrayObject<string, int>` instead of `ArrayObject<mixed, int>`), so it satisfies an `ArrayAccess<string, int>` parameter.
 - `new $class()` where `$class` holds a literal class name (with or without a leading `\`) is `InterfaceInstantiation`, `TraitInstantiation`, `EnumInstantiation` or `AbstractInstantiation` like `new Name()`.
 - An array literal's keys are checked against an array parameter: an int key passed to `array<string, V>`, or a string key or out-of-order int keys (`[1 => 'x', 0 => 'y']`) passed to `list<V>` or a list shape, is `InvalidArgument`.
+- `bool` passed to a parameter that takes `false` or `true` but not both is `PossiblyInvalidArgument` instead of being accepted.
 
 ## [0.96.0] - 2026-11-09
 
