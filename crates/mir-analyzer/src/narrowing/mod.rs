@@ -97,7 +97,8 @@ use literals::{
     narrow_prop_loose_bool, narrow_prop_loose_int, narrow_prop_loose_null,
     narrow_static_prop_int_comparison, narrow_string_to_non_empty, narrow_var_bool,
     narrow_var_int_comparison, narrow_var_literal_int, narrow_var_literal_string,
-    narrow_var_loose_bool, narrow_var_loose_int, narrow_var_loose_null, narrow_var_null,
+    narrow_var_loose_bool, narrow_var_loose_int, narrow_var_loose_null, narrow_var_loose_string,
+    narrow_var_null,
 };
 use strings::{
     extract_strlen_arg, extract_strlen_static_prop_arg, narrow_prop_string_strlen_comparison,
@@ -1253,6 +1254,8 @@ pub fn narrow_from_condition(
                         effective_true,
                         db,
                     );
+                } else if let Some(name) = extract_var_name(&b.left) {
+                    narrow_var_loose_string(ctx, name, &class_name_str.to_text(), effective_true);
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
@@ -1381,6 +1384,8 @@ pub fn narrow_from_condition(
                         effective_true,
                         db,
                     );
+                } else if let Some(name) = extract_var_name(&b.right) {
+                    narrow_var_loose_string(ctx, name, &class_name_str.to_text(), effective_true);
                 }
             }
             // `$x == 42` / `$x != 42` — sound only when every current atom is

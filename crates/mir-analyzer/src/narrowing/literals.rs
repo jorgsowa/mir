@@ -615,6 +615,39 @@ pub(super) fn narrow_var_literal_string(
     set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
+/// Loose-equality counterpart of `narrow_var_literal_string`, for `$x == 'lit'`.
+/// Against a non-empty, non-numeric literal an int, float or `null` never matches
+/// and a string matches only by identity; a bool or object could, so it isn't narrowed.
+pub(super) fn narrow_var_loose_string(
+    ctx: &mut FlowState,
+    name: &str,
+    value: &str,
+    is_value: bool,
+) {
+    if value.is_empty() || super::is_numeric_string(value) {
+        return;
+    }
+    let current = ctx.get_var(name);
+    let comparable = |a: &Atomic| {
+        a.is_string()
+            || a.is_int()
+            || matches!(
+                a,
+                Atomic::TFloat | Atomic::TLiteralFloat(..) | Atomic::TIntegralFloat | Atomic::TNull
+            )
+    };
+    if current.types.is_empty() || !current.types.iter().all(comparable) {
+        return;
+    }
+    let narrowed = if is_value {
+        literal_string_narrow_type(&current.filter(|a| a.is_string()), value, true)
+    } else {
+        literal_string_narrow_type(&current, value, false)
+    };
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
+}
+
 /// Property-access counterpart of `narrow_var_literal_string`, for
 /// `$this->prop === 'literal'` (or any `$obj->prop` receiver).
 pub(super) fn narrow_prop_literal_string(

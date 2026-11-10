@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `switch (get_class($x))`, `switch ($x::class)` and `switch (gettype($x))` narrow `$x` in each case to the type its labels name, so calling a method only that class has isn't `PossiblyUndefinedMethod`.
 - A builtin's `#[LanguageLevelTypeAware]` return type is refined by its docblock, as parameter types already were, and a docblock `|false` that the attribute's PHP version dropped is ignored, so `mb_str_split()` returns `array<int|string, string>` instead of `array`.
 - A `@return` listing only scalars on a function or method with a native class return type (`@return bool` on `: Query`) contradicts the hint, so the native type is used at call sites; the function's docblock is still `MismatchingDocblockReturnType`.
+- `$x == 'lit'` with a non-empty, non-numeric string literal narrows a union of strings, ints, floats and `null` as `===` does, so `'foo'|'bar'|int` is `'foo'` inside the check and `int` once both literals are ruled out.
 
 ## [0.96.0] - 2026-11-09
 
