@@ -19,6 +19,11 @@ fn main() {
     let cache_dir = PathBuf::from(&args[3]);
     let mode = args[4].as_str();
     let taint = args.iter().any(|a| a == "--taint");
+    // Hosts give analysis workers large stacks; rayon's default would grow one per parse.
+    rayon::ThreadPoolBuilder::new()
+        .stack_size(mir_analyzer::recursion::STACK_SIZE)
+        .build_global()
+        .expect("global thread pool");
 
     let files: Vec<(Arc<str>, Arc<str>)> = discover_files(&src)
         .iter()
