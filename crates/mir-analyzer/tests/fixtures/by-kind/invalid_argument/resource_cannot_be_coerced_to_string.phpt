@@ -14,3 +14,4 @@ Resource cannot be coerced to string
 function takesString(string $s) : void {}
 $a = fopen("php://memory", "r");
 takesString($a);
+//          ^^ InvalidArgument: Argument $s of takesString() expects 'string', got 'resource|false'

@@ -191,6 +191,7 @@ impl fmt::Display for Atomic {
             Atomic::TNumeric => write!(f, "numeric"),
 
             Atomic::TObject => write!(f, "object"),
+            Atomic::TResource => write!(f, "resource"),
             Atomic::TNamedObject { fqcn, type_params } => {
                 // `Traversable<mixed, mixed>`/`Generator<mixed, mixed, mixed, mixed>`
                 // carry no more information than the bare class name — every

@@ -1990,11 +1990,6 @@
       <code><![CDATA[$this->context->getObject()]]></code>
     </InvalidArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Validation/Plugin/Validation/Constraint/ValidKeysConstraintValidator.php">
-    <InvalidArgument>
-      <code><![CDATA[$this->context->getObject()]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/modules/announcements_feed/src/AnnounceFetcher.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$announcements === NULL]]></code>

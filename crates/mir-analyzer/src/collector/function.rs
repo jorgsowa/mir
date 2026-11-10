@@ -321,7 +321,13 @@ impl DefinitionCollector<'_> {
                 {
                     self.resolve_union_opt(Some(type_from_hint_owned(h, None)))
                 }
-                (Some(mut ty), _) => {
+                (Some(ty), hint) => {
+                    let mut ty = match hint {
+                        Some(h) => {
+                            super::strip_docblock_resource(&type_from_hint_owned(h, None), ty)
+                        }
+                        None => ty,
+                    };
                     ty.from_docblock = true;
                     let expanded = expand_aliases_only(ty, &type_aliases);
                     Some(self.resolve_union_doc_with_templates(

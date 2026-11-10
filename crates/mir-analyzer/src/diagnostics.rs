@@ -87,6 +87,29 @@ pub(crate) fn check_type_hint_classes(
             let name_str = crate::parser::name_to_string_owned(name);
             let mixed_class =
                 php_version < PhpVersion::new(8, 0) && name_str.eq_ignore_ascii_case("mixed");
+            if name_str.eq_ignore_ascii_case("resource") {
+                let resolved = crate::ast_ext::resolve_ast_name(name, db, file.as_ref());
+                if !class_exists(db, &resolved) {
+                    let (line, col_start) = offset_to_line_col(source, hint.span.start, source_map);
+                    let (line_end, col_end) = offset_to_line_col(source, hint.span.end, source_map);
+                    issues.push(
+                        mir_issues::Issue::new(
+                            mir_issues::IssueKind::NativeResourceType { class: resolved },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: clamp_col_end(line, line_end, col_start, col_end),
+                            },
+                        )
+                        .with_snippet(
+                            crate::parser::span_text(source, hint.span).unwrap_or_default(),
+                        ),
+                    );
+                }
+                return;
+            }
             if is_pseudo_type(&name_str) && !mixed_class {
                 return;
             }

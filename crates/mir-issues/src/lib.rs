@@ -218,6 +218,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/mod.rs` for an object used as `$obj->{$name}`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_member_name/`.
     InvalidMemberName { member: String, ty: String },
+    /// Emitted by `mir-analyzer/src/diagnostics.rs` for `resource` used as a native type.
+    /// Fixtures: `tests/fixtures/by-kind/native_resource_type/`.
+    NativeResourceType { class: String },
     /// Emitted by `mir-analyzer/src/call/args.rs` for `f(...$x)` with a scalar or `null`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_unpack/`.
     InvalidUnpack {
@@ -1090,6 +1093,7 @@ impl IssueKind {
             | IssueKind::DuplicateEnumCaseValue { .. }
             | IssueKind::DivisionByZero { .. }
             | IssueKind::InvalidMemberName { .. }
+            | IssueKind::NativeResourceType { .. }
             | IssueKind::ParentNotFound => Severity::Error,
             IssueKind::Trace { .. } => Severity::Info,
 
@@ -1317,6 +1321,7 @@ impl IssueKind {
             IssueKind::DivisionByZero { .. } => "MIR0229",
             IssueKind::InvalidMethodCall { .. } => "MIR0230",
             IssueKind::InvalidMemberName { .. } => "MIR0235",
+            IssueKind::NativeResourceType { .. } => "MIR0236",
             IssueKind::InvalidUnpack { .. } => "MIR0231",
             IssueKind::RawObjectIteration { .. } => "MIR0222",
             IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
@@ -1509,15 +1514,15 @@ impl IssueKind {
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0016" | "MIR0200"
             | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215"
-            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0235" | "MIR0600" | "MIR0601"
-            | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706"
-            | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713"
-            | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720"
-            | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804"
-            | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0811"
-            | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300"
-            | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604"
-            | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0235" | "MIR0236" | "MIR0600"
+            | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705"
+            | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712"
+            | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719"
+            | "MIR0720" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803"
+            | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810"
+            | "MIR0811" | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0900" | "MIR1205" | "MIR1207"
+            | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
+            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1587,6 +1592,7 @@ impl IssueKind {
             IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
             IssueKind::InvalidMethodCall { .. } => "InvalidMethodCall",
             IssueKind::InvalidMemberName { .. } => "InvalidMemberName",
+            IssueKind::NativeResourceType { .. } => "NativeResourceType",
             IssueKind::InvalidUnpack { .. } => "InvalidUnpack",
             IssueKind::InvalidArrayAccess { .. } => "InvalidArrayAccess",
             IssueKind::PossiblyInvalidArrayAccess { .. } => "PossiblyInvalidArrayAccess",
@@ -1975,6 +1981,9 @@ impl IssueKind {
             }
             IssueKind::InvalidMemberName { member, ty } => {
                 format!("Object of type '{ty}' cannot be converted to a {member} name")
+            }
+            IssueKind::NativeResourceType { class } => {
+                format!("'resource' is not a native type; PHP reads it as class '{class}', which no resource satisfies")
             }
             IssueKind::InvalidUnpack { ty } if ty.is_empty() => {
                 "Only arrays and Traversables can be unpacked".to_string()
@@ -3004,6 +3013,7 @@ mod code_tests {
                 member: s(),
                 ty: s(),
             },
+            IssueKind::NativeResourceType { class: s() },
             IssueKind::InvalidUnpack { ty: s() },
             IssueKind::InvalidArrayAccess { ty: s() },
             IssueKind::PossiblyInvalidArrayAccess { ty: s() },
@@ -3461,6 +3471,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 191);
+        assert_eq!(one_of_each().len(), 192);
     }
 }

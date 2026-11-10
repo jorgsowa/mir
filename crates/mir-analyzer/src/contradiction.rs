@@ -390,8 +390,9 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TLiteralEnumCase { .. }
         | Atomic::TIntersection { .. } => TypeFamily::Object,
 
-        // Open / unknown — cannot determine family.
+        // Open / unknown — cannot determine family. A `@var resource` is often stale (null until opened).
         Atomic::TMixed
+        | Atomic::TResource
         | Atomic::TScalar
         | Atomic::TNumeric
         | Atomic::TVoid

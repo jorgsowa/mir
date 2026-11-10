@@ -387,6 +387,9 @@ pub enum Atomic {
 
     /// `object{prop: T, ...}` — an object with these public properties.
     TObjectShape { properties: Arc<KeyedProperties> },
+
+    /// `resource` — a legacy resource handle (open or closed); docblock-only, never a native type.
+    TResource,
 }
 
 impl Atomic {
@@ -613,6 +616,7 @@ impl Atomic {
             Atomic::TScalar => "scalar",
             Atomic::TNumeric => "numeric",
             Atomic::TObject => "object",
+            Atomic::TResource => "resource",
             Atomic::TNamedObject { .. } => "object",
             Atomic::TStaticObject { .. } => "static",
             Atomic::TSelf { .. } => "self",
@@ -704,6 +708,7 @@ enum AtomicTag {
     TLiteralEnumCase,
     TIntersection,
     TObjectShape,
+    TResource,
 }
 
 impl Hash for Atomic {
@@ -733,6 +738,7 @@ impl Hash for Atomic {
             Atomic::TObject => (T::TObject as u8).hash(state),
             Atomic::TEnumString => (T::TEnumString as u8).hash(state),
             Atomic::TTraitString => (T::TTraitString as u8).hash(state),
+            Atomic::TResource => (T::TResource as u8).hash(state),
 
             // --- variants with fields ---
             Atomic::TLiteralString(s) => {

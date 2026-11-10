@@ -1,5 +1,5 @@
 ===description===
-Legacy `resource` property types are not undefined classes.
+A native `resource` property type is a class name to PHP, not an undefined class: NativeResourceType.
 ===config===
 <mir>
   <issueHandlers>
@@ -12,4 +12,5 @@ Legacy `resource` property types are not undefined classes.
 <?php
 class HandleBox {
     public resource $handle;
+//         ^^^^^^^^ NativeResourceType: 'resource' is not a native type; PHP reads it as class 'resource', which no resource satisfies
 }

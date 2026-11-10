@@ -140,6 +140,15 @@ pub(crate) fn check_one(
         &*crate::subtype::canonical_enum_cases(ea.db, param_ty),
         &*crate::subtype::canonical_enum_cases(ea.db, arg_ty),
     );
+    let without_legacy_handle;
+    let arg_ty = match without_legacy_handle_resource(arg_ty, param_ty) {
+        Some(t) if t.types.is_empty() => return,
+        Some(t) => {
+            without_legacy_handle = t;
+            &without_legacy_handle
+        }
+        None => arg_ty,
+    };
 
     // Null checks run here to preserve the original emission order
     // (after callable validations but before type-compat checks).
@@ -263,6 +272,7 @@ pub(crate) fn check_one(
                     || param_accepts_wider_than_arg(param_ty, &single)
             }))
         && !(arg_ty.is_single() && param_accepts_wider_than_arg(&param_ty.remove_null(), arg_ty))
+        && !(arg_core.is_single() && param_accepts_wider_than_arg(param_ty, &arg_core))
         && !(arg_ty.is_single()
             && param_ty
                 .types
@@ -385,6 +395,65 @@ pub(crate) fn check_one(
     }
 }
 
+/// Classes that replaced a resource in PHP 8; code supporting older versions still passes the resource.
+const RESOURCE_REPLACEMENT_CLASSES: &[&str] = &[
+    "AddressInfo",
+    "CurlHandle",
+    "CurlMultiHandle",
+    "CurlShareHandle",
+    "CurlSharePersistentHandle",
+    "Dba\\Connection",
+    "DeflateContext",
+    "EnchantBroker",
+    "EnchantDictionary",
+    "finfo",
+    "FTP\\Connection",
+    "GdFont",
+    "GdImage",
+    "GMP",
+    "IMAP\\Connection",
+    "InflateContext",
+    "LDAP\\Connection",
+    "LDAP\\Result",
+    "LDAP\\ResultEntry",
+    "Odbc\\Connection",
+    "Odbc\\Result",
+    "OpenSSLAsymmetricKey",
+    "OpenSSLCertificate",
+    "OpenSSLCertificateSigningRequest",
+    "PgSql\\Connection",
+    "PgSql\\Lob",
+    "PgSql\\Result",
+    "PSpell\\Config",
+    "PSpell\\Dictionary",
+    "Shmop",
+    "Socket",
+    "SysvMessageQueue",
+    "SysvSemaphore",
+    "SysvSharedMemory",
+    "XMLParser",
+    "XMLWriter",
+];
+
+/// `arg` without its `resource` arm when `param` takes a class that replaced that resource.
+fn without_legacy_handle_resource(arg: &Type, param: &Type) -> Option<Type> {
+    if !arg.contains(|a| matches!(a, Atomic::TResource))
+        || !param.contains(|p| {
+            matches!(p, Atomic::TNamedObject { fqcn, .. } if {
+                let name = fqcn.trim_start_matches('\\');
+                RESOURCE_REPLACEMENT_CLASSES
+                    .iter()
+                    .any(|c| c.eq_ignore_ascii_case(name))
+            })
+        })
+    {
+        return None;
+    }
+    let mut rest = arg.clone();
+    rest.types.retain(|a| !matches!(a, Atomic::TResource));
+    Some(rest)
+}
+
 /// A plain `string`/`int` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`).
 fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
     let arg = arg.remove_null();
@@ -408,9 +477,10 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
         && arg.types.iter().all(|a| {
             let single = Type::single(a.clone());
             single.is_subtype_structural(param)
-                || param.types.iter().any(|p| {
-                    refinable(p) && Type::single(p.clone()).is_subtype_structural(&single)
-                })
+                || param
+                    .types
+                    .iter()
+                    .any(|p| refinable(p) && Type::single(p.clone()).is_subtype_structural(&single))
         })
 }
 

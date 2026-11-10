@@ -290,6 +290,7 @@ pub(crate) fn scalar_docblock_contradicts_object(native: &Type, doc: &Type) -> b
 /// unchanged when `native` isn't a single concrete scalar (no conflict is
 /// detectable this way) or when nothing needed stripping.
 pub(crate) fn resolve_docblock_scalar_conflict(native: &Type, doc: Type) -> Type {
+    let doc = strip_docblock_resource(native, doc);
     let Some(family_check) = native_scalar_family(native) else {
         return doc;
     };
@@ -312,6 +313,29 @@ pub(crate) fn resolve_docblock_scalar_conflict(native: &Type, doc: Type) -> Type
         native.clone()
     } else {
         filtered
+    }
+}
+
+/// A docblock `resource` beside a native class type predates the class that replaced the
+/// resource (stubs' `@return resource|false` on `: CurlHandle|false`).
+pub(crate) fn strip_docblock_resource(native: &Type, mut doc: Type) -> Type {
+    if !native
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TNamedObject { .. } | Atomic::TObject))
+        || native
+            .types
+            .iter()
+            .any(|a| matches!(a, Atomic::TMixed | Atomic::TResource))
+        || !doc.types.iter().any(|a| matches!(a, Atomic::TResource))
+    {
+        return doc;
+    }
+    doc.types.retain(|a| !matches!(a, Atomic::TResource));
+    if doc.types.is_empty() {
+        native.clone()
+    } else {
+        doc
     }
 }
 
@@ -338,7 +362,8 @@ pub(crate) fn refine_version_attr_type(
     doc: Option<Type>,
     template_params: &[TemplateParam],
 ) -> Type {
-    let Some(mut doc) = doc else { return attr };
+    let Some(doc) = doc else { return attr };
+    let mut doc = strip_docblock_resource(&attr, doc);
     // A docblock's `|false` that the attribute's version dropped (PHP 8 throws instead).
     if !attr
         .types
@@ -2949,7 +2974,13 @@ impl<'a> DefinitionCollector<'a> {
             {
                 self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
             }
-            (Some(mut ty), _) => {
+            (Some(ty), hint) => {
+                let mut ty = match hint {
+                    Some(h) => {
+                        strip_docblock_resource(&type_from_hint_owned(h, Some(class_fqcn)), ty)
+                    }
+                    None => ty,
+                };
                 ty.from_docblock = true;
                 // Expand type aliases first (no FQN change), then resolve.
                 let expanded =

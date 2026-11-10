@@ -739,20 +739,6 @@
   <file src="src/Symfony/Component/DependencyInjection/EnvVarProcessor.php">
     <InvalidArgument>
       <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
-      <code><![CDATA[$env]]></code>
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/DependencyInjection/Exception/AutowiringFailedException.php">
@@ -1129,11 +1115,6 @@
       <code><![CDATA[$this->tempFileObject ? time() : $this->file->getMTime()]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/HttpFoundation/Request.php">
-    <InvalidArgument>
-      <code><![CDATA[strrpos($host, ']')]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/HttpFoundation/Response.php">
     <UndefinedFunction>
       <code><![CDATA[headers_send($statusCode)]]></code>
@@ -1401,6 +1382,18 @@
     <InvalidReturnType>
       <code><![CDATA[return array_map(fn (Address $address) => $this->formatAddress($address), $addresses);]]></code>
     </InvalidReturnType>
+  </file>
+  <file src="src/Symfony/Component/Mailer/Bridge/Amazon/Transport/SesApiAsyncAwsTransport.php">
+    <InvalidArgument>
+      <code><![CDATA[[
+                'Data' => $email->getTextBody(),
+                'Charset' => $email->getTextCharset(),
+            ]]]></code>
+      <code><![CDATA[[
+                'Data' => $email->getHtmlBody(),
+                'Charset' => $email->getHtmlCharset(),
+            ]]]></code>
+    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Mailer/Bridge/Amazon/Transport/SesHttpAsyncAwsTransport.php">
     <UndefinedMethod>

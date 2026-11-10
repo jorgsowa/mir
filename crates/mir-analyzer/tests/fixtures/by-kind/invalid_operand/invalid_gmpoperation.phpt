@@ -11,4 +11,4 @@ Invalid g m p operation
 <?php
 $a = gmp_init(2);
 $b = "a" + $a;
-//   ^^^^^^^^ InvalidOperand: Operator '+' not supported between '"a"' and 'mixed'
+//   ^^^^^^^^ InvalidOperand: Operator '+' not supported between '"a"' and 'GMP'

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `resource` type. A docblock `resource`, `open-resource` or `closed-resource` (and builtins such as `fopen()`) no longer means `mixed`: passing a resource to a `string`, `int` or `bool` parameter, or a non-resource to a `resource` parameter, is `InvalidArgument`, and `is_resource()` narrows `mixed` to `resource`. A stub docblock's `resource` beside a native class type (`CurlHandle`, `GMP`, `Socket`) is dropped.
+- `NativeResourceType` (MIR0236): `resource` used as a native parameter, return or property type, which PHP reads as a class name that no resource satisfies.
 - `NoDiscardReturnIgnored` (MIR1514): on PHP 8.5+, the result of a `#[\NoDiscard]` function or method (including builtins such as `DateTimeImmutable::add()`) is discarded by an expression statement. Casting the call to `(void)` opts out.
 - `NonInvariantDocblockPropertyType` (MIR0721, info): a redeclared property whose `@var` type is wider or narrower than the parent's. Templates, `static`, unknown classes and `null` on untyped properties are not compared.
 - `InvalidMemberName` (MIR0235): an object used as a dynamic property name that isn't `Stringable` (`$obj->{$name}`), or any object used as a dynamic method name (`$obj->{$name}()`).
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A nullable or `|false` argument whose remaining type is wider than the parameter (`?object` passed to `CurlHandle`, `null|scalar` to `string`) is `PossiblyNullArgument` or `PossiblyInvalidArgument` as the non-nullable type would be, instead of `InvalidArgument`.
 - A class or interface declaring `__toString()` implements `Stringable`, as PHP 8 adds it implicitly, so passing it to a `Stringable` parameter isn't `InvalidArgument`, and a non-public `__toString()` is `OverriddenMethodAccess`.
 - Arithmetic on `GMP` or `BcMath\Number` with the same class, an int or a numeric string (and bitwise operators on `GMP`) returns that class instead of `int|float`, and isn't `InvalidOperand`.
 - `array_key_exists($key, $map)` narrows a variable `$key` to the keys `$map` can hold: a string-keyed map drops `int` from `int|string`, and a sealed shape turns `string` into its literal keys.

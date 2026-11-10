@@ -18,5 +18,6 @@ function connect(string $host, string $user, string $password) {
 //       ^^^^^^^ MissingReturnType: Function connect() has no return type annotation
     $session = ssh2_connect($host);
     ssh2_auth_password($session, $user, $password);
+//                     ^^^^^^^^ PossiblyInvalidArgument: Argument $session of ssh2_auth_password() expects 'resource', possibly different type 'resource|false' provided
     return $session;
 }

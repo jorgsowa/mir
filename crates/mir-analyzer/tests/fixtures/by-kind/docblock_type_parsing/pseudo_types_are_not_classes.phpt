@@ -17,8 +17,9 @@ function f($benevolent, $properties, $publicProperties, $closed): void {
     echo count($properties);
     /** @mir-check $publicProperties is array<string, mixed> */
     echo count($publicProperties);
-    /** @mir-check $closed is mixed */
+    /** @mir-check $closed is resource */
     echo gettype($closed);
 }
 
 f(1, ['x' => 1], ['x' => 1], null);
+//                           ^^^^ NullArgument: Argument $closed of f() cannot be null

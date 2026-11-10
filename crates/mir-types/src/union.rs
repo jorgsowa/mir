@@ -1224,11 +1224,18 @@ impl Type {
     }
 
     /// Narrow as if `is_resource($x)` is true.
-    /// Note: No TResource atomic type exists in the type system; this is a no-op.
-    /// Resources are declining in modern PHP and not actively tracked.
     pub fn narrow_to_resource(&self) -> Type {
-        // No resource type in the system; just return mixed (allows any type)
-        self.filter(|t| matches!(t, Atomic::TMixed))
+        let mut out = self.filter(|t| match t {
+            Atomic::TResource | Atomic::TMixed => true,
+            Atomic::TTemplateParam { as_type, .. } => as_type.is_mixed(),
+            _ => false,
+        });
+        for t in out.types.iter_mut() {
+            if matches!(t, Atomic::TMixed) {
+                *t = Atomic::TResource;
+            }
+        }
+        out
     }
 
     /// Narrow as if `class_exists($x)` returned true for a string variable.
@@ -1798,6 +1805,7 @@ enum ValueClass {
     /// `list`-shaped arrays (sequential integer keys) — a refinement of [`Array`].
     List,
     Object,
+    Resource,
     Null,
     /// `mixed`/`void` — a value of every class; it overlaps every other
     /// class, so a `mixed` argument rules out no branch.
@@ -1896,6 +1904,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         // Null. `void` maps to `Top` (a `void`-typed value is unknown; treating
         // it as "everything" keeps any branch it feeds undecidable).
         Atomic::TNull => vec![Null],
+        Atomic::TResource => vec![Resource],
         Atomic::TVoid => vec![Top],
         // Everything / scalars.
         Atomic::TMixed => vec![Top],
@@ -1939,6 +1948,7 @@ fn subject_is_decidable(subject: &Atomic) -> bool {
             | Atomic::TList { .. }
             | Atomic::TObject
             | Atomic::TObjectShape { .. }
+            | Atomic::TResource
             | Atomic::TMixed
             | Atomic::TScalar
     )

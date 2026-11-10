@@ -105,6 +105,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "numeric",
     "numeric-string",
     "object",
+    "open-resource",
     "parent",
     "positive-int",
     "private-properties-of",
@@ -500,7 +501,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             u.add_type(Atomic::TString);
             u
         }
-        "resource" | "closed-resource" => Type::mixed(), // treat as mixed
+        "resource" | "closed-resource" | "open-resource" => Type::single(Atomic::TResource),
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
         "static" | "$this" => Type::single(Atomic::TStaticObject {
             fqcn: mir_types::Name::from(""),

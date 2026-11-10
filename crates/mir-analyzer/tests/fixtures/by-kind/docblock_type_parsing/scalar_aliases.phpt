@@ -48,7 +48,7 @@ function check_array_key($x) {
 function check_resource($x) {
     /**
      * @var resource $x
-     * @mir-check $x is mixed
+     * @mir-check $x is resource
      */
     var_dump($x);
 }
