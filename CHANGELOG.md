@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new $class()` where `$class` holds a literal class name (with or without a leading `\`) is `InterfaceInstantiation`, `TraitInstantiation`, `EnumInstantiation` or `AbstractInstantiation` like `new Name()`.
 - An array literal's keys are checked against an array parameter: an int key passed to `array<string, V>`, or a string key or out-of-order int keys (`[1 => 'x', 0 => 'y']`) passed to `list<V>` or a list shape, is `InvalidArgument`.
 - `bool` passed to a parameter that takes `false` or `true` but not both is `PossiblyInvalidArgument` instead of being accepted.
+- Analysis through `AnalysisSession` no longer gives some builtin functions another function's signature (`mkdir()` reporting `rename()`'s parameters, `str_replace()` expecting 2 arguments) on some runs: a bundled or user stub ingested as a file is filtered by PHP version like a stub loaded by the analyzer.
 
 ## [0.96.0] - 2026-11-09
 

@@ -277,6 +277,11 @@ impl AnalyzerDb {
             source,
             &parsed.source_map,
         );
+        let collector = if db_snapshot.collects_for_php_version(&file) {
+            collector.with_php_version(php_version)
+        } else {
+            collector
+        };
         let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
         all_issues.extend(collector_issues);
         mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
@@ -324,5 +329,28 @@ impl AnalyzerDb {
 impl Default for AnalyzerDb {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ingesting_a_stub_filters_by_php_version() {
+        let path = "stubs/session/session.php";
+        let content = crate::stubs::stub_content_for_path(path).unwrap();
+        let db = MirDbStorage::default();
+        let prepared =
+            AnalyzerDb::prepare_ingest(&db, None, Arc::from(path), content, PhpVersion::LATEST);
+        let expected =
+            crate::stubs::stub_slice_from_source(path, content, Some(PhpVersion::LATEST));
+        let names = |functions: &[Arc<mir_codebase::FunctionDef>]| {
+            functions.iter().map(|f| f.fqn.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(
+            names(&prepared.collected.file_defs.slice.functions),
+            names(&expected.functions)
+        );
     }
 }

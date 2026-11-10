@@ -1486,6 +1486,11 @@ impl MirDbStorage {
         }
     }
 
+    /// Whether `@since`/`@removed` in `path` name PHP versions: bundled and user stubs only.
+    pub(crate) fn collects_for_php_version(&self, path: &str) -> bool {
+        crate::stubs::is_stub_path(path) || self.user_stub_paths.read().contains(path)
+    }
+
     pub(crate) fn user_stub_paths(&self) -> rustc_hash::FxHashSet<Arc<str>> {
         self.user_stub_paths.read().clone()
     }
