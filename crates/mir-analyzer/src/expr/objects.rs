@@ -2131,6 +2131,48 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
         guard_key: Option<&Arc<str>>,
     ) -> Type {
+        let mut ty = self.resolve_first_property_type(
+            obj_ty,
+            prop_name,
+            span,
+            declaring_class,
+            ctx,
+            guard_key,
+        );
+        if obj_ty.types.len() < 2 || ty.is_mixed() {
+            return ty;
+        }
+        // Diagnostics come from the first object that resolves; the others only add their types.
+        let mark = self.issues.issue_count();
+        let had_collect_symbols = self.collect_symbols;
+        self.collect_symbols = false;
+        for atomic in &obj_ty.types {
+            let arm = self.resolve_first_property_type(
+                &Type::single(atomic.clone()),
+                prop_name,
+                span,
+                &mut None,
+                ctx,
+                guard_key,
+            );
+            if !arm.is_mixed() {
+                ty.merge_with(&arm);
+            }
+        }
+        self.collect_symbols = had_collect_symbols;
+        self.issues.truncate_to(mark);
+        ty
+    }
+
+    fn resolve_first_property_type(
+        &mut self,
+        obj_ty: &Type,
+        prop_name: &str,
+        span: php_ast::Span,
+        declaring_class: &mut Option<Arc<str>>,
+        ctx: &FlowState,
+        guard_key: Option<&Arc<str>>,
+    ) -> Type {
         let prop_guarded = guard_key.is_some_and(|key| {
             ctx.property_exists_guards
                 .contains(&(key.clone(), Arc::from(prop_name)))

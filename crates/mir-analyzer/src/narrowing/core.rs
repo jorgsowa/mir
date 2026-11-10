@@ -63,30 +63,27 @@ pub(crate) fn resolve_prop_current_type(
         Some((base, mid)) => resolve_prop_current_type(ctx, base, mid, db, file),
         None => receiver_type(ctx, obj_var, db),
     };
-    let mut prop_ty = mir_types::Type::mixed();
-    'outer: for atomic in &obj_ty.types {
-        if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-            let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-            // Try to find the property in the class chain
-            if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                if let Some(ty) = p_def.ty.as_deref() {
-                    prop_ty = ty.clone();
-                    break 'outer;
-                }
-            }
-        } else if let mir_types::Atomic::TSelf { fqcn }
-        | mir_types::Atomic::TStaticObject { fqcn }
-        | mir_types::Atomic::TParent { fqcn } = atomic
+    // A union receiver's property is the union of each object's declared type.
+    let mut found: Option<Type> = None;
+    for atomic in &obj_ty.types {
+        let fqcn = match atomic {
+            mir_types::Atomic::TNamedObject { fqcn, .. }
+            | mir_types::Atomic::TSelf { fqcn }
+            | mir_types::Atomic::TStaticObject { fqcn }
+            | mir_types::Atomic::TParent { fqcn } => fqcn,
+            _ => continue,
+        };
+        let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+        if let Some(ty) = crate::db::find_property_in_chain(db, here, prop)
+            .and_then(|(_, p_def)| p_def.ty.as_deref().cloned())
         {
-            let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-            if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                if let Some(ty) = p_def.ty.as_deref() {
-                    prop_ty = ty.clone();
-                    break 'outer;
-                }
+            match &mut found {
+                Some(acc) => acc.merge_with(&ty),
+                None => found = Some(ty),
             }
         }
     }
+    let mut prop_ty = found.unwrap_or_else(mir_types::Type::mixed);
     // Also try self_fqcn if obj_var is "this"
     if prop_ty.is_mixed() && obj_var == "this" {
         if let Some(fqcn) = ctx.self_fqcn.as_ref() {
