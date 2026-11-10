@@ -114,7 +114,11 @@ pub(crate) fn return_type_is_invalid(
 
 /// Some arm of `actual` is a class no declared type can ever hold, so the leniencies for a
 /// declared type narrower than `actual` don't apply.
-fn has_unrelated_class_arm(actual: &Type, declared: &Type, db: &dyn crate::db::MirDatabase) -> bool {
+fn has_unrelated_class_arm(
+    actual: &Type,
+    declared: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> bool {
     let concrete_class = |fqcn: &str| {
         matches!(
             crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn)),
@@ -125,7 +129,9 @@ fn has_unrelated_class_arm(actual: &Type, declared: &Type, db: &dyn crate::db::M
         .types
         .iter()
         .filter_map(|d| match d {
-            Atomic::TNamedObject { fqcn, .. } => Some(concrete_class(fqcn).then_some(fqcn.as_ref())),
+            Atomic::TNamedObject { fqcn, .. } => {
+                Some(concrete_class(fqcn).then_some(fqcn.as_ref()))
+            }
             Atomic::TNull => None,
             _ => Some(None),
         })

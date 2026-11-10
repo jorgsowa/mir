@@ -1509,15 +1509,15 @@ impl IssueKind {
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0016" | "MIR0200"
             | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215"
-            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0235" | "MIR0600" | "MIR0601" | "MIR0700"
-            | "MIR0701" | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
-            | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714"
-            | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720" | "MIR0228"
-            | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0805"
-            | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0811" | "MIR0812"
-            | "MIR0813" | "MIR0814" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400"
-            | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605"
-            | "MIR1606" => Some(Severity::Error),
+            | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0231" | "MIR0235" | "MIR0600" | "MIR0601"
+            | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0703" | "MIR0704" | "MIR0705" | "MIR0706"
+            | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0710" | "MIR0711" | "MIR0712" | "MIR0713"
+            | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719" | "MIR0720"
+            | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804"
+            | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810" | "MIR0811"
+            | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300"
+            | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604"
+            | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1526,9 +1526,7 @@ impl IssueKind {
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
-            | "MIR1514" => {
-                Some(Severity::Warning)
-            }
+            | "MIR1514" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1541,9 +1539,7 @@ impl IssueKind {
             | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
             | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
             | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
-            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" => {
-                Some(Severity::Info)
-            }
+            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" => Some(Severity::Info),
 
             _ => None,
         }

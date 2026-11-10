@@ -150,7 +150,10 @@ fn literal_key_matches_declared_key_type(
 }
 
 /// The key type of a generic array that only holds non-numeric string keys, when `key` is an int.
-pub(crate) fn string_keys_reject(arr_ty: &Type, key: &mir_types::atomic::ArrayKey) -> Option<String> {
+pub(crate) fn string_keys_reject(
+    arr_ty: &Type,
+    key: &mir_types::atomic::ArrayKey,
+) -> Option<String> {
     if !matches!(key, mir_types::atomic::ArrayKey::Int(_)) || arr_ty.types.is_empty() {
         return None;
     }

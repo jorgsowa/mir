@@ -462,7 +462,9 @@ fn split_bool_for_single_literal_param(arg: &Type, param: &Type) -> Option<Type>
     }
     let mut split = arg.clone();
     split.types.retain(|t| !matches!(t, Atomic::TBool));
-    split.types.retain(|t| !matches!(t, Atomic::TTrue | Atomic::TFalse));
+    split
+        .types
+        .retain(|t| !matches!(t, Atomic::TTrue | Atomic::TFalse));
     // Pushed directly: `add_type` would merge the pair back into `bool`.
     split.types.push(Atomic::TTrue);
     split.types.push(Atomic::TFalse);
