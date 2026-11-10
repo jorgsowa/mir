@@ -273,6 +273,8 @@ pub struct StatementsAnalyzer<'a> {
     /// real loop, `false` if it's a `switch`. `continue` behaves differently
     /// depending on which kind its target level is — see `analyze_continue_stmt`.
     loop_kind_stack: Vec<bool>,
+    /// One frame per enclosing `try` with a `finally`, collecting the states at each `return` in it.
+    finally_return_stack: Vec<Vec<FlowState>>,
     /// Snapshot of the installed plugin registry — see
     /// `ExpressionAnalyzer::plugins`.
     plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
@@ -330,6 +332,7 @@ impl<'a> StatementsAnalyzer<'a> {
             break_ctx_stack: Vec::new(),
             continue_ctx_stack: Vec::new(),
             loop_kind_stack: Vec::new(),
+            finally_return_stack: Vec::new(),
             plugins: mir_plugin::snapshot(),
             class_like_cache: None,
             function_cache: None,
@@ -730,6 +733,9 @@ impl<'a> StatementsAnalyzer<'a> {
             // ---- Return -------------------------------------------------------
             StmtKind::Return(opt_expr) => {
                 self.analyze_return_stmt(opt_expr, stmt, ctx);
+                if let Some(frame) = self.finally_return_stack.last_mut() {
+                    frame.push(ctx.clone());
+                }
             }
 
             // ---- Throw --------------------------------------------------------

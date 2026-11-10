@@ -1227,6 +1227,9 @@ impl<'a> StatementsAnalyzer<'a> {
         // An exception can leave the body after any statement, including a final
         // `return`/`throw`, so catch and finally see every intermediate state.
         let mut throw_points: Option<FlowState> = None;
+        if tc.finally.is_some() {
+            self.finally_return_stack.push(Vec::new());
+        }
         self.analyze_stmts_observed(&tc.body.stmts, &mut try_ctx, &mut |state| {
             let mut state = state.clone();
             state.diverges = false;
@@ -1414,8 +1417,12 @@ impl<'a> StatementsAnalyzer<'a> {
             // both, not just the optimistic success path, so a variable
             // reassigned only partway through the try body is correctly seen
             // as still possibly holding its earlier value inside finally.
-            let finally_start =
+            let mut finally_start =
                 FlowState::merge_branches(&pre_ctx, result.clone(), Some(catch_base.clone()));
+            for mut returned in self.finally_return_stack.pop().unwrap_or_default() {
+                returned.diverges = false;
+                finally_start = FlowState::merge_branches(&pre_ctx, finally_start, Some(returned));
+            }
             let mut finally_ctx = finally_start.clone();
             finally_ctx.inside_finally = true;
             // finally always executes regardless of whether try/catch diverged
