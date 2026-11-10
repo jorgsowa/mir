@@ -1914,11 +1914,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let invalid = name_ty.types.iter().all(|atomic| match atomic {
             Atomic::TObject | Atomic::TClosure { .. } => true,
+            // An unresolved docblock `Foo::*` stays a named object whose class doesn't exist.
             Atomic::TNamedObject { fqcn, .. } => {
-                is_method
-                    || (crate::db::class_exists(self.db, fqcn)
-                        && !crate::db::extends_or_implements(self.db, fqcn, "Stringable")
-                        && !crate::db::has_method_in_chain(self.db, fqcn, "__toString"))
+                crate::db::class_exists(self.db, fqcn)
+                    && (is_method
+                        || (!crate::db::extends_or_implements(self.db, fqcn, "Stringable")
+                            && !crate::db::has_method_in_chain(self.db, fqcn, "__toString")))
             }
             _ => false,
         });
