@@ -21,7 +21,7 @@ $a = rand(0, 10) ? 1 : "two";
 switch (gettype($a)) {
     case "string":
         testInt($a);
-//              ^^ PossiblyInvalidArgument: Argument $var of testInt() expects 'int', possibly different type '1|"two"' provided
+//              ^^ InvalidArgument: Argument $var of testInt() expects 'int', got '"two"'
 
     case "integer":
         testString($a);

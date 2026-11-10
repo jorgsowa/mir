@@ -1,4 +1,5 @@
 use crate::ast_ext::ByteStringExt as _;
+use crate::ast_ext::NameBareExt as _;
 use std::sync::Arc;
 
 use php_ast::ast::{AssignOp, BinaryOp};
@@ -786,6 +787,15 @@ impl<'a> StatementsAnalyzer<'a> {
                 pending_conditions.push(val);
                 if switch_on_true {
                     narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
+                } else if let Some(cond) =
+                    introspection_case_condition(&sw.expr, &pending_conditions)
+                {
+                    let mut narrowed = case_ctx.clone();
+                    narrow_from_condition(&cond, &mut narrowed, true, self.db, &self.file);
+                    // An impossible label is reported as such, not as unreachable code.
+                    if !narrowed.diverges {
+                        case_ctx = narrowed;
+                    }
                 } else if let Some(target) = &subject_target {
                     let narrow_ty = match &val.kind {
                         ExprKind::Int(n) => Some(Type::single(Atomic::TLiteralInt(*n))),
@@ -1624,4 +1634,49 @@ fn assigns_literal(stmt: &Stmt) -> bool {
                 | ExprKind::Bool(_)
                 | ExprKind::Null
         )
+}
+
+/// For `switch (get_class($x))`, `switch ($x::class)` or `switch (gettype($x))`,
+/// the labels that lead to a body as `subject === label || ...`, which narrows `$x`.
+fn introspection_case_condition(
+    subject: &php_ast::owned::Expr,
+    labels: &[&php_ast::owned::Expr],
+) -> Option<php_ast::owned::Expr> {
+    let introspects = match &subject.kind {
+        ExprKind::FunctionCall(call) => call.name.kind.name_bare().is_some_and(|n| {
+            ["get_class", "gettype", "get_debug_type"]
+                .iter()
+                .any(|f| n.eq_ignore_ascii_case(f))
+        }),
+        ExprKind::ClassConstAccess(cc) => {
+            matches!(&cc.member.kind, ExprKind::Identifier(m) if m.as_ref() == "class")
+        }
+        _ => false,
+    };
+    // Both sides are non-numeric strings, so the loose comparison is an identity check.
+    if !introspects
+        || !labels
+            .iter()
+            .all(|l| matches!(l.kind, ExprKind::String(_) | ExprKind::ClassConstAccess(_)))
+    {
+        return None;
+    }
+    labels
+        .iter()
+        .map(|label| php_ast::owned::Expr {
+            kind: ExprKind::Binary(Box::new(php_ast::owned::BinaryExpr {
+                left: subject.clone(),
+                op: BinaryOp::Identical,
+                right: (*label).clone(),
+            })),
+            span: label.span,
+        })
+        .reduce(|acc, next| php_ast::owned::Expr {
+            span: acc.span,
+            kind: ExprKind::Binary(Box::new(php_ast::owned::BinaryExpr {
+                left: acc,
+                op: BinaryOp::BooleanOr,
+                right: next,
+            })),
+        })
 }

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `array_key_exists($key, $map)` narrows a variable `$key` to the keys `$map` can hold: a string-keyed map drops `int` from `int|string`, and a sealed shape turns `string` into its literal keys.
 - `isset($a['k'])`, `isset($a[$k])` and `isset($list[0])` on a generic array with a nullable value type prove the element non-null inside the guard, also when the array itself is nullable. Such a check no longer forgets that a condition on the array guards a variable defined under it, so that variable isn't `PossiblyUndefinedVariable` there.
 - A property read through a union receiver (`StrBox|IntBox`) has the union of each class's declared type instead of the first class's, so `is_string($b->v)` isn't `RedundantCondition`.
+- `switch (get_class($x))`, `switch ($x::class)` and `switch (gettype($x))` narrow `$x` in each case to the type its labels name, so calling a method only that class has isn't `PossiblyUndefinedMethod`.
 
 ## [0.96.0] - 2026-11-09
 
