@@ -2547,20 +2547,16 @@ impl FlowState {
 
         let mut result = pre.clone();
 
-        // Collect all variable names from both branch contexts
-        let all_names: FxHashSet<Name> = if_ctx
-            .vars
-            .keys()
-            .chain(else_ctx.vars.keys())
-            .copied()
-            .collect();
-
         // `result` starts as a copy of `pre`, so only entries that differ from it are
         // written back; untouched maps stay shared instead of being deep-cloned.
         let mut var_updates: Vec<(Name, Arc<Type>)> = Vec::new();
         let mut assigned_updates: Vec<Name> = Vec::new();
         let mut possibly_updates: Vec<Name> = Vec::new();
-        for name in all_names {
+        let else_only = else_ctx
+            .vars
+            .keys()
+            .filter(|name| !if_ctx.vars.contains_key(*name));
+        for &name in if_ctx.vars.keys().chain(else_only) {
             let in_if = if_ctx.assigned_vars.contains(&name);
             let in_else = else_ctx.assigned_vars.contains(&name);
             let in_pre = pre.assigned_vars.contains(&name);
@@ -2958,13 +2954,14 @@ impl FlowState {
         }
 
         // Var locations: keep the earliest known span for each variable
-        for (name, loc) in if_ctx
-            .var_locations
-            .iter()
-            .chain(else_ctx.var_locations.iter())
-        {
-            if !result.var_locations.contains_key(name) {
-                Arc::make_mut(&mut result.var_locations).insert(*name, *loc);
+        for branch in [&if_ctx, &else_ctx] {
+            if Arc::ptr_eq(&branch.var_locations, &result.var_locations) {
+                continue;
+            }
+            for (name, loc) in branch.var_locations.iter() {
+                if !result.var_locations.contains_key(name) {
+                    Arc::make_mut(&mut result.var_locations).insert(*name, *loc);
+                }
             }
         }
 
@@ -2974,7 +2971,7 @@ impl FlowState {
         // concatenating onto pre's copy (which would grow the Vec ~3× per merge
         // → exponential under nested-loop fixpoint analysis; see
         // `extend_dead_writes_dedup`).
-        std::sync::Arc::make_mut(&mut result.dead_writes).clear();
+        result.dead_writes = Arc::new(Vec::new());
         extend_dead_writes_dedup(
             Arc::make_mut(&mut result.dead_writes),
             Arc::unwrap_or_clone(if_ctx.dead_writes),
