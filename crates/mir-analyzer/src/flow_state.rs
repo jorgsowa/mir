@@ -247,6 +247,9 @@ pub struct FlowState {
     /// Declared exception types for the current function/method (@throws).
     pub fn_declared_throws: Arc<[Arc<str>]>,
 
+    /// False in script scope, where there is no docblock to declare `@throws` in.
+    pub in_function_like: bool,
+
     /// Exception types caught by a `try`/`catch` currently enclosing this
     /// point — accumulates across nested try/catch (a call inside an inner
     /// try's body is covered if EITHER the inner or an outer catch would
@@ -798,6 +801,7 @@ impl FlowState {
             static_fqcn: None,
             fn_return_type: None,
             fn_declared_throws: Arc::from([]),
+            in_function_like: false,
             locally_caught_throws: Arc::from([]),
             inside_loop: false,
             has_dynamic_var_def: false,
@@ -968,6 +972,7 @@ impl FlowState {
         let mut ctx = Self::new();
         ctx.fn_return_type = return_type.map(Arc::new);
         ctx.fn_declared_throws = declared_throws;
+        ctx.in_function_like = true;
         ctx.self_fqcn = self_fqcn.clone();
         ctx.parent_fqcn = parent_fqcn;
         ctx.static_fqcn = static_fqcn;
@@ -3314,6 +3319,7 @@ impl FlowState {
             static_fqcn,
             fn_return_type,
             fn_declared_throws,
+            in_function_like,
             locally_caught_throws,
             inside_finally,
             is_generator,

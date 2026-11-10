@@ -1697,7 +1697,8 @@ impl CallAnalyzer {
                             declared.as_ref(),
                         )
                 };
-                if !ctx.fn_declared_throws.iter().any(is_covered)
+                if ctx.in_function_like
+                    && !ctx.fn_declared_throws.iter().any(is_covered)
                     && !ctx.locally_caught_throws.iter().any(is_covered)
                 {
                     ea.emit(

@@ -1824,7 +1824,8 @@ fn resolve_method_return<'a>(
                         declared.as_ref(),
                     )
             };
-            if !ctx.fn_declared_throws.iter().any(is_covered)
+            if ctx.in_function_like
+                && !ctx.fn_declared_throws.iter().any(is_covered)
                 && !ctx.locally_caught_throws.iter().any(is_covered)
                 && !guarded_by_reflection_throws_guard
             {

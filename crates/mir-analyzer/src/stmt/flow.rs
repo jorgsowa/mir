@@ -456,7 +456,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     declared.as_ref(),
                                 )
                         };
-                        if !thrown_is_template_param
+                        if ctx.in_function_like
+                            && !thrown_is_template_param
                             && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
                             && !ctx.fn_declared_throws.iter().any(throw_is_covered)
                             && !ctx.locally_caught_throws.iter().any(throw_is_covered)
@@ -527,7 +528,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     declared.as_ref(),
                                 )
                         };
-                        if !thrown_is_template_param
+                        if ctx.in_function_like
+                            && !thrown_is_template_param
                             && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
                             && !ctx.fn_declared_throws.iter().any(throw_is_covered)
                             && !ctx.locally_caught_throws.iter().any(throw_is_covered)
