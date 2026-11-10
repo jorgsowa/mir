@@ -242,7 +242,7 @@ pub struct FlowState {
     pub static_fqcn: Option<Arc<str>>,
 
     /// Declared return type for the current function/method.
-    pub fn_return_type: Option<Type>,
+    pub fn_return_type: Option<Arc<Type>>,
 
     /// Declared exception types for the current function/method (@throws).
     pub fn_declared_throws: Arc<[Arc<str>]>,
@@ -966,7 +966,7 @@ impl FlowState {
         template_params: Option<&[mir_codebase::TemplateParam]>,
     ) -> Self {
         let mut ctx = Self::new();
-        ctx.fn_return_type = return_type;
+        ctx.fn_return_type = return_type.map(Arc::new);
         ctx.fn_declared_throws = declared_throws;
         ctx.self_fqcn = self_fqcn.clone();
         ctx.parent_fqcn = parent_fqcn;
@@ -2555,89 +2555,111 @@ impl FlowState {
             .copied()
             .collect();
 
-        {
-            let result_vars = Arc::make_mut(&mut result.vars);
-            let result_assigned = Arc::make_mut(&mut result.assigned_vars);
-            let result_possibly = Arc::make_mut(&mut result.possibly_assigned_vars);
+        // `result` starts as a copy of `pre`, so only entries that differ from it are
+        // written back; untouched maps stay shared instead of being deep-cloned.
+        let mut var_updates: Vec<(Name, Arc<Type>)> = Vec::new();
+        let mut assigned_updates: Vec<Name> = Vec::new();
+        let mut possibly_updates: Vec<Name> = Vec::new();
+        for name in all_names {
+            let in_if = if_ctx.assigned_vars.contains(&name);
+            let in_else = else_ctx.assigned_vars.contains(&name);
+            let in_pre = pre.assigned_vars.contains(&name);
 
-            for name in all_names {
-                let in_if = if_ctx.assigned_vars.contains(&name);
-                let in_else = else_ctx.assigned_vars.contains(&name);
-                let in_pre = pre.assigned_vars.contains(&name);
+            let ty_if = if_ctx.vars.get(&name);
+            let ty_else = else_ctx.vars.get(&name);
 
-                let ty_if = if_ctx.vars.get(&name);
-                let ty_else = else_ctx.vars.get(&name);
-
-                match (ty_if, ty_else) {
-                    (Some(a), Some(b)) => {
-                        let merged = if Arc::ptr_eq(a, b) || a == b {
-                            a.clone()
-                        } else {
-                            let mut m = (**a).clone();
-                            m.merge_with(b);
-                            mir_codebase::definitions::wrap_var_type(m)
-                        };
-                        result_vars.insert(name, merged);
-                        if in_if && in_else {
-                            result_assigned.insert(name);
-                        } else {
-                            result_possibly.insert(name);
-                        }
-                    }
-                    (Some(a), None) => {
-                        if in_pre {
-                            let pre_arc = pre.vars.get(&name);
-                            let merged = match pre_arc {
-                                Some(pt) if Arc::ptr_eq(a, pt) || a == pt => a.clone(),
-                                Some(pt) => {
-                                    let mut m = (**a).clone();
-                                    m.merge_with(pt);
-                                    mir_codebase::definitions::wrap_var_type(m)
-                                }
-                                None => {
-                                    let mut m = (**a).clone();
-                                    m.merge_with(&Type::mixed());
-                                    mir_codebase::definitions::wrap_var_type(m)
-                                }
-                            };
-                            result_vars.insert(name, merged);
-                            result_assigned.insert(name);
-                        } else {
-                            let ty = mir_codebase::definitions::wrap_var_type(
-                                (**a).clone().possibly_undefined(),
-                            );
-                            result_vars.insert(name, ty);
-                            result_possibly.insert(name);
-                        }
-                    }
-                    (None, Some(b)) => {
-                        if in_pre {
-                            let pre_arc = pre.vars.get(&name);
-                            let merged = match pre_arc {
-                                Some(pt) if Arc::ptr_eq(b, pt) || b == pt => b.clone(),
-                                Some(pt) => {
-                                    let mut m = (**pt).clone();
-                                    m.merge_with(b);
-                                    mir_codebase::definitions::wrap_var_type(m)
-                                }
-                                None => {
-                                    let mut m = Type::mixed();
-                                    m.merge_with(b);
-                                    mir_codebase::definitions::wrap_var_type(m)
-                                }
-                            };
-                            result_vars.insert(name, merged);
-                            result_assigned.insert(name);
-                        } else {
-                            let ty = mir_codebase::definitions::wrap_var_type(
-                                (**b).clone().possibly_undefined(),
-                            );
-                            result_vars.insert(name, ty);
-                            result_possibly.insert(name);
-                        }
-                    }
-                    (None, None) => {}
+            let (merged, definitely) = match (ty_if, ty_else) {
+                (Some(a), Some(b)) => {
+                    let merged = if Arc::ptr_eq(a, b) || a == b {
+                        a.clone()
+                    } else {
+                        let mut m = (**a).clone();
+                        m.merge_with(b);
+                        mir_codebase::definitions::wrap_var_type(m)
+                    };
+                    (merged, in_if && in_else)
                 }
+                (Some(a), None) => {
+                    if in_pre {
+                        let merged = match pre.vars.get(&name) {
+                            Some(pt) if Arc::ptr_eq(a, pt) || a == pt => a.clone(),
+                            Some(pt) => {
+                                let mut m = (**a).clone();
+                                m.merge_with(pt);
+                                mir_codebase::definitions::wrap_var_type(m)
+                            }
+                            None => {
+                                let mut m = (**a).clone();
+                                m.merge_with(&Type::mixed());
+                                mir_codebase::definitions::wrap_var_type(m)
+                            }
+                        };
+                        (merged, true)
+                    } else {
+                        let ty = mir_codebase::definitions::wrap_var_type(
+                            (**a).clone().possibly_undefined(),
+                        );
+                        (ty, false)
+                    }
+                }
+                (None, Some(b)) => {
+                    if in_pre {
+                        let merged = match pre.vars.get(&name) {
+                            Some(pt) if Arc::ptr_eq(b, pt) || b == pt => b.clone(),
+                            Some(pt) => {
+                                let mut m = (**pt).clone();
+                                m.merge_with(b);
+                                mir_codebase::definitions::wrap_var_type(m)
+                            }
+                            None => {
+                                let mut m = Type::mixed();
+                                m.merge_with(b);
+                                mir_codebase::definitions::wrap_var_type(m)
+                            }
+                        };
+                        (merged, true)
+                    } else {
+                        let ty = mir_codebase::definitions::wrap_var_type(
+                            (**b).clone().possibly_undefined(),
+                        );
+                        (ty, false)
+                    }
+                }
+                (None, None) => continue,
+            };
+            if !pre
+                .vars
+                .get(&name)
+                .is_some_and(|pt| Arc::ptr_eq(pt, &merged))
+            {
+                var_updates.push((name, merged));
+            }
+            if definitely {
+                if !in_pre {
+                    assigned_updates.push(name);
+                }
+            } else if !pre.possibly_assigned_vars.contains(&name) {
+                possibly_updates.push(name);
+            }
+        }
+        // Inserted one by one rather than `extend`ed: an up-front reserve could change the
+        // table layout and with it the iteration order later diagnostics follow.
+        if !var_updates.is_empty() {
+            let vars = Arc::make_mut(&mut result.vars);
+            for (name, ty) in var_updates {
+                vars.insert(name, ty);
+            }
+        }
+        if !assigned_updates.is_empty() {
+            let assigned = Arc::make_mut(&mut result.assigned_vars);
+            for name in assigned_updates {
+                assigned.insert(name);
+            }
+        }
+        if !possibly_updates.is_empty() {
+            let possibly = Arc::make_mut(&mut result.possibly_assigned_vars);
+            for name in possibly_updates {
+                possibly.insert(name);
             }
         }
 

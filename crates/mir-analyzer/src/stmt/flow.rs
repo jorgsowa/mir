@@ -220,10 +220,13 @@ impl<'a> StatementsAnalyzer<'a> {
             // against that component instead of the whole declared `Generator` type.
             let generator_declared;
             let declared_opt = if ctx.is_generator {
-                generator_declared = ctx.fn_return_type.as_ref().map(generator_return_component);
+                generator_declared = ctx
+                    .fn_return_type
+                    .as_deref()
+                    .map(generator_return_component);
                 generator_declared.as_ref()
             } else {
-                ctx.fn_return_type.as_ref()
+                ctx.fn_return_type.as_deref()
             };
             if let Some(declared) = &declared_opt.cloned() {
                 // Check return type compatibility. Special case: `void` functions must not
