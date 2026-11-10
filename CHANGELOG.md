@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$x == 'lit'` with a non-empty, non-numeric string literal narrows a union of strings, ints, floats and `null` as `===` does, so `'foo'|'bar'|int` is `'foo'` inside the check and `int` once both literals are ruled out.
 - Invoking an array callable (`$f = [$repo, 'find']; $f()`, or `[Foo::class, 'make']`) returns the method's return type instead of `mixed`.
 - `SensitiveParameterValue` is generic over its wrapped value, so `getValue()` returns the constructor argument's type instead of `mixed`.
+- `new ArrayObject($array)` binds the key type from the array too (`ArrayObject<string, int>` instead of `ArrayObject<mixed, int>`), so it satisfies an `ArrayAccess<string, int>` parameter.
 
 ## [0.96.0] - 2026-11-09
 

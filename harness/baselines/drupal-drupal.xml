@@ -1675,6 +1675,7 @@
     <InvalidReturnType>
       <code><![CDATA[return $result;]]></code>
       <code><![CDATA[return array_intersect_key($this->routes, array_flip($names));]]></code>
+      <code><![CDATA[return $array_object->getIterator();]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Routing/Router.php">

@@ -27,7 +27,7 @@ function keyed(): void {
 
 function arrayObject(): void {
     $ao = new ArrayObject(['a' => 1]);
-    /** @mir-check $ao is ArrayObject<mixed, int> */
+    /** @mir-check $ao is ArrayObject<string, int> */
     takesStringKeyed($ao->getIterator());
 }
 

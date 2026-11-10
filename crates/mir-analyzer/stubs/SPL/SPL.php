@@ -1588,7 +1588,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     /**
      * Construct a new array object
      * @link https://php.net/manual/en/arrayobject.construct.php
-     * @param array<TValue>|object $array The input parameter accepts an array or an Object.
+     * @param array<TKey, TValue>|object $array The input parameter accepts an array or an Object.
      * @param int $flags Flags to control the behaviour of the ArrayObject object.
      * @param class-string<ArrayIterator> $iteratorClass Specify the class that will be used for iteration of the ArrayObject object. ArrayIterator is the default class used.
      */
