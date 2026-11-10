@@ -1367,6 +1367,7 @@ final class SensitiveParameter
  *
  * @link https://php.net/manual/en/class.sensitiveparametervalue.php
  * @since 8.2
+ * @template-covariant TValue
  */
 final class SensitiveParameterValue
 {
@@ -1378,7 +1379,7 @@ final class SensitiveParameterValue
      * Construct a SensitiveParameterValue holding a sensitive value.
      *
      * @link https://php.net/manual/en/sensitiveparametervalue.construct.php
-     * @param mixed $value An arbitrary value that should be stored inside the
+     * @param TValue $value An arbitrary value that should be stored inside the
      * SensitiveParameterValue object.
      */
     public function __construct(mixed $value) {}
@@ -1389,7 +1390,7 @@ final class SensitiveParameterValue
      * Get the sensitive value.
      *
      * @link https://php.net/manual/en/sensitiveparametervalue.getvalue.php
-     * @return mixed The sensitive value.
+     * @return TValue The sensitive value.
      */
     public function getValue(): mixed {}
 
