@@ -419,7 +419,7 @@ impl Atomic {
 
             Atomic::TLiteralString(s) => s.as_ref().is_empty() || s.as_ref() == "0",
 
-            Atomic::TKeyedArray { properties, .. } => properties.is_empty(),
+            Atomic::TKeyedArray { properties, .. } => properties.values().all(|p| p.optional),
 
             // An int range can be falsy (== 0) when 0 is within the bounds.
             Atomic::TIntRange { min, max } => {
