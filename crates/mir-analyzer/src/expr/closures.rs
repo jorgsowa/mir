@@ -605,7 +605,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // (`$f = function () use (&$f) {...}`, where this capture
                     // shares a name with the variable the closure literal is
                     // itself being assigned to) can safely be typed as a
-                    // callable of unknown arity. Any other undefined by-ref
+                    // callable of unknown arity, or null when the assigned
+                    // value is a call's result (`$prev = set_error_handler(
+                    // function () use (&$prev) {...})`). Any other undefined by-ref
                     // capture is the equally common by-ref out-param idiom
                     // (`set_error_handler(function () use (&$error) {
                     // $error = ...; })`, no enclosing assignment at all) —
@@ -613,17 +615,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // the value eventually assigned in the body can never be
                     // null/falsy, misfiring RedundantCondition/InvalidThrow
                     // at every later use. `mixed` makes no such claim.
-                    let is_self_ref = ctx.self_ref_closure_hint == Some(Name::from(name));
+                    let self_ref = ctx
+                        .self_ref_closure_hint
+                        .filter(|(hinted, _)| *hinted == Name::from(name));
+                    let callable = mir_types::Atomic::TCallable {
+                        params: None,
+                        return_type: None,
+                        is_pure: false,
+                    };
                     ctx.set_var(
                         name,
-                        if is_self_ref {
-                            Type::single(mir_types::Atomic::TCallable {
-                                params: None,
-                                return_type: None,
-                                is_pure: false,
-                            })
-                        } else {
-                            Type::mixed()
+                        match self_ref {
+                            Some((_, true)) => Type::single(callable),
+                            Some((_, false)) => Type::from_vec(vec![callable, Atomic::TNull]),
+                            None => Type::mixed(),
                         },
                     );
                 }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A by-reference capture of the variable a call's result is assigned to (`$prev = set_error_handler(function () use (&$prev) {…})`) may be null inside the closure, so testing it is no longer `RedundantCondition`. A closure assigned directly to the captured variable is still callable.
+
 ## [0.97.0] - 2026-11-10
 
 ### Added

@@ -645,7 +645,9 @@ pub struct FlowState {
     /// (`set_error_handler(function () use (&$error) { $error = ...; })`,
     /// no enclosing assignment at all) — the two require different seed
     /// types.
-    pub self_ref_closure_hint: Option<Name>,
+    /// The flag is false when the RHS is not the closure itself, so the
+    /// variable may hold null (`$prev = set_error_handler(function () use (&$prev) {…})`).
+    pub self_ref_closure_hint: Option<(Name, bool)>,
     /// Type of the variable a short-circuit RHS assigns (`A && $x = f()`), as it was
     /// before the RHS, by the RHS's span start. Holds on the path where the RHS is skipped.
     pub rhs_skipped_vars: Arc<FxHashMap<u32, (Name, Type)>>,

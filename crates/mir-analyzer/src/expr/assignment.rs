@@ -473,7 +473,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         // `FlowState::self_ref_closure_hint`.
         let prev_self_ref_hint = ctx.self_ref_closure_hint.take();
         if a.op == AssignOp::Assign && !a.by_ref {
-            ctx.self_ref_closure_hint = target_var_name.map(mir_types::Name::from);
+            let is_closure = matches!(a.value.kind, ExprKind::Closure(_));
+            ctx.self_ref_closure_hint =
+                target_var_name.map(|n| (mir_types::Name::from(n), is_closure));
         }
         self.vivifying_reference = a.by_ref && matches!(a.value.kind, ExprKind::ArrayAccess(_));
         if self.vivifying_reference {
