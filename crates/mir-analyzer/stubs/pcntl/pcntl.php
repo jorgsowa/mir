@@ -484,7 +484,7 @@ function pcntl_async_signals(
  * The signal number.
  * </p>
  *
- * @return bool|resource This function may return an integer value that refers to SIG_DFL or
+ * @return callable|int This function may return an integer value that refers to SIG_DFL or
  * SIG_IGN. If a custom handler has been set, that callable is returned.
  * @since 7.1
  */
