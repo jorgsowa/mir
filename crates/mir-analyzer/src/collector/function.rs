@@ -313,6 +313,14 @@ impl DefinitionCollector<'_> {
             ))
         } else {
             match (doc.return_type.clone(), decl.return_type.as_ref()) {
+                (Some(ty), Some(h))
+                    if super::scalar_docblock_contradicts_object(
+                        &type_from_hint_owned(h, None),
+                        &ty,
+                    ) =>
+                {
+                    self.resolve_union_opt(Some(type_from_hint_owned(h, None)))
+                }
                 (Some(mut ty), _) => {
                     ty.from_docblock = true;
                     let expanded = expand_aliases_only(ty, &type_aliases);

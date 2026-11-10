@@ -231,7 +231,8 @@ fn hook_bit(kind: php_ast::ast::PropertyHookKind) -> u8 {
 }
 
 /// The docblock type describes only values the native hint rules out, so the hint wins:
-/// another scalar family or `null` for a non-null scalar, an object for an array, or vice versa.
+/// another scalar family or `null` for a non-null scalar, an object for an array, or vice
+/// versa, or only scalars for an object.
 pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
     if doc.types.is_empty() {
         return false;
@@ -252,7 +253,10 @@ pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
     };
     match native.types.as_slice() {
         [n] if is_array(n) => return doc.types.iter().all(is_object),
-        [n] if is_object(n) => return doc.types.iter().all(is_array),
+        [n] if is_object(n) => {
+            return doc.types.iter().all(is_array)
+                || scalar_docblock_contradicts_object(native, doc)
+        }
         _ => {}
     }
     let Some(family_check) = native_scalar_family(native) else {
@@ -265,6 +269,16 @@ pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
             .types
             .iter()
             .all(|a| matches!(a, Atomic::TNull) || (is_any_scalar_family(a) && !family_check(a)))
+}
+
+/// A docblock of only scalars (and `null`) for a native class type.
+pub(crate) fn scalar_docblock_contradicts_object(native: &Type, doc: &Type) -> bool {
+    matches!(native.types.as_slice(), [Atomic::TNamedObject { fqcn, .. }] if !fqcn.starts_with(IMPORT_PLACEHOLDER_PREFIX))
+        && doc.types.iter().any(is_any_scalar_family)
+        && doc
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TNull) || is_any_scalar_family(a))
 }
 
 /// When `native` is a concrete scalar and `doc` contains scalar atoms from a
@@ -2903,6 +2917,14 @@ impl<'a> DefinitionCollector<'a> {
             attr_return.or_else(|| doc.return_type.clone()),
             m.return_type.as_ref(),
         ) {
+            (Some(ty), Some(h))
+                if scalar_docblock_contradicts_object(
+                    &type_from_hint_owned(h, Some(class_fqcn)),
+                    &ty,
+                ) =>
+            {
+                self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
+            }
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
                 // Expand type aliases first (no FQN change), then resolve.

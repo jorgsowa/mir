@@ -351,7 +351,29 @@ impl<'a> BodyAnalyzer<'a> {
             .iter()
             .map(|tp| tp.name.as_ref())
             .collect();
-        if let (Some(hint), Some(doc_ty)) = (&decl.return_type, stored.return_type.as_deref()) {
+        // A `@return` that contradicts the hint is stored as the hint, so read it from the docblock.
+        let contradicting_doc_return = stored
+            .return_type
+            .as_deref()
+            .is_some_and(|t| !t.from_docblock)
+            .then(|| {
+                decl.doc_comment
+                    .as_ref()
+                    .and_then(|c| crate::parser::DocblockParser::parse(&c.text).return_type)
+            })
+            .flatten()
+            .map(|t| {
+                let mut t =
+                    crate::expr::helpers::resolve_named_objects_in_union(t, self.db, file.as_ref());
+                t.from_docblock = true;
+                t
+            });
+        if let (Some(hint), Some(doc_ty)) = (
+            &decl.return_type,
+            contradicting_doc_return
+                .as_ref()
+                .or(stored.return_type.as_deref()),
+        ) {
             if doc_ty.from_docblock
                 && !docblock_type_unresolvable(doc_ty, &template_names)
                 && !fn_name.is_empty()

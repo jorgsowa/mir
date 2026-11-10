@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A property read through a union receiver (`StrBox|IntBox`) has the union of each class's declared type instead of the first class's, so `is_string($b->v)` isn't `RedundantCondition`.
 - `switch (get_class($x))`, `switch ($x::class)` and `switch (gettype($x))` narrow `$x` in each case to the type its labels name, so calling a method only that class has isn't `PossiblyUndefinedMethod`.
 - A builtin's `#[LanguageLevelTypeAware]` return type is refined by its docblock, as parameter types already were, and a docblock `|false` that the attribute's PHP version dropped is ignored, so `mb_str_split()` returns `array<int|string, string>` instead of `array`.
+- A `@return` listing only scalars on a function or method with a native class return type (`@return bool` on `: Query`) contradicts the hint, so the native type is used at call sites; the function's docblock is still `MismatchingDocblockReturnType`.
 
 ## [0.96.0] - 2026-11-09
 
