@@ -430,7 +430,7 @@ impl crate::ClassResolver for ChainedClassResolver {
 
 /// Returns `true` if `name` is a known PHP built-in function.
 ///
-/// Fast path: binary search on `BUILTIN_FN_NAMES`, a sorted compile-time slice
+/// Fast path: a hash set over `BUILTIN_FN_NAMES`, a compile-time slice
 /// generated from `PhpStormStubsMap.php` by `build.rs`.
 ///
 /// Fallback (when `BUILTIN_FN_NAMES` is empty): reads the embedded stub slices and checks
@@ -443,7 +443,9 @@ impl crate::ClassResolver for ChainedClassResolver {
 /// ```
 pub fn is_builtin_function(name: &str) -> bool {
     if !BUILTIN_FN_NAMES.is_empty() {
-        return BUILTIN_FN_NAMES.binary_search(&name).is_ok();
+        static NAMES: LazyLock<HashSet<&'static str>> =
+            LazyLock::new(|| BUILTIN_FN_NAMES.iter().copied().collect());
+        return NAMES.contains(name);
     }
     static FALLBACK: LazyLock<HashSet<Arc<str>>> = LazyLock::new(|| {
         builtin_stub_slices_for_version(PhpVersion::LATEST)
