@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `finally` sees the variables as they were at a `return` nested inside the `try` body or a `catch`, so a value assigned just before that return is no longer `ImpossibleIdenticalComparison`, `RedundantCondition` or `UndefinedVariable` there.
 - `is_string()`, `is_int()`, `is_float()` and `is_bool()` on the key or value of a template-typed array (`@template T of array`) keep the type undecided instead of ruling the check out.
 - `pcntl_signal_get_handler()` returns `callable|int` instead of `bool|resource`.
+- A write to a variable after a closure captured it by reference (`$prev = set_error_handler(function () use (&$prev) {…})`) is not `UnusedVariable`: the closure reads it through the reference.
 
 ## [0.97.0] - 2026-11-10
 

@@ -678,6 +678,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 closure_ctx.set_var(name, inner_ty.clone());
                 ctx.alias_var(name);
+                // The closure reads a later write through the reference.
+                ctx.foreach_byref_var_names.insert(Name::from(name));
                 byref_captures.push((name, inner_ty, opens_shape));
             } else {
                 closure_ctx.set_var(name, captured_ty.clone());

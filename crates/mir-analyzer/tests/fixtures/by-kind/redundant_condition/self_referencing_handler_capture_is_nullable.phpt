@@ -3,7 +3,6 @@ A by-ref capture of the variable the enclosing assignment defines may still be n
 ===config===
 <mir>
   <issueHandlers>
-    <UnusedVariable errorLevel="suppress"/>
     <MixedAssignment errorLevel="suppress"/>
   </issueHandlers>
 </mir>
