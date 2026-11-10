@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.97.0] - 2026-11-10
+
 ### Added
 
 - A `resource` type. A docblock `resource`, `open-resource` or `closed-resource` (and builtins such as `fopen()`) no longer means `mixed`: passing a resource to a `string`, `int` or `bool` parameter, or a non-resource to a `resource` parameter, is `InvalidArgument`, and `is_resource()` narrows `mixed` to `resource`. A stub docblock's `resource` beside a native class type (`CurlHandle`, `GMP`, `Socket`) is dropped.
@@ -14,35 +16,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NoDiscardReturnIgnored` (MIR1514): on PHP 8.5+, the result of a `#[\NoDiscard]` function or method (including builtins such as `DateTimeImmutable::add()`) is discarded by an expression statement. Casting the call to `(void)` opts out.
 - `NonInvariantDocblockPropertyType` (MIR0721, info): a redeclared property whose `@var` type is wider or narrower than the parent's. Templates, `static`, unknown classes and `null` on untyped properties are not compared.
 - `InvalidMemberName` (MIR0235): an object used as a dynamic property name that isn't `Stringable` (`$obj->{$name}`), or any object used as a dynamic method name (`$obj->{$name}()`).
-- `AnalysisSession::prepare_files_for_analysis` (and `prepare_files_for_analysis_cancellable`) warms up several files at once: their parsing and name resolution run in parallel, and only the class loads stay serial. The result is the same as calling `prepare_file_for_analysis` on each file in order. Re-analysis of dependents and stale query candidates use it too.
+- `AnalysisSession::prepare_files_for_analysis` (and `prepare_files_for_analysis_cancellable`) prepares several files at once: parsing and name resolution run in parallel and only class loads stay serial (Symfony cold prepare about 37% faster). The result matches calling `prepare_file_for_analysis` on each file in order. Re-analysis of dependents and stale query candidates use it too.
 
 ### Changed
 
-- Parser crates updated to 0.29: parsing takes about 19% less CPU time, and `C::public(set)` from PHP 8.4, `readonly` used as an expression from 8.1 and `readonly::class` are reported as `ParseError`s as PHP rejects them.
+- Workspace and internal crate versions were updated to `0.97.0`.
+- Parser crates updated to 0.29.1: parsing takes about 19% less CPU time, and `C::public(set)` from PHP 8.4, `readonly` used as an expression from 8.1 and `readonly::class` are reported as `ParseError`s, as PHP rejects them.
+- Performance: branch merges keep unchanged variable maps shared instead of copying them, and builtin function names are looked up in a hash set (with the parser update, Symfony about 4% fewer instructions, Laravel about 2%). The surface fingerprint hashes a file's tokens in one call.
 
 ### Fixed
 
+- Analysis through `AnalysisSession` no longer gives some builtin functions another function's signature on some runs (`mkdir()` reporting `rename()`'s parameters, `str_replace()` expecting 2 arguments): a bundled or user stub ingested as a file is filtered by PHP version like a stub loaded by the analyzer.
 - A nullable or `|false` argument whose remaining type is wider than the parameter (`?object` passed to `CurlHandle`, `null|scalar` to `string`) is `PossiblyNullArgument` or `PossiblyInvalidArgument` as the non-nullable type would be, instead of `InvalidArgument`.
 - A class or interface declaring `__toString()` implements `Stringable`, as PHP 8 adds it implicitly, so passing it to a `Stringable` parameter isn't `InvalidArgument`, and a non-public `__toString()` is `OverriddenMethodAccess`.
 - Arithmetic on `GMP` or `BcMath\Number` with the same class, an int or a numeric string (and bitwise operators on `GMP`) returns that class instead of `int|float`, and isn't `InvalidOperand`.
 - `array_key_exists($key, $map)` narrows a variable `$key` to the keys `$map` can hold: a string-keyed map drops `int` from `int|string`, and a sealed shape turns `string` into its literal keys.
-- `isset($a['k'])`, `isset($a[$k])` and `isset($list[0])` on a generic array with a nullable value type prove the element non-null inside the guard, also when the array itself is nullable. Such a check no longer forgets that a condition on the array guards a variable defined under it, so that variable isn't `PossiblyUndefinedVariable` there.
+- `isset($a['k'])`, `isset($a[$k])` and `isset($list[0])` on a generic array with a nullable value type prove the element non-null inside the guard, also when the array itself is nullable. A variable defined under a condition on that array stays guarded by it, so it isn't `PossiblyUndefinedVariable` there.
 - A property read through a union receiver (`StrBox|IntBox`) has the union of each class's declared type instead of the first class's, so `is_string($b->v)` isn't `RedundantCondition`.
 - `switch (get_class($x))`, `switch ($x::class)` and `switch (gettype($x))` narrow `$x` in each case to the type its labels name, so calling a method only that class has isn't `PossiblyUndefinedMethod`.
-- A builtin's `#[LanguageLevelTypeAware]` return type is refined by its docblock, as parameter types already were, and a docblock `|false` that the attribute's PHP version dropped is ignored, so `mb_str_split()` returns `array<int|string, string>` instead of `array`.
-- A `@return` listing only scalars on a function or method with a native class return type (`@return bool` on `: Query`) contradicts the hint, so the native type is used at call sites; the function's docblock is still `MismatchingDocblockReturnType`.
 - `$x == 'lit'` with a non-empty, non-numeric string literal narrows a union of strings, ints, floats and `null` as `===` does, so `'foo'|'bar'|int` is `'foo'` inside the check and `int` once both literals are ruled out.
+- A builtin's `#[LanguageLevelTypeAware]` return type is refined by its docblock, as parameter types already were, and a docblock `|false` that the attribute's PHP version dropped is ignored, so `mb_str_split()` returns `array<int|string, string>` instead of `array`.
+- A `@return` listing only scalars on a function or method with a native class return type (`@return bool` on `: Query`) contradicts the hint, so the native type is used at call sites; the declaration is still `MismatchingDocblockReturnType`.
 - Invoking an array callable (`$f = [$repo, 'find']; $f()`, or `[Foo::class, 'make']`) returns the method's return type instead of `mixed`.
 - `SensitiveParameterValue` is generic over its wrapped value, so `getValue()` returns the constructor argument's type instead of `mixed`.
 - `new ArrayObject($array)` binds the key type from the array too (`ArrayObject<string, int>` instead of `ArrayObject<mixed, int>`), so it satisfies an `ArrayAccess<string, int>` parameter.
-- `new $class()` where `$class` holds a literal class name (with or without a leading `\`) is `InterfaceInstantiation`, `TraitInstantiation`, `EnumInstantiation` or `AbstractInstantiation` like `new Name()`.
+- Top-level script code isn't `MissingThrowsDocblock`, as it has no docblock to declare `@throws` in; a closure declared there still is.
+- `new $class()` where `$class` holds a literal class name (with or without a leading `\`) is `InterfaceInstantiation`, `TraitInstantiation`, `EnumInstantiation` or `AbstractInstantiation`, like `new Name()`.
 - An array literal's keys are checked against an array parameter: an int key passed to `array<string, V>`, or a string key or out-of-order int keys (`[1 => 'x', 0 => 'y']`) passed to `list<V>` or a list shape, is `InvalidArgument`.
-- `bool` passed to a parameter that takes `false` or `true` but not both is `PossiblyInvalidArgument` instead of being accepted.
-- `clone($obj, ['prop' => $value])` checks each literal key like `$copy->prop = $value`: a mistyped value is `InvalidPropertyAssignment` and an undeclared property `DynamicPropertyCreation`. The property array's expression is analyzed too.
 - An int offset read or positionally destructured from an array whose keys are only non-numeric strings (`$m[0]` or `[$a, $b] = $m` on `array<string, int>`) is `InvalidArrayOffset`.
+- `clone($obj, ['prop' => $value])` checks each literal key like `$copy->prop = $value`: a mistyped value is `InvalidPropertyAssignment` and an undeclared property `DynamicPropertyCreation`. The property array's expression is analyzed too.
 - Returning a union with a class arm unrelated to every declared class (`A|B` from a function declared `: B`) is `InvalidReturnType`; a declared subclass of the returned class stays accepted.
+- `bool` passed to a parameter that takes `false` or `true` but not both is `PossiblyInvalidArgument` instead of being accepted.
 - A plain `string` or `int` passed to a `non-empty-string`, `numeric-string`, `positive-int` or int-range parameter (or its nullable form) is `ArgumentTypeCoercion` instead of being accepted.
-- Analysis through `AnalysisSession` no longer gives some builtin functions another function's signature (`mkdir()` reporting `rename()`'s parameters, `str_replace()` expecting 2 arguments) on some runs: a bundled or user stub ingested as a file is filtered by PHP version like a stub loaded by the analyzer.
 
 ## [0.96.0] - 2026-11-09
 

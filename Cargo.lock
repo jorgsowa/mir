@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "mir-analyzer"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "aho-corasick",
  "bincode",
@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "mir-codebase"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "dashmap",
  "indexmap",
@@ -715,7 +715,7 @@ dependencies = [
 
 [[package]]
 name = "mir-issues"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "mir-types",
  "serde",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "mir-php"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "mir-plugin"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "libloading",
  "mir-issues",
@@ -760,14 +760,14 @@ dependencies = [
 
 [[package]]
 name = "mir-plugin-example"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "mir-plugin",
 ]
 
 [[package]]
 name = "mir-types"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "dashmap",
  "indexmap",
@@ -779,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "mir-wasm"
-version = "0.96.0"
+version = "0.97.0"
 dependencies = [
  "getrandom",
  "mir-analyzer",
