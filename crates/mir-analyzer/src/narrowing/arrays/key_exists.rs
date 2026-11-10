@@ -259,6 +259,9 @@ pub(crate) fn narrow_array_key_exists_condition(
                 })
             }
         };
+        if is_true && literal_key.is_none() {
+            narrow_key_var_to_array_keys(ctx, key_value, arr_value);
+        }
         if let Some(key) = literal_key {
             if is_true {
                 if let Some(var_name) = extract_var_name(arr_value) {
@@ -440,5 +443,130 @@ pub(crate) fn narrow_array_key_exists_condition(
                 }
             }
         }
+    }
+}
+
+/// `array_key_exists($key, $map)` proves `$key` is one of `$map`'s keys.
+fn narrow_key_var_to_array_keys(
+    ctx: &mut FlowState,
+    key_value: &php_ast::owned::Expr,
+    arr_value: &php_ast::owned::Expr,
+) {
+    let (Some(key_name), Some(arr_name)) =
+        (extract_var_name(key_value), extract_var_name(arr_value))
+    else {
+        return;
+    };
+    let key_ty = ctx.get_var(key_name);
+    if key_ty.is_mixed() {
+        return;
+    }
+    let Some(domain) = ArrayKeyDomain::of(&ctx.get_var(arr_name).remove_null()) else {
+        return;
+    };
+    let mut narrowed = mir_types::Type::empty();
+    for atomic in &key_ty.types {
+        if atomic.is_int() {
+            match atomic {
+                _ if domain.any_int => narrowed.add_type(atomic.clone()),
+                Atomic::TLiteralInt(i) if domain.int_literals.contains(i) => {
+                    narrowed.add_type(atomic.clone())
+                }
+                Atomic::TLiteralInt(_) => {}
+                Atomic::TInt => {
+                    for i in &domain.int_literals {
+                        narrowed.add_type(Atomic::TLiteralInt(*i));
+                    }
+                }
+                _ if domain.int_literals.is_empty() => {}
+                _ => narrowed.add_type(atomic.clone()),
+            }
+        } else if atomic.is_string() {
+            match atomic {
+                _ if domain.any_string => narrowed.add_type(atomic.clone()),
+                // A numeric string is cast to an int key.
+                Atomic::TLiteralString(s) if crate::narrowing::is_numeric_string(s) => {
+                    narrowed.add_type(atomic.clone())
+                }
+                Atomic::TLiteralString(s) => {
+                    if domain.string_literals.iter().any(|l| l == s) {
+                        narrowed.add_type(atomic.clone());
+                    }
+                }
+                Atomic::TString | Atomic::TNonEmptyString
+                    if !domain.any_int && domain.int_literals.is_empty() =>
+                {
+                    for l in &domain.string_literals {
+                        narrowed.add_type(Atomic::TLiteralString(l.clone()));
+                    }
+                }
+                _ => narrowed.add_type(atomic.clone()),
+            }
+        } else {
+            narrowed.add_type(atomic.clone());
+        }
+    }
+    if !narrowed.types.is_empty() && narrowed != key_ty {
+        ctx.set_var(key_name, narrowed);
+    }
+}
+
+#[derive(Default)]
+struct ArrayKeyDomain {
+    any_int: bool,
+    any_string: bool,
+    int_literals: Vec<i64>,
+    string_literals: Vec<std::sync::Arc<str>>,
+}
+
+impl ArrayKeyDomain {
+    /// The keys an array of type `ty` can hold, or `None` when it isn't known to be an array.
+    fn of(ty: &mir_types::Type) -> Option<Self> {
+        if ty.types.is_empty() {
+            return None;
+        }
+        let mut domain = Self::default();
+        for atomic in &ty.types {
+            match atomic {
+                Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => domain.any_int = true,
+                Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => {
+                    if key.is_mixed() || key.types.is_empty() {
+                        return None;
+                    }
+                    for k in &key.types {
+                        match k {
+                            Atomic::TLiteralInt(i) => domain.int_literals.push(*i),
+                            Atomic::TLiteralString(s) => domain.string_literals.push(s.clone()),
+                            _ if k.is_int() => domain.any_int = true,
+                            _ if k.is_string() => domain.any_string = true,
+                            _ => return None,
+                        }
+                    }
+                }
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                } => {
+                    if *is_open {
+                        if *is_list {
+                            domain.any_int = true;
+                        } else {
+                            return None;
+                        }
+                    }
+                    for key in properties.keys() {
+                        match key {
+                            mir_types::atomic::ArrayKey::Int(i) => domain.int_literals.push(*i),
+                            mir_types::atomic::ArrayKey::String(s) => {
+                                domain.string_literals.push(s.clone())
+                            }
+                        }
+                    }
+                }
+                _ => return None,
+            }
+        }
+        Some(domain)
     }
 }

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A class or interface declaring `__toString()` implements `Stringable`, as PHP 8 adds it implicitly, so passing it to a `Stringable` parameter isn't `InvalidArgument`, and a non-public `__toString()` is `OverriddenMethodAccess`.
 - Arithmetic on `GMP` or `BcMath\Number` with the same class, an int or a numeric string (and bitwise operators on `GMP`) returns that class instead of `int|float`, and isn't `InvalidOperand`.
+- `array_key_exists($key, $map)` narrows a variable `$key` to the keys `$map` can hold: a string-keyed map drops `int` from `int|string`, and a sealed shape turns `string` into its literal keys.
 
 ## [0.96.0] - 2026-11-09
 
