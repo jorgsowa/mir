@@ -208,6 +208,11 @@
       <code><![CDATA[AssignNameExpression]]></code>
     </UndefinedClass>
   </file>
+  <file src="src/Symfony/Bridge/Twig/Validator/Constraints/TwigValidator.php">
+    <InvalidArgument>
+      <code><![CDATA[[$value]]]></code>
+    </InvalidArgument>
+  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Command/AboutCommand.php">
     <UndefinedMethod>
       <code><![CDATA[$this->getApplication()->getKernel()]]></code>
@@ -2093,6 +2098,13 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Contracts/Service/Test/ServiceLocatorTestCase.php">
+    <InvalidArgument>
+      <code><![CDATA[[
+            'foo' => static fn () => 'bar',
+            'bar' => static fn () => 'baz',
+            static fn () => 'dummy',
+        ]]]></code>
+    </InvalidArgument>
     <UndefinedClass>
       <code><![CDATA[TestCase]]></code>
     </UndefinedClass>

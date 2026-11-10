@@ -2611,14 +2611,24 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             Atomic::TKeyedArray {
                 properties: sub_props,
                 is_open: sub_open,
-                ..
+                is_list: sub_list,
             },
             Atomic::TKeyedArray {
                 properties: sup_props,
                 is_open: sup_open,
-                ..
+                is_list: sup_list,
             },
         ) => {
+            // A list shape's keys run 0, 1, … in order; `[1 => 'x', 0 => 'y']` isn't one.
+            if *sup_list
+                && !*sub_list
+                && sub_props
+                    .keys()
+                    .enumerate()
+                    .any(|(i, k)| *k != crate::atomic::ArrayKey::Int(i as i64))
+            {
+                return false;
+            }
             let keys_satisfied = sup_props
                 .iter()
                 .all(|(key, sup_prop)| match sub_props.get(key) {

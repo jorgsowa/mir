@@ -1258,6 +1258,30 @@ fn associative_array_intersection_part(atomic: &Atomic) -> Option<&Atomic> {
     })
 }
 
+/// A shape with a string key, or a closed one whose keys aren't `0, 1, …` in order.
+fn shape_definitely_not_list(atomic: &Atomic) -> bool {
+    let Atomic::TKeyedArray {
+        properties,
+        is_open,
+        is_list: false,
+    } = atomic
+    else {
+        return false;
+    };
+    if properties
+        .keys()
+        .any(|k| matches!(k, mir_types::atomic::ArrayKey::String(_)))
+    {
+        return true;
+    }
+    !*is_open
+        && properties.values().all(|p| !p.optional)
+        && properties
+            .keys()
+            .enumerate()
+            .any(|(i, k)| *k != mir_types::atomic::ArrayKey::Int(i as i64))
+}
+
 fn arg_is_definite_list(atomic: &Atomic) -> bool {
     matches!(
         atomic,
@@ -1506,6 +1530,28 @@ fn array_list_compatible_with(
                             p_atomic
                         };
                     if requires_non_list && arg_is_definite_list(a_atomic) {
+                        return false;
+                    }
+                    let keys_fit = match param_atomic {
+                        Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => {
+                            properties.keys().all(|k| {
+                                let k = match k {
+                                    mir_types::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+                                    mir_types::atomic::ArrayKey::String(s) => {
+                                        Atomic::TLiteralString(s.clone())
+                                    }
+                                };
+                                !array_key_definitely_mismatched(&Type::single(k), key)
+                            })
+                        }
+                        Atomic::TList { .. }
+                        | Atomic::TNonEmptyList { .. }
+                        | Atomic::TKeyedArray { is_list: true, .. } => {
+                            !shape_definitely_not_list(a_atomic)
+                        }
+                        _ => true,
+                    };
+                    if !keys_fit {
                         return false;
                     }
                     match param_atomic {
