@@ -487,6 +487,11 @@ impl CallAnalyzer {
                                         return resolved.return_ty_raw;
                                     }
                                 }
+                                Atomic::TKeyedArray { properties, .. } => {
+                                    if let Some(ty) = array_callable_return_type(ea, properties) {
+                                        return ty;
+                                    }
+                                }
                                 _ => {}
                             }
                         }
@@ -2032,4 +2037,39 @@ fn record_constant_fn_ref(
             ea.record_dynamic_constant_ref(&fqcn, span);
         }
     }
+}
+
+/// Return type of invoking `[$object, 'method']` or `[Foo::class, 'method']`.
+fn array_callable_return_type(
+    ea: &ExpressionAnalyzer<'_>,
+    properties: &mir_types::atomic::KeyedProperties,
+) -> Option<Type> {
+    use mir_types::atomic::ArrayKey;
+    if properties.len() != 2 {
+        return None;
+    }
+    let [target] = properties.get(&ArrayKey::Int(0))?.ty.types.as_slice() else {
+        return None;
+    };
+    let [Atomic::TLiteralString(method)] = properties.get(&ArrayKey::Int(1))?.ty.types.as_slice()
+    else {
+        return None;
+    };
+    let (fqcn, type_params): (Arc<str>, &[Type]) = match target {
+        Atomic::TNamedObject { fqcn, type_params } => (Arc::from(fqcn.as_ref()), type_params),
+        Atomic::TClassString(Some(fqcn)) => (Arc::from(fqcn.as_ref()), &[]),
+        _ => return None,
+    };
+    // `[Foo::class, 'parent::m']` names a method relative to another class.
+    if method.contains("::") {
+        return None;
+    }
+    let method_lower = crate::util::php_ident_lowercase(method);
+    let resolved = super::method::resolve_method_from_db(ea.db, &fqcn, &method_lower)?;
+    Some(super::args::substitute_static_in_return(
+        ea.db,
+        resolved.return_ty_raw,
+        &fqcn,
+        type_params,
+    ))
 }
