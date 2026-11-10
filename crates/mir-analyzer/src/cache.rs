@@ -99,7 +99,9 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
 
     let mut bodies = collector.spans.into_iter().peekable();
     let mut lexer = php_lexer::Lexer::new(source);
-    let mut hasher = blake3::Hasher::new();
+    // Hashed in one call: BLAKE3's per-update overhead dominates for single tokens,
+    // and the digest of the concatenation is the same.
+    let mut surface: Vec<u8> = Vec::with_capacity(source.len());
     let mut in_body = false;
     loop {
         let token = lexer.next_token();
@@ -110,7 +112,7 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
         while bodies.next_if(|&(_, end)| end <= start).is_some() {}
         if bodies.peek().is_some_and(|&(body, _)| body <= start) {
             if !in_body {
-                hasher.update(b"\x00body\x00");
+                surface.extend_from_slice(b"\x00body\x00");
                 in_body = true;
             }
             continue;
@@ -124,14 +126,14 @@ pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> S
                 | php_lexer::TokenKind::BlockComment
         ) && !text.contains('@');
         if !plain_comment {
-            hasher.update(text.as_bytes());
-            hasher.update(b"\x00");
+            surface.extend_from_slice(text.as_bytes());
+            surface.push(0);
         }
     }
     if !lexer.errors().is_empty() {
         return hash_content(source);
     }
-    hasher.finalize().to_hex().to_string()
+    blake3::hash(&surface).to_hex().to_string()
 }
 
 /// Memoized identity of the running mir build. Computed once per process.
