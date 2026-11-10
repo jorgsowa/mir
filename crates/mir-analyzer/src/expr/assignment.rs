@@ -877,13 +877,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 let range_result =
                     range_op.and_then(|op| infer_int_range_arithmetic(&lhs_ty, &rhs_ty, op));
-                let result_ty = range_result.unwrap_or_else(|| {
-                    if a.op == AssignOp::Div {
-                        infer_div(&lhs_ty, &rhs_ty)
-                    } else {
-                        infer_arithmetic(&lhs_ty, &rhs_ty)
-                    }
-                });
+                let result_ty = range_result
+                    .or_else(|| super::binary::overloaded_number_result(&lhs_ty, &rhs_ty, false))
+                    .unwrap_or_else(|| {
+                        if a.op == AssignOp::Div {
+                            infer_div(&lhs_ty, &rhs_ty)
+                        } else {
+                            infer_arithmetic(&lhs_ty, &rhs_ty)
+                        }
+                    });
                 // `$a += $tainted` reads the OLD value before writing, same
                 // "sticky" reasoning `.=` already applies: the result stays
                 // tainted if either side was, unlike plain `=` which fully

@@ -236,6 +236,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let array_or_mixed = |t: &Type| {
                     t.is_mixed() || (!t.types.is_empty() && t.types.iter().all(Atomic::is_array))
                 };
+                if let Some(result) = overloaded_number_result(&left_ty, &right_ty, false) {
+                    return result;
+                }
                 let both_arrays =
                     b.op == BinaryOp::Add && array_or_mixed(&left_ty) && array_or_mixed(&right_ty);
                 if !both_arrays {
@@ -418,6 +421,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::BitwiseXor
             | BinaryOp::ShiftLeft
             | BinaryOp::ShiftRight => {
+                if let Some(result) = overloaded_number_result(&left_ty, &right_ty, true) {
+                    return result;
+                }
                 if operand_is_non_bitwise(&left_ty) || operand_is_non_bitwise(&right_ty) {
                     self.emit(
                         IssueKind::InvalidOperand {
@@ -511,6 +517,45 @@ fn bitwise_op_symbol(op: BinaryOp) -> &'static str {
         BinaryOp::ShiftRight => ">>",
         _ => "?",
     }
+}
+
+/// `GMP` and `BcMath\Number` overload arithmetic (and `GMP` the bitwise
+/// operators): with the other operand of the same class, an int or a numeric
+/// string, the result is that class.
+pub(crate) fn overloaded_number_result(left: &Type, right: &Type, bitwise: bool) -> Option<Type> {
+    fn class_of(ty: &Type) -> Option<&'static str> {
+        match ty.types.as_slice() {
+            [Atomic::TNamedObject { fqcn, .. }] => {
+                let name = fqcn.trim_start_matches('\\');
+                if name.eq_ignore_ascii_case("GMP") {
+                    Some("GMP")
+                } else if name.eq_ignore_ascii_case("BcMath\\Number") {
+                    Some("BcMath\\Number")
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+    let (class, operand, other) = match (class_of(left), class_of(right)) {
+        (Some(l), Some(r)) if l == r => return Some(left.clone()),
+        (Some(_), Some(_)) | (None, None) => return None,
+        (Some(c), None) => (c, left, right),
+        (None, Some(c)) => (c, right, left),
+    };
+    if bitwise && class != "GMP" {
+        return None;
+    }
+    let accepted = !other.types.is_empty()
+        && other.types.iter().all(|a| {
+            a.is_int()
+                || match a {
+                    Atomic::TLiteralString(s) => crate::narrowing::is_numeric_string(s),
+                    _ => a.is_string(),
+                }
+        });
+    accepted.then(|| operand.clone())
 }
 
 /// Whether every member of `ty` is *definitely* a non-numeric value for
