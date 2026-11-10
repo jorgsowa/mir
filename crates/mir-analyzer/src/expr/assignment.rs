@@ -1244,6 +1244,79 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// `clone($obj, ['prop' => $value])` writes each literal key on the copy like `$copy->prop = $value`.
+    pub(crate) fn check_clone_with_properties(
+        &mut self,
+        obj_ty: &Type,
+        props_ty: &Type,
+        span: Span,
+    ) {
+        let [Atomic::TNamedObject { fqcn, type_params }] = obj_ty.types.as_slice() else {
+            return;
+        };
+        let [Atomic::TKeyedArray { properties, .. }] = props_ty.types.as_slice() else {
+            return;
+        };
+        if !type_params.is_empty() || !crate::db::class_exists(self.db, fqcn) {
+            return;
+        }
+        let here = crate::db::Fqcn::interned(self.db, *fqcn);
+        for (key, value) in properties.iter() {
+            let mir_types::ArrayKey::String(prop_name) = key else {
+                continue;
+            };
+            let Some((_, prop_def)) = crate::db::find_property_in_chain(self.db, here, prop_name)
+            else {
+                self.check_dynamic_property_creation(fqcn.as_ref(), prop_name, span);
+                continue;
+            };
+            let (Some(prop_ty), ty) = (prop_def.ty.as_deref(), &value.ty) else {
+                continue;
+            };
+            if prop_ty.is_mixed_not_template()
+                || ty.is_mixed_not_template()
+                || prop_ty.contains(|t| matches!(t, Atomic::TTemplateParam { .. }))
+            {
+                continue;
+            }
+            let mut compat_ty = prop_ty.clone();
+            if !prop_def.has_native_type {
+                compat_ty.add_type(Atomic::TNull);
+            }
+            if property_assign_compatible(ty, &compat_ty, self.db)
+                || crate::call::stringable_coercion_ok(ty, prop_ty, self)
+            {
+                continue;
+            }
+            if is_property_type_coercion(ty, prop_ty, self.db) {
+                self.emit(
+                    IssueKind::PropertyTypeCoercion {
+                        property: prop_name.to_string(),
+                        expected: prop_ty.to_string(),
+                        actual: ty.to_string(),
+                    },
+                    Severity::Info,
+                    span,
+                );
+            } else if let Some(kind) =
+                partial_property_assignment(ty, &compat_ty, prop_name, prop_ty, self.db)
+            {
+                let severity = kind.default_severity();
+                self.emit(kind, severity, span);
+            } else {
+                self.emit(
+                    IssueKind::InvalidPropertyAssignment {
+                        property: prop_name.to_string(),
+                        expected: prop_ty.to_string(),
+                        actual: ty.to_string(),
+                    },
+                    Severity::Warning,
+                    span,
+                );
+            }
+        }
+    }
+
     /// A write to a property `fqcn` does not declare: deprecated from 8.2, an `Error` on
     /// enums and readonly classes. Returns whether the write creates the property.
     fn check_dynamic_property_creation(&mut self, fqcn: &str, prop_name: &str, span: Span) -> bool {

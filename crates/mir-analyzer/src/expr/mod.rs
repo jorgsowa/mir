@@ -840,10 +840,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.check_clone_deprecated(&ty, expr.span);
                 ty
             }
-            ExprKind::CloneWith(inner, _props) => {
+            ExprKind::CloneWith(inner, props) => {
                 let ty = self.analyze(inner, ctx);
+                let props_ty = self.analyze(props, ctx);
                 self.check_clone_target(&ty, expr.span);
                 self.check_clone_visibility(&ty, expr.span, ctx.self_fqcn.as_deref());
+                self.check_clone_with_properties(&ty, &props_ty, props.span);
                 ty
             }
 
