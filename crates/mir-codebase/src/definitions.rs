@@ -542,6 +542,9 @@ pub struct MethodDef {
     /// True when the method has the `#[Override]` PHP attribute.
     #[serde(default)]
     pub is_override: bool,
+    /// `#[\NoDiscard]`: the attribute's message, empty when it has none.
+    #[serde(default)]
+    pub no_discard: Option<Arc<str>>,
     pub location: Option<Location>,
     /// Plain-text description from the docblock (text before `@tag` lines).
     /// Used for hover info.
@@ -999,6 +1002,9 @@ pub struct FunctionDef {
     /// `@no-named-arguments` — callers must not use named argument syntax.
     #[serde(default)]
     pub no_named_arguments: bool,
+    /// `#[\NoDiscard]`: the attribute's message, empty when it has none.
+    #[serde(default)]
+    pub no_discard: Option<Arc<str>>,
     pub location: Option<Location>,
     /// Plain-text description from the docblock (text before `@tag` lines).
     /// Used for hover info.

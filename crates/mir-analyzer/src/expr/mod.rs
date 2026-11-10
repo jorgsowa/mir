@@ -110,6 +110,8 @@ pub struct ExpressionAnalyzer<'a> {
     /// different (narrower) span, a genuine double-report rather than a
     /// harmlessly-deduplicated one.
     in_array_access_base: bool,
+    /// Span of the call an expression statement evaluates only for its side effects.
+    pub(crate) discarded_call: Option<php_ast::Span>,
     /// `(key type, value type)` for every `yield`/`yield from` encountered so
     /// far in the enclosing function body, regardless of which branch/loop it
     /// syntactically sits in — the AST is walked once, so no branch-merge
@@ -414,6 +416,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             vivifying_reference: false,
             callback_param_hints: None,
             in_array_access_base: false,
+            discarded_call: None,
             yielded_types,
             taint_summary,
             plugins: mir_plugin::snapshot(),
@@ -1874,6 +1877,29 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.record_dynamic_member_ref(fqcn, span);
             }
         }
+    }
+
+    /// PHP 8.5 warns when the result of a `#[\NoDiscard]` callee is thrown away.
+    pub(crate) fn check_no_discard(
+        &mut self,
+        no_discard: Option<&str>,
+        callee: impl FnOnce() -> String,
+        span: php_ast::Span,
+    ) {
+        let Some(message) = no_discard else {
+            return;
+        };
+        if self.discarded_call != Some(span) || self.php_version < PhpVersion::new(8, 5) {
+            return;
+        }
+        self.emit(
+            IssueKind::NoDiscardReturnIgnored {
+                callee: callee(),
+                message: Some(message.to_string()).filter(|m| !m.is_empty()),
+            },
+            Severity::Warning,
+            span,
+        );
     }
 
     /// An object as `$obj->{$name}` must be `Stringable`; as `$obj->{$name}()` it is never valid.

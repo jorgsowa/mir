@@ -7,7 +7,17 @@ use php_ast::owned::{Expr, ExprKind};
 
 impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_expression_stmt(&mut self, expr: &Expr, ctx: &mut FlowState) {
-        let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+        let mut ea = self.expr_analyzer(ctx);
+        if matches!(
+            expr.kind,
+            ExprKind::FunctionCall(_)
+                | ExprKind::MethodCall(_)
+                | ExprKind::NullsafeMethodCall(_)
+                | ExprKind::StaticMethodCall(_)
+        ) {
+            ea.discarded_call = Some(expr.span);
+        }
+        let expr_ty = ea.analyze(expr, ctx);
         if expr_ty.is_never() {
             ctx.diverges = true;
         }

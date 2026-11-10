@@ -37,6 +37,7 @@ struct ResolvedFn {
     return_ty_raw: Type,
     throws: Arc<[Arc<str>]>,
     no_named_arguments: bool,
+    no_discard: Option<Arc<str>>,
     is_pure: bool,
     /// `@psalm-mutation-free`/`@psalm-external-mutation-free` on a free
     /// function — both forbid mutating an argument (a free function has no
@@ -124,6 +125,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             return_ty_raw,
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
             no_named_arguments: f.no_named_arguments,
+            no_discard: f.no_discard.clone(),
             is_pure: f.is_pure,
             is_mutation_free: f.is_mutation_free || f.is_external_mutation_free,
             taint_sink_params: f.taint_sink_params.clone(),
@@ -936,6 +938,11 @@ impl CallAnalyzer {
                 }
             }
 
+            ea.check_no_discard(
+                resolved.no_discard.as_deref(),
+                || format!("function {}", resolved.fqn),
+                span,
+            );
             if let Some(msg) = deprecated {
                 ea.emit(
                     IssueKind::DeprecatedCall {

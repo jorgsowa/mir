@@ -977,6 +977,14 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/collector/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/non_public_magic_method/`.
     NonPublicMagicMethod { class: String, method: String },
+    /// The result of a `#[\NoDiscard]` function or method is discarded (PHP 8.5+ warning).
+    /// Emitted by `mir-analyzer/src/expr/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/no_discard_return_ignored/`.
+    NoDiscardReturnIgnored {
+        /// `function name` or `method Class::name`.
+        callee: String,
+        message: Option<String>,
+    },
 
     // --- Plugins --------------------------------------------------------------
     /// Raised by a registered plugin (mir-plugin). `name` is the plugin's own
@@ -1126,7 +1134,8 @@ impl IssueKind {
             | IssueKind::InvalidDocblockType { .. }
             | IssueKind::UseStatementHasNoEffect { .. }
             | IssueKind::PrivateFinalMethod { .. }
-            | IssueKind::NonPublicMagicMethod { .. } => Severity::Warning,
+            | IssueKind::NonPublicMagicMethod { .. }
+            | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -1485,6 +1494,7 @@ impl IssueKind {
             IssueKind::UseStatementHasNoEffect { .. } => "MIR1511",
             IssueKind::PrivateFinalMethod { .. } => "MIR1512",
             IssueKind::NonPublicMagicMethod { .. } => "MIR1513",
+            IssueKind::NoDiscardReturnIgnored { .. } => "MIR1514",
         }
     }
 
@@ -1515,7 +1525,8 @@ impl IssueKind {
             | "MIR0222" | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405"
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
-            | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513" => {
+            | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
+            | "MIR1514" => {
                 Some(Severity::Warning)
             }
 
@@ -1756,6 +1767,7 @@ impl IssueKind {
             IssueKind::UseStatementHasNoEffect { .. } => "UseStatementHasNoEffect",
             IssueKind::PrivateFinalMethod { .. } => "PrivateFinalMethod",
             IssueKind::NonPublicMagicMethod { .. } => "NonPublicMagicMethod",
+            IssueKind::NoDiscardReturnIgnored { .. } => "NoDiscardReturnIgnored",
             IssueKind::PluginIssue { .. } => "PluginIssue",
         }
     }
@@ -2624,6 +2636,10 @@ impl IssueKind {
             IssueKind::PrivateFinalMethod { class, method } => {
                 format!("Private method {class}::{method}() cannot be final as it is never overridden by other classes")
             }
+            IssueKind::NoDiscardReturnIgnored { callee, message } => {
+                let reason = message.as_deref().map(|m| format!(", {m}")).unwrap_or_default();
+                format!("The return value of {callee}() should either be used or intentionally ignored by casting it as (void){reason}")
+            }
             IssueKind::NonPublicMagicMethod { class, method } => {
                 format!("The magic method {class}::{method}() must have public visibility")
             }
@@ -3388,6 +3404,10 @@ mod code_tests {
                 class: s(),
                 method: s(),
             },
+            IssueKind::NoDiscardReturnIgnored {
+                callee: s(),
+                message: None,
+            },
         ]
     }
 
@@ -3445,6 +3465,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 190);
+        assert_eq!(one_of_each().len(), 191);
     }
 }

@@ -121,6 +121,7 @@ pub(crate) struct ResolvedMethod {
     pub(crate) native_return: Option<Type>,
     pub(crate) throws: Arc<[Arc<str>]>,
     pub(crate) no_named_arguments: bool,
+    pub(crate) no_discard: Option<Arc<str>>,
     pub(crate) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
     pub(crate) if_this_is: Option<Arc<Type>>,
     pub(crate) self_out: Option<Arc<Type>>,
@@ -503,6 +504,7 @@ pub(crate) fn resolve_method_from_db(
             },
             throws,
             no_named_arguments: storage.no_named_arguments,
+            no_discard: storage.no_discard.clone(),
             taint_sink_params: storage.taint_sink_params.clone(),
             if_this_is,
             self_out,
@@ -1253,6 +1255,11 @@ fn resolve_method_return<'a>(
             call.method.span,
         );
         record_trait_alias_origin_method_ref(ea, fqcn, &method_name_lower, call.method.span);
+        ea.check_no_discard(
+            resolved.no_discard.as_deref(),
+            || format!("method {}::{}", resolved.owner_fqcn, resolved.name),
+            span,
+        );
         if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(
                 IssueKind::DeprecatedMethod {

@@ -599,6 +599,11 @@ impl CallAnalyzer {
                 )),
                 call.method.span,
             );
+            ea.check_no_discard(
+                resolved.no_discard.as_deref(),
+                || format!("method {}::{}", resolved.owner_fqcn, resolved.name),
+                span,
+            );
             if let Some(msg) = resolved.deprecated.clone() {
                 ea.emit(
                     IssueKind::DeprecatedMethodCall {

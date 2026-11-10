@@ -11,4 +11,5 @@ final class Api {
 $api = new Api();
 $api->old();
 //<^^^^^^^^^^^ DeprecatedMethod: Method Api::old() is deprecated
+//<^^^^^^^^^^^ NoDiscardReturnIgnored: The return value of method Api::old() should either be used or intentionally ignored by casting it as (void)
 $api->current();

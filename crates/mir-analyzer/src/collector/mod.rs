@@ -1237,6 +1237,29 @@ impl<'a> DefinitionCollector<'a> {
         self.has_attribute(attributes, "Override")
     }
 
+    /// `#[\NoDiscard]`'s message (empty without one); `None` without the attribute.
+    pub(crate) fn no_discard_attribute(
+        &self,
+        attributes: &[php_ast::owned::Attribute],
+    ) -> Option<Arc<str>> {
+        let attr = attributes.iter().find(|a| {
+            self.resolve_ast_name(&a.name)
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("NoDiscard")
+        })?;
+        let message = attr
+            .args
+            .iter()
+            .find(|arg| {
+                arg.name
+                    .as_ref()
+                    .is_none_or(|n| n.last_part().eq_ignore_ascii_case("message"))
+            })
+            .and_then(|arg| arg.value())
+            .and_then(crate::expr::helpers::extract_string_from_expr);
+        Some(Arc::from(message.unwrap_or_default()))
+    }
+
     /// Whether one of `attributes` names the global class `name`.
     fn has_attribute(&self, attributes: &[php_ast::owned::Attribute], name: &str) -> bool {
         attributes.iter().any(|a| {
@@ -2199,6 +2222,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_impure: false,
                     no_named_arguments: false,
                     is_override: false,
+                    no_discard: None,
                     location: self
                         .tag_location(doc_start, method.tag_span)
                         .or_else(|| location.clone()),
@@ -3073,6 +3097,7 @@ impl<'a> DefinitionCollector<'a> {
             is_impure: doc.is_impure,
             no_named_arguments: doc.no_named_arguments,
             is_override,
+            no_discard: self.no_discard_attribute(&m.attributes),
             is_virtual: false,
             location: span.map(|s| self.location(s.start, s.end)),
             docstring: if doc.description.trim().is_empty() {

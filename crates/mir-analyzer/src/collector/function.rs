@@ -384,6 +384,7 @@ impl DefinitionCollector<'_> {
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,
             no_named_arguments: doc.no_named_arguments,
+            no_discard: self.no_discard_attribute(&decl.attributes),
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             docstring,
             tag_descriptions: self.tag_descriptions(&doc),
