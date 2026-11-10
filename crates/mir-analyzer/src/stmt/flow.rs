@@ -75,6 +75,9 @@ pub(crate) fn return_type_is_invalid(
     if return_arrays_compatible(actual, declared, db, file) {
         return false;
     }
+    if has_unrelated_class_arm(actual, declared, db) {
+        return true;
+    }
     // Non-strict scalar return coercion: PHP silently coerces int/false → bool
     // in non-strict files. Covers the idiomatic `return preg_match(...)` pattern.
     if !strict_types && scalar_return_coercion_ok(actual, declared) {
@@ -107,6 +110,47 @@ pub(crate) fn return_type_is_invalid(
         return false;
     }
     true
+}
+
+/// Some arm of `actual` is a class no declared type can ever hold, so the leniencies for a
+/// declared type narrower than `actual` don't apply.
+fn has_unrelated_class_arm(actual: &Type, declared: &Type, db: &dyn crate::db::MirDatabase) -> bool {
+    let concrete_class = |fqcn: &str| {
+        matches!(
+            crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn)),
+            Some(crate::db::ClassLike::Class(_) | crate::db::ClassLike::Enum(_))
+        )
+    };
+    let declared_classes: Option<Vec<&str>> = declared
+        .types
+        .iter()
+        .filter_map(|d| match d {
+            Atomic::TNamedObject { fqcn, .. } => Some(concrete_class(fqcn).then_some(fqcn.as_ref())),
+            Atomic::TNull => None,
+            _ => Some(None),
+        })
+        .collect();
+    let Some(declared_classes) = declared_classes.filter(|d| !d.is_empty()) else {
+        return false;
+    };
+    // Generic arms mostly come from collapsed conditional returns, too imprecise to trust.
+    if actual
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TNamedObject { type_params, .. } if !type_params.is_empty()))
+    {
+        return false;
+    }
+    actual.types.iter().any(|a| {
+        let Atomic::TNamedObject { fqcn, .. } = a else {
+            return false;
+        };
+        concrete_class(fqcn)
+            && declared_classes.iter().all(|d| {
+                !crate::db::extends_or_implements(db, fqcn, d)
+                    && !crate::db::extends_or_implements(db, d, fqcn)
+            })
+    })
 }
 
 fn projected_template_return_compatible(actual: &Type, declared: &Type) -> bool {
