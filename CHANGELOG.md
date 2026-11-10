@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `clone($obj, ['prop' => $value])` checks each literal key like `$copy->prop = $value`: a mistyped value is `InvalidPropertyAssignment` and an undeclared property `DynamicPropertyCreation`. The property array's expression is analyzed too.
 - An int offset read or positionally destructured from an array whose keys are only non-numeric strings (`$m[0]` or `[$a, $b] = $m` on `array<string, int>`) is `InvalidArrayOffset`.
 - Returning a union with a class arm unrelated to every declared class (`A|B` from a function declared `: B`) is `InvalidReturnType`; a declared subclass of the returned class stays accepted.
+- A plain `string` or `int` passed to a `non-empty-string`, `numeric-string`, `positive-int` or int-range parameter (or its nullable form) is `ArgumentTypeCoercion` instead of being accepted.
 - Analysis through `AnalysisSession` no longer gives some builtin functions another function's signature (`mkdir()` reporting `rename()`'s parameters, `str_replace()` expecting 2 arguments) on some runs: a bundled or user stub ingested as a file is filtered by PHP version like a stub loaded by the analyzer.
 
 ## [0.96.0] - 2026-11-09

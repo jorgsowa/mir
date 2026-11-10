@@ -243,7 +243,7 @@ pub(crate) fn check_one(
     }
 
     let arg_core = arg_ty.core_type();
-    if !scalar_arg_fits_param(arg_ty, param_ty)
+    let mismatch = !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()
         && !arg_ty.is_mixed()
         // An unresolved `Cls::CONST` has an unknown value, so a mismatch can't be proven.
@@ -284,8 +284,8 @@ pub(crate) fn check_one(
         // `[$obj, 'method']` / `['Class', 'method']` is a valid callable, even
         // though it types as a 2-element list shape.
         && !(param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TClosure { .. }))
-            && super::super::array_builtins::is_callable_array_pair(arg_ty, ea.db))
-    {
+            && super::super::array_builtins::is_callable_array_pair(arg_ty, ea.db));
+    if mismatch {
         // For union arg types, check if any individual atomic fits the param.
         // If some atomics fit and some don't → PossiblyInvalidArgument; otherwise → InvalidArgument.
         let any_atomic_fits = (!arg_ty.is_single()
@@ -298,7 +298,18 @@ pub(crate) fn check_one(
             }))
             || crate::expr::helpers::without_shape_nulls(arg_ty)
                 .is_some_and(|t| scalar_arg_fits_param(&t, param_ty));
-        if any_atomic_fits {
+        if scalar_refinement_coercion(arg_ty, param_ty) {
+            ea.emit(
+                IssueKind::ArgumentTypeCoercion {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("{param_ty}"),
+                    actual: arg_display.clone(),
+                },
+                Severity::Info,
+                arg_span,
+            );
+        } else if any_atomic_fits {
             ea.emit(
                 IssueKind::PossiblyInvalidArgument {
                     param: param_name.to_string(),
@@ -339,6 +350,17 @@ pub(crate) fn check_one(
                 arg_span,
             );
         }
+    } else if scalar_refinement_coercion(arg_ty, param_ty) {
+        ea.emit(
+            IssueKind::ArgumentTypeCoercion {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: format!("{param_ty}"),
+                actual: arg_display.clone(),
+            },
+            Severity::Info,
+            arg_span,
+        );
     }
 
     // When a supertype object is passed where a subtype is expected, emit ArgumentTypeCoercion.
@@ -361,6 +383,35 @@ pub(crate) fn check_one(
             arg_span,
         );
     }
+}
+
+/// A plain `string`/`int` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`).
+fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
+    let arg = arg.remove_null();
+    let refinable = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TString
+                | Atomic::TNonEmptyString
+                | Atomic::TNumericString
+                | Atomic::TInt
+                | Atomic::TIntRange { .. }
+                | Atomic::TPositiveInt
+                | Atomic::TNegativeInt
+                | Atomic::TNonNegativeInt
+        )
+    };
+    !arg.types.is_empty()
+        && arg.types.iter().all(refinable)
+        && !param.contains(|p| matches!(p, Atomic::TTemplateParam { .. }))
+        && !arg.is_subtype_structural(param)
+        && arg.types.iter().all(|a| {
+            let single = Type::single(a.clone());
+            single.is_subtype_structural(param)
+                || param.types.iter().any(|p| {
+                    refinable(p) && Type::single(p.clone()).is_subtype_structural(&single)
+                })
+        })
 }
 
 // ---------------------------------------------------------------------------

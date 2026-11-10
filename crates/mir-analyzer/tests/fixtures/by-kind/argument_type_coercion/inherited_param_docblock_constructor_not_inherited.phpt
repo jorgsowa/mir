@@ -20,6 +20,7 @@ final class Child extends Base {
     public function __construct(Throwable|string $exception) {
         /** @mir-check $exception is Throwable|string */
         parent::__construct($exception instanceof Throwable ? $exception->getMessage() : $exception);
+//                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $message of __construct() expects 'non-empty-string', got 'string' — coercion may fail at runtime
     }
 }
 

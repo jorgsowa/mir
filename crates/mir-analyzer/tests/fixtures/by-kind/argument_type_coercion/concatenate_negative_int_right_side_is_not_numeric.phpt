@@ -12,3 +12,4 @@ function foo(string $bar): int
 }
 
 foo(foo("123") . foo("-456"));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $bar of foo() expects 'numeric-string', got 'non-empty-string' — coercion may fail at runtime
