@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `NonInvariantDocblockPropertyType` (MIR0721, info): a redeclared property whose `@var` type is wider or narrower than the parent's. Templates, `static`, unknown classes and `null` on untyped properties are not compared.
 - `InvalidMemberName` (MIR0235): an object used as a dynamic property name that isn't `Stringable` (`$obj->{$name}`), or any object used as a dynamic method name (`$obj->{$name}()`).
 - `AnalysisSession::prepare_files_for_analysis` (and `prepare_files_for_analysis_cancellable`) warms up several files at once: their parsing and name resolution run in parallel, and only the class loads stay serial. The result is the same as calling `prepare_file_for_analysis` on each file in order. Re-analysis of dependents and stale query candidates use it too.
 

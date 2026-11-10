@@ -21,6 +21,7 @@ class A {
 class B extends A {
     /** @var array<int, Dog> */
     public array $items = [];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ NonInvariantDocblockPropertyType: Docblock type 'array<int, Dog>' of B::$items is not invariant with 'array<int, Animal>' in class A
 }
 
 class C {
@@ -31,4 +32,5 @@ class C {
 class D extends C {
     /** @var int */
     public int $count = 1;
+//  ^^^^^^^^^^^^^^^^^^^^^^ NonInvariantDocblockPropertyType: Docblock type 'int' of D::$count is not invariant with 'positive-int' in class C
 }

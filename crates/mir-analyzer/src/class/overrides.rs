@@ -1165,7 +1165,80 @@ impl<'a> ClassAnalyzer<'a> {
                     }
                 }
             }
+            if parent_in_user_code
+                && parent_prop.visibility != Visibility::Private
+                && !own_prop.from_docblock
+                && !parent_prop.from_docblock
+                && !parent_prop.get_only_hook
+            {
+                if let Some((own_t, parent_t)) =
+                    self.docblock_property_types(&own_prop, &parent_prop)
+                {
+                    // An untyped property can always hold null, whatever its `@var` says.
+                    let (own_cmp, parent_cmp) = if own_prop.has_native_type {
+                        (own_t.clone(), parent_t.clone())
+                    } else {
+                        (own_t.remove_null(), parent_t.remove_null())
+                    };
+                    let invariant = own_cmp.is_empty()
+                        || parent_cmp.is_empty()
+                        || (crate::subtype::is_subtype(self.db, &own_cmp, &parent_cmp)
+                            && crate::subtype::is_subtype(self.db, &parent_cmp, &own_cmp));
+                    if !invariant {
+                        let mut issue = Issue::new(
+                            IssueKind::NonInvariantDocblockPropertyType {
+                                class: fqcn.to_string(),
+                                property: prop_name.to_string(),
+                                parent: member_owner(&parent_fqcn).to_string(),
+                                expected: parent_t.to_string(),
+                                actual: own_t.to_string(),
+                            },
+                            issue_location(
+                                report_location.as_ref(),
+                                report_location
+                                    .as_ref()
+                                    .and_then(|l| self.sources.get(&l.file).copied()),
+                            ),
+                        );
+                        if let Some(snippet) =
+                            extract_snippet(report_location.as_ref(), &self.sources)
+                        {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
         }
+    }
+
+    /// Both properties' types when at least one comes from `@var`, their native hints agree,
+    /// and neither involves templates, late-static types or unknown classes.
+    fn docblock_property_types<'p>(
+        &self,
+        own: &'p mir_codebase::definitions::PropertyDef,
+        parent: &'p mir_codebase::definitions::PropertyDef,
+    ) -> Option<(&'p mir_types::Type, &'p mir_types::Type)> {
+        let (own_t, parent_t) = (own.ty.as_deref()?, parent.ty.as_deref()?);
+        let from_var = |p: &mir_codebase::definitions::PropertyDef, t: &mir_types::Type| {
+            p.native_ty.as_deref() != Some(t)
+        };
+        let natives_agree = match (own.native_ty.as_deref(), parent.native_ty.as_deref()) {
+            (None, None) => true,
+            (Some(a), Some(b)) => a.is_subtype_structural(b) && b.is_subtype_structural(a),
+            _ => false,
+        };
+        let checkable = |t: &mir_types::Type| {
+            !t.is_mixed()
+                && !self.return_type_has_template(t)
+                && !self.type_has_self_or_static(t)
+                && self.all_object_classes_known(t)
+        };
+        (natives_agree
+            && (from_var(own, own_t) || from_var(parent, parent_t))
+            && checkable(own_t)
+            && checkable(parent_t))
+        .then_some((own_t, parent_t))
     }
 
     // -----------------------------------------------------------------------

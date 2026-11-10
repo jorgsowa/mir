@@ -541,6 +541,15 @@ pub enum IssueKind {
         before_php85: bool,
     },
     /// Emitted by `mir-analyzer/src/class/overrides.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/non_invariant_docblock_property_type/`.
+    NonInvariantDocblockPropertyType {
+        class: String,
+        property: String,
+        parent: String,
+        expected: String,
+        actual: String,
+    },
+    /// Emitted by `mir-analyzer/src/class/overrides.rs`.
     /// Fixtures: `tests/fixtures/by-kind/readonly_property_redeclaration_mismatch/`.
     ReadonlyPropertyRedeclarationMismatch {
         parent_class: String,
@@ -1199,7 +1208,8 @@ impl IssueKind {
             | IssueKind::WrongCaseMethod { .. }
             | IssueKind::WrongCaseClass { .. }
             | IssueKind::InvalidAttribute { .. }
-            | IssueKind::UndefinedAttributeClass { .. } => Severity::Info,
+            | IssueKind::UndefinedAttributeClass { .. }
+            | IssueKind::NonInvariantDocblockPropertyType { .. } => Severity::Info,
             IssueKind::DuplicateClass { .. }
             | IssueKind::DuplicateInterface { .. }
             | IssueKind::DuplicateTrait { .. }
@@ -1382,6 +1392,7 @@ impl IssueKind {
             IssueKind::InterfaceInstantiation { .. } => "MIR0709",
             IssueKind::EnumInstantiation { .. } => "MIR0719",
             IssueKind::TraitInstantiation { .. } => "MIR0720",
+            IssueKind::NonInvariantDocblockPropertyType { .. } => "MIR0721",
             IssueKind::CircularInheritance { .. } => "MIR0707",
             IssueKind::InvalidOverride { .. } => "MIR0708",
 
@@ -1519,7 +1530,9 @@ impl IssueKind {
             | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
             | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
             | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
-            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
+            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" => {
+                Some(Severity::Info)
+            }
 
             _ => None,
         }
@@ -1643,6 +1656,9 @@ impl IssueKind {
             IssueKind::OverriddenPropertyAccess { .. } => "OverriddenPropertyAccess",
             IssueKind::PropertyTypeRedeclarationMismatch { .. } => {
                 "PropertyTypeRedeclarationMismatch"
+            }
+            IssueKind::NonInvariantDocblockPropertyType { .. } => {
+                "NonInvariantDocblockPropertyType"
             }
             IssueKind::ReadonlyPropertyRedeclarationMismatch { .. } => {
                 "ReadonlyPropertyRedeclarationMismatch"
@@ -2242,6 +2258,15 @@ impl IssueKind {
                     )
                 }
             }
+            IssueKind::NonInvariantDocblockPropertyType {
+                class,
+                property,
+                parent,
+                expected,
+                actual,
+            } => format!(
+                "Docblock type '{actual}' of {class}::${property} is not invariant with '{expected}' in class {parent}"
+            ),
             IssueKind::ReadonlyPropertyRedeclarationMismatch {
                 parent_class,
                 class,
@@ -3140,6 +3165,13 @@ mod code_tests {
                 covariant: false,
                 before_php85: false,
             },
+            IssueKind::NonInvariantDocblockPropertyType {
+                class: s(),
+                property: s(),
+                parent: s(),
+                expected: s(),
+                actual: s(),
+            },
             IssueKind::ReadonlyPropertyRedeclarationMismatch {
                 parent_class: s(),
                 class: s(),
@@ -3413,6 +3445,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 189);
+        assert_eq!(one_of_each().len(), 190);
     }
 }

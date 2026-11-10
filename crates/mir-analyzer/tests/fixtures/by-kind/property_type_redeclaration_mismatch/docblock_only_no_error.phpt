@@ -16,4 +16,5 @@ class A {
 class B extends A {
     /** @var string */
     public $x = 'hello';
+//  ^^^^^^^^^^^^^^^^^^^^ NonInvariantDocblockPropertyType: Docblock type 'string' of B::$x is not invariant with 'int' in class A
 }

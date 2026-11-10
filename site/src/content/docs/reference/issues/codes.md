@@ -151,6 +151,7 @@ issues keep their code.
 | MIR0718  | DuplicateEnumCaseValue        | [inheritance/duplicate-enum-case-value](../inheritance/duplicate-enum-case-value/) |
 | MIR0719  | EnumInstantiation             | [inheritance/enum-instantiation](../inheritance/enum-instantiation/) |
 | MIR0720  | TraitInstantiation            | [inheritance/trait-instantiation](../inheritance/trait-instantiation/) |
+| MIR0721  | NonInvariantDocblockPropertyType | [inheritance/non-invariant-docblock-property-type](../inheritance/non-invariant-docblock-property-type/) |
 | MIR0800  | TaintedInput                  | [security/tainted-input](../security/tainted-input/) |
 | MIR0801  | TaintedHtml                   | [security/tainted-html](../security/tainted-html/) |
 | MIR0802  | TaintedSql                    | [security/tainted-sql](../security/tainted-sql/) |
