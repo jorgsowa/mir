@@ -102,13 +102,10 @@ impl AnalysisSession {
             // Closed before the pass view is taken, so commits carry the
             // post-load generation.
             let mut session = self.defer_revision_bumps();
-            for file in &dependents {
-                if cancel.is_cancelled() {
-                    return Vec::new();
-                }
-                if !session.prepare_file_for_analysis_cancellable(file, &|| cancel.is_cancelled()) {
-                    return Vec::new();
-                }
+            if !session
+                .prepare_files_for_analysis_cancellable(&dependents, &|| cancel.is_cancelled())
+            {
+                return Vec::new();
             }
         }
 

@@ -44,6 +44,7 @@ mod param_default_text;
 mod perf_analysis;
 mod perf_open_file_closure;
 mod plugin_hooks;
+mod prepare_files_batch;
 mod ref_index_locks;
 mod reference_locations;
 mod regression_timing;

@@ -66,9 +66,7 @@ fn main() {
     for chunk in paths.chunks(chunk_size) {
         let t = Instant::now();
         session.prepare_for_query(None);
-        for file in chunk {
-            session.prepare_file_for_analysis(file);
-        }
+        session.prepare_files_for_analysis(chunk);
         prepare += t.elapsed();
         let t = Instant::now();
         let snapshot = session.snapshot();

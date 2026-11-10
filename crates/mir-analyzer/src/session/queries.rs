@@ -290,10 +290,8 @@ impl AnalysisSession {
     ) -> bool {
         {
             let mut session = self.defer_revision_bumps();
-            for path in stale {
-                if !session.prepare_file_for_analysis_cancellable(path, should_cancel) {
-                    return false;
-                }
+            if !session.prepare_files_for_analysis_cancellable(stale, should_cancel) {
+                return false;
             }
         }
         !should_cancel()

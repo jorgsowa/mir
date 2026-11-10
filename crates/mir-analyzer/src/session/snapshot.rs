@@ -705,8 +705,8 @@ impl AnalysisSnapshot {
     /// first, with nothing committed.
     ///
     /// Run the owner-side prelude first: `prepare_for_query(None)`, then
-    /// `prepare_file_for_analysis` per file, a map lookup for files ingested
-    /// with `ingest_file_prepared`.
+    /// `prepare_files_for_analysis` over `files`, a map lookup for files
+    /// ingested with `ingest_file_prepared`.
     #[allow(clippy::type_complexity)]
     pub fn reanalyze_files(
         &self,

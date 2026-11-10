@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AnalysisSession::prepare_files_for_analysis` (and `prepare_files_for_analysis_cancellable`) warms up several files at once: their parsing and name resolution run in parallel, and only the class loads stay serial. The result is the same as calling `prepare_file_for_analysis` on each file in order. Re-analysis of dependents and stale query candidates use it too.
+
 ### Changed
 
 - Parser crates updated to 0.29: parsing takes about 19% less CPU time, and `C::public(set)` from PHP 8.4, `readonly` used as an expression from 8.1 and `readonly::class` are reported as `ParseError`s as PHP rejects them.

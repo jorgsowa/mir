@@ -282,7 +282,8 @@ pub use self::nodes::*;
 pub use self::path_interner::PathInterner;
 pub use self::per_function::{infer_function, FunctionInferenceResult};
 pub(crate) use self::queries::{
-    allows_dynamic_properties, db_php_version, prefix_file_namespace, resolve_qualified_name,
+    allows_dynamic_properties, db_php_version, prefix_file_namespace, resolve_name_deferred,
+    resolve_qualified_name, NameResolution,
 };
 pub use self::queries::{
     class_constant_exists_in_chain, class_exists, class_is_immutable, class_kind,

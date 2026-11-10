@@ -221,6 +221,141 @@ impl AnalysisSession {
         true
     }
 
+    /// [`Self::prepare_file_for_analysis`] for each of `paths`, in order. Parsing
+    /// and name resolution run in parallel up front; only the loads stay serial.
+    pub fn prepare_files_for_analysis(&mut self, paths: &[std::sync::Arc<str>]) {
+        let _ = self.prepare_files_for_analysis_cancellable(paths, &|| false);
+    }
+
+    /// Cancellable variant of [`Self::prepare_files_for_analysis`]; `false` when
+    /// `should_cancel` stopped it before every file's warm-up ran.
+    pub fn prepare_files_for_analysis_cancellable(
+        &mut self,
+        paths: &[std::sync::Arc<str>],
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
+        if paths.len() < 2 {
+            return paths
+                .iter()
+                .all(|path| self.prepare_file_for_analysis_cancellable(path, should_cancel));
+        }
+        if should_cancel() {
+            return false;
+        }
+        let plans: Vec<Option<PreparePlan>> = {
+            use rayon::prelude::*;
+            let generation = self.prepare_generation_snapshot();
+            let stubs_pending = self.db.loaded_stubs.len() < crate::stubs::stub_files().len();
+            let with_resolver = self.resolver.is_some();
+            let view = self.db_view();
+            // Unknown and already-prepared files take the single-file path below.
+            let pending: Vec<Option<(crate::db::SourceFile, std::sync::Arc<str>)>> = paths
+                .iter()
+                .map(|path| {
+                    let sf = view.db().lookup_source_file(path.as_ref())?;
+                    let text = sf.text(view.db() as &dyn crate::db::MirDatabase).clone();
+                    (!self.is_prepared_for_analysis(path.as_ref(), &text, generation))
+                        .then_some((sf, text))
+                })
+                .collect();
+            paths
+                .par_iter()
+                .zip(pending)
+                .map_with(view.db().clone(), |db, (path, pending)| {
+                    let (sf, text) = pending?;
+                    if should_cancel() {
+                        return None;
+                    }
+                    Some(plan_prepare(
+                        db,
+                        path,
+                        text,
+                        sf,
+                        stubs_pending,
+                        with_resolver,
+                    ))
+                })
+                .collect()
+        };
+        if should_cancel() {
+            return false;
+        }
+        for (path, plan) in paths.iter().zip(plans) {
+            match plan {
+                Some(plan) => {
+                    if !self.apply_prepare_plan(plan, should_cancel) {
+                        return false;
+                    }
+                }
+                None => {
+                    if !self.prepare_file_for_analysis_cancellable(path, should_cancel) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// The serial half of [`Self::prepare_files_for_analysis_cancellable`] for one
+    /// file: the same steps, in the same order, as
+    /// [`Self::prepare_file_for_analysis_cancellable`].
+    fn apply_prepare_plan(
+        &mut self,
+        plan: PreparePlan,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
+        if should_cancel() {
+            return false;
+        }
+        let generation = self.prepare_generation_snapshot();
+        let current_text = {
+            let view = self.db_view();
+            let db = view.db();
+            db.lookup_source_file(plan.path.as_ref())
+                .map(|sf| sf.text(db as &dyn crate::db::MirDatabase).clone())
+        };
+        if !current_text.is_some_and(|text| std::sync::Arc::ptr_eq(&text, &plan.text)) {
+            return self.prepare_file_for_analysis_cancellable(&plan.path, should_cancel);
+        }
+        if self.is_prepared_for_analysis(plan.path.as_ref(), &plan.text, generation) {
+            return true;
+        }
+        let mut session = self.defer_revision_bumps();
+        if !plan.stub_paths.is_empty()
+            && session.db.loaded_stubs.len() < crate::stubs::stub_files().len()
+        {
+            session.db.ingest_stub_paths(&plan.stub_paths);
+        }
+        session.ensure_vendor_eager_functions();
+        if !plan.classes.is_empty() {
+            // Settled against the db as it stands before this file's loads, as
+            // `priority_index_for_ast` resolves every name before loading any.
+            let resolved: Vec<String> = {
+                let view = session.db_view();
+                let db = view.db() as &dyn crate::db::MirDatabase;
+                plan.classes
+                    .into_iter()
+                    .map(|class| match class {
+                        crate::db::NameResolution::Resolved(fqcn) => fqcn,
+                        crate::db::NameResolution::KnownOrPrefixed(name) => {
+                            if crate::db::class_exists(db, &name) {
+                                name
+                            } else {
+                                crate::db::prefix_file_namespace(db, plan.path.as_ref(), &name)
+                            }
+                        }
+                    })
+                    .collect()
+            };
+            for fqcn in resolved {
+                session.load_class(&fqcn);
+            }
+        }
+        session.mark_prepared_for_analysis(&plan.path, plan.text, generation);
+        true
+    }
+
     /// Current warm-up generation; capture before a prepare + mark pair so a
     /// [`Self::bump_prepare_generation`] during the warm-up invalidates the
     /// mark.
@@ -307,5 +442,45 @@ impl AnalysisSession {
     fn ensure_user_stubs_loaded(&mut self) {
         self.db
             .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
+    }
+}
+
+/// One file's warm-up inputs: everything that depends only on its own text,
+/// so it can be computed on a read snapshot ahead of the serial loads.
+struct PreparePlan {
+    path: std::sync::Arc<str>,
+    text: std::sync::Arc<str>,
+    stub_paths: Vec<&'static str>,
+    classes: Vec<crate::db::NameResolution>,
+}
+
+fn plan_prepare(
+    db: &crate::db::MirDbStorage,
+    path: &std::sync::Arc<str>,
+    text: std::sync::Arc<str>,
+    sf: crate::db::SourceFile,
+    stubs_pending: bool,
+    with_resolver: bool,
+) -> PreparePlan {
+    let mdb = db as &dyn crate::db::MirDatabase;
+    let parsed = crate::db::parse_file(mdb, sf).0.clone();
+    let stub_paths = if stubs_pending {
+        crate::stubs::collect_referenced_builtin_paths_from_ast(&parsed.program)
+    } else {
+        Vec::new()
+    };
+    let classes = if with_resolver {
+        collect_class_refs_from_ast(&parsed.program)
+            .into_iter()
+            .map(|raw| crate::db::resolve_name_deferred(mdb, path, &raw))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    PreparePlan {
+        path: path.clone(),
+        text,
+        stub_paths,
+        classes,
     }
 }

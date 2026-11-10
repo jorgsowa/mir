@@ -101,15 +101,41 @@ pub fn resolve_docblock_type_name(db: &dyn MirDatabase, file: &str, name: &str) 
 }
 
 pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
+    match resolve_name_deferred(db, file, name) {
+        NameResolution::Resolved(fqcn) => fqcn,
+        NameResolution::KnownOrPrefixed(name) => {
+            if class_exists(db, &name) {
+                name
+            } else {
+                prefix_file_namespace(db, file, &name)
+            }
+        }
+    }
+}
+
+/// [`resolve_name`] without its one lookup that depends on which classes exist.
+pub(crate) enum NameResolution {
+    Resolved(String),
+    /// A qualified name with no matching import: itself if that class exists, else
+    /// prefixed with the file's namespace.
+    KnownOrPrefixed(String),
+}
+
+pub(crate) fn resolve_name_deferred(
+    db: &dyn MirDatabase,
+    file: &str,
+    name: &str,
+) -> NameResolution {
+    use NameResolution::Resolved;
     if name.starts_with('\\') {
-        return name.trim_start_matches('\\').to_string();
+        return Resolved(name.trim_start_matches('\\').to_string());
     }
 
     if let Some(kw) = ["self", "static", "parent"]
         .into_iter()
         .find(|kw| name.eq_ignore_ascii_case(kw))
     {
-        return kw.to_string();
+        return Resolved(kw.to_string());
     }
 
     const RELATIVE: &str = "namespace\\";
@@ -117,26 +143,21 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         .get(..RELATIVE.len())
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(RELATIVE))
     {
-        return prefix_file_namespace(db, file, &name[RELATIVE.len()..]);
+        return Resolved(prefix_file_namespace(db, file, &name[RELATIVE.len()..]));
     }
 
     if let Some((first, rest)) = name.split_once('\\') {
         if let Some(imported) = import_qualified_name(db, file, first, rest) {
-            return imported;
+            return Resolved(imported);
         }
-        // If the name is already a known FQCN (e.g. stored in TNamedObject by a prior
-        // resolution step), return it unchanged to avoid double-prepending the namespace.
-        if class_exists(db, name) {
-            return name.to_string();
-        }
-        // Qualified name not yet in the DB (PSR-4 lazy-load will fire after this call):
-        // PHP always prepends the current namespace unconditionally.
-        return prefix_file_namespace(db, file, name);
+        // A name already stored as a FQCN (e.g. in a TNamedObject) must not get the
+        // namespace prepended again; otherwise PHP prepends the current namespace.
+        return NameResolution::KnownOrPrefixed(name.to_string());
     }
 
     let imports = db.file_class_imports(file);
     if let Some(fqcn) = imports.get(&Name::new(name)) {
-        return fqcn.as_str().to_string();
+        return Resolved(fqcn.as_str().to_string());
     }
     // Case-insensitive fallback: PHP class names are case-insensitive for
     // resolution. Iterate as a last resort; the exact-case hit above
@@ -145,9 +166,9 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         .iter()
         .find(|(alias, _)| alias.as_str().eq_ignore_ascii_case(name))
     {
-        return fqcn.as_str().to_string();
+        return Resolved(fqcn.as_str().to_string());
     }
-    prefix_file_namespace(db, file, name)
+    Resolved(prefix_file_namespace(db, file, name))
 }
 
 /// A qualified name whose first segment is a class import of `file`; PHP matches it case-insensitively.
