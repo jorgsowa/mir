@@ -15,4 +15,5 @@ function process($value): void {}
 
 $cond = true;
 $x = $cond ? 'hello' : new MyCountable();
+//   ^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
 process($x); // T = string|MyCountable, should pass - each arm satisfies one arm of bound

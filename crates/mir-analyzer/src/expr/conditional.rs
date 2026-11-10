@@ -45,6 +45,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.analyze(&t.else_expr, &mut else_ctx)
                 };
 
+                if !pre_ctx.diverges
+                    && (then_ctx.diverges || else_ctx.diverges)
+                    && !self
+                        .issues
+                        .has_impossible_comparison_within(&self.span_location(t.condition.span))
+                {
+                    let branch = if then_ctx.diverges { "then" } else { "else" };
+                    self.emit(
+                        IssueKind::RedundantCondition {
+                            always_true: !then_ctx.diverges,
+                            unreachable: Some(format!("{branch} branch")),
+                        },
+                        Severity::Info,
+                        t.condition.span,
+                    );
+                }
+
                 // A variable assigned inside a branch expression (e.g. `$c ? ($z =
                 // "yes") : ($z = "no")`) is a real, permanent assignment on
                 // whichever side actually ran — merge full variable state back,

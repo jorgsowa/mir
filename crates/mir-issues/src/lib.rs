@@ -341,7 +341,7 @@ pub enum IssueKind {
     DuplicateArrayKey { key: String },
 
     // --- Redundancy ---------------------------------------------------------
-    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` and `mir-analyzer/src/expr/conditional.rs`.
     /// Fixtures: `tests/fixtures/by-kind/redundant_condition/`.
     RedundantCondition {
         always_true: bool,

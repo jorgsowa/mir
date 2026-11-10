@@ -19,6 +19,7 @@ function process(callable $c): void {
 
 $flag = true;
 $cb = $flag
+//    ^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
     ? function (string $a, string $b): void {}
     : function (string $a): void {};
 

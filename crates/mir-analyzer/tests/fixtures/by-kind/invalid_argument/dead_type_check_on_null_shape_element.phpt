@@ -7,6 +7,7 @@ function f(array $values): string {
     if (!isset($values['value'])) { $values['value'] = null; }
     if (!is_array($values['value'])) {
         return is_object($values['value']) ? get_class($values['value']) : 'x';
+//             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
     }
     return '';
 }
