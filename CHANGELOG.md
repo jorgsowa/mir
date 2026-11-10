@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Invoking an array callable (`$f = [$repo, 'find']; $f()`, or `[Foo::class, 'make']`) returns the method's return type instead of `mixed`.
 - `SensitiveParameterValue` is generic over its wrapped value, so `getValue()` returns the constructor argument's type instead of `mixed`.
 - `new ArrayObject($array)` binds the key type from the array too (`ArrayObject<string, int>` instead of `ArrayObject<mixed, int>`), so it satisfies an `ArrayAccess<string, int>` parameter.
+- `new $class()` where `$class` holds a literal class name (with or without a leading `\`) is `InterfaceInstantiation`, `TraitInstantiation`, `EnumInstantiation` or `AbstractInstantiation` like `new Name()`.
 
 ## [0.96.0] - 2026-11-09
 

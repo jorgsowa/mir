@@ -866,6 +866,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 }
+                // A literal string names exactly one class, unlike `class-string<X>`.
+                if let [Atomic::TLiteralString(name)] = ty.types.as_slice() {
+                    self.check_literal_class_instantiation(name, n.class.span);
+                }
                 // Every atom a known `class-string<X>` or an `X` object: instantiates one of the X.
                 let mut instances = Type::empty();
                 for atomic in &ty.types {
@@ -889,6 +893,28 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         };
         class_ty
+    }
+
+    /// `new $class()` where `$class` is a literal class name: report what can't be instantiated.
+    fn check_literal_class_instantiation(&mut self, name: &str, span: php_ast::Span) {
+        let fqcn = name.trim_start_matches('\\');
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        let Some(class) = crate::db::find_class_like(self.db, here) else {
+            return;
+        };
+        let class_name = class.fqcn().to_string();
+        let kind = if class.is_interface() {
+            IssueKind::InterfaceInstantiation { class: class_name }
+        } else if class.is_trait() {
+            IssueKind::TraitInstantiation { class: class_name }
+        } else if class.is_enum() {
+            IssueKind::EnumInstantiation { class: class_name }
+        } else if class.is_class() && class.is_abstract() {
+            IssueKind::AbstractInstantiation { class: class_name }
+        } else {
+            return;
+        };
+        self.emit(kind, Severity::Error, span);
     }
 
     /// `EnumName::CaseName->value` / `->name`: look the case up directly from
