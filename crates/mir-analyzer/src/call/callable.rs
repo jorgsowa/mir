@@ -104,6 +104,7 @@ pub(crate) fn callable_string_token_span(source: &str, span: Span, token: &str) 
 pub(crate) struct ParamInfo {
     pub(crate) is_optional: bool,
     pub(crate) is_variadic: bool,
+    pub(crate) is_byref: bool,
     /// The parameter's declared type, when known — used for the parameter-type
     /// contravariance check in `check_typed_callable_arg`. `None` for untyped params
     /// (treated as accepting anything).
@@ -129,6 +130,7 @@ fn extract_all_callable_candidates(
                         .map(|p| ParamInfo {
                             is_optional: p.is_optional,
                             is_variadic: p.is_variadic,
+                            is_byref: p.is_byref,
                             ty: p.ty.as_ref().map(|t| t.to_union()),
                         })
                         .collect(),
@@ -149,6 +151,7 @@ fn extract_all_callable_candidates(
                             .map(|p| ParamInfo {
                                 is_optional: p.is_optional,
                                 is_variadic: p.is_variadic,
+                                is_byref: p.is_byref,
                                 ty: p.ty.as_deref().cloned(),
                             })
                             .collect(),
@@ -165,6 +168,7 @@ fn extract_all_callable_candidates(
                         .map(|p| ParamInfo {
                             is_optional: p.is_optional,
                             is_variadic: p.is_variadic,
+                            is_byref: p.is_byref,
                             ty: p.ty.as_ref().map(|t| t.to_union()),
                         })
                         .collect(),
@@ -1244,6 +1248,27 @@ pub(crate) fn check_typed_callable_arg(
             arg_span,
         );
         return;
+    }
+
+    // A parameter the signature passes by reference must be taken by reference.
+    for params in &candidates {
+        let by_value = expected_params
+            .iter()
+            .zip(params.iter())
+            .position(|(expected, actual)| expected.is_byref && !actual.is_byref);
+        if let Some(i) = by_value {
+            ea.emit(
+                IssueKind::InvalidArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("callable taking parameter #{} by reference", i + 1),
+                    actual: format!("callable taking parameter #{} by value", i + 1),
+                },
+                Severity::Error,
+                arg_span,
+            );
+            return;
+        }
     }
 
     // Parameter-type contravariance: every candidate closure must be able to accept
