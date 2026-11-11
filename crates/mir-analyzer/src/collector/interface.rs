@@ -303,6 +303,7 @@ impl<'a> DefinitionCollector<'a> {
                             virtual_hooks: self
                                 .virtual_hooks(&p.hooks, p.name.as_str().unwrap_or_default()),
                             from_docblock: false,
+                            write_only: false,
                         },
                     );
                 }

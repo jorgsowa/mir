@@ -581,6 +581,7 @@ impl DocblockParser {
                     result.is_readonly = true;
                     result.allow_private_mutation = true;
                 }
+                "phan-write-only" => result.is_write_only = true,
                 "allow-private-mutation" | "psalm-allow-private-mutation" => {
                     result.allow_private_mutation = true
                 }
@@ -996,6 +997,8 @@ pub struct ParsedDocblock {
     pub all_methods_pure: bool,
     /// `@psalm-allow-private-mutation`: a `@readonly` property stays writable inside its class.
     pub allow_private_mutation: bool,
+    /// `@phan-write-only` on a property.
+    pub is_write_only: bool,
     /// An explicit `@impure`/`@psalm-impure`/`@phpstan-impure` declaration.
     /// This opts an implementation out of an inherited purity contract.
     pub is_impure: bool,

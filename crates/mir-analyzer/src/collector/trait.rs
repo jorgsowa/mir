@@ -140,6 +140,7 @@ impl<'a> DefinitionCollector<'a> {
                                         p.name.as_str().unwrap_or_default(),
                                     ),
                                     from_docblock: false,
+                                    write_only: false,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
                             }
@@ -236,6 +237,7 @@ impl<'a> DefinitionCollector<'a> {
                             virtual_hooks: self
                                 .virtual_hooks(&p.hooks, p.name.as_str().unwrap_or_default()),
                             from_docblock: false,
+                            write_only: false,
                         },
                     );
                 }

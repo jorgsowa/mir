@@ -2186,6 +2186,7 @@ impl<'a> DefinitionCollector<'a> {
                     get_only_hook: false,
                     abstract_hooks: 0,
                     virtual_hooks: 0,
+                    write_only: false,
                 },
             );
         }

@@ -2237,7 +2237,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                         if !self.in_existence_check
                             && self.property_inaccessible(
-                                p.visibility,
+                                p.read_visibility(),
                                 owner.as_ref(),
                                 prop_name,
                                 ctx,
@@ -2538,7 +2538,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                         if !self.in_existence_check
                             && self.property_inaccessible(
-                                p.visibility,
+                                p.read_visibility(),
                                 owner.as_ref(),
                                 prop_name,
                                 ctx,

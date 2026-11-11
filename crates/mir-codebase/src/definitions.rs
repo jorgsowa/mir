@@ -702,6 +702,20 @@ pub struct PropertyDef {
         serialize_with = "serialize_param_type"
     )]
     pub native_ty: Option<Arc<Type>>,
+    /// `@phan-write-only`: readable only inside its class.
+    #[serde(default)]
+    pub write_only: bool,
+}
+
+impl PropertyDef {
+    /// Visibility for reading the property: a write-only one reads as private.
+    pub fn read_visibility(&self) -> Visibility {
+        if self.write_only {
+            Visibility::Private
+        } else {
+            self.visibility
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

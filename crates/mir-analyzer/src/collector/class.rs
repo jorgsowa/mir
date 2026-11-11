@@ -241,6 +241,7 @@ impl<'a> DefinitionCollector<'a> {
                                         p.name.as_str().unwrap_or_default(),
                                     ),
                                     from_docblock: false,
+                                    write_only: false,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
                             }
@@ -390,6 +391,7 @@ impl<'a> DefinitionCollector<'a> {
                         virtual_hooks: self
                             .virtual_hooks(&p.hooks, p.name.as_str().unwrap_or_default()),
                         from_docblock: false,
+                        write_only: prop_doc.is_write_only,
                     };
                     // A native `readonly` property (own keyword or whole-class
                     // `readonly class`) may not carry a default value — a PHP
