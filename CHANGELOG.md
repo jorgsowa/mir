@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.0] - 2026-11-11
+
 ### Added
 
 - `RedundantCondition` is reported for a ternary condition that is always true or always false (`is_string($int) ? … : …`, `$foo instanceof Bar ? … : …`), as it is for the same condition in an `if`. The short `?:` form is not checked.
@@ -14,9 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InvalidGeneratorIteration` (MIR0237) is reported for a `foreach` over a `Generator<K, V, TSend, R>` whose send type does not accept `null`: `foreach` resumes the generator without sending a value. A `void`, `mixed` or nullable send type is accepted.
 - `@return noreturn` is read as `never`: returning a value is `InvalidReturnType` and code after a call is `UnreachableCode`, instead of `UndefinedDocblockClass` for a class named `noreturn`.
 - `stringable-object` is enforced: an object without `__toString()`, or a non-object, passed for it is `InvalidArgument`.
-- `InvalidArgument` is reported for a string literal that cannot spell a class name (`'not a class'`, `'Foo[]'`, `''`) passed where `class-string` is required. Such text was skipped before.
+- `InvalidArgument` is reported for a string literal that cannot spell a class name (`'not a class'`, `'Foo[]'`, `''`) passed where `class-string` is required, unless the parameter lists that literal too (`class-string<T>|'*'`). Such text was skipped before.
 - `lowercase-string`, `uppercase-string`, `non-empty-lowercase-string` and `non-empty-uppercase-string` are enforced instead of being read as `string`: a literal of the wrong case is `InvalidArgument` / `InvalidReturnType`, a string of unknown case is `ArgumentTypeCoercion`. `strtolower()`, `strtoupper()` and their `mb_` forms return the matching type.
 - `literal-string`, `non-empty-literal-string` and `literal-int` are enforced instead of being read as `string` / `int`: a value read at runtime is `ArgumentTypeCoercion` as an argument and `InvalidReturnType` when returned. Literals, constants, `Foo::class` and concatenations of them are accepted.
+- `non-falsy-string` (and `truthy-string`) is its own type instead of an alias of `non-empty-string`: `'0'` is rejected, a `non-empty-string` or `numeric-string` passed to it is `ArgumentTypeCoercion`, and testing it for truthiness is `RedundantCondition`. A string that passed a truthiness check, and a concatenation of two non-empty parts, is a `non-falsy-string`.
 - `int-mask-of<Other::PREFIX_*>` resolves the int constants of a class other than the declaring one, so a value outside the mask is `InvalidArgument` / `InvalidReturnType`. It was read as `int` unless the class was `self`.
 - `properties-of<Cls>`, `public-properties-of`, `protected-properties-of` and `private-properties-of` are the shape of the class's instance properties (inherited ones included) instead of `array<string, mixed>`, so a wrongly typed or missing entry is `InvalidArgument`.
 - An object shape parameter (`object{foo: int, bar?: string}`) is checked against the class of the argument: a required property that is missing, not public or of another type is `InvalidArgument`. `stdClass` and classes with `__get()` are accepted as before.
@@ -26,17 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A method that takes the class template cannot be called through a star or covariant projection (`Collection<*>`, `Collection<covariant Animal>`): the argument is `InvalidArgument` against `never`. Methods that do not mention the template, and methods with a template of their own, are unaffected.
 - `template-type<Object, Class, 'T'>` is the type argument the object supplies for that template, also through `@extends`, instead of an undefined class named `template-type`.
 
+### Changed
+
+- Workspace and internal crate versions were updated to `0.98.0`.
+
 ### Fixed
 
-- A by-reference capture of the variable a call's result is assigned to (`$prev = set_error_handler(function () use (&$prev) {…})`) may be null inside the closure, so testing it is no longer `RedundantCondition`. A closure assigned directly to the captured variable is still callable.
+- The analysis cache records the content of files read on demand (a vendor class resolved through the autoloader), so the next session no longer re-analyzes every file that depends on them when they haven't changed.
+- A by-reference capture of the variable a call's result is assigned to (`$prev = set_error_handler(function () use (&$prev) {…})`) may be null inside the closure, so testing it is no longer `RedundantCondition`, and the write after the capture is not `UnusedVariable`, since the closure reads it through the reference. A closure assigned directly to the captured variable is still callable.
 - A shape whose keys are all optional (`array{page?: int}`, the result of `array_filter()` on a literal array) may be empty, so testing it is no longer `RedundantCondition`.
 - After `array_push($list, ...$more)` the array may still be empty, since a spread argument can unpack to nothing.
 - `finally` sees the variables as they were at a `return` nested inside the `try` body or a `catch`, so a value assigned just before that return is no longer `ImpossibleIdenticalComparison`, `RedundantCondition` or `UndefinedVariable` there.
 - `is_string()`, `is_int()`, `is_float()` and `is_bool()` on the key or value of a template-typed array (`@template T of array`) keep the type undecided instead of ruling the check out.
 - `pcntl_signal_get_handler()` returns `callable|int` instead of `bool|resource`.
-- A write to a variable after a closure captured it by reference (`$prev = set_error_handler(function () use (&$prev) {…})`) is not `UnusedVariable`: the closure reads it through the reference.
 - The key or value of a template-typed array passed back to the same template (`resolve($item)` inside `foreach ($value as $item)`) is no longer `InvalidTemplateParam`.
-- The docblock types `non-zero-int`, `non-positive-int`, `int-range<…>`, `number`, `decimal-int-string`, `non-decimal-int-string`, `non-empty-literal-string`, `non-empty-scalar`, `non-empty-mixed`, `non-null-mixed`, `callable-array`, `callable-object`, `static-closure` and `static-pure-closure` are read as types instead of class names, so a valid value is no longer `InvalidArgument` and the declaration no longer `UndefinedDocblockClass`.
+- The docblock types `non-zero-int`, `non-positive-int`, `int-range<…>`, `number`, `decimal-int-string`, `non-decimal-int-string`, `non-empty-scalar`, `non-empty-mixed`, `non-null-mixed`, `callable-array`, `callable-object`, `static-closure` and `static-pure-closure` are read as types instead of class names, so a valid value is no longer `InvalidArgument` and the declaration no longer `UndefinedDocblockClass`.
 - `numeric` accepts a numeric string literal (`'123'`, `'1.5e3'`), as an argument and as a returned value.
 - `enum-string` accepts the name of an enum and `trait-string` the name of a trait (`Suit::class`); the name of any other class is still rejected.
 - `key-of<T>` and `value-of<T>` name the template in a namespaced file instead of a class `T`, and `value-of<T>` of a backed enum case is that case's backing value.
@@ -49,7 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `str_split()` and `mb_str_split()` take a `positive-int` length, so a zero or negative length is `InvalidArgument`.
 - A shape nested in a list, map or other shape argument (`list<array{id: int}>` given `[['id' => 'x']]`) is checked key by key against the expected shape, so a wrong value type or a missing required key is `InvalidArgument`.
 - Under `strict_types` a `float` passed to an `int` parameter is `InvalidArgument`, and an `int|float` is `PossiblyInvalidArgument`; only float literals were reported before. This also covers a nested conditional return (`($a is int ? ($b is int ? int : float) : float)`) that resolves to `float`.
-- `non-falsy-string` (and `truthy-string`) is its own type instead of an alias of `non-empty-string`: `'0'` is rejected, a `non-empty-string` or `numeric-string` passed to it is `ArgumentTypeCoercion`, and testing it for truthiness is `RedundantCondition`. A string that passed a truthiness check, and a concatenation of two non-empty parts, is a `non-falsy-string`.
 
 ## [0.97.0] - 2026-11-10
 
