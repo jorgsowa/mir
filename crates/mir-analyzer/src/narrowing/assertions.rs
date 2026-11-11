@@ -642,10 +642,22 @@ pub(crate) fn negate_assertion_type(current: &Type, asserted: &Type, db: &dyn Mi
             | Atomic::TStaticObject { fqcn }
             | Atomic::TParent { fqcn } => filter_out_instanceof_match(&result, fqcn, db),
             Atomic::TIntersection { parts } => filter_out_intersection_match(&result, parts, db),
+            Atomic::TInt => negate_type_fn(result, "is_int", db),
+            Atomic::TString => negate_type_fn(result, "is_string", db),
+            Atomic::TFloat => negate_type_fn(result, "is_float", db),
+            Atomic::TBool => negate_type_fn(result, "is_bool", db),
+            Atomic::TObject => negate_type_fn(result, "is_object", db),
+            Atomic::TArray { value, .. } if value.is_mixed() => {
+                negate_type_fn(result, "is_array", db)
+            }
             _ => result,
         };
     }
     result
+}
+
+fn negate_type_fn(current: Type, fn_name: &str, db: &dyn MirDatabase) -> Type {
+    super::type_fn::type_fn_narrowed(&current, fn_name, db, false).unwrap_or(current)
 }
 
 /// Resolve the call argument that actually feeds `params[param_index]`,

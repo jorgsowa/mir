@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A negated assertion on a scalar, array or object type (`@psalm-assert !int $v`, `@phpstan-assert !string $v`) removes that type from the argument, as `!null` and `!ClassName` already did. A later `is_int($v)` is `RedundantCondition`.
+
 ## [0.98.0] - 2026-11-11
 
 ### Added
