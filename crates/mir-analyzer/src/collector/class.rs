@@ -353,18 +353,23 @@ impl<'a> DefinitionCollector<'a> {
                         ),
                         p.modifiers.is_static,
                     );
+                    // A docblock-readonly property writable inside its class is `private(set)`.
+                    let private_mutation = prop_doc.allow_private_mutation
+                        && (prop_doc.is_readonly || class_doc.is_readonly);
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
                         ty: mir_codebase::definitions::wrap_property_type(refined_ty),
                         inferred_ty: None,
                         native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                         visibility: Self::convert_visibility(p.modifiers.visibility),
-                        set_visibility: Self::convert_set_visibility(&p.modifiers),
+                        set_visibility: Self::convert_set_visibility(&p.modifiers)
+                            .or(private_mutation
+                                .then_some(mir_codebase::definitions::Visibility::Private)),
                         is_static: p.modifiers.is_static,
                         is_readonly: p.modifiers.is_readonly
                             || decl.modifiers.is_readonly
-                            || prop_doc.is_readonly
-                            || class_doc.is_readonly,
+                            || (!private_mutation
+                                && (prop_doc.is_readonly || class_doc.is_readonly)),
                         has_native_readonly: p.modifiers.is_readonly || decl.modifiers.is_readonly,
                         is_override: self.has_override_attribute(&p.attributes),
                         default: mir_codebase::definitions::wrap_property_type(default_ty),

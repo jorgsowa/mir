@@ -561,7 +561,18 @@ impl DocblockParser {
                 | "psalm-external-mutation-free"
                 | "phpstan-external-mutation-free" => result.is_external_mutation_free = true,
                 "immutable" | "psalm-immutable" | "phpstan-immutable" => result.is_immutable = true,
-                "readonly" | "psalm-readonly" | "phpstan-readonly" => result.is_readonly = true,
+                "readonly" | "psalm-readonly" | "phpstan-readonly" | "phan-read-only" => {
+                    result.is_readonly = true
+                }
+                "readonly-allow-private-mutation"
+                | "psalm-readonly-allow-private-mutation"
+                | "phpstan-readonly-allow-private-mutation" => {
+                    result.is_readonly = true;
+                    result.allow_private_mutation = true;
+                }
+                "allow-private-mutation" | "psalm-allow-private-mutation" => {
+                    result.allow_private_mutation = true
+                }
                 "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                 "api" | "psalm-api" => result.is_api = true,
@@ -956,6 +967,8 @@ pub struct ParsedDocblock {
     pub is_pure: bool,
     /// `@phpstan-all-methods-pure` on a class.
     pub all_methods_pure: bool,
+    /// `@psalm-allow-private-mutation`: a `@readonly` property stays writable inside its class.
+    pub allow_private_mutation: bool,
     /// An explicit `@impure`/`@psalm-impure`/`@phpstan-impure` declaration.
     /// This opts an implementation out of an inherited purity contract.
     pub is_impure: bool,

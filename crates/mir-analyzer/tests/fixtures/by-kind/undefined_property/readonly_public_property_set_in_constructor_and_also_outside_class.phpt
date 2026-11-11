@@ -19,3 +19,4 @@ class A {
 
 $a = new A();
 $a->bar = "goodbye";
+//<^^^^^^^^^^^^^^^^^^^ InaccessibleProperty: Cannot access property A::$bar
