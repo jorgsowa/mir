@@ -1582,6 +1582,45 @@ fn resolve_method_return<'a>(
             &substituted_params
         };
 
+        // Nothing can be written through a `covariant X` or `*` type argument.
+        let projected: Vec<&str> = class_tps
+            .iter()
+            .zip(receiver_type_params)
+            .filter(|(tp, arg)| {
+                matches!(
+                    crate::subtype::call_site_variance(arg),
+                    Some((mir_types::Variance::Covariant, _))
+                ) && param_bindings.contains_key(&Name::from(tp.name.as_ref()))
+            })
+            .map(|(tp, _)| tp.name.as_ref())
+            .collect();
+        if !projected.is_empty() && !has_spread && arg_names.iter().all(Option::is_none) {
+            for (i, p) in resolved.params.iter().enumerate() {
+                let takes_projected = p.ty.as_ref().is_some_and(|t| {
+                    t.contains(|a| {
+                        matches!(a, mir_types::Atomic::TTemplateParam { name, .. }
+                            if projected.contains(&name.as_str()))
+                    })
+                });
+                if let (true, Some(arg_ty), Some(arg_span)) = (
+                    takes_projected,
+                    effective_arg_types.get(i),
+                    effective_arg_spans.get(i),
+                ) {
+                    ea.emit(
+                        IssueKind::InvalidArgument {
+                            param: p.name.to_string(),
+                            fn_name: method_name.to_string(),
+                            expected: "never".to_string(),
+                            actual: arg_ty.to_string(),
+                        },
+                        Severity::Error,
+                        *arg_span,
+                    );
+                }
+            }
+        }
+
         check_args(
             ea,
             CheckArgsParams {
