@@ -1,6 +1,5 @@
 ===description===
-FALSE POSITIVE reproducer. Valid PHP: The string literal `'string[]'` is a runtime value, not a class name.
-Expected: no issue.
+The literal `'string[]'` cannot spell a class name: it is rejected as a class-string, not looked up as a class.
 ===config===
 <mir>
   <issueHandlers>
@@ -13,6 +12,6 @@ Expected: no issue.
 /** @param class-string $type */
 function deserialize(string $type, string $payload): mixed { return null; }
 function run(string $payload): mixed {
-    // expect: UndefinedClass "string[]" (array-type string parsed as a class)
     return deserialize('string[]', $payload);
+//                     ^^^^^^^^^^ InvalidArgument: Argument $type of deserialize() expects 'class-string', got '"string[]"'
 }

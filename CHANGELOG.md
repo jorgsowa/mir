@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InvalidGeneratorIteration` (MIR0237) is reported for a `foreach` over a `Generator<K, V, TSend, R>` whose send type does not accept `null`: `foreach` resumes the generator without sending a value. A `void`, `mixed` or nullable send type is accepted.
 - `@return noreturn` is read as `never`: returning a value is `InvalidReturnType` and code after a call is `UnreachableCode`, instead of `UndefinedDocblockClass` for a class named `noreturn`.
 - `stringable-object` is enforced: an object without `__toString()`, or a non-object, passed for it is `InvalidArgument`.
+- `InvalidArgument` is reported for a string literal that cannot spell a class name (`'not a class'`, `'Foo[]'`, `''`) passed where `class-string` is required. Such text was skipped before.
 
 ### Fixed
 

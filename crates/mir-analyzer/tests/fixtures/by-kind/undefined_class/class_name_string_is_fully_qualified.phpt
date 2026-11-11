@@ -2,7 +2,7 @@
 A class name held in a string is always fully qualified at runtime: neither
 the current namespace nor `use` imports apply to it. `'Exception'` names the
 global class, `'Thing'` stays `Thing` even with `use Lib\Thing`, and strings
-that can't be class names (`'0'`, `''`) are never looked up.
+that can't be class names (`'0'`, `''`) are rejected without a lookup.
 ===config===
 <mir>
   <issueHandlers>
@@ -44,6 +44,7 @@ namespace App {
         Factory::call('Exception::getMessage');
         if (!$maybe) {
             Factory::make($maybe);
+//                        ^^^^^^ InvalidArgument: Argument $class of make() expects 'class-string<T>', got '""'
         }
     }
 }

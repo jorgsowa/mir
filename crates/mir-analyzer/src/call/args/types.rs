@@ -118,7 +118,7 @@ pub(crate) fn check_one(
     if !skip_validation {
         validate_callable_argument(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
     }
-    validate_class_string_argument(ea, param_ty, arg_ty, arg_span);
+    validate_class_string_argument(ea, fn_name, param_name, param_ty, arg_ty, arg_span);
     validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
     validate_callable_type(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
 
@@ -1993,6 +1993,8 @@ fn validate_callable_argument(
 /// Validate class-string arguments: check that string references existing classes
 fn validate_class_string_argument(
     ea: &mut ExpressionAnalyzer<'_>,
+    fn_name: &str,
+    param_name: &str,
     param_ty: &Type,
     arg_ty: &Type,
     arg_span: Span,
@@ -2025,9 +2027,18 @@ fn validate_class_string_argument(
         Atomic::TLiteralString(s) => Some(s),
         _ => None,
     }) {
-        // Skip strings that cannot be valid PHP class names (e.g. 'string[]', 'int|null').
-        // A class name only contains letters, digits, underscores, and namespace separators.
+        // Text that cannot spell a class name (`'int|null'`, `'not a class'`) is no class-string.
         if !is_possible_class_name(s) {
+            ea.emit(
+                IssueKind::InvalidArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: param_ty.to_string(),
+                    actual: format!("\"{s}\""),
+                },
+                Severity::Error,
+                arg_span,
+            );
             continue;
         }
         let resolved = s.trim_start_matches('\\').to_string();
