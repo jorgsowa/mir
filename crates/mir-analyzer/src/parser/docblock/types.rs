@@ -134,6 +134,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "static-closure",
     "static-pure-closure",
     "string",
+    "stringable-object",
     "trait-string",
     "true",
     "truthy-string",
@@ -514,6 +515,11 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             })
         }
         "callable-string" => Type::single(Atomic::TCallableString),
+        // The leading backslash keeps namespace resolution from qualifying it.
+        "stringable-object" => Type::single(Atomic::TNamedObject {
+            fqcn: mir_types::Name::from("\\Stringable"),
+            type_params: Default::default(),
+        }),
         "iterable" => {
             let mut u = Type::single(Atomic::TArray {
                 key: Box::new(Type::array_key()),

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ArgumentTypeCoercion` is reported for a plain `string` passed where only string literals are accepted (`'asc'|'desc'`), as it is for `non-empty-string`. A string narrowed to those literals by a comparison, `in_array()` or `array_key_exists()` is accepted.
 - `InvalidGeneratorIteration` (MIR0237) is reported for a `foreach` over a `Generator<K, V, TSend, R>` whose send type does not accept `null`: `foreach` resumes the generator without sending a value. A `void`, `mixed` or nullable send type is accepted.
 - `@return noreturn` is read as `never`: returning a value is `InvalidReturnType` and code after a call is `UnreachableCode`, instead of `UndefinedDocblockClass` for a class named `noreturn`.
+- `stringable-object` is enforced: an object without `__toString()`, or a non-object, passed for it is `InvalidArgument`.
 
 ### Fixed
 
