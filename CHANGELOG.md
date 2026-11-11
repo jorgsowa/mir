@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new<…>` and an offset access (`ID_TABLE[T]`) in `@return` are no longer read as class names; the native return type applies.
 - `str_split()` and `mb_str_split()` take a `positive-int` length, so a zero or negative length is `InvalidArgument`.
 - A shape nested in a list, map or other shape argument (`list<array{id: int}>` given `[['id' => 'x']]`) is checked key by key against the expected shape, so a wrong value type or a missing required key is `InvalidArgument`.
+- Under `strict_types` a `float` passed to an `int` parameter is `InvalidArgument`, and an `int|float` is `PossiblyInvalidArgument`; only float literals were reported before. This also covers a nested conditional return (`($a is int ? ($b is int ? int : float) : float)`) that resolves to `float`.
 
 ## [0.97.0] - 2026-11-10
 

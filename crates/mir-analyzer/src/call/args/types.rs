@@ -251,6 +251,33 @@ pub(crate) fn check_one(
         return;
     }
 
+    // Under strict_types a float is never converted to an int.
+    if ea.strict_types
+        && arg_ty.contains(|t| matches!(t, Atomic::TFloat))
+        && !non_null_param.types.is_empty()
+        && non_null_param.types.iter().all(|t| t.is_int())
+    {
+        let expected = format!("{param_ty}");
+        let kind = if arg_ty.remove_null().is_single() {
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected,
+                actual: arg_display,
+            }
+        } else {
+            IssueKind::PossiblyInvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected,
+                actual: arg_display,
+            }
+        };
+        let severity = kind.default_severity();
+        ea.emit(kind, severity, arg_span);
+        return;
+    }
+
     let arg_core = arg_ty.core_type();
     let mismatch = !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()
