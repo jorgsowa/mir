@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `key-of<T>` and `value-of<T>` name the template in a namespaced file instead of a class `T`, and `value-of<T>` of a backed enum case is that case's backing value.
 - `class-string-map<T of Bound, T>` reads the template declared in place, so the value type is the bound instead of an undefined class `T`.
 - `@phan-type` declares a local type alias, like `@psalm-type` and `@phpstan-type`.
+- A `// comment` after an item of a multi-line `array{…}` shape is skipped instead of being read into the next key.
 
 ## [0.97.0] - 2026-11-10
 

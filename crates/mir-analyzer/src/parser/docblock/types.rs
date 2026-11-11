@@ -1095,13 +1095,32 @@ pub(super) fn strip_ascii_ci_prefix<'a>(s: &'a str, prefix: &str) -> Option<&'a 
         .then(|| &s[prefix.len()..])
 }
 
+/// Drops the `// …` comments a multi-line shape may carry after its items.
+fn strip_line_comments(s: &str) -> std::borrow::Cow<'_, str> {
+    if !s.contains("//") {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let code = |line: &str| {
+        let mut prev_slash = None;
+        for (i, ch) in unquoted_char_indices(line) {
+            if ch == '/' && prev_slash.is_some_and(|p| p + 1 == i) {
+                return line[..i - 1].to_string();
+            }
+            prev_slash = (ch == '/').then_some(i);
+        }
+        line.to_string()
+    };
+    std::borrow::Cow::Owned(s.lines().map(code).collect::<Vec<_>>().join("\n"))
+}
+
 pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     use mir_types::atomic::KeyedProperty;
     let mut properties: mir_types::KeyedProperties = mir_types::KeyedProperties::default();
     let mut is_open = false;
     let mut auto_index = 0i64;
 
-    for item in split_generics(inner) {
+    let inner = strip_line_comments(inner);
+    for item in split_generics(&inner) {
         let item = item.trim();
         if item.is_empty() {
             continue;
