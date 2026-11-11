@@ -298,6 +298,10 @@ pub enum IssueKind {
     /// Emitted when `yield from` might be used with a non-iterable object.
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     PossiblyRawObjectIteration { ty: String },
+    /// `foreach` over a generator whose send type does not accept the `null` each step sends.
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_generator_iteration/`.
+    InvalidGeneratorIteration { ty: String, send: String },
     /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/`.
     MismatchingDocblockReturnType { declared: String, inferred: String },
@@ -1156,6 +1160,7 @@ impl IssueKind {
             | IssueKind::PossiblyInvalidOperand { .. }
             | IssueKind::PossiblyNullOperand { .. }
             | IssueKind::PossiblyRawObjectIteration { .. }
+            | IssueKind::InvalidGeneratorIteration { .. }
             | IssueKind::PossiblyNullPropertyAssignmentValue { .. }
             | IssueKind::PossiblyFalsePropertyAssignmentValue { .. }
             | IssueKind::PossiblyInvalidPropertyAssignmentValue { .. } => Severity::Info,
@@ -1325,6 +1330,7 @@ impl IssueKind {
             IssueKind::InvalidUnpack { .. } => "MIR0231",
             IssueKind::RawObjectIteration { .. } => "MIR0222",
             IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
+            IssueKind::InvalidGeneratorIteration { .. } => "MIR0237",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
             IssueKind::InvalidStringClass { .. } => "MIR0211",
@@ -1544,7 +1550,9 @@ impl IssueKind {
             | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
             | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
             | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
-            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" => Some(Severity::Info),
+            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" | "MIR0237" => {
+                Some(Severity::Info)
+            }
 
             _ => None,
         }
@@ -1615,6 +1623,7 @@ impl IssueKind {
             IssueKind::DivisionByZero { .. } => "DivisionByZero",
             IssueKind::RawObjectIteration { .. } => "RawObjectIteration",
             IssueKind::PossiblyRawObjectIteration { .. } => "PossiblyRawObjectIteration",
+            IssueKind::InvalidGeneratorIteration { .. } => "InvalidGeneratorIteration",
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
@@ -2055,6 +2064,9 @@ impl IssueKind {
             }
             IssueKind::PossiblyRawObjectIteration { ty } => {
                 format!("Cannot iterate over possibly non-iterable object '{ty}'")
+            }
+            IssueKind::InvalidGeneratorIteration { ty, send } => {
+                format!("foreach sends null to '{ty}', but its send type is '{send}'")
             }
             IssueKind::MismatchingDocblockReturnType { declared, inferred } => {
                 format!("Docblock return type '{declared}' does not match inferred '{inferred}'")
@@ -3057,6 +3069,7 @@ mod code_tests {
             IssueKind::DivisionByZero { op: s() },
             IssueKind::RawObjectIteration { ty: s() },
             IssueKind::PossiblyRawObjectIteration { ty: s() },
+            IssueKind::InvalidGeneratorIteration { ty: s(), send: s() },
             IssueKind::MismatchingDocblockReturnType {
                 declared: s(),
                 inferred: s(),
@@ -3471,6 +3484,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 192);
+        assert_eq!(one_of_each().len(), 193);
     }
 }

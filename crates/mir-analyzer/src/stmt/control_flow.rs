@@ -421,6 +421,44 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = post;
     }
 
+    /// `foreach` resumes a generator with null, which a non-nullable send type rules out.
+    fn check_generator_send_type(&mut self, iterable: &Type, span: php_ast::Span, ctx: &FlowState) {
+        for atomic in &iterable.types {
+            let Atomic::TNamedObject { fqcn, type_params } = atomic else {
+                continue;
+            };
+            let Some(send) = type_params.get(2) else {
+                continue;
+            };
+            let accepts_null = send.is_mixed()
+                || send.types.is_empty()
+                || send.contains(|t| {
+                    matches!(
+                        t,
+                        Atomic::TNull
+                            | Atomic::TVoid
+                            | Atomic::TNever
+                            | Atomic::TTemplateParam { .. }
+                    )
+                });
+            if accepts_null
+                || !fqcn
+                    .trim_start_matches('\\')
+                    .eq_ignore_ascii_case("Generator")
+            {
+                continue;
+            }
+            self.expr_analyzer(ctx).emit(
+                IssueKind::InvalidGeneratorIteration {
+                    ty: atomic.to_string(),
+                    send: send.to_string(),
+                },
+                mir_issues::Severity::Info,
+                span,
+            );
+        }
+    }
+
     pub(super) fn analyze_foreach_stmt(
         &mut self,
         fe: &ForeachStmt,
@@ -450,6 +488,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.expr_analyzer(ctx)
                 .record_wholesale_property_read(&arr_ty, fe.expr.span);
         }
+        self.check_generator_send_type(&arr_ty, fe.expr.span, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 
         if let Some(vname) = extract_simple_var(&fe.value) {

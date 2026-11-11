@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `RedundantCondition` is reported for a ternary condition that is always true or always false (`is_string($int) ? … : …`, `$foo instanceof Bar ? … : …`), as it is for the same condition in an `if`. The short `?:` form is not checked.
 - `ArgumentTypeCoercion` is reported for a plain `string` passed where only string literals are accepted (`'asc'|'desc'`), as it is for `non-empty-string`. A string narrowed to those literals by a comparison, `in_array()` or `array_key_exists()` is accepted.
+- `InvalidGeneratorIteration` (MIR0237) is reported for a `foreach` over a `Generator<K, V, TSend, R>` whose send type does not accept `null`: `foreach` resumes the generator without sending a value. A `void`, `mixed` or nullable send type is accepted.
 
 ### Fixed
 
