@@ -126,7 +126,9 @@ impl DocblockParser {
                         if let Some(msg) = validate_type_str(&ty_s, "return") {
                             result.invalid_annotations.push(msg);
                         }
-                        result.return_type = Some(parse_type_string(&ty_s));
+                        // An unmodelled `new<T>` / `T[K]` leaves the native return type in charge.
+                        result.return_type =
+                            (!is_deferred_type(&ty_s)).then(|| parse_type_string(&ty_s));
                         if capture_descriptions {
                             let desc = description_after(&body_str, &ty_s);
                             if !desc.is_empty() {

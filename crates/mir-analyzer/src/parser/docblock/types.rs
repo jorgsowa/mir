@@ -94,6 +94,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "lowercase-string",
     "mixed",
     "negative-int",
+    "new",
     "never",
     "never-return",
     "never-returns",
@@ -241,6 +242,13 @@ fn parse_shape_key(inner: &str) -> mir_types::ArrayKey {
     mir_types::ArrayKey::String(std::sync::Arc::from(inner))
 }
 
+/// `new<T>` and offset access `T[K]`, whose result needs the bound template.
+pub(super) fn is_deferred_type(s: &str) -> bool {
+    let s = s.trim();
+    (s.ends_with(']') && !s.ends_with("[]") && s.contains('['))
+        || (s.ends_with('>') && strip_ascii_ci_prefix(s, "new<").is_some())
+}
+
 pub(crate) fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
     // Docblock keywords are legal with a leading global `\` (`@param \int $x`);
@@ -341,6 +349,10 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
     // Callable/closure syntax: `Closure(T): R` or `callable(T): R`
     if let Some(call_ty) = parse_callable_syntax(s) {
         return call_ty;
+    }
+
+    if is_deferred_type(s) {
+        return Type::mixed();
     }
 
     // Array shape: `array{key: Type, ...}` or `list{Type, ...}`
@@ -739,6 +751,7 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         }
         // PHPStan's lenient union: the members still describe the value.
         "__benevolent" => parse_type_string(inner.trim()),
+        "new" => Type::mixed(),
         "properties-of"
         | "public-properties-of"
         | "protected-properties-of"
