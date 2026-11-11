@@ -113,6 +113,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "non-null-mixed",
     "non-positive-int",
     "non-zero-int",
+    "noreturn",
     "null",
     "numeric",
     "numeric-string",
@@ -468,7 +469,9 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "false" => Type::single(Atomic::TFalse),
         "null" => Type::single(Atomic::TNull),
         "void" => Type::single(Atomic::TVoid),
-        "never" | "never-return" | "no-return" | "never-returns" => Type::single(Atomic::TNever),
+        "never" | "never-return" | "no-return" | "never-returns" | "noreturn" => {
+            Type::single(Atomic::TNever)
+        }
         // The falsy/null exclusions and callability have no atom; the base type is lenient.
         "mixed" | "non-empty-mixed" | "non-null-mixed" => Type::single(Atomic::TMixed),
         "object" | "callable-object" => Type::single(Atomic::TObject),
