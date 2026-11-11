@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `int-mask-of<Other::PREFIX_*>` resolves the int constants of a class other than the declaring one, so a value outside the mask is `InvalidArgument` / `InvalidReturnType`. It was read as `int` unless the class was `self`.
 - `properties-of<Cls>`, `public-properties-of`, `protected-properties-of` and `private-properties-of` are the shape of the class's instance properties (inherited ones included) instead of `array<string, mixed>`, so a wrongly typed or missing entry is `InvalidArgument`.
 - An object shape parameter (`object{foo: int, bar?: string}`) is checked against the class of the argument: a required property that is missing, not public or of another type is `InvalidArgument`. `stdClass` and classes with `__get()` are accepted as before.
+- `closed-resource` is its own type: `fclose()`, `pclose()` and `closedir()` close the variable they are given, a handle not known to be closed is `ArgumentTypeCoercion` where `closed-resource` is required, and `is_resource()` on a closed handle is `RedundantCondition`. A closed handle is still accepted for `resource`.
 
 ### Fixed
 

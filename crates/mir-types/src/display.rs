@@ -207,6 +207,7 @@ impl fmt::Display for Atomic {
 
             Atomic::TObject => write!(f, "object"),
             Atomic::TResource => write!(f, "resource"),
+            Atomic::TClosedResource => write!(f, "closed-resource"),
             Atomic::TPropertiesOf { class, filter } => {
                 let prefix = match filter {
                     PropertyFilter::All => "",

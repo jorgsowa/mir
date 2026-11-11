@@ -404,6 +404,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         // Open / unknown — cannot determine family. A `@var resource` is often stale (null until opened).
         Atomic::TMixed
         | Atomic::TResource
+        | Atomic::TClosedResource
         | Atomic::TScalar
         | Atomic::TNumeric
         | Atomic::TVoid

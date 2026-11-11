@@ -546,7 +546,7 @@ fn class_fits_object_shape(
     })
 }
 
-/// A plain `string`/`int` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`, `'a'|'b'`).
+/// A plain `string`/`int`/`resource` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`, `'a'|'b'`, `closed-resource`).
 fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
     let arg = arg.remove_null();
     let refinable = |a: &Atomic| {
@@ -563,6 +563,8 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
                 | Atomic::TRefinedInt(_)
+                | Atomic::TResource
+                | Atomic::TClosedResource
         )
     };
     !arg.types.is_empty()

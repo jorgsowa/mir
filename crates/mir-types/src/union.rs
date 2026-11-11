@@ -564,6 +564,12 @@ impl Type {
             self.types
                 .retain(|t| !int_bounds(t).is_some_and(|b| bounds_contain(new_bounds, b)));
         }
+        // `resource` covers closed handles too.
+        match atomic {
+            Atomic::TClosedResource if self.types.contains(&Atomic::TResource) => return,
+            Atomic::TResource => self.types.retain(|t| *t != Atomic::TClosedResource),
+            _ => {}
+        }
         // literal-int sits between the int literals and int.
         const LITERAL_INT: Atomic = Atomic::TRefinedInt(IntRefinement::Literal);
         match atomic {
@@ -1945,7 +1951,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         // Null. `void` maps to `Top` (a `void`-typed value is unknown; treating
         // it as "everything" keeps any branch it feeds undecidable).
         Atomic::TNull => vec![Null],
-        Atomic::TResource => vec![Resource],
+        Atomic::TResource | Atomic::TClosedResource => vec![Resource],
         Atomic::TVoid => vec![Top],
         // Everything / scalars.
         Atomic::TMixed => vec![Top],
@@ -2205,6 +2211,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         value: Box::new(Type::mixed()),
     };
     match (sub, sup) {
+        (Atomic::TClosedResource, _) => return atomic_subtype(&Atomic::TResource, sup),
         (Atomic::TPropertiesOf { .. }, _) => return atomic_subtype(&string_keyed_array(), sup),
         (_, Atomic::TPropertiesOf { .. }) => return atomic_subtype(sub, &string_keyed_array()),
         (Atomic::TObjectShape { properties: have }, Atomic::TObjectShape { properties: want }) => {

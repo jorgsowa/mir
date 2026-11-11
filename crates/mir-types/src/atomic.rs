@@ -436,6 +436,8 @@ pub enum Atomic {
 
     /// `resource` — a legacy resource handle (open or closed); docblock-only, never a native type.
     TResource,
+    /// `closed-resource` — a handle known to be closed, as after `fclose()`.
+    TClosedResource,
 
     /// `properties-of<Cls>` and its visibility-filtered forms: a shape built from the class when checked.
     TPropertiesOf { class: Name, filter: PropertyFilter },
@@ -687,7 +689,7 @@ impl Atomic {
             Atomic::TScalar => "scalar",
             Atomic::TNumeric => "numeric",
             Atomic::TObject => "object",
-            Atomic::TResource => "resource",
+            Atomic::TResource | Atomic::TClosedResource => "resource",
             Atomic::TPropertiesOf { .. } => "array",
             Atomic::TNamedObject { .. } => "object",
             Atomic::TStaticObject { .. } => "static",
@@ -784,6 +786,7 @@ enum AtomicTag {
     TIntersection,
     TObjectShape,
     TResource,
+    TClosedResource,
     TPropertiesOf,
 }
 
@@ -828,6 +831,7 @@ impl Hash for Atomic {
             Atomic::TEnumString => (T::TEnumString as u8).hash(state),
             Atomic::TTraitString => (T::TTraitString as u8).hash(state),
             Atomic::TResource => (T::TResource as u8).hash(state),
+            Atomic::TClosedResource => (T::TClosedResource as u8).hash(state),
             Atomic::TPropertiesOf { class, filter } => {
                 (T::TPropertiesOf as u8).hash(state);
                 class.hash(state);

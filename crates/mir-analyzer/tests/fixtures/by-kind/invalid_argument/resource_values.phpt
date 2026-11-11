@@ -38,6 +38,7 @@ function run(mixed $m, CurlHandle $c, ?object $o, $legacy): void {
 //                 ^^^^^^^^^^^^^^ InvalidArgument: Argument $r of takes_resource() expects 'resource', got 'stdClass'
     fclose($h);
     if (!is_resource($h)) {
+//      ^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         echo 'closed';
     }
     if (is_resource($m)) {

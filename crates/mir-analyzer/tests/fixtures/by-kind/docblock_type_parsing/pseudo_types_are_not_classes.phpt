@@ -17,7 +17,7 @@ function f($benevolent, $properties, $publicProperties, $closed): void {
     echo count($properties);
     /** @mir-check $publicProperties is array{'x': int} */
     echo count($publicProperties);
-    /** @mir-check $closed is resource */
+    /** @mir-check $closed is closed-resource */
     echo gettype($closed);
 }
 

@@ -1619,6 +1619,25 @@ impl CallAnalyzer {
                 }
             }
 
+            // The handle variable passed to fclose() is closed from here on.
+            if matches!(resolved_fn_name.as_str(), "fclose" | "pclose" | "closedir") {
+                if let Some(ExprKind::Variable(name)) =
+                    call.args.first().and_then(|a| a.value()).map(|v| &v.kind)
+                {
+                    let var_name = name.as_ref().trim_start_matches('$');
+                    if let Some(handle) = arg_types.first().filter(|t| t.contains(|a| *a == Atomic::TResource)) {
+                        let mut closed = Type::empty();
+                        for a in &handle.types {
+                            closed.add_type(match a {
+                                Atomic::TResource => Atomic::TClosedResource,
+                                other => other.clone(),
+                            });
+                        }
+                        ctx.set_var(var_name, closed);
+                    }
+                }
+            }
+
             // Sort functions (and array_walk/array_walk_recursive, which mutate
             // values in place without adding/removing/reordering keys, and the
             // internal-pointer functions, which change nothing): the by-ref loop
