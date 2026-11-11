@@ -1239,4 +1239,6 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
 pub fn is_unchecked_exception(db: &dyn MirDatabase, fqcn: &str) -> bool {
     extends_or_implements(db, fqcn, "RuntimeException")
         || extends_or_implements(db, fqcn, "LogicException")
+        // Thrown only when the system has no randomness source.
+        || extends_or_implements(db, fqcn, "Random\\RandomException")
 }
