@@ -364,6 +364,54 @@ pub(crate) fn check_one(
         return;
     }
 
+    // An object shape, on its own or as an intersection part (`object{foo: int}&stdClass`), must keep the param's property types.
+    let object_shape_of = |a: &Atomic| match a {
+        Atomic::TObjectShape { properties } => Some(properties.clone()),
+        Atomic::TIntersection { parts } => parts
+            .iter()
+            .flat_map(|part| part.types.iter())
+            .find_map(|t| match t {
+                Atomic::TObjectShape { properties } => Some(properties.clone()),
+                _ => None,
+            }),
+        _ => None,
+    };
+    let has_wrong_property = |a: &Atomic| {
+        object_shape_of(a).is_some_and(|have| {
+            param_ty.types.iter().all(|p| {
+                object_shape_of(p).is_some_and(|want| {
+                    want.iter().any(|(key, wanted)| {
+                        have.get(key)
+                            .is_some_and(|had| !union_compatible(&had.ty, &wanted.ty, ea))
+                    })
+                })
+            })
+        })
+    };
+    let any_wrong = arg_ty.types.iter().any(has_wrong_property);
+    let all_wrong = any_wrong && arg_ty.types.iter().all(has_wrong_property);
+    if any_wrong {
+        let expected = format!("{param_ty}");
+        let kind = if all_wrong {
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected,
+                actual: arg_display,
+            }
+        } else {
+            IssueKind::PossiblyInvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected,
+                actual: arg_display,
+            }
+        };
+        let severity = kind.default_severity();
+        ea.emit(kind, severity, arg_span);
+        return;
+    }
+
     if !scalar_arg_fits_param(arg_ty, param_ty)
         && crate::expr::helpers::without_shape_nulls(arg_ty)
             .is_some_and(|t| scalar_arg_fits_param(&t, param_ty))

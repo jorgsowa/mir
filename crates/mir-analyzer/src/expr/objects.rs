@@ -2561,8 +2561,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 Atomic::TIntersection { parts } => {
+                    // A shape part types its properties and leaves others unknown, as on its own;
+                    // beside `stdClass` (an `(object)` cast) any property may have been reassigned.
+                    let is_std_class = |a: &Atomic| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.eq_ignore_ascii_case("stdClass"));
+                    let mut has_shape = false;
+                    let std_class_part =
+                        parts.iter().any(|part| part.types.iter().any(is_std_class));
                     for part in parts.iter() {
                         for inner_atomic in &part.types {
+                            if let Atomic::TObjectShape { properties } = inner_atomic {
+                                has_shape = true;
+                                if std_class_part {
+                                    return Type::mixed();
+                                }
+                                if let Some(p) = properties
+                                    .get(&mir_types::ArrayKey::String(Arc::from(prop_name)))
+                                {
+                                    return p.ty.clone();
+                                }
+                            }
                             if let Atomic::TNamedObject { fqcn, .. } = inner_atomic {
                                 let prop_result = crate::db::find_property_in_chain(
                                     self.db,
@@ -2581,7 +2598,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                     }
-                    if !self.in_existence_check {
+                    if !self.in_existence_check && !has_shape {
                         self.emit(
                             IssueKind::UndefinedProperty {
                                 class: atomic.to_string(),

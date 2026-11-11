@@ -5,6 +5,7 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::CastKind;
 use php_ast::owned::Expr;
+use std::sync::Arc;
 
 /// Internal classes whose cast handler converts them without a warning.
 fn has_cast_handler(atom: &Atomic, kind: &CastKind) -> bool {
@@ -386,9 +387,37 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Type::single(Atomic::TObject);
                 }
                 let mut out = Type::empty();
+                let std_class = || Atomic::TNamedObject {
+                    fqcn: mir_types::Name::from("stdClass"),
+                    type_params: Default::default(),
+                };
                 for atom in inner_ty.types.iter() {
                     if !atom.is_definitely_non_object() {
                         out.add_type(atom.clone());
+                    } else if let Atomic::TKeyedArray { properties, .. } = atom {
+                        if properties.is_empty() {
+                            out.add_type(std_class());
+                            continue;
+                        }
+                        // Each array key becomes a property, an int key by its decimal name.
+                        let props: mir_types::KeyedProperties = properties
+                            .iter()
+                            .map(|(key, prop)| {
+                                let name = match key {
+                                    mir_types::ArrayKey::String(s) => s.clone(),
+                                    mir_types::ArrayKey::Int(n) => Arc::from(n.to_string()),
+                                };
+                                (mir_types::ArrayKey::String(name), prop.clone())
+                            })
+                            .collect();
+                        out.add_type(Atomic::TIntersection {
+                            parts: Arc::from(vec![
+                                Type::single(Atomic::TObjectShape {
+                                    properties: Arc::new(props),
+                                }),
+                                Type::single(std_class()),
+                            ]),
+                        });
                     } else {
                         out.add_type(Atomic::TNamedObject {
                             fqcn: mir_types::Name::from("stdClass"),

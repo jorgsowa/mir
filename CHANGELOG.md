@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `(object)` on an array shape is `object{...}&stdClass` instead of a bare `stdClass`, so a mistyped property passed for an `object{foo: int}` or `object{foo: int}&stdClass` parameter is `InvalidArgument`. An object-shape value inside an intersection is checked the same way, and reading an unlisted property on it is no longer `UndefinedProperty`.
 - An int passed for a union that lists int types is checked against those, not widened to its `float` member: `0` is rejected for `non-empty-mixed`, `non-empty-scalar` and `positive-int|float`. An int still widens to a `float` (or `float|string`) parameter.
 - Inside a namespace, `@psalm-self-out self<U>` and `@psalm-this-out static<U>` retype the receiver with the method's template instead of naming a class `App\self`, so a later `@psalm-if-this-is` check sees the new type. A self-out template that no parameter mentions is `mixed`, not its bound.
 - A scalar passed for a class-typed shape value (`['item' => 'nope']` for `array{item: Foo}`) is `InvalidArgument`. Nothing was reported.
