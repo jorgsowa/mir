@@ -17,7 +17,7 @@ sibling.
 function f(array $x): string {
     if (!empty($x['a']['b'])) {
         $b = $x['a']['b'];
-        /** @mir-check $b is non-empty-string */
+        /** @mir-check $b is non-falsy-string */
         return $b;
     }
     return '';
@@ -27,7 +27,7 @@ function f(array $x): string {
 function threeLevels(array $data): string {
     if (!empty($data['a']['b']['c'])) {
         $c = $data['a']['b']['c'];
-        /** @mir-check $c is non-empty-string */
+        /** @mir-check $c is non-falsy-string */
         return $c;
     }
     return "none";

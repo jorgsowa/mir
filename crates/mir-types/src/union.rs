@@ -577,10 +577,22 @@ impl Type {
             }
         }
         // TNonEmptyString is subsumed by TString.
-        if matches!(atomic, Atomic::TNonEmptyString)
+        if matches!(atomic, Atomic::TNonEmptyString | Atomic::TNonFalsyString)
             && self.types.iter().any(|t| matches!(t, Atomic::TString))
         {
             return;
+        }
+        // non-falsy-string is subsumed by non-empty-string.
+        if matches!(atomic, Atomic::TNonFalsyString)
+            && self
+                .types
+                .iter()
+                .any(|t| matches!(t, Atomic::TNonEmptyString))
+        {
+            return;
+        }
+        if matches!(atomic, Atomic::TNonEmptyString) {
+            self.types.retain(|t| !matches!(t, Atomic::TNonFalsyString));
         }
         // TTrue / TFalse are subsumed by TBool.
         if matches!(atomic, Atomic::TTrue | Atomic::TFalse)
@@ -604,8 +616,12 @@ impl Type {
         }
         // Adding TString widens away all TLiteralString and TNonEmptyString variants.
         if matches!(atomic, Atomic::TString) {
-            self.types
-                .retain(|t| !matches!(t, Atomic::TLiteralString(_) | Atomic::TNonEmptyString));
+            self.types.retain(|t| {
+                !matches!(
+                    t,
+                    Atomic::TLiteralString(_) | Atomic::TNonEmptyString | Atomic::TNonFalsyString
+                )
+            });
         }
         // Adding TBool widens away TTrue/TFalse.
         if matches!(atomic, Atomic::TBool) {
@@ -736,10 +752,10 @@ impl Type {
                 Atomic::TList { value } => result.add_type(Atomic::TNonEmptyList {
                     value: value.clone(),
                 }),
-                // string: only "" and "0" are falsy; truthy branch is non-empty-string.
-                // non-empty-string still includes "0" (which is falsy) but that is the
-                // standard approximation used by Psalm and other analyzers.
-                Atomic::TString => result.add_type(Atomic::TNonEmptyString),
+                // string: only "" and "0" are falsy.
+                Atomic::TString | Atomic::TNonEmptyString => {
+                    result.add_type(Atomic::TNonFalsyString)
+                }
                 // numeric-string: "0" is the only falsy value; non-zero numerics are truthy.
                 // No named "non-zero numeric-string" type exists; keep as-is conservatively.
                 // int<0, max> only has 0 as its falsy value; truthy branch is int<1, max>.
@@ -1879,6 +1895,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         // Strings — every refined string kind maps to one class.
         Atomic::TString
         | Atomic::TNonEmptyString
+        | Atomic::TNonFalsyString
         | Atomic::TNumericString
         | Atomic::TCallableString => vec![String],
         Atomic::TClassString(_)
@@ -2261,6 +2278,12 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             true
         }
         (Atomic::TLiteralString(s), Atomic::TNonEmptyString) => !s.is_empty(),
+        (Atomic::TLiteralString(s), Atomic::TNonFalsyString) => !s.is_empty() && s.as_ref() != "0",
+        // "0" is non-empty and numeric, but falsy.
+        (Atomic::TNonEmptyString | Atomic::TNumericString, Atomic::TNonFalsyString) => false,
+        // Otherwise non-falsy-string relates to other types as non-empty-string does.
+        (Atomic::TNonFalsyString, _) => atomic_subtype(&Atomic::TNonEmptyString, sup),
+        (_, Atomic::TNonFalsyString) => atomic_subtype(sub, &Atomic::TNonEmptyString),
         (Atomic::TLiteralString(s), Atomic::TNumericString | Atomic::TNumeric) => {
             s.parse::<f64>().is_ok()
         }

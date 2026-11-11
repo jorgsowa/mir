@@ -24,7 +24,7 @@ function narrowsEmpty(Box $x): void {
 
 function narrowsNotEmpty(Box $x): void {
     if (!empty($x->name)) {
-        /** @mir-check $x->name is non-empty-string */
+        /** @mir-check $x->name is non-falsy-string */
         $_ = 1;
     }
 }

@@ -102,6 +102,7 @@ fn atomic_can_equal(a: &Atomic, lit: &Lit) -> bool {
             // Scalars that can never be (strictly) an integer.
             Atomic::TString
             | Atomic::TNonEmptyString
+            | Atomic::TNonFalsyString
             | Atomic::TNumericString
             | Atomic::TLiteralString(_)
             | Atomic::TClassString { .. }
@@ -305,6 +306,7 @@ pub(crate) fn gettype_possible_values(ty: &Type) -> Option<Vec<&'static str>> {
             Atomic::TString
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
+            | Atomic::TNonFalsyString
             | Atomic::TNumericString
             | Atomic::TClassString { .. } => "string",
             Atomic::TBool | Atomic::TTrue | Atomic::TFalse => "boolean",
@@ -365,6 +367,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TCallableString
         | Atomic::TClassString(_)
         | Atomic::TNonEmptyString
+        | Atomic::TNonFalsyString
         | Atomic::TNumericString
         | Atomic::TInterfaceString(_)
         | Atomic::TEnumString

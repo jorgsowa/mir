@@ -17,7 +17,7 @@ final class Holder {
 
     public function narrowsLooseEqualTrue(): void {
         if ($this->value == true) {
-            /** @mir-check $this->value is int|non-empty-string */
+            /** @mir-check $this->value is int|non-falsy-string */
             $_ = 1;
         }
     }

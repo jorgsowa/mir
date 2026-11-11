@@ -31,7 +31,7 @@ class Config {
 
     public function notEmptyNarrowsProp(): string {
         if (!empty($this->data['name'])) {
-            /** @mir-check $this->data is array{name: non-empty-string} */
+            /** @mir-check $this->data is array{name: non-falsy-string} */
             $_ = 1;
             return $this->data['name'];
         }

@@ -14,7 +14,7 @@ truthy/falsy check, since PHP defines loose comparison to a bool literal as
 /** @param string $x */
 function test_equal_true(string $x): void {
     if ($x == true) {
-        /** @mir-check $x is non-empty-string */
+        /** @mir-check $x is non-falsy-string */
         $_ = $x;
     } else {
         /** @mir-check $x is ''|'0' */
@@ -28,7 +28,7 @@ function test_equal_false(string $x): void {
         /** @mir-check $x is ''|'0' */
         $_ = $x;
     } else {
-        /** @mir-check $x is non-empty-string */
+        /** @mir-check $x is non-falsy-string */
         $_ = $x;
     }
 }
@@ -44,7 +44,7 @@ function test_not_equal_true(string $x): void {
 /** @param string $x */
 function test_not_equal_false(string $x): void {
     if ($x != false) {
-        /** @mir-check $x is non-empty-string */
+        /** @mir-check $x is non-falsy-string */
         $_ = $x;
     }
 }
@@ -52,7 +52,7 @@ function test_not_equal_false(string $x): void {
 /** @param string $x */
 function test_swapped_operands(string $x): void {
     if (true == $x) {
-        /** @mir-check $x is non-empty-string */
+        /** @mir-check $x is non-falsy-string */
         $_ = $x;
     }
 }

@@ -20,14 +20,14 @@ class Holder {
 
     public static function bareTruthy(): void {
         if (self::$name) {
-            /** @mir-check self::$name is non-empty-string */
+            /** @mir-check self::$name is non-falsy-string */
             $_ = 1;
         }
     }
 
     public static function looseBoolTrue(): void {
         if (self::$name == true) {
-            /** @mir-check self::$name is non-empty-string */
+            /** @mir-check self::$name is non-falsy-string */
             $_ = 1;
         }
     }
@@ -48,7 +48,7 @@ class Holder {
 
     public static function emptyNarrows(): void {
         if (!empty(self::$name)) {
-            /** @mir-check self::$name is non-empty-string */
+            /** @mir-check self::$name is non-falsy-string */
             $_ = 1;
         }
     }

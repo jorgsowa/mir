@@ -13,7 +13,7 @@ open shapes stay open, and list shapes keep the generic result.
 /** @param array{code: int|null, key: string|null} $s */
 function plain(array $s): void {
     $f = array_filter($s);
-    /** @mir-check $f is array{'code'?: int, 'key'?: non-empty-string} */
+    /** @mir-check $f is array{'code'?: int, 'key'?: non-falsy-string} */
     echo 1;
 }
 

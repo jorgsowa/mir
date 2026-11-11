@@ -13,7 +13,7 @@ A nullable string truthy check additionally removes null in the true branch.
 /** @param string $x */
 function test_string(string $x): void {
     if ($x) {
-        /** @mir-check $x is non-empty-string */
+        /** @mir-check $x is non-falsy-string */
         $_ = $x;
     } else {
         /** @mir-check $x is ''|'0' */
@@ -24,7 +24,7 @@ function test_string(string $x): void {
 /** @param string|null $y */
 function test_nullable_string(string|null $y): void {
     if ($y) {
-        /** @mir-check $y is non-empty-string */
+        /** @mir-check $y is non-falsy-string */
         $_ = $y;
     } else {
         /** @mir-check $y is ''|'0'|null */

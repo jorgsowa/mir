@@ -31,7 +31,7 @@ class Config {
 
     public static function notEmptyNarrowsStaticProp(): string {
         if (!empty(self::$data['name'])) {
-            /** @mir-check self::$data is array{name: non-empty-string} */
+            /** @mir-check self::$data is array{name: non-falsy-string} */
             $_ = 1;
             return self::$data['name'];
         }

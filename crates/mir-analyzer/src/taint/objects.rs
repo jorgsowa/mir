@@ -607,6 +607,7 @@ pub(crate) fn type_may_hold_object(ty: &mir_types::Type) -> bool {
             | Atomic::TCallableString
             | Atomic::TClassString(_)
             | Atomic::TNonEmptyString
+            | Atomic::TNonFalsyString
             | Atomic::TNumericString
             | Atomic::TInt
             | Atomic::TLiteralInt(_)

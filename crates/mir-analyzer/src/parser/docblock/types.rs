@@ -408,13 +408,9 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "string" => Type::single(Atomic::TString),
         "non-empty-string" => Type::single(Atomic::TNonEmptyString),
         "numeric-string" => Type::single(Atomic::TNumericString),
-        // Psalm string refinements. mir does not model case/falsiness of strings
-        // precisely; approximate with the closest representable atom (same
-        // approach Psalm documents for back-compat). `truthy-string` /
-        // `non-falsy-string` ≈ non-empty-string; case-constrained strings ≈ string.
-        "truthy-string" | "non-falsy-string" | "non-empty-literal-string" => {
-            Type::single(Atomic::TNonEmptyString)
-        }
+        "truthy-string" | "non-falsy-string" => Type::single(Atomic::TNonFalsyString),
+        // mir does not model the case or literalness of strings; use the closest atom.
+        "non-empty-literal-string" => Type::single(Atomic::TNonEmptyString),
         "decimal-int-string" => Type::single(Atomic::TNumericString),
         "lowercase-string"
         | "uppercase-string"

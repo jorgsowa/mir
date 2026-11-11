@@ -24,7 +24,7 @@ class A {
     public function andTernary(): string {
         if ($this->cfg->isLocal && $this->cfg->domain) {
             $v = $this->cfg->domain;
-            /** @mir-check $v is non-empty-string */
+            /** @mir-check $v is non-falsy-string */
             return $v;
         }
         return $this->cfg->isLocal && $this->cfg->domain ? $this->cfg->domain : 'default';
@@ -67,7 +67,7 @@ class A {
 
     public function mergedBranches(bool $c): ?string {
         $v = $c && $this->cfg->domain ? $this->cfg->domain : null;
-        /** @mir-check $v is non-empty-string|null */
+        /** @mir-check $v is non-falsy-string|null */
         return $v;
     }
 

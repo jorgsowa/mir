@@ -32,7 +32,7 @@ function check_numeric_string($x) {
 function check_truthy_string($x) {
     /**
      * @var truthy-string $x
-     * @mir-check $x is non-empty-string
+     * @mir-check $x is non-falsy-string
      */
     var_dump($x);
 }
@@ -40,7 +40,7 @@ function check_truthy_string($x) {
 function check_non_falsy_string($x) {
     /**
      * @var non-falsy-string $x
-     * @mir-check $x is non-empty-string
+     * @mir-check $x is non-falsy-string
      */
     var_dump($x);
 }

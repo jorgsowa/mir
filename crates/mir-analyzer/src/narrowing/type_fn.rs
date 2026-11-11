@@ -264,7 +264,7 @@ pub(crate) fn type_fn_narrowed(
                             narrowed_parts.add_type(t.clone());
                         }
                         // A generic string could be numeric; narrow to numeric-string.
-                        Atomic::TString | Atomic::TNonEmptyString => {
+                        Atomic::TString | Atomic::TNonEmptyString | Atomic::TNonFalsyString => {
                             narrowed_parts.add_type(Atomic::TNumericString);
                         }
                         // A literal string is numeric only if it parses as a number.

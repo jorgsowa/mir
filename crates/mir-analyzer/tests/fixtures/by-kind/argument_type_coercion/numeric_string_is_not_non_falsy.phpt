@@ -15,3 +15,4 @@ function bar(): string
 }
 
 foo(bar());
+//  ^^^^^ ArgumentTypeCoercion: Argument $arg of foo() expects 'non-falsy-string', got 'numeric-string' — coercion may fail at runtime

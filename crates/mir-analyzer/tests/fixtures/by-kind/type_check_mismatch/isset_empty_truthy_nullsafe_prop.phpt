@@ -27,14 +27,14 @@ function issetNullsafe(?Box $box): void {
 
 function bareTruthyNullsafe(?Box $box): void {
     if ($box?->value) {
-        /** @mir-check $box->value is non-empty-string */
+        /** @mir-check $box->value is non-falsy-string */
         $_ = 1;
     }
 }
 
 function emptyNullsafe(?Box $box): void {
     if (!empty($box?->value)) {
-        /** @mir-check $box->value is non-empty-string */
+        /** @mir-check $box->value is non-falsy-string */
         $_ = 1;
     }
 }

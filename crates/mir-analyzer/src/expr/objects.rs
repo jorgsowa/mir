@@ -1003,6 +1003,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         | Atomic::TLiteralFloat(_, _)
                         | Atomic::TString
                         | Atomic::TNonEmptyString
+                        | Atomic::TNonFalsyString
                         | Atomic::TNumericString
                         | Atomic::TLiteralString(_)
                         | Atomic::TBool

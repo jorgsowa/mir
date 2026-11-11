@@ -261,6 +261,7 @@ pub(crate) fn is_valid_callable_type(union: &Type, db: &dyn crate::db::MirDataba
             | Atomic::TCallable { .. }
             | Atomic::TString
             | Atomic::TNonEmptyString
+            | Atomic::TNonFalsyString
             | Atomic::TLiteralString(_)
             | Atomic::TNull => {
                 return true;
@@ -359,6 +360,7 @@ fn is_non_empty_string(ty: &Type) -> bool {
             matches!(
                 a,
                 Atomic::TNonEmptyString
+                    | Atomic::TNonFalsyString
                     | Atomic::TClassString(_)
                     | Atomic::TInterfaceString(_)
                     | Atomic::TEnumString
@@ -550,7 +552,7 @@ fn sprintf_format_guarantees_non_empty(fmt: &str) -> bool {
 pub(crate) fn explode_return_type(arg_types: &[Type], stub_return: &Type) -> Option<Type> {
     let separator = arg_types.first()?;
     let sep_non_empty = separator.types.iter().any(|a| {
-        matches!(a, Atomic::TNonEmptyString)
+        matches!(a, Atomic::TNonEmptyString | Atomic::TNonFalsyString)
             || matches!(a, Atomic::TLiteralString(s) if !s.as_ref().is_empty())
     });
     if !sep_non_empty {

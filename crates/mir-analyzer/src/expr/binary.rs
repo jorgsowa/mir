@@ -352,7 +352,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 // If either operand is guaranteed non-empty when cast to string,
                 // the result is also non-empty (concatenation can only add characters).
-                if is_non_empty_when_concat(&left_ty) || is_non_empty_when_concat(&right_ty) {
+                let (left_non_empty, right_non_empty) = (
+                    is_non_empty_when_concat(&left_ty),
+                    is_non_empty_when_concat(&right_ty),
+                );
+                // Two or more characters, or a non-falsy part, can be neither "" nor "0".
+                let non_falsy = |t: &Type| {
+                    !t.types.is_empty()
+                        && t.types.iter().all(|a| matches!(a, Atomic::TNonFalsyString))
+                };
+                if (left_non_empty && right_non_empty)
+                    || non_falsy(&left_ty)
+                    || non_falsy(&right_ty)
+                {
+                    return Type::single(Atomic::TNonFalsyString);
+                }
+                if left_non_empty || right_non_empty {
                     return Type::single(Atomic::TNonEmptyString);
                 }
                 Type::single(Atomic::TString)

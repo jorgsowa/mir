@@ -943,7 +943,9 @@ pub(super) fn const_type_with_literal_narrowing(
     ) {
         (Some([Atomic::TInt]), Some([Atomic::TLiteralInt(_)]))
         | (Some([Atomic::TString]), Some([Atomic::TLiteralString(_)]))
-        | (Some([Atomic::TString]), Some([Atomic::TNonEmptyString])) => true,
+        | (Some([Atomic::TString]), Some([Atomic::TNonEmptyString | Atomic::TNonFalsyString])) => {
+            true
+        }
         // A bare `array` hint (key/value both unannotated `mixed`) narrows to
         // the literal's own keyed-shape/list type the same way — an explicitly
         // narrower hint (`array<int, string>`) is left as-is, since the

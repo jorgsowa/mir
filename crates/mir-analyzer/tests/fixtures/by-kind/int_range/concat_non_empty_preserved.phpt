@@ -13,28 +13,28 @@ yields non-empty-string.
 /** @param positive-int $n */
 function test_int_concat(int $n): void {
     $r = "prefix_" . $n;
-    /** @mir-check $r is non-empty-string */
+    /** @mir-check $r is non-falsy-string */
     $_ = $r;
 }
 
 /** @param non-empty-string $s */
 function test_nonempty_right(string $s): void {
     $r = "value_" . $s;
-    /** @mir-check $r is non-empty-string */
+    /** @mir-check $r is non-falsy-string */
     $_ = $r;
 }
 
 /** @param non-empty-string $s */
 function test_nonempty_left(string $s): void {
     $r = $s . "_suffix";
-    /** @mir-check $r is non-empty-string */
+    /** @mir-check $r is non-falsy-string */
     $_ = $r;
 }
 
 /** @param non-negative-int $n */
 function test_non_negative_int_concat(int $n): void {
     $r = "count=" . $n;
-    /** @mir-check $r is non-empty-string */
+    /** @mir-check $r is non-falsy-string */
     $_ = $r;
 }
 

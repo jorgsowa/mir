@@ -493,7 +493,7 @@ fn narrow_key_var_to_array_keys(
                         narrowed.add_type(atomic.clone());
                     }
                 }
-                Atomic::TString | Atomic::TNonEmptyString
+                Atomic::TString | Atomic::TNonEmptyString | Atomic::TNonFalsyString
                     if !domain.any_int && domain.int_literals.is_empty() =>
                 {
                     for l in &domain.string_literals {

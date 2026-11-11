@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `str_split()` and `mb_str_split()` take a `positive-int` length, so a zero or negative length is `InvalidArgument`.
 - A shape nested in a list, map or other shape argument (`list<array{id: int}>` given `[['id' => 'x']]`) is checked key by key against the expected shape, so a wrong value type or a missing required key is `InvalidArgument`.
 - Under `strict_types` a `float` passed to an `int` parameter is `InvalidArgument`, and an `int|float` is `PossiblyInvalidArgument`; only float literals were reported before. This also covers a nested conditional return (`($a is int ? ($b is int ? int : float) : float)`) that resolves to `float`.
+- `non-falsy-string` (and `truthy-string`) is its own type instead of an alias of `non-empty-string`: `'0'` is rejected, a `non-empty-string` or `numeric-string` passed to it is `ArgumentTypeCoercion`, and testing it for truthiness is `RedundantCondition`. A string that passed a truthiness check, and a concatenation of two non-empty parts, is a `non-falsy-string`.
 
 ## [0.97.0] - 2026-11-10
 

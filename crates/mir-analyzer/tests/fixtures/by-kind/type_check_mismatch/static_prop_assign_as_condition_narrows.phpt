@@ -16,7 +16,7 @@ class Foo {
 
     public static function compute(): string {
         if (self::$cache = self::fetch()) {
-            /** @mir-check self::$cache is non-empty-string */
+            /** @mir-check self::$cache is non-falsy-string */
             return self::$cache;
         } else {
             /** @mir-check self::$cache is ''|'0'|null */

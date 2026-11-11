@@ -667,11 +667,11 @@ fn dotted_non_number_is_not_float_literal() {
 fn parse_truthy_and_non_falsy_string() {
     assert!(matches!(
         parse_type_string("truthy-string").types[0],
-        Atomic::TNonEmptyString
+        Atomic::TNonFalsyString
     ));
     assert!(matches!(
         parse_type_string("non-falsy-string").types[0],
-        Atomic::TNonEmptyString
+        Atomic::TNonFalsyString
     ));
 }
 

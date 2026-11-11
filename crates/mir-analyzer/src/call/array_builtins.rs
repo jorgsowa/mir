@@ -50,13 +50,17 @@ pub(crate) fn is_callable_array_pair(arg: &Type, db: &dyn MirDatabase) -> bool {
                     | Atomic::TClassString(_)
                     | Atomic::TString
                     | Atomic::TNonEmptyString
+                    | Atomic::TNonFalsyString
                     | Atomic::TMixed
             )
         });
         let second_ok = second.ty.contains(|t| {
             matches!(
                 t,
-                Atomic::TString | Atomic::TNonEmptyString | Atomic::TLiteralString(_)
+                Atomic::TString
+                    | Atomic::TNonEmptyString
+                    | Atomic::TNonFalsyString
+                    | Atomic::TLiteralString(_)
             )
         });
         first_ok && second_ok

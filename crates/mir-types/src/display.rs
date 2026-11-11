@@ -156,6 +156,7 @@ impl fmt::Display for Atomic {
             Atomic::TClassString(None) => write!(f, "class-string"),
             Atomic::TClassString(Some(cls)) => write!(f, "class-string<{cls}>"),
             Atomic::TNonEmptyString => write!(f, "non-empty-string"),
+            Atomic::TNonFalsyString => write!(f, "non-falsy-string"),
             Atomic::TNumericString => write!(f, "numeric-string"),
 
             Atomic::TInt => write!(f, "int"),

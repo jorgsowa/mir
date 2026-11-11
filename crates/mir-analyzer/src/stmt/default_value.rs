@@ -323,6 +323,7 @@ fn php_value_type(ty: &Type) -> Option<String> {
             Atomic::TString
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
+            | Atomic::TNonFalsyString
             | Atomic::TNumericString
             | Atomic::TCallableString
             | Atomic::TClassString(_)

@@ -489,6 +489,7 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
             a,
             Atomic::TString
                 | Atomic::TNonEmptyString
+                | Atomic::TNonFalsyString
                 | Atomic::TNumericString
                 | Atomic::TInt
                 | Atomic::TIntRange { .. }
@@ -507,6 +508,12 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                 || param.types.iter().any(|p| {
                     (refinable(p) || matches!(p, Atomic::TLiteralString(_)))
                         && Type::single(p.clone()).is_subtype_structural(&single)
+                        // The two overlap: every numeric string but "0" is non-falsy.
+                        || matches!(
+                            (a, p),
+                            (Atomic::TNumericString, Atomic::TNonFalsyString)
+                                | (Atomic::TNonFalsyString, Atomic::TNumericString)
+                        )
                 })
         })
 }
@@ -573,7 +580,10 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
     let param_accepts_string = param.types.iter().any(|p| {
         matches!(
             p,
-            Atomic::TString | Atomic::TNonEmptyString | Atomic::TNumericString
+            Atomic::TString
+                | Atomic::TNonEmptyString
+                | Atomic::TNonFalsyString
+                | Atomic::TNumericString
         )
     });
     if param_accepts_string {
@@ -1394,6 +1404,7 @@ fn classify_array_key(ty: &Type) -> ArrayKeyKind {
         Atomic::TString
         | Atomic::TLiteralString(_)
         | Atomic::TNonEmptyString
+        | Atomic::TNonFalsyString
         | Atomic::TNumericString => ArrayKeyKind::Str,
         _ => ArrayKeyKind::Other,
     }
@@ -1901,6 +1912,7 @@ fn validate_callable_argument(
         Atomic::TString
         | Atomic::TLiteralString(_)
         | Atomic::TNonEmptyString
+        | Atomic::TNonFalsyString
         | Atomic::TNumericString
         | Atomic::TClassString(_)
         | Atomic::TMixed
@@ -1997,10 +2009,12 @@ fn validate_class_string_argument(
     // When the parameter also accepts a plain `string` (e.g. `string|class-string<T>`),
     // a literal string satisfies the `string` alternative — don't check class existence.
     // This avoids false positives from IoC container keys like `Container::make('config')`.
-    let has_plain_string = param_ty
-        .types
-        .iter()
-        .any(|t| matches!(t, Atomic::TString | Atomic::TNonEmptyString));
+    let has_plain_string = param_ty.types.iter().any(|t| {
+        matches!(
+            t,
+            Atomic::TString | Atomic::TNonEmptyString | Atomic::TNonFalsyString
+        )
+    });
     if has_plain_string {
         return;
     }
@@ -2050,7 +2064,10 @@ fn validate_interface_string_argument(
     let has_wider_alternative = param_ty.types.iter().any(|t| {
         matches!(
             t,
-            Atomic::TString | Atomic::TNonEmptyString | Atomic::TClassString(_)
+            Atomic::TString
+                | Atomic::TNonEmptyString
+                | Atomic::TNonFalsyString
+                | Atomic::TClassString(_)
         )
     });
     if has_wider_alternative {
