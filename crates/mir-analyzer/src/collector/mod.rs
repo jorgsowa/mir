@@ -1504,15 +1504,21 @@ impl<'a> DefinitionCollector<'a> {
                 // as TNamedObject with type params in some docblock parse paths; do not
                 // namespace-qualify those — fall through to resolve_union_doc.
                 mir_types::Atomic::TNamedObject { fqcn, type_params }
-                    if !type_params.is_empty() && !is_php_builtin_type(fqcn.as_ref()) =>
+                    if !type_params.is_empty()
+                        && (!is_php_builtin_type(fqcn.as_ref())
+                            || resolution::is_self_static_parent_keyword(fqcn)) =>
                 {
-                    let resolved_fqcn = resolution::resolve_type_name(
-                        fqcn.as_ref(),
-                        true,
-                        true,
-                        &self.namespace,
-                        &self.use_aliases,
-                    );
+                    let resolved_fqcn = if resolution::is_self_static_parent_keyword(fqcn) {
+                        *fqcn
+                    } else {
+                        resolution::resolve_type_name(
+                            fqcn.as_ref(),
+                            true,
+                            true,
+                            &self.namespace,
+                            &self.use_aliases,
+                        )
+                    };
                     let new_params: Vec<Type> = type_params
                         .iter()
                         .map(|p| {

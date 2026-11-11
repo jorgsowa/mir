@@ -2012,6 +2012,24 @@ fn resolve_method_return<'a>(
         // (including `$this`), the same way a by-ref `@param-out` retypes its
         // argument above.
         if let Some(self_out_raw) = resolved.self_out.clone() {
+            // A method template no parameter mentions can't be inferred, so it is `mixed`, not its bound.
+            let uninferable: rustc_hash::FxHashMap<Name, Type> = resolved
+                .template_params
+                .iter()
+                .filter(|tp| {
+                    let tp = std::slice::from_ref(*tp);
+                    !resolved
+                        .params
+                        .iter()
+                        .any(|p| p.ty.as_deref().is_some_and(|t| mentions_template(t, tp)))
+                })
+                .map(|tp| (tp.name, Type::mixed()))
+                .collect();
+            let self_out_raw = if uninferable.is_empty() {
+                self_out_raw
+            } else {
+                Arc::new(self_out_raw.substitute_templates(&uninferable))
+            };
             let self_out_ty = substitute_static_in_return(
                 ea.db,
                 (*self_out_raw).clone(),

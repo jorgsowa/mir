@@ -317,7 +317,7 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
     }
 }
 
-fn is_self_static_parent_keyword(name: &Name) -> bool {
+pub(super) fn is_self_static_parent_keyword(name: &Name) -> bool {
     matches!(
         crate::util::php_ident_lowercase(name.as_ref()).as_str(),
         "self" | "static" | "parent"
