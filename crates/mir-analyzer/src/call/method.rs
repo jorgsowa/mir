@@ -1046,6 +1046,7 @@ impl CallAnalyzer {
                                     is_pure: data.is_pure,
                                     is_static: data.is_static,
                                     rejects_surplus_args: data.rejects_surplus_args,
+                                    is_impure: data.is_impure,
                                 }),
                             });
                             bound.add_type(mir_types::Atomic::TNull);

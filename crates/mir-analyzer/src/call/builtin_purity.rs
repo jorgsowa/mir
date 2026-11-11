@@ -107,6 +107,34 @@ fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -
     }
 }
 
+/// Whether an argument is a callable whose target visibly has side effects, so it cannot be a `pure-callable`.
+pub(crate) fn callable_is_visibly_impure(
+    ea: &ExpressionAnalyzer<'_>,
+    arg_ty: &Type,
+    arg_expr: Option<&Expr>,
+) -> bool {
+    let function_is_impure =
+        |name: &FunctionRef<'_>| name.find(ea.db, &ea.file).is_some_and(|(_, f)| f.is_impure);
+    let named_target_is_impure = match arg_expr.map(|e| &e.kind) {
+        Some(ExprKind::CallableCreate(cc)) => match &cc.kind {
+            CallableCreateKind::Function(target) => target
+                .kind
+                .function_ref(ea.db, &ea.file)
+                .is_some_and(|name| function_is_impure(&name)),
+            _ => false,
+        },
+        _ => false,
+    };
+    named_target_is_impure
+        || arg_ty.types.iter().any(|a| match a {
+            Atomic::TClosure { data } => data.is_impure,
+            Atomic::TLiteralString(name) => {
+                !name.contains("::") && function_is_impure(&FunctionRef::from_text(name))
+            }
+            _ => false,
+        })
+}
+
 fn function_is_pure(ea: &ExpressionAnalyzer<'_>, name: &FunctionRef<'_>) -> bool {
     name.find(ea.db, &ea.file).is_some_and(|(_, f)| f.is_pure)
 }

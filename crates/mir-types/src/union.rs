@@ -1531,6 +1531,7 @@ impl Type {
                             is_pure: data.is_pure,
                             is_static: data.is_static,
                             rejects_surplus_args: data.rejects_surplus_args,
+                            is_impure: data.is_impure,
                         }),
                     });
                 }
@@ -3547,6 +3548,7 @@ mod tests {
                 is_pure: false,
                 is_static: false,
                 rejects_surplus_args: false,
+                is_impure: false,
             }),
         });
         let result = ty.substitute_templates(&bindings_t_string());

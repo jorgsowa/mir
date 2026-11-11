@@ -105,6 +105,48 @@ fn body_writes_no_properties(m: &MethodDecl, safe: &HashSet<&str>) -> bool {
     body.stmts.iter().all(|s| scan.visit_stmt(s).is_continue())
 }
 
+/// Whether a function body visibly has side effects: output, `exit`, `global` or `static` variables.
+pub(crate) fn has_visible_side_effect(stmts: &[Stmt]) -> bool {
+    stmts.iter().any(|s| SideEffectScan.visit_stmt(s).is_break())
+}
+
+/// [`has_visible_side_effect`] for an arrow function's body expression.
+pub(crate) fn expr_has_visible_side_effect(body: &Expr) -> bool {
+    SideEffectScan.visit_expr(body).is_break()
+}
+
+struct SideEffectScan;
+
+impl OwnedVisitor for SideEffectScan {
+    type Break = ();
+
+    fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
+        match &stmt.kind {
+            StmtKind::Echo(_)
+            | StmtKind::InlineHtml(_)
+            | StmtKind::Global(_)
+            | StmtKind::StaticVar(_) => ControlFlow::Break(()),
+            // A nested declaration runs only when called.
+            StmtKind::Function(_)
+            | StmtKind::Class(_)
+            | StmtKind::Interface(_)
+            | StmtKind::Trait(_)
+            | StmtKind::Enum(_) => ControlFlow::Continue(()),
+            _ => crate::recursion::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+        match &expr.kind {
+            ExprKind::Print(_) | ExprKind::Exit(_) => ControlFlow::Break(()),
+            ExprKind::Closure(_) | ExprKind::ArrowFunction(_) | ExprKind::AnonymousClass(_) => {
+                ControlFlow::Continue(())
+            }
+            _ => crate::recursion::walk_expr(self, expr),
+        }
+    }
+}
+
 struct BodyScan<'a> {
     safe: &'a HashSet<&'a str>,
 }

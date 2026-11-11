@@ -387,6 +387,8 @@ impl DefinitionCollector<'_> {
                 }
             }),
             is_pure: doc.is_pure || self.pure_attr(&decl.attributes),
+            is_impure: doc.is_impure
+                || super::mutation_free::has_visible_side_effect(&decl.body.stmts),
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,
             no_named_arguments: doc.no_named_arguments,

@@ -226,6 +226,9 @@ pub struct ClosureData {
     /// A first-class callable of a named function or method, so surplus arguments are reported.
     #[serde(default)]
     pub rejects_surplus_args: bool,
+    /// A closure literal whose body visibly has side effects (output, `exit`, `global`, `static`).
+    #[serde(default)]
+    pub is_impure: bool,
 }
 
 /// Payload of [`Atomic::TConditional`].

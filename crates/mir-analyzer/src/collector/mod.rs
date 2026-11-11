@@ -30,6 +30,7 @@ mod annotation;
 mod class;
 mod r#enum;
 pub(crate) use r#enum::{enum_case_value_key, php_value_type_name};
+pub(crate) use mutation_free::{expr_has_visible_side_effect, has_visible_side_effect};
 pub(crate) use resolution::fill_self_static_parent;
 mod function;
 mod interface;
@@ -626,6 +627,7 @@ where
                 is_pure: data.is_pure,
                 is_static: data.is_static,
                 rejects_surplus_args: data.rejects_surplus_args,
+                is_impure: data.is_impure,
             }),
         }),
         // `@return ($param is X ? A : B)` — a type alias used in either
@@ -1716,6 +1718,7 @@ impl<'a> DefinitionCollector<'a> {
                             is_pure: data.is_pure,
                             is_static: data.is_static,
                             rejects_surplus_args: data.rejects_surplus_args,
+                            is_impure: data.is_impure,
                         }),
                     });
                 }

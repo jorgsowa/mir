@@ -1744,6 +1744,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 is_pure,
                 is_static: false,
                 rejects_surplus_args: true,
+                is_impure: false,
             }),
         }
     }

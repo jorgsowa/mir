@@ -327,6 +327,7 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
                     is_pure: data.is_pure,
                     is_static: data.is_static,
                     rejects_surplus_args: data.rejects_surplus_args,
+                    is_impure: data.is_impure,
                 }),
             }
         }

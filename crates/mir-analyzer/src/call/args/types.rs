@@ -119,6 +119,29 @@ pub(crate) fn check_one(
         validate_callable_argument(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
     }
     validate_class_string_argument(ea, fn_name, param_name, param_ty, arg_ty, arg_span);
+    let wants_callable = |pure: bool| {
+        param_ty.contains(|p| match p {
+            Atomic::TCallable { is_pure, .. } => *is_pure == pure,
+            Atomic::TClosure { data } => data.is_pure == pure,
+            _ => false,
+        })
+    };
+    if wants_callable(true)
+        && !wants_callable(false)
+        && super::super::builtin_purity::callable_is_visibly_impure(ea, arg_ty, arg_expr)
+    {
+        ea.emit(
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: param_ty.to_string(),
+                actual: format!("impure {arg_ty}"),
+            },
+            Severity::Error,
+            arg_span,
+        );
+        return;
+    }
     validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
     validate_callable_type(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
 

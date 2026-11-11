@@ -871,6 +871,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 is_pure: ctx.is_in_pure_fn,
                 is_static: c.is_static,
                 rejects_surplus_args: false,
+                is_impure: crate::collector::has_visible_side_effect(&c.body.stmts),
             }),
         })
     }
@@ -1169,6 +1170,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 is_pure: ctx.is_in_pure_fn,
                 is_static: af.is_static,
                 rejects_surplus_args: false,
+                is_impure: crate::collector::expr_has_visible_side_effect(&af.body),
             }),
         })
     }

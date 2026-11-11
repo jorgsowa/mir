@@ -988,6 +988,9 @@ pub struct FunctionDef {
     pub throws: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
+    /// `@impure`, or a body that visibly has side effects (output, `exit`, `global`, `static`).
+    #[serde(default)]
+    pub is_impure: bool,
     /// `@psalm-mutation-free` / `@phpstan-mutation-free` on a free function.
     /// A free function has no `$this`, so this is behaviorally equivalent to
     /// `is_external_mutation_free` here (both forbid mutating a parameter);
