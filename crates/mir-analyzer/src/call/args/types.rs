@@ -339,6 +339,23 @@ pub(crate) fn check_one(
         return;
     }
 
+    if !scalar_arg_fits_param(arg_ty, param_ty)
+        && crate::expr::helpers::without_shape_nulls(arg_ty)
+            .is_some_and(|t| scalar_arg_fits_param(&t, param_ty))
+    {
+        ea.emit(
+            IssueKind::PossiblyInvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: format!("{param_ty}"),
+                actual: arg_display,
+            },
+            Severity::Info,
+            arg_span,
+        );
+        return;
+    }
+
     let arg_core = arg_ty.core_type();
     let mismatch = !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()

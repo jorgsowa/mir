@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A shape with a nullable value passed for a shape whose value must not be null (`[$stringOrNull]` for `list{string}`) is `PossiblyInvalidArgument`, as it is for `list<string>`. Nothing was reported.
 - A negated assertion on a scalar, array or object type (`@psalm-assert !int $v`, `@phpstan-assert !string $v`) removes that type from the argument, as `!null` and `!ClassName` already did. A later `is_int($v)` is `RedundantCondition`.
 
 ## [0.98.0] - 2026-11-11
