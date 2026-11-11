@@ -857,6 +857,7 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     part.types.iter().any(|part_atomic| {
                         let (part_fqcn, part_params) = match part_atomic {
                             Atomic::TNamedObject { fqcn, type_params } => (fqcn, type_params),
+                            Atomic::TObject | Atomic::TObjectShape { .. } => return true,
                             _ => return false,
                         };
                         let resolved_part =

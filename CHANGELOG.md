@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `class-string-map<T of Bound, T>` reads the template declared in place, so the value type is the bound instead of an undefined class `T`.
 - `@phan-type` declares a local type alias, like `@psalm-type` and `@phpstan-type`.
 - A `// comment` after an item of a multi-line `array{…}` shape is skipped instead of being read into the next key.
+- A `stdClass` (such as `(object) ['foo' => 1]`) is accepted for `object{foo: int}&stdClass`.
 
 ## [0.97.0] - 2026-11-10
 
