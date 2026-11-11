@@ -1371,8 +1371,14 @@ mod docblock_hint_compat {
             | Atomic::TNamedObject { .. }
             | Atomic::TSelf { .. }
             | Atomic::TStaticObject { .. }
-            | Atomic::TParent { .. }
-            | Atomic::TIntersection { .. } => OBJECT,
+            | Atomic::TParent { .. } => OBJECT,
+            // `associative-array` is an intersection of array types.
+            Atomic::TIntersection { parts }
+                if parts.iter().all(|p| p.types.iter().all(|t| fam(t) == ARRAY)) =>
+            {
+                ARRAY
+            }
+            Atomic::TIntersection { .. } => OBJECT,
             Atomic::TClosure { .. } => OBJECT | CALLABLE,
             Atomic::TCallable { .. } => CALLABLE | STRING | ARRAY | OBJECT,
             Atomic::TScalar => BOOL | INT | FLOAT | STRING,

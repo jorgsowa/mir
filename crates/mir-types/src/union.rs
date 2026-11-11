@@ -2778,6 +2778,25 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // intersection part. This handles the Psalm idiom of using intersection types
         // for "shape plus extra keys allowed" patterns like:
         // @psalm-type Context = array<string,mixed> & array{actor:...,target?:...,outcome:...}
+        // `associative-array` (an intersection with an open, empty, non-list shape) is never a list.
+        (
+            Atomic::TKeyedArray {
+                properties,
+                is_list: true,
+                ..
+            },
+            Atomic::TIntersection { parts },
+        ) if !properties.is_empty()
+            && parts.iter().any(|part| {
+                matches!(
+                    part.types.as_slice(),
+                    [Atomic::TKeyedArray { properties, is_open: true, is_list: false }]
+                        if properties.is_empty()
+                )
+            }) =>
+        {
+            false
+        }
         (
             Atomic::TKeyedArray {
                 properties,

@@ -1813,11 +1813,15 @@ fn array_intersection_coercion(arg_ty: &Type, param_ty: &Type) -> bool {
     is_array_like(arg_ty)
         && param_ty.types.iter().any(|p| match p {
             Atomic::TIntersection { parts } => {
-                parts.iter().all(|part| {
-                    is_array_like(part)
-                        && (part.is_subtype_structural(arg_ty)
-                            || arg_ty.is_subtype_structural(part))
-                }) && parts.iter().any(|part| part.is_subtype_structural(arg_ty))
+                let list_for_associative = parts.iter().any(is_non_list_array_marker)
+                    && arg_ty.types.iter().all(arg_is_definite_list);
+                !list_for_associative
+                    && parts.iter().all(|part| {
+                        is_array_like(part)
+                            && (part.is_subtype_structural(arg_ty)
+                                || arg_ty.is_subtype_structural(part))
+                    })
+                    && parts.iter().any(|part| part.is_subtype_structural(arg_ty))
             }
             _ => false,
         })

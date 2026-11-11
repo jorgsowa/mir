@@ -11,13 +11,17 @@ fn associative_array_marker() -> Type {
     })
 }
 
-fn associative_array_type(key: Type, value: Type) -> Type {
+fn associative_array_type(key: Type, value: Type, non_empty: bool) -> Type {
+    let key = Box::new(key);
+    let value = Box::new(value);
+    let array = if non_empty {
+        Atomic::TNonEmptyArray { key, value }
+    } else {
+        Atomic::TArray { key, value }
+    };
     Type::single(Atomic::TIntersection {
         parts: mir_types::union::vec_to_type_params(vec![
-            Type::single(Atomic::TArray {
-                key: Box::new(key),
-                value: Box::new(value),
-            }),
+            Type::single(array),
             associative_array_marker(),
         ]),
     })
@@ -477,7 +481,9 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             t.add_type(Atomic::TObject);
             t
         }
-        "non-empty-associative-array" => associative_array_type(Type::array_key(), Type::mixed()),
+        "non-empty-associative-array" => {
+            associative_array_type(Type::array_key(), Type::mixed(), true)
+        }
         "non-empty-list" => Type::single(Atomic::TNonEmptyList {
             value: Box::new(Type::mixed()),
         }),
@@ -540,7 +546,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
-        "associative-array" => associative_array_type(Type::array_key(), Type::mixed()),
+        "associative-array" => associative_array_type(Type::array_key(), Type::mixed(), false),
         "list" => Type::single(Atomic::TList {
             value: Box::new(Type::mixed()),
         }),
@@ -698,7 +704,7 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 value: Box::new(value),
             })
         }
-        "associative-array" => {
+        "associative-array" | "non-empty-associative-array" => {
             let params = split_generics(inner);
             let (key, value) = match params.len() {
                 n if n >= 2 => (
@@ -708,7 +714,7 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 1 => (Type::array_key(), parse_type_string(params[0].trim())),
                 _ => (Type::array_key(), Type::mixed()),
             };
-            associative_array_type(key, value)
+            associative_array_type(key, value, name.to_lowercase().starts_with("non-empty"))
         }
         // Psalm-only pseudo-type: any object implementing ArrayAccess,
         // Countable, and Traversable. The bare spelling remains unresolved in
