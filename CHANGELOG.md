@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `get_class($obj)` on an object of a known class is `class-string<Cls>` instead of `string`, so a static property read through it (`$class::$count`) is typed instead of mixed.
 - Inside a generic function or method, returning the template value for a `template-type<Box<T>, Box, 'T'>` return type is no longer `MixedReturnStatement`, and a method's `template-type` return is no longer `UndefinedDocblockClass`.
 - `Random\RandomException` is unchecked, like `RuntimeException`: calling `random_int()` or `random_bytes()` no longer asks for `@throws`. It is thrown only when the system has no randomness source.
 - `unset` in a docblock union (`@var \DateTime|unset $x`) is read as `null` instead of an undefined class, so an `isset($x)` guard is no longer `RedundantCondition` and an unguarded read is possibly null.

@@ -1286,14 +1286,6 @@
       <code><![CDATA[return $implementationsByHook;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Hook/OrderOperation/OrderOperation.php">
-    <UnhandledMatchCondition>
-      <code><![CDATA[match(get_class($this)) {
-      BeforeOrAfter::class => TRUE,
-      FirstOrLast::class => FALSE,
-    }]]></code>
-    </UnhandledMatchCondition>
-  </file>
   <file src="core/lib/Drupal/Core/Hook/ThemeHookCollectorPass.php">
     <InvalidReturnType>
       <code><![CDATA[return $implementationsByHookOrig;]]></code>

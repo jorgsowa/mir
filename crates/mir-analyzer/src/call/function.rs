@@ -1244,6 +1244,12 @@ impl CallAnalyzer {
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                "get_class" => match arg_types.first().map(|t| t.types.as_slice()) {
+                    Some([Atomic::TNamedObject { fqcn, .. }]) => {
+                        Type::single(Atomic::TClassString(Some(*fqcn)))
+                    }
+                    _ => return_ty,
+                },
                 "strtolower" | "mb_strtolower" | "strtoupper" | "mb_strtoupper" => {
                     super::callable::case_conversion_return_type(
                         fn_name.ends_with("lower"),
