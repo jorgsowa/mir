@@ -1347,7 +1347,8 @@ mod docblock_hint_compat {
             | Atomic::TIntRange { .. }
             | Atomic::TPositiveInt
             | Atomic::TNegativeInt
-            | Atomic::TNonNegativeInt => INT,
+            | Atomic::TNonNegativeInt
+            | Atomic::TAnyLiteralInt => INT,
             Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => FLOAT,
             Atomic::TString
             | Atomic::TLiteralString(_)

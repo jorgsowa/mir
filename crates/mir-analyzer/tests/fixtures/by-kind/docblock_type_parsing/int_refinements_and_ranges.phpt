@@ -39,7 +39,7 @@ function check_non_negative_int($x) {
 function check_literal_int($x) {
     /**
      * @var literal-int $x
-     * @mir-check $x is int
+     * @mir-check $x is literal-int
      */
     var_dump($x);
 }

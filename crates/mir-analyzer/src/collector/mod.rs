@@ -123,6 +123,7 @@ fn in_int_family(a: &mir_types::atomic::Atomic) -> bool {
             | Atomic::TPositiveInt
             | Atomic::TNegativeInt
             | Atomic::TNonNegativeInt
+            | Atomic::TAnyLiteralInt
     )
 }
 fn in_float_family(a: &mir_types::atomic::Atomic) -> bool {

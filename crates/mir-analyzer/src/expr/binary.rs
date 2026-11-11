@@ -356,6 +356,37 @@ impl<'a> ExpressionAnalyzer<'a> {
                     is_non_empty_when_concat(&left_ty),
                     is_non_empty_when_concat(&right_ty),
                 );
+                // A literal-string joined with other source-written parts stays one.
+                let is_literal_string = |a: &Atomic| {
+                    matches!(
+                        a,
+                        Atomic::TRefinedString {
+                            refinement: mir_types::StringRefinement::Literal,
+                            ..
+                        }
+                    )
+                };
+                let written_in_source = |t: &Type| {
+                    !t.types.is_empty()
+                        && t.types.iter().all(|a| {
+                            is_literal_string(a)
+                                || matches!(
+                                    a,
+                                    Atomic::TLiteralString(_)
+                                        | Atomic::TLiteralInt(_)
+                                        | Atomic::TAnyLiteralInt
+                                )
+                        })
+                };
+                if (left_ty.contains(is_literal_string) || right_ty.contains(is_literal_string))
+                    && written_in_source(&left_ty)
+                    && written_in_source(&right_ty)
+                {
+                    return Type::single(Atomic::TRefinedString {
+                        refinement: mir_types::StringRefinement::Literal,
+                        non_empty: left_non_empty || right_non_empty,
+                    });
+                }
                 // Two or more characters, or a non-falsy part, can be neither "" nor "0".
                 let non_falsy = |t: &Type| {
                     !t.types.is_empty()

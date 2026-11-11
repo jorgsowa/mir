@@ -254,6 +254,7 @@ pub(crate) fn type_fn_narrowed(
                         | Atomic::TIntRange { .. }
                         | Atomic::TPositiveInt
                         | Atomic::TNonNegativeInt
+                        | Atomic::TAnyLiteralInt
                         | Atomic::TNegativeInt
                         | Atomic::TLiteralInt(_)
                         | Atomic::TFloat
@@ -295,6 +296,7 @@ pub(crate) fn type_fn_narrowed(
                             | Atomic::TIntRange { .. }
                             | Atomic::TPositiveInt
                             | Atomic::TNonNegativeInt
+                            | Atomic::TAnyLiteralInt
                             | Atomic::TNegativeInt
                             | Atomic::TFloat
                             | Atomic::TIntegralFloat

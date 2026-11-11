@@ -244,6 +244,8 @@ pub struct ConditionalData {
 pub enum StringRefinement {
     Lowercase,
     Uppercase,
+    /// `literal-string` — a value written in the source, not read at runtime.
+    Literal,
 }
 
 impl StringRefinement {
@@ -251,6 +253,7 @@ impl StringRefinement {
         match self {
             StringRefinement::Lowercase => !s.bytes().any(|b| b.is_ascii_uppercase()),
             StringRefinement::Uppercase => !s.bytes().any(|b| b.is_ascii_lowercase()),
+            StringRefinement::Literal => true,
         }
     }
 }
@@ -276,7 +279,7 @@ pub enum Atomic {
     TNonFalsyString,
     /// `numeric-string`
     TNumericString,
-    /// `lowercase-string`, `uppercase-string` and their `non-empty-` forms.
+    /// `lowercase-string`, `uppercase-string`, `literal-string` and their `non-empty-` forms.
     TRefinedString {
         refinement: StringRefinement,
         non_empty: bool,
@@ -294,6 +297,8 @@ pub enum Atomic {
     TNegativeInt,
     /// `non-negative-int`
     TNonNegativeInt,
+    /// `literal-int` — an int written in the source, not read at runtime.
+    TAnyLiteralInt,
 
     /// `float`
     TFloat,
@@ -426,6 +431,7 @@ impl Atomic {
             | Atomic::TLiteralInt(0)
             | Atomic::TLiteralFloat(0, 0)
             | Atomic::TInt
+            | Atomic::TAnyLiteralInt
             | Atomic::TFloat
             | Atomic::TNumeric
             | Atomic::TScalar
@@ -499,6 +505,7 @@ impl Atomic {
                 | Atomic::TPositiveInt
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
+                | Atomic::TAnyLiteralInt
                 | Atomic::TFloat
                 | Atomic::TIntegralFloat
                 | Atomic::TLiteralFloat(..)
@@ -517,6 +524,7 @@ impl Atomic {
                 | Atomic::TPositiveInt
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
+                | Atomic::TAnyLiteralInt
         )
     }
 
@@ -588,6 +596,7 @@ impl Atomic {
                 | Atomic::TPositiveInt
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
+                | Atomic::TAnyLiteralInt
                 | Atomic::TFloat
                 | Atomic::TIntegralFloat
                 | Atomic::TLiteralFloat(..)
@@ -639,7 +648,10 @@ impl Atomic {
             | Atomic::TNumericString => "string",
             Atomic::TCallableString => "callable-string",
             Atomic::TClassString(_) => "class-string",
-            Atomic::TInt | Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => "int",
+            Atomic::TInt
+            | Atomic::TLiteralInt(_)
+            | Atomic::TIntRange { .. }
+            | Atomic::TAnyLiteralInt => "int",
             Atomic::TPositiveInt => "positive-int",
             Atomic::TNegativeInt => "negative-int",
             Atomic::TNonNegativeInt => "non-negative-int",
@@ -714,6 +726,7 @@ enum AtomicTag {
     TPositiveInt,
     TNegativeInt,
     TNonNegativeInt,
+    TAnyLiteralInt,
     TFloat,
     TIntegralFloat,
     TLiteralFloat,
@@ -773,6 +786,7 @@ impl Hash for Atomic {
             Atomic::TPositiveInt => (T::TPositiveInt as u8).hash(state),
             Atomic::TNegativeInt => (T::TNegativeInt as u8).hash(state),
             Atomic::TNonNegativeInt => (T::TNonNegativeInt as u8).hash(state),
+            Atomic::TAnyLiteralInt => (T::TAnyLiteralInt as u8).hash(state),
             Atomic::TFloat => (T::TFloat as u8).hash(state),
             Atomic::TIntegralFloat => (T::TIntegralFloat as u8).hash(state),
             Atomic::TBool => (T::TBool as u8).hash(state),

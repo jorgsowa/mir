@@ -608,6 +608,7 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     | Atomic::TPositiveInt
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
+                    | Atomic::TAnyLiteralInt
                     | Atomic::TIntRange { .. },
                     Atomic::TFloat,
                 ) => true,

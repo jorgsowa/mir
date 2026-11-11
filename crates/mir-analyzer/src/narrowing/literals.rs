@@ -827,7 +827,11 @@ pub(super) fn literal_int_narrow_type(current: &Type, value: i64, is_value: bool
                 // Generic/wide int types: the literal could satisfy them — narrow to
                 // the literal exactly like every narrower sibling atom below does
                 // (TIntRange, TPositiveInt, TNonNegativeInt, TNegativeInt).
-                Atomic::TInt | Atomic::TScalar | Atomic::TNumeric | Atomic::TMixed => {
+                Atomic::TInt
+                | Atomic::TAnyLiteralInt
+                | Atomic::TScalar
+                | Atomic::TNumeric
+                | Atomic::TMixed => {
                     result.add_type(Atomic::TLiteralInt(value));
                 }
                 Atomic::TIntRange { min, max } if int_contains(*min, *max) => {

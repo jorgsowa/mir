@@ -61,7 +61,7 @@ function check_non_decimal_int_string($x) {
 function check_non_empty_literal_string($x) {
     /**
      * @var non-empty-literal-string $x
-     * @mir-check $x is non-empty-string
+     * @mir-check $x is non-empty-literal-string
      */
     var_dump($x);
 }

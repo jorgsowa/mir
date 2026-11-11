@@ -16,4 +16,5 @@ since the keyword wasn't recognized at all.
  */
 function foo(string $s1, string $s2): string {
     return "hello $s1 $s2";
+//  ^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'non-empty-string' is not compatible with declared 'literal-string'
 }

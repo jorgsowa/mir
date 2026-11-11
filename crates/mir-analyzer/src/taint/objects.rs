@@ -616,6 +616,7 @@ pub(crate) fn type_may_hold_object(ty: &mir_types::Type) -> bool {
             | Atomic::TPositiveInt
             | Atomic::TNegativeInt
             | Atomic::TNonNegativeInt
+            | Atomic::TAnyLiteralInt
             | Atomic::TFloat
             | Atomic::TIntegralFloat
             | Atomic::TLiteralFloat(..)

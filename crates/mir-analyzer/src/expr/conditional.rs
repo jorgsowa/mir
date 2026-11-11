@@ -907,6 +907,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Atomic::TInt
                     | Atomic::TPositiveInt
                     | Atomic::TNonNegativeInt
+                    | Atomic::TAnyLiteralInt
                     | Atomic::TNegativeInt
                     | Atomic::TString
                     | Atomic::TNonEmptyString
@@ -925,6 +926,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     Atomic::TInt
                         | Atomic::TPositiveInt
                         | Atomic::TNonNegativeInt
+                        | Atomic::TAnyLiteralInt
                         | Atomic::TNegativeInt
                         | Atomic::TIntRange { .. }
                         | Atomic::TString

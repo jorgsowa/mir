@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `stringable-object` is enforced: an object without `__toString()`, or a non-object, passed for it is `InvalidArgument`.
 - `InvalidArgument` is reported for a string literal that cannot spell a class name (`'not a class'`, `'Foo[]'`, `''`) passed where `class-string` is required. Such text was skipped before.
 - `lowercase-string`, `uppercase-string`, `non-empty-lowercase-string` and `non-empty-uppercase-string` are enforced instead of being read as `string`: a literal of the wrong case is `InvalidArgument` / `InvalidReturnType`, a string of unknown case is `ArgumentTypeCoercion`. `strtolower()`, `strtoupper()` and their `mb_` forms return the matching type.
+- `literal-string`, `non-empty-literal-string` and `literal-int` are enforced instead of being read as `string` / `int`: a value read at runtime is `ArgumentTypeCoercion` as an argument and `InvalidReturnType` when returned. Literals, constants, `Foo::class` and concatenations of them are accepted.
 
 ### Fixed
 

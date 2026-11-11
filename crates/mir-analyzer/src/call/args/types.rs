@@ -497,6 +497,7 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                 | Atomic::TPositiveInt
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
+                | Atomic::TAnyLiteralInt
         )
     };
     !arg.types.is_empty()
@@ -515,7 +516,7 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                             (Atomic::TNumericString, Atomic::TNonFalsyString)
                                 | (Atomic::TNonFalsyString, Atomic::TNumericString)
                         )
-                        // A case refinement overlaps every other kind of string.
+                        // A case or literal refinement overlaps every other kind of string or int.
                         || (a.is_string()
                             && p.is_string()
                             && matches!(
@@ -523,6 +524,7 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                                 (Atomic::TRefinedString { .. }, _)
                                     | (_, Atomic::TRefinedString { .. })
                             ))
+                        || (a.is_int() && matches!(p, Atomic::TAnyLiteralInt))
                 })
         })
 }
@@ -606,6 +608,7 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
                     | Atomic::TPositiveInt
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
+                    | Atomic::TAnyLiteralInt
                     | Atomic::TFloat
                     | Atomic::TIntegralFloat
                     | Atomic::TLiteralFloat(..)
@@ -1409,6 +1412,7 @@ fn classify_array_key(ty: &Type) -> ArrayKeyKind {
         | Atomic::TLiteralInt(_)
         | Atomic::TPositiveInt
         | Atomic::TNonNegativeInt
+        | Atomic::TAnyLiteralInt
         | Atomic::TNegativeInt
         | Atomic::TIntRange { .. } => ArrayKeyKind::Int,
         Atomic::TString

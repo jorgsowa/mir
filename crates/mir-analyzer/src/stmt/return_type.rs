@@ -1157,6 +1157,7 @@ pub(crate) fn scalar_return_coercion_ok(actual: &Type, declared: &Type) -> bool 
         | Atomic::TPositiveInt
         | Atomic::TNegativeInt
         | Atomic::TNonNegativeInt
+        | Atomic::TAnyLiteralInt
         | Atomic::TFalse
         | Atomic::TTrue
         | Atomic::TBool => true,

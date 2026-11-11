@@ -32,4 +32,4 @@ acceptsNonDecimal(12);
 
 acceptsNonEmptyLiteral('x');
 acceptsNonEmptyLiteral('');
-//                     ^^ InvalidArgument: Argument $value of acceptsNonEmptyLiteral() expects 'non-empty-string', got '""'
+//                     ^^ InvalidArgument: Argument $value of acceptsNonEmptyLiteral() expects 'non-empty-literal-string', got '""'

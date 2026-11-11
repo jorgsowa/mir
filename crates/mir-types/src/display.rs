@@ -166,6 +166,7 @@ impl fmt::Display for Atomic {
                 let kind = match refinement {
                     StringRefinement::Lowercase => "lowercase",
                     StringRefinement::Uppercase => "uppercase",
+                    StringRefinement::Literal => "literal",
                 };
                 write!(f, "{prefix}{kind}-string")
             }
@@ -183,6 +184,7 @@ impl fmt::Display for Atomic {
             Atomic::TPositiveInt => write!(f, "positive-int"),
             Atomic::TNegativeInt => write!(f, "negative-int"),
             Atomic::TNonNegativeInt => write!(f, "non-negative-int"),
+            Atomic::TAnyLiteralInt => write!(f, "literal-int"),
 
             Atomic::TFloat | Atomic::TIntegralFloat => write!(f, "float"),
             Atomic::TLiteralFloat(high, low) => {

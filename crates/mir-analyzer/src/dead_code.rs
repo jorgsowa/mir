@@ -133,6 +133,7 @@ fn is_plain_data(ty: &mir_types::Type) -> bool {
             | A::TPositiveInt
             | A::TNegativeInt
             | A::TNonNegativeInt
+            | A::TAnyLiteralInt
             | A::TFloat
             | A::TIntegralFloat
             | A::TLiteralFloat(..)

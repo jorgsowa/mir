@@ -444,8 +444,8 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "non-empty-string" => Type::single(Atomic::TNonEmptyString),
         "numeric-string" => Type::single(Atomic::TNumericString),
         "truthy-string" | "non-falsy-string" => Type::single(Atomic::TNonFalsyString),
-        // mir does not model the case or literalness of strings; use the closest atom.
-        "non-empty-literal-string" => Type::single(Atomic::TNonEmptyString),
+        "literal-string" => refined_string(StringRefinement::Literal, false),
+        "non-empty-literal-string" => refined_string(StringRefinement::Literal, true),
         "decimal-int-string" => Type::single(Atomic::TNumericString),
         "non-decimal-int-string" => Type::single(Atomic::TString),
         "lowercase-string" => refined_string(StringRefinement::Lowercase, false),
@@ -475,16 +475,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             t
         }
         "int" | "integer" | "int-range" => Type::single(Atomic::TInt),
-        // `literal-int`/`literal-string`: "any literal value of this kind",
-        // used almost exclusively as a template bound (`@template T of
-        // literal-string`). mir has no atom for "any literal, unspecified
-        // value" — approximate with the bare scalar type, same approach as
-        // the `truthy-string`/`lowercase-string` approximations above (every
-        // literal atom is already a subtype of its bare scalar, so a bound
-        // check against the base type still accepts any literal argument;
-        // it's merely lenient about accepting a non-literal one too).
-        "literal-int" => Type::single(Atomic::TInt),
-        "literal-string" => Type::single(Atomic::TString),
+        "literal-int" => Type::single(Atomic::TAnyLiteralInt),
         "positive-int" => Type::single(Atomic::TPositiveInt),
         "negative-int" => Type::single(Atomic::TNegativeInt),
         "non-negative-int" => Type::single(Atomic::TNonNegativeInt),

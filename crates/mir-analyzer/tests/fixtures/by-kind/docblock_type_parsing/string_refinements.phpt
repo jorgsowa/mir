@@ -80,7 +80,7 @@ function check_non_empty_uppercase_string($x) {
 function check_literal_string($x) {
     /**
      * @var literal-string $x
-     * @mir-check $x is string
+     * @mir-check $x is literal-string
      */
     var_dump($x);
 }
