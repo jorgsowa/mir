@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `enum-string` accepts the name of an enum and `trait-string` the name of a trait (`Suit::class`); the name of any other class is still rejected.
 - `key-of<T>` and `value-of<T>` name the template in a namespaced file instead of a class `T`, and `value-of<T>` of a backed enum case is that case's backing value.
 - `class-string-map<T of Bound, T>` reads the template declared in place, so the value type is the bound instead of an undefined class `T`.
+- `@phan-type` declares a local type alias, like `@psalm-type` and `@phpstan-type`.
 
 ## [0.97.0] - 2026-11-10
 

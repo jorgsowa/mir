@@ -506,7 +506,7 @@ impl DocblockParser {
                         result.methods.push(m);
                     }
                 }
-                "psalm-type" | "phpstan-type" => {
+                "psalm-type" | "phpstan-type" | "phan-type" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((name, type_expr)) = split_type_alias_decl(&body_str) {
                             result.type_aliases.push(DocTypeAlias {
