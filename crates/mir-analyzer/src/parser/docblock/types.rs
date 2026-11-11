@@ -455,7 +455,8 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
     }
 
     // Keywords
-    match s.to_lowercase().as_str() {
+    let lower = s.to_lowercase();
+    match lower.as_str() {
         "string" => Type::single(Atomic::TString),
         "non-empty-string" => Type::single(Atomic::TNonEmptyString),
         "numeric-string" => Type::single(Atomic::TNumericString),
@@ -571,10 +572,25 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         // `pure-closure` isn't a real class name, so it needs the same
         // explicit mapping.
         "pure-closure" | "static-closure" | "static-pure-closure" => {
-            Type::single(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("Closure"),
-                type_params: Default::default(),
-            })
+            let signature = if lower.contains("pure") {
+                "pure-Closure(mixed...): mixed"
+            } else {
+                "Closure(mixed...): mixed"
+            };
+            let is_static = lower.starts_with("static");
+            Type::from_vec(
+                parse_type_string(signature)
+                    .types
+                    .into_iter()
+                    .map(|a| match a {
+                        Atomic::TClosure { mut data } => {
+                            data.is_static = is_static;
+                            Atomic::TClosure { data }
+                        }
+                        other => other,
+                    })
+                    .collect(),
+            )
         }
         "callable-string" => Type::single(Atomic::TCallableString),
         // The leading backslash keeps namespace resolution from qualifying it.

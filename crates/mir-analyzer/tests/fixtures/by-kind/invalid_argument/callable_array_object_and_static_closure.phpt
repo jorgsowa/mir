@@ -41,8 +41,8 @@ acceptsCallableObject('greet');
 
 acceptsStaticClosure(static fn (): int => 1);
 acceptsStaticClosure(new Greeter());
-//                   ^^^^^^^^^^^^^ InvalidArgument: Argument $value of acceptsStaticClosure() expects 'Closure', got 'App\Greeter'
+//                   ^^^^^^^^^^^^^ InvalidArgument: Argument $value of acceptsStaticClosure() expects 'Closure(mixed): mixed', got 'App\Greeter'
 
 acceptsStaticPureClosure(static fn (int $value): int => $value + 1);
 acceptsStaticPureClosure([new Greeter(), 'greet']);
-//                       ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of acceptsStaticPureClosure() expects 'Closure', got 'array{0: App\Greeter, 1: "greet"}'
+//                       ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of acceptsStaticPureClosure() expects 'pure-Closure(mixed): mixed', got 'array{0: App\Greeter, 1: "greet"}'

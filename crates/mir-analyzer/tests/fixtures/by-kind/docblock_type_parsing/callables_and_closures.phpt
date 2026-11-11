@@ -55,7 +55,7 @@ function check_closure_with_signature($x) {
 function check_pure_closure_bare($x) {
     /**
      * @var pure-closure $x
-     * @mir-check $x is Closure
+     * @mir-check $x is pure-Closure(mixed): mixed
      */
     var_dump($x);
 }

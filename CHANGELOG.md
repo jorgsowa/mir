@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `pure-closure`, `static-closure` and `static-pure-closure` are closures taking any arguments instead of any `Closure` object: a closure with visible side effects passed for a pure one, and a non-static closure literal passed for a static one, is `InvalidArgument`.
 - `decimal-int-string` and `non-decimal-int-string` are enforced instead of being read as `numeric-string` / `string`: `'007'` or `'+1'` passed for `decimal-int-string`, and `'123'` or `'-1'` passed for `non-decimal-int-string`, is `InvalidArgument`.
 - `non-empty-scalar`, `non-empty-mixed` and `non-null-mixed` reject the values they exclude instead of being read as `scalar` / `mixed`: `''`, `'0'`, `false`, `[]` or `null` passed for them is reported.
 - `stdClass{name: string}` is read as the object shape `object{name: string}`, so its properties are typed, instead of an undefined class.
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An array callable (`[$obj, 'method']`) passed for a `Closure(...)` parameter is `InvalidArgument`: it is callable, but not a `Closure`.
 - `associative-array<int, T>` rejects a list (`['a', 'b']`, a `list<T>` value), not only one whose keys clash with the declared key type, and `non-empty-associative-array` rejects `[]`. Either docblock type beside a native `array` hint is no longer `MismatchingDocblockParamType`.
 - A conditional return on a class (`@return ($key is Model ? TModel|null : static)`) resolves each member of a union argument on its own, and resolves a `null` or array argument against a subject that mixes classes and `array`, instead of widening to every branch. `find($nullableUser)` is `User|null`, not `User|null|Collection`.
 - `get_class($obj)` on an object of a known class is `class-string<Cls>` instead of `string`, so a static property read through it (`$class::$count`) is typed instead of mixed.

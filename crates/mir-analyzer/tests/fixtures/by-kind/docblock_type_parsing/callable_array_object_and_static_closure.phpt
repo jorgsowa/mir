@@ -1,5 +1,5 @@
 ===description===
-`callable-array`, `callable-object`, `static-closure` and `static-pure-closure` parse to their base type.
+`callable-array` and `callable-object` parse to their base type; `static-closure` and `static-pure-closure` to a closure taking any arguments.
 ===config===
 <mir>
   <issueHandlers>
@@ -29,7 +29,7 @@ function check_callable_object($x) {
 function check_static_closure($x) {
     /**
      * @var static-closure $x
-     * @mir-check $x is Closure
+     * @mir-check $x is Closure(mixed): mixed
      */
     var_dump($x);
 }
@@ -37,7 +37,7 @@ function check_static_closure($x) {
 function check_static_pure_closure($x) {
     /**
      * @var static-pure-closure $x
-     * @mir-check $x is Closure
+     * @mir-check $x is pure-Closure(mixed): mixed
      */
     var_dump($x);
 }

@@ -20,6 +20,6 @@ function useCallable($cb): void {
 
 /** @param pure-Closure $c */
 function useClosure($c): void {
-    /** @mir-check $c is Closure */
+    /** @mir-check $c is pure-Closure(mixed): mixed */
     $_ = 1;
 }

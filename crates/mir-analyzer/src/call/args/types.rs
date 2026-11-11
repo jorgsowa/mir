@@ -142,6 +142,31 @@ pub(crate) fn check_one(
         );
         return;
     }
+    let wants_static_closure = !param_ty.types.is_empty()
+        && param_ty
+            .types
+            .iter()
+            .all(|p| matches!(p, Atomic::TClosure { data } if data.is_static));
+    let non_static_literal = matches!(
+        arg_expr.map(|e| &e.kind),
+        Some(ExprKind::Closure(_) | ExprKind::ArrowFunction(_))
+    ) && arg_ty
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TClosure { data } if !data.is_static));
+    if wants_static_closure && non_static_literal {
+        ea.emit(
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: param_ty.to_string(),
+                actual: format!("non-static {arg_ty}"),
+            },
+            Severity::Error,
+            arg_span,
+        );
+        return;
+    }
     validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
     validate_callable_type(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
 
@@ -398,7 +423,7 @@ pub(crate) fn check_one(
         && !stringable_coercion_ok(arg_ty, param_ty, ea)
         // `[$obj, 'method']` / `['Class', 'method']` is a valid callable, even
         // though it types as a 2-element list shape.
-        && !(param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TClosure { .. }))
+        && !(param_ty.contains(|t| matches!(t, Atomic::TCallable { .. }))
             && super::super::array_builtins::is_callable_array_pair(arg_ty, ea.db));
     if mismatch {
         // For union arg types, check if any individual atomic fits the param.
