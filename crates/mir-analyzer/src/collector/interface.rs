@@ -343,6 +343,16 @@ impl<'a> DefinitionCollector<'a> {
                 own_properties,
                 seal_properties,
                 type_aliases: Self::stored_type_aliases(&type_aliases),
+                sealed: iface_doc
+                    .sealed
+                    .iter()
+                    .map(|c| self.resolve_type_name(c.as_str(), true).into())
+                    .collect(),
+                require_extends: iface_doc
+                    .require_extends
+                    .iter()
+                    .map(|c| self.resolve_type_name(c.as_str(), true).into())
+                    .collect(),
             }));
 
         self.own_constants = prev_own_constants;

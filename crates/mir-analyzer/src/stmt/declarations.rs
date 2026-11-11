@@ -629,6 +629,7 @@ impl<'a> StatementsAnalyzer<'a> {
             IssueKind::InvalidExtendClass {
                 parent: parent_resolved.to_string(),
                 child: child_fqcn.to_string(),
+                reason: None,
             },
             Location {
                 file: self.file.clone(),

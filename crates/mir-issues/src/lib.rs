@@ -615,7 +615,13 @@ pub enum IssueKind {
     DirectConstructorCall { class: String },
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_extend_class/`.
-    InvalidExtendClass { parent: String, child: String },
+    InvalidExtendClass {
+        parent: String,
+        child: String,
+        /// Set when the parent is not final but restricts its subtypes (`@phpstan-sealed`, `@phpstan-require-extends`).
+        #[serde(default)]
+        reason: Option<String>,
+    },
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/final_method_overridden/`.
     FinalMethodOverridden {
@@ -2371,9 +2377,14 @@ impl IssueKind {
                     "Cannot modify readonly property {class}::${property} — already initialized"
                 )
             }
-            IssueKind::InvalidExtendClass { parent, child } => {
-                format!("Class {child} cannot extend final class {parent}")
-            }
+            IssueKind::InvalidExtendClass {
+                parent,
+                child,
+                reason,
+            } => match reason {
+                Some(reason) => reason.clone(),
+                None => format!("Class {child} cannot extend final class {parent}"),
+            },
             IssueKind::InvalidTemplateParam {
                 name,
                 expected_bound,
@@ -3242,6 +3253,7 @@ mod code_tests {
             IssueKind::InvalidExtendClass {
                 parent: s(),
                 child: s(),
+                reason: None,
             },
             IssueKind::FinalMethodOverridden {
                 class: s(),

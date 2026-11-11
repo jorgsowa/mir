@@ -705,6 +705,11 @@ impl<'a> DefinitionCollector<'a> {
             is_internal: class_doc.is_internal,
             internal_scope: class_doc.internal_scope.as_deref().map(Arc::from),
             consistent_constructor: class_doc.consistent_constructor,
+            sealed: class_doc
+                .sealed
+                .iter()
+                .map(|c| self.resolve_type_name(c.as_str(), true).into())
+                .collect(),
             is_immutable: class_doc.is_immutable,
             attribute_flags: parse_attribute_flags(&decl.attributes),
             allows_dynamic_properties: self

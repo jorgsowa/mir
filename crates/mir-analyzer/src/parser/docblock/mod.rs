@@ -611,6 +611,16 @@ impl DocblockParser {
                         }
                     }
                 }
+                "phpstan-sealed" | "psalm-inheritors" => {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
+                        let list = body_str.split_whitespace().next().unwrap_or("");
+                        result.sealed.extend(
+                            list.split('|')
+                                .map(|c| c.trim_matches(|ch| ch == '(' || ch == ')').to_string())
+                                .filter(|c| !c.is_empty()),
+                        );
+                    }
+                }
                 "psalm-require-extends" | "phpstan-require-extends" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         let cls = body_str
@@ -979,6 +989,8 @@ pub struct ParsedDocblock {
     pub internal_scope: Option<String>,
     /// `@psalm-consistent-constructor` on a class.
     pub consistent_constructor: bool,
+    /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`.
+    pub sealed: Vec<String>,
     pub is_pure: bool,
     /// `@phpstan-all-methods-pure` on a class.
     pub all_methods_pure: bool,

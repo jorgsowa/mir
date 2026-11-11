@@ -768,6 +768,9 @@ pub struct ClassDef {
     /// `@psalm-consistent-constructor`: subclass constructors must match this class's.
     #[serde(default)]
     pub consistent_constructor: bool,
+    /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`: the only classes that may extend this one.
+    #[serde(default)]
+    pub sealed: Vec<Arc<str>>,
     /// Set when the class carries `@psalm-immutable` — non-constructor methods must not
     /// assign to `$this` properties.
     #[serde(default)]
@@ -868,6 +871,12 @@ pub struct InterfaceDef {
     /// Type aliases declared on this interface via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
     pub type_aliases: FxHashMap<Arc<str>, Type>,
+    /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`: the only classes that may implement this one.
+    #[serde(default)]
+    pub sealed: Vec<Arc<str>>,
+    /// `@phpstan-require-extends Cls`: implementing classes must extend `Cls`.
+    #[serde(default)]
+    pub require_extends: Vec<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------

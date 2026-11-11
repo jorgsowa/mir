@@ -133,6 +133,7 @@ impl<'a> ClassAnalyzer<'a> {
                         IssueKind::InvalidExtendClass {
                             parent: parent_fqcn.to_string(),
                             child: fqcn.to_string(),
+                            reason: None,
                         },
                         location.as_ref(),
                     );
@@ -196,6 +197,59 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
         }
+        // ---- 1c. Sealed supertypes and interface `@phpstan-require-extends` ---
+        let direct_supertypes = parent_fqcn.iter().chain(class.interfaces().iter());
+        for sup in direct_supertypes {
+            let sealed = match crate::db::find_class_like(
+                self.db,
+                crate::db::Fqcn::from_str(self.db, sup.as_ref()),
+            ) {
+                Some(crate::db::ClassLike::Class(c)) => c.sealed.clone(),
+                Some(crate::db::ClassLike::Interface(i)) => i.sealed.clone(),
+                _ => continue,
+            };
+            if !sealed.is_empty() && !sealed.iter().any(|c| c.eq_ignore_ascii_case(fqcn)) {
+                let allowed: Vec<&str> = sealed.iter().map(|c| c.as_ref()).collect();
+                self.push_located_issue(
+                    &mut issues,
+                    IssueKind::InvalidExtendClass {
+                        parent: sup.to_string(),
+                        child: fqcn.to_string(),
+                        reason: Some(format!(
+                            "Class {fqcn} cannot extend sealed {sup}, which allows only {}",
+                            allowed.join("|")
+                        )),
+                    },
+                    location.as_ref(),
+                );
+            }
+        }
+        let ancestors =
+            crate::db::class_ancestors_by_fqcn(self.db, crate::db::Fqcn::from_str(self.db, fqcn));
+        for ancestor in ancestors.iter() {
+            let Some(crate::db::ClassLike::Interface(iface)) = crate::db::find_class_like(
+                self.db,
+                crate::db::Fqcn::from_str(self.db, ancestor.as_ref()),
+            ) else {
+                continue;
+            };
+            for required in iface.require_extends.iter() {
+                if !ancestors.iter().any(|a| a.eq_ignore_ascii_case(required)) {
+                    self.push_located_issue(
+                        &mut issues,
+                        IssueKind::InvalidExtendClass {
+                            parent: required.to_string(),
+                            child: fqcn.to_string(),
+                            reason: Some(format!(
+                                "Class {fqcn} implements {ancestor}, which requires extending {required}"
+                            )),
+                        },
+                        location.as_ref(),
+                    );
+                }
+            }
+        }
+
         for trait_fqcn in class.class_traits() {
             let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
             if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
