@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `literal-string`, `non-empty-literal-string` and `literal-int` are enforced instead of being read as `string` / `int`: a value read at runtime is `ArgumentTypeCoercion` as an argument and `InvalidReturnType` when returned. Literals, constants, `Foo::class` and concatenations of them are accepted.
 - `int-mask-of<Other::PREFIX_*>` resolves the int constants of a class other than the declaring one, so a value outside the mask is `InvalidArgument` / `InvalidReturnType`. It was read as `int` unless the class was `self`.
 - `properties-of<Cls>`, `public-properties-of`, `protected-properties-of` and `private-properties-of` are the shape of the class's instance properties (inherited ones included) instead of `array<string, mixed>`, so a wrongly typed or missing entry is `InvalidArgument`.
+- An object shape parameter (`object{foo: int, bar?: string}`) is checked against the class of the argument: a required property that is missing, not public or of another type is `InvalidArgument`. `stdClass` and classes with `__get()` are accepted as before.
 
 ### Fixed
 

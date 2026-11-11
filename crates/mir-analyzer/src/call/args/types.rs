@@ -278,6 +278,40 @@ pub(crate) fn check_one(
         return;
     }
 
+    // A class instance fits `object{...}` only when it declares those public properties.
+    let misses_object_shape = |a: &Atomic| {
+        let Atomic::TNamedObject { fqcn, .. } = a else {
+            return false;
+        };
+        !param_ty.types.iter().any(|p| match p {
+            Atomic::TObjectShape { properties } => class_fits_object_shape(ea, fqcn, properties),
+            _ => crate::subtype::is_subtype(ea.db, &Type::single(a.clone()), &Type::single(p.clone())),
+        })
+    };
+    if param_ty.contains(|p| matches!(p, Atomic::TObjectShape { .. }))
+        && arg_ty.types.iter().any(misses_object_shape)
+    {
+        let expected = format!("{param_ty}");
+        let kind = if arg_ty.types.iter().all(misses_object_shape) {
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected,
+                actual: arg_display,
+            }
+        } else {
+            IssueKind::PossiblyInvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected,
+                actual: arg_display,
+            }
+        };
+        let severity = kind.default_severity();
+        ea.emit(kind, severity, arg_span);
+        return;
+    }
+
     let arg_core = arg_ty.core_type();
     let mismatch = !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()
@@ -479,6 +513,37 @@ fn without_legacy_handle_resource(arg: &Type, param: &Type) -> Option<Type> {
     let mut rest = arg.clone();
     rest.types.retain(|a| !matches!(a, Atomic::TResource));
     Some(rest)
+}
+
+/// Whether instances of `class` carry the public properties `object{...}` asks for.
+fn class_fits_object_shape(
+    ea: &ExpressionAnalyzer<'_>,
+    class: &str,
+    wanted: &mir_types::KeyedProperties,
+) -> bool {
+    let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, class);
+    // Properties of stdClass and of classes with `__get` are not declared.
+    if !crate::db::class_exists(ea.db, &resolved)
+        || resolved.eq_ignore_ascii_case("stdClass")
+        || crate::db::has_method_in_chain(ea.db, &resolved, "__get")
+    {
+        return true;
+    }
+    let fqcn = crate::db::Fqcn::from_str(ea.db, &resolved);
+    wanted.iter().all(|(key, want)| {
+        let mir_types::ArrayKey::String(name) = key else {
+            return true;
+        };
+        match crate::db::find_property_in_chain(ea.db, fqcn, name) {
+            Some((_, prop)) => {
+                prop.visibility == mir_codebase::definitions::Visibility::Public
+                    && prop.ty.as_deref().is_none_or(|have| {
+                        have.is_mixed() || crate::subtype::is_subtype(ea.db, have, &want.ty)
+                    })
+            }
+            None => want.optional,
+        }
+    })
 }
 
 /// A plain `string`/`int` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`, `'a'|'b'`).
