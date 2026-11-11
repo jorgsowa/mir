@@ -588,6 +588,17 @@ impl AnalysisCache {
         known
     }
 
+    /// Record `content` like [`Self::observe_dependency`]; true only when
+    /// this cache had recorded different content for `file_path`.
+    pub(crate) fn dependency_content_changed(&self, file_path: &str, content: &str) -> bool {
+        let seen = self.file_id_map.lock().get(file_path).is_some_and(|id| {
+            self.dep_hashes.lock().contains_key(&id)
+                || self.entries.lock().contains_key(&id)
+                || self.evicted_hashes.lock().contains_key(&id)
+        });
+        !self.observe_dependency(file_path, content) && seen
+    }
+
     fn remember_evicted(&self, evicted: impl IntoIterator<Item = (FileId, CacheEntry)>) {
         let mut hashes = self.evicted_hashes.lock();
         for (id, entry) in evicted {

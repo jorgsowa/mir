@@ -360,6 +360,7 @@ impl AnalysisSession {
     /// should call this after its warm sweep completes and on shutdown so the
     /// next launch's [`Self::warm_start_files`] finds them.
     pub fn flush_analysis_cache(&self) {
+        self.observe_on_demand_files();
         if let Some(cache) = &self.cache {
             cache.flush();
         }

@@ -112,6 +112,8 @@ pub struct MirDbStorage {
     /// `on_demand_files.len()` at this handle's last adoption; entries are
     /// never removed, so equal means nothing new to adopt.
     on_demand_adopted: usize,
+    /// On-demand registrations whose content the owner hasn't recorded yet.
+    on_demand_unobserved: Arc<Mutex<Vec<Arc<str>>>>,
     /// Paths whose on-demand read found nothing, shared by every clone.
     on_demand_misses: Arc<Mutex<OnDemandMisses>>,
     /// Side-channel resolver state. The `ResolverConfig` salsa input is
@@ -357,6 +359,7 @@ impl Default for MirDbStorage {
             deleted_files: Arc::default(),
             on_demand_files: Arc::default(),
             on_demand_adopted: 0,
+            on_demand_unobserved: Arc::default(),
             on_demand_misses: Arc::default(),
             resolver_state: Arc::default(),
             workspace_revision_input: None,
@@ -637,6 +640,10 @@ impl MirDatabase for MirDbStorage {
             .new(self);
         on_demand.insert(path.clone(), OnDemandFile { file, durability });
         drop(on_demand);
+        // Stubs ship with the binary, whose identity already keys the cache.
+        if !crate::stubs::is_stub_path(&path) {
+            self.on_demand_unobserved.lock().push(path.clone());
+        }
         self.mark_index_pending(&path);
         Some(file)
     }
@@ -1685,6 +1692,11 @@ impl MirDbStorage {
         }
         Arc::make_mut(&mut self.source_files).extend(adopted);
         self.bump_workspace_revision();
+    }
+
+    /// Drain the on-demand registrations made since the last call.
+    pub(crate) fn take_unobserved_on_demand_files(&self) -> Vec<Arc<str>> {
+        std::mem::take(&mut *self.on_demand_unobserved.lock())
     }
 
     /// Registered paths plus files loaded on demand and not yet adopted:

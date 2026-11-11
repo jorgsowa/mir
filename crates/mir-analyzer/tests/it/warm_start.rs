@@ -929,7 +929,16 @@ fn factory_workspace(factory: &str) -> Vec<(Arc<str>, Arc<str>)> {
 
 /// A language server's launch: mirror every file, then replay the cache.
 fn lsp_boot(dir: &std::path::Path, files: &[(Arc<str>, Arc<str>)]) -> AnalysisSession {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    lsp_boot_session(
+        AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir),
+        files,
+    )
+}
+
+fn lsp_boot_session(
+    mut session: AnalysisSession,
+    files: &[(Arc<str>, Arc<str>)],
+) -> AnalysisSession {
     session.ensure_all_stubs();
     for (path, text) in files {
         session.upsert_source_file(path.clone(), text.clone(), salsa::Durability::LOW);
@@ -1104,4 +1113,131 @@ fn open_file_analysis_records_dependencies_of_its_commit() {
         salsa::Durability::LOW,
     );
     assert!(!session.reference_postings_fresh("late.php"));
+}
+
+const VENDOR_RUNNER_PATH: &str = "vendor/Runner.php";
+const VENDOR_RUNNER: &str =
+    "<?php\nnamespace Vendor;\nclass Runner { public function run(): void {} }\n";
+const VENDOR_RUNNER_CHANGED: &str =
+    "<?php\nnamespace Vendor;\nclass Runner { public function run(): int { return 1; } }\n";
+const VENDOR_RUNNER_CALLER: &str = "<?php\nfunction go(\\Vendor\\Runner $r): void { $r->run(); }\n";
+
+/// Maps `Vendor\Runner` to [`VENDOR_RUNNER_PATH`], served from memory.
+struct VendorRunner(&'static str);
+
+impl mir_analyzer::ClassResolver for VendorRunner {
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+        (fqcn == "Vendor\\Runner").then(|| std::path::PathBuf::from(VENDOR_RUNNER_PATH))
+    }
+}
+
+impl mir_analyzer::SourceProvider for VendorRunner {
+    fn read(&self, path: &str) -> Option<Arc<str>> {
+        (path == VENDOR_RUNNER_PATH).then(|| Arc::from(self.0))
+    }
+}
+
+fn runner_caller() -> Vec<(Arc<str>, Arc<str>)> {
+    vec![(Arc::from("caller.php"), Arc::from(VENDOR_RUNNER_CALLER))]
+}
+
+/// A launch whose host mirrors only `caller.php`; the vendor class resolves on demand.
+fn vendor_boot(dir: &std::path::Path, vendor_text: &'static str) -> AnalysisSession {
+    let session = AnalysisSession::new(PhpVersion::LATEST)
+        .with_cache_dir(dir)
+        .with_class_resolver(Arc::new(VendorRunner(vendor_text)))
+        .with_source_provider(Arc::new(VendorRunner(vendor_text)));
+    lsp_boot_session(session, &runner_caller())
+}
+
+/// [`vendor_boot`] with the resolver attached after launch, so the launch reads no vendor file.
+fn vendor_boot_unread(dir: &std::path::Path, vendor_text: &'static str) -> AnalysisSession {
+    let session = AnalysisSession::new(PhpVersion::LATEST)
+        .with_cache_dir(dir)
+        .with_source_provider(Arc::new(VendorRunner(vendor_text)));
+    let session = lsp_boot_session(session, &runner_caller())
+        .with_class_resolver(Arc::new(VendorRunner(vendor_text)));
+    assert!(session.reference_postings_fresh("caller.php"));
+    assert!(session.lookup_source_file(VENDOR_RUNNER_PATH).is_none());
+    session
+}
+
+/// A first session that reads the vendor file itself, before the host mirrors the same text.
+fn seed_on_demand_vendor_cache(dir: &std::path::Path, load_class_first: bool) {
+    let files = runner_caller();
+    let mut seed = vendor_boot(dir, VENDOR_RUNNER);
+    if load_class_first {
+        assert!(seed.load_class("Vendor\\Runner").is_loaded());
+    }
+    warm_sweep(&mut seed, &files);
+    assert_eq!(
+        run_refs(&mut seed, "Vendor\\Runner", &files),
+        ["caller.php"]
+    );
+    seed.upsert_source_file(
+        Arc::from(VENDOR_RUNNER_PATH),
+        Arc::from(VENDOR_RUNNER),
+        salsa::Durability::HIGH,
+    );
+    seed.flush_analysis_cache();
+}
+
+fn assert_unchanged_vendor_mirror_keeps_dependent(load_class_first: bool) {
+    let dir = create_temp_dir("warm_start_on_demand_unchanged");
+    seed_on_demand_vendor_cache(dir.path(), load_class_first);
+
+    let mut files = runner_caller();
+    files.push((Arc::from(VENDOR_RUNNER_PATH), Arc::from(VENDOR_RUNNER)));
+    let mut session = lsp_boot(dir.path(), &files);
+    assert!(session.reference_postings_fresh("caller.php"));
+    assert_eq!(warm_sweep(&mut session, &runner_caller()), 0);
+}
+
+#[test]
+fn unchanged_dependency_read_by_a_snapshot_keeps_replayed_dependent() {
+    assert_unchanged_vendor_mirror_keeps_dependent(false);
+}
+
+#[test]
+fn unchanged_dependency_read_by_load_class_keeps_replayed_dependent() {
+    assert_unchanged_vendor_mirror_keeps_dependent(true);
+}
+
+#[test]
+fn changed_dependency_read_by_load_class_evicts_replayed_dependent() {
+    let dir = create_temp_dir("warm_start_on_demand_changed_load_class");
+    seed_on_demand_vendor_cache(dir.path(), false);
+
+    let mut session = vendor_boot_unread(dir.path(), VENDOR_RUNNER_CHANGED);
+    assert!(session.load_class("Vendor\\Runner").is_loaded());
+    assert!(!session.reference_postings_fresh("caller.php"));
+}
+
+#[test]
+fn changed_dependency_read_by_a_snapshot_evicts_replayed_dependent() {
+    let dir = create_temp_dir("warm_start_on_demand_changed_snapshot");
+    seed_on_demand_vendor_cache(dir.path(), false);
+
+    let mut session = vendor_boot_unread(dir.path(), VENDOR_RUNNER_CHANGED);
+    session
+        .snapshot()
+        .find_method_in_chain("Vendor\\Runner", "run")
+        .expect("not cancelled")
+        .expect("resolves on demand");
+    session.prepare_for_query(None);
+    assert!(!session.reference_postings_fresh("caller.php"));
+}
+
+#[test]
+fn dependency_read_during_launch_evicts_replayed_dependent_only_when_changed() {
+    let dir = create_temp_dir("warm_start_on_demand_launch");
+    seed_on_demand_vendor_cache(dir.path(), false);
+
+    let unchanged = vendor_boot(dir.path(), VENDOR_RUNNER);
+    assert!(unchanged.lookup_source_file(VENDOR_RUNNER_PATH).is_some());
+    assert!(unchanged.reference_postings_fresh("caller.php"));
+    drop(unchanged);
+
+    let changed = vendor_boot(dir.path(), VENDOR_RUNNER_CHANGED);
+    assert!(!changed.reference_postings_fresh("caller.php"));
 }

@@ -135,6 +135,28 @@ impl AnalysisSession {
         new_content
     }
 
+    /// Record content the session read itself. Results of this session
+    /// already saw it, so only a different recorded content evicts.
+    fn record_read_content(&self, path: &str, text: &str) {
+        let Some(cache) = self.cache.as_deref() else {
+            return;
+        };
+        if cache.dependency_content_changed(path, text) {
+            self.invalidate_dependents(&[path.to_string()], true);
+        }
+    }
+
+    /// Record the content of files reads registered on demand, so the next
+    /// session can tell whether they changed.
+    pub(crate) fn observe_on_demand_files(&self) {
+        let db = &self.db.salsa;
+        for path in db.take_unobserved_on_demand_files() {
+            if let Some(sf) = db.lookup_source_file(&path) {
+                self.record_read_content(&path, sf.text(db));
+            }
+        }
+    }
+
     /// Evict the cached results of every transitive dependent of `changed`
     /// (and of `changed` itself when `include_changed`), and demote the
     /// dependents' committed postings to stale so the next reference query
@@ -243,11 +265,17 @@ impl AnalysisSession {
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&mut self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
-        let text_unchanged = self
+        let registered_text = self
             .lookup_source_file(file.as_ref())
-            .is_some_and(|sf| sf.text(&self.db.salsa).as_ref() == source.as_ref());
+            .map(|sf| sf.text(&self.db.salsa).clone());
+        let text_unchanged = registered_text
+            .as_ref()
+            .is_some_and(|text| text.as_ref() == source.as_ref());
         if text_unchanged && self.last_ingested_symbols.contains_key(file.as_ref()) {
             return;
+        }
+        if registered_text.is_none() {
+            self.record_read_content(&file, &source);
         }
         self.index.clear_transient_batch_replay();
 
@@ -1090,6 +1118,7 @@ impl AnalysisSession {
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
         self.db.salsa.adopt_on_demand_files();
+        self.observe_on_demand_files();
         // Bounded: snapshot readers keep queueing on-demand loads meanwhile.
         let mut rounds_left = SETTLE_ROUNDS;
         loop {
