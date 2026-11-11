@@ -1752,6 +1752,26 @@ impl<'a> DefinitionCollector<'a> {
                         is_pure: *is_pure,
                     });
                 }
+                mir_types::Atomic::TKeyOf { target } => {
+                    result.add_type(mir_types::Atomic::TKeyOf {
+                        target: Box::new(self.resolve_union_doc_with_templates(
+                            *target.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TValueOf { target } => {
+                    result.add_type(mir_types::Atomic::TValueOf {
+                        target: Box::new(self.resolve_union_doc_with_templates(
+                            *target.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
                 // `class-string<T>`/`interface-string<T>` where `T` matches a
                 // template param: leave the inner name as the bare template
                 // name, same shielding `TNamedObject` gets above — some

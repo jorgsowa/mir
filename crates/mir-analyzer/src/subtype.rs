@@ -840,12 +840,14 @@ fn const_array_projection(db: &dyn MirDatabase, atomic: &Atomic) -> Option<Type>
 pub(crate) fn enum_backing_values(db: &dyn MirDatabase, target: &Type) -> Option<Type> {
     let mut result = Type::empty();
     for atomic in &target.types {
-        let Atomic::TNamedObject { fqcn, type_params } = atomic else {
-            return None;
+        let (fqcn, only_case) = match atomic {
+            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => (fqcn, None),
+            Atomic::TLiteralEnumCase {
+                enum_fqcn,
+                case_name,
+            } => (enum_fqcn, Some(case_name)),
+            _ => return None,
         };
-        if !type_params.is_empty() {
-            return None;
-        }
         let crate::db::ClassLike::Enum(e) =
             crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn))?
         else {
@@ -854,8 +856,9 @@ pub(crate) fn enum_backing_values(db: &dyn MirDatabase, target: &Type) -> Option
         let scalar = e.scalar_type.as_ref()?;
         let literals: Option<Vec<Atomic>> = e
             .cases
-            .values()
-            .map(|c| {
+            .iter()
+            .filter(|(name, _)| only_case.is_none_or(|c| name.as_ref() == c.as_ref()))
+            .map(|(_, c)| {
                 let v = c.value.as_ref()?;
                 v.types
                     .iter()

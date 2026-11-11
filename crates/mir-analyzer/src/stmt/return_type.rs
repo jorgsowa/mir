@@ -417,6 +417,7 @@ fn union_contains_template(u: &Type) -> bool {
 pub(super) fn declared_return_has_template(declared: &Type, db: &dyn MirDatabase) -> bool {
     declared.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
+        Atomic::TKeyOf { target } | Atomic::TValueOf { target } => union_contains_template(target),
         // Skip when the named class doesn't exist in the codebase (e.g. type aliases
         // resolved to a fully-qualified name that isn't a real class).
         // Skip when the type is an interface — concrete implementations may satisfy the
