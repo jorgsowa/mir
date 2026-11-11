@@ -23,12 +23,12 @@ function acceptsNonEmptyLiteral($value): void {}
 acceptsDecimal('123');
 acceptsDecimal('-1');
 acceptsDecimal('abc');
-//             ^^^^^ InvalidArgument: Argument $value of acceptsDecimal() expects 'numeric-string', got '"abc"'
+//             ^^^^^ InvalidArgument: Argument $value of acceptsDecimal() expects 'decimal-int-string', got '"abc"'
 
 acceptsNonDecimal('00');
 acceptsNonDecimal('foo');
 acceptsNonDecimal(12);
-//                ^^ ArgumentTypeCoercion: Argument $value of acceptsNonDecimal() expects 'string', got '12' — coercion may fail at runtime
+//                ^^ ArgumentTypeCoercion: Argument $value of acceptsNonDecimal() expects 'non-decimal-int-string', got '12' — coercion may fail at runtime
 
 acceptsNonEmptyLiteral('x');
 acceptsNonEmptyLiteral('');

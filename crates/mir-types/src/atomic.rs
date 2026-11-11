@@ -267,6 +267,9 @@ pub enum StringRefinement {
     Uppercase,
     /// `literal-string` — a value written in the source, not read at runtime.
     Literal,
+    /// `decimal-int-string` — the canonical spelling of an int, which PHP casts to an int array key.
+    DecimalInt,
+    NonDecimalInt,
 }
 
 impl StringRefinement {
@@ -275,8 +278,14 @@ impl StringRefinement {
             StringRefinement::Lowercase => !s.bytes().any(|b| b.is_ascii_uppercase()),
             StringRefinement::Uppercase => !s.bytes().any(|b| b.is_ascii_lowercase()),
             StringRefinement::Literal => true,
+            StringRefinement::DecimalInt => is_decimal_int(s),
+            StringRefinement::NonDecimalInt => !is_decimal_int(s),
         }
     }
+}
+
+fn is_decimal_int(s: &str) -> bool {
+    s.parse::<i64>().is_ok_and(|n| n.to_string() == s)
 }
 
 // ---------------------------------------------------------------------------

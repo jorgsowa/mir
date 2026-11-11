@@ -2349,6 +2349,13 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             },
         ) => have == want && (*have_non_empty || !want_non_empty),
         // Otherwise a refined string relates to wider types as its unrefined form does.
+        (
+            Atomic::TRefinedString {
+                refinement: StringRefinement::DecimalInt,
+                ..
+            },
+            _,
+        ) => atomic_subtype(&Atomic::TNumericString, sup),
         (Atomic::TRefinedString { non_empty, .. }, _) => {
             let base = if *non_empty {
                 Atomic::TNonEmptyString

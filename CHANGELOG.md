@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `decimal-int-string` and `non-decimal-int-string` are enforced instead of being read as `numeric-string` / `string`: `'007'` or `'+1'` passed for `decimal-int-string`, and `'123'` or `'-1'` passed for `non-decimal-int-string`, is `InvalidArgument`.
 - `non-empty-scalar`, `non-empty-mixed` and `non-null-mixed` reject the values they exclude instead of being read as `scalar` / `mixed`: `''`, `'0'`, `false`, `[]` or `null` passed for them is reported.
 - `stdClass{name: string}` is read as the object shape `object{name: string}`, so its properties are typed, instead of an undefined class.
 - `@phan-assert`, `@phan-assert-true-condition` and `@phan-assert-false-condition` are read as `@psalm-assert`, `@psalm-assert-if-true` and `@psalm-assert-if-false`.

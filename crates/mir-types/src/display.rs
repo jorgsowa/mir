@@ -167,6 +167,8 @@ impl fmt::Display for Atomic {
                     StringRefinement::Lowercase => "lowercase",
                     StringRefinement::Uppercase => "uppercase",
                     StringRefinement::Literal => "literal",
+                    StringRefinement::DecimalInt => "decimal-int",
+                    StringRefinement::NonDecimalInt => "non-decimal-int",
                 };
                 write!(f, "{prefix}{kind}-string")
             }

@@ -45,7 +45,7 @@ function check_number($x) {
 function check_decimal_int_string($x) {
     /**
      * @var decimal-int-string $x
-     * @mir-check $x is numeric-string
+     * @mir-check $x is decimal-int-string
      */
     var_dump($x);
 }
@@ -53,7 +53,7 @@ function check_decimal_int_string($x) {
 function check_non_decimal_int_string($x) {
     /**
      * @var non-decimal-int-string $x
-     * @mir-check $x is string
+     * @mir-check $x is non-decimal-int-string
      */
     var_dump($x);
 }
