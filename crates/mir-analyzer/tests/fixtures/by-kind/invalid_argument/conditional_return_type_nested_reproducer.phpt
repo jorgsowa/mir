@@ -34,12 +34,11 @@ $arr_result = wrap(['a', 'b']);
 /** @mir-check $arr_result is array<int, "a"|"b"> */
 takesArray($arr_result);
 
-// Union arg (string|null): outer can't resolve, so both branches are widened.
-// Recursive widening must also flatten the inner TConditional inside if_false.
+// Union arg (string|null): each member takes its own branch, and no TConditional survives.
 /** @var string|null $str_or_null */
 $str_or_null = rand() ? 'x' : null;
 $union_result = wrap($str_or_null);
-/** @mir-check $union_result is array{}|array{0: string} */
+/** @mir-check $union_result is array{0: string}|array{} */
 takesArray($union_result);
 
 // Flat single-level conditional: widening (subject not in predicate list) collapses to string.

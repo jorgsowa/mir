@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A conditional return on a class (`@return ($key is Model ? TModel|null : static)`) resolves each member of a union argument on its own, and resolves a `null` or array argument against a subject that mixes classes and `array`, instead of widening to every branch. `find($nullableUser)` is `User|null`, not `User|null|Collection`.
 - `get_class($obj)` on an object of a known class is `class-string<Cls>` instead of `string`, so a static property read through it (`$class::$count`) is typed instead of mixed.
 - Inside a generic function or method, returning the template value for a `template-type<Box<T>, Box, 'T'>` return type is no longer `MixedReturnStatement`, and a method's `template-type` return is no longer `UndefinedDocblockClass`.
 - `Random\RandomException` is unchecked, like `RuntimeException`: calling `random_int()` or `random_bytes()` no longer asks for `@throws`. It is thrown only when the system has no randomness source.

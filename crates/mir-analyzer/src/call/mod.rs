@@ -152,6 +152,28 @@ fn resolve_conditional_dyn(
             resolved.add_type(atomic);
             continue;
         };
+        // A union argument takes the branch each of its members takes.
+        if let Some(name) = &data.param_name {
+            if let Some(arg) = lookup(name.as_ref()).filter(|t| t.types.len() > 1) {
+                for member in arg.types {
+                    let member = mir_types::Type::single(member);
+                    let member_lookup = |n: &str| {
+                        if n == name.as_ref() {
+                            Some(member.clone())
+                        } else {
+                            lookup(n)
+                        }
+                    };
+                    resolved.merge_with(&resolve_conditional_dyn(
+                        mir_types::Type::single(atomic.clone()),
+                        db,
+                        templates,
+                        &member_lookup,
+                    ));
+                }
+                continue;
+            }
+        }
         match resolve_class_subject_branch(data, db, templates, lookup) {
             Some(branch) => resolved.merge_with(&branch),
             None => resolved
@@ -161,24 +183,15 @@ fn resolve_conditional_dyn(
     crate::subtype::resolve_template_types(db, resolved)
 }
 
-/// The chosen branch of a conditional whose subject and discriminant are both
-/// object types, resolved through `is_subtype`.
+/// The chosen branch of a conditional whose subject names a class, resolved through `is_subtype`.
 fn resolve_class_subject_branch(
     data: &mir_types::atomic::ConditionalData,
     db: &dyn crate::db::MirDatabase,
     templates: Option<&rustc_hash::FxHashMap<mir_types::Name, mir_types::Type>>,
     lookup: &dyn Fn(&str) -> Option<mir_types::Type>,
 ) -> Option<mir_types::Type> {
-    use mir_types::Atomic;
-    let is_object = |ty: &mir_types::Type| {
-        !ty.types.is_empty()
-            && ty.types.iter().all(|a| {
-                matches!(a, Atomic::TLiteralEnumCase { .. })
-                    || a.named_object_fqcn().is_some_and(|f| !f.contains("::"))
-            })
-    };
     let subject = crate::subtype::canonical_enum_cases(db, &data.subject);
-    if !is_object(&subject) {
+    if !subject.types.iter().any(is_object_like) {
         return None;
     }
     let param_name = data.param_name.as_ref()?;
@@ -186,7 +199,8 @@ fn resolve_class_subject_branch(
     let arg_ty = lookup(param_name.as_ref())
         .or_else(|| templates.and_then(|t| t.get(param_name).cloned()))?;
     let arg_ty = crate::subtype::canonical_enum_cases(db, &arg_ty);
-    if !is_object(&arg_ty) {
+    let definite = |a: &mir_types::Atomic| is_object_like(a) || a.is_definitely_non_object();
+    if arg_ty.types.is_empty() || !arg_ty.types.iter().all(definite) {
         return None;
     }
     let branch = if crate::subtype::is_subtype(db, &arg_ty, &subject) {
@@ -204,6 +218,11 @@ fn resolve_class_subject_branch(
     Some(resolve_conditional_dyn(branch, db, templates, lookup))
 }
 
+fn is_object_like(a: &mir_types::Atomic) -> bool {
+    matches!(a, mir_types::Atomic::TLiteralEnumCase { .. })
+        || a.named_object_fqcn().is_some_and(|f| !f.contains("::"))
+}
+
 /// True when no value can be both `a` and `s`, given `a` is not a subtype of `s`.
 /// Unknown or enum-vs-class pairs are not provably disjoint.
 fn provably_disjoint(
@@ -214,6 +233,18 @@ fn provably_disjoint(
     use mir_types::Atomic;
     if let (Atomic::TLiteralEnumCase { .. }, Atomic::TLiteralEnumCase { .. }) = (a, s) {
         return a != s;
+    }
+    match (is_object_like(a), is_object_like(s)) {
+        (true, false) => return s.is_definitely_non_object(),
+        (false, true) => return a.is_definitely_non_object(),
+        _ => {}
+    }
+    match (a, s) {
+        (Atomic::TNull, Atomic::TNull) => return false,
+        (Atomic::TNull, other) | (other, Atomic::TNull) => {
+            return other.is_definitely_non_object() && !matches!(other, Atomic::TVoid);
+        }
+        _ => {}
     }
     let (Some(a), Some(s)) = (a.named_object_fqcn(), s.named_object_fqcn()) else {
         return false;
