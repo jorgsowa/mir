@@ -747,7 +747,8 @@ pub(crate) fn canonical_params<'a>(
             .iter()
             .map(|p| {
                 let mut p = p.clone();
-                if let Some(Cow::Owned(ty)) = p.ty.as_deref().map(|ty| canonical_enum_cases(db, ty)) {
+                if let Some(Cow::Owned(ty)) = p.ty.as_deref().map(|ty| canonical_enum_cases(db, ty))
+                {
                     p.ty = Some(std::sync::Arc::new(ty));
                 }
                 p
@@ -866,8 +867,9 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
 
 /// A call's return type with each resolvable `template-type<Obj, Cls, 'T'>` replaced by its argument.
 pub(crate) fn resolve_template_types(db: &dyn MirDatabase, ty: Type) -> Type {
-    if !ty.contains(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.as_str() == "template-type"))
-    {
+    if !ty.contains(
+        |a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.as_str() == "template-type"),
+    ) {
         return ty;
     }
     let mut out = Type::empty();
@@ -912,7 +914,11 @@ fn template_type_argument(db: &dyn MirDatabase, atomic: &Atomic) -> Option<Type>
 }
 
 /// The instance properties of `class` and its ancestors as a sealed shape, or a string-keyed array when the class is unknown.
-fn properties_of_shape(db: &dyn MirDatabase, class: &str, filter: mir_types::PropertyFilter) -> Atomic {
+fn properties_of_shape(
+    db: &dyn MirDatabase,
+    class: &str,
+    filter: mir_types::PropertyFilter,
+) -> Atomic {
     use mir_codebase::definitions::Visibility;
     use mir_types::PropertyFilter;
     let fqcn = crate::db::Fqcn::from_str(db, class);
@@ -925,7 +931,8 @@ fn properties_of_shape(db: &dyn MirDatabase, class: &str, filter: mir_types::Pro
     let mut properties = mir_types::KeyedProperties::default();
     for ancestor in crate::db::class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = crate::db::Fqcn::interned(db, Name::new(ancestor.as_ref()));
-        let Some(own) = crate::db::find_class_like(db, here).and_then(|c| c.own_properties().cloned())
+        let Some(own) =
+            crate::db::find_class_like(db, here).and_then(|c| c.own_properties().cloned())
         else {
             continue;
         };
@@ -939,7 +946,13 @@ fn properties_of_shape(db: &dyn MirDatabase, class: &str, filter: mir_types::Pro
             let key = mir_types::ArrayKey::String(name.clone());
             if kept && !prop.is_static && !properties.contains_key(&key) {
                 let ty = prop.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
-                properties.insert(key, mir_types::atomic::KeyedProperty { ty, optional: false });
+                properties.insert(
+                    key,
+                    mir_types::atomic::KeyedProperty {
+                        ty,
+                        optional: false,
+                    },
+                );
             }
         }
     }

@@ -185,7 +185,9 @@ impl fmt::Display for Atomic {
             Atomic::TNegativeInt => write!(f, "negative-int"),
             Atomic::TNonNegativeInt => write!(f, "non-negative-int"),
             Atomic::TRefinedInt(IntRefinement::Literal) => write!(f, "literal-int"),
-            Atomic::TRefinedInt(IntRefinement::MaskOf(target)) => write!(f, "int-mask-of<{target}>"),
+            Atomic::TRefinedInt(IntRefinement::MaskOf(target)) => {
+                write!(f, "int-mask-of<{target}>")
+            }
 
             Atomic::TFloat | Atomic::TIntegralFloat => write!(f, "float"),
             Atomic::TLiteralFloat(high, low) => {

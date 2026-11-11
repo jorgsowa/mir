@@ -575,12 +575,8 @@ impl Type {
         match atomic {
             Atomic::TRefinedInt(_) if self.types.contains(&Atomic::TInt) => return,
             Atomic::TLiteralInt(_) if self.types.contains(&LITERAL_INT) => return,
-            LITERAL_INT => self
-                .types
-                .retain(|t| !matches!(t, Atomic::TLiteralInt(_))),
-            Atomic::TInt => self
-                .types
-                .retain(|t| !matches!(t, Atomic::TRefinedInt(_))),
+            LITERAL_INT => self.types.retain(|t| !matches!(t, Atomic::TLiteralInt(_))),
+            Atomic::TInt => self.types.retain(|t| !matches!(t, Atomic::TRefinedInt(_))),
             _ => {}
         }
         // TLiteralString(s) is subsumed by TString.

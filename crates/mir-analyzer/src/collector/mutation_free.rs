@@ -107,7 +107,9 @@ fn body_writes_no_properties(m: &MethodDecl, safe: &HashSet<&str>) -> bool {
 
 /// Whether a function body visibly has side effects: output, `exit`, `global` or `static` variables.
 pub(crate) fn has_visible_side_effect(stmts: &[Stmt]) -> bool {
-    stmts.iter().any(|s| SideEffectScan.visit_stmt(s).is_break())
+    stmts
+        .iter()
+        .any(|s| SideEffectScan.visit_stmt(s).is_break())
 }
 
 /// [`has_visible_side_effect`] for an arrow function's body expression.

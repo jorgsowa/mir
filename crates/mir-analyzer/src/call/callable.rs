@@ -366,7 +366,10 @@ fn is_non_empty_string(ty: &Type) -> bool {
                 a,
                 Atomic::TNonEmptyString
                     | Atomic::TNonFalsyString
-                    | Atomic::TRefinedString { non_empty: true, .. }
+                    | Atomic::TRefinedString {
+                        non_empty: true,
+                        ..
+                    }
                     | Atomic::TClassString(_)
                     | Atomic::TInterfaceString(_)
                     | Atomic::TEnumString
@@ -556,7 +559,11 @@ fn sprintf_format_guarantees_non_empty(fmt: &str) -> bool {
 /// preserving any `false` component (PHP 7.x stub). Returns `None` when the
 /// separator's non-emptiness cannot be proven so the stub type is used as-is.
 /// `strtolower()` / `strtoupper()` return a string of that case, non-empty when the argument is.
-pub(crate) fn case_conversion_return_type(lower: bool, arg_types: &[Type], stub_return: Type) -> Type {
+pub(crate) fn case_conversion_return_type(
+    lower: bool,
+    arg_types: &[Type],
+    stub_return: Type,
+) -> Type {
     if !matches!(stub_return.types.as_slice(), [Atomic::TString]) {
         return stub_return;
     }

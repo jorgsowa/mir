@@ -680,8 +680,16 @@ fn parse_case_constrained_string() {
     for (keyword, refinement, non_empty) in [
         ("lowercase-string", StringRefinement::Lowercase, false),
         ("uppercase-string", StringRefinement::Uppercase, false),
-        ("non-empty-lowercase-string", StringRefinement::Lowercase, true),
-        ("non-empty-uppercase-string", StringRefinement::Uppercase, true),
+        (
+            "non-empty-lowercase-string",
+            StringRefinement::Lowercase,
+            true,
+        ),
+        (
+            "non-empty-uppercase-string",
+            StringRefinement::Uppercase,
+            true,
+        ),
     ] {
         assert_eq!(
             parse_type_string(keyword).types[0],

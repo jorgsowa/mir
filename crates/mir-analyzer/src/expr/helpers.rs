@@ -1293,7 +1293,9 @@ pub fn is_non_empty_when_concat(ty: &Type) -> bool {
         && ty.types.iter().all(|a| match a {
             Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
-            | Atomic::TRefinedString { non_empty: true, .. }
+            | Atomic::TRefinedString {
+                non_empty: true, ..
+            }
             | Atomic::TNumericString
             | Atomic::TCallableString
             | Atomic::TClassString(_)

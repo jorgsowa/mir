@@ -308,7 +308,11 @@ pub(crate) fn check_one(
         };
         !param_ty.types.iter().any(|p| match p {
             Atomic::TObjectShape { properties } => class_fits_object_shape(ea, fqcn, properties),
-            _ => crate::subtype::is_subtype(ea.db, &Type::single(a.clone()), &Type::single(p.clone())),
+            _ => crate::subtype::is_subtype(
+                ea.db,
+                &Type::single(a.clone()),
+                &Type::single(p.clone()),
+            ),
         })
     };
     if param_ty.contains(|p| matches!(p, Atomic::TObjectShape { .. }))

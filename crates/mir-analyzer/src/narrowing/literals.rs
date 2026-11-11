@@ -414,7 +414,9 @@ pub(super) fn narrow_string_to_empty(ty: &Type) -> Type {
     ty.filter(|t| match t {
         Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
-        | Atomic::TRefinedString { non_empty: true, .. }
+        | Atomic::TRefinedString {
+            non_empty: true, ..
+        }
         | Atomic::TNumericString
         | Atomic::TClassString(_)
         | Atomic::TCallableString => false,
