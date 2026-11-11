@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@phan-side-effect-free` is read as `@pure` on a function or method, and on a class makes every method pure. `@phpstan-all-methods-pure` does the same for a class; a method marked `@phpstan-impure` stays impure.
 - A typed shape remainder (`array{name: string, ...<Foo>}`, `...<string, int>`) is enforced instead of being read as bare `...`: an extra key whose value is not a `Foo` is `InvalidArgument`, and reading an unlisted key gives `Foo` instead of `mixed`.
 - `pure-closure`, `static-closure` and `static-pure-closure` are closures taking any arguments instead of any `Closure` object: a closure with visible side effects passed for a pure one, and a non-static closure literal passed for a static one, is `InvalidArgument`.
 - `decimal-int-string` and `non-decimal-int-string` are enforced instead of being read as `numeric-string` / `string`: `'007'` or `'+1'` passed for `decimal-int-string`, and `'123'` or `'-1'` passed for `non-decimal-int-string`, is `InvalidArgument`.

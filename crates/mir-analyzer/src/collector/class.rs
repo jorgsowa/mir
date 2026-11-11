@@ -246,13 +246,16 @@ impl<'a> DefinitionCollector<'a> {
                             }
                         }
                     }
-                    if let Some(method) = self.build_method_storage(
+                    if let Some(mut method) = self.build_method_storage(
                         m,
                         &fqcn,
                         Some(&member.span),
                         Some(&type_aliases),
                         &class_template_params,
                     ) {
+                        if class_doc.all_methods_pure && !method.is_impure {
+                            method.is_pure = true;
+                        }
                         let key = Arc::from(crate::util::php_ident_lowercase(&method.name));
                         if let Some(existing) = own_methods.get(&key) {
                             own_methods.insert(key, merge_method_overloads(existing, &method));

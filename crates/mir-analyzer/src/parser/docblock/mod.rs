@@ -543,6 +543,14 @@ impl DocblockParser {
                 }
                 "internal" | "psalm-internal" => result.is_internal = true,
                 "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
+                // Phan's tag covers a function, a method or every method of a class.
+                "phan-side-effect-free" => {
+                    result.is_pure = true;
+                    result.all_methods_pure = true;
+                }
+                "phpstan-all-methods-pure" | "psalm-all-methods-pure" => {
+                    result.all_methods_pure = true
+                }
                 "impure" | "psalm-impure" | "phpstan-impure" => result.is_impure = true,
                 "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
@@ -946,6 +954,8 @@ pub struct ParsedDocblock {
     pub is_deprecated: bool,
     pub is_internal: bool,
     pub is_pure: bool,
+    /// `@phpstan-all-methods-pure` on a class.
+    pub all_methods_pure: bool,
     /// An explicit `@impure`/`@psalm-impure`/`@phpstan-impure` declaration.
     /// This opts an implementation out of an inherited purity contract.
     pub is_impure: bool,
