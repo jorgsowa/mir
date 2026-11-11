@@ -661,7 +661,7 @@ impl<'a> BodyAnalyzer<'a> {
                         // for consistency, though only reachable via `@return` here.
                         if matches!(
                             crate::util::php_ident_lowercase(cls_fqcn.as_ref()).as_str(),
-                            "self" | "static" | "parent"
+                            "self" | "static" | "parent" | "template-type"
                         ) {
                             continue;
                         }

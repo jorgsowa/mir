@@ -5,7 +5,6 @@ With several templates `template-type` picks the one that is named, also when th
   <issueHandlers>
     <UnusedParam errorLevel="suppress"/>
     <UnusedVariable errorLevel="suppress"/>
-    <MixedReturnStatement errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===

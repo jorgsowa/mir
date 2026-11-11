@@ -278,7 +278,10 @@ impl<'a> StatementsAnalyzer<'a> {
             } else {
                 ctx.fn_return_type.as_deref()
             };
-            if let Some(declared) = &declared_opt.cloned() {
+            if let Some(declared) = &declared_opt
+                .cloned()
+                .map(|d| crate::subtype::resolve_template_types(self.db, d))
+            {
                 // Check return type compatibility. Special case: `void` functions must not
                 // return any value (named_object_return_compatible considers TVoid compatible
                 // with TNull, so handle void separately to avoid false suppression), and
@@ -297,7 +300,12 @@ impl<'a> StatementsAnalyzer<'a> {
                     && !declared.is_void()
                     && !declared.is_mixed()
                     && check_ty.is_mixed()
-                    && !declared.contains(|t| matches!(t, Atomic::TConditional { .. }));
+                    && !declared.contains(|t| match t {
+                        Atomic::TConditional { .. } => true,
+                        // Unresolved while its object is itself a template.
+                        Atomic::TNamedObject { fqcn, .. } => fqcn.as_str() == "template-type",
+                        _ => false,
+                    });
                 if is_mixed_return {
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(

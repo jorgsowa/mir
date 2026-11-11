@@ -5,7 +5,6 @@
   <issueHandlers>
     <UnusedParam errorLevel="suppress"/>
     <UnusedVariable errorLevel="suppress"/>
-    <MixedReturnStatement errorLevel="suppress"/>
   </issueHandlers>
 </mir>
 ===file===
