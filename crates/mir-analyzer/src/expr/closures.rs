@@ -540,7 +540,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         let mut closure_ctx = crate::flow_state::FlowState::for_function(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty_hint.clone(),
             Arc::from([]),
             ctx.self_fqcn.clone(),
@@ -941,7 +941,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             });
 
         let mut arrow_ctx = crate::flow_state::FlowState::for_function(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty_hint.clone(),
             Arc::from([]),
             ctx.self_fqcn.clone(),

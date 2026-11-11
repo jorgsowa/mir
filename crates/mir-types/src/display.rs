@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::atomic::{Atomic, IntRefinement, StringRefinement};
+use crate::atomic::{Atomic, IntRefinement, PropertyFilter, StringRefinement};
 use crate::union::Type;
 
 /// Write `items` separated by `sep` straight into the formatter, avoiding the
@@ -207,6 +207,15 @@ impl fmt::Display for Atomic {
 
             Atomic::TObject => write!(f, "object"),
             Atomic::TResource => write!(f, "resource"),
+            Atomic::TPropertiesOf { class, filter } => {
+                let prefix = match filter {
+                    PropertyFilter::All => "",
+                    PropertyFilter::Public => "public-",
+                    PropertyFilter::Protected => "protected-",
+                    PropertyFilter::Private => "private-",
+                };
+                write!(f, "{prefix}properties-of<{class}>")
+            }
             Atomic::TNamedObject { fqcn, type_params } => {
                 // `Traversable<mixed, mixed>`/`Generator<mixed, mixed, mixed, mixed>`
                 // carry no more information than the bare class name — every

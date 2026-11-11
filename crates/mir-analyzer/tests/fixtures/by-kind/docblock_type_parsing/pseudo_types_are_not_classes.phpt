@@ -13,9 +13,9 @@ class Foo { public int $x = 0; }
 function f($benevolent, $properties, $publicProperties, $closed): void {
     /** @mir-check $benevolent is int|false */
     echo $benevolent;
-    /** @mir-check $properties is array<string, mixed> */
+    /** @mir-check $properties is array{'x': int} */
     echo count($properties);
-    /** @mir-check $publicProperties is array<string, mixed> */
+    /** @mir-check $publicProperties is array{'x': int} */
     echo count($publicProperties);
     /** @mir-check $closed is resource */
     echo gettype($closed);

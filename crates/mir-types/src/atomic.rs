@@ -239,6 +239,15 @@ pub struct ConditionalData {
     pub if_false: Type,
 }
 
+/// Which properties a [`Atomic::TPropertiesOf`] keeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PropertyFilter {
+    All,
+    Public,
+    Protected,
+    Private,
+}
+
 /// What a [`Atomic::TRefinedInt`] guarantees about its value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum IntRefinement {
@@ -427,6 +436,9 @@ pub enum Atomic {
 
     /// `resource` — a legacy resource handle (open or closed); docblock-only, never a native type.
     TResource,
+
+    /// `properties-of<Cls>` and its visibility-filtered forms: a shape built from the class when checked.
+    TPropertiesOf { class: Name, filter: PropertyFilter },
 }
 
 impl Atomic {
@@ -676,6 +688,7 @@ impl Atomic {
             Atomic::TNumeric => "numeric",
             Atomic::TObject => "object",
             Atomic::TResource => "resource",
+            Atomic::TPropertiesOf { .. } => "array",
             Atomic::TNamedObject { .. } => "object",
             Atomic::TStaticObject { .. } => "static",
             Atomic::TSelf { .. } => "self",
@@ -771,6 +784,7 @@ enum AtomicTag {
     TIntersection,
     TObjectShape,
     TResource,
+    TPropertiesOf,
 }
 
 impl Hash for Atomic {
@@ -814,6 +828,11 @@ impl Hash for Atomic {
             Atomic::TEnumString => (T::TEnumString as u8).hash(state),
             Atomic::TTraitString => (T::TTraitString as u8).hash(state),
             Atomic::TResource => (T::TResource as u8).hash(state),
+            Atomic::TPropertiesOf { class, filter } => {
+                (T::TPropertiesOf as u8).hash(state);
+                class.hash(state);
+                filter.hash(state);
+            }
 
             // --- variants with fields ---
             Atomic::TLiteralString(s) => {

@@ -164,7 +164,7 @@ impl<'a> BodyAnalyzer<'a> {
         );
         let declared_return = return_ty.clone();
         let mut ctx = FlowState::for_method_with_templates(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty,
             declared_throws,
             None,
@@ -762,7 +762,7 @@ impl<'a> BodyAnalyzer<'a> {
         );
 
         let mut ctx = FlowState::for_method_with_templates(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty,
             declared_throws,
             None,
@@ -956,7 +956,7 @@ impl<'a> BodyAnalyzer<'a> {
         );
 
         let mut ctx = FlowState::for_function(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty,
             declared_throws,
             None,

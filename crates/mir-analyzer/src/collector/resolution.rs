@@ -215,6 +215,10 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
         Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(target)) => {
             Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(rename(target.as_str())))
         }
+        Atomic::TPropertiesOf { class, filter } => Atomic::TPropertiesOf {
+            class: rename(class.as_str()),
+            filter,
+        },
         Atomic::TKeyOf { target } => Atomic::TKeyOf {
             target: Box::new(ru!(*target)),
         },

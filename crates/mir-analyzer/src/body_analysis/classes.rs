@@ -229,7 +229,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
 
             let mut ctx = FlowState::for_method(
-                &params,
+                &crate::subtype::canonical_params(self.db, &params),
                 return_ty,
                 Arc::from([]),
                 Some(Arc::from(fqcn)),
@@ -1292,7 +1292,7 @@ impl<'a> BodyAnalyzer<'a> {
             None
         };
         let mut ctx = FlowState::for_method_with_templates(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty,
             declared_throws,
             Some(cx.fqcn.clone()),

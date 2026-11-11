@@ -1927,6 +1927,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         Atomic::TLiteralString(s) => vec![LitString(s.clone())],
         // Arrays — `list` is a refinement of `array`.
         Atomic::TArray { .. }
+        | Atomic::TPropertiesOf { .. }
         | Atomic::TNonEmptyArray { .. }
         | Atomic::TKeyedArray { is_list: false, .. } => vec![Array],
         Atomic::TList { .. }
@@ -2198,7 +2199,14 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
     if sub == sup {
         return true;
     }
+    // Until resolved against its class, `properties-of<Cls>` is a string-keyed array.
+    let string_keyed_array = || Atomic::TArray {
+        key: Box::new(Type::string()),
+        value: Box::new(Type::mixed()),
+    };
     match (sub, sup) {
+        (Atomic::TPropertiesOf { .. }, _) => return atomic_subtype(&string_keyed_array(), sup),
+        (_, Atomic::TPropertiesOf { .. }) => return atomic_subtype(sub, &string_keyed_array()),
         (Atomic::TObjectShape { properties: have }, Atomic::TObjectShape { properties: want }) => {
             return object_shape_subtype(have, want);
         }

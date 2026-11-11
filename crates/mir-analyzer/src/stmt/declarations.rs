@@ -73,7 +73,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 _ => None,
             };
             let mut hook_ctx = FlowState::for_method(
-                &params,
+                &crate::subtype::canonical_params(self.db, &params),
                 return_ty,
                 Arc::from([]),
                 Some(fqcn.clone()),
@@ -196,7 +196,7 @@ impl<'a> StatementsAnalyzer<'a> {
         };
 
         let mut fn_ctx = FlowState::for_function(
-            &params,
+            &crate::subtype::canonical_params(self.db, &params),
             return_ty,
             Arc::from([]),
             None,
@@ -489,7 +489,7 @@ impl<'a> StatementsAnalyzer<'a> {
             };
             let is_ctor = method_name == "__construct";
             let mut method_ctx = FlowState::for_method(
-                &params,
+                &crate::subtype::canonical_params(self.db, &params),
                 return_ty,
                 Arc::from([]),
                 Some(fqcn.clone()),

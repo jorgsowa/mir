@@ -388,7 +388,8 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TList { .. }
         | Atomic::TNonEmptyArray { .. }
         | Atomic::TNonEmptyList { .. }
-        | Atomic::TKeyedArray { .. } => TypeFamily::Array,
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TPropertiesOf { .. } => TypeFamily::Array,
 
         Atomic::TObject
         | Atomic::TObjectShape { .. }

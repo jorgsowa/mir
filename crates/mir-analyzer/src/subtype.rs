@@ -695,7 +695,8 @@ fn atomic_mentions_enum_case(a: &Atomic) -> bool {
         Atomic::TLiteralEnumCase { .. }
         | Atomic::TKeyOf { .. }
         | Atomic::TValueOf { .. }
-        | Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(_)) => true,
+        | Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(_))
+        | Atomic::TPropertiesOf { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
             fqcn.contains("::") || type_params.iter().any(mentions_enum_case)
         }
@@ -724,6 +725,33 @@ pub(crate) fn single_case_fits_bare_enum(actual: &Type, declared: &Type) -> bool
 
 fn mentions_enum_case(ty: &Type) -> bool {
     ty.types.iter().any(atomic_mentions_enum_case)
+}
+
+/// Parameters as a body sees them: `properties-of<Cls>` resolved to its shape.
+pub(crate) fn canonical_params<'a>(
+    db: &dyn MirDatabase,
+    params: &'a [mir_codebase::DeclaredParam],
+) -> Cow<'a, [mir_codebase::DeclaredParam]> {
+    // Constant and enum-case references stay as written: a body may still test them.
+    let mentions = |p: &mir_codebase::DeclaredParam| {
+        p.ty.as_deref()
+            .is_some_and(|ty| ty.contains(|a| matches!(a, Atomic::TPropertiesOf { .. })))
+    };
+    if !params.iter().any(mentions) {
+        return Cow::Borrowed(params);
+    }
+    Cow::Owned(
+        params
+            .iter()
+            .map(|p| {
+                let mut p = p.clone();
+                if let Some(Cow::Owned(ty)) = p.ty.as_deref().map(|ty| canonical_enum_cases(db, ty)) {
+                    p.ty = Some(std::sync::Arc::new(ty));
+                }
+                p
+            })
+            .collect(),
+    )
 }
 
 /// [`normalize_enum_cases`], borrowing when `ty` mentions no enum case.
@@ -759,6 +787,10 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
             for a in int_mask_of_constants(db, target).types {
                 out.add_type(a);
             }
+            continue;
+        }
+        if let Atomic::TPropertiesOf { class, filter } = atomic {
+            out.add_type(properties_of_shape(db, class, *filter));
             continue;
         }
         if let Atomic::TValueOf { target } = atomic {
@@ -822,6 +854,45 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
         });
     }
     collapse_complete_enums(db, out)
+}
+
+/// The instance properties of `class` and its ancestors as a sealed shape, or a string-keyed array when the class is unknown.
+fn properties_of_shape(db: &dyn MirDatabase, class: &str, filter: mir_types::PropertyFilter) -> Atomic {
+    use mir_codebase::definitions::Visibility;
+    use mir_types::PropertyFilter;
+    let fqcn = crate::db::Fqcn::from_str(db, class);
+    if crate::db::find_class_like(db, fqcn).is_none() {
+        return Atomic::TArray {
+            key: Box::new(Type::string()),
+            value: Box::new(Type::mixed()),
+        };
+    }
+    let mut properties = mir_types::KeyedProperties::default();
+    for ancestor in crate::db::class_ancestors_by_fqcn(db, fqcn).iter() {
+        let here = crate::db::Fqcn::interned(db, Name::new(ancestor.as_ref()));
+        let Some(own) = crate::db::find_class_like(db, here).and_then(|c| c.own_properties().cloned())
+        else {
+            continue;
+        };
+        for (name, prop) in own.iter() {
+            let kept = match filter {
+                PropertyFilter::All => true,
+                PropertyFilter::Public => prop.visibility == Visibility::Public,
+                PropertyFilter::Protected => prop.visibility == Visibility::Protected,
+                PropertyFilter::Private => prop.visibility == Visibility::Private,
+            };
+            let key = mir_types::ArrayKey::String(name.clone());
+            if kept && !prop.is_static && !properties.contains_key(&key) {
+                let ty = prop.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                properties.insert(key, mir_types::atomic::KeyedProperty { ty, optional: false });
+            }
+        }
+    }
+    Atomic::TKeyedArray {
+        properties: std::sync::Arc::new(properties),
+        is_open: false,
+        is_list: false,
+    }
 }
 
 /// Every OR-combination of the int constants `Cls::PATTERN` names, or `int` when they are unknown or too many.

@@ -781,13 +781,30 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         // PHPStan's lenient union: the members still describe the value.
         "__benevolent" => parse_type_string(inner.trim()),
         "new" => Type::mixed(),
-        "properties-of"
+        keyword @ ("properties-of"
         | "public-properties-of"
         | "protected-properties-of"
-        | "private-properties-of" => Type::single(Atomic::TArray {
-            key: Box::new(Type::string()),
-            value: Box::new(Type::mixed()),
-        }),
+        | "private-properties-of") => {
+            let filter = match keyword {
+                "public-properties-of" => mir_types::PropertyFilter::Public,
+                "protected-properties-of" => mir_types::PropertyFilter::Protected,
+                "private-properties-of" => mir_types::PropertyFilter::Private,
+                _ => mir_types::PropertyFilter::All,
+            };
+            // Only a plain class name can be looked up later.
+            match parse_type_string(inner.trim()).types.as_slice() {
+                [Atomic::TNamedObject { fqcn, type_params }] if type_params.is_empty() => {
+                    Type::single(Atomic::TPropertiesOf {
+                        class: *fqcn,
+                        filter,
+                    })
+                }
+                _ => Type::single(Atomic::TArray {
+                    key: Box::new(Type::string()),
+                    value: Box::new(Type::mixed()),
+                }),
+            }
+        }
         // `key-of<T>` — the union of array/shape key types of `T`.
         "key-of" => {
             let inner_ty = parse_type_string(inner.trim());
