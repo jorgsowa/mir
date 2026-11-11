@@ -262,6 +262,7 @@ pub(crate) fn is_valid_callable_type(union: &Type, db: &dyn crate::db::MirDataba
             | Atomic::TString
             | Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
+            | Atomic::TRefinedString { .. }
             | Atomic::TLiteralString(_)
             | Atomic::TNull => {
                 return true;
@@ -361,6 +362,7 @@ fn is_non_empty_string(ty: &Type) -> bool {
                 a,
                 Atomic::TNonEmptyString
                     | Atomic::TNonFalsyString
+                    | Atomic::TRefinedString { non_empty: true, .. }
                     | Atomic::TClassString(_)
                     | Atomic::TInterfaceString(_)
                     | Atomic::TEnumString
@@ -549,6 +551,22 @@ fn sprintf_format_guarantees_non_empty(fmt: &str) -> bool {
 /// the array portion of `stub_return` to `non-empty-list<string>` while
 /// preserving any `false` component (PHP 7.x stub). Returns `None` when the
 /// separator's non-emptiness cannot be proven so the stub type is used as-is.
+/// `strtolower()` / `strtoupper()` return a string of that case, non-empty when the argument is.
+pub(crate) fn case_conversion_return_type(lower: bool, arg_types: &[Type], stub_return: Type) -> Type {
+    if !matches!(stub_return.types.as_slice(), [Atomic::TString]) {
+        return stub_return;
+    }
+    let refinement = if lower {
+        mir_types::StringRefinement::Lowercase
+    } else {
+        mir_types::StringRefinement::Uppercase
+    };
+    Type::single(Atomic::TRefinedString {
+        refinement,
+        non_empty: arg_types.first().is_some_and(is_non_empty_string),
+    })
+}
+
 pub(crate) fn explode_return_type(arg_types: &[Type], stub_return: &Type) -> Option<Type> {
     let separator = arg_types.first()?;
     let sep_non_empty = separator.types.iter().any(|a| {

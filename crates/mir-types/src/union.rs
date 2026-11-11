@@ -577,8 +577,10 @@ impl Type {
             }
         }
         // TNonEmptyString is subsumed by TString.
-        if matches!(atomic, Atomic::TNonEmptyString | Atomic::TNonFalsyString)
-            && self.types.iter().any(|t| matches!(t, Atomic::TString))
+        if matches!(
+            atomic,
+            Atomic::TNonEmptyString | Atomic::TNonFalsyString | Atomic::TRefinedString { .. }
+        ) && self.types.iter().any(|t| matches!(t, Atomic::TString))
         {
             return;
         }
@@ -619,7 +621,10 @@ impl Type {
             self.types.retain(|t| {
                 !matches!(
                     t,
-                    Atomic::TLiteralString(_) | Atomic::TNonEmptyString | Atomic::TNonFalsyString
+                    Atomic::TLiteralString(_)
+                        | Atomic::TNonEmptyString
+                        | Atomic::TNonFalsyString
+                        | Atomic::TRefinedString { .. }
                 )
             });
         }
@@ -1896,6 +1901,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         Atomic::TString
         | Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
+        | Atomic::TRefinedString { .. }
         | Atomic::TNumericString
         | Atomic::TCallableString => vec![String],
         Atomic::TClassString(_)
@@ -2284,6 +2290,33 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // Otherwise non-falsy-string relates to other types as non-empty-string does.
         (Atomic::TNonFalsyString, _) => atomic_subtype(&Atomic::TNonEmptyString, sup),
         (_, Atomic::TNonFalsyString) => atomic_subtype(sub, &Atomic::TNonEmptyString),
+        (
+            Atomic::TLiteralString(s),
+            Atomic::TRefinedString {
+                refinement,
+                non_empty,
+            },
+        ) => refinement.accepts(s) && !(*non_empty && s.is_empty()),
+        (
+            Atomic::TRefinedString {
+                refinement: have,
+                non_empty: have_non_empty,
+            },
+            Atomic::TRefinedString {
+                refinement: want,
+                non_empty: want_non_empty,
+            },
+        ) => have == want && (*have_non_empty || !want_non_empty),
+        // Otherwise a refined string relates to wider types as its unrefined form does.
+        (Atomic::TRefinedString { non_empty, .. }, _) => {
+            let base = if *non_empty {
+                Atomic::TNonEmptyString
+            } else {
+                Atomic::TString
+            };
+            atomic_subtype(&base, sup)
+        }
+        (_, Atomic::TRefinedString { .. }) => false,
         (Atomic::TLiteralString(s), Atomic::TNumericString | Atomic::TNumeric) => {
             s.parse::<f64>().is_ok()
         }

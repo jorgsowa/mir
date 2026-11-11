@@ -15,7 +15,7 @@ class Flag {
         $name = 'x';
         /* plain comment */
         $name = strtoupper($name);
-        /** @mir-check $name is non-empty-string */
+        /** @mir-check $name is non-empty-uppercase-string */
         return $name;
     }
 }

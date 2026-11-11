@@ -1,5 +1,5 @@
 use super::*;
-use mir_types::Atomic;
+use mir_types::{Atomic, StringRefinement};
 
 #[test]
 fn parse_string() {
@@ -677,14 +677,20 @@ fn parse_truthy_and_non_falsy_string() {
 
 #[test]
 fn parse_case_constrained_string() {
-    assert!(matches!(
-        parse_type_string("lowercase-string").types[0],
-        Atomic::TString
-    ));
-    assert!(matches!(
-        parse_type_string("uppercase-string").types[0],
-        Atomic::TString
-    ));
+    for (keyword, refinement, non_empty) in [
+        ("lowercase-string", StringRefinement::Lowercase, false),
+        ("uppercase-string", StringRefinement::Uppercase, false),
+        ("non-empty-lowercase-string", StringRefinement::Lowercase, true),
+        ("non-empty-uppercase-string", StringRefinement::Uppercase, true),
+    ] {
+        assert_eq!(
+            parse_type_string(keyword).types[0],
+            Atomic::TRefinedString {
+                refinement,
+                non_empty
+            }
+        );
+    }
 }
 
 #[test]

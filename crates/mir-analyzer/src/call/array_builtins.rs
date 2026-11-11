@@ -51,6 +51,7 @@ pub(crate) fn is_callable_array_pair(arg: &Type, db: &dyn MirDatabase) -> bool {
                     | Atomic::TString
                     | Atomic::TNonEmptyString
                     | Atomic::TNonFalsyString
+                    | Atomic::TRefinedString { .. }
                     | Atomic::TMixed
             )
         });
@@ -60,6 +61,7 @@ pub(crate) fn is_callable_array_pair(arg: &Type, db: &dyn MirDatabase) -> bool {
                 Atomic::TString
                     | Atomic::TNonEmptyString
                     | Atomic::TNonFalsyString
+                    | Atomic::TRefinedString { .. }
                     | Atomic::TLiteralString(_)
             )
         });

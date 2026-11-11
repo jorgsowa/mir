@@ -414,6 +414,7 @@ pub(super) fn narrow_string_to_empty(ty: &Type) -> Type {
     ty.filter(|t| match t {
         Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
+        | Atomic::TRefinedString { non_empty: true, .. }
         | Atomic::TNumericString
         | Atomic::TClassString(_)
         | Atomic::TCallableString => false,
@@ -687,6 +688,14 @@ pub(super) fn literal_string_narrow_type(current: &Type, value: &str, is_value: 
                     result.add_type(Atomic::TLiteralString(lit.clone()));
                 }
                 Atomic::TNumericString if is_numeric_string(value) => {
+                    result.add_type(Atomic::TLiteralString(lit.clone()));
+                }
+                Atomic::TRefinedString { .. }
+                    if mir_types::union::atomic_subtype(
+                        &Atomic::TLiteralString(lit.clone()),
+                        t,
+                    ) =>
+                {
                     result.add_type(Atomic::TLiteralString(lit.clone()));
                 }
                 Atomic::TCallableString

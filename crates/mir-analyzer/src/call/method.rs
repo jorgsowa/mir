@@ -2200,6 +2200,7 @@ fn is_non_object_atom(a: &mir_types::Atomic) -> bool {
             | TString
             | TNonEmptyString
             | TNonFalsyString
+            | TRefinedString { .. }
             | TNumericString
             | TLiteralString(_)
             | TBool

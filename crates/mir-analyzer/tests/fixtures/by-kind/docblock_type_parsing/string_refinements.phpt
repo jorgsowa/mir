@@ -48,7 +48,7 @@ function check_non_falsy_string($x) {
 function check_lowercase_string($x) {
     /**
      * @var lowercase-string $x
-     * @mir-check $x is string
+     * @mir-check $x is lowercase-string
      */
     var_dump($x);
 }
@@ -56,7 +56,7 @@ function check_lowercase_string($x) {
 function check_uppercase_string($x) {
     /**
      * @var uppercase-string $x
-     * @mir-check $x is string
+     * @mir-check $x is uppercase-string
      */
     var_dump($x);
 }
@@ -64,7 +64,7 @@ function check_uppercase_string($x) {
 function check_non_empty_lowercase_string($x) {
     /**
      * @var non-empty-lowercase-string $x
-     * @mir-check $x is string
+     * @mir-check $x is non-empty-lowercase-string
      */
     var_dump($x);
 }
@@ -72,7 +72,7 @@ function check_non_empty_lowercase_string($x) {
 function check_non_empty_uppercase_string($x) {
     /**
      * @var non-empty-uppercase-string $x
-     * @mir-check $x is string
+     * @mir-check $x is non-empty-uppercase-string
      */
     var_dump($x);
 }

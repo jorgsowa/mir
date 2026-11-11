@@ -490,6 +490,7 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
             Atomic::TString
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TNumericString
                 | Atomic::TInt
                 | Atomic::TIntRange { .. }
@@ -514,6 +515,14 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                             (Atomic::TNumericString, Atomic::TNonFalsyString)
                                 | (Atomic::TNonFalsyString, Atomic::TNumericString)
                         )
+                        // A case refinement overlaps every other kind of string.
+                        || (a.is_string()
+                            && p.is_string()
+                            && matches!(
+                                (a, p),
+                                (Atomic::TRefinedString { .. }, _)
+                                    | (_, Atomic::TRefinedString { .. })
+                            ))
                 })
         })
 }
@@ -583,6 +592,7 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
             Atomic::TString
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TNumericString
         )
     });
@@ -1405,6 +1415,7 @@ fn classify_array_key(ty: &Type) -> ArrayKeyKind {
         | Atomic::TLiteralString(_)
         | Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
+        | Atomic::TRefinedString { .. }
         | Atomic::TNumericString => ArrayKeyKind::Str,
         _ => ArrayKeyKind::Other,
     }
@@ -1913,6 +1924,7 @@ fn validate_callable_argument(
         | Atomic::TLiteralString(_)
         | Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
+        | Atomic::TRefinedString { .. }
         | Atomic::TNumericString
         | Atomic::TClassString(_)
         | Atomic::TMixed
@@ -2078,6 +2090,7 @@ fn validate_interface_string_argument(
             Atomic::TString
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TClassString(_)
         )
     });

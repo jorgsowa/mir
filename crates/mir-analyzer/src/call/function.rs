@@ -1244,6 +1244,13 @@ impl CallAnalyzer {
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                "strtolower" | "mb_strtolower" | "strtoupper" | "mb_strtoupper" => {
+                    super::callable::case_conversion_return_type(
+                        fn_name.ends_with("lower"),
+                        &arg_types,
+                        return_ty,
+                    )
+                }
                 // explode with a non-empty separator always returns non-empty-list<string>.
                 "explode" => super::callable::explode_return_type(&arg_types, &return_ty)
                     .unwrap_or(return_ty),
@@ -1420,11 +1427,7 @@ impl CallAnalyzer {
                 // Case-folding, encoding, and similar string functions that preserve non-emptiness:
                 // a non-empty input always produces a non-empty output, and these functions
                 // always return string (not string|false).
-                "strtolower"
-                | "strtoupper"
-                | "mb_strtolower"
-                | "mb_strtoupper"
-                | "ucfirst"
+                "ucfirst"
                 | "lcfirst"
                 | "ucwords"
                 | "mb_convert_case"

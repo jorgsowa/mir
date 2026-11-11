@@ -121,6 +121,7 @@ fn is_plain_data(ty: &mir_types::Type) -> bool {
             | A::TLiteralString(_)
             | A::TNonEmptyString
             | A::TNonFalsyString
+            | A::TRefinedString { .. }
             | A::TNumericString
             | A::TClassString(_)
             | A::TInterfaceString(_)

@@ -661,6 +661,7 @@ fn compute_template_residual(
                     | Atomic::TString
                     | Atomic::TNonEmptyString
                     | Atomic::TNonFalsyString
+                    | Atomic::TRefinedString { .. }
             )
             || matches!(a, Atomic::TLiteralString(s) if has_template_class_string && literal_is_class_like(s));
         if consumed_by_class_string {

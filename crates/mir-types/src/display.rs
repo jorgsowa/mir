@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::atomic::Atomic;
+use crate::atomic::{Atomic, StringRefinement};
 use crate::union::Type;
 
 /// Write `items` separated by `sep` straight into the formatter, avoiding the
@@ -158,6 +158,17 @@ impl fmt::Display for Atomic {
             Atomic::TNonEmptyString => write!(f, "non-empty-string"),
             Atomic::TNonFalsyString => write!(f, "non-falsy-string"),
             Atomic::TNumericString => write!(f, "numeric-string"),
+            Atomic::TRefinedString {
+                refinement,
+                non_empty,
+            } => {
+                let prefix = if *non_empty { "non-empty-" } else { "" };
+                let kind = match refinement {
+                    StringRefinement::Lowercase => "lowercase",
+                    StringRefinement::Uppercase => "uppercase",
+                };
+                write!(f, "{prefix}{kind}-string")
+            }
 
             Atomic::TInt => write!(f, "int"),
             Atomic::TLiteralInt(n) => write!(f, "{n}"),

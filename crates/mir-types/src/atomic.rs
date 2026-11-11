@@ -239,6 +239,22 @@ pub struct ConditionalData {
     pub if_false: Type,
 }
 
+/// What a [`Atomic::TRefinedString`] guarantees about its characters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StringRefinement {
+    Lowercase,
+    Uppercase,
+}
+
+impl StringRefinement {
+    pub fn accepts(self, s: &str) -> bool {
+        match self {
+            StringRefinement::Lowercase => !s.bytes().any(|b| b.is_ascii_uppercase()),
+            StringRefinement::Uppercase => !s.bytes().any(|b| b.is_ascii_lowercase()),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Atomic — every distinct PHP type variant
 // ---------------------------------------------------------------------------
@@ -260,6 +276,11 @@ pub enum Atomic {
     TNonFalsyString,
     /// `numeric-string`
     TNumericString,
+    /// `lowercase-string`, `uppercase-string` and their `non-empty-` forms.
+    TRefinedString {
+        refinement: StringRefinement,
+        non_empty: bool,
+    },
 
     /// `int`
     TInt,
@@ -412,6 +433,7 @@ impl Atomic {
             | Atomic::TString
             | Atomic::TNonEmptyString  // "0" is both non-empty and falsy in PHP
             | Atomic::TNumericString   // "0" is a valid numeric-string and is falsy
+            | Atomic::TRefinedString { .. }
             | Atomic::TKeyOf { .. }
             | Atomic::TValueOf { .. }
             | Atomic::TArray { .. }
@@ -508,6 +530,7 @@ impl Atomic {
                 | Atomic::TClassString(_)
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TNumericString
                 | Atomic::TInterfaceString(_)
                 | Atomic::TEnumString
@@ -554,6 +577,7 @@ impl Atomic {
                 | Atomic::TClassString(_)
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TNumericString
                 | Atomic::TInterfaceString(_)
                 | Atomic::TEnumString
@@ -611,6 +635,7 @@ impl Atomic {
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
+            | Atomic::TRefinedString { .. }
             | Atomic::TNumericString => "string",
             Atomic::TCallableString => "callable-string",
             Atomic::TClassString(_) => "class-string",
@@ -682,6 +707,7 @@ enum AtomicTag {
     TNonEmptyString,
     TNonFalsyString,
     TNumericString,
+    TRefinedString,
     TInt,
     TLiteralInt,
     TIntRange,
@@ -735,6 +761,14 @@ impl Hash for Atomic {
             Atomic::TNonEmptyString => (T::TNonEmptyString as u8).hash(state),
             Atomic::TNonFalsyString => (T::TNonFalsyString as u8).hash(state),
             Atomic::TNumericString => (T::TNumericString as u8).hash(state),
+            Atomic::TRefinedString {
+                refinement,
+                non_empty,
+            } => {
+                (T::TRefinedString as u8).hash(state);
+                refinement.hash(state);
+                non_empty.hash(state);
+            }
             Atomic::TInt => (T::TInt as u8).hash(state),
             Atomic::TPositiveInt => (T::TPositiveInt as u8).hash(state),
             Atomic::TNegativeInt => (T::TNegativeInt as u8).hash(state),

@@ -1353,6 +1353,7 @@ mod docblock_hint_compat {
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
+            | Atomic::TRefinedString { .. }
             | Atomic::TNumericString
             | Atomic::TInterfaceString(_)
             | Atomic::TEnumString

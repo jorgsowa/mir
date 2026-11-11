@@ -103,6 +103,7 @@ fn atomic_can_equal(a: &Atomic, lit: &Lit) -> bool {
             Atomic::TString
             | Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
+            | Atomic::TRefinedString { .. }
             | Atomic::TNumericString
             | Atomic::TLiteralString(_)
             | Atomic::TClassString { .. }
@@ -307,6 +308,7 @@ pub(crate) fn gettype_possible_values(ty: &Type) -> Option<Vec<&'static str>> {
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
+            | Atomic::TRefinedString { .. }
             | Atomic::TNumericString
             | Atomic::TClassString { .. } => "string",
             Atomic::TBool | Atomic::TTrue | Atomic::TFalse => "boolean",
@@ -368,6 +370,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TClassString(_)
         | Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
+        | Atomic::TRefinedString { .. }
         | Atomic::TNumericString
         | Atomic::TInterfaceString(_)
         | Atomic::TEnumString

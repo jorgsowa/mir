@@ -8,6 +8,7 @@ pub mod union;
 pub use atomic::ArrayKey;
 pub use atomic::Atomic;
 pub use atomic::KeyedProperties;
+pub use atomic::StringRefinement;
 pub use atomic::Variance;
 pub use compact::SimpleType;
 pub use location::Location;

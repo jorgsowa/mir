@@ -23,7 +23,7 @@ final class Str
         $lower = self::lower($value);
         /** @trace $lower */
         return $lower;
-//      ^^^^^^^^^^^^^^ Trace: Type of $lower is ""|non-empty-string
+//      ^^^^^^^^^^^^^^ Trace: Type of $lower is ""|non-empty-lowercase-string
     }
 
     /** @return non-empty-string&lowercase-string */

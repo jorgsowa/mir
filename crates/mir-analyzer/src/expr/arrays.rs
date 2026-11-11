@@ -140,6 +140,7 @@ fn literal_key_matches_declared_key_type(
         | Atomic::TLiteralString(_)
         | Atomic::TNonEmptyString
         | Atomic::TNonFalsyString
+        | Atomic::TRefinedString { .. }
         | Atomic::TNumericString
         | Atomic::TClassString(_)
         | Atomic::TInterfaceString(_)
@@ -171,6 +172,7 @@ pub(crate) fn string_keys_reject(
                 Atomic::TString
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TClassString(_)
                 | Atomic::TInterfaceString(_)
                 | Atomic::TEnumString
@@ -1028,6 +1030,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 | Atomic::TLiteralString(_)
                 | Atomic::TNonEmptyString
                 | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TNumericString
                 | Atomic::TCallableString
                 | Atomic::TClassString(_)

@@ -1,5 +1,6 @@
 use super::*;
 use crate::expr::helpers::canonical_int_array_key;
+use mir_types::StringRefinement;
 use std::cell::RefCell;
 
 fn associative_array_marker() -> Type {
@@ -20,6 +21,35 @@ fn associative_array_type(key: Type, value: Type) -> Type {
             associative_array_marker(),
         ]),
     })
+}
+
+fn refined_string(refinement: StringRefinement, non_empty: bool) -> Type {
+    Type::single(Atomic::TRefinedString {
+        refinement,
+        non_empty,
+    })
+}
+
+/// `non-empty-string&lowercase-string` is `non-empty-lowercase-string`.
+fn intersect_refined_string(parts: &[Type]) -> Option<Type> {
+    let refinement = parts.iter().find_map(|part| match part.types.as_slice() {
+        [Atomic::TRefinedString { refinement, .. }] => Some(*refinement),
+        _ => None,
+    })?;
+    let non_empty_string = Type::single(Atomic::TNonEmptyString);
+    let mut non_empty = false;
+    for part in parts {
+        match part.types.as_slice() {
+            [Atomic::TRefinedString {
+                refinement: other,
+                non_empty: part_non_empty,
+            }] if *other == refinement => non_empty |= part_non_empty,
+            [Atomic::TString] => {}
+            _ if part.is_subtype_structural(&non_empty_string) => non_empty = true,
+            _ => return None,
+        }
+    }
+    Some(refined_string(refinement, non_empty))
 }
 
 fn arraylike_object_type(key: Type, value: Type) -> Type {
@@ -319,6 +349,9 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             // `non-empty-string&lowercase-string` is the narrowest of its scalar parts.
             let is_scalar = |part: &Type| part.types.iter().all(|a| a.is_string() || a.is_int());
             if parts.iter().all(is_scalar) {
+                if let Some(refined) = intersect_refined_string(&parts) {
+                    return refined;
+                }
                 if let Some(narrowest) = parts
                     .iter()
                     .find(|part| parts.iter().all(|other| part.is_subtype_structural(other)))
@@ -414,11 +447,11 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         // mir does not model the case or literalness of strings; use the closest atom.
         "non-empty-literal-string" => Type::single(Atomic::TNonEmptyString),
         "decimal-int-string" => Type::single(Atomic::TNumericString),
-        "lowercase-string"
-        | "uppercase-string"
-        | "non-empty-lowercase-string"
-        | "non-empty-uppercase-string"
-        | "non-decimal-int-string" => Type::single(Atomic::TString),
+        "non-decimal-int-string" => Type::single(Atomic::TString),
+        "lowercase-string" => refined_string(StringRefinement::Lowercase, false),
+        "uppercase-string" => refined_string(StringRefinement::Uppercase, false),
+        "non-empty-lowercase-string" => refined_string(StringRefinement::Lowercase, true),
+        "non-empty-uppercase-string" => refined_string(StringRefinement::Uppercase, true),
         "class-string" => Type::single(Atomic::TClassString(None)),
         "interface-string" => Type::single(Atomic::TInterfaceString(None)),
         "trait-string" => Type::single(Atomic::TTraitString),

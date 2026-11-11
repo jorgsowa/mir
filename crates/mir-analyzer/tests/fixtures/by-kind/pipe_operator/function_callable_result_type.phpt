@@ -10,7 +10,7 @@ $b = "hi" |> strtoupper(...);
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $a is int
 /** @trace $b */
 $c = [3, 1, 2] |> array_sum(...);
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $b is non-empty-string
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $b is non-empty-uppercase-string
 /** @trace $c */
 echo $a + $c, $b;
 //<^^^^^^^^^^^^^^^^^ Trace: Type of $c is int|float

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@return noreturn` is read as `never`: returning a value is `InvalidReturnType` and code after a call is `UnreachableCode`, instead of `UndefinedDocblockClass` for a class named `noreturn`.
 - `stringable-object` is enforced: an object without `__toString()`, or a non-object, passed for it is `InvalidArgument`.
 - `InvalidArgument` is reported for a string literal that cannot spell a class name (`'not a class'`, `'Foo[]'`, `''`) passed where `class-string` is required. Such text was skipped before.
+- `lowercase-string`, `uppercase-string`, `non-empty-lowercase-string` and `non-empty-uppercase-string` are enforced instead of being read as `string`: a literal of the wrong case is `InvalidArgument` / `InvalidReturnType`, a string of unknown case is `ArgumentTypeCoercion`. `strtolower()`, `strtoupper()` and their `mb_` forms return the matching type.
 
 ### Fixed
 

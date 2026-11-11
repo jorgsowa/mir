@@ -1004,6 +1004,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         | Atomic::TString
                         | Atomic::TNonEmptyString
                         | Atomic::TNonFalsyString
+                        | Atomic::TRefinedString { .. }
                         | Atomic::TNumericString
                         | Atomic::TLiteralString(_)
                         | Atomic::TBool

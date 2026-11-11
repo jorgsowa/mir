@@ -15,10 +15,10 @@ class B { public function m(string $s) { return strtoupper($s); } }
 namespace App;
 function c(): int { return (new B())->m('x'); }
 ===expect===
-C.php: InvalidReturnType@3:20-3:45: Return type 'string' is not compatible with declared 'int'
+C.php: InvalidReturnType@3:20-3:45: Return type 'uppercase-string' is not compatible with declared 'int'
 ===edit:C.php===
 <?php
 namespace App;
 function c(): int { return (new B())->m('y'); }
 ===expect===
-C.php: InvalidReturnType@3:20-3:45: Return type 'string' is not compatible with declared 'int'
+C.php: InvalidReturnType@3:20-3:45: Return type 'uppercase-string' is not compatible with declared 'int'

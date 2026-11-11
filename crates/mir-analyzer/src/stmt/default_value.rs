@@ -324,6 +324,7 @@ fn php_value_type(ty: &Type) -> Option<String> {
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
             | Atomic::TNonFalsyString
+            | Atomic::TRefinedString { .. }
             | Atomic::TNumericString
             | Atomic::TCallableString
             | Atomic::TClassString(_)
