@@ -361,7 +361,7 @@ impl DocblockParser {
                         result.uses.push(parse_type_string(trimmed));
                     }
                 }
-                "assert" | "psalm-assert" | "phpstan-assert" => {
+                "assert" | "psalm-assert" | "phpstan-assert" | "phan-assert" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
@@ -557,7 +557,10 @@ impl DocblockParser {
                 "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                 "api" | "psalm-api" => result.is_api = true,
-                "assert-if-true" | "psalm-assert-if-true" | "phpstan-assert-if-true" => {
+                "assert-if-true"
+                | "psalm-assert-if-true"
+                | "phpstan-assert-if-true"
+                | "phan-assert-true-condition" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
@@ -566,7 +569,10 @@ impl DocblockParser {
                         }
                     }
                 }
-                "assert-if-false" | "psalm-assert-if-false" | "phpstan-assert-if-false" => {
+                "assert-if-false"
+                | "psalm-assert-if-false"
+                | "phpstan-assert-if-false"
+                | "phan-assert-false-condition" => {
                     if let Some(body_str) = body_text(tag.body.as_ref()) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
