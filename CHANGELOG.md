@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The key or value of a template-typed array passed back to the same template (`resolve($item)` inside `foreach ($value as $item)`) is no longer `InvalidTemplateParam`.
 - The docblock types `non-zero-int`, `non-positive-int`, `int-range<…>`, `number`, `decimal-int-string`, `non-decimal-int-string`, `non-empty-literal-string`, `non-empty-scalar`, `non-empty-mixed`, `non-null-mixed`, `callable-array`, `callable-object`, `static-closure` and `static-pure-closure` are read as types instead of class names, so a valid value is no longer `InvalidArgument` and the declaration no longer `UndefinedDocblockClass`.
 - `numeric` accepts a numeric string literal (`'123'`, `'1.5e3'`), as an argument and as a returned value.
+- `enum-string` accepts the name of an enum and `trait-string` the name of a trait (`Suit::class`); the name of any other class is still rejected.
 
 ## [0.97.0] - 2026-11-10
 

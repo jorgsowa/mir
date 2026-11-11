@@ -734,6 +734,14 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     Atomic::TInterfaceString(None) => {
                         crate::db::is_interface(ea.db, arg_cls.as_ref())
                     }
+                    Atomic::TEnumString => {
+                        let kind = crate::db::class_kind(ea.db, arg_cls.as_ref());
+                        kind.is_some_and(|k| k.is_enum)
+                    }
+                    Atomic::TTraitString => {
+                        let kind = crate::db::class_kind(ea.db, arg_cls.as_ref());
+                        kind.is_some_and(|k| k.is_trait)
+                    }
                     Atomic::TInterfaceString(Some(param_cls)) => {
                         crate::db::is_interface(ea.db, arg_cls.as_ref())
                             && (arg_cls == param_cls

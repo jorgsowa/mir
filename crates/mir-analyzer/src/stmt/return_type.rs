@@ -143,6 +143,12 @@ pub(crate) fn named_object_return_compatible(
                     // holds actually names an interface (e.g. `SomeInterface::class`
                     // types as `class-string<SomeInterface>`, not `interface-string`).
                     Atomic::TInterfaceString(None) => is_interface(db, actual_cls.as_ref()),
+                    Atomic::TEnumString => {
+                        crate::db::class_kind(db, actual_cls.as_ref()).is_some_and(|k| k.is_enum)
+                    }
+                    Atomic::TTraitString => {
+                        crate::db::class_kind(db, actual_cls.as_ref()).is_some_and(|k| k.is_trait)
+                    }
                     Atomic::TInterfaceString(Some(declared_iface)) => {
                         is_interface(db, actual_cls.as_ref())
                             && (actual_cls == declared_iface

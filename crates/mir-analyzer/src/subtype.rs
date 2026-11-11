@@ -630,6 +630,13 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         && (sub_cls == sup_iface
                             || extends_or_implements(db, sub_cls.as_ref(), sup_iface.as_ref()))
                 }
+                (Atomic::TClassString(Some(cls)), Atomic::TEnumString) => {
+                    crate::db::class_kind(db, cls.as_ref()).is_some_and(|k| k.is_enum)
+                }
+                (Atomic::TClassString(Some(cls)), Atomic::TTraitString) => {
+                    crate::db::class_kind(db, cls.as_ref()).is_some_and(|k| k.is_trait)
+                }
+                (Atomic::TClassString(None), Atomic::TEnumString | Atomic::TTraitString) => true,
                 // An unresolved class-string could name an interface — stay permissive
                 // rather than definitely reject, matching the None-vs-Some convention above.
                 (Atomic::TClassString(None), Atomic::TInterfaceString(_)) => true,
