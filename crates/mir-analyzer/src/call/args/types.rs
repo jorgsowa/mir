@@ -2141,6 +2141,10 @@ fn validate_class_string_argument(
         Atomic::TLiteralString(s) => Some(s),
         _ => None,
     }) {
+        // The literal is one the parameter lists beside class-string (`class-string<T>|'*'`).
+        if param_ty.contains(|p| matches!(p, Atomic::TLiteralString(listed) if listed == s)) {
+            continue;
+        }
         // Text that cannot spell a class name (`'int|null'`, `'not a class'`) is no class-string.
         if !is_possible_class_name(s) {
             ea.emit(

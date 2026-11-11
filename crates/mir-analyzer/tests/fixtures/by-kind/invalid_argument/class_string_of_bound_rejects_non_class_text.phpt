@@ -27,3 +27,10 @@ resolve('mail handler');
 optional(null);
 optional('mail-handler');
 //       ^^^^^^^^^^^^^^ InvalidArgument: Argument $class of optional() expects 'class-string|null', got '"mail-handler"'
+
+/** @param class-string<Handler>|'*'|null $class */
+function attributes(?string $class): void {}
+
+attributes('*');
+attributes('?');
+//         ^^^ InvalidArgument: Argument $class of attributes() expects 'class-string<Handler>|"*"|null', got '"?"'

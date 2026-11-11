@@ -3138,6 +3138,11 @@
     }, $links)]]></code>
     </InvalidPropertyAssignment>
   </file>
+  <file src="core/modules/jsonapi/src/JsonApiResource/ResourceIdentifier.php">
+    <InvalidArgument>
+      <code><![CDATA['']]></code>
+    </InvalidArgument>
+  </file>
   <file src="core/modules/jsonapi/src/JsonApiResource/ResourceObject.php">
     <InvalidReturnType>
       <code><![CDATA[return $output;]]></code>
