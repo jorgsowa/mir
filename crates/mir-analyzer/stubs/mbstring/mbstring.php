@@ -1419,7 +1419,7 @@ function mbereg_search_setpos($position) {}
  * @param string $string <p>
  * The string to split into characters or chunks.
  * </p>
- * @param int $length [optional] <p>
+ * @param positive-int $length [optional] <p>
  * If specified, each element of the returned array will be composed of multiple characters instead of a single character.
  * </p>
  * @param string|null $encoding [optional] <p>

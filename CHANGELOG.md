@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `stdClass` (such as `(object) ['foo' => 1]`) is accepted for `object{foo: int}&stdClass`.
 - A template bounded by `key-of<GLOBAL_CONST>` accepts the keys of that constant, and `Foo::class` in a constant initializer is a `class-string<Foo>`, so a constant array of class names keeps its shape.
 - `new<…>` and an offset access (`ID_TABLE[T]`) in `@return` are no longer read as class names; the native return type applies.
+- `str_split()` and `mb_str_split()` take a `positive-int` length, so a zero or negative length is `InvalidArgument`.
 
 ## [0.97.0] - 2026-11-10
 

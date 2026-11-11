@@ -394,7 +394,7 @@ function str_word_count(string $string, int $format = 0, ?string $characters = n
  * @param string $string <p>
  * The input string.
  * </p>
- * @param int $length [optional] <p>
+ * @param positive-int $length [optional] <p>
  * Maximum length of the chunk.
  * </p>
  * @return string[]|false <p>If the optional split_length parameter is
