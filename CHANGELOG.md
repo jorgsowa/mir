@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `non-empty-scalar`, `non-empty-mixed` and `non-null-mixed` reject the values they exclude instead of being read as `scalar` / `mixed`: `''`, `'0'`, `false`, `[]` or `null` passed for them is reported.
 - `stdClass{name: string}` is read as the object shape `object{name: string}`, so its properties are typed, instead of an undefined class.
 - `@phan-assert`, `@phan-assert-true-condition` and `@phan-assert-false-condition` are read as `@psalm-assert`, `@psalm-assert-if-true` and `@psalm-assert-if-false`.
 

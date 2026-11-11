@@ -33,4 +33,4 @@ acceptsNonEmptyScalar(1.5);
 acceptsNonEmptyScalar('x');
 acceptsNonEmptyScalar(true);
 acceptsNonEmptyScalar([1]);
-//                    ^^^ InvalidArgument: Argument $value of acceptsNonEmptyScalar() expects 'scalar', got 'array{0: 1}'
+//                    ^^^ InvalidArgument: Argument $value of acceptsNonEmptyScalar() expects 'non-falsy-string|negative-int|positive-int|float|true', got 'array{0: 1}'

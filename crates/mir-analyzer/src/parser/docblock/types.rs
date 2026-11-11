@@ -282,6 +282,17 @@ pub(super) fn is_deferred_type(s: &str) -> bool {
         || (s.ends_with('>') && strip_ascii_ci_prefix(s, "new<").is_some())
 }
 
+/// Scalars that are not falsy: `0.0` stays possible since float has no atom without it.
+fn non_empty_scalar() -> Type {
+    Type::from_vec(vec![
+        Atomic::TNonFalsyString,
+        Atomic::TNegativeInt,
+        Atomic::TPositiveInt,
+        Atomic::TFloat,
+        Atomic::TTrue,
+    ])
+}
+
 pub(crate) fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
     // Docblock keywords are legal with a leading global `\` (`@param \int $x`);
@@ -499,8 +510,27 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "never" | "never-return" | "no-return" | "never-returns" | "noreturn" => {
             Type::single(Atomic::TNever)
         }
-        // The falsy/null exclusions and callability have no atom; the base type is lenient.
-        "mixed" | "non-empty-mixed" | "non-null-mixed" => Type::single(Atomic::TMixed),
+        "mixed" => Type::single(Atomic::TMixed),
+        "non-null-mixed" => Type::from_vec(vec![
+            Atomic::TScalar,
+            Atomic::TArray {
+                key: Box::new(Type::array_key()),
+                value: Box::new(Type::mixed()),
+            },
+            Atomic::TObject,
+            Atomic::TResource,
+        ]),
+        "non-empty-mixed" => {
+            let mut u = non_empty_scalar();
+            u.add_type(Atomic::TNonEmptyArray {
+                key: Box::new(Type::array_key()),
+                value: Box::new(Type::mixed()),
+            });
+            u.add_type(Atomic::TObject);
+            u.add_type(Atomic::TResource);
+            u
+        }
+        "non-empty-scalar" => non_empty_scalar(),
         "object" | "callable-object" => Type::single(Atomic::TObject),
         "array" | "callable-array" => Type::single(Atomic::TArray {
             key: Box::new(Type::array_key()),
@@ -557,7 +587,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             });
             u
         }
-        "scalar" | "non-empty-scalar" => Type::single(Atomic::TScalar),
+        "scalar" => Type::single(Atomic::TScalar),
         "numeric" => Type::single(Atomic::TNumeric),
         // `empty` — Psalm's falsy pseudo-type. mir has no single "falsy" atom,
         // so approximate as the union of all falsy literals it can express.

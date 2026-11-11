@@ -69,7 +69,7 @@ function check_non_empty_literal_string($x) {
 function check_non_empty_scalar($x) {
     /**
      * @var non-empty-scalar $x
-     * @mir-check $x is scalar
+     * @mir-check $x is non-falsy-string|negative-int|positive-int|float|true
      */
     var_dump($x);
 }
@@ -77,7 +77,7 @@ function check_non_empty_scalar($x) {
 function check_non_empty_mixed($x) {
     /**
      * @var non-empty-mixed $x
-     * @mir-check $x is mixed
+     * @mir-check $x is non-falsy-string|negative-int|positive-int|float|true|non-empty-array|object|resource
      */
     var_dump($x);
 }
@@ -85,7 +85,7 @@ function check_non_empty_mixed($x) {
 function check_non_null_mixed($x) {
     /**
      * @var non-null-mixed $x
-     * @mir-check $x is mixed
+     * @mir-check $x is scalar|array|object|resource
      */
     var_dump($x);
 }
