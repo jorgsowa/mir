@@ -793,13 +793,24 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         // approximate as a plain array from `class-string` to `V`.
         "class-string-map" => {
             let params = split_generics(inner);
+            // `T of Bound` declares a template in place; a value naming it is read as the bound.
+            let inline_template = params.first().and_then(|p| {
+                let p = p.trim();
+                let (name, bound) = p.split_once(" of ").or(p.split_once(" as "))?;
+                Some((name.trim(), bound.trim()))
+            });
             // The two-arg form (`class-string-map<T, V>`) is canonical, but
             // Psalm also accepts the one-arg shorthand (`class-string-map<T>`)
             // where the value type defaults to `T` itself, not `mixed`.
             let value = params
                 .get(1)
                 .or(params.first())
-                .map(|p| parse_type_string(p.trim()))
+                .map(|p| match inline_template {
+                    Some((name, bound)) if p.trim() == name || params.len() == 1 => {
+                        parse_type_string(bound)
+                    }
+                    _ => parse_type_string(p.trim()),
+                })
                 .unwrap_or_else(Type::mixed);
             Type::single(Atomic::TArray {
                 key: Box::new(Type::single(Atomic::TClassString(None))),
