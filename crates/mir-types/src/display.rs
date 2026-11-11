@@ -332,6 +332,10 @@ impl fmt::Display for Atomic {
                     }
                     write!(f, ": {}", v.ty)?;
                 }
+                if let Some(rest) = &properties.remainder {
+                    let sep = if properties.is_empty() { "" } else { ", " };
+                    write!(f, "{sep}...<{rest}>")?;
+                }
                 f.write_str("}")
             }
 

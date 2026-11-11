@@ -545,18 +545,7 @@ where
             is_open,
             is_list,
         } => {
-            let properties = std::sync::Arc::unwrap_or_clone(properties)
-                .into_iter()
-                .map(|(k, prop)| {
-                    (
-                        k,
-                        mir_types::atomic::KeyedProperty {
-                            ty: expand_aliases_only(prop.ty, aliases),
-                            optional: prop.optional,
-                        },
-                    )
-                })
-                .collect();
+            let properties = properties.map_types(|ty| expand_aliases_only(ty.clone(), aliases));
             Type::single(Atomic::TKeyedArray {
                 properties: Arc::new(properties),
                 is_open,
@@ -1638,15 +1627,14 @@ impl<'a> DefinitionCollector<'a> {
                     is_open,
                     is_list,
                 } => {
-                    let mut new_props = mir_types::KeyedProperties::clone(properties);
-                    for prop in new_props.values_mut() {
-                        prop.ty = self.resolve_union_doc_with_templates(
-                            prop.ty.clone(),
+                    let new_props = properties.map_types(|ty| {
+                        self.resolve_union_doc_with_templates(
+                            ty.clone(),
                             template_names,
                             defining_entity,
                             template_params,
-                        );
-                    }
+                        )
+                    });
                     result.add_type(mir_types::Atomic::TKeyedArray {
                         properties: std::sync::Arc::new(new_props),
                         is_open: *is_open,

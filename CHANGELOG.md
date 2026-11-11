@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A typed shape remainder (`array{name: string, ...<Foo>}`, `...<string, int>`) is enforced instead of being read as bare `...`: an extra key whose value is not a `Foo` is `InvalidArgument`, and reading an unlisted key gives `Foo` instead of `mixed`.
 - `pure-closure`, `static-closure` and `static-pure-closure` are closures taking any arguments instead of any `Closure` object: a closure with visible side effects passed for a pure one, and a non-static closure literal passed for a static one, is `InvalidArgument`.
 - `decimal-int-string` and `non-decimal-int-string` are enforced instead of being read as `numeric-string` / `string`: `'007'` or `'+1'` passed for `decimal-int-string`, and `'123'` or `'-1'` passed for `non-decimal-int-string`, is `InvalidArgument`.
 - `non-empty-scalar`, `non-empty-mixed` and `non-null-mixed` reject the values they exclude instead of being read as `scalar` / `mixed`: `''`, `'0'`, `false`, `[]` or `null` passed for them is reported.
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A scalar passed for a class-typed shape value (`['item' => 'nope']` for `array{item: Foo}`) is `InvalidArgument`. Nothing was reported.
 - An array callable (`[$obj, 'method']`) passed for a `Closure(...)` parameter is `InvalidArgument`: it is callable, but not a `Closure`.
 - `associative-array<int, T>` rejects a list (`['a', 'b']`, a `list<T>` value), not only one whose keys clash with the declared key type, and `non-empty-associative-array` rejects `[]`. Either docblock type beside a native `array` hint is no longer `MismatchingDocblockParamType`.
 - A conditional return on a class (`@return ($key is Model ? TModel|null : static)`) resolves each member of a union argument on its own, and resolves a `null` or array argument against a subject that mixes classes and `array`, instead of widening to every branch. `find($nullableUser)` is `User|null`, not `User|null|Collection`.

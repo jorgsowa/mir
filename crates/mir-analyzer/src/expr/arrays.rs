@@ -6,18 +6,25 @@ use mir_types::{Atomic, Type};
 use php_ast::owned::{ArrayAccessExpr, ArrayElement, Expr, ExprKind};
 use std::sync::Arc;
 
-/// A read of a key the shape doesn't list: an open shape may hold anything there.
+/// A read of a key the shape doesn't list (`unlisted_key`) or of a dynamic key: an open shape may hold anything there unless it types its remainder.
 fn merge_unknown_key_read(
     result: &mut Type,
     properties: &mir_types::KeyedProperties,
     is_open: bool,
+    unlisted_key: bool,
 ) {
-    if is_open {
+    if is_open && properties.remainder.is_none() {
         result.merge_with(&Type::mixed());
-    } else {
-        for prop in properties.values() {
-            result.merge_with(&prop.ty);
+        return;
+    }
+    if let Some(rest) = &properties.remainder {
+        result.merge_with(rest);
+        if unlisted_key {
+            return;
         }
+    }
+    for prop in properties.values() {
+        result.merge_with(&prop.ty);
     }
 }
 
@@ -923,7 +930,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // Present only on some paths.
                         absent_on_some_arm = true;
                     } else {
-                        merge_unknown_key_read(&mut result, properties, *is_open);
+                        merge_unknown_key_read(&mut result, properties, *is_open, true);
                     }
                 }
                 return if result.types.is_empty() {
@@ -986,10 +993,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                             uncertain_offset = true;
                         } else {
-                            merge_unknown_key_read(&mut result, properties, *is_open);
+                            merge_unknown_key_read(&mut result, properties, *is_open, true);
                         }
                     } else {
-                        merge_unknown_key_read(&mut result, properties, *is_open);
+                        merge_unknown_key_read(&mut result, properties, *is_open, false);
                     }
                 }
                 Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {

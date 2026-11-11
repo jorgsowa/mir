@@ -1004,20 +1004,7 @@ impl Type {
                     is_open,
                     is_list,
                 } => Atomic::TKeyedArray {
-                    properties: Arc::new(
-                        properties
-                            .iter()
-                            .map(|(k, p)| {
-                                (
-                                    k.clone(),
-                                    crate::atomic::KeyedProperty {
-                                        ty: f(&p.ty),
-                                        optional: p.optional,
-                                    },
-                                )
-                            })
-                            .collect(),
-                    ),
+                    properties: Arc::new(properties.map_types(f)),
                     is_open: *is_open,
                     is_list: *is_list,
                 },
@@ -1473,19 +1460,7 @@ impl Type {
                     is_open,
                     is_list,
                 } => {
-                    use crate::atomic::KeyedProperty;
-                    let new_props = properties
-                        .iter()
-                        .map(|(k, prop)| {
-                            (
-                                k.clone(),
-                                KeyedProperty {
-                                    ty: prop.ty.substitute_templates(bindings),
-                                    optional: prop.optional,
-                                },
-                            )
-                        })
-                        .collect();
+                    let new_props = properties.map_types(|ty| ty.substitute_templates(bindings));
                     result.add_type(Atomic::TKeyedArray {
                         properties: Arc::new(new_props),
                         is_open: *is_open,
@@ -2746,6 +2721,27 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             {
                 return false;
             }
+            // Class-typed values are left to the hierarchy-aware checks, unless the value can't be an object.
+            let value_fits = |sub: &Type, sup: &Type| {
+                if sub.is_subtype_by_template_bounds(sup) {
+                    return true;
+                }
+                let has_template = sup
+                    .types
+                    .iter()
+                    .any(|a| matches!(a, Atomic::TTemplateParam { .. }));
+                let has_class = sup.types.iter().any(|a| {
+                    matches!(
+                        a,
+                        Atomic::TNamedObject { .. }
+                            | Atomic::TSelf { .. }
+                            | Atomic::TStaticObject { .. }
+                            | Atomic::TClosure { .. }
+                    )
+                });
+                has_template
+                    || (has_class && !sub.types.iter().all(Atomic::is_definitely_non_object))
+            };
             let keys_satisfied = sup_props
                 .iter()
                 .all(|(key, sup_prop)| match sub_props.get(key) {
@@ -2756,22 +2752,24 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                         if !sup_prop.optional && sub_prop.optional {
                             return false;
                         }
-                        let has_named_obj = sup_prop.ty.types.iter().any(|a| {
-                            matches!(
-                                a,
-                                Atomic::TNamedObject { .. }
-                                    | Atomic::TSelf { .. }
-                                    | Atomic::TStaticObject { .. }
-                                    | Atomic::TClosure { .. }
-                                    | Atomic::TTemplateParam { .. }
-                            )
-                        });
-                        has_named_obj || sub_prop.ty.is_subtype_by_template_bounds(&sup_prop.ty)
+                        value_fits(&sub_prop.ty, &sup_prop.ty)
                     }
-                    None => sup_prop.optional || *sub_open,
+                    None => {
+                        sup_prop.optional
+                            || (*sub_open
+                                && sub_props
+                                    .remainder
+                                    .as_ref()
+                                    .is_none_or(|rest| value_fits(rest, &sup_prop.ty)))
+                    }
                 });
-            let no_undeclared_extras =
-                *sup_open || sub_props.keys().all(|k| sup_props.contains_key(k));
+            let no_undeclared_extras = sub_props.iter().all(|(k, sub_prop)| {
+                sup_props.contains_key(k)
+                    || match &sup_props.remainder {
+                        Some(rest) => value_fits(&sub_prop.ty, rest),
+                        None => *sup_open,
+                    }
+            });
             keys_satisfied && no_undeclared_extras
         }
         // TKeyedArray (array shape) satisfies TIntersection iff it satisfies every

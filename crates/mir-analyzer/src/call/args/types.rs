@@ -1718,9 +1718,13 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                                 Some(have) => union_compatible(&have.ty, &want.ty, ea),
                                 None => want.optional || *is_open,
                             })
-                            && (*expected_open
-                                || *is_open
-                                || properties.keys().all(|k| expected.contains_key(k)))
+                            && properties.iter().all(|(k, have)| {
+                                expected.contains_key(k)
+                                    || match &expected.remainder {
+                                        Some(rest) => union_compatible(&have.ty, rest, ea),
+                                        None => *expected_open || *is_open,
+                                    }
+                            })
                     }
                     _ => *is_open,
                 });
@@ -1944,9 +1948,13 @@ fn array_list_compatible_with(
                                     Some(arg_prop) => elem_ok(&arg_prop.ty, &param_prop.ty),
                                     None => param_prop.optional || *is_open,
                                 }
-                            }) && (*param_open
-                                || *is_open
-                                || properties.keys().all(|k| param_properties.contains_key(k)))
+                            }) && properties.iter().all(|(k, arg_prop)| {
+                                param_properties.contains_key(k)
+                                    || match &param_properties.remainder {
+                                        Some(rest) => elem_ok(&arg_prop.ty, rest),
+                                        None => *param_open || *is_open,
+                                    }
+                            })
                         }
                         _ => *is_open,
                     }

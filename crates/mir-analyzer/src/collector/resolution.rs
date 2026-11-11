@@ -1,8 +1,4 @@
-use mir_types::{
-    atomic::{ConditionalData, KeyedProperty},
-    union::vec_to_type_params,
-    Atomic, Name, Type,
-};
+use mir_types::{atomic::ConditionalData, union::vec_to_type_params, Atomic, Name, Type};
 use rustc_hash::FxHashMap;
 
 /// Look up `alias` in `use_aliases`, falling back to a case-insensitive scan
@@ -259,21 +255,7 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
             is_open,
             is_list,
         } => Atomic::TKeyedArray {
-            properties: std::sync::Arc::new(
-                std::sync::Arc::unwrap_or_clone(properties)
-                    .into_iter()
-                    .map(|(key, prop)| {
-                        let resolved_ty = ru!(prop.ty);
-                        (
-                            key,
-                            KeyedProperty {
-                                ty: resolved_ty,
-                                optional: prop.optional,
-                            },
-                        )
-                    })
-                    .collect(),
-            ),
+            properties: std::sync::Arc::new(properties.map_types(|ty| ru!(ty.clone()))),
             is_open,
             is_list,
         },
@@ -411,19 +393,7 @@ pub(crate) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
                 is_list,
             } => Atomic::TKeyedArray {
                 properties: std::sync::Arc::new(
-                    std::sync::Arc::unwrap_or_clone(properties)
-                        .into_iter()
-                        .map(|(key, prop)| {
-                            let ty = fill_self_static_parent(prop.ty, class_fqcn);
-                            (
-                                key,
-                                KeyedProperty {
-                                    ty,
-                                    optional: prop.optional,
-                                },
-                            )
-                        })
-                        .collect(),
+                    properties.map_types(|ty| fill_self_static_parent(ty.clone(), class_fqcn)),
                 ),
                 is_open,
                 is_list,

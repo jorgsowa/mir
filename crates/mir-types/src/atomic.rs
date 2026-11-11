@@ -96,9 +96,10 @@ type KeyedMap = IndexMap<ArrayKey, KeyedProperty, rustc_hash::FxBuildHasher>;
 /// order-independent hash, since a shared shape is hashed again whenever a
 /// type holding it is interned; any mutable access forgets it.
 #[derive(Default, Serialize, Deserialize)]
-#[serde(transparent)]
 pub struct KeyedProperties {
     map: KeyedMap,
+    /// Value type of the keys an open shape does not list (`...<Foo>`).
+    pub remainder: Option<Type>,
     #[serde(skip)]
     hash: std::sync::OnceLock<u64>,
 }
@@ -108,15 +109,40 @@ impl KeyedProperties {
         KeyedMap::with_capacity_and_hasher(n, hasher).into()
     }
 
+    /// Applies `f` to every entry's type and to the remainder.
+    pub fn map_types(&self, mut f: impl FnMut(&Type) -> Type) -> KeyedProperties {
+        let mut out: KeyedProperties = self
+            .map
+            .iter()
+            .map(|(k, p)| {
+                let property = KeyedProperty {
+                    ty: f(&p.ty),
+                    optional: p.optional,
+                };
+                (k.clone(), property)
+            })
+            .collect();
+        out.remainder = self.remainder.as_ref().map(f);
+        out
+    }
+
     /// Hash of the entries, independent of their order (equality ignores it too).
     pub fn entries_hash(&self) -> u64 {
         *self.hash.get_or_init(|| {
-            self.map.iter().fold(0u64, |combined, (k, v)| {
+            let entries = self.map.iter().fold(0u64, |combined, (k, v)| {
                 let mut entry_hasher = rustc_hash::FxHasher::default();
                 k.hash(&mut entry_hasher);
                 v.hash(&mut entry_hasher);
                 combined.wrapping_add(std::hash::Hasher::finish(&entry_hasher))
-            })
+            });
+            match &self.remainder {
+                None => entries,
+                Some(rest) => {
+                    let mut hasher = rustc_hash::FxHasher::default();
+                    rest.hash(&mut hasher);
+                    entries ^ std::hash::Hasher::finish(&hasher)
+                }
+            }
         })
     }
 }
@@ -125,6 +151,7 @@ impl From<KeyedMap> for KeyedProperties {
     fn from(map: KeyedMap) -> Self {
         KeyedProperties {
             map,
+            remainder: None,
             hash: std::sync::OnceLock::new(),
         }
     }
@@ -134,6 +161,7 @@ impl Clone for KeyedProperties {
     fn clone(&self) -> Self {
         KeyedProperties {
             map: self.map.clone(),
+            remainder: self.remainder.clone(),
             hash: self.hash.clone(),
         }
     }
@@ -153,7 +181,7 @@ impl PartialEq for KeyedProperties {
                 return false;
             }
         }
-        self.map == other.map
+        self.map == other.map && self.remainder == other.remainder
     }
 }
 

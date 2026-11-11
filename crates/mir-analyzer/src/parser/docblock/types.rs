@@ -1251,6 +1251,7 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     use mir_types::atomic::KeyedProperty;
     let mut properties: mir_types::KeyedProperties = mir_types::KeyedProperties::default();
     let mut is_open = false;
+    let mut remainder = None;
     let mut auto_index = 0i64;
 
     let inner = strip_line_comments(inner);
@@ -1259,11 +1260,13 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
         if item.is_empty() {
             continue;
         }
-        // `...` (untyped) or `...array<K, V>` (typed catch-all remainder) — both
-        // mark the shape open; TKeyedArray has no field for the remainder's
-        // value type, so a typed one is treated the same as bare `...`.
-        if item == "..." || item.starts_with("...") {
+        if let Some(rest) = item.strip_prefix("...") {
             is_open = true;
+            if let Some(args) = rest.strip_prefix('<').and_then(|r| r.strip_suffix('>')) {
+                remainder = split_generics(args)
+                    .last()
+                    .map(|v| parse_type_string(v.trim()));
+            }
             continue;
         }
         // Find a colon that is not inside nested generics/braces
@@ -1309,6 +1312,7 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
         }
     }
 
+    properties.remainder = remainder;
     Type::single(Atomic::TKeyedArray {
         properties: Arc::new(properties),
         is_open,
