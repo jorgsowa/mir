@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A shape parameter written without `...` is sealed: an argument with a key the shape does not declare (`['foo' => 1, 'buz' => 2]` or an `array{foo: int, buz: int}` value for `array{foo: int}`) is `InvalidArgument`. Spell the shape `array{foo: int, ...}` to accept extra keys.
+
 ### Added
 
 - `stdClass{name: string}` is read as the object shape `object{name: string}`, so its properties are typed, instead of an undefined class.

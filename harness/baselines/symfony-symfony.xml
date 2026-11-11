@@ -1093,6 +1093,7 @@
   <file src="src/Symfony/Component/HttpClient/CachingHttpClient.php">
     <InvalidArgument>
       <code><![CDATA[$cacheControlHeader]]></code>
+      <code><![CDATA[$cachedData]]></code>
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/HttpClient/GuzzleHttpHandler.php">
@@ -1699,6 +1700,11 @@
     <UndefinedFunction>
       <code><![CDATA[frankenphp_handle_request($handler)]]></code>
     </UndefinedFunction>
+  </file>
+  <file src="src/Symfony/Component/Runtime/SymfonyRuntime.php">
+    <InvalidArgument>
+      <code><![CDATA[$options]]></code>
+    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Scheduler/Trigger/CronExpressionTrigger.php">
     <NullableReturnStatement>

@@ -1684,13 +1684,19 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         .all(|p| union_compatible(&p.ty, value, ea)),
                     Atomic::TKeyedArray {
                         properties: expected,
+                        is_open: expected_open,
                         ..
-                    } => expected
-                        .iter()
-                        .all(|(key, want)| match properties.get(key) {
-                            Some(have) => union_compatible(&have.ty, &want.ty, ea),
-                            None => want.optional || *is_open,
-                        }),
+                    } => {
+                        expected
+                            .iter()
+                            .all(|(key, want)| match properties.get(key) {
+                                Some(have) => union_compatible(&have.ty, &want.ty, ea),
+                                None => want.optional || *is_open,
+                            })
+                            && (*expected_open
+                                || *is_open
+                                || properties.keys().all(|k| expected.contains_key(k)))
+                    }
                     _ => *is_open,
                 });
             }
@@ -1901,13 +1907,18 @@ fn array_list_compatible_with(
                         }
                         Atomic::TKeyedArray {
                             properties: param_properties,
+                            is_open: param_open,
                             ..
-                        } => param_properties.iter().all(|(key, param_prop)| {
-                            match properties.get(key) {
-                                Some(arg_prop) => elem_ok(&arg_prop.ty, &param_prop.ty),
-                                None => param_prop.optional || *is_open,
-                            }
-                        }),
+                        } => {
+                            param_properties.iter().all(|(key, param_prop)| {
+                                match properties.get(key) {
+                                    Some(arg_prop) => elem_ok(&arg_prop.ty, &param_prop.ty),
+                                    None => param_prop.optional || *is_open,
+                                }
+                            }) && (*param_open
+                                || *is_open
+                                || properties.keys().all(|k| param_properties.contains_key(k)))
+                        }
                         _ => *is_open,
                     }
                 });

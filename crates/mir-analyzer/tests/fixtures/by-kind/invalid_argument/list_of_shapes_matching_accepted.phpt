@@ -1,5 +1,5 @@
 ===description===
-Matching shapes nested in a list are accepted, including extra keys, int for float and open shapes.
+Matching shapes nested in a list are accepted, including int for float and open shapes. An extra key is rejected by the sealed element shape.
 ===config===
 <mir>
   <issueHandlers>
@@ -21,6 +21,7 @@ function run(array $row, array $open): void {
     saveItems([['id' => 1, 'price' => 2]]);
     saveItems([['id' => 1, 'price' => 2.5, 'tag' => 'new']]);
     saveItems([['id' => 1, 'price' => 2.5, 'extra' => true]]);
+    //        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $items of saveItems() expects 'list<array{'id': int, 'price': float, 'tag'?: string}>', got 'array{0: array{'id': 1, 'price': 2.5, 'extra': true}}'
     saveItems([$row, $row]);
     saveItems([$open]);
 }
