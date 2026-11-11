@@ -1387,8 +1387,18 @@ fn generic_type_params_compatible(
     // `TypedMap<string, int>`) still has type args in both sides worth
     // comparing position-by-position; `zip` below just stops at the
     // shorter side instead of silently skipping the check entirely.
-    if arg_params.is_empty() || param_params.is_empty() {
+    if param_params.is_empty() {
         return true;
+    }
+    // A bare argument still has to fit a call-site projection (`Collection<covariant Animal>`) through its template bounds.
+    if arg_params.is_empty() {
+        return param_params.iter().enumerate().all(|(i, param_p)| {
+            let bound = template_params
+                .get(i)
+                .and_then(|tp| tp.bound.as_deref().cloned())
+                .unwrap_or_else(Type::mixed);
+            crate::subtype::fits_call_site_variance(ea.db, &bound, param_p).unwrap_or(true)
+        });
     }
 
     for (i, (arg_p, param_p)) in arg_params.iter().zip(param_params.iter()).enumerate() {

@@ -261,11 +261,10 @@ pub(crate) fn fits_call_site_variance(
 ) -> Option<bool> {
     let (variance, bound) = call_site_variance(param)?;
     Some(
-        arg.is_mixed()
-            || bound.is_mixed()
+        bound.is_mixed()
             || match variance {
                 Variance::Contravariant => is_subtype(db, bound, arg),
-                _ => is_subtype(db, arg, bound),
+                _ => !arg.is_mixed() && is_subtype(db, arg, bound),
             },
     )
 }
