@@ -18,7 +18,7 @@ final class Impl implements I {}
 function top(string $c): void {}
 /** @param array{k: class-string<P>} $c */
 function shape(array $c): void {}
-/** @param array{k: array{j: class-string<P>}} $c */
+/** @param array{k: array{k: class-string<P>}} $c */
 function deepShape(array $c): void {}
 /** @param list<class-string<P>> $c */
 function lst(array $c): void {}

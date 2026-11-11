@@ -1499,12 +1499,9 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
             // rather than as one merged union, so a mix of a compatible and
             // an incompatible property value is correctly rejected) — `is_open`
             // only excuses the keys it doesn't know about, not the ones it
-            // does. A TKeyedArray param atom (shape-to-shape) is left
-            // permissive: `atomic_subtype` has no shape-vs-shape arm at all,
-            // so this is the only path that currently accepts a structurally-
-            // fine shape argument (e.g. an int literal where the param
-            // property is `float`) — precise shape-vs-shape checking is a
-            // separate, larger gap than the scalar/array-param one this fixes.
+            // does. A TKeyedArray param atom (shape-to-shape) needs every
+            // required key present with a compatible value; extra arg keys
+            // stay permissive.
             Atomic::TKeyedArray {
                 properties,
                 is_open,
@@ -1517,7 +1514,15 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                     | Atomic::TNonEmptyList { value } => properties
                         .values()
                         .all(|p| union_compatible(&p.ty, value, ea)),
-                    Atomic::TKeyedArray { .. } => true,
+                    Atomic::TKeyedArray {
+                        properties: expected,
+                        ..
+                    } => expected
+                        .iter()
+                        .all(|(key, want)| match properties.get(key) {
+                            Some(have) => union_compatible(&have.ty, &want.ty, ea),
+                            None => want.optional || *is_open,
+                        }),
                     _ => *is_open,
                 });
             }
