@@ -541,7 +541,15 @@ impl DocblockParser {
                         }
                     }
                 }
-                "internal" | "psalm-internal" => result.is_internal = true,
+                "internal" => result.is_internal = true,
+                "psalm-internal" => {
+                    result.is_internal = true;
+                    result.internal_scope = body_text(tag.body.as_ref()).and_then(|b| {
+                        b.split_whitespace()
+                            .next()
+                            .map(|ns| ns.trim_start_matches('\\').to_string())
+                    });
+                }
                 "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
                 // Phan's tag covers a function, a method or every method of a class.
                 "phan-side-effect-free" => {
@@ -964,6 +972,8 @@ pub struct ParsedDocblock {
     pub suppressed_issues: Vec<String>,
     pub is_deprecated: bool,
     pub is_internal: bool,
+    /// `@psalm-internal Ns` — the namespace callers must be in.
+    pub internal_scope: Option<String>,
     pub is_pure: bool,
     /// `@phpstan-all-methods-pure` on a class.
     pub all_methods_pure: bool,

@@ -792,10 +792,15 @@ impl CallAnalyzer {
                     span,
                 );
             }
-            if resolved.is_internal {
+            if resolved.is_internal || resolved.internal_scope.is_some() {
                 let calling_ns = ea.db.file_namespace(&ea.file);
-                let calling_root = namespace_root(calling_ns.as_deref());
-                let owner_root = namespace_root(extract_namespace(&resolved.owner_fqcn));
+                let outside = match resolved.internal_scope.as_deref() {
+                    Some(scope) => !super::method::namespace_within(calling_ns.as_deref(), scope),
+                    None => {
+                        namespace_root(calling_ns.as_deref())
+                            != namespace_root(extract_namespace(&resolved.owner_fqcn))
+                    }
+                };
                 // self::/static::/parent:: calls are self-calls; also allow when calling
                 // on a class that is the current self (trait @internal methods included).
                 let is_self_call = is_self_parent_call
@@ -804,7 +809,7 @@ impl CallAnalyzer {
                         .as_deref()
                         .map(|s| s.eq_ignore_ascii_case(fqcn.as_str()))
                         .unwrap_or(false);
-                if calling_root != owner_root && !is_self_call {
+                if outside && !is_self_call {
                     ea.emit(
                         IssueKind::InternalMethod {
                             class: fqcn.clone(),

@@ -1,6 +1,5 @@
 ===description===
-@psalm-internal is recognized as an alias for @internal (the namespace
-argument is accepted but not itself enforced, matching bare @internal).
+`@psalm-internal Vendor\Library` reports a call from outside that namespace.
 ===file:Library.php===
 <?php
 namespace Vendor\Library;

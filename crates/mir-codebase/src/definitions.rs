@@ -532,6 +532,9 @@ pub struct MethodDef {
     pub throws: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
+    /// `@psalm-internal Ns`: callers must be in `Ns` or below it.
+    #[serde(default)]
+    pub internal_scope: Option<Arc<str>>,
     pub is_pure: bool,
     /// An explicit `@impure`/`@psalm-impure`/`@phpstan-impure` declaration.
     #[serde(default)]
@@ -759,6 +762,9 @@ pub struct ClassDef {
     pub is_readonly: bool,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
+    /// `@psalm-internal Ns`: its methods may only be called from `Ns` or below it.
+    #[serde(default)]
+    pub internal_scope: Option<Arc<str>>,
     /// Set when the class carries `@psalm-immutable` — non-constructor methods must not
     /// assign to `$this` properties.
     #[serde(default)]

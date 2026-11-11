@@ -94,6 +94,15 @@ fn extract_namespace(fqcn: &str) -> Option<&str> {
 /// First namespace segment ("root namespace"), or `None` for the global namespace.
 /// `@internal` (no argument) scopes a symbol to its root namespace, so any
 /// sub-namespace under the same root may use it (Psalm semantics).
+/// Whether `ns` is `scope` or a namespace nested in it.
+pub(crate) fn namespace_within(ns: Option<&str>, scope: &str) -> bool {
+    let ns = ns.unwrap_or("").trim_start_matches('\\');
+    let scope = scope.trim_start_matches('\\');
+    ns.len() >= scope.len()
+        && ns[..scope.len()].eq_ignore_ascii_case(scope)
+        && (ns.len() == scope.len() || ns.as_bytes()[scope.len()] == b'\\')
+}
+
 fn namespace_root(ns: Option<&str>) -> Option<&str> {
     ns.map(|n| n.trim_start_matches('\\'))
         .and_then(|n| n.split('\\').next())
@@ -108,6 +117,8 @@ pub(crate) struct ResolvedMethod {
     pub(crate) visibility: Visibility,
     pub(crate) deprecated: Option<Arc<str>>,
     pub(crate) is_internal: bool,
+    /// `@psalm-internal` namespace of the method, or else of its class.
+    pub(crate) internal_scope: Option<Arc<str>>,
     pub(crate) is_static: bool,
     pub(crate) is_abstract: bool,
     pub(crate) is_pure: bool,
@@ -466,6 +477,12 @@ pub(crate) fn resolve_method_from_db(
             visibility: storage.visibility,
             deprecated: storage.deprecated.clone(),
             is_internal: storage.is_internal,
+            internal_scope: storage.internal_scope.clone().or_else(|| {
+                match crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &owner_fqcn)) {
+                    Some(crate::db::ClassLike::Class(c)) => c.internal_scope.clone(),
+                    _ => None,
+                }
+            }),
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
             is_pure: crate::db::method_is_pure_in_chain(
@@ -1406,10 +1423,15 @@ fn resolve_method_return<'a>(
                 }
             }
         }
-        if resolved.is_internal {
+        if resolved.is_internal || resolved.internal_scope.is_some() {
             let calling_ns = ea.db.file_namespace(&ea.file);
-            let calling_root = namespace_root(calling_ns.as_deref());
-            let owner_root = namespace_root(extract_namespace(&resolved.owner_fqcn));
+            let outside = match resolved.internal_scope.as_deref() {
+                Some(scope) => !namespace_within(calling_ns.as_deref(), scope),
+                None => {
+                    namespace_root(calling_ns.as_deref())
+                        != namespace_root(extract_namespace(&resolved.owner_fqcn))
+                }
+            };
             // Calling an @internal method on $this (self-call or inherited) is allowed —
             // trait methods become part of the using class, and child classes may call
             // parent/trait @internal methods that are part of their own API.
@@ -1418,7 +1440,7 @@ fn resolve_method_return<'a>(
                 .as_deref()
                 .map(|s| s.eq_ignore_ascii_case(fqcn.as_ref()))
                 .unwrap_or(false);
-            if calling_root != owner_root && !is_self_call {
+            if outside && !is_self_call {
                 ea.emit(
                     IssueKind::InternalMethod {
                         class: fqcn.to_string(),

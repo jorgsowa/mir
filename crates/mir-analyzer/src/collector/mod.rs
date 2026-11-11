@@ -2265,6 +2265,7 @@ impl<'a> DefinitionCollector<'a> {
                     throws: vec![],
                     deprecated: None,
                     is_internal: false,
+                    internal_scope: None,
                     is_pure: false,
                     is_impure: false,
                     no_named_arguments: false,
@@ -3146,6 +3147,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
             }),
             is_internal: doc.is_internal,
+            internal_scope: doc.internal_scope.as_deref().map(Arc::from),
             is_pure: doc.is_pure || self.pure_attr(&m.attributes),
             is_impure: doc.is_impure,
             no_named_arguments: doc.no_named_arguments,
