@@ -481,7 +481,7 @@ fn without_legacy_handle_resource(arg: &Type, param: &Type) -> Option<Type> {
     Some(rest)
 }
 
-/// A plain `string`/`int` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`).
+/// A plain `string`/`int` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`, `'a'|'b'`).
 fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
     let arg = arg.remove_null();
     let refinable = |a: &Atomic| {
@@ -504,10 +504,10 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
         && arg.types.iter().all(|a| {
             let single = Type::single(a.clone());
             single.is_subtype_structural(param)
-                || param
-                    .types
-                    .iter()
-                    .any(|p| refinable(p) && Type::single(p.clone()).is_subtype_structural(&single))
+                || param.types.iter().any(|p| {
+                    (refinable(p) || matches!(p, Atomic::TLiteralString(_)))
+                        && Type::single(p.clone()).is_subtype_structural(&single)
+                })
         })
 }
 
