@@ -258,7 +258,7 @@ impl<'a> ClassAnalyzer<'a> {
                         None
                     })
                     .collect();
-            // A constructor answers only to a final, abstract or interface constructor.
+            // A constructor answers only to a final, abstract, interface or `@psalm-consistent-constructor` one.
             let all_parent_methods = if method_name_lower.as_ref() == "__construct" {
                 let contracts: Vec<_> = all_parent_methods
                     .into_iter()
@@ -267,6 +267,10 @@ impl<'a> ClassAnalyzer<'a> {
                             || m.is_abstract
                             || crate::db::class_kind(self.db, anc.as_ref())
                                 .is_some_and(|k| k.is_interface)
+                            || matches!(
+                                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, anc.as_ref())),
+                                Some(crate::db::ClassLike::Class(c)) if c.consistent_constructor
+                            )
                     })
                     .collect();
                 if contracts.is_empty() {

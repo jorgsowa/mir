@@ -542,6 +542,9 @@ impl DocblockParser {
                     }
                 }
                 "internal" => result.is_internal = true,
+                "consistent-constructor"
+                | "psalm-consistent-constructor"
+                | "phpstan-consistent-constructor" => result.consistent_constructor = true,
                 "psalm-internal" => {
                     result.is_internal = true;
                     result.internal_scope = body_text(tag.body.as_ref()).and_then(|b| {
@@ -974,6 +977,8 @@ pub struct ParsedDocblock {
     pub is_internal: bool,
     /// `@psalm-internal Ns` — the namespace callers must be in.
     pub internal_scope: Option<String>,
+    /// `@psalm-consistent-constructor` on a class.
+    pub consistent_constructor: bool,
     pub is_pure: bool,
     /// `@phpstan-all-methods-pure` on a class.
     pub all_methods_pure: bool,

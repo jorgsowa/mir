@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@psalm-consistent-constructor` / `@phpstan-consistent-constructor` holds subclass constructors to the tagged class's signature: an incompatible one is `MethodSignatureMismatch`, as for an abstract constructor.
 - `@psalm-internal Vendor\Library` limits calls to that namespace and the ones nested in it, on a method or on a whole class, instead of to the root namespace: a call from `Vendor\App` is `InternalMethod`.
 - `@psalm-readonly-allow-private-mutation`, `@phpstan-readonly-allow-private-mutation` and `@readonly` with `@psalm-allow-private-mutation` make a property writable only inside its class, like `private(set)`: a write from outside is `InaccessibleProperty`, and one inside the class is no longer `ReadonlyPropertyAssignment`. `@phan-read-only` is read as `@readonly`.
 - `@phan-side-effect-free` is read as `@pure` on a function or method, and on a class makes every method pure. `@phpstan-all-methods-pure` does the same for a class; a method marked `@phpstan-impure` stays impure.

@@ -765,6 +765,9 @@ pub struct ClassDef {
     /// `@psalm-internal Ns`: its methods may only be called from `Ns` or below it.
     #[serde(default)]
     pub internal_scope: Option<Arc<str>>,
+    /// `@psalm-consistent-constructor`: subclass constructors must match this class's.
+    #[serde(default)]
+    pub consistent_constructor: bool,
     /// Set when the class carries `@psalm-immutable` — non-constructor methods must not
     /// assign to `$this` properties.
     #[serde(default)]
