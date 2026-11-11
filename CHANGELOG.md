@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@phan-type` declares a local type alias, like `@psalm-type` and `@phpstan-type`.
 - A `// comment` after an item of a multi-line `array{…}` shape is skipped instead of being read into the next key.
 - A `stdClass` (such as `(object) ['foo' => 1]`) is accepted for `object{foo: int}&stdClass`.
+- A template bounded by `key-of<GLOBAL_CONST>` accepts the keys of that constant, and `Foo::class` in a constant initializer is a `class-string<Foo>`, so a constant array of class names keeps its shape.
 
 ## [0.97.0] - 2026-11-10
 

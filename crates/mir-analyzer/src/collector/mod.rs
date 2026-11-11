@@ -846,9 +846,6 @@ pub(super) fn infer_const_value(
             let php_ast::owned::ExprKind::Identifier(const_name) = &cca.member.kind else {
                 return None;
             };
-            if const_name.as_ref() == "class" {
-                return None;
-            }
             let own = collector.own_constants.as_ref();
             let resolved = match (class_name.kind, class_name.as_str()) {
                 (php_ast::ast::NameKind::Unqualified, only)
@@ -863,6 +860,11 @@ pub(super) fn infer_const_value(
                 }
                 _ => collector.resolve_ast_name(class_name),
             };
+            if const_name.as_ref() == "class" {
+                return Some(Type::single(Atomic::TClassString(Some(Name::from(
+                    resolved.as_str(),
+                )))));
+            }
             if let Some(own) = own.filter(|own| own.fqcn.eq_ignore_ascii_case(&resolved)) {
                 if own.cases.contains(const_name.as_ref()) {
                     return Some(Type::single(Atomic::TNamedObject {

@@ -814,7 +814,7 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
     collapse_complete_enums(db, out)
 }
 
-/// `key-of<Cls::CONST>` / `value-of<Cls::CONST>` over the constant's array type.
+/// `key-of<Cls::CONST>` / `value-of<Cls::CONST>` / `key-of<GLOBAL_CONST>` over the constant's array type.
 fn const_array_projection(db: &dyn MirDatabase, atomic: &Atomic) -> Option<Type> {
     let (target, project): (_, fn(&Type) -> Option<Type>) = match atomic {
         Atomic::TKeyOf { target } => (target, mir_types::union::eval_key_of_type),
@@ -825,7 +825,8 @@ fn const_array_projection(db: &dyn MirDatabase, atomic: &Atomic) -> Option<Type>
         return None;
     };
     if !fqcn.contains("::") {
-        return None;
+        let constant = crate::db::find_global_constant(db, crate::db::Fqcn::from_str(db, fqcn))?;
+        return project(&constant);
     }
     // An unresolvable constant accepts anything rather than guess.
     Some(
