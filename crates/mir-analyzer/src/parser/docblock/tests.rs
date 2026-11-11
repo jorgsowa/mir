@@ -738,11 +738,16 @@ fn parse_int_mask_too_many_members_falls_back() {
 }
 
 #[test]
-fn parse_int_mask_of_always_falls_back() {
-    // int-mask-of cannot resolve class constants at parse time → always int
+fn parse_int_mask_of_other_class_is_deferred() {
     let u = parse_type_string("int-mask-of<Foo::*>");
-    assert_eq!(u.types.len(), 1);
-    assert!(matches!(u.types[0], Atomic::TInt));
+    assert_eq!(
+        u.types.as_slice(),
+        [Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(
+            "Foo::*".into()
+        ))]
+    );
+    let not_a_pattern = parse_type_string("int-mask-of<Foo::BAR>");
+    assert!(matches!(not_a_pattern.types[0], Atomic::TInt));
 }
 
 #[test]

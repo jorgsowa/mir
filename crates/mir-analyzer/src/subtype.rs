@@ -608,7 +608,7 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     | Atomic::TPositiveInt
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
-                    | Atomic::TAnyLiteralInt
+                    | Atomic::TRefinedInt(_)
                     | Atomic::TIntRange { .. },
                     Atomic::TFloat,
                 ) => true,
@@ -692,7 +692,10 @@ fn is_only_key_zero(key: &Type) -> bool {
 
 fn atomic_mentions_enum_case(a: &Atomic) -> bool {
     match a {
-        Atomic::TLiteralEnumCase { .. } | Atomic::TKeyOf { .. } | Atomic::TValueOf { .. } => true,
+        Atomic::TLiteralEnumCase { .. }
+        | Atomic::TKeyOf { .. }
+        | Atomic::TValueOf { .. }
+        | Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(_)) => true,
         Atomic::TNamedObject { fqcn, type_params } => {
             fqcn.contains("::") || type_params.iter().any(mentions_enum_case)
         }
@@ -751,6 +754,12 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
                 }
                 continue;
             }
+        }
+        if let Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(target)) = atomic {
+            for a in int_mask_of_constants(db, target).types {
+                out.add_type(a);
+            }
+            continue;
         }
         if let Atomic::TValueOf { target } = atomic {
             if let Some(values) = enum_backing_values(db, target) {
@@ -813,6 +822,24 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
         });
     }
     collapse_complete_enums(db, out)
+}
+
+/// Every OR-combination of the int constants `Cls::PATTERN` names, or `int` when they are unknown or too many.
+fn int_mask_of_constants(db: &dyn MirDatabase, target: &str) -> Type {
+    let members: Vec<i64> = class_constant_ref_type(db, target)
+        .map(|constants| {
+            constants
+                .types
+                .iter()
+                .filter_map(|a| match a {
+                    Atomic::TLiteralInt(n) => Some(*n),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    crate::parser::docblock::expand_int_mask_members(&members)
+        .unwrap_or_else(|| Type::single(Atomic::TInt))
 }
 
 /// `key-of<Cls::CONST>` / `value-of<Cls::CONST>` / `key-of<GLOBAL_CONST>` over the constant's array type.

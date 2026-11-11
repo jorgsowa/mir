@@ -68,7 +68,7 @@ fn int_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
         let (lo, hi) = match a {
             Atomic::TLiteralInt(n) => (Some(*n), Some(*n)),
             Atomic::TIntRange { min, max } => (*min, *max),
-            Atomic::TInt | Atomic::TAnyLiteralInt | Atomic::TNumeric => (None, None),
+            Atomic::TInt | Atomic::TRefinedInt(_) | Atomic::TNumeric => (None, None),
             Atomic::TPositiveInt => (Some(1), None),
             Atomic::TNonNegativeInt => (Some(0), None),
             Atomic::TNegativeInt => (None, Some(-1)),
@@ -124,7 +124,7 @@ fn atomic_can_equal(a: &Atomic, lit: &Lit) -> bool {
             | Atomic::TIntRange { .. }
             | Atomic::TPositiveInt
             | Atomic::TNonNegativeInt
-            | Atomic::TAnyLiteralInt
+            | Atomic::TRefinedInt(_)
             | Atomic::TNegativeInt
             | Atomic::TFloat
             | Atomic::TIntegralFloat
@@ -187,7 +187,7 @@ pub(crate) fn is_closed_precise(ty: &Type) -> bool {
             Atomic::TIntRange { .. }
                 | Atomic::TPositiveInt
                 | Atomic::TNonNegativeInt
-                | Atomic::TAnyLiteralInt
+                | Atomic::TRefinedInt(_)
                 | Atomic::TNegativeInt
         )
     });
@@ -304,7 +304,7 @@ pub(crate) fn gettype_possible_values(ty: &Type) -> Option<Vec<&'static str>> {
             | Atomic::TIntRange { .. }
             | Atomic::TPositiveInt
             | Atomic::TNonNegativeInt
-            | Atomic::TAnyLiteralInt
+            | Atomic::TRefinedInt(_)
             | Atomic::TNegativeInt => "integer",
             Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => "double",
             Atomic::TString
@@ -364,7 +364,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TPositiveInt
         | Atomic::TNegativeInt
         | Atomic::TNonNegativeInt
-        | Atomic::TAnyLiteralInt => TypeFamily::Int,
+        | Atomic::TRefinedInt(_) => TypeFamily::Int,
 
         Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => TypeFamily::Float,
 
@@ -557,7 +557,7 @@ fn is_int_atomic(a: &Atomic) -> bool {
             | Atomic::TIntRange { .. }
             | Atomic::TPositiveInt
             | Atomic::TNonNegativeInt
-            | Atomic::TAnyLiteralInt
+            | Atomic::TRefinedInt(_)
             | Atomic::TNegativeInt
     )
 }

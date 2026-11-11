@@ -624,7 +624,7 @@ pub(crate) fn abs_return_type(arg_types: &[Type]) -> Option<Type> {
                 | Atomic::TLiteralInt(_)
                 | Atomic::TPositiveInt
                 | Atomic::TNonNegativeInt
-                | Atomic::TAnyLiteralInt
+                | Atomic::TRefinedInt(_)
                 | Atomic::TNegativeInt
                 | Atomic::TIntRange { .. }
         )
@@ -743,7 +743,7 @@ fn int_type_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
             Atomic::TPositiveInt => (Some(1), None),
             Atomic::TNonNegativeInt => (Some(0), None),
             Atomic::TNegativeInt => (None, Some(-1)),
-            Atomic::TInt | Atomic::TAnyLiteralInt => (None, None),
+            Atomic::TInt | Atomic::TRefinedInt(_) => (None, None),
             _ => return None,
         };
         min = match (min, lo) {
@@ -1093,7 +1093,7 @@ fn is_int_or_float(t: &Type) -> bool {
                     | Atomic::TPositiveInt
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
-                    | Atomic::TAnyLiteralInt
+                    | Atomic::TRefinedInt(_)
                     | Atomic::TFloat
                     | Atomic::TIntegralFloat
                     | Atomic::TLiteralFloat(..)

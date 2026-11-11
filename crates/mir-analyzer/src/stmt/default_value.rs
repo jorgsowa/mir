@@ -337,7 +337,7 @@ fn php_value_type(ty: &Type) -> Option<String> {
             | Atomic::TPositiveInt
             | Atomic::TNegativeInt
             | Atomic::TNonNegativeInt
-            | Atomic::TAnyLiteralInt => "int",
+            | Atomic::TRefinedInt(_) => "int",
             Atomic::TFloat | Atomic::TLiteralFloat(..) | Atomic::TIntegralFloat => "float",
             Atomic::TBool | Atomic::TTrue | Atomic::TFalse => "bool",
             Atomic::TNull => "null",

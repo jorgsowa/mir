@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::sync::{Arc, OnceLock};
 
-use crate::atomic::{ArrayKey, Atomic, KeyedProperties, KeyedProperty, StringRefinement};
+use crate::atomic::{
+    ArrayKey, Atomic, IntRefinement, KeyedProperties, KeyedProperty, StringRefinement,
+};
 use crate::symbol::Name;
 
 /// Returns a cached empty `Arc<[Type]>` for `type_params` / `parts` fields.
@@ -563,17 +565,16 @@ impl Type {
                 .retain(|t| !int_bounds(t).is_some_and(|b| bounds_contain(new_bounds, b)));
         }
         // literal-int sits between the int literals and int.
+        const LITERAL_INT: Atomic = Atomic::TRefinedInt(IntRefinement::Literal);
         match atomic {
-            Atomic::TAnyLiteralInt | Atomic::TLiteralInt(_)
-                if self.types.contains(&Atomic::TAnyLiteralInt) =>
-            {
-                return;
-            }
-            Atomic::TAnyLiteralInt if self.types.contains(&Atomic::TInt) => return,
-            Atomic::TAnyLiteralInt => self
+            Atomic::TRefinedInt(_) if self.types.contains(&Atomic::TInt) => return,
+            Atomic::TLiteralInt(_) if self.types.contains(&LITERAL_INT) => return,
+            LITERAL_INT => self
                 .types
                 .retain(|t| !matches!(t, Atomic::TLiteralInt(_))),
-            Atomic::TInt => self.types.retain(|t| *t != Atomic::TAnyLiteralInt),
+            Atomic::TInt => self
+                .types
+                .retain(|t| !matches!(t, Atomic::TRefinedInt(_))),
             _ => {}
         }
         // TLiteralString(s) is subsumed by TString.
@@ -1901,7 +1902,7 @@ fn value_classes(a: &Atomic) -> Vec<ValueClass> {
         | Atomic::TPositiveInt
         | Atomic::TNegativeInt
         | Atomic::TNonNegativeInt
-        | Atomic::TAnyLiteralInt => vec![Int],
+        | Atomic::TRefinedInt(_) => vec![Int],
         Atomic::TLiteralInt(v) => vec![LitInt(*v)],
         // Floats.
         Atomic::TFloat | Atomic::TIntegralFloat => vec![Float],
@@ -2224,9 +2225,11 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TLiteralInt(_), Atomic::TInt) => true,
         (Atomic::TLiteralInt(_), Atomic::TNumeric) => true,
         (Atomic::TLiteralInt(_), Atomic::TScalar) => true,
-        (Atomic::TLiteralInt(_), Atomic::TAnyLiteralInt) => true,
-        (Atomic::TAnyLiteralInt, _) => atomic_subtype(&Atomic::TInt, sup),
-        (_, Atomic::TAnyLiteralInt) => false,
+        (Atomic::TLiteralInt(_), Atomic::TRefinedInt(IntRefinement::Literal)) => true,
+        (Atomic::TRefinedInt(_), _) => atomic_subtype(&Atomic::TInt, sup),
+        (_, Atomic::TRefinedInt(IntRefinement::Literal)) => false,
+        // An unresolved mask accepts what int accepts.
+        (_, Atomic::TRefinedInt(IntRefinement::MaskOf(_))) => atomic_subtype(sub, &Atomic::TInt),
         (Atomic::TLiteralInt(n), Atomic::TPositiveInt) => *n > 0,
         (Atomic::TLiteralInt(n), Atomic::TNonNegativeInt) => *n >= 0,
         (Atomic::TLiteralInt(n), Atomic::TNegativeInt) => *n < 0,

@@ -497,7 +497,7 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                 | Atomic::TPositiveInt
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
-                | Atomic::TAnyLiteralInt
+                | Atomic::TRefinedInt(_)
         )
     };
     !arg.types.is_empty()
@@ -524,7 +524,11 @@ fn scalar_refinement_coercion(arg: &Type, param: &Type) -> bool {
                                 (Atomic::TRefinedString { .. }, _)
                                     | (_, Atomic::TRefinedString { .. })
                             ))
-                        || (a.is_int() && matches!(p, Atomic::TAnyLiteralInt))
+                        || (a.is_int()
+                            && matches!(
+                                p,
+                                Atomic::TRefinedInt(mir_types::IntRefinement::Literal)
+                            ))
                 })
         })
 }
@@ -608,7 +612,7 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
                     | Atomic::TPositiveInt
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
-                    | Atomic::TAnyLiteralInt
+                    | Atomic::TRefinedInt(_)
                     | Atomic::TFloat
                     | Atomic::TIntegralFloat
                     | Atomic::TLiteralFloat(..)
@@ -1412,7 +1416,7 @@ fn classify_array_key(ty: &Type) -> ArrayKeyKind {
         | Atomic::TLiteralInt(_)
         | Atomic::TPositiveInt
         | Atomic::TNonNegativeInt
-        | Atomic::TAnyLiteralInt
+        | Atomic::TRefinedInt(_)
         | Atomic::TNegativeInt
         | Atomic::TIntRange { .. } => ArrayKeyKind::Int,
         Atomic::TString

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::atomic::{Atomic, StringRefinement};
+use crate::atomic::{Atomic, IntRefinement, StringRefinement};
 use crate::union::Type;
 
 /// Write `items` separated by `sep` straight into the formatter, avoiding the
@@ -184,7 +184,8 @@ impl fmt::Display for Atomic {
             Atomic::TPositiveInt => write!(f, "positive-int"),
             Atomic::TNegativeInt => write!(f, "negative-int"),
             Atomic::TNonNegativeInt => write!(f, "non-negative-int"),
-            Atomic::TAnyLiteralInt => write!(f, "literal-int"),
+            Atomic::TRefinedInt(IntRefinement::Literal) => write!(f, "literal-int"),
+            Atomic::TRefinedInt(IntRefinement::MaskOf(target)) => write!(f, "int-mask-of<{target}>"),
 
             Atomic::TFloat | Atomic::TIntegralFloat => write!(f, "float"),
             Atomic::TLiteralFloat(high, low) => {

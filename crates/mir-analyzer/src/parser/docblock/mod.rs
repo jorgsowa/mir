@@ -1111,5 +1111,6 @@ use types::*;
 use validate::*;
 
 pub(crate) use types::constant_glob_matches;
+pub(crate) use types::expand_int_mask_members;
 pub(crate) use types::is_docblock_type_keyword;
 pub(crate) use types::parse_type_string;

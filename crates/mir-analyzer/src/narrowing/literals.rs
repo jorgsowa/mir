@@ -828,7 +828,7 @@ pub(super) fn literal_int_narrow_type(current: &Type, value: i64, is_value: bool
                 // the literal exactly like every narrower sibling atom below does
                 // (TIntRange, TPositiveInt, TNonNegativeInt, TNegativeInt).
                 Atomic::TInt
-                | Atomic::TAnyLiteralInt
+                | Atomic::TRefinedInt(_)
                 | Atomic::TScalar
                 | Atomic::TNumeric
                 | Atomic::TMixed => {

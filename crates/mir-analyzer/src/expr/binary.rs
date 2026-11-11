@@ -374,7 +374,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     a,
                                     Atomic::TLiteralString(_)
                                         | Atomic::TLiteralInt(_)
-                                        | Atomic::TAnyLiteralInt
+                                        | Atomic::TRefinedInt(_)
                                 )
                         })
                 };

@@ -17,7 +17,7 @@ pub fn is_injection_safe_type(ty: &mir_types::Type) -> bool {
                     | Atomic::TPositiveInt
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
-                    | Atomic::TAnyLiteralInt
+                    | Atomic::TRefinedInt(_)
                     | Atomic::TFloat
                     | Atomic::TIntegralFloat
                     | Atomic::TLiteralFloat(..)

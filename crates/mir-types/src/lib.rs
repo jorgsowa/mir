@@ -7,6 +7,7 @@ pub mod union;
 
 pub use atomic::ArrayKey;
 pub use atomic::Atomic;
+pub use atomic::IntRefinement;
 pub use atomic::KeyedProperties;
 pub use atomic::StringRefinement;
 pub use atomic::Variance;

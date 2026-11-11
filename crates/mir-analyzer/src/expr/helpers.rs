@@ -973,7 +973,7 @@ fn int_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
             Atomic::TPositiveInt => (Some(1), None),
             Atomic::TNonNegativeInt => (Some(0), None),
             Atomic::TNegativeInt => (None, Some(-1)),
-            Atomic::TInt | Atomic::TAnyLiteralInt => (None, None),
+            Atomic::TInt | Atomic::TRefinedInt(_) => (None, None),
             _ => return None,
         };
         // Widen the accumulated bounds to cover this member (union semantics).
@@ -998,7 +998,7 @@ fn contains_int_range(ty: &Type) -> bool {
             Atomic::TIntRange { .. }
                 | Atomic::TPositiveInt
                 | Atomic::TNonNegativeInt
-                | Atomic::TAnyLiteralInt
+                | Atomic::TRefinedInt(_)
                 | Atomic::TNegativeInt
         )
     })
@@ -1307,7 +1307,7 @@ pub fn is_non_empty_when_concat(ty: &Type) -> bool {
             | Atomic::TPositiveInt
             | Atomic::TNegativeInt
             | Atomic::TNonNegativeInt
-            | Atomic::TAnyLiteralInt
+            | Atomic::TRefinedInt(_)
             | Atomic::TIntRange { .. } => true,
             // Any float casts to a non-empty string ("0", "1.5", …)
             Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => true,

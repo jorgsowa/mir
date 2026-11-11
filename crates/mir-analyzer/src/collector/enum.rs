@@ -479,7 +479,7 @@ pub(crate) fn php_value_type_name(ty: &mir_types::Type) -> Option<&'static str> 
         | Atomic::TPositiveInt
         | Atomic::TNegativeInt
         | Atomic::TNonNegativeInt
-        | Atomic::TAnyLiteralInt => "int",
+        | Atomic::TRefinedInt(_) => "int",
         Atomic::TString
         | Atomic::TLiteralString(_)
         | Atomic::TNonEmptyString

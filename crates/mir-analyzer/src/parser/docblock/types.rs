@@ -475,7 +475,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             t
         }
         "int" | "integer" | "int-range" => Type::single(Atomic::TInt),
-        "literal-int" => Type::single(Atomic::TAnyLiteralInt),
+        "literal-int" => Type::single(Atomic::TRefinedInt(mir_types::IntRefinement::Literal)),
         "positive-int" => Type::single(Atomic::TPositiveInt),
         "negative-int" => Type::single(Atomic::TNegativeInt),
         "non-negative-int" => Type::single(Atomic::TNonNegativeInt),
@@ -823,12 +823,13 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 Type::single(Atomic::TInt)
             }
         }
-        // `int-mask-of<T::CONST_*>` — resolves against the constants of the
-        // *currently-collected* class when `T` is `self`/`static`/the class's
-        // own name (see `SelfIntConstantsGuard`); any other class reference
-        // needs cross-file lookup that isn't available here, so it falls back
-        // to `int`.
-        "int-mask-of" => resolve_int_mask_of(inner).unwrap_or_else(|| Type::single(Atomic::TInt)),
+        // Another class's constants are not known here, so that mask is resolved when checked.
+        "int-mask-of" => resolve_int_mask_of(inner).unwrap_or_else(|| {
+            Type::single(match deferred_int_mask_target(inner) {
+                Some(target) => Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(target)),
+                None => Atomic::TInt,
+            })
+        }),
         // `class-string-map<T, V>` — maps `class-string<T>` keys to `V` values.
         // mir does not tie the value type to the specific class looked up (that
         // needs flow-sensitive template binding at each access site), so
@@ -981,7 +982,7 @@ pub(super) fn eval_value_of(t: &Type) -> Option<Type> {
 /// `int-mask<...>` (literal members) and `int-mask-of<...>` (members read
 /// from resolved class constants). Returns `None` when the set is empty,
 /// contains a negative value, or is too large to enumerate (> 8 members).
-pub(super) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
+pub(crate) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
     if members.is_empty() || members.len() > 8 || members.iter().any(|&v| v < 0) {
         return None;
     }
@@ -1108,6 +1109,14 @@ pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
     members.sort_unstable();
     members.dedup();
     expand_int_mask_members(&members)
+}
+
+/// `Cls::PATTERN*` naming a class other than the one being collected.
+fn deferred_int_mask_target(inner: &str) -> Option<mir_types::Name> {
+    let inner = inner.trim();
+    let (class_ref, pattern) = inner.split_once("::")?;
+    (pattern.contains('*') && self_constant_values(class_ref, pattern).is_none())
+        .then(|| mir_types::Name::from(inner))
 }
 
 /// Resolve `self::NAME` / `self::PREFIX_*` to the union of the matching literal
