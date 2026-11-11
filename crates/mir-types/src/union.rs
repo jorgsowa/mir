@@ -2261,7 +2261,9 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             true
         }
         (Atomic::TLiteralString(s), Atomic::TNonEmptyString) => !s.is_empty(),
-        (Atomic::TLiteralString(s), Atomic::TNumericString) => s.parse::<f64>().is_ok(),
+        (Atomic::TLiteralString(s), Atomic::TNumericString | Atomic::TNumeric) => {
+            s.parse::<f64>().is_ok()
+        }
         // A literal string is type-compatible with class-string; validate_class_string_argument
         // separately checks whether the string names a real class (UndefinedClass).
         (Atomic::TLiteralString(_), Atomic::TClassString(_)) => true,
