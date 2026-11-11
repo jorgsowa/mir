@@ -1374,7 +1374,9 @@ mod docblock_hint_compat {
             | Atomic::TParent { .. } => OBJECT,
             // `associative-array` is an intersection of array types.
             Atomic::TIntersection { parts }
-                if parts.iter().all(|p| p.types.iter().all(|t| fam(t) == ARRAY)) =>
+                if parts
+                    .iter()
+                    .all(|p| p.types.iter().all(|t| fam(t) == ARRAY)) =>
             {
                 ARRAY
             }
