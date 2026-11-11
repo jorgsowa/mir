@@ -168,6 +168,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "trait-string",
     "true",
     "truthy-string",
+    "unset",
     "uppercase-string",
     "value-of",
     "void",
@@ -492,7 +493,8 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "bool" | "boolean" => Type::single(Atomic::TBool),
         "true" => Type::single(Atomic::TTrue),
         "false" => Type::single(Atomic::TFalse),
-        "null" => Type::single(Atomic::TNull),
+        // Reading an unset variable yields null.
+        "null" | "unset" => Type::single(Atomic::TNull),
         "void" => Type::single(Atomic::TVoid),
         "never" | "never-return" | "no-return" | "never-returns" | "noreturn" => {
             Type::single(Atomic::TNever)
