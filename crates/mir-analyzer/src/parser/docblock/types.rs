@@ -68,10 +68,13 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "bool",
     "boolean",
     "callable",
+    "callable-array",
+    "callable-object",
     "callable-string",
     "class-string",
     "class-string-map",
     "closed-resource",
+    "decimal-int-string",
     "double",
     "empty",
     "enum-string",
@@ -80,6 +83,7 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "int",
     "int-mask",
     "int-mask-of",
+    "int-range",
     "integer",
     "interface-string",
     "iterable",
@@ -89,18 +93,25 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "literal-string",
     "lowercase-string",
     "mixed",
+    "negative-int",
     "never",
     "never-return",
     "never-returns",
     "no-return",
-    "negative-int",
+    "non-decimal-int-string",
     "non-empty-array",
-    "non-empty-lowercase-string",
     "non-empty-list",
+    "non-empty-literal-string",
+    "non-empty-lowercase-string",
+    "non-empty-mixed",
+    "non-empty-scalar",
     "non-empty-string",
     "non-empty-uppercase-string",
     "non-falsy-string",
     "non-negative-int",
+    "non-null-mixed",
+    "non-positive-int",
+    "non-zero-int",
     "null",
     "numeric",
     "numeric-string",
@@ -118,6 +129,8 @@ pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
     "scalar",
     "self",
     "static",
+    "static-closure",
+    "static-pure-closure",
     "string",
     "trait-string",
     "true",
@@ -371,6 +384,13 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         ));
     }
 
+    // Lowercase only: `Number` stays a class name (`BcMath\Number`).
+    if s == "number" {
+        let mut u = Type::single(Atomic::TInt);
+        u.add_type(Atomic::TFloat);
+        return u;
+    }
+
     // Keywords
     match s.to_lowercase().as_str() {
         "string" => Type::single(Atomic::TString),
@@ -380,11 +400,15 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         // precisely; approximate with the closest representable atom (same
         // approach Psalm documents for back-compat). `truthy-string` /
         // `non-falsy-string` ≈ non-empty-string; case-constrained strings ≈ string.
-        "truthy-string" | "non-falsy-string" => Type::single(Atomic::TNonEmptyString),
+        "truthy-string" | "non-falsy-string" | "non-empty-literal-string" => {
+            Type::single(Atomic::TNonEmptyString)
+        }
+        "decimal-int-string" => Type::single(Atomic::TNumericString),
         "lowercase-string"
         | "uppercase-string"
         | "non-empty-lowercase-string"
-        | "non-empty-uppercase-string" => Type::single(Atomic::TString),
+        | "non-empty-uppercase-string"
+        | "non-decimal-int-string" => Type::single(Atomic::TString),
         "class-string" => Type::single(Atomic::TClassString(None)),
         "interface-string" => Type::single(Atomic::TInterfaceString(None)),
         "trait-string" => Type::single(Atomic::TTraitString),
@@ -407,7 +431,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             t.add_type(Atomic::TObject);
             t
         }
-        "int" | "integer" => Type::single(Atomic::TInt),
+        "int" | "integer" | "int-range" => Type::single(Atomic::TInt),
         // `literal-int`/`literal-string`: "any literal value of this kind",
         // used almost exclusively as a template bound (`@template T of
         // literal-string`). mir has no atom for "any literal, unspecified
@@ -421,6 +445,15 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "positive-int" => Type::single(Atomic::TPositiveInt),
         "negative-int" => Type::single(Atomic::TNegativeInt),
         "non-negative-int" => Type::single(Atomic::TNonNegativeInt),
+        "non-positive-int" => Type::single(Atomic::TIntRange {
+            min: None,
+            max: Some(0),
+        }),
+        "non-zero-int" => {
+            let mut u = Type::single(Atomic::TNegativeInt);
+            u.add_type(Atomic::TPositiveInt);
+            u
+        }
         "float" | "double" => Type::single(Atomic::TFloat),
         "bool" | "boolean" => Type::single(Atomic::TBool),
         "true" => Type::single(Atomic::TTrue),
@@ -428,9 +461,10 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "null" => Type::single(Atomic::TNull),
         "void" => Type::single(Atomic::TVoid),
         "never" | "never-return" | "no-return" | "never-returns" => Type::single(Atomic::TNever),
-        "mixed" => Type::single(Atomic::TMixed),
-        "object" => Type::single(Atomic::TObject),
-        "array" => Type::single(Atomic::TArray {
+        // The falsy/null exclusions and callability have no atom; the base type is lenient.
+        "mixed" | "non-empty-mixed" | "non-null-mixed" => Type::single(Atomic::TMixed),
+        "object" | "callable-object" => Type::single(Atomic::TObject),
+        "array" | "callable-array" => Type::single(Atomic::TArray {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
@@ -462,10 +496,12 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         // already resolves correctly via the named-class fallthrough below.
         // `pure-closure` isn't a real class name, so it needs the same
         // explicit mapping.
-        "pure-closure" => Type::single(Atomic::TNamedObject {
-            fqcn: mir_types::Name::from("Closure"),
-            type_params: Default::default(),
-        }),
+        "pure-closure" | "static-closure" | "static-pure-closure" => {
+            Type::single(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("Closure"),
+                type_params: Default::default(),
+            })
+        }
         "callable-string" => Type::single(Atomic::TCallableString),
         "iterable" => {
             let mut u = Type::single(Atomic::TArray {
@@ -478,7 +514,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             });
             u
         }
-        "scalar" => Type::single(Atomic::TScalar),
+        "scalar" | "non-empty-scalar" => Type::single(Atomic::TScalar),
         "numeric" => Type::single(Atomic::TNumeric),
         // `empty` — Psalm's falsy pseudo-type. mir has no single "falsy" atom,
         // so approximate as the union of all falsy literals it can express.
@@ -684,7 +720,7 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         "interface-string" => Type::single(Atomic::TInterfaceString(Some(
             normalize_fqcn(strip_generic_args(inner.trim())).into(),
         ))),
-        "int" => {
+        "int" | "int-range" => {
             // int<min, max> — `min`/`max` keywords (or a missing/garbled bound)
             // mean "unbounded on that side"; a numeric literal is an inclusive
             // bound. e.g. `int<0, max>` → min 0, no upper bound.
