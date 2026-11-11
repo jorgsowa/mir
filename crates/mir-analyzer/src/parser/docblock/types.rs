@@ -400,7 +400,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
                 return parse_keyed_array(inner, false);
             } else if prefix == "list" {
                 return parse_keyed_array(inner, true);
-            } else if prefix == "object" {
+            } else if matches!(prefix.as_str(), "object" | "stdclass" | "\\stdclass") {
                 return match parse_keyed_array(inner, false).types.into_iter().next() {
                     Some(Atomic::TKeyedArray { properties, .. }) if !properties.is_empty() => {
                         Type::single(Atomic::TObjectShape { properties })

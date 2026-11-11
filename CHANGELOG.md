@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `stdClass{name: string}` is read as the object shape `object{name: string}`, so its properties are typed, instead of an undefined class.
 - `@phan-assert`, `@phan-assert-true-condition` and `@phan-assert-false-condition` are read as `@psalm-assert`, `@psalm-assert-if-true` and `@psalm-assert-if-false`.
 
 ### Fixed
