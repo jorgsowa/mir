@@ -98,6 +98,11 @@
       <code><![CDATA[return $instance;]]></code>
     </NullableReturnStatement>
   </file>
+  <file src="core/lib/Drupal/Component/Utility/Environment.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $max_size;]]></code>
+    </InvalidReturnType>
+  </file>
   <file src="core/lib/Drupal/Component/Utility/Html.php">
     <UndefinedMethod>
       <code><![CDATA[$node->getAttribute($attr)]]></code>

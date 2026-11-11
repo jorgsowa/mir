@@ -1704,7 +1704,7 @@ impl Type {
             return true; // never <: everything
         }
         self.types.iter().all(|a| {
-            let fits = |a: &Atomic| other.types.iter().any(|b| atomic_subtype(a, b));
+            let fits = |a: &Atomic| other.accepts_atomic_structural(a);
             fits(a) || composite_parts(a).is_some_and(|parts| parts.iter().all(fits))
         })
     }
@@ -1728,7 +1728,12 @@ impl Type {
         if self.is_mixed() {
             return true;
         }
-        matches!(sub, Atomic::TNever) || self.types.iter().any(|b| atomic_subtype(sub, b))
+        // An int stays an int when the union lists int types; it widens to `float` only otherwise.
+        let int_skips_float = sub.is_int() && self.types.iter().any(Atomic::is_int);
+        matches!(sub, Atomic::TNever)
+            || self.types.iter().any(|b| {
+                !(int_skips_float && matches!(b, Atomic::TFloat)) && atomic_subtype(sub, b)
+            })
     }
 
     // --- Utilities ----------------------------------------------------------
