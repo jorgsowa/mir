@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pure-callable`, `pure-callable(...)` and `pure-Closure(...)` reject a callable that visibly has side effects: a closure, or a named function passed as `f(...)` or `'f'`, whose body echoes, prints, exits or declares a `global` / `static` variable, or a function marked `@impure`, is `InvalidArgument`.
 - A callable signature that passes a parameter by reference (`callable(string &$value): mixed`) requires a callback taking it by reference: a closure, first-class callable or function name taking it by value is `InvalidArgument`.
 - A method that takes the class template cannot be called through a star or covariant projection (`Collection<*>`, `Collection<covariant Animal>`): the argument is `InvalidArgument` against `never`. Methods that do not mention the template, and methods with a template of their own, are unaffected.
+- `template-type<Object, Class, 'T'>` is the type argument the object supplies for that template, also through `@extends`, instead of an undefined class named `template-type`.
 
 ### Fixed
 

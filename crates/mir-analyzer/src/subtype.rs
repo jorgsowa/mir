@@ -698,7 +698,9 @@ fn atomic_mentions_enum_case(a: &Atomic) -> bool {
         | Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(_))
         | Atomic::TPropertiesOf { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
-            fqcn.contains("::") || type_params.iter().any(mentions_enum_case)
+            fqcn.contains("::")
+                || fqcn.as_str() == "template-type"
+                || type_params.iter().any(mentions_enum_case)
         }
         Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
             mentions_enum_case(key) || mentions_enum_case(value)
@@ -789,6 +791,12 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
             }
             continue;
         }
+        if let Some(resolved) = template_type_argument(db, atomic) {
+            for a in resolved.types {
+                out.add_type(a);
+            }
+            continue;
+        }
         if let Atomic::TPropertiesOf { class, filter } = atomic {
             out.add_type(properties_of_shape(db, class, *filter));
             continue;
@@ -854,6 +862,53 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
         });
     }
     collapse_complete_enums(db, out)
+}
+
+/// A call's return type with each resolvable `template-type<Obj, Cls, 'T'>` replaced by its argument.
+pub(crate) fn resolve_template_types(db: &dyn MirDatabase, ty: Type) -> Type {
+    if !ty.contains(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.as_str() == "template-type"))
+    {
+        return ty;
+    }
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    for atomic in ty.types {
+        match template_type_argument(db, &atomic) {
+            Some(resolved) => out.merge_with(&resolved),
+            None => out.add_type(atomic),
+        }
+    }
+    out
+}
+
+/// `template-type<Obj, Cls, 'T'>`: the type argument `Obj` supplies for the template `T`
+/// of its class or an ancestor. `None` while `Obj` is not a concrete generic object.
+fn template_type_argument(db: &dyn MirDatabase, atomic: &Atomic) -> Option<Type> {
+    let Atomic::TNamedObject { fqcn, type_params } = atomic else {
+        return None;
+    };
+    if fqcn.as_str() != "template-type" {
+        return None;
+    }
+    let [object, _class, template] = &type_params[..] else {
+        return None;
+    };
+    let [Atomic::TNamedObject {
+        fqcn: object_fqcn,
+        type_params: object_args,
+    }] = object.types.as_slice()
+    else {
+        return None;
+    };
+    let [Atomic::TLiteralString(template)] = template.types.as_slice() else {
+        return None;
+    };
+    let class_tps = crate::db::class_template_params(db, object_fqcn)?;
+    let mut bindings = crate::generic::build_class_bindings(&class_tps, object_args);
+    for (name, ty) in crate::db::inherited_template_bindings(db, object_fqcn, &bindings) {
+        bindings.entry(name).or_insert(ty);
+    }
+    bindings.get(&Name::from(template.as_ref())).cloned()
 }
 
 /// The instance properties of `class` and its ancestors as a sealed shape, or a string-keyed array when the class is unknown.

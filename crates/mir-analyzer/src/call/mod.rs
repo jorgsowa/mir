@@ -158,7 +158,7 @@ fn resolve_conditional_dyn(
                 .merge_with(&mir_types::Type::single(atomic).resolve_conditional_returns(lookup)),
         }
     }
-    resolved
+    crate::subtype::resolve_template_types(db, resolved)
 }
 
 /// The chosen branch of a conditional whose subject and discriminant are both

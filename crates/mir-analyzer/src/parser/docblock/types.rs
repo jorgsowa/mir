@@ -806,6 +806,17 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 }),
             }
         }
+        // `template-type<Obj, Cls, 'T'>` stays a named pseudo-type until `Obj` is concrete.
+        // The leading backslash keeps namespace resolution from qualifying it.
+        "template-type" => Type::single(Atomic::TNamedObject {
+            fqcn: mir_types::Name::from("\\template-type"),
+            type_params: mir_types::union::vec_to_type_params(
+                split_generics(inner)
+                    .iter()
+                    .map(|arg| parse_type_string(arg.trim()))
+                    .collect(),
+            ),
+        }),
         // `key-of<T>` — the union of array/shape key types of `T`.
         "key-of" => {
             let inner_ty = parse_type_string(inner.trim());

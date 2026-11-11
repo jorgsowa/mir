@@ -43,7 +43,10 @@ pub(super) fn collect_named_object_fqcns_with_arity(
     for atomic in &ty.types {
         match atomic {
             mir_types::Atomic::TNamedObject { fqcn, type_params } => {
-                out.push((*fqcn, type_params.len()));
+                // `template-type<Obj, Cls, 'T'>` is a utility type, not a class.
+                if fqcn.as_str() != "template-type" {
+                    out.push((*fqcn, type_params.len()));
+                }
                 for tp in type_params.iter() {
                     collect_named_object_fqcns_with_arity(tp, out);
                 }
