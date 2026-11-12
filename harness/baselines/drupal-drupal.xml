@@ -4819,11 +4819,6 @@
       <code><![CDATA[SAVED_UPDATED]]></code>
     </UndefinedConstant>
   </file>
-  <file src="core/modules/telephone/src/Plugin/Field/FieldType/TelephoneItem.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[pow(10, 8)]]></code>
-    </ImplicitFloatToIntCast>
-  </file>
   <file src="core/modules/toolbar/src/Controller/ToolbarController.php">
     <UndefinedFunction>
       <code><![CDATA[toolbar_get_rendered_subtrees()]]></code>

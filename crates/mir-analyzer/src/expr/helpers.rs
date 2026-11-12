@@ -1029,14 +1029,17 @@ pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Op
             BinaryOp::Div if r != 0 && l.checked_rem(r) == Some(0) => l.checked_div(r),
             // `PHP_INT_MIN % -1` is 0 in PHP.
             BinaryOp::Mod if r != 0 => Some(l.checked_rem(r).unwrap_or(0)),
+            BinaryOp::Pow => u32::try_from(r).ok().and_then(|e| l.checked_pow(e)),
             _ => None,
         };
         if let Some(n) = result {
             return Some(Type::single(Atomic::TLiteralInt(n)));
         }
-        // Overflow and non-exact literal integer division (e.g. 5 / 2 = 2.5) → float.
-        if matches!(op, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul)
-            || op == BinaryOp::Div && r != 0
+        // Overflow, a negative exponent and non-exact literal integer division (5 / 2) → float.
+        if matches!(
+            op,
+            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Pow
+        ) || op == BinaryOp::Div && r != 0
         {
             return Some(Type::single(Atomic::TFloat));
         }

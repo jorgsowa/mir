@@ -1379,6 +1379,7 @@ impl CallAnalyzer {
                 }
                 "strlen" | "mb_strlen" => super::callable::strlen_return_type(&arg_types),
                 "abs" => super::callable::abs_return_type(&arg_types).unwrap_or(return_ty),
+                "pow" => super::callable::pow_return_type(&arg_types).unwrap_or(return_ty),
                 // floor() and ceil() always return a whole-valued float — represent as
                 // TIntegralFloat so passing the result to an int param doesn't emit a FP.
                 "floor" | "ceil" => Type::single(Atomic::TIntegralFloat),

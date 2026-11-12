@@ -624,6 +624,30 @@ pub(crate) fn sprintf_return_type(arg_types: &[Type]) -> Option<Type> {
 /// PHP semantics: abs always returns a non-negative value with the same type
 /// (int → int, float → float). When the argument is a known int subtype or
 /// range, we can tighten the result accordingly.
+/// `pow()` on int/float operands is typed like `**`; other operands (GMP, numeric strings) keep the stub type.
+pub(crate) fn pow_return_type(arg_types: &[Type]) -> Option<Type> {
+    let [base, exponent] = arg_types else {
+        return None;
+    };
+    let is_number = |t: &Type| {
+        !t.types.is_empty()
+            && t.types.iter().all(|a| {
+                a.is_int()
+                    || matches!(
+                        a,
+                        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+                    )
+            })
+    };
+    if !is_number(base) || !is_number(exponent) {
+        return None;
+    }
+    Some(
+        crate::expr::infer_int_range_arithmetic(base, exponent, php_ast::ast::BinaryOp::Pow)
+            .unwrap_or_else(|| crate::expr::infer_div(base, exponent)),
+    )
+}
+
 pub(crate) fn abs_return_type(arg_types: &[Type]) -> Option<Type> {
     let arg = arg_types.first()?;
     // Only engage when the argument is purely integer (no float components).

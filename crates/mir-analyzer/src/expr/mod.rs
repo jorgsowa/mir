@@ -34,6 +34,7 @@ mod variables;
 pub(crate) use assignment::{literal_key_name, root_receiver_var};
 pub(crate) use binary::{operand_is_definitely_zero, pipe_as_call};
 pub use helpers::{duplicate_literal_conditions, extract_simple_var};
+pub(crate) use helpers::{infer_div, infer_int_range_arithmetic};
 pub(crate) use variables::constant_expr_type;
 
 /// Parses `text` as a standalone PHP expression by wrapping it as a
