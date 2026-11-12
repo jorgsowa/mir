@@ -804,9 +804,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/lib/Drupal/Core/Entity/EntityRepository.php">
-    <InvalidMethodCall>
-      <code><![CDATA[$contexts[$context_id]->getContextValue()]]></code>
-    </InvalidMethodCall>
     <NullableReturnStatement>
       <code><![CDATA[return $storage->loadRevision($revision_id);]]></code>
     </NullableReturnStatement>

@@ -84,7 +84,14 @@ pub(super) fn narrow_element(
     let diverges = ctx.diverges;
     ctx.narrow_var(STAND_IN, possible);
     super::narrow_from_condition(&folded, ctx, is_true, db, file);
-    let narrowed = ctx.get_var(STAND_IN);
+    let mut narrowed = ctx.get_var(STAND_IN);
+    // A passing check the element type rules out means that type is wrong; the check decides.
+    if is_true && ctx.diverges && !diverges {
+        ctx.diverges = false;
+        ctx.narrow_var(STAND_IN, mir_types::Type::mixed());
+        super::narrow_from_condition(&folded, ctx, is_true, db, file);
+        narrowed = ctx.get_var(STAND_IN);
+    }
     ctx.unset_var(STAND_IN);
     ctx.diverges = diverges;
     if !narrowed.is_empty() && (present || !narrowed.is_nullable()) && narrowed != current {
