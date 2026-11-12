@@ -1,6 +1,7 @@
 ===description===
 `array + array` over keyed shapes keeps left keys and appends right-only keys
-(including class-constant shapes), instead of keeping only the left shape.
+(including class-constant shapes), instead of keeping only the left shape. A generic
+right operand types the keys it adds with its value type.
 ===config===
 <mir>
   <issueHandlers>
@@ -40,8 +41,8 @@ class A {
     public function plainArrayRight(array $x): int {
         /** @var array<string, int> $x */
         $o = ['un_c' => 3] + $x;
+        /** @mir-check $o is array{'un_c': 3, ...<int>} */
         return $o['un_c'] + $o['anything'];
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
     }
 }
 

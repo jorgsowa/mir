@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$a[$k] instanceof X` narrows the element to `X` when the array's docblock element type rules `X` out, as it does for a variable.
 - An array element passed by reference takes the type the parameter writes (its `@param-out`, declared or `mixed` type), as a variable does, instead of keeping its shape from before the call.
 - A variable defined under `count($a) > n` or a property condition (`$this->lazy`, `$p->root !== ''`) is defined wherever that condition holds again, and a guard stays valid when the defining branch rewrites its variable. A write to the guard variable in the then branch now voids a guard negated into the else branch.
+- `$shape + $array` keeps the right operand's value type for the keys it adds (`array{0: null, ...<T>}`), and `[] + $array` is `$array`.
 
 ## [0.99.0] - 2026-11-12
 

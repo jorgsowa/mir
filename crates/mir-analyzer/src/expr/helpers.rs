@@ -1210,7 +1210,7 @@ fn widen_array_values_by(left: &Type, right: &Type) -> Option<Type> {
 }
 
 /// `array + array` over single keyed shapes: left keys win, right-only keys are appended.
-/// A non-keyed right operand may add arbitrary keys, so the result is open.
+/// A non-keyed right operand may add arbitrary keys of its value type, so the result is open.
 fn keyed_array_union(left: &Type, right: &Type) -> Option<Type> {
     let [Atomic::TKeyedArray {
         properties: lp,
@@ -1226,8 +1226,19 @@ fn keyed_array_union(left: &Type, right: &Type) -> Option<Type> {
         is_list: r_list,
     }] = right.types.as_slice()
     else {
+        if lp.is_empty() && !*l_open {
+            return Some(right.clone());
+        }
+        let mut props = (**lp).clone();
+        if !*l_open || props.remainder.is_some() {
+            let (_, right_value) = crate::stmt::infer_foreach_types(right);
+            props.remainder = Some(match &props.remainder {
+                Some(rest) => Type::merge(rest, &right_value),
+                None => right_value,
+            });
+        }
         return Some(Type::single(Atomic::TKeyedArray {
-            properties: lp.clone(),
+            properties: std::sync::Arc::new(props),
             is_open: true,
             is_list: false,
         }));

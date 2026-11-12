@@ -715,6 +715,9 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Entity/ContentEntityStorageBase.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $revisions;]]></code>
+    </InvalidReturnType>
     <UndefinedConstant>
       <code><![CDATA[SAVED_NEW]]></code>
       <code><![CDATA[SAVED_UPDATED]]></code>
