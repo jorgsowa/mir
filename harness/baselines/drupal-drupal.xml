@@ -1409,11 +1409,6 @@
       <code><![CDATA[$this->loggerFactory = \Drupal::service('logger.factory')]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="core/lib/Drupal/Core/Mail/Plugin/Mail/SymfonyMailer.php">
-    <InvalidArgument>
-      <code><![CDATA[$factories]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/lib/Drupal/Core/Menu/Form/MenuLinkDefaultForm.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->moduleExtensionList = \Drupal::service('extension.list.module')]]></code>

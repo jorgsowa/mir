@@ -292,7 +292,7 @@ pub(crate) fn scalar_docblock_contradicts_object(native: &Type, doc: &Type) -> b
 /// unchanged when `native` isn't a single concrete scalar (no conflict is
 /// detectable this way) or when nothing needed stripping.
 pub(crate) fn resolve_docblock_scalar_conflict(native: &Type, doc: Type) -> Type {
-    let doc = strip_docblock_resource(native, doc);
+    let doc = iterable_docblock_arrays(native, strip_docblock_resource(native, doc));
     let Some(family_check) = native_scalar_family(native) else {
         return doc;
     };
@@ -316,6 +316,53 @@ pub(crate) fn resolve_docblock_scalar_conflict(native: &Type, doc: Type) -> Type
     } else {
         filtered
     }
+}
+
+/// `T[]` on a native `iterable` means `iterable<T>`: each docblock array also admits a `Traversable`.
+fn iterable_docblock_arrays(native: &Type, mut doc: Type) -> Type {
+    let traversable = native.types.iter().find_map(|a| match a {
+        Atomic::TNamedObject { fqcn, .. }
+            if fqcn
+                .as_ref()
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("Traversable") =>
+        {
+            Some(*fqcn)
+        }
+        _ => None,
+    });
+    let Some(traversable) = traversable else {
+        return doc;
+    };
+    if !native
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TArray { .. }))
+        || doc
+            .types
+            .iter()
+            .any(|a| !matches!(a, Atomic::TArray { .. } | Atomic::TNull))
+    {
+        return doc;
+    }
+    let traversables: Vec<Atomic> = doc
+        .types
+        .iter()
+        .filter_map(|a| match a {
+            Atomic::TArray { key, value } => Some(Atomic::TNamedObject {
+                fqcn: traversable,
+                type_params: mir_types::union::vec_to_type_params(vec![
+                    (**key).clone(),
+                    (**value).clone(),
+                ]),
+            }),
+            _ => None,
+        })
+        .collect();
+    for t in traversables {
+        doc.add_type(t);
+    }
+    doc
 }
 
 /// A docblock `resource` beside a native class type predates the class that replaced the
