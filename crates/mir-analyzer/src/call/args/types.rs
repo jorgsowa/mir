@@ -122,6 +122,25 @@ fn class_string_map_values_match_keys(ea: &ExpressionAnalyzer<'_>, arg_ty: &Type
     })
 }
 
+fn unsealed_shapes(param_ty: &Type) -> Option<Type> {
+    let is_sealed = |a: &Atomic| {
+        matches!(a, Atomic::TKeyedArray { properties, is_open: false, .. }
+            if !properties.is_empty() && properties.remainder.is_none())
+    };
+    if !param_ty.types.iter().any(is_sealed) {
+        return None;
+    }
+    let mut out = param_ty.clone();
+    for a in out.types.iter_mut() {
+        if is_sealed(a) {
+            if let Atomic::TKeyedArray { is_open, .. } = a {
+                *is_open = true;
+            }
+        }
+    }
+    Some(out)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_one(
     ea: &mut ExpressionAnalyzer<'_>,
@@ -277,6 +296,16 @@ pub(crate) fn check_one(
         &*crate::subtype::canonical_enum_cases(ea.db, param_ty),
         &*crate::subtype::canonical_enum_cases(ea.db, arg_ty),
     );
+    // Extra keys are a likely typo only in an array literal; a wider shape value is accepted.
+    let unsealed;
+    let param_ty = if matches!(arg_expr.map(|e| &e.kind), Some(ExprKind::Array(_))) {
+        param_ty
+    } else if let Some(t) = unsealed_shapes(param_ty) {
+        unsealed = t;
+        &unsealed
+    } else {
+        param_ty
+    };
     let without_legacy_handle;
     let arg_ty = match without_legacy_handle_resource(arg_ty, param_ty) {
         Some(t) if t.types.is_empty() => return,

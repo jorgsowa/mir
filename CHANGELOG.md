@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A sealed shape parameter (`array{a: int}`) rejects extra keys only in an array literal: a wider shape from a variable or another expression (`array{a: int, b: string}`) is accepted again.
 - A callback whose parameter is required where the expected signature has a typed variadic (`callable(float ...$values)` given `fn (float $value) => …`) is `InvalidArgument`, since the variadic may receive no arguments. An untyped or `mixed` variadic still accepts any callback.
 
 ## [0.99.0] - 2026-11-12
