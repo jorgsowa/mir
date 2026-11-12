@@ -661,10 +661,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Entity/EntityBase.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$rel === NULL]]></code>
-      <code><![CDATA[$rel !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[return array_filter(array_keys($this->linkTemplates()), function ($link_relation_type) {
       // It's not guaranteed that every link relation type also has a
@@ -2603,6 +2599,9 @@
     <PossiblyInvalidArrayOffset>
       <code><![CDATA[[$width, $height] = getimagesize($file->getFileUri())]]></code>
     </PossiblyInvalidArrayOffset>
+    <TaintedCallable>
+      <code><![CDATA[$random->image($file_system->realpath($destination), $min_resolution, $max_resolution)]]></code>
+    </TaintedCallable>
   </file>
   <file src="core/modules/image/src/Plugin/ImageEffect/RotateImageEffect.php">
     <ImplicitFloatToIntCast>

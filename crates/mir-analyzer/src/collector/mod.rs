@@ -287,6 +287,20 @@ pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
             .all(|a| matches!(a, Atomic::TNull) || (is_any_scalar_family(a) && !family_check(a)))
 }
 
+/// An untyped parameter defaulting to `null` can hold `null` whatever its docblock says.
+pub(crate) fn add_null_default(
+    doc: &mut Type,
+    native: Option<&Type>,
+    default: Option<&php_ast::owned::Expr>,
+) {
+    if native.is_none()
+        && !doc.is_mixed()
+        && default.is_some_and(|d| matches!(d.kind, php_ast::owned::ExprKind::Null))
+    {
+        doc.add_type(Atomic::TNull);
+    }
+}
+
 /// A docblock of only scalars (and `null`) for a native class type.
 pub(crate) fn scalar_docblock_contradicts_object(native: &Type, doc: &Type) -> bool {
     matches!(native.types.as_slice(), [Atomic::TNamedObject { fqcn, .. }] if !fqcn.starts_with(IMPORT_PLACEHOLDER_PREFIX))
@@ -2925,6 +2939,11 @@ impl<'a> DefinitionCollector<'a> {
                     native_ty.as_ref(),
                     doc_type_raw.as_deref(),
                     doc_ty,
+                );
+                add_null_default(
+                    &mut doc_ty,
+                    native_ty.as_ref(),
+                    p.default.as_ref().filter(|_| !p.by_ref),
                 );
                 doc_ty.from_docblock = true;
                 Self::fill_self_static_parent(doc_ty, class_fqcn)

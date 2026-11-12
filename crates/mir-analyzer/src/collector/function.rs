@@ -187,6 +187,11 @@ impl DefinitionCollector<'_> {
                     doc_type_raw.as_deref(),
                     doc_ty,
                 );
+                super::add_null_default(
+                    &mut doc_ty,
+                    native_ty.as_ref(),
+                    p.default.as_ref().filter(|_| !p.by_ref),
+                );
                 doc_ty.from_docblock = true;
                 doc_ty
             });
