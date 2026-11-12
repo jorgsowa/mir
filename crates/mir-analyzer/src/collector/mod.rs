@@ -233,8 +233,8 @@ fn hook_bit(kind: php_ast::ast::PropertyHookKind) -> u8 {
 }
 
 /// The docblock type describes only values the native hint rules out, so the hint wins:
-/// another scalar family or `null` for a non-null scalar, an object for an array, or vice
-/// versa, or only scalars for an object.
+/// another scalar family, `null`, an array or an object for a non-null scalar, an object for
+/// an array, or vice versa, or only scalars for an object.
 pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
     if doc.types.is_empty() {
         return false;
@@ -264,6 +264,20 @@ pub(crate) fn docblock_contradicts_native(native: &Type, doc: &Type) -> bool {
     let Some(family_check) = native_scalar_family(native) else {
         return false;
     };
+    // `Class::*` constant refs resolve later, possibly to scalars.
+    let non_scalar = |a: &Atomic| {
+        is_array(a)
+            || (is_object(a)
+                && !matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::")))
+    };
+    if doc.types.iter().any(non_scalar)
+        && doc
+            .types
+            .iter()
+            .all(|a| non_scalar(a) || matches!(a, Atomic::TNull))
+    {
+        return true;
+    }
     // Docblock must contain ONLY scalar atoms from other families or null (no mixed/object
     // that could be a union refinement, and none from the hint's own family).
     doc.types.iter().any(is_any_scalar_family)

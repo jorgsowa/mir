@@ -1610,12 +1610,6 @@
       <code><![CDATA[return new TranslatableMarkup($id, $this->processParameters($parameters), $this->getOptions($domain, $locale));]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Validation/Plugin/Validation/Constraint/ClassResolverConstraintValidator.php">
-    <InvalidArgument>
-      <code><![CDATA[$constraint->classOrService]]></code>
-      <code><![CDATA[$constraint->classOrService]]></code>
-    </InvalidArgument>
-  </file>
   <file src="core/lib/Drupal/Core/Validation/Plugin/Validation/Constraint/CountryCodeConstraint.php">
     <InvalidReturnType>
       <code><![CDATA[return new Choice(...$configuration);]]></code>
@@ -1630,18 +1624,6 @@
     <InvalidArgument>
       <code><![CDATA[$this->context->getObject()]]></code>
     </InvalidArgument>
-  </file>
-  <file src="core/modules/announcements_feed/src/AnnounceFetcher.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$announcements === NULL]]></code>
-    </ImpossibleIdenticalComparison>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->tempStore = $temp_store->get('announcements_feed')]]></code>
-    </InvalidPropertyAssignment>
-    <UndefinedMethod>
-      <code><![CDATA[$this->tempStore->setWithExpire('announcements', $announcements,
-        $this->config->get('max_age'))]]></code>
-    </UndefinedMethod>
   </file>
   <file src="core/modules/ban/src/BanIpManager.php">
     <NullableReturnStatement>
@@ -2793,6 +2775,12 @@
     ]);]]></code>
     </InvalidReturnType>
   </file>
+  <file src="core/modules/language/src/Form/ContentLanguageSettingsForm.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $this->t('Content language and translation');]]></code>
+      <code><![CDATA[return $this->t('Content language');]]></code>
+    </InvalidReturnType>
+  </file>
   <file src="core/modules/language/src/Form/LanguageAddForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -3310,6 +3298,11 @@
   <file src="core/modules/migrate/src/Annotation/MigrateSource.php">
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="core/modules/migrate/src/Audit/AuditResult.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $this->reasons;]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/migrate/src/Controller/MigrateMessageController.php">

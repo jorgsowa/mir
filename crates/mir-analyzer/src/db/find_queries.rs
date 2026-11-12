@@ -2036,7 +2036,27 @@ fn property_in_chain<'db>(
             prop.native_ty.as_deref(),
         )));
     }
+    if let (Some(ty), Some(native)) = (prop.ty.as_deref(), prop.native_ty.as_ref()) {
+        if class_docblock_contradicts_native(db, ty, native) {
+            prop.ty = Some(native.clone());
+        }
+    }
     Some((owner, prop))
+}
+
+/// A `@var` class that isn't a subtype of the native class hint can't hold, so the hint wins.
+fn class_docblock_contradicts_native(db: &dyn MirDatabase, doc: &Type, native: &Type) -> bool {
+    let known_classes = |t: &Type| {
+        !t.types.is_empty()
+            && t.types.iter().all(|a| match a {
+                Atomic::TNamedObject { fqcn, type_params } => {
+                    type_params.is_empty() && crate::db::class_exists(db, fqcn.as_ref())
+                }
+                _ => false,
+            })
+    };
+    let (doc, native) = (doc.remove_null(), native.remove_null());
+    known_classes(&doc) && known_classes(&native) && !crate::subtype::is_subtype(db, &doc, &native)
 }
 
 fn find_property_in_chain_uncached<'db>(
