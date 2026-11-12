@@ -1033,11 +1033,6 @@
       <code><![CDATA[$matches[1]]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToTimestampTransformer.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$value]]></code>
-    </ImplicitFloatToIntCast>
-  </file>
   <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/NumberToLocalizedStringTransformer.php">
     <InvalidArgument>
       <code><![CDATA[$this->grouping]]></code>
@@ -1449,11 +1444,6 @@
       <code><![CDATA[return $id;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Messenger/Command/ConsumeMessagesCommand.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$limit]]></code>
-    </ImplicitFloatToIntCast>
-  </file>
   <file src="src/Symfony/Component/Messenger/DependencyInjection/MessengerPass.php">
     <NullableReturnStatement>
       <code><![CDATA[return $definition->getClass();]]></code>
@@ -1621,9 +1611,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/PropertyAccess/PropertyAccessor.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$defaultLifetime / 5]]></code>
-    </ImplicitFloatToIntCast>
     <NullableReturnStatement>
       <code><![CDATA[return $this->writePropertyCache[$key] = $mutator;]]></code>
     </NullableReturnStatement>
@@ -1706,12 +1693,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->tokenIds = array_flip($tokenIds)]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Security/Http/Authenticator/X509Authenticator.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[hexdec(substr($dn, $i + 1, 2))]]></code>
-      <code><![CDATA[hexdec(substr($dn, $i + 2, 2))]]></code>
-    </ImplicitFloatToIntCast>
   </file>
   <file src="src/Symfony/Component/Security/Http/Firewall/ContextListener.php">
     <UndefinedClass>
@@ -1813,11 +1794,6 @@
       <code><![CDATA[return $version->nodeValue;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/Tui/Render/LayoutEngine.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$total]]></code>
-    </ImplicitFloatToIntCast>
-  </file>
   <file src="src/Symfony/Component/Tui/Style/Style.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->ansiPrefix;]]></code>
@@ -1884,9 +1860,6 @@
     </TooFewArguments>
   </file>
   <file src="src/Symfony/Component/Uid/UuidV6.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[10000 * hexdec(substr($uuid, 20, 3)) + substr($time, -4)]]></code>
-    </ImplicitFloatToIntCast>
     <InvalidArgument>
       <code><![CDATA[$ms]]></code>
     </InvalidArgument>
@@ -2056,13 +2029,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $value;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Yaml/Unescaper.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[hexdec(substr($value, 2, 2))]]></code>
-      <code><![CDATA[hexdec(substr($value, 2, 4))]]></code>
-      <code><![CDATA[hexdec(substr($value, 2, 8))]]></code>
-    </ImplicitFloatToIntCast>
   </file>
   <file src="src/Symfony/Contracts/HttpClient/Test/Fixtures/web/index.php">
     <TaintedHeader>

@@ -1002,12 +1002,6 @@
       <code><![CDATA[$delta]]></code>
     </InvalidArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldType/DecimalItem.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$max]]></code>
-      <code><![CDATA[$min]]></code>
-    </ImplicitFloatToIntCast>
-  </file>
   <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldWidget/OptionsButtonsWidget.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->t('N/A');]]></code>
@@ -1171,12 +1165,6 @@
       <code><![CDATA[return new TranslatableMarkup('Unknown');]]></code>
       <code><![CDATA[return new TranslatableMarkup('Unknown (@langcode)', ['@langcode' => $langcode]);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Layout/Icon/SvgIconBuilder.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$row_height]]></code>
-      <code><![CDATA[$column_width]]></code>
-    </ImplicitFloatToIntCast>
   </file>
   <file src="core/lib/Drupal/Core/Layout/LayoutDefinition.php">
     <InvalidReturnType>
@@ -1669,13 +1657,6 @@
     <InvalidArgument>
       <code><![CDATA[TRUE]]></code>
     </InvalidArgument>
-  </file>
-  <file src="core/modules/big_pipe/src/Hook/BigPipeHooks.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[Url::fromRoute('big_pipe.nojs', [], [
-                'query' => \Drupal::service('redirect.destination')->getAsArray(),
-              ])->toString()]]></code>
-    </ImplicitToStringCast>
   </file>
   <file src="core/modules/big_pipe/src/Render/BigPipe.php">
     <UndefinedMethod>
@@ -3984,9 +3965,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/sqlite/src/Driver/Database/sqlite/Install/Tasks.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[\Drupal::getContainer()->getParameter('site.path')]]></code>
-    </ImplicitToStringCast>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('SQLite');]]></code>
     </InvalidReturnType>
@@ -3998,11 +3976,6 @@
     <NullArgument>
       <code><![CDATA[NULL]]></code>
     </NullArgument>
-  </file>
-  <file src="core/modules/system/src/Command/StatusCommand.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[Url::fromRoute('<front>')->setAbsolute()->toString()]]></code>
-    </ImplicitToStringCast>
   </file>
   <file src="core/modules/system/src/Controller/AssetControllerBase.php">
     <TaintedFile>
@@ -4137,10 +4110,6 @@
     </InvalidArgument>
   </file>
   <file src="core/modules/system/src/Hook/SystemRequirementsHooks.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[$site_path]]></code>
-      <code><![CDATA[$site_path]]></code>
-    </ImplicitToStringCast>
     <InvalidStringClass>
       <code><![CDATA[$class]]></code>
     </InvalidStringClass>
@@ -4204,9 +4173,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/system/src/Theme/BatchNegotiator.php">
-    <ImplicitFloatToIntCast>
-      <code><![CDATA[$request->request->get('id')]]></code>
-    </ImplicitFloatToIntCast>
     <UndefinedFunction>
       <code><![CDATA[batch_get()]]></code>
     </UndefinedFunction>
@@ -4279,12 +4245,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/update/src/Hook/UpdateHooks.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[Url::fromRoute('update.status', [], [
-      'absolute' => TRUE,
-      'language' => $language,
-    ])->toString()]]></code>
-    </ImplicitToStringCast>
     <UndefinedFunction>
       <code><![CDATA[update_storage_clear()]]></code>
       <code><![CDATA[update_storage_clear()]]></code>
@@ -4708,11 +4668,6 @@
       <code><![CDATA[$this->view->result]]></code>
     </TooManyArguments>
   </file>
-  <file src="core/modules/views/src/Plugin/views/display/PathPluginBase.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[Url::fromRoute('<none>', [], ['absolute' => TRUE])->toString()]]></code>
-    </ImplicitToStringCast>
-  </file>
   <file src="core/modules/views/src/Plugin/views/field/Boolean.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$options]]></code>
@@ -4732,16 +4687,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/views/src/Plugin/views/field/Date.php">
-    <ImplicitToStringCast>
-      <code><![CDATA[$this->dateFormatter->formatTimeDiffSince($value, [
-            'strict' => FALSE,
-            'granularity' => is_numeric($custom_format) ? $custom_format : 2,
-          ])]]></code>
-      <code><![CDATA[$this->dateFormatter->formatTimeDiffSince($value, [
-            'strict' => FALSE,
-            'granularity' => is_numeric($custom_format) ? $custom_format : 2,
-          ])]]></code>
-    </ImplicitToStringCast>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>

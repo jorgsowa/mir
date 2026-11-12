@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Concatenating a union where only some members are objects without `__toString()` (`string|GeneratedUrl`) is `PossiblyInvalidOperand` instead of `ImplicitToStringCast`, and `int|float` passed to an `int` parameter in a non-strict file is `PossiblyInvalidArgument` instead of `ImplicitFloatToIntCast`.
 - `+` between two operands that may both be arrays (`array + (array|Definition)`, `array + ?array`) is `PossiblyInvalidOperand`, or `PossiblyNullOperand` when the only non-array member is `null`, instead of `InvalidOperand`.
 - A comparison that only a docblock type makes impossible (`@param`, `@return`, a `@var` property, or a type merged with one) is `DocblockTypeContradiction` instead of `ImpossibleIdenticalComparison` / `ImpossibleLooseComparison`, since the check may guard against a wrong docblock.
 - An `object` assigned to a class-typed property is `PropertyTypeCoercion` instead of `InvalidPropertyAssignment`, and after any property coercion the property holds its declared type, so a lazily initialized `?T` property returned as `T` is no longer `NullableReturnStatement`.

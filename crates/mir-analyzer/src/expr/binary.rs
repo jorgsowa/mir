@@ -337,10 +337,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             BinaryOp::Concat => {
                 self.record_namespace_prefix_ref(&left_ty, b.left.span);
-                self.check_implicit_to_string_cast(&left_ty, b.left.span);
-                self.check_implicit_to_string_cast(&right_ty, b.right.span);
-                // Flag when a union member is an array (not stringifiable).
-                if operand_has_any_array_member(&left_ty) || operand_has_any_array_member(&right_ty)
+                let partial_left = self.check_implicit_to_string_cast(&left_ty, b.left.span);
+                let partial_right = self.check_implicit_to_string_cast(&right_ty, b.right.span);
+                // Flag when a union member is an array or an object without `__toString()`.
+                if partial_left
+                    || partial_right
+                    || operand_has_any_array_member(&left_ty)
+                    || operand_has_any_array_member(&right_ty)
                 {
                     self.emit(
                         IssueKind::PossiblyInvalidOperand {
@@ -561,31 +564,36 @@ impl<'a> ExpressionAnalyzer<'a> {
             })
     }
 
-    fn check_implicit_to_string_cast(&mut self, ty: &Type, span: Span) {
+    /// Reports objects that can't be cast to string; true when only some members are such objects.
+    fn check_implicit_to_string_cast(&mut self, ty: &Type, span: Span) -> bool {
         let ty = crate::subtype::canonical_enum_cases(self.db, ty);
-        for atomic in &ty.types {
-            // A non-Stringable enum concatenated implicitly is a guaranteed PHP
-            // fatal ("Object of class X could not be converted to string"),
-            // same as any other non-Stringable object.
-            let fqcn = match atomic {
-                Atomic::TNamedObject { fqcn, .. } => Some(fqcn),
-                Atomic::TLiteralEnumCase { enum_fqcn, .. } => Some(enum_fqcn),
+        // A non-Stringable object or enum concatenated is a PHP fatal.
+        let non_stringable: Vec<&str> = ty
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                Atomic::TNamedObject { fqcn, .. } => Some(fqcn.as_ref()),
+                Atomic::TLiteralEnumCase { enum_fqcn, .. } => Some(enum_fqcn.as_ref()),
                 _ => None,
-            };
-            let Some(fqcn) = fqcn else { continue };
-            let fqcn_str = fqcn.as_ref();
-            if !crate::db::has_method_in_chain(self.db, fqcn_str, "__toString")
-                && !crate::db::extends_or_implements(self.db, fqcn_str, "Stringable")
-            {
-                self.emit(
-                    IssueKind::ImplicitToStringCast {
-                        class: fqcn_str.to_string(),
-                    },
-                    Severity::Warning,
-                    span,
-                );
-            }
+            })
+            .filter(|fqcn| {
+                !crate::db::has_method_in_chain(self.db, fqcn, "__toString")
+                    && !crate::db::extends_or_implements(self.db, fqcn, "Stringable")
+            })
+            .collect();
+        if non_stringable.len() < ty.types.len() && !non_stringable.is_empty() {
+            return true;
         }
+        for fqcn in non_stringable {
+            self.emit(
+                IssueKind::ImplicitToStringCast {
+                    class: fqcn.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
+        }
+        false
     }
 }
 

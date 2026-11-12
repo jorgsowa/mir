@@ -407,13 +407,33 @@ pub(crate) fn check_one(
         && param_ty.contains(|t| t.is_int())
         && !ea.strict_types
     {
-        ea.emit(
-            IssueKind::ImplicitFloatToIntCast {
-                from: arg_ty.to_string(),
-            },
-            Severity::Warning,
-            arg_span,
-        );
+        // `int|float` (`hexdec()`, division) is a float only on some paths.
+        let partly_float = arg_ty.types.iter().any(|t| {
+            !matches!(
+                t,
+                Atomic::TFloat | Atomic::TLiteralFloat(..) | Atomic::TIntegralFloat | Atomic::TNull
+            )
+        });
+        if partly_float {
+            ea.emit(
+                IssueKind::PossiblyInvalidArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("{param_ty}"),
+                    actual: arg_display,
+                },
+                Severity::Info,
+                arg_span,
+            );
+        } else {
+            ea.emit(
+                IssueKind::ImplicitFloatToIntCast {
+                    from: arg_ty.to_string(),
+                },
+                Severity::Warning,
+                arg_span,
+            );
+        }
         return;
     }
 
