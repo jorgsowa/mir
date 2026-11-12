@@ -735,11 +735,6 @@
       <code><![CDATA[return $this->t('Delete %label', ['%label' => $label]);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Entity/Element/EntityAutocomplete.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$id]]></code>
-    </PossiblyUndefinedVariable>
-  </file>
   <file src="core/lib/Drupal/Core/Entity/Entity/EntityFormDisplay.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->pluginManager = \Drupal::service('plugin.manager.field.widget')]]></code>

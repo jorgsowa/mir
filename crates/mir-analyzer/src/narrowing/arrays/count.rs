@@ -247,6 +247,16 @@ pub(crate) fn narrow_array_count_comparison(
 ) {
     let current = ctx.get_var(arr_var);
     if current.is_mixed() {
+        // A `Countable` object is rare enough that a counted mixed value is taken as an array.
+        if count_or_strlen_emptiness(op, n, is_true) == Some(true) {
+            ctx.set_var(
+                arr_var,
+                Type::single(Atomic::TNonEmptyArray {
+                    key: Box::new(Type::array_key()),
+                    value: Box::new(Type::mixed()),
+                }),
+            );
+        }
         return;
     }
     // count()/sizeof()/iterator_count() throw a TypeError for a null

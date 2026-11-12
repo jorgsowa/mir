@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReflectionClass::newInstanceArgs()` returns an instance of the reflected class instead of `T|null`.
 - `pow()` on int and float operands is typed like `**`, and `**` folds two int literals: `pow(10, 8)` is `100000000` instead of `object|int|float`.
 - `array_keys($a['k'])` carries the taint of the keys written under `$a['k']` instead of the taint of its values. A tainted key written there (`$a['k'][$_GET['x']] = …`) is now reported.
+- `count($mixed) > 0` narrows the value to a non-empty array, so a later `foreach` over it is known to run.
 
 ## [0.99.0] - 2026-11-12
 
