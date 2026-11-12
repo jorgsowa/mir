@@ -3099,9 +3099,8 @@ fn property_refinement(
         return Some(assigned.clone());
     }
     // A coercion that doesn't throw leaves a value of the declared type.
-    (!assigned.is_nullable()
-        && is_property_type_coercion(assigned, declared, db))
-    .then(|| declared.remove_null())
+    (!assigned.is_nullable() && is_property_type_coercion(assigned, declared, db))
+        .then(|| declared.remove_null())
 }
 
 /// Built-in classes PHP declares `@strict-properties` (`ZEND_ACC_NO_DYNAMIC_PROPERTIES`):
