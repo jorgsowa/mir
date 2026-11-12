@@ -154,6 +154,7 @@ fn resolve_conditional_dyn(
     lookup: &dyn Fn(&str) -> Option<mir_types::Type>,
 ) -> mir_types::Type {
     let mut resolved = mir_types::Type::empty();
+    resolved.from_docblock = ty.from_docblock;
     for atomic in ty.types {
         let mir_types::Atomic::TConditional { data } = &atomic else {
             resolved.add_type(atomic);

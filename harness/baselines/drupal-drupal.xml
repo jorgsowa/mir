@@ -6,9 +6,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/lib/Drupal/Component/Annotation/Doctrine/DocParser.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[self::$metadataParser === null]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->lexer = new DocLexer]]></code>
       <code><![CDATA[$this->target = $target]]></code>
@@ -101,11 +98,6 @@
       <code><![CDATA[$node->setAttribute('srcset', implode(', ', $image_candidate_strings))]]></code>
     </UndefinedMethod>
   </file>
-  <file src="core/lib/Drupal/Component/Utility/Number.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[NULL === $string]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/lib/Drupal/Component/Uuid/Com.php">
     <UndefinedFunction>
       <code><![CDATA[com_create_guid()]]></code>
@@ -128,11 +120,6 @@
     <UndefinedMethod>
       <code><![CDATA[$this->tempStore->set($this->currentUser->id() . ':' . $this->getPluginDefinition()['type'], $selection)]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="core/lib/Drupal/Core/Ajax/AnnounceCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->priority !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Archiver/ArchiverManager.php">
     <InvalidReturnType>
@@ -219,7 +206,6 @@
   <file src="core/lib/Drupal/Core/Cache/ChainedFastBackend.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$last_write_timestamp === 0]]></code>
-      <code><![CDATA[$this->lastWriteTimestamp === NULL]]></code>
     </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Cache/Context/AccountPermissionsCacheContext.php">
@@ -636,21 +622,12 @@
     </InvalidOperand>
   </file>
   <file src="core/lib/Drupal/Core/DependencyInjection/YamlFileLoader.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[null === $service]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[return $content;]]></code>
       <code><![CDATA[return new ServiceClosureArgument($argument);]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/DrupalKernel.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$app_root === NULL]]></code>
-      <code><![CDATA[$app_root === NULL]]></code>
-      <code><![CDATA[$app_root === NULL]]></code>
-      <code><![CDATA[$class_loader === NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$container]]></code>
       <code><![CDATA[$container]]></code>
@@ -994,11 +971,6 @@
       <code><![CDATA[$minor_version]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/lib/Drupal/Core/Extension/InfoParser.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[FileCacheFactory::getPrefix() !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/lib/Drupal/Core/Extension/ModuleHandler.php">
     <InvalidTemplateParam>
       <code><![CDATA[array_keys($modules_by_identifier)]]></code>
@@ -1193,11 +1165,6 @@
       <code><![CDATA[return $this->getRequest()->headers->get('HX-Trigger', '');]]></code>
       <code><![CDATA[return $this->getRequest()->headers->get('HX-Trigger-Name', '');]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/lib/Drupal/Core/Image/ImageFactory.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->toolkitId === NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Installer/Form/SelectLanguageForm.php">
     <UndefinedFunction>
@@ -1455,8 +1422,6 @@
       <code><![CDATA[$attribute->requirements !== NULL]]></code>
       <code><![CDATA[$attribute->options !== NULL]]></code>
       <code><![CDATA[$attribute->defaults !== NULL]]></code>
-      <code><![CDATA[$attribute->schemes !== NULL]]></code>
-      <code><![CDATA[$attribute->methods !== NULL]]></code>
     </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Routing/ContentTypeHeaderMatcher.php">
@@ -1493,11 +1458,6 @@
       <code><![CDATA[$session_data]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/lib/Drupal/Core/Site/Settings.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[self::$instance === NULL]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/lib/Drupal/Core/Site/SettingsEditor.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$index]]></code>
@@ -1516,11 +1476,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return static::basePath();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/lib/Drupal/Core/StreamWrapper/PublicStream.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$site_path === NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/StreamWrapper/StreamWrapperManager.php">
     <NullableReturnStatement>
@@ -1598,11 +1553,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->lockId = $matches[1]]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/Test/TestDiscovery.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$doc_comment === NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Test/TestKernel.php">
     <NullArgument>
@@ -1692,9 +1642,6 @@
     </UndefinedProperty>
   </file>
   <file src="core/lib/Drupal/Core/TypedData/Validation/RecursiveContextualValidator.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$groups !== Constraint::DEFAULT_GROUP]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[$propertyName]]></code>
       <code><![CDATA[$property_name]]></code>
@@ -1703,8 +1650,8 @@
   <file src="core/lib/Drupal/Core/Update/UpdateHookRegistry.php">
     <InvalidArrayOffset>
       <code><![CDATA[$module]]></code>
-      <code><![CDATA[$module]]></code>
       <code><![CDATA[$ran_update_number]]></code>
+      <code><![CDATA[$module]]></code>
       <code><![CDATA[$version]]></code>
     </InvalidArrayOffset>
     <InvalidPropertyAssignment>
@@ -2107,11 +2054,6 @@
     });]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/content_translation/src/Access/ContentTranslationManageAccessCheck.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$language !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/modules/content_translation/src/ContentTranslationHandler.php">
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
@@ -2178,11 +2120,6 @@
       <code><![CDATA[$day]]></code>
     </InvalidArgument>
   </file>
-  <file src="core/modules/datetime/src/Plugin/Validation/Constraint/DateTimeFormatConstraintValidator.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$date === NULL]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/modules/dblog/src/Controller/DbLogController.php">
     <UndefinedConstant>
       <code><![CDATA[RESPONSIVE_PRIORITY_MEDIUM]]></code>
@@ -2202,9 +2139,6 @@
     </UndefinedProperty>
   </file>
   <file src="core/modules/editor/src/Entity/Editor.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->format !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[return array_keys(\Drupal::service('stream_wrapper_manager')->getNames(StreamWrapperInterface::WRITE_VISIBLE));]]></code>
     </InvalidReturnType>
@@ -2316,11 +2250,6 @@
       <code><![CDATA[]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/file/src/ComputedFileUrl.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->url !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/modules/file/src/Controller/FileWidgetAjaxController.php">
     <UndefinedFunction>
       <code><![CDATA[uploadprogress_get_info($key)]]></code>
@@ -2363,11 +2292,6 @@
     <TooManyArguments>
       <code><![CDATA[FALSE]]></code>
     </TooManyArguments>
-  </file>
-  <file src="core/modules/file/src/Plugin/views/field/File.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$data !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/modules/file/src/Upload/FileUploadHandler.php">
     <InvalidReturnType>
@@ -2787,9 +2711,6 @@
     </UndefinedConstant>
   </file>
   <file src="core/modules/history/src/Plugin/views/field/NodeNewComments.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$data !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
@@ -2830,10 +2751,6 @@
     </ImplicitFloatToIntCast>
   </file>
   <file src="core/modules/jsonapi/src/Access/TemporaryQueryGuard.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[static::$fieldManager !== NULL]]></code>
-      <code><![CDATA[static::$moduleHandler !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[$filter->root()]]></code>
     </InvalidArgument>
@@ -2915,9 +2832,6 @@
     </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/jsonapi/src/ResourceType/ResourceType.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$deserialization_target_class === NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidMethodCall>
       <code><![CDATA[$this->fields[$field_name]->getPublicName()]]></code>
       <code><![CDATA[$this->fields[$field_name]->isFieldEnabled()]]></code>
@@ -3026,9 +2940,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/language/src/Plugin/LanguageNegotiation/LanguageNegotiationContentEntity.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->languageManager === NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$langcode]]></code>
     </PossiblyUndefinedVariable>
@@ -3638,11 +3549,6 @@
       <code><![CDATA[$patterns]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/modules/migrate_drupal/src/MigrationPluginManager.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->enforcedSourceModuleTags === NULL]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="core/modules/migrate_drupal_ui/src/Batch/MigrateUpgradeImportBatch.php">
     <InvalidArgument>
       <code><![CDATA[Link::fromTextAndUrl(new TranslatableMarkup('Review the detailed upgrade log'), $url)]]></code>
@@ -3861,11 +3767,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $node->getChangedTime();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/node/src/Plugin/views/field/Node.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$data !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/modules/node/src/Plugin/views/field/NodeBulkForm.php">
     <InvalidReturnType>
@@ -4280,9 +4181,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/system/src/Controller/DbUpdateController.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$severity === RequirementSeverity::Warning]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[$severity]]></code>
     </InvalidArgument>
@@ -5093,9 +4991,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/views/src/Plugin/views/field/NumericField.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$value === 0]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[$value]]></code>
     </InvalidArgument>
@@ -5159,9 +5054,6 @@
     </UndefinedProperty>
   </file>
   <file src="core/modules/views/src/Plugin/views/style/StylePluginBase.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$group_rendered === NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <TaintedCallable>
       <code><![CDATA[$this->getField($index, $field)]]></code>
       <code><![CDATA[$renderer->render($data)]]></code>
@@ -5169,9 +5061,6 @@
     </TaintedCallable>
   </file>
   <file src="core/modules/views/src/Plugin/views/style/Table.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$fields === NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <ImpossibleLooseComparison>
       <code><![CDATA[$field == $column]]></code>
     </ImpossibleLooseComparison>
@@ -5193,9 +5082,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/views/src/ViewExecutable.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$page !== NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[$this->display_handler->output]]></code>
     </InvalidArgument>
@@ -5234,9 +5120,6 @@
     </TooManyArguments>
   </file>
   <file src="core/modules/views/src/Views.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$type === NULL]]></code>
-    </ImpossibleIdenticalComparison>
     <InvalidReturnType>
       <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple();]]></code>
       <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($query);]]></code>
@@ -5324,11 +5207,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/workflows/src/Plugin/WorkflowTypeBase.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$state_ids === NULL]]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="core/modules/workflows/src/Transition.php">
     <InvalidReturnType>

@@ -12,5 +12,5 @@ A non-empty array is always truthy, so it can never be loosely equal to false.
 /** @param non-empty-array<string> $arr */
 function test(array $arr): void {
     if ($arr == false) {}
-//      ^^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'non-empty-array<int|string, string>' and 'false' is always false — these types can never be loosely equal
+//      ^^^^^^^^^^^^^ DocblockTypeContradiction: Type 'non-empty-array<int|string, string>' makes '$arr == false' impossible — this can never hold
 }

@@ -5,11 +5,6 @@
       <code><![CDATA[$cookie->getName() !== null]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Handler/CurlMultiHandler.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[false === $multiHandle]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/RetryMiddleware.php">
     <TooManyArguments>
       <code><![CDATA[$response]]></code>

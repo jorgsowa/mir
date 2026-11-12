@@ -13,5 +13,5 @@ either — null converts to an empty array for the comparison.
 /** @param non-empty-array<string> $arr */
 function test(array $arr): void {
     if ($arr == null) {}
-//      ^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'non-empty-array<int|string, string>' and 'null' is always false — these types can never be loosely equal
+//      ^^^^^^^^^^^^ DocblockTypeContradiction: Type 'non-empty-array<int|string, string>' makes '$arr == null' impossible — this can never hold
 }

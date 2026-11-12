@@ -15,5 +15,5 @@ No integer in the range [1, 100] can loosely equal a non-numeric string in PHP 8
 function test(int $n): void {
     $s = "baz";
     if ($s == $n) {}
-//      ^^^^^^^^ ImpossibleLooseComparison: '==' between '"baz"' and 'int<1, 100>' is always false — these types can never be loosely equal
+//      ^^^^^^^^ DocblockTypeContradiction: Type 'int<1, 100>' makes '$s == $n' impossible — this can never hold
 }

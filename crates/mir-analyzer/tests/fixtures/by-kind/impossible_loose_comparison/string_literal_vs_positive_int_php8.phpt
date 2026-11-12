@@ -15,5 +15,5 @@ No positive integer can ever loosely equal a non-numeric string in PHP 8+.
 function test(int $n): void {
     $s = "foo";
     if ($s == $n) {}
-//      ^^^^^^^^ ImpossibleLooseComparison: '==' between '"foo"' and 'positive-int' is always false — these types can never be loosely equal
+//      ^^^^^^^^ DocblockTypeContradiction: Type 'positive-int' makes '$s == $n' impossible — this can never hold
 }

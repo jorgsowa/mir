@@ -12,5 +12,5 @@ The exemption covers only a bare `false`/`null` comparison: any other literal co
 function other_literal(string $s): bool {
     $part = substr($s, 1);
     return $part === 1;
-//         ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and '1' is always false — these types can never be identical
+//         ^^^^^^^^^^^ DocblockTypeContradiction: Type 'string' makes '$part === 1' impossible — this can never hold
 }

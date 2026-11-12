@@ -22,8 +22,7 @@ isolates this specific fix (see the `RedundantCondition` presence).
 /** @param "a"|"b" $s */
 function varUnionMismatchUnreachable(string $s): void {
     if ($s === 'c') {
-//      ^^^^^^^^^^ DocblockTypeContradiction: Type '"a"|"b"' makes '$s === "c"' impossible — this can never hold
-//      ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
+//      ^^^^^^^^^^ DocblockTypeContradiction: Type '"a"|"b"' makes '$s === 'c'' impossible — this can never hold
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -43,7 +42,7 @@ class Bag {
 
     public function propUnionMismatchUnreachable(): void {
         if ($this->label === 'c') {
-//          ^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
+//          ^^^^^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type '"a"|"b"' makes '$this->label === 'c'' impossible — this can never hold
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -56,7 +55,7 @@ class StaticBag {
 
     public static function staticPropUnionMismatchUnreachable(): void {
         if (self::$label === 'c') {
-//          ^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
+//          ^^^^^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type '"a"|"b"' makes 'self::$label === 'c'' impossible — this can never hold
             /** @mir-check $_ is never */
             $_ = 1;
         }

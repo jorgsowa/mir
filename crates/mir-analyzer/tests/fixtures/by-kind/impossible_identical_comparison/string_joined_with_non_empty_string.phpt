@@ -22,7 +22,7 @@ function reversed(string $plain, string $strict, bool $c): void {
     $x = $c ? $strict : $plain;
     /** @mir-check $x is string */
     if ($x === null) {}
-//      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'null' is always false — these types can never be identical
+//      ^^^^^^^^^^^ DocblockTypeContradiction: Type 'string' makes '$x === null' impossible — this can never hold
 }
 
 /** @param non-empty-string $strict */
@@ -38,5 +38,5 @@ function onlyNonEmpty(string $a, bool $c): void {
     $x = $c ? $a : $a;
     /** @mir-check $x is non-empty-string */
     if ($x === null) {}
-//      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'non-empty-string' and 'null' is always false — these types can never be identical
+//      ^^^^^^^^^^^ DocblockTypeContradiction: Type 'non-empty-string' makes '$x === null' impossible — this can never hold
 }

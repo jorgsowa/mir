@@ -405,7 +405,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             BinaryOp::Identical | BinaryOp::NotIdentical => {
-                if !crate::contradiction::types_can_be_identical(&left_ty, &right_ty) {
+                if !crate::contradiction::types_can_be_identical(&left_ty, &right_ty)
+                    && !self.emit_docblock_contradiction(&left_ty, &right_ty, span)
+                {
                     let op = if b.op == BinaryOp::Identical {
                         "==="
                     } else {
@@ -431,6 +433,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.php_version,
                 ) && !self.stringable_vs_string(&left_ty, &right_ty)
                     && !self.stringable_vs_string(&right_ty, &left_ty)
+                    && !self.emit_docblock_contradiction(&left_ty, &right_ty, span)
                 {
                     let op = if b.op == BinaryOp::Equal { "==" } else { "!=" };
                     self.emit(
@@ -498,6 +501,22 @@ impl<'a> ExpressionAnalyzer<'a> {
             BinaryOp::Instanceof => Type::single(Atomic::TBool),
             _ => Type::mixed(),
         }
+    }
+
+    /// An impossible comparison against a docblock type may still guard against a wrong docblock.
+    fn emit_docblock_contradiction(&mut self, left: &Type, right: &Type, span: Span) -> bool {
+        let Some(declared) = [left, right].into_iter().find(|t| t.from_docblock) else {
+            return false;
+        };
+        self.emit(
+            IssueKind::DocblockTypeContradiction {
+                expr: crate::parser::span_text(self.source, span).unwrap_or_default(),
+                declared: declared.to_string(),
+            },
+            Severity::Info,
+            span,
+        );
+        true
     }
 
     /// A Stringable object loosely compares to a string by its `__toString()` value.

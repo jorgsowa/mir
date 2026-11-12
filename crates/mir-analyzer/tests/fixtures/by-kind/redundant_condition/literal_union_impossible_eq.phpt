@@ -18,7 +18,6 @@ always-false for ===).
  */
 function test_ne_impossible($n): void {
     if ($n !== 5) {
-//      ^^^^^^^^ ImpossibleIdenticalComparison: '!==' between '1|2|3' and '5' is always true — these types can never be identical
         $_ = $n; // always here
     }
 }

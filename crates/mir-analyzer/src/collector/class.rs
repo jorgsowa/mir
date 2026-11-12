@@ -291,7 +291,7 @@ impl<'a> DefinitionCollector<'a> {
                     // keeps TKey/TValue as template params instead of resolving them to
                     // namespaced classes (App\Support\TKey).
                     let doc_ty = prop_doc.var_type.map(|t| {
-                        let resolved = Self::fill_self_static_parent(
+                        let mut resolved = Self::fill_self_static_parent(
                             self.resolve_union_doc_with_templates(
                                 super::expand_aliases_only(t, &type_aliases),
                                 &class_template_names,
@@ -300,6 +300,7 @@ impl<'a> DefinitionCollector<'a> {
                             ),
                             &fqcn,
                         );
+                        resolved.from_docblock = true;
                         // A `@var` refining a nullable native hint but
                         // omitting `|null` must not erase that
                         // nullability — same fix point as the

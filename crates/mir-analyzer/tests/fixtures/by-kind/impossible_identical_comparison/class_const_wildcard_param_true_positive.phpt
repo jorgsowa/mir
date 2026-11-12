@@ -10,6 +10,6 @@ class D {
     /** @param self::MODE_* $mode */
     public function f(int $mode): bool {
         return $mode === self::OTHER;
-//             ^^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '1|2' and '9' is always false — these types can never be identical
+//             ^^^^^^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type '1|2' makes '$mode === self::OTHER' impossible — this can never hold
     }
 }
