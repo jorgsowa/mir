@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Performance: the analysis cache stores each file's class-level check results, so a cached run replays them for files whose result is still valid instead of re-running the checks (unchanged re-run: Laravel about 14% fewer instructions, Symfony about 6%). The cache from an earlier mir build is discarded.
+- Performance: the analysis cache stores each file's class-level check results, so a cached run replays them for files whose result is still valid instead of re-running the checks (unchanged re-run: Laravel about 14% fewer instructions, Symfony about 6%). The cache from an earlier mir build is discarded. Lazy class loading resolves PSR-4 paths only for names the index lacks, saving a file stat per referenced class on every run.
 - A shape parameter written without `...` is sealed: an argument with a key the shape does not declare (`['foo' => 1, 'buz' => 2]` or an `array{foo: int, buz: int}` value for `array{foo: int}`) is `InvalidArgument`. Spell the shape `array{foo: int, ...}` to accept extra keys.
 
 ### Added

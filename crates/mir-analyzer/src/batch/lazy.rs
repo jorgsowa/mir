@@ -60,8 +60,19 @@ impl AnalysisSession {
                 .chain(import_candidates)
                 .filter(|fqcn| !seen.contains(fqcn.as_str()) && seen.insert(fqcn.clone()))
                 .collect();
-            let unresolved: Vec<&String> = unique
+            // Only a name the index lacks may need loading; resolving costs file stats.
+            let unindexed: Vec<&String> = {
+                let db = self.snapshot_db();
+                unique
+                    .iter()
+                    .filter(|fqcn| {
+                        !crate::db::class_like_indexed(&db, crate::db::Fqcn::from_str(&db, fqcn))
+                    })
+                    .collect()
+            };
+            let unresolved: Vec<&String> = unindexed
                 .iter()
+                .copied()
                 .filter(|fqcn| !resolved.contains_key(fqcn.as_str()))
                 .collect();
             let paths: Vec<Option<PathBuf>> = unresolved
@@ -76,12 +87,8 @@ impl AnalysisSession {
                 self.snapshot_db().source_provider()
             };
             if let Some(provider) = provider.as_ref() {
-                let db = self.snapshot_db();
-                let paths: Vec<String> = unique
+                let paths: Vec<String> = unindexed
                     .iter()
-                    .filter(|fqcn| {
-                        !crate::db::class_like_indexed(&db, crate::db::Fqcn::from_str(&db, fqcn))
-                    })
                     .filter_map(|fqcn| resolved[fqcn.as_str()].as_ref())
                     .map(|path| path.to_string_lossy().into_owned())
                     .filter(|path| self.db.lookup_source_file(path).is_none())
@@ -100,8 +107,11 @@ impl AnalysisSession {
                     if exists {
                         continue;
                     }
-                    if let Some(path) = &resolved[fqcn.as_str()] {
-                        let path = path.clone();
+                    let path = resolved
+                        .entry(fqcn.clone())
+                        .or_insert_with(|| psr4.resolve(&fqcn))
+                        .clone();
+                    if let Some(path) = path {
                         to_load.push((fqcn, path));
                     }
                 }
