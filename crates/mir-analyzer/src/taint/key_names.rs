@@ -31,6 +31,7 @@ pub fn exact_key_names(
         ExprKind::Variable(var) => ctx
             .has_exact_keys(var)
             .then(|| ctx.key_names_taint(var.trim_start_matches('$'))),
+        ExprKind::ArrayAccess(aa) => exact_element_key_names(&aa.array, ctx, db, file),
         ExprKind::Array(elements) => {
             let mut keys = Taint::NONE;
             for element in elements {
@@ -46,14 +47,48 @@ pub fn exact_key_names(
         ExprKind::FunctionCall(_)
         | ExprKind::MethodCall(_)
         | ExprKind::NullsafeMethodCall(_)
-        | ExprKind::StaticMethodCall(_) => call_keys_taint(expr, ctx, db, file),
+        | ExprKind::StaticMethodCall(_) => call_keys_taint(expr, false, ctx, db, file),
         _ => None,
     }
 }
 
-/// Key names the array a call to user code returns carries, from the callee's summary.
+/// Taint of the key names of the arrays held by the elements of the array `expr` evaluates to.
+pub fn exact_element_key_names(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Option<Taint> {
+    let expr = unwrap_parens(expr);
+    match &expr.kind {
+        ExprKind::Variable(var) => ctx
+            .has_exact_keys(var)
+            .then(|| ctx.element_key_names_taint(var)),
+        ExprKind::Array(elements) => {
+            let mut keys = Taint::NONE;
+            for element in elements {
+                if element.is_spread() {
+                    return None;
+                }
+                let value = element.value();
+                keys |= exact_key_names(value, ctx, db, file)
+                    .unwrap_or_else(|| expr_taint(value, ctx, db, file));
+            }
+            Some(keys)
+        }
+        ExprKind::FunctionCall(_)
+        | ExprKind::MethodCall(_)
+        | ExprKind::NullsafeMethodCall(_)
+        | ExprKind::StaticMethodCall(_) => call_keys_taint(expr, true, ctx, db, file),
+        _ => None,
+    }
+}
+
+/// Key names the array a call to user code returns carries, or with `elements` the key names
+/// of the arrays its elements hold, from the callee's summary.
 fn call_keys_taint(
     call: &Expr,
+    elements: bool,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
@@ -75,11 +110,10 @@ fn call_keys_taint(
             if expr_taint(call, ctx, db, file).is_empty() {
                 return Some(Taint::NONE);
             }
-            summary_keys(crate::db::function_taint_summary(
-                db,
-                file,
-                func.fqn.as_ref(),
-            )?)
+            summary_keys(
+                crate::db::function_taint_summary(db, file, func.fqn.as_ref())?,
+                elements,
+            )
         }
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             let ExprKind::Identifier(method_name) = &mc.method.kind else {
@@ -104,6 +138,7 @@ fn call_keys_taint(
                     &mc.args,
                     Some(&mc.object),
                     false,
+                    elements,
                     ctx,
                     db,
                     file,
@@ -136,6 +171,7 @@ fn call_keys_taint(
                 &smc.args,
                 this_receiver.as_ref(),
                 false,
+                elements,
                 ctx,
                 db,
                 file,
@@ -145,8 +181,13 @@ fn call_keys_taint(
     }
 }
 
-fn summary_keys(summary: TaintSummary) -> Option<Taint> {
-    match summary.return_keys {
+fn summary_keys(summary: TaintSummary, elements: bool) -> Option<Taint> {
+    let keys = if elements {
+        summary.return_element_keys
+    } else {
+        summary.return_keys
+    };
+    match keys {
         ReturnKeys::Exact(keys) => Some(keys),
         _ => None,
     }
@@ -160,6 +201,7 @@ fn method_keys(
     args: &[php_ast::owned::Arg],
     receiver: Option<&Expr>,
     dispatched: bool,
+    elements: bool,
     ctx: &FlowState,
     db: &dyn crate::db::MirDatabase,
     file: &str,
@@ -175,7 +217,18 @@ fn method_keys(
             .iter()
             .try_fold(Taint::NONE, |acc, implementor| {
                 let here = crate::db::Fqcn::from_str(db, implementor.as_str());
-                Some(acc | method_keys(here, method_lower, args, receiver, true, ctx, db, file)?)
+                let keys = method_keys(
+                    here,
+                    method_lower,
+                    args,
+                    receiver,
+                    true,
+                    elements,
+                    ctx,
+                    db,
+                    file,
+                )?;
+                Some(acc | keys)
             });
     }
     let whole = method_call_taint(
@@ -198,10 +251,8 @@ fn method_keys(
     if !summarized {
         return None;
     }
-    summary_keys(crate::db::method_taint_summary(
-        db,
-        file,
-        owner.as_ref(),
-        method_lower,
-    )?)
+    summary_keys(
+        crate::db::method_taint_summary(db, file, owner.as_ref(), method_lower)?,
+        elements,
+    )
 }

@@ -233,6 +233,8 @@ impl<'a> StatementsAnalyzer<'a> {
                     .record_return(crate::taint::Taint::NONE, crate::taint::Taint::NONE);
                 self.taint_summary
                     .record_return_keys(Some(crate::taint::Taint::NONE));
+                self.taint_summary
+                    .record_return_element_keys(Some(crate::taint::Taint::NONE));
             } else {
                 let returned = crate::taint::expr_taint(expr, ctx, self.db, &self.file);
                 let parts = crate::taint::param_parts(expr, ctx, self.db, &self.file);
@@ -249,6 +251,9 @@ impl<'a> StatementsAnalyzer<'a> {
                             .then_some(crate::taint::Taint::NONE)
                     });
                 self.taint_summary.record_return_keys(keys);
+                self.taint_summary.record_return_element_keys(
+                    crate::taint::exact_element_key_names(expr, ctx, self.db, &self.file),
+                );
             }
 
             // If there's a bare `@var Type` (no variable name) on the return statement,

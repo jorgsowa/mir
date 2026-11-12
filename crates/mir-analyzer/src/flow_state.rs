@@ -70,6 +70,10 @@ impl PartialEq for StoredCheck {
     }
 }
 
+fn element_keys_name(name: &str) -> String {
+    format!("{}[]", name.trim_start_matches('$'))
+}
+
 /// A condition on a plain variable that guarded definitions are keyed on.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Guard {
@@ -1918,8 +1922,22 @@ impl FlowState {
         self.taint_key_names(name, taint);
     }
 
+    /// Taint of the key names of the arrays `$name`'s elements hold, kept as `name[]`.
+    pub fn element_key_names_taint(&self, name: &str) -> Taint {
+        self.key_names_taint(&element_keys_name(name))
+    }
+
+    pub fn taint_element_key_names(&mut self, name: &str, taint: Taint) {
+        self.taint_key_names(&element_keys_name(name), taint);
+    }
+
+    pub fn set_element_key_names(&mut self, name: &str, taint: Taint) {
+        self.set_key_names(&element_keys_name(name), taint);
+    }
+
     /// `$to` holds a copy of `$from`'s keys.
     pub fn copy_key_names(&mut self, from: &str, to: &str) {
+        self.set_element_key_names(to, self.element_key_names_taint(from));
         let taint = self.key_names_taint(from);
         remove_entry(&mut self.key_names, &Name::from(to.trim_start_matches('$')));
         self.taint_key_names(to, taint);

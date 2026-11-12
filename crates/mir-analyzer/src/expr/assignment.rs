@@ -186,6 +186,10 @@ fn taint_array_element_write(
                 if let (None, Some(index)) = (key, inner.index.as_ref()) {
                     ctx.taint_key_names(name, crate::taint::expr_taint(index, ctx, db, file));
                 }
+                if let Some(index) = aa.index.as_ref() {
+                    let taint = crate::taint::expr_taint(index, ctx, db, file);
+                    ctx.taint_element_key_names(name, taint);
+                }
             }
             _ => taint_array_write_base(&aa.array, ctx, db, file, taint),
         },
@@ -694,6 +698,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some(keys) = exact_keys {
                             ctx.mark_exact_keys(name);
                             ctx.set_key_names(name, keys);
+                            let element_keys = crate::taint::exact_element_key_names(
+                                &a.value, ctx, self.db, &self.file,
+                            )
+                            .unwrap_or(rhs_taint);
+                            ctx.set_element_key_names(name, element_keys);
                         }
                         if let Some(trail) = trail {
                             std::sync::Arc::make_mut(&mut ctx.taint_trails).insert(
@@ -749,6 +758,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let stored = rhs_taint
                             | crate::taint::held_prop_taint(&a.value, ctx, self.db, &self.file);
                         taint_array_element_write(aa, ctx, self.db, &self.file, stored, true);
+                        let may_be_array = rhs_ty.is_mixed()
+                            || rhs_ty.types.iter().any(mir_types::Atomic::is_array);
+                        if let (true, ExprKind::Variable(base)) = (may_be_array, &aa.array.kind) {
+                            let keys =
+                                crate::taint::exact_key_names(&a.value, ctx, self.db, &self.file)
+                                    .unwrap_or(stored);
+                            ctx.taint_element_key_names(base, keys);
+                        }
                     }
                     // `self::$prop = $tainted;` / `Foo::$prop = $tainted;` —
                     // static properties were entirely untracked for taint,
