@@ -22,7 +22,7 @@ function listInList(array $x): array { return $x; }
 
 /** @param array<string, list<Animal>> $x @return array<string, list<Cat>> */
 function narrowingIsStillRejected(array $x): array { return $x; }
-//                                                   ^^^^^^^^^^ InvalidReturnType: Return type 'array<string, list<Animal>>' is not compatible with declared 'array<string, list<Cat>>'
+//                                                   ^^^^^^^^^^ LessSpecificReturnStatement: Return type 'array<string, list<Animal>>' is less specific than declared 'array<string, list<Cat>>'
 
 /** @param array<string, list<Cat>> $x @return array<int, list<Animal>> */
 function outerKeyMismatchIsStillRejected(array $x): array { return $x; }

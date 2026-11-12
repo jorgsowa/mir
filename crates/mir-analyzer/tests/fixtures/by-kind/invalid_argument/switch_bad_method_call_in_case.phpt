@@ -13,6 +13,6 @@ function f(string $p): void { }
 switch (true) {
     case $q = (bool) rand(0,1):
         f($q); // this type problem is not detected
-//        ^^ InvalidArgument: Argument $p of f() expects 'string', got 'bool'
+//        ^^ InvalidScalarArgument: Argument $p of f() expects 'string', got scalar 'bool'
         break;
 }

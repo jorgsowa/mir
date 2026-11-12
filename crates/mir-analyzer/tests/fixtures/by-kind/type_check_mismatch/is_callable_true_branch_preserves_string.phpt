@@ -23,7 +23,7 @@ function test_string_branch_alive(string $fn): void {
         // Branch must be reachable: $fn is string so needs_int fires.
         // Before fix: branch diverges → suppressed → test fails.
         needs_int($fn);
-//                ^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'string'
+//                ^^^ InvalidScalarArgument: Argument $i of needs_int() expects 'int', got scalar 'string'
     }
 }
 
@@ -41,7 +41,7 @@ function test_int_dropped_string_kept(mixed $x): void {
         // After fix: $x is string (int dropped). needs_int(string) fires.
         // Before fix: branch diverges → suppressed → test fails.
         needs_int($x);
-//                ^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'string'
+//                ^^ InvalidScalarArgument: Argument $i of needs_int() expects 'int', got scalar 'string'
     }
 }
 

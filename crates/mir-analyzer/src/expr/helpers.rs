@@ -1743,6 +1743,40 @@ fn is_generic_array_coercion(
         })
 }
 
+/// A generic array whose key or value type is a supertype of the expected one
+/// (`array<array-key, Entity>` for `array<string, Role>`): it may still fit at runtime.
+pub(crate) fn is_supertype_array(
+    value: &Type,
+    expected: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> bool {
+    let generic = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TNonEmptyList { .. }
+        )
+    };
+    let non_empty = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+        )
+    };
+    let expected = expected.remove_null();
+    match (value.types.as_slice(), expected.types.as_slice()) {
+        ([v], [e]) => {
+            generic(v)
+                && generic(e)
+                && (non_empty(v) || !non_empty(e))
+                && is_subtype(db, &expected, value)
+        }
+        _ => false,
+    }
+}
+
 fn is_array_like(atom: &Atomic) -> bool {
     matches!(
         atom,
@@ -1767,7 +1801,10 @@ fn is_atom_property_coercion(
                 .iter()
                 .any(|p| matches!(p, Atomic::TNamedObject { .. }))
         }
-        a => return is_generic_array_coercion(a, prop_ty, db),
+        a => {
+            return is_generic_array_coercion(a, prop_ty, db)
+                || is_supertype_array(&Type::single(a.clone()), prop_ty, db)
+        }
     };
     prop_ty.types.iter().any(|p| {
         let prop_fqcn = match p {

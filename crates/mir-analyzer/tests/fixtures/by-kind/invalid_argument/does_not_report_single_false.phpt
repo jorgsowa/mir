@@ -11,5 +11,5 @@ does not report single false
 function takesInt(int $n): void { var_dump($n); }
 function test(): void {
     takesInt(false);
-//           ^^^^^ InvalidArgument: Argument $n of takesInt() expects 'int', got 'false'
+//           ^^^^^ InvalidScalarArgument: Argument $n of takesInt() expects 'int', got scalar 'false'
 }

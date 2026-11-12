@@ -174,9 +174,20 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_return_type/`.
     InvalidReturnType { expected: String, actual: String },
+    /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/less_specific_return_statement/`.
+    LessSpecificReturnStatement { expected: String, actual: String },
     /// Emitted by `mir-analyzer/src/call/args.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/`.
     InvalidArgument {
+        param: String,
+        fn_name: String,
+        expected: String,
+        actual: String,
+    },
+    /// Emitted by `mir-analyzer/src/call/args/types.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_scalar_argument/`.
+    InvalidScalarArgument {
         param: String,
         fn_name: String,
         expected: String,
@@ -1123,6 +1134,7 @@ impl IssueKind {
             | IssueKind::PossiblyInvalidArrayOffset { .. }
             | IssueKind::UndefinedProperty { .. }
             | IssueKind::InvalidOperand { .. }
+            | IssueKind::InvalidScalarArgument { .. }
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. }
@@ -1192,6 +1204,7 @@ impl IssueKind {
             | IssueKind::UnusedSuppress { .. }
             | IssueKind::ArgumentTypeCoercion { .. }
             | IssueKind::PropertyTypeCoercion { .. }
+            | IssueKind::LessSpecificReturnStatement { .. }
             | IssueKind::DeprecatedCall { .. }
             | IssueKind::DeprecatedProperty { .. }
             | IssueKind::DeprecatedConstant { .. }
@@ -1307,10 +1320,12 @@ impl IssueKind {
             IssueKind::PossiblyNullMethodCall { .. } => "MIR0107",
             IssueKind::PossiblyNullArrayAccess => "MIR0108",
             IssueKind::NullableReturnStatement { .. } => "MIR0109",
+            IssueKind::LessSpecificReturnStatement { .. } => "MIR0110",
 
             // Type mismatches (0200-0299)
             IssueKind::InvalidReturnType { .. } => "MIR0200",
             IssueKind::InvalidArgument { .. } => "MIR0201",
+            IssueKind::InvalidScalarArgument { .. } => "MIR0238",
             IssueKind::TooFewArguments { .. } => "MIR0202",
             IssueKind::TooManyArguments { .. } => "MIR0203",
             IssueKind::InvalidNamedArgument { .. } => "MIR0204",
@@ -1543,7 +1558,7 @@ impl IssueKind {
             | "MIR0408" | "MIR0500" | "MIR0506" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
-            | "MIR1514" => Some(Severity::Warning),
+            | "MIR1514" | "MIR0238" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1556,7 +1571,7 @@ impl IssueKind {
             | "MIR1105" | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206"
             | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505"
             | "MIR1507" | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227"
-            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" | "MIR0237" => {
+            | "MIR0406" | "MIR0407" | "MIR0902" | "MIR1510" | "MIR0721" | "MIR0237" | "MIR0110" => {
                 Some(Severity::Info)
             }
 
@@ -1598,6 +1613,8 @@ impl IssueKind {
             IssueKind::NullableReturnStatement { .. } => "NullableReturnStatement",
             IssueKind::InvalidReturnType { .. } => "InvalidReturnType",
             IssueKind::InvalidArgument { .. } => "InvalidArgument",
+            IssueKind::InvalidScalarArgument { .. } => "InvalidScalarArgument",
+            IssueKind::LessSpecificReturnStatement { .. } => "LessSpecificReturnStatement",
             IssueKind::TooFewArguments { .. } => "TooFewArguments",
             IssueKind::TooManyArguments { .. } => "TooManyArguments",
             IssueKind::InvalidNamedArgument { .. } => "InvalidNamedArgument",
@@ -1934,6 +1951,17 @@ impl IssueKind {
 
             IssueKind::InvalidReturnType { expected, actual } => {
                 format!("Return type '{actual}' is not compatible with declared '{expected}'")
+            }
+            IssueKind::LessSpecificReturnStatement { expected, actual } => {
+                format!("Return type '{actual}' is less specific than declared '{expected}'")
+            }
+            IssueKind::InvalidScalarArgument {
+                param,
+                fn_name,
+                expected,
+                actual,
+            } => {
+                format!("Argument ${param} of {fn_name}() expects '{expected}', got scalar '{actual}'")
             }
             IssueKind::InvalidArgument {
                 param,
@@ -3001,7 +3029,17 @@ mod code_tests {
                 expected: s(),
                 actual: s(),
             },
+            IssueKind::LessSpecificReturnStatement {
+                expected: s(),
+                actual: s(),
+            },
             IssueKind::InvalidArgument {
+                param: s(),
+                fn_name: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::InvalidScalarArgument {
                 param: s(),
                 fn_name: s(),
                 expected: s(),
@@ -3496,6 +3534,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 193);
+        assert_eq!(one_of_each().len(), 195);
     }
 }

@@ -664,6 +664,17 @@ pub(crate) fn check_one(
                 Severity::Info,
                 arg_span,
             );
+        } else if !ea.strict_types && only_scalars(arg_ty) && converts_to(arg_ty, param_ty) {
+            ea.emit(
+                IssueKind::InvalidScalarArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("{param_ty}"),
+                    actual: arg_display.clone(),
+                },
+                Severity::Warning,
+                arg_span,
+            );
         } else {
             ea.emit(
                 IssueKind::InvalidArgument {
@@ -709,6 +720,46 @@ pub(crate) fn check_one(
             arg_span,
         );
     }
+}
+
+/// Whether PHP's non-strict conversion of `arg` can produce a value of `param`: a general
+/// `int`, `float`, `string` or `bool` parameter, and not only non-numeric strings for a number.
+fn converts_to(arg: &Type, param: &Type) -> bool {
+    let param = param.remove_null();
+    let numeric = |p: &Atomic| matches!(p, Atomic::TInt | Atomic::TFloat);
+    !param.types.is_empty()
+        && param
+            .types
+            .iter()
+            .all(|p| numeric(p) || matches!(p, Atomic::TString | Atomic::TBool))
+        && !(param.types.iter().all(numeric)
+            && arg.types.iter().all(|a| {
+                matches!(a, Atomic::TLiteralString(s) if !crate::narrowing::is_numeric_string(s))
+            }))
+}
+
+/// Non-empty and made only of int, float, string or bool values, which PHP converts between
+/// in a file without `strict_types`.
+fn only_scalars(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| {
+            a.is_int()
+                || matches!(
+                    a,
+                    Atomic::TFloat
+                        | Atomic::TLiteralFloat(..)
+                        | Atomic::TIntegralFloat
+                        | Atomic::TBool
+                        | Atomic::TTrue
+                        | Atomic::TFalse
+                        | Atomic::TString
+                        | Atomic::TLiteralString(_)
+                        | Atomic::TNonEmptyString
+                        | Atomic::TNonFalsyString
+                        | Atomic::TNumericString
+                        | Atomic::TRefinedString { .. }
+                )
+        })
 }
 
 /// Classes that replaced a resource in PHP 8; code supporting older versions still passes the resource.

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `LessSpecificReturnStatement` (MIR0110) for a returned generic array whose keys or values are wider than declared (`list<Entity>` for `list<Role>`), instead of `InvalidReturnType`. Assigning such an array to a property is `PropertyTypeCoercion`.
+- `InvalidScalarArgument` (MIR0238) for a scalar of another type passed to a general `int`, `float`, `string` or `bool` parameter in a file without `strict_types` (`string` to `int`), instead of `InvalidArgument`. A string that can never be numeric and literal-typed parameters stay `InvalidArgument`.
 - `@return CONST[T]` and `@return self::MAP[T]` with `T of key-of<…>` are the constant's value at the key the caller passed (or at the parameter's default) instead of the native return type, so passing that value on is checked per key.
 - `@return new<T>` is an instance of the class the caller passed, including a class picked from a constant map (`new<CLASSES[T]>`), instead of the native return type.
 - `callable-array` and `callable-object` are enforced instead of being read as `array` / `object`: an array that is not `[object|class-string, existing-method]` (such as `[1, 2]`) and an object without `__invoke()` are `InvalidArgument`. A two-element array whose first element is never an object or string is no longer accepted for `callable` either.

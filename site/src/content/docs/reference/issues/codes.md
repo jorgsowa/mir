@@ -68,6 +68,7 @@ issues keep their code.
 | MIR0107  | PossiblyNullMethodCall        | [nullability/possibly-null-method-call](../nullability/possibly-null-method-call/) |
 | MIR0108  | PossiblyNullArrayAccess       | [nullability/possibly-null-array-access](../nullability/possibly-null-array-access/) |
 | MIR0109  | NullableReturnStatement       | [nullability/nullable-return-statement](../nullability/nullable-return-statement/) |
+| MIR0110  | LessSpecificReturnStatement   | [type-mismatches/less-specific-return-statement](../type-mismatches/less-specific-return-statement/) |
 | MIR0200  | InvalidReturnType             | [type-mismatches/invalid-return-type](../type-mismatches/invalid-return-type/) |
 | MIR0201  | InvalidArgument               | [type-mismatches/invalid-argument](../type-mismatches/invalid-argument/) |
 | MIR0202  | TooFewArguments               | [type-mismatches/too-few-arguments](../type-mismatches/too-few-arguments/) |
@@ -106,6 +107,7 @@ issues keep their code.
 | MIR0235  | InvalidMemberName             | [type-mismatches/invalid-member-name](../type-mismatches/invalid-member-name/) |
 | MIR0236  | NativeResourceType            | [type-mismatches/native-resource-type](../type-mismatches/native-resource-type/) |
 | MIR0237  | InvalidGeneratorIteration     | [type-mismatches/invalid-generator-iteration](../type-mismatches/invalid-generator-iteration/) |
+| MIR0238  | InvalidScalarArgument         | [type-mismatches/invalid-scalar-argument](../type-mismatches/invalid-scalar-argument/) |
 | MIR0300  | InvalidArrayOffset            | [array/invalid-array-offset](../array/invalid-array-offset/) |
 | MIR0301  | NonExistentArrayOffset        | [array/non-existent-array-offset](../array/non-existent-array-offset/) |
 | MIR0302  | PossiblyInvalidArrayOffset    | [array/possibly-invalid-array-offset](../array/possibly-invalid-array-offset/) |

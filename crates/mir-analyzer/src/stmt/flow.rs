@@ -336,13 +336,19 @@ impl<'a> StatementsAnalyzer<'a> {
                         ),
                     );
                 } else if has_invalid {
+                    let less_specific = !declared.is_void()
+                        && !declared.is_never()
+                        && crate::expr::helpers::is_supertype_array(&check_ty, declared, self.db);
+                    let (expected, actual) = (format!("{declared}"), format!("{ret_ty}"));
+                    let kind = if less_specific {
+                        IssueKind::LessSpecificReturnStatement { expected, actual }
+                    } else {
+                        IssueKind::InvalidReturnType { expected, actual }
+                    };
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(
                         mir_issues::Issue::new(
-                            IssueKind::InvalidReturnType {
-                                expected: format!("{declared}"),
-                                actual: format!("{ret_ty}"),
-                            },
+                            kind,
                             Location {
                                 file: self.file.clone(),
                                 line,

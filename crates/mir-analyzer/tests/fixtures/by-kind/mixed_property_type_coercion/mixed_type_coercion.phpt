@@ -18,6 +18,6 @@ class A {
     public function barBar(array $arr): void
     {
         $this->foo = $arr;
-//      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'array<int, A>', cannot assign 'array<int|string, A>'
+//      ^^^^^^^^^^^^^^^^^ PropertyTypeCoercion: Property $foo expects 'array<int, A>', cannot assign 'array<int|string, A>' — coercion may fail at runtime
     }
 }

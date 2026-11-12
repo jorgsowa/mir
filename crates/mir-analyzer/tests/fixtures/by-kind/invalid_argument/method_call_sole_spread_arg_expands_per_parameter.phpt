@@ -19,7 +19,7 @@ class Calc {
 /** @param array{0: int, 1: string} $pair */
 function checksEachArg(Calc $c, array $pair): void {
     $c->needsTwoInts(...$pair);
-//                    ^^^^^^^ InvalidArgument: Argument $b of needsTwoInts() expects 'int', got 'string'
+//                    ^^^^^^^ InvalidScalarArgument: Argument $b of needsTwoInts() expects 'int', got scalar 'string'
 }
 
 class Pair {

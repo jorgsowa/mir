@@ -15,7 +15,7 @@ function takesInt(int $value): void {}
 $wrapped = new SensitiveParameterValue('secret');
 takesString($wrapped->getValue());
 takesInt($wrapped->getValue());
-//       ^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of takesInt() expects 'int', got 'string'
+//       ^^^^^^^^^^^^^^^^^^^^ InvalidScalarArgument: Argument $value of takesInt() expects 'int', got scalar 'string'
 
 $intWrapped = new SensitiveParameterValue(1);
 takesInt($intWrapped->getValue());

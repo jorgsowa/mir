@@ -24,11 +24,6 @@
       <code><![CDATA[$this->parentStaticReflectionParser = new static($this->parentClassName, $this->finder)]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="core/lib/Drupal/Component/Annotation/Doctrine/TokenParser.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->tokens = token_get_all($contents)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Component/Annotation/Plugin/Discovery/AnnotatedClassDiscovery.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->annotationReader = new SimpleAnnotationReader()]]></code>
@@ -198,11 +193,6 @@
       ->execute();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Cache/CacheableMetadata.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->cacheTags = $cache_tags]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Cache/ChainedFastBackend.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$last_write_timestamp === 0]]></code>
@@ -258,12 +248,12 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Cache/Context/PagersCacheContext.php">
-    <InvalidArgument>
-      <code><![CDATA[$pager_id]]></code>
-    </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return t('Pager');]]></code>
     </InvalidReturnType>
+    <InvalidScalarArgument>
+      <code><![CDATA[$pager_id]]></code>
+    </InvalidScalarArgument>
   </file>
   <file src="core/lib/Drupal/Core/Cache/Context/PathCacheContext.php">
     <InvalidReturnType>
@@ -415,11 +405,6 @@
       <code><![CDATA[return $this->id();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Config/Entity/ConfigEntityBundleBase.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $storage->loadMultiple($ids);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Config/Entity/ConfigEntityStorage.php">
     <NullArgument>
       <code><![CDATA[NULL]]></code>
@@ -462,9 +447,6 @@
     </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/Config/Schema/ArrayElement.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->elements = $this->parse()]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return new \ArrayIterator($this->getElements());]]></code>
     </InvalidReturnType>
@@ -575,10 +557,10 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Datetime/Element/Datelist.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[$year]]></code>
       <code><![CDATA[$month]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/lib/Drupal/Core/DefaultContent/Finder.php">
     <UnhandledMatchCondition>
@@ -1116,9 +1098,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/lib/Drupal/Core/Installer/Form/SiteConfigureForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->entityTypeManager->getStorage('user_role')->loadByProperties(['is_admin' => TRUE]);]]></code>
-    </InvalidReturnType>
     <UndefinedConstant>
       <code><![CDATA[FILE_EXIST]]></code>
       <code><![CDATA[FILE_READABLE]]></code>
@@ -1252,11 +1231,6 @@
       <code><![CDATA[$requirement]]></code>
     </InvalidArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Plugin/ContextAwarePluginTrait.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $definition->getContextDefinitions();]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Plugin/Discovery/AttributeDiscoveryWithAnnotations.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->annotationReader = new SimpleAnnotationReader()]]></code>
@@ -1346,9 +1320,9 @@
     </ImpossibleIdenticalComparison>
   </file>
   <file src="core/lib/Drupal/Core/Routing/ContentTypeHeaderMatcher.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[FALSE]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/lib/Drupal/Core/Routing/LazyRouteCollection.php">
     <InvalidReturnType>
@@ -1563,10 +1537,10 @@
     </UndefinedProperty>
   </file>
   <file src="core/lib/Drupal/Core/TypedData/Validation/RecursiveContextualValidator.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[$propertyName]]></code>
       <code><![CDATA[$property_name]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/lib/Drupal/Core/Update/UpdateHookRegistry.php">
     <InvalidArrayOffset>
@@ -1627,14 +1601,14 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/ban/src/Form/BanDelete.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[$ban_id]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/big_pipe/src/Controller/BigPipeController.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[TRUE]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/big_pipe/src/Render/BigPipe.php">
     <UndefinedMethod>
@@ -1823,9 +1797,6 @@
     <ImplicitFloatToIntCast>
       <code><![CDATA[$cid]]></code>
     </ImplicitFloatToIntCast>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->comments = $this->entityTypeManager->getStorage('comment')->loadMultiple($cids)]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return;]]></code>
       <code><![CDATA[return;]]></code>
@@ -1913,13 +1884,6 @@
       <code><![CDATA[return array_keys($this->configuration['entity_types']);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/content_moderation/src/StateTransitionValidation.php">
-    <InvalidReturnType>
-      <code><![CDATA[return array_filter($current_state->getTransitions(), function (Transition $transition) use ($workflow, $user) {
-      return $user->hasPermission('use ' . $workflow->id() . ' transition ' . $transition->id());
-    });]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/content_translation/src/ContentTranslationHandler.php">
     <InvalidReturnType>
       <code><![CDATA[return FALSE;]]></code>
@@ -1970,11 +1934,11 @@
     </UndefinedMethod>
   </file>
   <file src="core/modules/datetime/src/Plugin/Field/FieldWidget/DateTimeWidgetBase.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[$year]]></code>
       <code><![CDATA[$month]]></code>
       <code><![CDATA[$day]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/dblog/src/Controller/DbLogController.php">
     <UndefinedConstant>
@@ -2033,10 +1997,6 @@
   <file src="core/modules/field/src/FieldUninstallValidator.php">
     <InvalidReturnType>
       <code><![CDATA[return $reasons;]]></code>
-      <code><![CDATA[return $this->fieldStorageConfigStorage->loadByProperties([
-      'module' => $module,
-      'include_deleted' => TRUE,
-    ]);]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/field_ui/src/Access/FormModeAccessCheck.php">
@@ -2073,9 +2033,6 @@
     <InvalidArgument>
       <code><![CDATA[$load_ids]]></code>
     </InvalidArgument>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->entityTypeManager->getStorage($display_entity_type)->loadMultiple($load_ids);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/field_ui/src/Form/EntityDisplayModeFormBase.php">
     <InvalidReturnType>
@@ -2139,10 +2096,10 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/file/src/Plugin/Validation/Constraint/FileImageDimensionsConstraintValidator.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[$width]]></code>
       <code><![CDATA[$height]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/file/src/Plugin/rest/resource/FileUploadResource.php">
     <TooManyArguments>
@@ -2176,16 +2133,6 @@
     <UndefinedFunction>
       <code><![CDATA[user_role_change_permissions($rid, [$permission => $enabled])]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/filter/src/FilterFormatRepository.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $formats;]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/filter/src/FilterUninstallValidator.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->filterStorage->loadByProperties(['status' => TRUE]);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/filter/src/Hook/FilterHooks.php">
     <UndefinedFunction>
@@ -2670,9 +2617,6 @@
     </InvalidArgument>
   </file>
   <file src="core/modules/jsonapi/src/JsonApiResource/ResourceObject.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $output;]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->versionIdentifier;]]></code>
     </NullableReturnStatement>
@@ -2938,9 +2882,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/locale/src/Form/TranslateFormBase.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->localeStorage->getTranslations($conditions, $options);]]></code>
-    </InvalidReturnType>
     <UndefinedConstant>
       <code><![CDATA[LOCALE_NOT_CUSTOMIZED]]></code>
       <code><![CDATA[LOCALE_CUSTOMIZED]]></code>
@@ -3274,12 +3215,12 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/menu_ui/src/Form/MenuDeleteForm.php">
-    <InvalidArgument>
-      <code><![CDATA[TRUE]]></code>
-    </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return $caption;]]></code>
     </InvalidReturnType>
+    <InvalidScalarArgument>
+      <code><![CDATA[TRUE]]></code>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/menu_ui/src/MenuForm.php">
     <InvalidReturnType>
@@ -3353,14 +3294,14 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/migrate/src/Plugin/migrate/process/MigrationLookup.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[0]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/migrate/src/Plugin/migrate/source/SourcePluginBase.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA['cache']]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/migrate_drupal/src/MigrationConfigurationTrait.php">
     <ImpossibleIdenticalComparison>
@@ -3834,7 +3775,6 @@
   </file>
   <file src="core/modules/search/src/SearchPageRepository.php">
     <InvalidReturnType>
-      <code><![CDATA[return $this->storage->loadMultiple($ids);]]></code>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
   </file>
@@ -3887,14 +3827,9 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/shortcut/src/Controller/ShortcutController.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA['error']]></code>
-    </InvalidArgument>
-  </file>
-  <file src="core/modules/shortcut/src/Entity/ShortcutSet.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $shortcuts;]]></code>
-    </InvalidReturnType>
+    </InvalidScalarArgument>
   </file>
   <file src="core/modules/shortcut/src/Form/SetCustomize.php">
     <InvalidReturnType>
@@ -3975,9 +3910,9 @@
     </TaintedFile>
   </file>
   <file src="core/modules/system/src/Controller/BatchController.php">
-    <InvalidArgument>
+    <InvalidScalarArgument>
       <code><![CDATA[$request_id]]></code>
-    </InvalidArgument>
+    </InvalidScalarArgument>
     <UndefinedFunction>
       <code><![CDATA[_batch_page($request)]]></code>
       <code><![CDATA[batch_get()]]></code>
@@ -4200,7 +4135,6 @@
   <file src="core/modules/taxonomy/src/TermStorage.php">
     <InvalidReturnType>
       <code><![CDATA[return $parents + $loaded_parents;]]></code>
-      <code><![CDATA[return static::loadMultiple($query->execute());]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/taxonomy/src/VocabularyForm.php">
@@ -4377,9 +4311,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/user/src/Form/UserPermissionsForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->roleStorage->loadMultipleOverrideFree();]]></code>
-    </InvalidReturnType>
     <UndefinedFunction>
       <code><![CDATA[system_admin_compact_mode()]]></code>
       <code><![CDATA[user_role_change_permissions($role_name, (array) $form_state->getValue($role_name))]]></code>
@@ -4666,11 +4597,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/views/src/Plugin/views/field/BulkForm.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->actions = array_filter($this->actionStorage->loadMultiple(), function ($action) use ($entity_type) {
-      return $action->getType() == $entity_type;
-    })]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('No items selected.');]]></code>
     </InvalidReturnType>
@@ -4854,13 +4780,6 @@
       <code><![CDATA[$this->display_handler->useGroupBy()]]></code>
       <code><![CDATA[$this->display_handler->useGroupBy()]]></code>
     </TooManyArguments>
-  </file>
-  <file src="core/modules/views/src/Views.php">
-    <InvalidReturnType>
-      <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple();]]></code>
-      <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($query);]]></code>
-      <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($query);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/views_ui/src/Form/AdvancedSettingsForm.php">
     <UndefinedFunction>

@@ -338,16 +338,7 @@
       <code><![CDATA[$callableXML->childNodes->item(0)->setAttribute('priority', $eventDispatcher->getListenerPriority($event, $listener))]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/EventListener/ConsoleProfilerListener.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$command->arguments = $input->getArguments()]]></code>
-      <code><![CDATA[$command->options = $input->getOptions()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Test/BrowserKitAssertionsTrait.php">
-    <InvalidArgument>
-      <code><![CDATA[$serverExceptionFile[1]]]></code>
-    </InvalidArgument>
     <UndefinedClass>
       <code><![CDATA[LogicalAnd]]></code>
       <code><![CDATA[LogicalNot]]></code>
@@ -408,11 +399,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return self::getClient($client);]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Bundle/FrameworkBundle/Translation/Translator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->resourceLocales = array_keys($this->options['resource_files'])]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Bundle/TwigBundle/Command/LintCommand.php">
     <UndefinedMethod>
@@ -536,7 +522,6 @@
   </file>
   <file src="src/Symfony/Component/Cache/Traits/RedisTrait.php">
     <InvalidArgument>
-      <code><![CDATA[$pattern]]></code>
       <code><![CDATA['MATCH']]></code>
     </InvalidArgument>
     <NullableReturnStatement>
@@ -594,12 +579,6 @@
       <code><![CDATA[fn () => array_keys((new ApplicationDescription($this->getApplication()))->getCommands())]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Console/Command/TraceableCommand.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->arguments = $input->getArguments()]]></code>
-      <code><![CDATA[$this->options = $input->getOptions()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Console/Descriptor/XmlDescriptor.php">
     <InvalidTemplateParam>
       <code><![CDATA[$parentNode->appendChild($parentNode->ownerDocument->importNode($childNode, true))]]></code>
@@ -640,11 +619,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $this->children->key();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/Console/Input/ArgvInput.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->tokens = $argv]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Symfony/Component/Console/Input/InputArgument.php">
     <TooFewArguments>
@@ -842,16 +816,6 @@
       <code><![CDATA[$result->getAttribute('cp')]]></code>
     </UndefinedMethod>
   </file>
-  <file src="src/Symfony/Component/Emoji/Util/GzipStreamWrapper.php">
-    <InvalidArgument>
-      <code><![CDATA[$arg1]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/ErrorHandler/ErrorHandler.php">
-    <InvalidArgument>
-      <code><![CDATA[$throw]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/ErrorHandler/ErrorRenderer/HtmlErrorRenderer.php">
     <NullableReturnStatement>
       <code><![CDATA[return $dumper->dump($value, true);]]></code>
@@ -1016,41 +980,10 @@
       <code><![CDATA[$token->value]]></code>
     </ImplicitFloatToIntCast>
   </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToHtml5LocalDateTimeTransformer.php">
-    <InvalidArgument>
-      <code><![CDATA[$matches[2]]]></code>
-      <code><![CDATA[$matches[3]]]></code>
-      <code><![CDATA[$matches[1]]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/DateTimeToRfc3339Transformer.php">
-    <InvalidArgument>
-      <code><![CDATA[$matches[2]]]></code>
-      <code><![CDATA[$matches[3]]]></code>
-      <code><![CDATA[$matches[1]]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Form/Extension/Core/DataTransformer/NumberToLocalizedStringTransformer.php">
-    <InvalidArgument>
-      <code><![CDATA[$this->grouping]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-      <code><![CDATA[$number]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Form/Extension/Core/Type/FileType.php">
     <ImplicitFloatToIntCast>
       <code><![CDATA[$coef]]></code>
     </ImplicitFloatToIntCast>
-    <InvalidArgument>
-      <code><![CDATA[$double]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Form/Extension/Validator/Constraints/FormValidator.php">
     <InvalidReturnType>
@@ -1101,11 +1034,6 @@
     <UndefinedMethod>
       <code><![CDATA[$this->responseFactory->next()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="src/Symfony/Component/HttpFoundation/BinaryFileResponse.php">
-    <InvalidArgument>
-      <code><![CDATA[$this->tempFileObject ? time() : $this->file->getMTime()]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/HttpFoundation/Response.php">
     <UndefinedFunction>
@@ -1194,9 +1122,6 @@
     </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/HttpKernel/HttpCache/HttpCache.php">
-    <InvalidArgument>
-      <code><![CDATA[$ignoreErrors]]></code>
-    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $this->surrogate;]]></code>
     </NullableReturnStatement>
@@ -1242,24 +1167,9 @@
       <code><![CDATA[[$name,  $extra]]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Intl/Data/Generator/RegionDataGenerator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->regionCodes = array_merge($this->regionCodes, array_keys($data['Names']))]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Intl/Data/Generator/ScriptDataGenerator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->scriptCodes = array_merge($this->scriptCodes, array_keys($data['Names']))]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Intl/Data/Generator/TimezoneDataGenerator.php">
     <InvalidArgument>
       <code><![CDATA[[$city, $name]]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Intl/Util/GzipStreamWrapper.php">
-    <InvalidArgument>
-      <code><![CDATA[$arg1]]></code>
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Intl/Util/IntlTestHelper.php">
@@ -1593,9 +1503,6 @@
     </UndefinedFunction>
   </file>
   <file src="src/Symfony/Component/Process/PhpExecutableFinder.php">
-    <InvalidArgument>
-      <code><![CDATA[false]]></code>
-    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $this->executableFinder->find('php', false, $dirs);]]></code>
     </NullableReturnStatement>
@@ -1649,11 +1556,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $minimalRateLimit;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="src/Symfony/Component/RateLimiter/Policy/Rate.php">
-    <InvalidArgument>
-      <code><![CDATA[$rate]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Runtime/Internal/ComposerPlugin.php">
     <UndefinedClass>
@@ -1856,18 +1758,6 @@
       <code><![CDATA[new Lexer()]]></code>
     </TooFewArguments>
   </file>
-  <file src="src/Symfony/Component/Uid/UuidV6.php">
-    <InvalidArgument>
-      <code><![CDATA[$ms]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Validator/Constraints/DateValidator.php">
-    <InvalidArgument>
-      <code><![CDATA[$matches['year'] ?? $matches[1]]]></code>
-      <code><![CDATA[$matches['month'] ?? $matches[2]]]></code>
-      <code><![CDATA[$matches['day'] ?? $matches[3]]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Symfony/Component/Validator/Constraints/EmailValidator.php">
     <InvalidArgument>
       <code><![CDATA[false]]></code>
@@ -1877,25 +1767,6 @@
     <ImplicitFloatToIntCast>
       <code><![CDATA[$coef]]></code>
     </ImplicitFloatToIntCast>
-    <InvalidArgument>
-      <code><![CDATA[$double]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Validator/Constraints/GroupSequence.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->groups = $groups]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Symfony/Component/Validator/Constraints/TimeValidator.php">
-    <InvalidArgument>
-      <code><![CDATA[$matches[1]]]></code>
-      <code><![CDATA[$matches[2]]]></code>
-    </InvalidArgument>
-  </file>
-  <file src="src/Symfony/Component/Validator/Constraints/WeekValidator.php">
-    <InvalidArgument>
-      <code><![CDATA[$year]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Validator/Mapping/ClassMetadata.php">
     <InvalidPropertyAssignment>

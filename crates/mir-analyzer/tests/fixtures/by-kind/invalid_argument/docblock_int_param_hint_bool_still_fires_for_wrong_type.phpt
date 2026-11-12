@@ -20,4 +20,4 @@ class Converter {
 }
 
 Converter::convert('hello', 'yes');
-//                          ^^^^^ InvalidArgument: Argument $withQuote of convert() expects 'bool', got '"yes"'
+//                          ^^^^^ InvalidScalarArgument: Argument $withQuote of convert() expects 'bool', got scalar '"yes"'

@@ -13,5 +13,5 @@ function takesInt(int $n): void { var_dump($n); }
 function getResult(): string|false { return 'x'; }
 function test(): void {
     takesInt(getResult());
-//           ^^^^^^^^^^^ InvalidArgument: Argument $n of takesInt() expects 'int', got 'string|false'
+//           ^^^^^^^^^^^ InvalidScalarArgument: Argument $n of takesInt() expects 'int', got scalar 'string|false'
 }
