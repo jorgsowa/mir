@@ -138,9 +138,7 @@ pub trait MirDatabase: salsa::Database {
         text: &dyn Fn() -> Option<Arc<str>>,
     ) -> Option<SourceFile>;
 
-    /// Reader for resolver-mapped files. **Side channel** — this read is not
-    /// salsa-tracked; tracked queries that consult it must also read
-    /// `resolver_config().revision(db)`.
+    /// Reader for resolver-mapped files; records a dependency on `resolver_config().revision(db)`.
     fn source_provider(&self) -> Option<Arc<dyn crate::SourceProvider>>;
 
     /// Return the singleton [`AnalyzeFileInput`] input handle, lazily
@@ -155,10 +153,7 @@ pub trait MirDatabase: salsa::Database {
     /// they're invalidated when the resolver or source provider changes.
     fn resolver_config(&self) -> ResolverConfig;
 
-    /// Return the current class resolver, if any. **Side channel** — this
-    /// read is not salsa-tracked. Tracked queries that consult this must
-    /// also read `resolver_config().revision(db)` so salsa correctly
-    /// invalidates on resolver swap.
+    /// The current class resolver, if any; records a dependency on `resolver_config().revision(db)`.
     fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>>;
 
     /// Return the singleton [`WorkspaceRevision`] input. Tracked
@@ -197,10 +192,7 @@ pub trait MirDatabase: salsa::Database {
     /// Diagnostic hook: `n` units of `work` done (see [`WorkCounts`]).
     fn note_work(&self, _work: Work, _n: u64) {}
 
-    /// Snapshot every registered SourceFile. Side channel — not
-    /// salsa-tracked; tracked queries that consult this must also
-    /// read `workspace_revision().revision(db)` so file add/remove
-    /// correctly invalidates results.
+    /// Every registered SourceFile; records a dependency on `workspace_revision().revision(db)`.
     fn all_source_files(&self) -> Vec<SourceFile>;
 
     /// Return the subset of registered SourceFile inputs that are user-provided

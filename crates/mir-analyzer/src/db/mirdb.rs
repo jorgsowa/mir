@@ -649,6 +649,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn source_provider(&self) -> Option<Arc<dyn crate::SourceProvider>> {
+        let _ = self.resolver_config().revision(self);
         self.resolver_state.read().source_provider.clone()
     }
 
@@ -680,6 +681,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>> {
+        let _ = self.resolver_config().revision(self);
         self.resolver_state.read().resolver.clone()
     }
 
@@ -709,10 +711,12 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn all_source_files(&self) -> Vec<SourceFile> {
+        let _ = self.workspace_revision().revision(self);
         self.source_files.values().copied().collect()
     }
 
     fn user_stub_source_files(&self) -> Vec<SourceFile> {
+        let _ = self.workspace_revision().revision(self);
         let user_paths = self.user_stub_paths.read();
         self.source_files
             .iter()

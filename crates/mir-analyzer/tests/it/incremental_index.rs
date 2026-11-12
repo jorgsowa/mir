@@ -367,3 +367,37 @@ fn index_batch_honours_cancellation() {
     assert!(outcome.cancelled);
     assert_eq!(outcome.registered, 0);
 }
+
+/// A newly added caller reaches already-memoized opaque-callback inference.
+#[test]
+fn added_caller_reaches_memoized_opaque_callback_inference() {
+    const LIB: &str = "<?php\nfunction apply(callable $cb, array $nums): int {\n    return array_map($cb, $nums)[0];\n}\n";
+    const APP: &str = "<?php\nfunction useIt(array $nums): void {\n    apply(fn(int $x): string => (string) $x, $nums);\n}\n";
+    let lib_issues = |session: &AnalysisSession| {
+        let db = session.snapshot_db();
+        let file = db.lookup_source_file("/proj/lib.php").unwrap();
+        let mut kinds: Vec<String> = analyze_file(&db, file)
+            .issues
+            .iter()
+            .map(|i| i.kind.name().to_string())
+            .collect();
+        kinds.sort();
+        kinds
+    };
+
+    let mut incremental = fresh_session(PhpVersion::LATEST);
+    incremental.ingest_file(Arc::from("/proj/lib.php"), Arc::from(LIB));
+    let lib_alone = lib_issues(&incremental);
+    incremental.ingest_file(Arc::from("/proj/app.php"), Arc::from(APP));
+
+    let mut fresh = fresh_session(PhpVersion::LATEST);
+    fresh.ingest_file(Arc::from("/proj/lib.php"), Arc::from(LIB));
+    fresh.ingest_file(Arc::from("/proj/app.php"), Arc::from(APP));
+    let expected = lib_issues(&fresh);
+
+    assert_ne!(
+        lib_alone, expected,
+        "the caller must change lib.php's diagnostics"
+    );
+    assert_eq!(lib_issues(&incremental), expected);
+}
