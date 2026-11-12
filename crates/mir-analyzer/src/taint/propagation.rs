@@ -161,6 +161,9 @@ pub(super) fn receiver_demands_summary(
     file: &str,
 ) -> bool {
     match receiver.map(|r| &unwrap_parens(r).kind) {
+        Some(ExprKind::Variable(_)) if !ctx.summarizing_taint && ctx.tainted_props.is_empty() => {
+            false
+        }
         Some(ExprKind::Variable(var)) => {
             let var = mir_types::Name::from(var.trim_start_matches('$'));
             (ctx.summarizing_taint && var.as_str() == "this")
@@ -566,6 +569,9 @@ pub fn expr_taint(
             if is_superglobal(n) {
                 return Taint::ALL;
             }
+            if ctx.tainted_vars.is_empty() && !ctx.has_dynamic_tainted_var_def {
+                return Taint::NONE;
+            }
             let sym = mir_types::Name::from(n);
             if ctx
                 .vars
@@ -579,7 +585,7 @@ pub fn expr_taint(
             if ctx.has_dynamic_tainted_var_def && !ctx.var_is_defined_sym(sym) {
                 return Taint::ALL;
             }
-            ctx.var_taint(n)
+            ctx.tainted_vars.get(&sym).copied().unwrap_or_default()
         }
 
         // `$$name` where `$name` holds a known literal string resolves to

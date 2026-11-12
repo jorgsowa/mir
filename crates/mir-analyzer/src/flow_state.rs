@@ -1820,6 +1820,9 @@ impl FlowState {
     }
 
     pub fn key_taints(&self, name: &str) -> Option<&KeyTaint> {
+        if self.tainted_keys.is_empty() {
+            return None;
+        }
         self.tainted_keys
             .get(&Name::from(name.trim_start_matches('$')))
     }
@@ -1899,6 +1902,9 @@ impl FlowState {
 
     /// Taint of the key names of `$name`.
     pub fn key_names_taint(&self, name: &str) -> Taint {
+        if self.key_names.is_empty() {
+            return Taint::default();
+        }
         self.key_names
             .get(&Name::from(name.trim_start_matches('$')))
             .copied()
@@ -1984,6 +1990,10 @@ impl FlowState {
     }
 
     pub fn var_taint(&self, name: &str) -> Taint {
+        // Most scopes hold no taint; skip interning the name for them.
+        if self.tainted_vars.is_empty() {
+            return Taint::default();
+        }
         let sym = Name::from(name.trim_start_matches('$'));
         self.tainted_vars.get(&sym).copied().unwrap_or_default()
     }
@@ -2197,6 +2207,9 @@ impl FlowState {
     }
 
     pub fn prop_taint(&self, obj_var: &str, prop: &str) -> Taint {
+        if self.tainted_props.is_empty() {
+            return Taint::default();
+        }
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
@@ -2221,6 +2234,9 @@ impl FlowState {
     }
 
     pub fn static_prop_taint(&self, fqcn: &str, prop: &str) -> Taint {
+        if self.tainted_static_props.is_empty() {
+            return Taint::default();
+        }
         let key = (Name::from(fqcn), Name::from(prop));
         self.tainted_static_props
             .get(&key)
