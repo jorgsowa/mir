@@ -538,9 +538,15 @@ pub(super) fn array_access_under_prop_hops(
 
 /// The guard that holds when `expr` evaluates to `is_true`, for conditions on a plain variable.
 pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> Option<Guard> {
-    // An element with a literal key is keyed as `a[k]`, which a write to `$a` drops.
+    // An element with a literal key is keyed as `a[k]`, which a write to `$a` drops; a
+    // property as `a->p`, which a write to it or to `$a` or a call on `$a` drops.
     let plain_var = |e: &php_ast::owned::Expr| match &strip_parens(e).kind {
         ExprKind::Variable(v) => Some(Name::from(&**v)),
+        ExprKind::PropertyAccess(_) => {
+            let (obj, prop) = extract_prop_access(e)?;
+            (!obj.contains("->") && !prop.ends_with("()"))
+                .then(|| Name::from(format!("{obj}->{prop}").as_str()))
+        }
         ExprKind::ArrayAccess(aa) => {
             let ExprKind::Variable(base) = &aa.array.kind else {
                 return None;
@@ -560,7 +566,9 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
             return established_guard(&u.operand, !is_true)
         }
-        ExprKind::Variable(_) | ExprKind::ArrayAccess(_) => (plain_var(expr)?, truthiness),
+        ExprKind::Variable(_) | ExprKind::ArrayAccess(_) | ExprKind::PropertyAccess(_) => {
+            (plain_var(expr)?, truthiness)
+        }
         ExprKind::Empty(inner) => (plain_var(inner)?, falsiness),
         ExprKind::Assign(a) if a.op == AssignOp::Assign && !a.by_ref => {
             (plain_var(&a.target)?, truthiness)
@@ -572,8 +580,18 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
             let holds = (b.op == BinaryOp::NotIdentical) != is_true;
             let (var_side, lit_side) =
                 match (&strip_parens(&b.left).kind, &strip_parens(&b.right).kind) {
-                    (ExprKind::Variable(_) | ExprKind::ArrayAccess(_), _) => (&b.left, &b.right),
-                    (_, ExprKind::Variable(_) | ExprKind::ArrayAccess(_)) => (&b.right, &b.left),
+                    (
+                        ExprKind::Variable(_)
+                        | ExprKind::ArrayAccess(_)
+                        | ExprKind::PropertyAccess(_),
+                        _,
+                    ) => (&b.left, &b.right),
+                    (
+                        _,
+                        ExprKind::Variable(_)
+                        | ExprKind::ArrayAccess(_)
+                        | ExprKind::PropertyAccess(_),
+                    ) => (&b.right, &b.left),
                     _ => return None,
                 };
             let kind = match &strip_parens(lit_side).kind {
@@ -591,6 +609,35 @@ pub(crate) fn established_guard(expr: &php_ast::owned::Expr, is_true: bool) -> O
                 _ => return None,
             };
             (plain_var(var_side)?, kind)
+        }
+        // `count($v) > n`, `count($v) >= n`, `n < count($v)`
+        ExprKind::Binary(b)
+            if is_true
+                && matches!(
+                    b.op,
+                    BinaryOp::Greater
+                        | BinaryOp::GreaterOrEqual
+                        | BinaryOp::Less
+                        | BinaryOp::LessOrEqual
+                ) =>
+        {
+            let (count, n, inclusive) = match b.op {
+                BinaryOp::Greater => (&b.left, &b.right, false),
+                BinaryOp::GreaterOrEqual => (&b.left, &b.right, true),
+                BinaryOp::Less => (&b.right, &b.left, false),
+                _ => (&b.right, &b.left, true),
+            };
+            let n = super::literals::extract_int_literal(n)?;
+            let var = match extract_count_arg(count)? {
+                ScalarArgTarget::Var(v) => Name::from(v.trim_start_matches('$')),
+                ScalarArgTarget::Prop(obj, prop) => {
+                    Name::from(format!("{}->{prop}", obj.trim_start_matches('$')).as_str())
+                }
+            };
+            (
+                var,
+                GuardKind::CountAbove(if inclusive { n - 1 } else { n }),
+            )
         }
         _ => return None,
     };

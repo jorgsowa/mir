@@ -29,9 +29,17 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut then_ctx = ctx.branch();
         narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
         let then_unreachable_from_narrowing = then_ctx.diverges;
+        // A guard holds again only if the branch it skips leaves its variable alone: the then
+        // guard needs an unwritten else branch, the else guard an unwritten then branch.
         // Sentinel entry: any write to the guard inside the branch drops it.
         let guard = established_guard(&if_stmt.condition, true);
-        if let Some(g) = guard {
+        let else_guard = if_stmt
+            .elseif_branches
+            .is_empty()
+            .then(|| established_guard(&if_stmt.condition, false))
+            .flatten();
+        let then_sentinel = guard.or(else_guard);
+        if let Some(g) = then_sentinel {
             then_ctx.add_guarded_def(g.var, g);
         }
         if !then_ctx.diverges {
@@ -39,8 +47,8 @@ impl<'a> StatementsAnalyzer<'a> {
         } else if !pre_diverges {
             self.analyze_impossible_branch(&if_stmt.then_branch, ctx);
         }
-        let guard_unwritten = guard.is_some_and(|g| then_ctx.has_guarded_def(g.var, g));
-        if let Some(g) = guard {
+        let then_unwritten = then_sentinel.is_some_and(|g| then_ctx.has_guarded_def(g.var, g));
+        if let Some(g) = then_sentinel {
             then_ctx.drop_guarded_def(g.var);
         }
         then_ctx.record_flag_guarded_defs(&pre_ctx, &[&pre_ctx]);
@@ -146,12 +154,6 @@ impl<'a> StatementsAnalyzer<'a> {
         // chained through the loop above, including any assignments made in
         // an elseif's own condition.
         let mut else_ctx = running_ctx;
-        let else_guard = if_stmt
-            .elseif_branches
-            .is_empty()
-            .then(|| established_guard(&if_stmt.condition, false))
-            .flatten();
-        // Both guards test the same variable; a write to it in the else branch voids either.
         let mut else_unwritten = true;
         if let Some(else_branch) = &if_stmt.else_branch {
             let sentinel = else_guard.or(guard);
@@ -168,12 +170,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 else_ctx.drop_guarded_def(g.var);
             }
         }
-        let guard_unwritten = guard_unwritten && else_unwritten;
+        let guard_unwritten = guard.is_some() && else_unwritten;
         if if_stmt.else_branch.is_some() && if_stmt.elseif_branches.is_empty() {
             else_ctx.record_flag_guarded_defs(&pre_ctx, &[&then_ctx]);
         }
         let else_guard_unwritten =
-            else_guard.is_some() && if_stmt.else_branch.is_some() && else_unwritten;
+            else_guard.is_some() && if_stmt.else_branch.is_some() && then_unwritten;
 
         if !pre_diverges && (then_unreachable_from_narrowing || else_unreachable_from_narrowing) {
             self.emit_redundant_condition(

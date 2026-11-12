@@ -1447,9 +1447,6 @@
     <NullArgument>
       <code><![CDATA[NULL]]></code>
     </NullArgument>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$root]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Menu/Plugin/Validation/Constraint/MenuLinkDepthConstraintValidator.php">
     <InvalidArgument>
@@ -3782,9 +3779,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $this->getDerivativeId();]]></code>
     </NullableReturnStatement>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$uuid]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/menu_ui/src/Form/MenuDeleteForm.php">
     <InvalidArgument>
@@ -3848,11 +3842,6 @@
       <code><![CDATA[$this->destinationPlugin = $this->destinationPluginManager->createInstance($this->destination['plugin'], $this->destination, $this)]]></code>
       <code><![CDATA[$this->idMapPlugin = $this->idMapPluginManager->createInstance($plugin, $configuration, $this)]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="core/modules/migrate/src/Plugin/migrate/destination/EntityConfigBase.php">
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$id_keys]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/migrate/src/Plugin/migrate/id_map/NullIdMap.php">
     <InvalidReturnType>
@@ -3922,9 +3911,6 @@
       <code><![CDATA[return $this->restartUpgradeForm();]]></code>
       <code><![CDATA[return $this->t('Review upgrade');]]></code>
     </InvalidReturnType>
-    <PossiblyUndefinedVariable>
-      <code><![CDATA[$version]]></code>
-    </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/migrate_drupal_ui/src/Form/IdConflictForm.php">
     <InvalidReturnType>

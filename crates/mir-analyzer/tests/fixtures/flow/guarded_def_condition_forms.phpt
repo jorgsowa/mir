@@ -105,7 +105,6 @@ function guardReassignedInBranch(?string $g): void {
         $x = compute();
     }
     if (isset($g)) { echo $x; }
-//                        ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
 function withElseBranch(?string $g): void {

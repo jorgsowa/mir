@@ -51,7 +51,11 @@ pub(crate) fn forget_element_write(target: &Expr, ctx: &mut FlowState) {
     let receiver = match &base.kind {
         ExprKind::Variable(var) => var.trim_start_matches('$').to_string(),
         _ => match extract_prop_access(base) {
-            Some((obj, prop)) => format!("{obj}->{prop}"),
+            Some((obj, prop)) => {
+                let receiver = format!("{obj}->{prop}");
+                ctx.drop_prop_guards(&receiver);
+                receiver
+            }
             None => return,
         },
     };

@@ -103,6 +103,8 @@ pub enum GuardKind {
     Identical(FlagValue),
     /// `$v !== 'x'`, `$v !== 1`
     NotIdentical(FlagValue),
+    /// `count($v) > n`
+    CountAbove(i64),
 }
 
 /// A literal a flag variable is compared against or assigned.
@@ -155,6 +157,9 @@ impl Guard {
                             || (self.kind == GuardKind::Truthy && v.is_truthy())
                             || matches!(self.kind, GuardKind::NotIdentical(other) if other != v)
                     }
+                    GuardKind::CountAbove(m) => {
+                        matches!(self.kind, GuardKind::CountAbove(n) if n <= m)
+                    }
                     GuardKind::NotNull | GuardKind::Falsy | GuardKind::NotIdentical(_) => false,
                 })
     }
@@ -162,7 +167,7 @@ impl Guard {
     fn excludes(self, atom: &Atomic) -> bool {
         match (self.kind, atom) {
             (GuardKind::Falsy, atom) => is_always_truthy(atom),
-            (GuardKind::NotIdentical(_), _) => false,
+            (GuardKind::NotIdentical(_) | GuardKind::CountAbove(_), _) => false,
             (_, Atomic::TNull) => true,
             (GuardKind::NotNull, _) => false,
             (GuardKind::Truthy, Atomic::TFalse | Atomic::TLiteralInt(0)) => true,
@@ -1304,17 +1309,30 @@ impl FlowState {
             Arc::make_mut(&mut self.stored_checks)
                 .retain(|var, s| *var != name && s.subject != name && s.captures != Some(name));
         }
-        let on_name = |g: &Guard| {
-            g.var == name
-                || g.var
-                    .as_str()
+        self.drop_guards_where(|var| {
+            var == name.as_str()
+                || var
                     .strip_prefix(name.as_str())
-                    .is_some_and(|rest| rest.starts_with('['))
-        };
-        if self.guarded_defs.values().flatten().any(on_name) {
+                    .is_some_and(|rest| rest.starts_with('[') || rest.starts_with("->"))
+        });
+    }
+
+    /// Drops guarded defs whose guard is on a property of the receiver `prefix` ends in (`this->`)
+    /// or on the property `prefix` names (`this->p`).
+    pub(crate) fn drop_prop_guards(&mut self, prefix: &str) {
+        self.drop_guards_where(|var| {
+            var.strip_prefix(prefix).is_some_and(|rest| {
+                rest.is_empty() || prefix.ends_with("->") || rest.starts_with("->")
+            })
+        });
+    }
+
+    fn drop_guards_where(&mut self, on: impl Fn(&str) -> bool) {
+        let on_guard = |g: &Guard| on(g.var.as_str());
+        if self.guarded_defs.values().flatten().any(on_guard) {
             let defs = Arc::make_mut(&mut self.guarded_defs);
             for guards in defs.values_mut() {
-                guards.retain(|g| !on_name(g));
+                guards.retain(|g| !on_guard(g));
             }
             defs.retain(|_, guards| !guards.is_empty());
         }
@@ -1464,10 +1482,9 @@ impl FlowState {
     /// Discard any narrowed type for an instance property (call on write to
     /// invalidate stale refinements from a prior guard).
     pub fn clear_prop_refined(&mut self, obj_var: &str, prop: &str) {
-        self.drop_element_refinements(
-            &format!("{}->{prop}", obj_var.trim_start_matches('$')),
-            false,
-        );
+        let chain = format!("{}->{prop}", obj_var.trim_start_matches('$'));
+        self.drop_prop_guards(&chain);
+        self.drop_element_refinements(&chain, false);
         let key = (
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
@@ -1481,6 +1498,7 @@ impl FlowState {
     /// (`"obj->prop"`, `"obj->prop->..."`), stale once `obj->prop` is reassigned.
     pub fn clear_prop_refined_chain(&mut self, obj_var: &str, prop: &str) {
         let chain = format!("{}->{prop}", obj_var.trim_start_matches('$'));
+        self.drop_prop_guards(&chain);
         let prefix = format!("{chain}->");
         let stale = |obj: &Name| obj.as_ref() == chain || obj.as_ref().starts_with(prefix.as_str());
         if self.prop_refined.keys().any(|(obj, _)| stale(obj)) {
@@ -1542,6 +1560,7 @@ impl FlowState {
         }
         let receiver = Name::from(stripped);
         self.forget_local_props(receiver);
+        self.drop_prop_guards(&format!("{stripped}->"));
         // A 2-hop chained receiver key (`chained_prop_receiver_key`) encodes
         // as `"{receiver}->{prop}"` — an entry keyed this way is also stale
         // once `receiver` itself may have been reassigned by an opaque call,

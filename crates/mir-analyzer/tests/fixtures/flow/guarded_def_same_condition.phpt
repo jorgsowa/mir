@@ -1,6 +1,7 @@
 ===description===
 A variable assigned under `if ($flag)` is defined wherever `$flag` is truthy
-again; the guard being rewritten or a different guard keeps it possibly undefined.
+again, even when the defining branch rewrites `$flag`; the guard being rewritten
+elsewhere or a different guard keeps it possibly undefined.
 ===file===
 <?php
 function compute(): int { return 1; }
@@ -33,10 +34,19 @@ function guardReassigned(bool $flag): void {
 //               ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 
-function guardReassignedInBranch(bool $flag): void {
+function guardReassignedInDefiningBranch(bool $flag): void {
     if ($flag) {
         $flag = (bool) rand(0, 1);
         $x = compute();
+    }
+    if ($flag && $x > 0) { echo $x; }
+}
+
+function guardReassignedInElseBranch(bool $flag): void {
+    if ($flag) {
+        $x = compute();
+    } else {
+        $flag = (bool) rand(0, 1);
     }
     if ($flag && $x > 0) { echo $x; }
 //               ^^ PossiblyUndefinedVariable: Variable $x might not be defined
