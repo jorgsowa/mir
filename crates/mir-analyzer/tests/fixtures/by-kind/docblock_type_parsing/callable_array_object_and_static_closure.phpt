@@ -13,7 +13,7 @@
 function check_callable_array($x) {
     /**
      * @var callable-array $x
-     * @mir-check $x is array<array-key, mixed>
+     * @mir-check $x is array<array-key, mixed>&callable
      */
     var_dump($x);
 }
@@ -21,7 +21,7 @@ function check_callable_array($x) {
 function check_callable_object($x) {
     /**
      * @var callable-object $x
-     * @mir-check $x is object
+     * @mir-check $x is object&callable
      */
     var_dump($x);
 }

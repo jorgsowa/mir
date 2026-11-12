@@ -269,6 +269,21 @@ pub(crate) fn fits_call_site_variance(
     )
 }
 
+/// The base and `callable` parts of `callable-array` / `callable-object` (`array&callable`).
+pub(crate) fn callable_refinement_parts(ty: &Type) -> Option<(&Type, &Type)> {
+    let [Atomic::TIntersection { parts }] = ty.types.as_slice() else {
+        return None;
+    };
+    let [base, callable] = &parts[..] else {
+        return None;
+    };
+    matches!(
+        callable.types.as_slice(),
+        [Atomic::TCallable { params: None, .. }]
+    )
+    .then_some((base, callable))
+}
+
 pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
     if sub.is_subtype_structural(sup) {
         return true;
@@ -285,6 +300,9 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
     }
     if let Some(expanded) = expand_small_int_ranges(sub) {
         return is_subtype(db, &expanded, sup);
+    }
+    if let Some((base, callable)) = callable_refinement_parts(sup) {
+        return is_subtype(db, sub, base) && is_subtype(db, sub, callable);
     }
 
     sub.types.iter().all(|a| {

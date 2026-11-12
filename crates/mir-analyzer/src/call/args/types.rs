@@ -85,6 +85,29 @@ pub(crate) fn check_one(
     ctx: &FlowState,
     arg_expr: Option<&Expr>,
 ) {
+    // `callable-array` / `callable-object`: the argument must fit the base type, then be callable.
+    if let Some((base, callable)) = crate::subtype::callable_refinement_parts(param_ty) {
+        let issues_before = ea.issues.issue_count();
+        for part in [base, callable] {
+            check_one(
+                ea,
+                fn_name,
+                param_name,
+                part,
+                arg_ty,
+                arg_span,
+                arg_idx,
+                template_params,
+                ctx,
+                arg_expr,
+            );
+            if ea.issues.issue_count() != issues_before {
+                break;
+            }
+        }
+        return;
+    }
+
     // Check typed callable signature compatibility when param type is
     // `callable(T1,T2,...):R` or the equivalent `Closure(T1,T2,...):R` docblock syntax —
     // both parse to a concrete param list and must be checked the same way.
@@ -168,7 +191,9 @@ pub(crate) fn check_one(
         return;
     }
     validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
-    validate_callable_type(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
+    validate_callable_type(
+        ea, fn_name, param_name, param_ty, arg_ty, arg_span, ctx, arg_expr,
+    );
 
     // A bare string literal passed where any parameter accepts `callable` is a
     // real runtime reference to the named function/method (register_shutdown_function,
@@ -2363,8 +2388,11 @@ fn is_possible_class_name(s: &str) -> bool {
 }
 
 /// Validate callable type arguments: check that arrays are in valid [obj/class, "method"] format
+#[allow(clippy::too_many_arguments)]
 fn validate_callable_type(
     ea: &mut ExpressionAnalyzer<'_>,
+    fn_name: &str,
+    param_name: &str,
     param_ty: &Type,
     arg_ty: &Type,
     arg_span: Span,
@@ -2424,6 +2452,35 @@ fn validate_callable_type(
             let obj_prop = properties.values().next();
             let method_prop = properties.values().nth(1);
             if let (Some(obj_prop), Some(method_prop)) = (obj_prop, method_prop) {
+                let never_names = |t: &Type| {
+                    !t.types.is_empty()
+                        && t.types.iter().all(|a| {
+                            a.is_int()
+                                || a.is_array()
+                                || matches!(
+                                    a,
+                                    Atomic::TFloat
+                                        | Atomic::TLiteralFloat(..)
+                                        | Atomic::TBool
+                                        | Atomic::TTrue
+                                        | Atomic::TFalse
+                                        | Atomic::TNull
+                                )
+                        })
+                };
+                if never_names(&obj_prop.ty) || never_names(&method_prop.ty) {
+                    ea.emit(
+                        IssueKind::InvalidArgument {
+                            param: param_name.to_string(),
+                            fn_name: fn_name.to_string(),
+                            expected: "callable".to_string(),
+                            actual: arg_ty.to_string(),
+                        },
+                        Severity::Error,
+                        arg_span,
+                    );
+                    continue;
+                }
                 // Check if second element is a string (method name)
                 if let Some(Atomic::TLiteralString(method_name)) = method_prop.ty.types.first() {
                     // Get the class from the object/class reference. `[Foo::class,

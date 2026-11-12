@@ -32,6 +32,9 @@ pub(crate) fn return_type_is_invalid(
     if declared.is_mixed() || actual.is_mixed() {
         return false;
     }
+    if crate::subtype::callable_refinement_parts(declared).is_some() {
+        return !crate::subtype::is_subtype(db, actual, declared);
+    }
     if named_object_return_compatible(actual, declared, db, file) {
         return false;
     }

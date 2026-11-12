@@ -567,11 +567,31 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             u
         }
         "non-empty-scalar" => non_empty_scalar(),
-        "object" | "callable-object" => Type::single(Atomic::TObject),
-        "array" | "callable-array" => Type::single(Atomic::TArray {
+        "object" => Type::single(Atomic::TObject),
+        "array" => Type::single(Atomic::TArray {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
+        "callable-object" | "callable-array" => {
+            let base = if lower == "callable-object" {
+                Atomic::TObject
+            } else {
+                Atomic::TArray {
+                    key: Box::new(Type::array_key()),
+                    value: Box::new(Type::mixed()),
+                }
+            };
+            Type::single(Atomic::TIntersection {
+                parts: mir_types::union::vec_to_type_params(vec![
+                    Type::single(base),
+                    Type::single(Atomic::TCallable {
+                        params: None,
+                        return_type: None,
+                        is_pure: false,
+                    }),
+                ]),
+            })
+        }
         "non-empty-array" => Type::single(Atomic::TNonEmptyArray {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
