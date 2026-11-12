@@ -303,7 +303,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     && !declared.contains(|t| match t {
                         Atomic::TConditional { .. } => true,
                         // Unresolved while its object is itself a template.
-                        Atomic::TNamedObject { fqcn, .. } => fqcn.as_str() == "template-type",
+                        Atomic::TNamedObject { fqcn, .. } => crate::subtype::is_type_operator(fqcn),
                         _ => false,
                     });
                 if is_mixed_return {

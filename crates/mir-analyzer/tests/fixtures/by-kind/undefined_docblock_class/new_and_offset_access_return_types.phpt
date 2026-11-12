@@ -1,5 +1,5 @@
 ===description===
-`new<…>` and offset access `CONST[T]` in `@return` are not class names; the native return type applies.
+`new<…>` and offset access `CONST[T]` in `@return` are not class names.
 ===config===
 <mir>
   <issueHandlers>
@@ -43,6 +43,6 @@ function takesArray(array $value): void {}
 
 takesObject(instantiate(\DateTimeImmutable::class));
 takesArray(instantiate(\DateTimeImmutable::class));
-//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of takesArray() expects 'array', got 'object'
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of takesArray() expects 'array', got 'DateTimeImmutable'
 takesArray(lookUp('immutable'));
-//         ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of takesArray() expects 'array', got 'int|string'
+//         ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of takesArray() expects 'array', got '1'

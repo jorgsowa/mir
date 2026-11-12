@@ -1506,7 +1506,8 @@ impl<'a> DefinitionCollector<'a> {
                 mir_types::Atomic::TNamedObject { fqcn, type_params }
                     if !type_params.is_empty()
                         && (!is_php_builtin_type(fqcn.as_ref())
-                            || resolution::is_self_static_parent_keyword(fqcn)) =>
+                            || resolution::is_self_static_parent_keyword(fqcn)
+                            || crate::subtype::is_type_operator(fqcn.trim_start_matches('\\'))) =>
                 {
                     let resolved_fqcn = if resolution::is_self_static_parent_keyword(fqcn) {
                         *fqcn

@@ -698,7 +698,7 @@ fn atomic_mentions_enum_case(a: &Atomic) -> bool {
         | Atomic::TPropertiesOf { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
             fqcn.contains("::")
-                || fqcn.as_str() == "template-type"
+                || is_type_operator(fqcn)
                 || type_params.iter().any(mentions_enum_case)
         }
         Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
@@ -864,20 +864,94 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
     collapse_complete_enums(db, out)
 }
 
-/// A call's return type with each resolvable `template-type<Obj, Cls, 'T'>` replaced by its argument.
+/// Docblock pseudo-types naming a type operator (`template-type<…>`, `new<C>`, `T[K]`), not a class.
+pub(crate) fn is_type_operator(fqcn: &str) -> bool {
+    matches!(fqcn, "template-type" | "new" | "offset-access")
+}
+
+/// A call's return type with each resolvable type operator replaced by its result.
 pub(crate) fn resolve_template_types(db: &dyn MirDatabase, ty: Type) -> Type {
-    if !ty.contains(
-        |a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.as_str() == "template-type"),
-    ) {
+    if !ty.contains(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if is_type_operator(fqcn))) {
         return ty;
     }
     let mut out = Type::empty();
     out.from_docblock = ty.from_docblock;
     for atomic in ty.types {
-        match template_type_argument(db, &atomic) {
+        let resolved = match &atomic {
+            Atomic::TNamedObject { fqcn, type_params } => match (fqcn.as_str(), &type_params[..]) {
+                ("new", [class]) => Some(new_object_type(db, class)),
+                ("offset-access", [target, offset]) => Some(offset_access_type(db, target, offset)),
+                _ => template_type_argument(db, &atomic),
+            },
+            _ => None,
+        };
+        match resolved {
             Some(resolved) => out.merge_with(&resolved),
             None => out.add_type(atomic),
         }
+    }
+    out
+}
+
+/// `new<C>`: an instance of each class `C` names, or `object` when it names none.
+fn new_object_type(db: &dyn MirDatabase, class: &Type) -> Type {
+    let class = resolve_template_types(db, class.clone());
+    let mut out = Type::empty();
+    for atomic in &class.types {
+        let fqcn = match atomic {
+            Atomic::TLiteralString(name) => Some(Name::new(name.trim_start_matches('\\'))),
+            Atomic::TClassString(Some(name)) => Some(*name),
+            _ => None,
+        };
+        out.add_type(match fqcn {
+            Some(fqcn) => Atomic::TNamedObject {
+                fqcn,
+                type_params: Default::default(),
+            },
+            None => Atomic::TObject,
+        });
+    }
+    if out.types.is_empty() {
+        out.add_type(Atomic::TObject);
+    }
+    out
+}
+
+/// `T[K]`: the value at each literal key `K` of the array (or array constant) `T`;
+/// any other key reads every value.
+fn offset_access_type(db: &dyn MirDatabase, target: &Type, offset: &Type) -> Type {
+    let array = match target.types.as_slice() {
+        [Atomic::TNamedObject { fqcn, .. }] if fqcn.contains("::") => {
+            class_constant_ref_type(db, fqcn)
+        }
+        [Atomic::TNamedObject { fqcn, .. }] => {
+            crate::db::find_global_constant(db, crate::db::Fqcn::from_str(db, fqcn))
+                .map(|c| (*c).clone())
+        }
+        _ => Some(target.clone()),
+    };
+    let Some(array) = array else {
+        return Type::mixed();
+    };
+    let offset = resolve_template_types(db, offset.clone());
+    let all_values = || mir_types::union::eval_value_of_type(&array).unwrap_or_else(Type::mixed);
+    let [Atomic::TKeyedArray { properties, .. }] = array.types.as_slice() else {
+        return all_values();
+    };
+    let mut out = Type::empty();
+    for atomic in &offset.types {
+        let key = match atomic {
+            Atomic::TLiteralString(s) => mir_types::ArrayKey::String(s.clone()),
+            Atomic::TLiteralInt(n) => mir_types::ArrayKey::Int(*n),
+            _ => return all_values(),
+        };
+        match properties.get(&key) {
+            Some(property) => out.merge_with(&property.ty),
+            None => return all_values(),
+        }
+    }
+    if out.types.is_empty() {
+        return all_values();
     }
     out
 }

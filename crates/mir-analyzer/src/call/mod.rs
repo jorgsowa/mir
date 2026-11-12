@@ -105,6 +105,13 @@ pub(crate) fn literal_default_type(
         )
         .then_some(ty);
     }
+    let quoted = text
+        .strip_prefix('\'')
+        .and_then(|t| t.strip_suffix('\''))
+        .filter(|t| !t.contains(['\'', '\\']));
+    if let Some(s) = quoted {
+        return Some(mir_types::Type::single(Atomic::TLiteralString(s.into())));
+    }
     let atomic = match text.to_ascii_lowercase().as_str() {
         "true" => Atomic::TTrue,
         "false" => Atomic::TFalse,

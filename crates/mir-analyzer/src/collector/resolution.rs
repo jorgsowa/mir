@@ -77,6 +77,9 @@ pub(super) fn resolve_type_name(
     }
     // `Enum::Case`: only the class part is a name to resolve.
     if let Some((class, member)) = name.split_once("::") {
+        if class.eq_ignore_ascii_case("self") {
+            return Name::from(name);
+        }
         let class = resolve_type_name(
             class,
             full_qualify,
@@ -361,6 +364,24 @@ pub(crate) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
                     ),
                 }
             }
+            // `self::CONST`, as in `key-of<self::MAP>` or `self::MAP[K]`.
+            Atomic::TNamedObject { fqcn, type_params }
+                if fqcn
+                    .split_once("::")
+                    .is_some_and(|(class, _)| class.eq_ignore_ascii_case("self")) =>
+            {
+                let (_, member) = fqcn.split_once("::").unwrap_or_default();
+                Atomic::TNamedObject {
+                    fqcn: format!("{class_fqcn}::{member}").into(),
+                    type_params,
+                }
+            }
+            Atomic::TKeyOf { target } => Atomic::TKeyOf {
+                target: Box::new(fill_self_static_parent(*target, class_fqcn)),
+            },
+            Atomic::TValueOf { target } => Atomic::TValueOf {
+                target: Box::new(fill_self_static_parent(*target, class_fqcn)),
+            },
             // Keywords nested in generic arguments / array element types (`list<self>`).
             Atomic::TNamedObject { fqcn, type_params } if !type_params.is_empty() => {
                 Atomic::TNamedObject {

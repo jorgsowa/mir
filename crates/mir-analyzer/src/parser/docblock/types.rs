@@ -280,10 +280,39 @@ fn parse_shape_key(inner: &str) -> mir_types::ArrayKey {
 }
 
 /// `new<T>` and offset access `T[K]`, whose result needs the bound template.
-pub(super) fn is_deferred_type(s: &str) -> bool {
+fn is_deferred_type(s: &str) -> bool {
     let s = s.trim();
     (s.ends_with(']') && !s.ends_with("[]") && s.contains('['))
         || (s.ends_with('>') && strip_ascii_ci_prefix(s, "new<").is_some())
+}
+
+/// `new<C>` / `T[K]` as the `new` / `offset-access` pseudo-types the call site resolves.
+fn parse_deferred_type(s: &str) -> Type {
+    let (name, args) = match strip_ascii_ci_prefix(s, "new<") {
+        Some(inner) => ("\\new", vec![parse_type_string(&inner[..inner.len() - 1])]),
+        None => {
+            let mut depth = 0;
+            let open = s
+                .char_indices()
+                .rev()
+                .find(|&(_, c)| {
+                    match c {
+                        ']' => depth += 1,
+                        '[' => depth -= 1,
+                        _ => {}
+                    }
+                    depth == 0
+                })
+                .map_or(0, |(i, _)| i);
+            let target = parse_type_string(&s[..open]);
+            let offset = parse_type_string(&s[open + 1..s.len() - 1]);
+            ("\\offset-access", vec![target, offset])
+        }
+    };
+    Type::single(Atomic::TNamedObject {
+        fqcn: mir_types::Name::from(name),
+        type_params: mir_types::union::vec_to_type_params(args),
+    })
 }
 
 /// Scalars that are not falsy: `0.0` stays possible since float has no atom without it.
@@ -403,7 +432,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
     }
 
     if is_deferred_type(s) {
-        return Type::mixed();
+        return parse_deferred_type(s);
     }
 
     // Array shape: `array{key: Type, ...}` or `list{Type, ...}`
@@ -835,7 +864,6 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         }
         // PHPStan's lenient union: the members still describe the value.
         "__benevolent" => parse_type_string(inner.trim()),
-        "new" => Type::mixed(),
         keyword @ ("properties-of"
         | "public-properties-of"
         | "protected-properties-of"

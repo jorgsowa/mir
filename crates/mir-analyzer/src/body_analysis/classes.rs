@@ -44,8 +44,11 @@ pub(super) fn collect_named_object_fqcns_with_arity(
         match atomic {
             mir_types::Atomic::TNamedObject { fqcn, type_params } => {
                 // `template-type<Obj, Cls, 'T'>` is a utility type, not a class.
-                if fqcn.as_str() != "template-type" {
+                if !crate::subtype::is_type_operator(fqcn) {
                     out.push((*fqcn, type_params.len()));
+                } else if fqcn.as_str() != "template-type" {
+                    // `new<T>` / `T[K]` arguments name templates and constants, not classes.
+                    continue;
                 }
                 for tp in type_params.iter() {
                     collect_named_object_fqcns_with_arity(tp, out);
@@ -661,7 +664,12 @@ impl<'a> BodyAnalyzer<'a> {
                         // for consistency, though only reachable via `@return` here.
                         if matches!(
                             crate::util::php_ident_lowercase(cls_fqcn.as_ref()).as_str(),
-                            "self" | "static" | "parent" | "template-type"
+                            "self"
+                                | "static"
+                                | "parent"
+                                | "template-type"
+                                | "new"
+                                | "offset-access"
                         ) {
                             continue;
                         }
