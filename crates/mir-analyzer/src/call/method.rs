@@ -797,6 +797,10 @@ impl CallAnalyzer {
                 )),
                 call.method.span,
             );
+            // The unknown callee may take an array element by reference and write to it.
+            for value in call.args.iter().filter_map(|a| a.value()) {
+                super::write_byref_element(ea, ctx, value, Type::mixed());
+            }
             return Type::mixed();
         }
 

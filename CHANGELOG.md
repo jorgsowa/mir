@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An array element passed to a method of a `mixed` receiver may be written by reference, so it no longer keeps its shape from before the call (`NonExistentArrayOffset` on a key the callee adds).
 - An untyped parameter with a `null` default (`/** @param string $root */ function f($root = NULL)`) can be `null`, so `$root === NULL` is no longer reported as impossible.
 - A docblock type that the native type rules out is ignored in favor of the native type: an array or object on a scalar (`@var array` on `string`), and a property `@var` class that is not a subtype of the native class.
 - `@param T[]` on a native `iterable` parameter reads as `iterable<T>`, so a `Traversable` argument is no longer `InvalidArgument`.

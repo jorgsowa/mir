@@ -4873,12 +4873,6 @@
       <code><![CDATA[$view->cacheSet()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="core/modules/views_ui/src/Form/Ajax/Display.php">
-    <NonExistentArrayOffset>
-      <code><![CDATA['#title']]></code>
-      <code><![CDATA['override']]></code>
-    </NonExistentArrayOffset>
-  </file>
   <file src="core/modules/views_ui/src/Form/Ajax/ViewsFormBase.php">
     <InvalidReturnType>
       <code><![CDATA[return new RedirectResponse($form_url->setAbsolute()->toString());]]></code>
