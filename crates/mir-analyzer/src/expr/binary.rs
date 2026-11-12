@@ -241,7 +241,37 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 let both_arrays =
                     b.op == BinaryOp::Add && array_or_mixed(&left_ty) && array_or_mixed(&right_ty);
-                if !both_arrays {
+                let may_be_array = |t: &Type| t.is_mixed() || t.types.iter().any(Atomic::is_array);
+                let array_or_null = |t: &Type| {
+                    t.types
+                        .iter()
+                        .all(|a| a.is_array() || matches!(a, Atomic::TNull))
+                };
+                if !both_arrays
+                    && b.op == BinaryOp::Add
+                    && may_be_array(&left_ty)
+                    && may_be_array(&right_ty)
+                {
+                    // `array + array` is valid for the array members of each side.
+                    let kind = if array_or_null(&left_ty) && array_or_null(&right_ty) {
+                        let nullable = if operand_contains_null(&left_ty) {
+                            &left_ty
+                        } else {
+                            &right_ty
+                        };
+                        IssueKind::PossiblyNullOperand {
+                            op: "+".to_string(),
+                            ty: nullable.to_string(),
+                        }
+                    } else {
+                        IssueKind::PossiblyInvalidOperand {
+                            op: "+".to_string(),
+                            left: left_ty.to_string(),
+                            right: right_ty.to_string(),
+                        }
+                    };
+                    self.emit(kind, Severity::Info, span);
+                } else if !both_arrays {
                     if operand_is_non_numeric(&left_ty) || operand_is_non_numeric(&right_ty) {
                         self.emit(
                             IssueKind::InvalidOperand {

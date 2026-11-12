@@ -390,29 +390,6 @@
       <code><![CDATA[user_pass_reset_url($user)]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/lib/Drupal/Core/Config/Action/Plugin/ConfigAction/Deriver/CreateForEachBundleDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[$base_plugin_definition + [
-      'create_action' => 'createIfNotExists',
-    ]]]></code>
-      <code><![CDATA[$base_plugin_definition + [
-      'create_action' => 'create',
-    ]]]></code>
-    </InvalidOperand>
-  </file>
-  <file src="core/lib/Drupal/Core/Config/Action/Plugin/ConfigAction/Deriver/EntityCreateDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[$base_plugin_definition + ['constructor_args' => ['exists' => Exists::ReturnEarlyIfExists]]]]></code>
-      <code><![CDATA[$base_plugin_definition + ['constructor_args' => ['exists' => Exists::ErrorIfExists]]]]></code>
-    </InvalidOperand>
-  </file>
-  <file src="core/lib/Drupal/Core/Config/Action/Plugin/ConfigAction/Deriver/PermissionsPerBundleDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-          'target_entity_type' => $id,
-        ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/lib/Drupal/Core/Config/Action/Plugin/ConfigAction/PermissionsPerBundle.php">
     <InvalidArgument>
       <code><![CDATA[$permissions]]></code>
@@ -616,11 +593,6 @@
       <code><![CDATA[$attribute->newInstance()->value]]></code>
     </InvalidCast>
   </file>
-  <file src="core/lib/Drupal/Core/DependencyInjection/Compiler/BackwardsCompatibilityClassLoaderPass.php">
-    <InvalidOperand>
-      <code><![CDATA[$moved_classes + $module_moved]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/lib/Drupal/Core/DependencyInjection/YamlFileLoader.php">
     <InvalidReturnType>
       <code><![CDATA[return $content;]]></code>
@@ -805,21 +777,6 @@
       <code><![CDATA[$records]]></code>
     </InvalidArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Entity/Plugin/DataType/Deriver/EntityDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-        'class' => $class,
-        'label' => $entity_type->getLabel(),
-        'constraints' => $entity_type->getConstraints(),
-        'internal' => $entity_type->isInternal(),
-      ] + $base_plugin_definition]]></code>
-      <code><![CDATA[[
-            'class' => $class,
-            'label' => $info['label'],
-            'constraints' => $this->derivatives[$entity_type_id]['constraints'],
-          ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/lib/Drupal/Core/Entity/Plugin/DataType/EntityAdapter.php">
     <NullableReturnStatement>
       <code><![CDATA[return isset($this->entity) ? $this->entity->label() : '';]]></code>
@@ -830,14 +787,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->id = $value]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/Entity/Plugin/Derivative/VersionHistoryLocalTasks.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-        'route_name' => "entity.$entity_type_id.version_history",
-        'base_route' => "entity.$entity_type_id.canonical",
-      ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Query/Sql/Condition.php">
     <ImpossibleIdenticalComparison>
@@ -1250,13 +1199,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Menu/InaccessibleMenuLink.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-      'route_name' => '<front>',
-      'route_parameters' => [],
-      'url' => NULL,
-    ] + $this->wrappedLink->getPluginDefinition()]]></code>
-    </InvalidOperand>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('Inaccessible');]]></code>
     </InvalidReturnType>
@@ -1265,11 +1207,6 @@
     <NullArgument>
       <code><![CDATA[NULL]]></code>
     </NullArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Menu/MenuLinkDefault.php">
-    <InvalidOperand>
-      <code><![CDATA[$overrides + $this->getPluginDefinition()]]></code>
-    </InvalidOperand>
   </file>
   <file src="core/lib/Drupal/Core/Menu/MenuLinkManager.php">
     <InvalidReturnType>
@@ -1748,16 +1685,6 @@
       <code><![CDATA[$ajax_response->getAttachments()]]></code>
     </UndefinedMethod>
   </file>
-  <file src="core/modules/block/src/Plugin/ConfigAction/PlaceBlockDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-      'which_theme' => 'admin',
-    ] + $base_plugin_definition]]></code>
-      <code><![CDATA[[
-      'which_theme' => 'default',
-    ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/block_content/src/BlockContentForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -2022,26 +1949,6 @@
       <code><![CDATA[moderation_state]]></code>
     </UndefinedProperty>
   </file>
-  <file src="core/modules/content_moderation/src/Plugin/ConfigAction/AddModerationDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-          'target_entity_type' => $id,
-          'admin_label' => $this->t('Add moderation to all @bundles', [
-            '@bundles' => $bundle_entity_type->getPluralLabel() ?: $bundle_entity_type->id(),
-          ]),
-        ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
-  <file src="core/modules/content_moderation/src/Plugin/Derivative/DynamicLocalTasks.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-        'route_name' => "entity.$entity_type_id.latest_version",
-        'title' => $this->t('Latest version'),
-        'base_route' => "entity.$entity_type_id.canonical",
-        'weight' => 1,
-      ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/content_moderation/src/Plugin/WorkflowType/ContentModeration.php">
     <InvalidReturnType>
       <code><![CDATA[return array_keys($this->configuration['entity_types']);]]></code>
@@ -2076,16 +1983,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $original;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/content_translation/src/Plugin/Derivative/ContentTranslationLocalTasks.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-        'entity_type' => $entity_type_id,
-        'title' => $this->t('Translate'),
-        'route_name' => $translation_route_name,
-        'base_route' => $base_route_name,
-      ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
   </file>
   <file src="core/modules/content_translation/src/Plugin/Validation/Constraint/ContentTranslationSynchronizedFieldsConstraintValidator.php">
     <NullableReturnStatement>
@@ -2984,16 +2881,6 @@
       <code><![CDATA[return $permissions;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/layout_builder/src/Plugin/ConfigAction/Deriver/AddComponentDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[$base_plugin_definition + [
-      'multiple' => FALSE,
-    ]]]></code>
-      <code><![CDATA[$base_plugin_definition + [
-      'multiple' => TRUE,
-    ]]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/layout_builder/src/Plugin/Layout/MultiWidthLayoutBase.php">
     <NullableReturnStatement>
       <code><![CDATA[return array_shift($width_classes);]]></code>
@@ -3360,28 +3247,6 @@
       <code><![CDATA[return $this->resourceFetcher->fetchResource($resource_url)->getProvider();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/media/src/Plugin/Derivative/DynamicLocalTasks.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-      'route_name' => "entity.media.canonical",
-      'title' => $this->t('Edit'),
-      'base_route' => "entity.media.canonical",
-      'weight' => 1,
-    ] + $base_plugin_definition]]></code>
-      <code><![CDATA[[
-        'route_name' => "entity.media.edit_form",
-        'title' => $this->t('Edit'),
-        'base_route' => 'entity.media.canonical',
-        'weight' => 2,
-      ] + $base_plugin_definition]]></code>
-      <code><![CDATA[[
-      'route_name' => "entity.media.delete_form",
-      'title' => $this->t('Delete'),
-      'base_route' => "entity.media.canonical",
-      'weight' => 10,
-    ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/media/src/Plugin/Filter/MediaEmbed.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->t('
@@ -3412,17 +3277,6 @@
       <code><![CDATA[$this->fileSystem->saveData((string) $response->getBody(), $local_thumbnail_uri, FileExists::Replace)]]></code>
     </TaintedFile>
   </file>
-  <file src="core/modules/media/src/Plugin/media/Source/OEmbedDeriver.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-        'id' => 'video',
-        'label' => $this->t('Remote video'),
-        'description' => $this->t('Use remote video URL for reusable media.'),
-        'providers' => ['YouTube', 'Vimeo'],
-        'default_thumbnail_filename' => 'video.png',
-      ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/media_library/src/Form/FileUploadForm.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->renderer = $renderer]]></code>
@@ -3447,9 +3301,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/menu_link_content/src/Plugin/Menu/MenuLinkContent.php">
-    <InvalidOperand>
-      <code><![CDATA[$overrides + $this->getPluginDefinition()]]></code>
-    </InvalidOperand>
     <NullableReturnStatement>
       <code><![CDATA[return $this->getDerivativeId();]]></code>
     </NullableReturnStatement>
@@ -3632,18 +3483,6 @@
     <UndefinedFunction>
       <code><![CDATA[_file_save_upload_from_form($form['logo']['custom']['logo_upload'], $form_state, 0)]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/navigation/src/Menu/NavigationMenuLinkTreeManipulators.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-      'title' => $this->t('Overview', [
-        '@title' => $element->link->getTitle(),
-      ]),
-      'parent' => $element->link->getPluginId(),
-      'provider' => 'navigation',
-      'weight' => -1000,
-    ] + $element->link->getPluginDefinition()]]></code>
-    </InvalidOperand>
   </file>
   <file src="core/modules/navigation/src/Plugin/SectionStorage/NavigationSectionStorage.php">
     <NullableReturnStatement>
@@ -4199,9 +4038,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/system/src/Controller/LinksetController.php">
-    <InvalidOperand>
-      <code><![CDATA[parse_url($request->getUri()) + ['query' => FALSE]]]></code>
-    </InvalidOperand>
     <PossiblyInvalidArrayOffset>
       <code><![CDATA[['path' => $path, 'query' => $query] = parse_url($request->getUri()) + ['query' => FALSE]]]></code>
     </PossiblyInvalidArrayOffset>
@@ -4269,11 +4105,6 @@
     <UndefinedFunction>
       <code><![CDATA[batch_set($batch_builder->toArray())]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/system/src/Form/ThemeAdminForm.php">
-    <InvalidOperand>
-      <code><![CDATA[['' => $this->t('Default theme')] + $theme_options]]></code>
-    </InvalidOperand>
   </file>
   <file src="core/modules/system/src/Form/ThemeExperimentalConfirmForm.php">
     <InvalidReturnType>
@@ -4607,16 +4438,6 @@
       <code><![CDATA[user_picture_enabled()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/modules/user/src/Plugin/Derivative/UserLocalTask.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-        'route_name' => "entity.$bundle_type_id.entity_permissions_form",
-        'weight' => 10,
-        'title' => $this->t('Manage permissions'),
-        'base_route' => $base_route,
-      ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/user/src/Plugin/LanguageNegotiation/LanguageNegotiationUserAdmin.php">
     <PossiblyUndefinedVariable>
       <code><![CDATA[$route_object]]></code>
@@ -4755,29 +4576,10 @@
       <code><![CDATA[$this->addContextualLinks($output, 'exposed_filter')]]></code>
     </TaintedCallable>
   </file>
-  <file src="core/modules/views/src/Plugin/Derivative/ViewsLocalTask.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-          'route_name' => $route_name,
-          'weight' => $menu['weight'],
-          'title' => $menu['title'],
-        ] + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
-  <file src="core/modules/views/src/Plugin/Derivative/ViewsMenuLink.php">
-    <InvalidOperand>
-      <code><![CDATA[$link + $base_plugin_definition]]></code>
-    </InvalidOperand>
-  </file>
   <file src="core/modules/views/src/Plugin/EntityReferenceSelection/ViewsSelection.php">
     <NullableReturnStatement>
       <code><![CDATA[return $results;]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/views/src/Plugin/Menu/ViewsMenuLink.php">
-    <InvalidOperand>
-      <code><![CDATA[$overrides + $this->pluginDefinition]]></code>
-    </InvalidOperand>
   </file>
   <file src="core/modules/views/src/Plugin/views/BrokenHandlerTrait.php">
     <PossiblyUndefinedVariable>
@@ -4996,9 +4798,6 @@
     </InvalidArgument>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/BooleanOperator.php">
-    <InvalidOperand>
-      <code><![CDATA[['All' => $this->t('- Any -')] + $form['value']['#options']]]></code>
-    </InvalidOperand>
     <InvalidReturnType>
       <code><![CDATA[return $options;]]></code>
     </InvalidReturnType>
