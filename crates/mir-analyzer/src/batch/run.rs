@@ -374,15 +374,38 @@ impl AnalysisSession {
             }
         }
         let _t_class_analyzer = std::time::Instant::now();
+        // Class checks see only declarations, so a file whose cached result is
+        // still valid (no dependency surface changed) replays them too.
+        let cached_class_issues: HashMap<Arc<str>, Arc<[Issue]>> = match &self.cache {
+            Some(cache) => file_data
+                .iter()
+                .filter_map(|(f, _)| {
+                    let issues = cache.class_issues(f, content_hexes.get(f)?)?;
+                    Some((f.clone(), issues))
+                })
+                .collect(),
+            None => HashMap::default(),
+        };
+        let mut fresh_class_issues: HashMap<Arc<str>, Arc<[Issue]>> = HashMap::default();
         {
             let class_db = self.db.snapshot_db();
-            let class_issues = crate::class::ClassAnalyzer::with_files(
+            let reuse: HashSet<Arc<str>> = cached_class_issues.keys().cloned().collect();
+            let (by_file, unlocated) = crate::class::ClassAnalyzer::with_files(
                 &class_db,
                 analyzed_file_set.clone(),
                 &file_data,
             )
-            .analyze_all_par(self.db.snapshot_db());
-            all_issues.extend(class_issues);
+            .analyze_by_file_par(self.db.snapshot_db(), &reuse);
+            for (file, issues) in by_file {
+                match issues {
+                    Some(issues) => {
+                        all_issues.extend(issues.iter().cloned());
+                        fresh_class_issues.insert(file, issues.into());
+                    }
+                    None => all_issues.extend(cached_class_issues[&file].iter().cloned()),
+                }
+            }
+            all_issues.extend(unlocated);
         }
         let _t_class_analyzer_ms = _t_class_analyzer.elapsed().as_secs_f64() * 1000.0;
 
@@ -482,11 +505,16 @@ impl AnalysisSession {
                         .unwrap_or_default();
                     cache.put(
                         &parsed.file,
-                        h,
+                        h.clone(),
                         surface,
                         issues.as_slice().into(),
                         cache_locs,
                     );
+                    let class_issues = fresh_class_issues
+                        .get(&parsed.file)
+                        .cloned()
+                        .unwrap_or_else(|| Arc::from([]));
+                    cache.put_class_issues(&parsed.file, &h, class_issues);
                     if let Some(cb) = &opts.on_file_done {
                         cb();
                     }

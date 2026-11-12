@@ -893,3 +893,110 @@ fn autoloadable_new_class_reanalyzes_every_cached_consumer() {
         "no cached UndefinedClass survives the class becoming loadable"
     );
 }
+
+/// Issue kinds a fresh session reports on `paths` with the shared cache, sorted.
+fn cached_run_kinds(cache_dir: &std::path::Path, paths: &[std::path::PathBuf]) -> Vec<String> {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
+    let result = session.analyze_paths(paths, &BatchOptions::new().without_symbols());
+    let mut kinds: Vec<String> = result
+        .issues
+        .iter()
+        .map(|i| i.kind.name().to_string())
+        .filter(|k| !dead_code_issue_kinds().contains(&k.as_str()))
+        .collect();
+    kinds.sort();
+    kinds
+}
+
+#[test]
+fn class_issues_replay_from_cache() {
+    let src_dir = create_temp_dir("class_issues_replay: source files");
+    let cache_dir = create_temp_dir("class_issues_replay: cache");
+    let paths = [
+        write_file(
+            &src_dir,
+            "Base.php",
+            "<?php\nabstract class Base {\n    abstract public function go(): void;\n}\n",
+        ),
+        write_file(
+            &src_dir,
+            "Child.php",
+            "<?php\nclass Child extends Base {}\n",
+        ),
+    ];
+    let cold = cached_run_kinds(cache_dir.path(), &paths);
+    assert_eq!(cold, ["UnimplementedAbstractMethod"]);
+    assert_eq!(reanalyzed_count(cache_dir.path(), &paths), 0);
+    assert_eq!(cached_run_kinds(cache_dir.path(), &paths), cold);
+}
+
+#[test]
+fn class_issues_follow_ancestor_signature_changes() {
+    let src_dir = create_temp_dir("class_issues_ancestors: source files");
+    let cache_dir = create_temp_dir("class_issues_ancestors: cache");
+    let paths = [
+        write_file(&src_dir, "Grand.php", "<?php\nabstract class Grand {}\n"),
+        write_file(
+            &src_dir,
+            "Base.php",
+            "<?php\nabstract class Base extends Grand {}\n",
+        ),
+        write_file(
+            &src_dir,
+            "Child.php",
+            "<?php\nclass Child extends Base {}\n",
+        ),
+    ];
+    assert!(cached_run_kinds(cache_dir.path(), &paths).is_empty());
+
+    write_file(
+        &src_dir,
+        "Grand.php",
+        "<?php\nabstract class Grand {\n    abstract public function go(): void;\n}\n",
+    );
+    assert_eq!(
+        cached_run_kinds(cache_dir.path(), &paths),
+        ["UnimplementedAbstractMethod"],
+        "a grandparent's new abstract method reaches the unchanged child"
+    );
+
+    write_file(
+        &src_dir,
+        "Grand.php",
+        "<?php\n/** @deprecated */\nabstract class Grand {\n    public function go(): void {}\n}\n",
+    );
+    assert_eq!(
+        cached_run_kinds(cache_dir.path(), &paths),
+        ["DeprecatedClass"],
+        "a docblock-only change to the parent's parent invalidates the parent's checks"
+    );
+}
+
+#[test]
+fn class_issues_follow_return_type_hierarchy_changes() {
+    let src_dir = create_temp_dir("class_issues_return_types: source files");
+    let cache_dir = create_temp_dir("class_issues_return_types: cache");
+    let paths = [
+        write_file(&src_dir, "Res.php", "<?php\nclass Res {}\n"),
+        write_file(&src_dir, "Thing.php", "<?php\nclass Thing extends Res {}\n"),
+        write_file(
+            &src_dir,
+            "Base.php",
+            "<?php\nclass Base {\n    public function make(): Res { return new Res(); }\n}\n",
+        ),
+        write_file(
+            &src_dir,
+            "Child.php",
+            "<?php\nclass Child extends Base {\n    public function make(): Thing { return new Thing(); }\n}\n",
+        ),
+    ];
+    assert!(cached_run_kinds(cache_dir.path(), &paths).is_empty());
+
+    write_file(&src_dir, "Thing.php", "<?php\nclass Thing {}\n");
+    assert!(
+        cached_run_kinds(cache_dir.path(), &paths)
+            .iter()
+            .any(|k| k == "MethodSignatureMismatch"),
+        "the override's return type no longer narrowing the parent's is reported"
+    );
+}

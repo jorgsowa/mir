@@ -231,6 +231,9 @@ struct CacheEntry {
     /// edit to a declared-return callable leaves it untouched. An empty value
     /// is treated as "unknown" and conservatively cascades.
     surface_hash: String,
+    /// Class-level check issues of the class-likes this file declares; `None`
+    /// until a batch run stores them.
+    class_issues: Option<std::sync::Arc<[Issue]>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +266,7 @@ struct DiskEntry {
     issues: Vec<Issue>,
     /// `(symbol, line, col_start, col_end)`, the symbol an index into `strings`.
     refs: Vec<(u32, u32, u16, u16)>,
+    class_issues: Option<Vec<Issue>>,
 }
 
 /// Borrowing counterpart of [`CacheFile`] for `flush`; bincode encodes it
@@ -283,6 +287,7 @@ struct DiskEntryView<'a> {
     surface_hash: &'a str,
     issues: &'a [Issue],
     refs: Vec<(u32, u32, u16, u16)>,
+    class_issues: Option<&'a [Issue]>,
 }
 
 #[derive(Default)]
@@ -478,6 +483,7 @@ impl AnalysisCache {
                     issues: e.issues.into(),
                     reference_locations,
                     surface_hash: e.surface_hash,
+                    class_issues: e.class_issues.map(Into::into),
                 },
             );
         }
@@ -638,6 +644,7 @@ impl AnalysisCache {
                 issues,
                 reference_locations,
                 surface_hash,
+                class_issues: None,
             },
         );
         let mut unresolved = self.unresolved_entries.lock();
@@ -647,6 +654,39 @@ impl AnalysisCache {
             unresolved.remove(&id);
         }
         self.dirty.store(true, Ordering::Relaxed);
+    }
+
+    /// Stored class-level issues for `file_path`, if its entry matches `content_hash`
+    /// and holds them.
+    pub fn class_issues(
+        &self,
+        file_path: &str,
+        content_hash: &str,
+    ) -> Option<std::sync::Arc<[Issue]>> {
+        let id = self.file_id_map.lock().get(file_path)?;
+        let entries = self.entries.lock();
+        let entry = entries.get(&id)?;
+        (entry.content_hash == content_hash)
+            .then(|| entry.class_issues.clone())
+            .flatten()
+    }
+
+    /// Attach class-level issues to the entry [`Self::put`] stored for `content_hash`.
+    pub fn put_class_issues(
+        &self,
+        file_path: &str,
+        content_hash: &str,
+        issues: std::sync::Arc<[Issue]>,
+    ) {
+        let Some(id) = self.file_id_map.lock().get(file_path) else {
+            return;
+        };
+        if let Some(entry) = self.entries.lock().get_mut(&id) {
+            if entry.content_hash == content_hash {
+                entry.class_issues = Some(issues);
+                self.dirty.store(true, Ordering::Relaxed);
+            }
+        }
     }
 
     /// The stored cross-file surface digest for `file_path`, if an entry exists.
@@ -686,6 +726,7 @@ impl AnalysisCache {
                     surface_hash: &entry.surface_hash,
                     issues: &entry.issues,
                     refs,
+                    class_issues: entry.class_issues.as_deref(),
                 })
             })
             .collect();
@@ -1095,6 +1136,38 @@ mod tests {
     fn surface(src: &str) -> String {
         let parsed = php_rs_parser::parse(src);
         surface_fingerprint(src, &parsed.program)
+    }
+
+    #[test]
+    fn class_issues_persist_and_reset_on_put() {
+        let dir = TempDir::new().unwrap();
+        let issue = Issue::new(
+            mir_issues::IssueKind::MissingConstructor {
+                class: "C".to_string(),
+            },
+            mir_issues::Location {
+                file: "/a.php".into(),
+                line: 1,
+                line_end: 1,
+                col_start: 0,
+                col_end: 1,
+            },
+        );
+        {
+            let cache = make_cache(&dir);
+            seed(&cache, "/a.php");
+            assert!(cache.class_issues("/a.php", "hash").is_none());
+            cache.put_class_issues("/a.php", "other", [issue.clone()].into());
+            assert!(cache.class_issues("/a.php", "hash").is_none());
+            cache.put_class_issues("/a.php", "hash", [issue.clone()].into());
+            cache.flush();
+        }
+        let cache = make_cache(&dir);
+        let stored = cache.class_issues("/a.php", "hash").expect("persisted");
+        assert_eq!(stored.len(), 1);
+        assert!(cache.class_issues("/a.php", "new").is_none());
+        seed(&cache, "/a.php");
+        assert!(cache.class_issues("/a.php", "hash").is_none());
     }
 
     #[test]

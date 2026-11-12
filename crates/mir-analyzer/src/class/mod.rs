@@ -15,6 +15,28 @@ use mir_issues::{Issue, IssueKind, Location};
 
 use crate::db::MirDatabase;
 
+/// Per-file issues (`None` for a reused file) and issues tied to no single file.
+pub type IssuesByFile = (Vec<(Arc<str>, Option<Vec<Issue>>)>, Vec<Issue>);
+
+enum AnalyzedDef {
+    Class(Arc<str>, crate::db::ClassLike),
+    Interface(Arc<str>, Arc<mir_codebase::definitions::InterfaceDef>),
+    Enum(Arc<str>, Arc<mir_codebase::definitions::EnumDef>),
+    Trait(Arc<mir_codebase::definitions::TraitDef>),
+}
+
+impl AnalyzedDef {
+    fn file(&self) -> Option<&Arc<str>> {
+        let location = match self {
+            AnalyzedDef::Class(_, class) => class.location(),
+            AnalyzedDef::Interface(_, iface) => iface.location.as_ref(),
+            AnalyzedDef::Enum(_, def) => def.location.as_ref(),
+            AnalyzedDef::Trait(def) => def.location.as_ref(),
+        };
+        location.map(|l| &l.file)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
 // ---------------------------------------------------------------------------
@@ -42,31 +64,6 @@ impl<'a> ClassAnalyzer<'a> {
             analyzed_files: Arc::new(files),
             sources: Arc::new(sources),
         }
-    }
-
-    /// [`Self::analyze_all`] with the class checks spread over the rayon pool,
-    /// each worker on its own clone of `db`.
-    pub fn analyze_all_par<D>(&self, db: D) -> Vec<Issue>
-    where
-        D: MirDatabase + Clone + Send,
-    {
-        use rayon::prelude::*;
-        let classes = crate::db::analyzed_class_defs(self.db, &self.analyzed_files);
-        let (analyzed_files, sources) = (&self.analyzed_files, &self.sources);
-        let per_class: Vec<Vec<Issue>> = classes
-            .par_iter()
-            .map_with(db, |db, (fqcn, class)| {
-                ClassAnalyzer {
-                    db: &*db as &dyn MirDatabase,
-                    analyzed_files: Arc::clone(analyzed_files),
-                    sources: Arc::clone(sources),
-                }
-                .class_issues(fqcn, class)
-            })
-            .collect();
-        let mut issues: Vec<Issue> = per_class.into_iter().flatten().collect();
-        issues.extend(self.analyze_non_class_likes());
-        issues
     }
 
     /// Build an `Issue` of `kind` at `location` (with a source snippet when
@@ -386,33 +383,114 @@ impl<'a> ClassAnalyzer<'a> {
 
     /// Run all class-level checks and return every discovered issue.
     pub fn analyze_all(&self) -> Vec<Issue> {
-        let mut issues = Vec::new();
-
-        // Only plain classes defined in the analyzed file set, already sorted by
-        // FQCN. Decomposing per file via `collect_file_definitions` means vendor
-        // / stub classes are never materialized (they aren't in `analyzed_files`),
-        // which is the dominant cost on cold start over a large `vendor/`.
-        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
-            issues.extend(self.class_issues(&fqcn, &class));
-        }
-        issues.extend(self.analyze_non_class_likes());
+        let mut issues: Vec<Issue> = self
+            .analyzed_defs()
+            .iter()
+            .flat_map(|def| self.def_issues(def))
+            .collect();
+        issues.extend(self.cycle_issues());
         issues
     }
 
-    /// Checks of the analyzed interfaces, enums and traits, and class cycles.
-    fn analyze_non_class_likes(&self) -> Vec<Issue> {
-        let mut issues = Vec::new();
+    /// Class-like definitions of the analyzed files in check order: classes,
+    /// interfaces, enums, then traits, each sorted by FQCN.
+    fn analyzed_defs(&self) -> Vec<AnalyzedDef> {
+        // Decomposing per file via `collect_file_definitions` means vendor / stub
+        // classes are never materialized (they aren't in `analyzed_files`), which
+        // is the dominant cost on cold start over a large `vendor/`.
+        let files = &self.analyzed_files;
+        let mut defs: Vec<AnalyzedDef> = crate::db::analyzed_class_defs(self.db, files)
+            .into_iter()
+            .map(|(fqcn, class)| AnalyzedDef::Class(fqcn, class))
+            .collect();
+        defs.extend(
+            crate::db::analyzed_interface_defs(self.db, files)
+                .into_iter()
+                .map(|(fqcn, iface)| AnalyzedDef::Interface(fqcn, iface)),
+        );
+        defs.extend(
+            crate::db::analyzed_enum_defs(self.db, files)
+                .into_iter()
+                .map(|(fqcn, def)| AnalyzedDef::Enum(fqcn, def)),
+        );
+        defs.extend(
+            crate::db::analyzed_trait_defs(self.db, files)
+                .into_iter()
+                .map(|(_, def)| AnalyzedDef::Trait(def)),
+        );
+        defs
+    }
 
-        // ---- 5. Interface-level #[Override] check + extends casing --------
-        // Interfaces are not included in the class loop above, so scan them
-        // separately for #[Override] on methods that have no parent interface method.
-        for (iface_fqcn, iface) in crate::db::analyzed_interface_defs(self.db, &self.analyzed_files)
+    fn def_issues(&self, def: &AnalyzedDef) -> Vec<Issue> {
+        match def {
+            AnalyzedDef::Class(fqcn, class) => self.class_issues(fqcn, class),
+            AnalyzedDef::Interface(fqcn, iface) => self.interface_issues(fqcn, iface),
+            AnalyzedDef::Enum(fqcn, def) => self.enum_issues(fqcn, def),
+            AnalyzedDef::Trait(def) => self.trait_issues(def),
+        }
+    }
+
+    /// The checks of [`Self::analyze_all`] spread over the rayon pool, each
+    /// worker on its own clone of `db`. Per-definition issues come back grouped
+    /// by declaring file, in the order the files first appear; files in `reuse`
+    /// are not checked and come back as `None`. The second element holds the
+    /// cross-file cycle issues and those of definitions without a location.
+    pub fn analyze_by_file_par<D>(&self, db: D, reuse: &HashSet<Arc<str>>) -> IssuesByFile
+    where
+        D: MirDatabase + Clone + Send,
+    {
+        use rayon::prelude::*;
+        let defs = self.analyzed_defs();
+        let (analyzed_files, sources) = (&self.analyzed_files, &self.sources);
+        let per_def: Vec<Option<Vec<Issue>>> = defs
+            .par_iter()
+            .map_with(db, |db, def| {
+                if def.file().is_some_and(|f| reuse.contains(f)) {
+                    return None;
+                }
+                let analyzer = ClassAnalyzer {
+                    db: &*db as &dyn MirDatabase,
+                    analyzed_files: Arc::clone(analyzed_files),
+                    sources: Arc::clone(sources),
+                };
+                Some(analyzer.def_issues(def))
+            })
+            .collect();
+
+        let mut by_file: Vec<(Arc<str>, Option<Vec<Issue>>)> = Vec::new();
+        let mut slot_of: HashMap<Arc<str>, usize> = HashMap::default();
+        let mut unlocated = Vec::new();
+        for (def, issues) in defs.iter().zip(per_def) {
+            let Some(file) = def.file() else {
+                unlocated.extend(issues.unwrap_or_default());
+                continue;
+            };
+            let slot = *slot_of.entry(file.clone()).or_insert_with(|| {
+                let reused = reuse.contains(file);
+                by_file.push((file.clone(), (!reused).then(Vec::new)));
+                by_file.len() - 1
+            });
+            if let (Some(acc), Some(issues)) = (by_file[slot].1.as_mut(), issues) {
+                acc.extend(issues);
+            }
+        }
+        unlocated.extend(self.cycle_issues());
+        (by_file, unlocated)
+    }
+
+    /// Interface-level `#[Override]`, constant and extends checks.
+    fn interface_issues(
+        &self,
+        iface_fqcn: &Arc<str>,
+        iface: &Arc<mir_codebase::definitions::InterfaceDef>,
+    ) -> Vec<Issue> {
+        let mut issues = Vec::new();
         {
-            self.check_overrides(&iface_fqcn, None, &mut issues);
-            self.check_constant_overrides(&iface_fqcn, &iface.own_constants, &mut issues);
+            self.check_overrides(iface_fqcn, None, &mut issues);
+            self.check_constant_overrides(iface_fqcn, &iface.own_constants, &mut issues);
             let location = iface.location.clone();
             self.check_ambiguous_constants(
-                &iface_fqcn,
+                iface_fqcn,
                 "Interface",
                 &iface.own_constants,
                 None,
@@ -462,11 +540,19 @@ impl<'a> ClassAnalyzer<'a> {
                     );
                 }
             }
-            self.check_magic_method_casing(&iface_fqcn, &mut issues);
+            self.check_magic_method_casing(iface_fqcn, &mut issues);
         }
+        issues
+    }
 
-        // ---- 5b. Enum-level implements casing + magic methods ---------------
-        for (enum_fqcn, enum_def) in crate::db::analyzed_enum_defs(self.db, &self.analyzed_files) {
+    /// Enum-level implements casing, magic method and contract checks.
+    fn enum_issues(
+        &self,
+        enum_fqcn: &Arc<str>,
+        enum_def: &Arc<mir_codebase::definitions::EnumDef>,
+    ) -> Vec<Issue> {
+        let mut issues = Vec::new();
+        {
             let location = enum_def.location.clone();
             for iface_fqcn in enum_def.interfaces.iter() {
                 let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
@@ -495,13 +581,13 @@ impl<'a> ClassAnalyzer<'a> {
                     }
                 }
             }
-            self.check_magic_method_casing(&enum_fqcn, &mut issues);
-            self.check_enum_magic_methods(&enum_def, &mut issues);
-            self.check_enum_builtin_redeclarations(&enum_def, &mut issues);
-            self.check_abstract_methods_implemented(&enum_fqcn, location.as_ref(), &mut issues);
-            self.check_abstract_property_hooks(&enum_fqcn, true, location.as_ref(), &mut issues);
+            self.check_magic_method_casing(enum_fqcn, &mut issues);
+            self.check_enum_magic_methods(enum_def, &mut issues);
+            self.check_enum_builtin_redeclarations(enum_def, &mut issues);
+            self.check_abstract_methods_implemented(enum_fqcn, location.as_ref(), &mut issues);
+            self.check_abstract_property_hooks(enum_fqcn, true, location.as_ref(), &mut issues);
             self.check_trait_member_compatibility(
-                &enum_fqcn,
+                enum_fqcn,
                 None,
                 None,
                 &enum_def.own_constants,
@@ -510,9 +596,9 @@ impl<'a> ClassAnalyzer<'a> {
                 location.as_ref(),
                 &mut issues,
             );
-            self.check_constant_overrides(&enum_fqcn, &enum_def.own_constants, &mut issues);
+            self.check_constant_overrides(enum_fqcn, &enum_def.own_constants, &mut issues);
             self.check_ambiguous_constants(
-                &enum_fqcn,
+                enum_fqcn,
                 "Enum",
                 &enum_def.own_constants,
                 None,
@@ -532,7 +618,7 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- Enum interface methods must be implemented --------------------
             self.check_enum_interface_methods_implemented(
-                &enum_fqcn,
+                enum_fqcn,
                 location.as_ref(),
                 &mut issues,
             );
@@ -545,13 +631,15 @@ impl<'a> ClassAnalyzer<'a> {
             // went completely undetected. `ClassLike::Enum::ancestor_fqcns`
             // already walks the enum's interface chain, so check_overrides
             // (built for classes/interfaces) works unchanged here too.
-            self.check_overrides(&enum_fqcn, location.as_ref(), &mut issues);
+            self.check_overrides(enum_fqcn, location.as_ref(), &mut issues);
         }
+        issues
+    }
 
-        // ---- 5c. DeprecatedTrait: trait uses a deprecated trait ---------------
-        for (trait_fqcn, trait_def) in crate::db::analyzed_trait_defs(self.db, &self.analyzed_files)
+    /// `DeprecatedTrait`: the trait uses a deprecated trait.
+    fn trait_issues(&self, trait_def: &mir_codebase::definitions::TraitDef) -> Vec<Issue> {
+        let mut issues = Vec::new();
         {
-            let _ = &trait_fqcn;
             let location = trait_def.location.clone();
             for used_trait_fqcn in trait_def.traits.iter() {
                 let fqcn_key = crate::db::Fqcn::from_str(self.db, used_trait_fqcn.as_ref());
@@ -570,8 +658,12 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
         }
+        issues
+    }
 
-        // ---- 6. Circular inheritance detection --------------------------------
+    /// Circular inheritance and trait composition, which span files.
+    fn cycle_issues(&self) -> Vec<Issue> {
+        let mut issues = Vec::new();
         self.check_circular_class_inheritance(&mut issues);
         self.check_circular_interface_inheritance(&mut issues);
         self.check_circular_trait_composition(&mut issues);
