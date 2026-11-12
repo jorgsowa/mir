@@ -93,11 +93,6 @@
       <code><![CDATA[$class]]></code>
     </InvalidStringClass>
   </file>
-  <file src="core/lib/Drupal/Component/Plugin/Factory/ReflectionFactory.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $instance;]]></code>
-    </NullableReturnStatement>
-  </file>
   <file src="core/lib/Drupal/Component/Utility/Environment.php">
     <InvalidReturnType>
       <code><![CDATA[return $max_size;]]></code>

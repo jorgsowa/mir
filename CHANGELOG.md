@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `@param T[]` on a native `iterable` parameter reads as `iterable<T>`, so a `Traversable` argument is no longer `InvalidArgument`.
+- `ReflectionClass::newInstanceArgs()` returns an instance of the reflected class instead of `T|null`.
 
 ## [0.99.0] - 2026-11-12
 
