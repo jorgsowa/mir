@@ -15,10 +15,10 @@ namespace App;
 /** @param class-string-map<T of \Throwable, T> $map */
 function acceptsThrowableMap(array $map): void
 {
-    /** @mir-check $map is array<class-string, Throwable> */
+    /** @mir-check $map is array<class-string<\Throwable>, \Throwable> */
     echo \count($map);
 }
 
 acceptsThrowableMap([\RuntimeException::class => new \RuntimeException()]);
 acceptsThrowableMap([\RuntimeException::class => new \stdClass()]);
-//                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $map of acceptsThrowableMap() expects 'array<class-string, Throwable>', got 'non-empty-array<class-string<RuntimeException>, stdClass>'
+//                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $map of acceptsThrowableMap() expects 'array<class-string<Throwable>, Throwable> with each value an instance of its key', got 'non-empty-array<class-string<RuntimeException>, stdClass>'

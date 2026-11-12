@@ -42,7 +42,7 @@ function check_class_string_map_two_args($x) {
 function check_class_string_map_one_arg($x) {
     /**
      * @var class-string-map<Foo> $x
-     * @mir-check $x is array<class-string, Foo>
+     * @mir-check $x is array<class-string<Foo>, Foo>
      */
     var_dump($x);
 }

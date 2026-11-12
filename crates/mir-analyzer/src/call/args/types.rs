@@ -72,6 +72,56 @@ fn possibly_empty(atomic: &Atomic) -> Atomic {
     }
 }
 
+/// `array<class-string<X>, X>`, as `class-string-map<T of X, T>` parses: each value is an instance of its key.
+fn is_class_string_map(param_ty: &Type) -> bool {
+    let [Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value }] =
+        param_ty.types.as_slice()
+    else {
+        return false;
+    };
+    matches!(
+        (key.types.as_slice(), value.types.as_slice()),
+        ([Atomic::TClassString(Some(k))], [Atomic::TNamedObject { fqcn, type_params }])
+            if k == fqcn && type_params.is_empty()
+    )
+}
+
+/// Whether every value of `arg_ty` is an instance of a class its keys name; unknown keys pass.
+fn class_string_map_values_match_keys(ea: &ExpressionAnalyzer<'_>, arg_ty: &Type) -> bool {
+    let instance_of_any = |value: &Type, classes: &[Name]| {
+        value.is_mixed()
+            || value.types.iter().all(|v| {
+                classes.iter().any(|class| {
+                    let class = Type::single(Atomic::TNamedObject {
+                        fqcn: *class,
+                        type_params: Default::default(),
+                    });
+                    crate::subtype::is_subtype(ea.db, &Type::single(v.clone()), &class)
+                })
+            })
+    };
+    arg_ty.types.iter().all(|atomic| match atomic {
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            let classes: Option<Vec<Name>> = key
+                .types
+                .iter()
+                .map(|k| match k {
+                    Atomic::TClassString(Some(class)) => Some(*class),
+                    _ => None,
+                })
+                .collect();
+            classes.is_none_or(|classes| instance_of_any(value, &classes))
+        }
+        Atomic::TKeyedArray { properties, .. } => properties.iter().all(|(key, prop)| match key {
+            mir_types::ArrayKey::String(class) if crate::db::class_exists(ea.db, class) => {
+                instance_of_any(&prop.ty, &[Name::new(class.trim_start_matches('\\'))])
+            }
+            _ => true,
+        }),
+        _ => true,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_one(
     ea: &mut ExpressionAnalyzer<'_>,
@@ -105,6 +155,20 @@ pub(crate) fn check_one(
                 break;
             }
         }
+        return;
+    }
+
+    if is_class_string_map(param_ty) && !class_string_map_values_match_keys(ea, arg_ty) {
+        ea.emit(
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: format!("{param_ty} with each value an instance of its key"),
+                actual: arg_ty.to_string(),
+            },
+            Severity::Error,
+            arg_span,
+        );
         return;
     }
 

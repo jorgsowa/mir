@@ -976,18 +976,27 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             // The two-arg form (`class-string-map<T, V>`) is canonical, but
             // Psalm also accepts the one-arg shorthand (`class-string-map<T>`)
             // where the value type defaults to `T` itself, not `mixed`.
+            let value_is_key = params.len() == 1
+                || inline_template.is_some_and(|(name, _)| params[1].trim() == name);
             let value = params
                 .get(1)
                 .or(params.first())
                 .map(|p| match inline_template {
-                    Some((name, bound)) if p.trim() == name || params.len() == 1 => {
-                        parse_type_string(bound)
-                    }
+                    Some((_, bound)) if value_is_key => parse_type_string(bound),
                     _ => parse_type_string(p.trim()),
                 })
                 .unwrap_or_else(Type::mixed);
+            // `class-string<X>` keys mapped to `X` mark each value as an instance of its key.
+            let key_class = match value.types.as_slice() {
+                [Atomic::TNamedObject { fqcn, type_params }]
+                    if value_is_key && type_params.is_empty() =>
+                {
+                    Some(*fqcn)
+                }
+                _ => None,
+            };
             Type::single(Atomic::TArray {
-                key: Box::new(Type::single(Atomic::TClassString(None))),
+                key: Box::new(Type::single(Atomic::TClassString(key_class))),
                 value: Box::new(value),
             })
         }

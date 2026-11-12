@@ -19,5 +19,5 @@ function makeMap() {
 }
 
 $map = makeMap();
-/** @mir-check $map is array<class-string, Foo> */
+/** @mir-check $map is array<class-string<Foo>, Foo> */
 $_ = 1;
