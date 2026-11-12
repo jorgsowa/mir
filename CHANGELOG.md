@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@return CONST[T]` and `@return self::MAP[T]` with `T of key-of<…>` are the constant's value at the key the caller passed (or at the parameter's default) instead of the native return type, so passing that value on is checked per key.
 - `@return new<T>` is an instance of the class the caller passed, including a class picked from a constant map (`new<CLASSES[T]>`), instead of the native return type.
 
+### Changed
+
+- A callback whose parameter is required where the expected signature has a typed variadic (`callable(float ...$values)` given `fn (float $value) => …`) is `InvalidArgument`, since the variadic may receive no arguments. An untyped or `mixed` variadic still accepts any callback.
+
 ## [0.99.0] - 2026-11-12
 
 ### Added

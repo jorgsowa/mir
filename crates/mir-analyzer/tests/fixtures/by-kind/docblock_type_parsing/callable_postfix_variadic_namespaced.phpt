@@ -23,9 +23,9 @@ run(fn (string $s, int $n): bool => $n > 0);
 /** @param Closure(int...):void $f */
 function each_int(\Closure $f): void { $f(1, 2); }
 
+each_int(function (int ...$x): void {});
 each_int(function (int $x): void {});
-each_int(function (string $x): void {});
-//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of each_int() expects 'callable whose parameter #1 accepts int', got 'callable whose parameter #1 only accepts string'
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $f of each_int() expects 'callable accepting variadic parameter #1', got 'callable requiring parameter #1'
 
 function check_mixed_variadic($x) {
     /**

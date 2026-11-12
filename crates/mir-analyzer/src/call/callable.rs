@@ -1257,6 +1257,34 @@ pub(crate) fn check_typed_callable_arg(
         return;
     }
 
+    // A typed variadic may be passed no arguments, so the callback can't require one there.
+    // An untyped or `mixed` variadic (`callable(mixed...)`) stands for any signature.
+    let typed_variadic = expected_params
+        .iter()
+        .position(|p| p.is_variadic && p.ty.as_ref().is_some_and(|t| !t.to_union().is_mixed()));
+    if let Some(v) = typed_variadic {
+        let required_at = candidates.iter().find_map(|params| {
+            params
+                .iter()
+                .skip(v)
+                .position(|p| !p.is_optional && !p.is_variadic)
+                .map(|i| i + v)
+        });
+        if let Some(i) = required_at {
+            ea.emit(
+                IssueKind::InvalidArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("callable accepting variadic parameter #{}", v + 1),
+                    actual: format!("callable requiring parameter #{}", i + 1),
+                },
+                Severity::Error,
+                arg_span,
+            );
+            return;
+        }
+    }
+
     // A parameter the signature passes by reference must be taken by reference.
     for params in &candidates {
         let by_value = expected_params
