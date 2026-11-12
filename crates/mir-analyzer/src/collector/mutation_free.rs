@@ -1,11 +1,11 @@
 use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::NameBareExt as _;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use mir_codebase::definitions::{MemberMap, MethodDef};
-use php_ast::ast::{UnaryPostfixOp, UnaryPrefixOp};
+use mir_codebase::definitions::{MemberMap, MethodDef, PropertyWrite};
+use php_ast::ast::{AssignOp, UnaryPostfixOp, UnaryPrefixOp};
 use php_ast::owned::visitor::OwnedVisitor;
 use php_ast::owned::{ClassMember, ClassMemberKind, Expr, ExprKind, MethodDecl, Stmt, StmtKind};
 
@@ -43,16 +43,20 @@ const PURE_BUILTINS: &[&str] = &[
 ];
 
 /// Marks the methods of one class whose bodies provably never write a
-/// property, so a call to them cannot stale the receiver's property narrowing.
+/// property, so a call to them cannot stale the receiver's property narrowing,
+/// and records which `$this` properties the others change, when that is all
+/// they can change.
 ///
-/// A method qualifies when it only writes locals and only calls allow-listed
-/// pure builtins or other qualifying methods of the same class through `$this`,
-/// `self` or `static`. Subclass overrides are not considered.
+/// A method is mutation-free when it only writes locals and only calls
+/// allow-listed pure builtins or other such methods of the same class through
+/// `$this`, `self` or `static`. The write summary also admits `$this` property
+/// writes and calls on other objects, as long as `$this` itself never escapes.
+/// Subclass overrides are not considered.
 pub(super) fn infer_mutation_free(
     members: &[ClassMember],
     own_methods: &mut MemberMap<Arc<MethodDef>>,
 ) {
-    let mut candidates: Vec<(String, &MethodDecl)> = members
+    let candidates: Vec<(String, &MethodDecl)> = members
         .iter()
         .filter_map(|m| match &m.kind {
             ClassMemberKind::Method(m) if has_inferable_signature(m, own_methods) => {
@@ -62,25 +66,87 @@ pub(super) fn infer_mutation_free(
         })
         .collect();
 
+    for (key, _) in qualifying(&candidates, false) {
+        if let Some(def) = own_methods.get_mut(key.as_str()) {
+            Arc::make_mut(def).inferred_mutation_free = true;
+        }
+    }
+    for (key, writes) in qualifying(&candidates, true) {
+        if let Some(def) = own_methods.get_mut(key.as_str()) {
+            Arc::make_mut(def).inferred_this_writes = Some(
+                writes
+                    .into_iter()
+                    .map(|(prop, write)| (Arc::from(prop), write))
+                    .collect(),
+            );
+        }
+    }
+}
+
+/// The candidates whose bodies pass the scan, each with the `$this` property writes of its
+/// body and of the methods it calls.
+fn qualifying(
+    candidates: &[(String, &MethodDecl)],
+    lenient: bool,
+) -> Vec<(String, BTreeMap<String, PropertyWrite>)> {
     // Greatest fixpoint: drop methods that call a non-qualifying one until stable,
-    // so mutually recursive clean methods still qualify.
+    // so mutually recursive methods still qualify.
+    let mut kept: Vec<&(String, &MethodDecl)> = candidates.iter().collect();
+    let mut scans: Vec<BodySummary>;
     loop {
-        let safe: HashSet<&str> = candidates.iter().map(|(k, _)| k.as_str()).collect();
-        let before = candidates.len();
-        let keep: Vec<bool> = candidates
+        let safe: HashSet<&str> = kept.iter().map(|(k, _)| k.as_str()).collect();
+        scans = kept
             .iter()
-            .map(|(_, m)| body_writes_no_properties(m, &safe))
+            .map(|(_, m)| scan_body(m, &safe, lenient))
             .collect();
-        let mut keep = keep.into_iter();
-        candidates.retain(|_| keep.next().unwrap_or(false));
-        if candidates.len() == before {
+        let before = kept.len();
+        let mut keep = scans.iter().map(|s| s.qualifies);
+        kept.retain(|_| keep.next().unwrap_or(false));
+        if kept.len() == before {
             break;
         }
     }
 
-    for (key, _) in &candidates {
-        if let Some(def) = own_methods.get_mut(key.as_str()) {
-            Arc::make_mut(def).inferred_mutation_free = true;
+    let index: HashMap<&str, usize> = kept
+        .iter()
+        .enumerate()
+        .map(|(i, (k, _))| (k.as_str(), i))
+        .collect();
+    let mut writes: Vec<_> = scans.iter().map(|s| s.writes.clone()).collect();
+    loop {
+        let mut changed = false;
+        for (i, scan) in scans.iter().enumerate() {
+            for callee in &scan.calls {
+                let Some(&j) = index.get(callee.as_str()).filter(|&&j| j != i) else {
+                    continue;
+                };
+                for (prop, write) in writes[j].clone() {
+                    changed |= record_write(&mut writes[i], prop, write);
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    kept.iter().map(|(k, _)| k.clone()).zip(writes).collect()
+}
+
+/// Adds a write of `$this->prop`; two different kinds of write combine to `Assign`.
+fn record_write(
+    writes: &mut BTreeMap<String, PropertyWrite>,
+    prop: String,
+    write: PropertyWrite,
+) -> bool {
+    match writes.get_mut(&prop) {
+        Some(existing) if *existing != write && *existing != PropertyWrite::Assign => {
+            *existing = PropertyWrite::Assign;
+            true
+        }
+        Some(_) => false,
+        None => {
+            writes.insert(prop, write);
+            true
         }
     }
 }
@@ -97,12 +163,28 @@ fn has_inferable_signature(m: &MethodDecl, own_methods: &MemberMap<Arc<MethodDef
             .is_some_and(|d| !d.is_impure && d.self_out.is_none())
 }
 
-fn body_writes_no_properties(m: &MethodDecl, safe: &HashSet<&str>) -> bool {
-    let Some(body) = &m.body else {
-        return false;
+struct BodySummary {
+    qualifies: bool,
+    writes: BTreeMap<String, PropertyWrite>,
+    calls: Vec<String>,
+}
+
+fn scan_body(m: &MethodDecl, safe: &HashSet<&str>, lenient: bool) -> BodySummary {
+    let mut scan = BodyScan {
+        safe,
+        lenient,
+        writes: BTreeMap::new(),
+        calls: Vec::new(),
     };
-    let mut scan = BodyScan { safe };
-    body.stmts.iter().all(|s| scan.visit_stmt(s).is_continue())
+    let qualifies = m
+        .body
+        .as_ref()
+        .is_some_and(|body| body.stmts.iter().all(|s| scan.visit_stmt(s).is_continue()));
+    BodySummary {
+        qualifies,
+        writes: scan.writes,
+        calls: scan.calls,
+    }
 }
 
 /// Whether a function body visibly has side effects: output, `exit`, `global` or `static` variables.
@@ -151,11 +233,140 @@ impl OwnedVisitor for SideEffectScan {
 
 struct BodyScan<'a> {
     safe: &'a HashSet<&'a str>,
+    /// Admits `$this` property writes and calls on other objects, recording the writes.
+    lenient: bool,
+    writes: BTreeMap<String, PropertyWrite>,
+    calls: Vec<String>,
 }
 
 impl BodyScan<'_> {
     fn reject(&self) -> ControlFlow<()> {
         ControlFlow::Break(())
+    }
+
+    /// Whether writing `e` is allowed, recording it when it is a `$this` property.
+    fn write(&mut self, e: &Expr, appends: bool) -> bool {
+        if is_local_target(e) {
+            return true;
+        }
+        let Some(prop) = this_property(e).filter(|_| self.lenient) else {
+            return false;
+        };
+        // Appending to an element can still change the property's shape.
+        let write = if appends && matches!(e.kind, ExprKind::PropertyAccess(_)) {
+            PropertyWrite::Append
+        } else {
+            PropertyWrite::Assign
+        };
+        record_write(&mut self.writes, prop.to_string(), write);
+        true
+    }
+
+    /// Whether `name` is a qualifying method of this class, recording the call.
+    fn call(&mut self, name: &Expr) -> bool {
+        let ExprKind::Identifier(n) = &name.kind else {
+            return false;
+        };
+        let key = crate::util::php_ident_lowercase(n);
+        let safe = self.safe.contains(key.as_str());
+        if safe {
+            self.calls.push(key);
+        }
+        safe
+    }
+
+    /// An unknown callee may take a `$this` property argument by reference.
+    fn pass_args(&mut self, args: &[php_ast::owned::Arg]) {
+        for prop in args.iter().filter_map(|a| this_property(a.value()?)) {
+            record_write(&mut self.writes, prop.to_string(), PropertyWrite::Assign);
+        }
+    }
+
+    fn visit_args(&mut self, args: &[php_ast::owned::Arg]) -> ControlFlow<()> {
+        args.iter()
+            .filter_map(|a| a.value())
+            .try_for_each(|v| self.visit_expr(v))
+    }
+
+    fn visit_expr_lenient(&mut self, expr: &Expr) -> Option<ControlFlow<()>> {
+        Some(match &expr.kind {
+            // Any other use of `$this` lets it escape.
+            ExprKind::Variable(v) if &**v == "this" => self.reject(),
+            ExprKind::PropertyAccess(p) | ExprKind::NullsafePropertyAccess(p)
+                if is_this(&p.object) =>
+            {
+                if matches!(p.property.kind, ExprKind::Identifier(_)) {
+                    ControlFlow::Continue(())
+                } else {
+                    self.reject()
+                }
+            }
+            ExprKind::MethodCall(c) if is_this(&c.object) => {
+                if self.call(&c.method) {
+                    self.visit_args(&c.args)
+                } else {
+                    self.reject()
+                }
+            }
+            ExprKind::MethodCall(c) | ExprKind::NullsafeMethodCall(c) => {
+                if let Some(prop) = this_property(&c.object) {
+                    record_write(&mut self.writes, prop.to_string(), PropertyWrite::Inner);
+                }
+                self.pass_args(&c.args);
+                crate::recursion::walk_expr(self, expr)
+            }
+            ExprKind::FunctionCall(c) => {
+                let Some(name) = c.name.kind.name_bare() else {
+                    return Some(self.reject());
+                };
+                if !is_pure_builtin(name) {
+                    self.pass_args(&c.args);
+                }
+                self.visit_args(&c.args)
+            }
+            ExprKind::StaticMethodCall(c) if is_self_reference(&c.class) => {
+                if self.call(&c.method) {
+                    self.visit_args(&c.args)
+                } else {
+                    self.reject()
+                }
+            }
+            ExprKind::StaticMethodCall(c)
+                if !c
+                    .class
+                    .kind
+                    .name_bare()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("parent")) =>
+            {
+                self.pass_args(&c.args);
+                crate::recursion::walk_expr(self, expr)
+            }
+            ExprKind::New(n) => {
+                self.pass_args(&n.args);
+                crate::recursion::walk_expr(self, expr)
+            }
+            ExprKind::Clone(_) | ExprKind::CloneWith(..) => crate::recursion::walk_expr(self, expr),
+            ExprKind::Closure(c) if c.is_static => crate::recursion::walk_expr(self, expr),
+            ExprKind::ArrowFunction(f) if f.is_static => crate::recursion::walk_expr(self, expr),
+            _ => return None,
+        })
+    }
+}
+
+fn is_this(e: &Expr) -> bool {
+    matches!(&e.kind, ExprKind::Variable(v) if &**v == "this")
+}
+
+/// The property name of `$this->name` or an element of it.
+fn this_property(e: &Expr) -> Option<&str> {
+    match &e.kind {
+        ExprKind::PropertyAccess(p) if is_this(&p.object) => match &p.property.kind {
+            ExprKind::Identifier(n) => Some(n),
+            _ => None,
+        },
+        ExprKind::ArrayAccess(a) => this_property(&a.array),
+        ExprKind::Parenthesized(inner) => this_property(inner),
+        _ => None,
     }
 }
 
@@ -201,7 +412,9 @@ impl OwnedVisitor for BodyScan<'_> {
 
     fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
         match &stmt.kind {
-            StmtKind::Unset(targets) if !targets.iter().all(is_local_target) => self.reject(),
+            StmtKind::Unset(targets) if !targets.iter().all(|t| self.write(t, false)) => {
+                self.reject()
+            }
             StmtKind::Foreach(fe)
                 if !is_local_target(&fe.value)
                     || fe.key.as_ref().is_some_and(|k| !is_local_target(k)) =>
@@ -220,19 +433,24 @@ impl OwnedVisitor for BodyScan<'_> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+        if self.lenient {
+            if let Some(flow) = self.visit_expr_lenient(expr) {
+                return flow;
+            }
+        }
         let allowed = match &expr.kind {
-            ExprKind::Assign(a) => !a.by_ref && is_local_target(&a.target),
+            ExprKind::Assign(a) => !a.by_ref && self.write(&a.target, a.op == AssignOp::Concat),
             ExprKind::UnaryPrefix(u) => {
                 !matches!(
                     u.op,
                     UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement
-                ) || is_local_target(&u.operand)
+                ) || self.write(&u.operand, false)
             }
             ExprKind::UnaryPostfix(u) => {
                 !matches!(
                     u.op,
                     UnaryPostfixOp::PostIncrement | UnaryPostfixOp::PostDecrement
-                ) || is_local_target(&u.operand)
+                ) || self.write(&u.operand, false)
             }
             ExprKind::FunctionCall(c) => {
                 c.name.kind.name_bare().is_some_and(is_pure_builtin)
@@ -244,14 +462,9 @@ impl OwnedVisitor for BodyScan<'_> {
             }
             ExprKind::MethodCall(c) => {
                 matches!(&c.object.kind, ExprKind::Variable(v) if &**v == "this")
-                    && matches!(&c.method.kind, ExprKind::Identifier(n)
-                        if self.safe.contains(crate::util::php_ident_lowercase(n).as_str()))
+                    && self.call(&c.method)
             }
-            ExprKind::StaticMethodCall(c) => {
-                is_self_reference(&c.class)
-                    && matches!(&c.method.kind, ExprKind::Identifier(n)
-                        if self.safe.contains(crate::util::php_ident_lowercase(n).as_str()))
-            }
+            ExprKind::StaticMethodCall(c) => is_self_reference(&c.class) && self.call(&c.method),
             ExprKind::NullsafeMethodCall(_)
             | ExprKind::StaticMethodCallDynamic(_)
             | ExprKind::New(_)

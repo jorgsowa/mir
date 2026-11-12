@@ -1577,6 +1577,60 @@ impl FlowState {
         }
     }
 
+    /// Like [`Self::invalidate_prop_refined_receiver`], for a callee known to change only
+    /// `writes` on `receiver`: a property only appended to with `.=` widens to `string`, and
+    /// one whose object alone changes keeps its own narrowing.
+    pub fn invalidate_written_props(
+        &mut self,
+        receiver: &str,
+        writes: &[(Arc<str>, mir_codebase::definitions::PropertyWrite)],
+        kept_call: Option<&str>,
+    ) {
+        use mir_codebase::definitions::PropertyWrite;
+        let receiver = receiver.trim_start_matches('$');
+        if receiver == "this" {
+            self.mark_this_escaped_to_call();
+        }
+        self.forget_local_props(Name::from(receiver));
+        // A memoized call result (`$recv->m()`) may read any property, so it is stale too,
+        // except for `kept_call`, the zero-arg call being made.
+        let prefix = format!("{receiver}->");
+        let stale_call = |call: &str| call.ends_with("()") && Some(call) != kept_call;
+        let via_call = |key: &str| {
+            key.strip_prefix(prefix.as_str())
+                .is_some_and(|rest| rest.split("->").next().is_some_and(stale_call))
+        };
+        self.drop_guards_where(|var| via_call(var));
+        if self
+            .prop_refined
+            .keys()
+            .any(|(obj, prop)| (obj.as_ref() == receiver && stale_call(prop)) || via_call(obj))
+        {
+            Arc::make_mut(&mut self.prop_refined).retain(|(obj, prop), _| {
+                !((obj.as_ref() == receiver && stale_call(prop)) || via_call(obj))
+            });
+        }
+        for (prop, write) in writes {
+            if *write == PropertyWrite::Inner {
+                self.clear_prop_refined_chain(receiver, prop);
+                continue;
+            }
+            let widened = self
+                .get_prop_refined(receiver, prop)
+                .filter(|_| *write == PropertyWrite::Append)
+                .map(|t| {
+                    let mut t = t.clone();
+                    t.merge_with(&Type::string());
+                    t
+                });
+            self.clear_prop_refined(receiver, prop);
+            self.clear_prop_refined_chain(receiver, prop);
+            if let Some(ty) = widened {
+                self.set_prop_refined(receiver, prop, ty);
+            }
+        }
+    }
+
     /// Like [`Self::invalidate_prop_refined_receiver`], but keeps what is
     /// narrowed on the memoized result of `receiver`'s own zero-arg call
     /// `call_key` (`method_call_key`): repeating that call is the point of

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A call to a method of the same class keeps the narrowing of every property that method (and the methods it calls) can't change: mir now infers which `$this` properties a method writes. A property only appended to with `.=` widens to `string`, one reassigned falls back to its declared type, and one whose object has a method called on it drops only the narrowing below it. Calls on other objects are assumed not to reach `$this` unless it is passed along; `include`, `eval`, dynamic calls and non-static closures still drop everything.
 - An array element passed to a method of a `mixed` receiver may be written by reference, so it no longer keeps its shape from before the call (`NonExistentArrayOffset` on a key the callee adds).
 - An untyped parameter with a `null` default (`/** @param string $root */ function f($root = NULL)`) can be `null`, so `$root === NULL` is no longer reported as impossible.
 - A docblock type that the native type rules out is ignored in favor of the native type: an array or object on a scalar (`@var array` on `string`), and a property `@var` class that is not a subtype of the native class.

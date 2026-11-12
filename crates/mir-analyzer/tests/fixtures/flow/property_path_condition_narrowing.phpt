@@ -80,11 +80,28 @@ class A {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
-    public function callOnThisInvalidates(): string {
+    public function callOnThisWritingOtherPropertyKeeps(): string {
         if ($this->cfg->domain === null) {
             return 'default';
         }
         $this->touch();
+        return $this->cfg->domain;
+    }
+
+    public function callOnThisReplacingInvalidates(): string {
+        if ($this->cfg->domain === null) {
+            return 'default';
+        }
+        $this->replaceCfg();
+        return $this->cfg->domain;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
+    }
+
+    public function callOnThisMutatingInvalidates(): string {
+        if ($this->cfg->domain === null) {
+            return 'default';
+        }
+        $this->resetCfg();
         return $this->cfg->domain;
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
@@ -117,4 +134,6 @@ class A {
     }
 
     private function touch(): void { $this->touched++; }
+    private function replaceCfg(): void { $this->cfg = new Cfg(); }
+    private function resetCfg(): void { $this->cfg->reset(); }
 }

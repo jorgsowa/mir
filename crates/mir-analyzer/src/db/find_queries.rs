@@ -1308,6 +1308,7 @@ pub fn find_method_in_class<'db>(
                 is_mutation_free: false,
                 is_external_mutation_free: false,
                 inferred_mutation_free: false,
+                inferred_this_writes: None,
                 data_provider_targets: vec![],
             }));
         }
@@ -1380,6 +1381,7 @@ pub fn find_method_in_class<'db>(
                 is_mutation_free: false,
                 is_external_mutation_free: false,
                 inferred_mutation_free: false,
+                inferred_this_writes: None,
                 data_provider_targets: vec![],
             }));
         }

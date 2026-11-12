@@ -125,6 +125,8 @@ pub(crate) struct ResolvedMethod {
     pub(crate) is_mutation_free: bool,
     pub(crate) is_external_mutation_free: bool,
     pub(crate) inferred_mutation_free: bool,
+    pub(crate) inferred_this_writes:
+        Option<Vec<(Arc<str>, mir_codebase::definitions::PropertyWrite)>>,
     pub(crate) params: Vec<DeclaredParam>,
     pub(crate) template_params: Vec<TemplateParam>,
     pub(crate) return_ty_raw: Type,
@@ -508,6 +510,7 @@ pub(crate) fn resolve_method_from_db(
                     )),
             is_external_mutation_free: storage.is_external_mutation_free,
             inferred_mutation_free: storage.inferred_mutation_free,
+            inferred_this_writes: storage.inferred_this_writes.clone(),
             params: params
                 .into_iter()
                 .map(|p| crate::util::reconcile_declared_param_docblock_shadow(db, param_file, p))
@@ -1678,9 +1681,12 @@ fn resolve_method_return<'a>(
             && !resolved.inferred_mutation_free
         {
             if let ExprKind::Variable(recv_name) = &call.object.kind {
-                if call.args.is_empty() && ea.db.memoize_method_call_results() {
-                    let own_key = crate::narrowing::method_call_key(method_name);
-                    ctx.invalidate_prop_refined_receiver_keeping_call(recv_name, &own_key);
+                let memoized = (call.args.is_empty() && ea.db.memoize_method_call_results())
+                    .then(|| crate::narrowing::method_call_key(method_name));
+                if let Some(writes) = &resolved.inferred_this_writes {
+                    ctx.invalidate_written_props(recv_name, writes, memoized.as_deref());
+                } else if let Some(own_key) = &memoized {
+                    ctx.invalidate_prop_refined_receiver_keeping_call(recv_name, own_key);
                 } else {
                     ctx.invalidate_prop_refined_receiver(recv_name);
                 }

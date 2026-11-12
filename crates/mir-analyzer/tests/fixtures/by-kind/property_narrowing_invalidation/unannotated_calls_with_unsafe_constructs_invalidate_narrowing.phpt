@@ -1,7 +1,9 @@
 ===description===
 An unannotated method is not treated as mutation-free when its body contains any
 construct that may write a property or run unknown code, so the caller's
-`$this->prop` narrowing is dropped after the call.
+`$this->prop` narrowing is dropped after the call. Unsetting or incrementing another
+property only invalidates that property, and calling builtins or methods of other objects
+can't reach `$this`, so `$this->user` stays narrowed in those cases.
 ===config===
 <mir>
   <issueHandlers>
@@ -27,7 +29,7 @@ class Session {
     public function unsetsPropertyCaller(string $u): void {
         $this->user = $u;
         $this->unsetsProperty();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
@@ -69,42 +71,42 @@ class Session {
     public function preIncrementsPropertyCaller(string $u): void {
         $this->user = $u;
         $this->preIncrementsProperty();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
     public function postIncrementsPropertyCaller(string $u): void {
         $this->user = $u;
         $this->postIncrementsProperty();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
     public function passesPropertyToBuiltinCaller(string $u): void {
         $this->user = $u;
         $this->passesPropertyToBuiltin();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
     public function callsImpureBuiltinCaller(string $u): void {
         $this->user = $u;
         $this->callsImpureBuiltin();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
     public function callsOtherReceiverCaller(string $u): void {
         $this->user = $u;
         $this->callsOtherReceiver();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
     public function callsNullsafeCaller(string $u): void {
         $this->user = $u;
         $this->callsNullsafe();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
@@ -118,7 +120,7 @@ class Session {
     public function createsObjectCaller(string $u): void {
         $this->user = $u;
         $this->createsObject();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 
@@ -188,7 +190,7 @@ class Session {
     public function callsStaticOnOtherCaller(string $u): void {
         $this->user = $u;
         $this->callsStaticOnOther();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 

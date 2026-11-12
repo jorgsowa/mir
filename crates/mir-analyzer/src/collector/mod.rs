@@ -2364,6 +2364,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_mutation_free: false,
                     is_external_mutation_free: false,
                     inferred_mutation_free: false,
+                    inferred_this_writes: None,
                     data_provider_targets: vec![],
                 }),
             );
@@ -3257,6 +3258,7 @@ impl<'a> DefinitionCollector<'a> {
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,
             inferred_mutation_free: false,
+            inferred_this_writes: None,
             data_provider_targets,
         })
     }

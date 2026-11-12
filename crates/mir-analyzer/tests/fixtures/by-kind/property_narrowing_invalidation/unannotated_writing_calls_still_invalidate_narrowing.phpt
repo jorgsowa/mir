@@ -1,7 +1,8 @@
 ===description===
 An unannotated method is not treated as mutation-free when its body can write
 a property: a direct write, an increment, a by-ref parameter, an unknown call,
-or a call to another method that does.
+or a call to another method that does. A method that only writes another property
+(`$this->hits++`) keeps the narrowing of `$this->user`.
 ===config===
 <mir>
   <issueHandlers>
@@ -46,7 +47,7 @@ class Session {
     public function viaIncrement(string $u): void {
         $this->user = $u;
         $this->bump();
-        /** @mir-check $this->user is string|null */
+        /** @mir-check $this->user is string */
         $_ = 1;
     }
 

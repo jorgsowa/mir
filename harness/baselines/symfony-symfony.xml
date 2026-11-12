@@ -429,6 +429,11 @@
       <code><![CDATA[\ZSTD_COMPRESS_LEVEL_MAX]]></code>
     </UndefinedConstant>
   </file>
+  <file src="src/Symfony/Component/BrowserKit/AbstractBrowser.php">
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->crawler;]]></code>
+    </NullableReturnStatement>
+  </file>
   <file src="src/Symfony/Component/BrowserKit/Test/Constraint/BrowserCookieValueSame.php">
     <UndefinedClass>
       <code><![CDATA[Constraint]]></code>
@@ -546,11 +551,6 @@
       <code><![CDATA[ClusterInterface]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/Symfony/Component/Config/Definition/Dumper/XmlReferenceDumper.php">
-    <NullableReturnStatement>
-      <code><![CDATA[return $ref;]]></code>
-    </NullableReturnStatement>
-  </file>
   <file src="src/Symfony/Component/Config/Definition/Dumper/YamlReferenceDumper.php">
     <InvalidCast>
       <code><![CDATA[$default]]></code>
@@ -619,9 +619,6 @@
     <ImplicitFloatToIntCast>
       <code><![CDATA[$completeBars]]></code>
     </ImplicitFloatToIntCast>
-    <NullableReturnStatement>
-      <code><![CDATA[return preg_replace_callback($regex, $callback, $this->format);]]></code>
-    </NullableReturnStatement>
   </file>
   <file src="src/Symfony/Component/Console/Helper/QuestionHelper.php">
     <ImplicitFloatToIntCast>

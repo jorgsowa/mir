@@ -603,11 +603,26 @@ pub struct MethodDef {
     /// `is_mutation_free`, which comes from the annotation.
     #[serde(default)]
     pub inferred_mutation_free: bool,
+    /// The `$this` properties the body changes, when it can change nothing else of `$this`.
+    /// `None` when unknown.
+    #[serde(default)]
+    pub inferred_this_writes: Option<Vec<(Arc<str>, PropertyWrite)>>,
     /// Method names referenced via `@dataProvider name` / `#[DataProvider('name')]`
     /// (PHPUnit) — treated as used by dead-code analysis, since PHPUnit invokes
     /// them by name through reflection rather than a direct call site.
     #[serde(default)]
     pub data_provider_targets: Vec<Arc<str>>,
+}
+
+/// How a method body changes one of `$this`'s properties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PropertyWrite {
+    /// Only appended to with `.=`.
+    Append,
+    /// Reassigned or modified in place.
+    Assign,
+    /// Only the object it holds is changed, through a method call.
+    Inner,
 }
 
 impl MethodDef {
