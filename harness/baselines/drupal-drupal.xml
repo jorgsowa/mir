@@ -67,11 +67,6 @@
       <code><![CDATA[$y0]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/lib/Drupal/Component/FileCache/FileCache.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->cache = new $cache_backend_class($cache_backend_configuration)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Component/Gettext/PoStreamReader.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->currentPluralIndex = substr($from_bracket, 1, strpos($from_bracket, ']') - 1)]]></code>
@@ -126,11 +121,6 @@
       <code><![CDATA[]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Access/RouteProcessorCsrf.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->requestStack = \Drupal::service('request_stack')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Action/Plugin/Action/DeleteAction.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->tempStore = $temp_store_factory->get('entity_delete_multiple_confirm')]]></code>
@@ -143,11 +133,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$this->priority !== NULL]]></code>
     </ImpossibleIdenticalComparison>
-  </file>
-  <file src="core/lib/Drupal/Core/Annotation/ContextDefinition.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->definition = new $class($values['value'], $values['label'], $values['required'], $values['multiple'], $values['description'], $values['default_value'])]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Archiver/ArchiverManager.php">
     <InvalidReturnType>
@@ -200,9 +185,6 @@
     </NullArgument>
   </file>
   <file src="core/lib/Drupal/Core/Asset/LibraryDiscoveryParser.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->yamlCacheCollector = \Drupal::service('libraries.parsing_cache')]]></code>
-    </InvalidPropertyAssignment>
     <UndefinedConstant>
       <code><![CDATA[JS_LIBRARY]]></code>
       <code><![CDATA[CSS_AGGREGATE_THEME]]></code>
@@ -554,18 +536,6 @@
       <code><![CDATA[return $e;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Controller/ControllerBase.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->entityTypeManager = $this->container()->get('entity_type.manager')]]></code>
-      <code><![CDATA[$this->entityFormBuilder = $this->container()->get('entity.form_builder')]]></code>
-      <code><![CDATA[$this->configFactory = $this->container()->get('config.factory')]]></code>
-      <code><![CDATA[$this->stateService = $this->container()->get('state')]]></code>
-      <code><![CDATA[$this->moduleHandler = $this->container()->get('module_handler')]]></code>
-      <code><![CDATA[$this->formBuilder = $this->container()->get('form_builder')]]></code>
-      <code><![CDATA[$this->currentUser = $this->container()->get('current_user')]]></code>
-      <code><![CDATA[$this->languageManager = $this->container()->get('language_manager')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Database/Connection.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA["Could not determine last insert id" . $name === NULL]]></code>
@@ -681,9 +651,6 @@
       <code><![CDATA[$app_root === NULL]]></code>
       <code><![CDATA[$class_loader === NULL]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->bootstrapContainer = new $this->bootstrapContainerClass(Settings::get('bootstrap_container_definition', $this->defaultBootstrapContainerDefinition))]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$container]]></code>
       <code><![CDATA[$container]]></code>
@@ -739,18 +706,10 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Entity/EntityFormDisplay.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->pluginManager = \Drupal::service('plugin.manager.field.widget')]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$candidate_ids]]></code>
       <code><![CDATA[$candidate_ids]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/lib/Drupal/Core/Entity/Entity/EntityViewDisplay.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->pluginManager = \Drupal::service('plugin.manager.field.formatter')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Entity/EntityBase.php">
     <ImpossibleIdenticalComparison>
@@ -790,11 +749,6 @@
     <InvalidReturnType>
       <code><![CDATA[return array_keys($this->violationOffsetsByField);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Entity/EntityDisplayBase.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->renderer = \Drupal::service('renderer')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Entity/EntityFieldManager.php">
     <InvalidTemplateParam>
@@ -857,14 +811,6 @@
       <code><![CDATA[return '';]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Entity/Form/WorkspaceSafeFormTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->workspaceInfo = \Drupal::service('workspaces.information')]]></code>
-    </InvalidPropertyAssignment>
-    <NullableReturnStatement>
-      <code><![CDATA[return $this->workspaceInfo;]]></code>
-    </NullableReturnStatement>
-  </file>
   <file src="core/lib/Drupal/Core/Entity/KeyValueStore/KeyValueContentEntityStorage.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -881,12 +827,6 @@
     <InvalidArgument>
       <code><![CDATA[$records]]></code>
     </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Entity/Plugin/DataType/ConfigEntityAdapter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->typedConfigManager = \Drupal::service('config.typed')]]></code>
-      <code><![CDATA[$this->typedDataManager = \Drupal::service('config.typed')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Plugin/DataType/Deriver/EntityDeriver.php">
     <InvalidOperand>
@@ -931,9 +871,6 @@
     <InvalidArgument>
       <code><![CDATA[$this->sqlQuery]]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->tables = new $class($this->sqlQuery)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Query/Sql/QueryAggregate.php">
     <InvalidArgument>
@@ -941,9 +878,6 @@
     </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Query/Sql/Tables.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->entityFieldManager = \Drupal::service('entity_field.manager')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return 0;]]></code>
     </InvalidReturnType>
@@ -972,9 +906,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Sql/SqlContentEntityStorage.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->storageSchema = new $class($this->entityTypeManager, $this->entityType, $this, $this->database, $this->entityFieldManager)]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $items_by_entity;]]></code>
     </InvalidReturnType>
@@ -985,11 +916,6 @@
       <code><![CDATA[$revision_query]]></code>
       <code><![CDATA[$revision_query]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/lib/Drupal/Core/Entity/Sql/SqlContentEntityStorageSchema.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->deletedFieldsRepository = \Drupal::service('entity_field.deleted_fields_repository')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Entity/entity.api.php">
     <UndefinedClass>
@@ -1040,10 +966,6 @@
     </InvalidTemplateParam>
   </file>
   <file src="core/lib/Drupal/Core/Extension/DatabaseDriver.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->classLoader = \Drupal::service('class_loader')]]></code>
-      <code><![CDATA[$this->installTasks = new $installTasksClass()]]></code>
-    </InvalidPropertyAssignment>
     <InvalidStringClass>
       <code><![CDATA[$installTasksClass]]></code>
     </InvalidStringClass>
@@ -1084,12 +1006,6 @@
     </InvalidTemplateParam>
   </file>
   <file src="core/lib/Drupal/Core/Extension/ModuleInstaller.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->uninstallValidators = \Drupal::service('module_installer.uninstall_validators')]]></code>
-      <code><![CDATA[$this->moduleHandler = $container->get('module_handler')]]></code>
-      <code><![CDATA[$this->connection = $container->get('database')]]></code>
-      <code><![CDATA[$this->updateRegistry = $container->get('update.update_hook_registry')]]></code>
-    </InvalidPropertyAssignment>
     <UndefinedFunction>
       <code><![CDATA[module_config_sort(array_merge(
         array_fill_keys($module_list, 0),
@@ -1112,11 +1028,6 @@
     <InvalidReturnType>
       <code><![CDATA[return array_keys($this->installedThemes);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Extension/ThemeInstaller.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->kernel = \Drupal::service('kernel')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Extension/module.api.php">
     <InvalidReturnType>
@@ -1202,11 +1113,6 @@
       <code><![CDATA[base_path()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/lib/Drupal/Core/File/HtaccessWriter.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->settings = \Drupal::service('settings')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/File/MimeType/MimeTypeGuesser.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$real_path !== FALSE]]></code>
@@ -1229,10 +1135,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/lib/Drupal/Core/Form/FormBase.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->configFactory = $this->container()->get('config.factory')]]></code>
-      <code><![CDATA[$this->requestStack = \Drupal::service('request_stack')]]></code>
-    </InvalidPropertyAssignment>
     <NullableReturnStatement>
       <code><![CDATA[return $this->requestStack->getCurrentRequest();]]></code>
     </NullableReturnStatement>
@@ -1308,11 +1210,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/lib/Drupal/Core/Installer/Form/SiteConfigureForm.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->entityTypeManager = $container->get('entity_type.manager')]]></code>
-      <code><![CDATA[$this->moduleInstaller = $container->get('module_installer')]]></code>
-      <code><![CDATA[$this->userNameValidator = $container->get('user.name_validator')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->entityTypeManager->getStorage('user_role')->loadByProperties(['is_admin' => TRUE]);]]></code>
     </InvalidReturnType>
@@ -1375,11 +1272,6 @@
       <code><![CDATA[return $categories;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Link.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->linkGenerator = \Drupal::service('link_generator')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Lock/LockBackendAbstract.php">
     <InvalidArgument>
       <code><![CDATA[$sleep]]></code>
@@ -1389,16 +1281,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Logger/LoggerChannelTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->loggerFactory = \Drupal::service('logger.factory')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/Menu/Form/MenuLinkDefaultForm.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->moduleExtensionList = \Drupal::service('extension.list.module')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Menu/InaccessibleMenuLink.php">
     <InvalidOperand>
@@ -1412,15 +1294,7 @@
       <code><![CDATA[return $this->t('Inaccessible');]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Menu/LocalTaskDefault.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->routeProvider = \Drupal::service('router.route_provider')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Menu/MenuActiveTrail.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->pathMatcher = \Drupal::service('path.matcher')]]></code>
-    </InvalidPropertyAssignment>
     <NullArgument>
       <code><![CDATA[NULL]]></code>
     </NullArgument>
@@ -1515,46 +1389,6 @@
       <code><![CDATA[$this->discovery = new ComponentYamlDirectoryDiscovery($directories, $file_cache_key_suffix, $key)]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Batch/BatchStorage.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Lock/DatabaseLockBackend.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Lock/PersistentDatabaseLockBackend.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Menu/MenuActiveTrail.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/PageCache/ChainResponsePolicy.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Render/BareHtmlPageRenderer.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Routing/MatcherDumper.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/ProxyClass/Routing/RouteBuilder.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->service = $this->container->get($this->drupalProxyOriginalServiceId)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Queue/DatabaseQueue.php">
     <NullableReturnStatement>
       <code><![CDATA[return $query->execute();]]></code>
@@ -1593,11 +1427,6 @@
     <UndefinedFunction>
       <code><![CDATA[drupal_attach_tabledrag($element, $options)]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/lib/Drupal/Core/Render/HtmlResponseAttachmentsProcessor.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->fileUrlGenerator = \Drupal::service('file_url_generator')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Render/Renderer.php">
     <ImpossibleIdenticalComparison>
@@ -1641,11 +1470,6 @@
       <code><![CDATA[return $this->provider->getRoutesByNames(NULL);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Routing/LocalAwareRedirectResponseTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->requestContext = \Drupal::service('router.request_context')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/lib/Drupal/Core/Routing/RouteProvider.php">
     <InvalidReturnType>
       <code><![CDATA[return $result;]]></code>
@@ -1663,11 +1487,6 @@
       <code><![CDATA[$route->getRouteKey()]]></code>
       <code><![CDATA[$route->getRouteKey()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="core/lib/Drupal/Core/Routing/YamlRouteDiscovery.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->yamlCacheCollector = \Drupal::service('routing.yaml_cache_collector')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Session/SessionManager.php">
     <PossiblyUndefinedVariable>
@@ -1707,16 +1526,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return array_pop($matches);]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/lib/Drupal/Core/StringTranslation/StringTranslationTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->stringTranslation = \Drupal::service('string_translation')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/StringTranslation/TranslatableMarkup.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->stringTranslation = \Drupal::service('string_translation')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Template/Attribute.php">
     <InvalidArgument>
@@ -1823,10 +1632,6 @@
     </UndefinedConstant>
   </file>
   <file src="core/lib/Drupal/Core/Theme/ThemeManager.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->keyValueFactory = \Drupal::service('keyvalue')]]></code>
-      <code><![CDATA[$this->cache = \Drupal::service('cache.bootstrap')]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$candidate]]></code>
     </PossiblyUndefinedVariable>
@@ -1858,11 +1663,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/TypedData/Plugin/DataType/Language.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->language = $value]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/TypedData/Plugin/DataType/LanguageReference.php">
     <InvalidReturnType>
@@ -1927,12 +1727,6 @@
     <UndefinedFunction>
       <code><![CDATA[drupal_get_updaters()]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/lib/Drupal/Core/Url.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->accessManager = \Drupal::service('access_manager')]]></code>
-      <code><![CDATA[$this->urlAssembler = \Drupal::service('unrouted_url_assembler')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/lib/Drupal/Core/Utility/Error.php">
     <InvalidReturnType>
@@ -2006,11 +1800,6 @@
       <code><![CDATA[$ajax_response->getAttachments()]]></code>
       <code><![CDATA[$ajax_response->getAttachments()]]></code>
     </UndefinedMethod>
-  </file>
-  <file src="core/modules/block/src/Entity/Block.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->conditionPluginManager = \Drupal::service('plugin.manager.condition')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/block/src/Plugin/ConfigAction/PlaceBlockDeriver.php">
     <InvalidOperand>
@@ -2241,17 +2030,11 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/config_translation/src/Plugin/Menu/ContextualLink/ConfigTranslationContextualLink.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->mapperManager = \Drupal::service('plugin.manager.config_translation.mapper')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('Translate @type_name', ['@type_name' => $type_name]);]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/config_translation/src/Plugin/Menu/LocalTask/ConfigTranslationLocalTask.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->mapperManager = \Drupal::service('plugin.manager.config_translation.mapper')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('Translate @type_name', ['@type_name' => $type_name]);]]></code>
     </InvalidReturnType>
@@ -2328,11 +2111,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$language !== NULL]]></code>
     </ImpossibleIdenticalComparison>
-  </file>
-  <file src="core/modules/content_translation/src/Access/ContentTranslationOverviewAccess.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->callableResolver = \Drupal::service('callable_resolver')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/content_translation/src/ContentTranslationHandler.php">
     <InvalidReturnType>
@@ -2427,9 +2205,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$this->format !== NULL]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->editorPluginManager = \Drupal::service('plugin.manager.editor')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return array_keys(\Drupal::service('stream_wrapper_manager')->getNames(StreamWrapperInterface::WRITE_VISIBLE));]]></code>
     </InvalidReturnType>
@@ -3250,11 +3025,6 @@
       <code><![CDATA[$method_id]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/modules/language/src/Plugin/LanguageNegotiation/LanguageNegotiationBrowser.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$instance->pageCacheKillSwitch = $container->get('page_cache_kill_switch')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/modules/language/src/Plugin/LanguageNegotiation/LanguageNegotiationContentEntity.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$this->languageManager === NULL]]></code>
@@ -3278,20 +3048,10 @@
       <code><![CDATA[return t('Layout Builder user interface');]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/layout_builder/src/Context/LayoutBuilderContextTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->contextRepository = \Drupal::service('context.repository')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/modules/layout_builder/src/Controller/LayoutBuilderController.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->t('Edit layout for %label', ['%label' => $section_storage->label() ?? $section_storage->getStorageType() . ' ' . $section_storage->getStorageId()]);]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/layout_builder/src/Entity/LayoutBuilderEntityViewDisplay.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->entityFieldManager = \Drupal::service('entity_field.manager')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/layout_builder/src/Form/DefaultsEntityForm.php">
     <NullableReturnStatement>
@@ -3821,9 +3581,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/migrate/src/MigrateExecutable.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->eventDispatcher = \Drupal::service('event_dispatcher')]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$destination_property_name]]></code>
       <code><![CDATA[$destination_property_name]]></code>
@@ -3838,13 +3595,6 @@
     <MethodSignatureMismatch>
       <code><![CDATA[prepareannotationdefinition]]></code>
     </MethodSignatureMismatch>
-  </file>
-  <file src="core/modules/migrate/src/Plugin/Migration.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->sourcePlugin = $this->sourcePluginManager->createInstance($this->source['plugin'], $this->source, $this)]]></code>
-      <code><![CDATA[$this->destinationPlugin = $this->destinationPluginManager->createInstance($this->destination['plugin'], $this->destination, $this)]]></code>
-      <code><![CDATA[$this->idMapPlugin = $this->idMapPluginManager->createInstance($plugin, $configuration, $this)]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/migrate/src/Plugin/migrate/id_map/NullIdMap.php">
     <InvalidReturnType>
@@ -3884,11 +3634,6 @@
     <InvalidArgument>
       <code><![CDATA[$drupal_version]]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->configFactory = \Drupal::service('config.factory')]]></code>
-      <code><![CDATA[$this->migrationPluginManager = \Drupal::service('plugin.manager.migration')]]></code>
-      <code><![CDATA[$this->state = \Drupal::service('state')]]></code>
-    </InvalidPropertyAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$patterns]]></code>
     </PossiblyUndefinedVariable>
@@ -4020,9 +3765,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/node/src/Controller/NodePreviewController.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->formBuilder = \Drupal::service('form_builder')]]></code>
-    </InvalidPropertyAssignment>
     <NullableReturnStatement>
       <code><![CDATA[return $this->entityRepository->getTranslationFromContext($node_preview)->label();]]></code>
     </NullableReturnStatement>
@@ -4104,11 +3846,6 @@
     <UndefinedConstant>
       <code><![CDATA[RESPONSIVE_PRIORITY_MEDIUM]]></code>
     </UndefinedConstant>
-  </file>
-  <file src="core/modules/node/src/NodeViewsData.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->moduleExtensionList = \Drupal::service('extension.list.module')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/node/src/Plugin/migrate/D6NodeTranslation.php">
     <InvalidArgument>
@@ -4223,9 +3960,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/package_manager/src/SandboxManagerBase.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->eventDispatcher = \Drupal::service('event_dispatcher')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->lock[3];]]></code>
     </InvalidReturnType>
@@ -4311,11 +4045,6 @@
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/rest/src/Entity/RestResourceConfig.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->pluginManager = \Drupal::service('plugin.manager.rest')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/rest/src/EventSubscriber/ResourceResponseSubscriber.php">
     <InvalidReturnType>
@@ -4912,15 +4641,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/user/src/Entity/User.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[static::$anonymousUser = new $class([
-        'uid' => [LanguageInterface::LANGCODE_DEFAULT => 0],
-        'name' => [LanguageInterface::LANGCODE_DEFAULT => ''],
-        // Explicitly set the langcode to ensure that field definitions do not
-        // need to be fetched to figure out a default.
-        'langcode' => [LanguageInterface::LANGCODE_DEFAULT => LanguageInterface::LANGCODE_NOT_SPECIFIED],
-      ], $entity_type->id())]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return array_keys(\Drupal::languageManager()->getLanguages(LanguageInterface::STATE_CONFIGURABLE));]]></code>
     </InvalidReturnType>
@@ -4976,9 +4696,6 @@
     </UndefinedFunction>
   </file>
   <file src="core/modules/user/src/Form/UserPermissionsForm.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->moduleExtensionList = \Drupal::service('extension.list.module')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return $this->roleStorage->loadMultipleOverrideFree();]]></code>
     </InvalidReturnType>
@@ -5033,9 +4750,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/user/src/Plugin/views/field/UserData.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->moduleExtensionList = \Drupal::service('extension.list.module')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
@@ -5063,11 +4777,6 @@
     <UndefinedConstant>
       <code><![CDATA[SAVED_UPDATED]]></code>
     </UndefinedConstant>
-  </file>
-  <file src="core/modules/user/src/Theme/AdminNegotiator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->adminContext = \Drupal::service('router.admin_context')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/user/src/TimeZoneItem.php">
     <InvalidReturnType>
@@ -5111,9 +4820,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/views/src/Entity/Render/EntityTranslationRenderTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->entityTranslationRenderer = new $class($view, $this->getLanguageManager(), $entity_type)]]></code>
-    </InvalidPropertyAssignment>
     <InvalidStringClass>
       <code><![CDATA[$class]]></code>
     </InvalidStringClass>
@@ -5128,11 +4834,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $entity_type->getDataTable() ?: $entity_type->getBaseTable();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/views/src/FieldAPIHandlerTrait.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->entityFieldManager = \Drupal::service('entity_field.manager')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/views/src/Hook/ViewsThemeHooks.php">
     <TaintedCallable>
@@ -5199,11 +4900,6 @@
     <UndefinedProperty>
       <code><![CDATA[relationships]]></code>
     </UndefinedProperty>
-  </file>
-  <file src="core/modules/views/src/Plugin/views/PluginBase.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->renderer = \Drupal::service('renderer')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/views/src/Plugin/views/area/DisplayLink.php">
     <TaintedCallable>
@@ -5368,9 +5064,6 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/views/src/Plugin/views/field/FieldPluginBase.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->renderer = \Drupal::service('renderer')]]></code>
-    </InvalidPropertyAssignment>
     <NullableReturnStatement>
       <code><![CDATA[return $this->last_render;]]></code>
     </NullableReturnStatement>
@@ -5506,12 +5199,6 @@
     <InvalidArgument>
       <code><![CDATA[$this->display_handler->output]]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->displayPluginManager = \Drupal::service('plugin.manager.views.display')]]></code>
-      <code><![CDATA[$this->viewsData = \Drupal::service('views.views_data')]]></code>
-      <code><![CDATA[$this->routeProvider = \Drupal::service('router.route_provider')]]></code>
-      <code><![CDATA[$this->displayPluginManager = \Drupal::service('plugin.manager.views.display')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
@@ -5546,18 +5233,10 @@
       <code><![CDATA[$this->display_handler->useGroupBy()]]></code>
     </TooManyArguments>
   </file>
-  <file src="core/modules/views/src/ViewExecutableFactory.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->displayPluginManager = \Drupal::service('plugin.manager.views.display')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/modules/views/src/Views.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$type === NULL]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[static::$translationManager = \Drupal::service('string_translation')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple();]]></code>
       <code><![CDATA[return \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($query);]]></code>
@@ -5661,11 +5340,6 @@
       <code><![CDATA[return $route_match->getRouteObject()->getRequirement('_workflow_access');]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/workspaces/src/EntityQuery/Tables.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->workspaceInfo = \Drupal::service('workspaces.information')]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="core/modules/workspaces/src/EventSubscriber/WorkspaceSwitchSubscriber.php">
     <InvalidReturnType>
       <code><![CDATA[return $events;]]></code>
@@ -5681,11 +5355,6 @@
     <InvalidArgument>
       <code><![CDATA[[$entity->id()]]]></code>
     </InvalidArgument>
-  </file>
-  <file src="core/modules/workspaces/src/Plugin/EntityReferenceSelection/WorkspaceSelection.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$instance->workspaceRepository = $container->get('workspaces.repository')]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="core/modules/workspaces/src/WorkspaceCacheContext.php">
     <InvalidReturnType>
@@ -5715,22 +5384,11 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/workspaces_ui/src/Form/WorkspaceForm.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$instance->workspaceManager = $container->get('workspaces.manager')]]></code>
-    </InvalidPropertyAssignment>
     <InvalidReturnType>
       <code><![CDATA[]]></code>
     </InvalidReturnType>
     <UndefinedConstant>
       <code><![CDATA[SAVED_UPDATED]]></code>
     </UndefinedConstant>
-  </file>
-  <file src="core/modules/workspaces_ui/src/WorkspaceViewBuilder.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$instance->entityTypeManager = $container->get('entity_type.manager')]]></code>
-      <code><![CDATA[$instance->workspaceTracker = $container->get('workspaces.tracker')]]></code>
-      <code><![CDATA[$instance->dateFormatter = $container->get('date.formatter')]]></code>
-      <code><![CDATA[$instance->bundleInfo = $container->get('entity_type.bundle.info')]]></code>
-    </InvalidPropertyAssignment>
   </file>
 </files>

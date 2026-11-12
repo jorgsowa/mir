@@ -1671,14 +1671,6 @@
       <code><![CDATA[$rate]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Routing/Router.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->matcher = new $this->options['matcher_class']($routes, $this->context)]]></code>
-      <code><![CDATA[$this->matcher = new $this->options['matcher_class'](self::getCompiledRoutes($cache->getPath()), $this->context)]]></code>
-      <code><![CDATA[$this->generator = new $this->options['generator_class']($routes, $this->context, $this->logger, $this->defaultLocale)]]></code>
-      <code><![CDATA[$this->generator = new $this->options['generator_class'](self::getCompiledRoutes($cache->getPath()), $this->context, $this->logger, $this->defaultLocale)]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Symfony/Component/Runtime/Internal/ComposerPlugin.php">
     <UndefinedClass>
       <code><![CDATA[PluginInterface]]></code>

@@ -1761,6 +1761,12 @@ fn is_atom_property_coercion(
 ) -> bool {
     let val_fqcn = match atom {
         Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => fqcn,
+        Atomic::TObject => {
+            return prop_ty
+                .types
+                .iter()
+                .any(|p| matches!(p, Atomic::TNamedObject { .. }))
+        }
         a => return is_generic_array_coercion(a, prop_ty, db),
     };
     prop_ty.types.iter().any(|p| {

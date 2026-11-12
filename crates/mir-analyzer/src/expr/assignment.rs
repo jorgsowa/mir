@@ -3092,8 +3092,16 @@ fn property_refinement(
             .filter(|d| !d.is_mixed() && d.is_nullable())
             .map(|_| assigned.clone());
     }
-    let fits = declared.is_none_or(|d| crate::subtype::is_subtype(db, &assigned.remove_null(), d));
-    fits.then(|| assigned.clone())
+    let Some(declared) = declared else {
+        return Some(assigned.clone());
+    };
+    if crate::subtype::is_subtype(db, &assigned.remove_null(), declared) {
+        return Some(assigned.clone());
+    }
+    // A coercion that doesn't throw leaves a value of the declared type.
+    (!assigned.is_nullable()
+        && is_property_type_coercion(assigned, declared, db))
+    .then(|| declared.remove_null())
 }
 
 /// Built-in classes PHP declares `@strict-properties` (`ZEND_ACC_NO_DYNAMIC_PROPERTIES`):
