@@ -366,10 +366,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             if crate::call::has_unbound_template(&out_ty) {
                 return;
             }
-            if let Some(ExprKind::Variable(name)) = arg.value().map(|v| &v.kind) {
+            let Some(value) = arg.value() else {
+                return;
+            };
+            if let ExprKind::Variable(name) = &value.kind {
                 let var_name = name.as_ref().trim_start_matches('$');
                 ctx.set_var(var_name, out_ty);
                 ctx.set_var_taint(var_name, args_taint);
+            } else {
+                crate::call::write_byref_element(self, ctx, value, out_ty);
             }
         });
     }

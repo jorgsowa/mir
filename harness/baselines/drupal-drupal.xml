@@ -1270,11 +1270,7 @@
     </UndefinedVariable>
   </file>
   <file src="core/lib/Drupal/Core/Hook/HookCollectorPass.php">
-    <InvalidArgument>
-      <code><![CDATA[$implementationsByHook[$hook]]]></code>
-    </InvalidArgument>
     <InvalidReturnType>
-      <code><![CDATA[return $implementationsByHook;]]></code>
       <code><![CDATA[return $implementationsByHook;]]></code>
     </InvalidReturnType>
   </file>

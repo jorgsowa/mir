@@ -449,6 +449,18 @@ pub(crate) fn byref_written_type(
     }
 }
 
+/// An array element passed by reference takes the type the param writes, like a variable does.
+pub(crate) fn write_byref_element(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    ctx: &mut crate::flow_state::FlowState,
+    value: &php_ast::owned::Expr,
+    written: mir_types::Type,
+) {
+    if matches!(value.kind, php_ast::owned::ExprKind::ArrayAccess(_)) {
+        ea.assign_to_target(value, written, ctx, value.span);
+    }
+}
+
 /// True when `ty` still names an unbound template param.
 pub(crate) fn has_unbound_template(ty: &mir_types::Type) -> bool {
     use mir_types::Atomic;

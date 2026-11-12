@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `array_keys($a['k'])` carries the taint of the keys written under `$a['k']` instead of the taint of its values. A tainted key written there (`$a['k'][$_GET['x']] = …`) is now reported.
 - `count($mixed) > 0` narrows the value to a non-empty array, so a later `foreach` over it is known to run.
 - `$a[$k] instanceof X` narrows the element to `X` when the array's docblock element type rules `X` out, as it does for a variable.
+- An array element passed by reference takes the type the parameter writes (its `@param-out`, declared or `mixed` type), as a variable does, instead of keeping its shape from before the call.
 
 ## [0.99.0] - 2026-11-12
 

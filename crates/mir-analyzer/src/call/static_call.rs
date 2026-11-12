@@ -1264,6 +1264,8 @@ impl CallAnalyzer {
                         let var_name = name.as_ref().trim_start_matches('$');
                         ctx.set_var(var_name, out_ty);
                         ctx.set_var_taint(var_name, args_taint);
+                    } else {
+                        super::write_byref_element(ea, ctx, value, out_ty);
                     }
                 }
             }

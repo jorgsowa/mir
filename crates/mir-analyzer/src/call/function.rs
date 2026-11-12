@@ -1111,6 +1111,7 @@ impl CallAnalyzer {
                             ctx.set_var_taint(var_name, args_taint);
                         } else {
                             ea.check_byref_arg_purity(value, ctx, value.span);
+                            super::write_byref_element(ea, ctx, value, output_ty);
                         }
                     }
                 }
