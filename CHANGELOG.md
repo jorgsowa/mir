@@ -7,10 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Performance: the analysis cache stores each file's class-level check results, so a cached run replays them for files whose result is still valid instead of re-running the checks (unchanged re-run: Laravel about 14% fewer instructions, Symfony about 6%). The cache from an earlier mir build is discarded. Lazy class loading resolves PSR-4 paths only for names the index lacks, saving a file stat per referenced class on every run. Taint lookups in a scope with no tainted variables or properties skip interning the name (cold Symfony about 1% fewer instructions).
-- A shape parameter written without `...` is sealed: an argument with a key the shape does not declare (`['foo' => 1, 'buz' => 2]` or an `array{foo: int, buz: int}` value for `array{foo: int}`) is `InvalidArgument`. Spell the shape `array{foo: int, ...}` to accept extra keys.
+## [0.99.0] - 2026-11-12
 
 ### Added
 
@@ -27,11 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `stdClass{name: string}` is read as the object shape `object{name: string}`, so its properties are typed, instead of an undefined class.
 - `@phan-assert`, `@phan-assert-true-condition` and `@phan-assert-false-condition` are read as `@psalm-assert`, `@psalm-assert-if-true` and `@psalm-assert-if-false`.
 
+### Changed
+
+- A shape parameter written without `...` is sealed: an argument with a key the shape does not declare (`['foo' => 1, 'buz' => 2]` or an `array{foo: int, buz: int}` value for `array{foo: int}`) is `InvalidArgument`. Spell the shape `array{foo: int, ...}` to accept extra keys.
+- Performance: the analysis cache stores each file's class-level check results, so an unchanged re-run replays them instead of re-running the checks (Laravel about 14% fewer instructions, Symfony about 6%). The cache from an earlier mir build is discarded.
+- Performance: lazy class loading resolves PSR-4 paths only for names the index lacks, saving a file stat per referenced class on every run.
+- Performance: taint lookups in a scope with no tainted variables or properties skip interning the name (cold Symfony about 1% fewer instructions).
+- Workspace and internal crate versions were updated to `0.99.0`.
+
 ### Fixed
 
 - A call-site covariant projection (`Collection<covariant Animal>`) rejects `Collection<mixed>` instead of accepting it as it would any argument.
 - `(object)` on an array shape is `object{...}&stdClass` instead of a bare `stdClass`, so a mistyped property passed for an `object{foo: int}` or `object{foo: int}&stdClass` parameter is `InvalidArgument`. An object-shape value inside an intersection is checked the same way, and reading an unlisted property on it is no longer `UndefinedProperty`.
-- An int passed for a union that lists int types is checked against those, not widened to its `float` member: `0` is rejected for `non-empty-mixed`, `non-empty-scalar` and `positive-int|float`. An int still widens to a `float` (or `float|string`) parameter.
+- An int passed for a union that lists int types is checked against those, not widened to its `float` member, so `0` is rejected for `positive-int|float`. An int still widens to a `float` (or `float|string`) parameter.
 - Inside a namespace, `@psalm-self-out self<U>` and `@psalm-this-out static<U>` retype the receiver with the method's template instead of naming a class `App\self`, so a later `@psalm-if-this-is` check sees the new type. A self-out template that no parameter mentions is `mixed`, not its bound.
 - A scalar passed for a class-typed shape value (`['item' => 'nope']` for `array{item: Foo}`) is `InvalidArgument`. Nothing was reported.
 - An array callable (`[$obj, 'method']`) passed for a `Closure(...)` parameter is `InvalidArgument`: it is callable, but not a `Closure`.
