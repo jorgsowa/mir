@@ -368,6 +368,90 @@ fn index_batch_honours_cancellation() {
     assert_eq!(outcome.registered, 0);
 }
 
+/// A line-shifting body edit re-runs no more dependent scopes than an in-place one.
+#[test]
+fn line_shifting_body_edit_keeps_dependent_scopes_memoized() {
+    fn scopes_rerun_after(edit: &str) -> u64 {
+        let dep = |body: &str| {
+            Arc::<str>::from(format!(
+                "<?php\nnamespace App;\nclass Dep {{\n    public function first(): int {{\n{body}        return 1;\n    }}\n    public function go(): int {{ return 1; }}\n    public int $prop = 0;\n    const C = 1;\n}}\nfunction helper(): int {{ return 1; }}\n"
+            ))
+        };
+        let mut session = fresh_session(PhpVersion::LATEST);
+        session.ingest_file(Arc::from("/proj/Dep.php"), dep("        $x = 1;\n"));
+        session.ingest_file(
+            Arc::from("/proj/User.php"),
+            Arc::from(
+                "<?php\nnamespace App;\n\
+                function useDep(Dep $d): int { return $d->go() + $d->prop + Dep::C + helper(); }\n",
+            ),
+        );
+        let analyze_user = |session: &AnalysisSession| {
+            let db = session.snapshot_db();
+            let file = db.lookup_source_file("/proj/User.php").unwrap();
+            analyze_file(&db, file).issues.len()
+        };
+        assert_eq!(analyze_user(&session), 0);
+        session.ingest_file(Arc::from("/proj/Dep.php"), dep(edit));
+        let before = session.work_count(Work::ScopeAnalysis);
+        assert_eq!(analyze_user(&session), 0);
+        session.work_count(Work::ScopeAnalysis) - before
+    }
+
+    let same_lines = scopes_rerun_after("        $y = 2;\n");
+    let shifted = scopes_rerun_after("        $y = 2;\n\n\n\n");
+    assert_eq!(
+        shifted, same_lines,
+        "moving Dep's members down must not re-run more of User than an in-place edit"
+    );
+}
+
+/// Declaration lookups report current lines after an edit that only moves declarations.
+#[test]
+fn definition_lines_follow_a_line_shifting_edit() {
+    use mir_analyzer::Name;
+    let dep = |padding: &str| {
+        Arc::<str>::from(format!(
+            "<?php\nnamespace App;\nclass Dep {{\n    public function first(): int {{\n{padding}        return 1;\n    }}\n    public function go(): int {{ return 1; }}\n    public int $prop = 0;\n    const C = 1;\n}}\nfunction helper(): int {{ return 1; }}\n"
+        ))
+    };
+    let mut session = fresh_session(PhpVersion::LATEST);
+    session.ingest_file(Arc::from("/proj/Dep.php"), dep(""));
+    session.ingest_file(
+        Arc::from("/proj/User.php"),
+        Arc::from(
+            "<?php\nnamespace App;\n\
+            function useDep(Dep $d): int { return $d->go() + $d->prop + Dep::C + helper(); }\n",
+        ),
+    );
+    let symbols = [
+        Name::method("App\\Dep", "go"),
+        Name::property("App\\Dep", "prop"),
+        Name::class_constant("App\\Dep", "C"),
+        Name::function("App\\helper"),
+    ];
+    let lines = |session: &AnalysisSession| {
+        let db = session.snapshot_db();
+        let file = db.lookup_source_file("/proj/User.php").unwrap();
+        let _ = analyze_file(&db, file);
+        symbols
+            .iter()
+            .map(|s| session.definition_of_cached(s).expect("declared").line)
+            .collect::<Vec<_>>()
+    };
+    let before = lines(&session);
+    session.ingest_file(
+        Arc::from("/proj/Dep.php"),
+        dep("        $a = 1;\n        $b = 2;\n\n"),
+    );
+    let after = lines(&session);
+    assert_eq!(
+        after,
+        before.iter().map(|line| line + 3).collect::<Vec<_>>(),
+        "every declaration below the edit moved down three lines"
+    );
+}
+
 /// A newly added caller reaches already-memoized opaque-callback inference.
 #[test]
 fn added_caller_reaches_memoized_opaque_callback_inference() {

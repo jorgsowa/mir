@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A variable defined under `count($a) > n` or a property condition (`$this->lazy`, `$p->root !== ''`) is defined wherever that condition holds again, and a guard stays valid when the defining branch rewrites its variable. A write to the guard variable in the then branch now voids a guard negated into the else branch.
 - `$shape + $array` keeps the right operand's value type for the keys it adds (`array{0: null, ...<T>}`), and `[] + $array` is `$array`.
 
+### Performance
+
+- In the language server, adding or removing lines inside a function body no longer re-analyzes the files that use the classes and functions declared below it; only a change to a declaration does.
+
 ## [0.99.0] - 2026-11-12
 
 ### Added

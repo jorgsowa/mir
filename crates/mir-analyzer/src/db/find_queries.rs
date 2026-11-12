@@ -26,6 +26,38 @@ use crate::db::{
     collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile, SymbolLoc,
     WorkspaceSymbolIndex,
 };
+use mir_codebase::PositionBlindEq;
+
+/// Salsa compares this with [`PositionBlindEq`]; tracked dependents must never copy a line or column out of it.
+#[derive(Clone, Debug)]
+struct PositionBlind<T>(T);
+
+impl<T: PositionBlindEq> PartialEq for PositionBlind<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq_ignoring_positions(&other.0)
+    }
+}
+
+impl<T: PositionBlindEq> Eq for PositionBlind<T> {}
+
+impl PositionBlindEq for ClassLike {
+    fn eq_ignoring_positions(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ClassLike::Class(a), ClassLike::Class(b)) => a.eq_ignoring_positions(b),
+            (ClassLike::Interface(a), ClassLike::Interface(b)) => a.eq_ignoring_positions(b),
+            (ClassLike::Trait(a), ClassLike::Trait(b)) => a.eq_ignoring_positions(b),
+            (ClassLike::Enum(a), ClassLike::Enum(b)) => a.eq_ignoring_positions(b),
+            _ => false,
+        }
+    }
+}
+
+/// Re-run the caller when `loc`'s file moves, since it returns `loc` through position-blind lookups.
+fn depend_on_positions(db: &dyn MirDatabase, loc: Option<&mir_types::Location>) {
+    if let Some(file) = loc.and_then(|loc| db.lookup_source_file(&loc.file)) {
+        let _ = collect_file_definitions(db, file);
+    }
+}
 
 fn find_named_def<T>(
     defs: &[Arc<T>],
@@ -1098,7 +1130,19 @@ pub fn function_def_at(
     file: SourceFile,
     idx: u32,
 ) -> Option<Arc<FunctionDef>> {
-    file_function_defs(db, file).get(idx as usize).cloned()
+    file_function_signatures(db, file)
+        .0
+        .get(idx as usize)
+        .cloned()
+}
+
+/// [`file_function_defs`] compared position-blind; keyed by file alone to stay off salsa's argument interner.
+#[salsa::tracked(returns(ref))]
+fn file_function_signatures(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+) -> PositionBlind<Vec<Arc<FunctionDef>>> {
+    PositionBlind(file_function_defs(db, file).clone())
 }
 
 /// [`resolve_cross_file_imports`] for a free function's signature.
@@ -1135,7 +1179,7 @@ fn resolve_function_cross_file_imports(
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
     // O(1) index lookup (borrowing the frozen index on batch passes), then a
     // per-(file, idx) salsa-memoized fetch of the Arc<Storage>.
-    class_like_by_name(db, fqcn).clone()
+    class_like_by_name(db, fqcn).0.clone()
 }
 
 /// [`find_class_like`] borrowing the memoized definition instead of cloning it.
@@ -1143,14 +1187,20 @@ pub fn find_class_like_ref<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
 ) -> Option<ClassLikeRef<'db>> {
-    class_like_by_name(db, fqcn).as_ref().map(ClassLike::as_ref)
+    class_like_by_name(db, fqcn)
+        .0
+        .as_ref()
+        .map(ClassLike::as_ref)
 }
 
 /// The class-like `fqcn` names, memoized per name: one fetch per lookup
 /// instead of one for its location and one for its file's definitions.
 #[salsa::tracked(returns(ref))]
-fn class_like_by_name<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
-    class_like_loc(db, fqcn).and_then(|loc| class_like_from_loc(db, loc))
+fn class_like_by_name<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+) -> PositionBlind<Option<ClassLike>> {
+    PositionBlind(class_like_loc(db, fqcn).and_then(|loc| class_like_from_loc(db, loc)))
 }
 
 /// Whether the workspace symbol index already holds `fqcn`, as opposed to
@@ -1167,16 +1217,19 @@ pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<
 /// Composite: resolve `fqn` to its defining file, then locate the
 /// function within it.
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
-    function_by_name(db, fqn).clone()
+    function_by_name(db, fqn).0.clone()
 }
 
 /// [`find_function`] memoized per name, like [`class_like_by_name`].
 #[salsa::tracked(returns(ref))]
-fn function_by_name<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
-    let SymbolLoc::Function { file, idx } = function_loc(db, fqn)? else {
-        return None;
-    };
-    function_def_at(db, file, idx as u32)
+fn function_by_name<'db>(
+    db: &'db dyn MirDatabase,
+    fqn: Fqcn<'db>,
+) -> PositionBlind<Option<Arc<FunctionDef>>> {
+    PositionBlind(match function_loc(db, fqn) {
+        Some(SymbolLoc::Function { file, idx }) => file_function_defs(db, file).get(idx).cloned(),
+        _ => None,
+    })
 }
 
 /// Where function `fqn` is declared as seen from `file`: a declaration in
@@ -1618,7 +1671,7 @@ pub fn find_method_in_chain<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
-    method_in_chain(db, fqcn, Name::new(name)).clone()
+    method_in_chain(db, fqcn, Name::new(name)).0.clone()
 }
 
 /// [`find_method_in_chain`] memoized per class and name as written.
@@ -1627,8 +1680,17 @@ fn method_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: Name,
+) -> PositionBlind<Option<(Arc<str>, Arc<MethodDef>)>> {
+    let found = method_in_chain_uncached(db, fqcn, name.as_str());
+    depend_on_positions(db, found.as_ref().and_then(|(_, m)| m.location.as_ref()));
+    PositionBlind(found)
+}
+
+fn method_in_chain_uncached<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
-    let name = name.as_str();
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
         if let Some(m) = find_method_in_class(db, here, name) {
@@ -1862,7 +1924,7 @@ pub fn find_method_respecting_precedence<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
-    method_by_precedence(db, fqcn, Name::new(name)).clone()
+    method_by_precedence(db, fqcn, Name::new(name)).0.clone()
 }
 
 /// [`find_method_respecting_precedence`] memoized per class and name as written.
@@ -1871,15 +1933,17 @@ fn method_by_precedence<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: Name,
-) -> Option<(Arc<str>, Arc<MethodDef>)> {
+) -> PositionBlind<Option<(Arc<str>, Arc<MethodDef>)>> {
     let name = name.as_str();
     let lower = name.to_ascii_lowercase();
     let mut visited = std::collections::HashSet::<Arc<str>>::new();
-    walk_method_with_precedence(db, fqcn, &lower, &mut visited).or_else(|| {
+    let found = walk_method_with_precedence(db, fqcn, &lower, &mut visited).or_else(|| {
         // @mixin fallback — same as find_method_in_chain
         let mut visited_mixins = std::collections::HashSet::<Arc<str>>::new();
         find_method_in_mixins(db, fqcn, name, &mut visited_mixins)
-    })
+    });
+    depend_on_positions(db, found.as_ref().and_then(|(_, m)| m.location.as_ref()));
+    PositionBlind(found)
 }
 
 fn walk_method_with_precedence<'db>(
@@ -2014,12 +2078,22 @@ pub fn find_property_in_chain<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, PropertyDef)> {
-    property_in_chain(db, fqcn, Name::new(name)).clone()
+    property_in_chain(db, fqcn, Name::new(name)).0.clone()
 }
 
 /// [`find_property_in_chain`] memoized per class and name.
 #[salsa::tracked(returns(ref))]
 fn property_in_chain<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: Name,
+) -> PositionBlind<Option<(Arc<str>, PropertyDef)>> {
+    let found = reconciled_property_in_chain(db, fqcn, name);
+    depend_on_positions(db, found.as_ref().and_then(|(_, p)| p.location.as_ref()));
+    PositionBlind(found)
+}
+
+fn reconciled_property_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: Name,

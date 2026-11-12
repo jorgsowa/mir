@@ -1,5 +1,6 @@
 pub mod definitions;
 pub mod file_id;
+pub mod position_blind;
 
 pub use definitions::{
     deduplicate_params_in_slice, wrap_param_type, ClassDef, ConstantDef, DeclaredParam,
@@ -8,3 +9,4 @@ pub use definitions::{
 };
 pub use file_id::{FileId, FileIdMap};
 pub use mir_types::Location;
+pub use position_blind::PositionBlindEq;
