@@ -842,20 +842,18 @@ impl CallAnalyzer {
                 .any(&has_call_magic),
             _ => false,
         });
-        // Some union members declare the method: atoms lacking it are only
-        // "possibly undefined", not certainly undefined.
+        // Some union members declare the method, or are unknown classes that may: atoms
+        // lacking it are only "possibly undefined", not certainly undefined.
         let union_declares_method = receiver.types.len() > 1
             && receiver.types.iter().any(|atomic| match atomic {
                 mir_types::Atomic::TNamedObject { fqcn, .. }
                 | mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
                 | mir_types::Atomic::TParent { fqcn } => {
-                    let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
-                    crate::db::has_method_in_chain(
-                        ea.db,
-                        &Arc::from(resolved.as_str()),
-                        method_name,
-                    )
+                    let resolved: Arc<str> =
+                        Arc::from(crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn).as_str());
+                    crate::db::has_method_in_chain(ea.db, &resolved, method_name)
+                        || !crate::db::class_exists(ea.db, &resolved)
                 }
                 _ => false,
             });
