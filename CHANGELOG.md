@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A truthy `$x?->m()` makes `$x` non-null, so `if (!$x?->m()) { throw … }` no longer leaves `$x` nullable afterwards.
 - A readonly property's element passed to a method on `mixed` (`$m->dispatch($r->context['e'])`) is no longer a `ReadonlyPropertyAssignment`.
 - A `non-empty-string` or `non-falsy-string` class name (`$class . 'Query'`) is a valid `new` or `::` receiver instead of `InvalidStringClass`, as a plain `string` already was.
+- A variable assigned inside a property fetch's receiver or offset in the right operand of `&&` (`$n > 0 && $d[$i = $n - 1]->p > 0`, `$a && ($e = f())->p`) is defined in the truthy branch instead of `PossiblyUndefinedVariable`.
 
 ## [0.100.0] - 2026-11-13
 

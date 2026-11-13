@@ -1093,6 +1093,9 @@ pub(crate) fn promote_assignment_effects(
                 promote_assignment_effects(idx, ctx, db, file);
             }
         }
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            promote_assignment_effects(&pa.object, ctx, db, file);
+        }
         _ => {}
     }
 }
