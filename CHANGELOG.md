@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.100.0] - 2026-11-13
+
 ### Added
 
 - `LessSpecificReturnStatement` (MIR0110) for a returned generic array whose keys or values are wider than declared (`list<Entity>` for `list<Role>`), instead of `InvalidReturnType`. Assigning such an array to a property is `PropertyTypeCoercion`.
@@ -27,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A callback whose parameter is required where the expected signature has a typed variadic (`callable(float ...$values)` given `fn (float $value) => …`) is `InvalidArgument`, since the variadic may receive no arguments. An untyped or `mixed` variadic still accepts any callback.
 - Performance: a directory path argument (`mir src`) is walked without entering `<ignoreFiles>` directories, and the baseline check resolves analyzed files' real paths once per directory and each issue file's once (Symfony at `-j 8`: cached run 0.61 → 0.40 s, about 24% fewer instructions; cold run about 5% fewer).
 - Performance: branch merges reuse variable and property maps neither branch changed instead of rebuilding them (cold Symfony about 1% fewer instructions).
+- Performance: in the language server, adding or removing lines inside a function body no longer re-analyzes the files that use the classes and functions declared below it; only a change to a declaration does.
+- Workspace and internal crate versions were updated to `0.100.0`.
 
 ### Fixed
 
@@ -46,10 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An array element passed by reference takes the type the parameter writes (its `@param-out`, declared or `mixed` type), as a variable does, instead of keeping its shape from before the call.
 - A variable defined under `count($a) > n` or a property condition (`$this->lazy`, `$p->root !== ''`) is defined wherever that condition holds again, and a guard stays valid when the defining branch rewrites its variable. A write to the guard variable in the then branch now voids a guard negated into the else branch.
 - `$shape + $array` keeps the right operand's value type for the keys it adds (`array{0: null, ...<T>}`), and `[] + $array` is `$array`.
-
-### Performance
-
-- In the language server, adding or removing lines inside a function body no longer re-analyzes the files that use the classes and functions declared below it; only a change to a declaration does.
 
 ## [0.99.0] - 2026-11-12
 
