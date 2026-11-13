@@ -981,7 +981,7 @@ impl CallAnalyzer {
             // `is_pure` (not `is_mutation_free`, which is documented as
             // scoped to `$this`) is a trustworthy "touches nothing" signal
             // here, mirroring the `is_in_pure_fn` check above.
-            if resolved.is_static && !resolved.is_pure {
+            if resolved.is_static && !resolved.is_pure && !resolved.inferred_mutation_free {
                 ctx.invalidate_prop_refined_receiver(&fqcn);
             }
             // An object passed as an argument may have its own properties

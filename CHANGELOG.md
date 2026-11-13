@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `print_r($v, true)` and `var_export($v, true)` are pure, since they return the dump instead of printing it.
 - `reset()` and `end()` on a property are no longer writes to it (`ImmutablePropertyModification`, `ImpurePropertyAssignment`), since they only move the internal pointer.
 - Appending to a `@psalm-readonly` (docblock) array property in its own constructor is no longer `ReadonlyPropertyAssignment`.
+- A static property's narrowing survives a call to a same-class static method whose body writes no property (`self::$cache = […]; self::helper(); return self::$cache;`), as it already did for `$this` methods.
 
 ## [0.100.0] - 2026-11-13
 
