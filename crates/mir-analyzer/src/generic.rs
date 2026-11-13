@@ -365,6 +365,24 @@ pub fn check_template_bounds_with_inheritance<'a>(
                 // template that was just bound from another argument.
                 let resolved_bound =
                     resolve_static_in_bound(bound.substitute_templates(bindings), receiver_fqcn);
+                // A bound naming a template left unbound here (a class template in a static
+                // call) is checked against that template's own bound.
+                let resolved_bound = if resolved_bound
+                    .types
+                    .iter()
+                    .any(|a| matches!(a, Atomic::TTemplateParam { .. }))
+                {
+                    let mut widened = Type::empty();
+                    for a in &resolved_bound.types {
+                        match a {
+                            Atomic::TTemplateParam { as_type, .. } => widened.merge_with(as_type),
+                            other => widened.add_type(other.clone()),
+                        }
+                    }
+                    widened
+                } else {
+                    resolved_bound
+                };
                 if !resolved_bound.is_mixed()
                     && !inferred.is_mixed()
                     && !is_unresolved(inferred, template_params)

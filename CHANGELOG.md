@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An override without a docblock inherits a parent's `@param T` through the class's `@implements Runner<Concrete>` / `@extends` binding, so its native `Handle $h` is read as the bound `WinHandle`.
 - A template named in an `object{…}` shape property (`object{key: T}`) is the template instead of a class named `T`, so its bound applies (an `int|string` bound is a valid array offset).
 - A `string` passed for a template bounded by `int|float` in a file without `strict_types` is `InvalidScalarArgument`, as for a plain `int|float` parameter, instead of `InvalidArgument`.
+- A method template bounded by a class template that the call leaves unbound (`@template R of TResponse` called statically) is checked against the class template's own bound instead of rejecting every argument as not a `TResponse`.
 
 ## [0.100.0] - 2026-11-13
 
