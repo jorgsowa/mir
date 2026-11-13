@@ -262,6 +262,9 @@ fn map_class_names_atomic(atomic: Atomic, rename: &dyn Fn(&str) -> Name) -> Atom
             is_open,
             is_list,
         },
+        Atomic::TObjectShape { properties } => Atomic::TObjectShape {
+            properties: std::sync::Arc::new(properties.map_types(|ty| ru!(ty.clone()))),
+        },
         // `callable(T): R` / `Closure(T): R` — a class name embedded in one
         // of these signatures (including inside a `@psalm-type` alias body)
         // goes through `use`-import/namespace resolution too, as in
