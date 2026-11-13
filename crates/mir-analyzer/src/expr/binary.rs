@@ -448,6 +448,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                         non_empty: left_non_empty || right_non_empty,
                     });
                 }
+                for case in [
+                    mir_types::StringRefinement::Lowercase,
+                    mir_types::StringRefinement::Uppercase,
+                ] {
+                    let in_case = |t: &Type| {
+                        !t.types.is_empty()
+                            && t.types.iter().all(|a| match a {
+                                Atomic::TRefinedString { refinement, .. } => *refinement == case,
+                                Atomic::TLiteralString(s) => case.accepts(s),
+                                _ => false,
+                            })
+                    };
+                    if in_case(&left_ty) && in_case(&right_ty) {
+                        return Type::single(Atomic::TRefinedString {
+                            refinement: case,
+                            non_empty: left_non_empty || right_non_empty,
+                        });
+                    }
+                }
                 // Two or more characters, or a non-falsy part, can be neither "" nor "0".
                 let non_falsy = |t: &Type| {
                     !t.types.is_empty()

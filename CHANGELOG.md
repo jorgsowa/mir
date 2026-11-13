@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_object_vars()` returns `array<string, mixed>`, so its keys are no longer `int|string`.
 - `parse_url($url, PHP_URL_HOST)` and the other `PHP_URL_*` components return `string|null|false` (`int|null|false` for `PHP_URL_PORT`) instead of including `array`.
 - `$mixed & $string` (and `|`, `^`) is `int|string` instead of `int`, since the `mixed` operand may be a string too.
+- Concatenating `lowercase-string`s, or one with a literal that has no uppercase letters (`strtolower($c) . '::m'`), is a `lowercase-string` (likewise `uppercase-string`) instead of a plain `non-empty-string`.
 
 ## [0.100.0] - 2026-11-13
 
