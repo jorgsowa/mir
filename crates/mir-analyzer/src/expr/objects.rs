@@ -564,7 +564,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             s.no_named_arguments,
                             s.taint_sink_params.clone(),
                             s.is_pure,
-                            s.is_mutation_free,
+                            // Constructing only initializes the new instance.
+                            s.is_mutation_free || s.is_external_mutation_free,
                             owner,
                         )
                     });
@@ -609,7 +610,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // external mutation, the same exemption
                         // mutation_free_constructor_ok already proves for a
                         // plain assignment inside the constructor body.
-                        if ctx.is_in_pure_fn && !ctor_is_pure && !ctor_is_mutation_free {
+                        if ctx.is_in_pure_fn
+                            && !ctor_is_pure
+                            && !ctor_is_mutation_free
+                            && !crate::db::class_is_immutable(self.db, ctor_owner)
+                        {
                             self.emit(
                                 IssueKind::ImpureFunctionCall {
                                     fn_name: format!("{fqcn}::__construct"),
