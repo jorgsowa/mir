@@ -222,21 +222,7 @@ pub(crate) fn reconcile_declared_params_for_body(
     params
         .iter()
         .cloned()
-        .map(|mut p| {
-            p = reconcile_declared_param_docblock_shadow(db, file, p);
-            if let Some(ty) = p.ty.take() {
-                if ty.from_docblock {
-                    p.ty = Some(std::sync::Arc::new(reconcile_docblock_builtin_shadow(
-                        db,
-                        file,
-                        (*ty).clone(),
-                    )));
-                } else {
-                    p.ty = Some(ty);
-                }
-            }
-            p
-        })
+        .map(|p| reconcile_declared_param_docblock_shadow(db, file, p))
         .collect::<Vec<_>>()
         .into()
 }
@@ -246,20 +232,23 @@ pub(crate) fn reconcile_declared_param_docblock_shadow(
     default_file: &str,
     mut param: mir_codebase::DeclaredParam,
 ) -> mir_codebase::DeclaredParam {
-    let Some(raw) = param.doc_type_raw.as_deref() else {
-        return param;
-    };
     let Some(ty) = param.ty.as_deref() else {
         return param;
     };
     if !ty.from_docblock {
         return param;
     }
-    let raw = raw.trim();
-    if !is_shadowable_docblock_pseudotype_alias(raw) {
-        return param;
-    }
     let file = param.doc_type_file.as_deref().unwrap_or(default_file);
+    let Some(raw) = param
+        .doc_type_raw
+        .as_deref()
+        .map(str::trim)
+        .filter(|raw| is_shadowable_docblock_pseudotype_alias(raw))
+    else {
+        let reconciled = reconcile_docblock_builtin_shadow(db, file, ty.clone());
+        param.ty = Some(std::sync::Arc::new(reconciled));
+        return param;
+    };
     let fqcn = crate::db::resolve_name(db, file, raw);
     if !crate::db::class_exists(db, &fqcn) {
         return param;

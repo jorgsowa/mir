@@ -2107,10 +2107,14 @@ fn reconciled_property_in_chain<'db>(
     // consumer (flow analysis, member lookup, assignment checks) reads
     // through.
     if let Some(ty) = prop.ty.take() {
-        prop.ty = Some(Arc::new(crate::util::reconcile_property_ty_against_native(
+        let mut ty = crate::util::reconcile_property_ty_against_native(
             (*ty).clone(),
             prop.native_ty.as_deref(),
-        )));
+        );
+        if let Some(loc) = prop.location.as_ref().filter(|_| ty.from_docblock) {
+            ty = crate::util::reconcile_docblock_builtin_shadow(db, &loc.file, ty);
+        }
+        prop.ty = Some(Arc::new(ty));
     }
     if let (Some(ty), Some(native)) = (prop.ty.as_deref(), prop.native_ty.as_ref()) {
         if class_docblock_contradicts_native(db, ty, native) {
