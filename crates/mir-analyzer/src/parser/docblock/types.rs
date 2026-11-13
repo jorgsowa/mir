@@ -352,6 +352,17 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         });
     }
 
+    // `Foo::class` / `T::class` names the class string of that class or template.
+    if let Some(class) = s
+        .len()
+        .checked_sub("::class".len())
+        .filter(|&i| s.is_char_boundary(i) && s[i..].eq_ignore_ascii_case("::class"))
+        .map(|i| &s[..i])
+        .filter(|c| !c.is_empty() && !c.contains(['<', '(', '{', '|', '&', ' ', ':']))
+    {
+        return Type::single(Atomic::TClassString(Some(normalize_fqcn(class).into())));
+    }
+
     // Nullable shorthand: `?Type`
     if let Some(inner) = s.strip_prefix('?') {
         let inner_ty = parse_type_string(inner);

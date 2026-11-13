@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A property passed by reference to a function (`array_shift($o->extra)`) loses a narrowed non-emptiness, so a later `array_shift()` result may be `null` again.
 - `array{}` joined with a `non-empty-list<T>` or `non-empty-array<K, V>` is `list<T>` / `array<K, V>` instead of the non-empty type, so the empty case is no longer lost (`RedundantCondition` on `if ($keys)`).
 - `count($l) === N` (and `!== N` on the false side) narrows a `list<T>` to the sealed shape `array{T, …, T}` of N elements, for N up to 8, so it satisfies a `array{T, T}` parameter.
+- `T::class` (or `Foo::class`) in a docblock is the class string of that template or class instead of a class named `T::class`.
 
 ## [0.100.0] - 2026-11-13
 
