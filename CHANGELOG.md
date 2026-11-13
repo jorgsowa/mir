@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A sentence-ending dot after a `@return` type (`@return void.`) is no longer read as part of a class name.
 - `extract()` and `array_multisort()` accept a non-variable array (`extract(f())`) instead of reporting `InvalidPassByReference`, since PHP passes it by reference only when it can.
 - `get_object_vars()` returns `array<string, mixed>`, so its keys are no longer `int|string`.
+- `parse_url($url, PHP_URL_HOST)` and the other `PHP_URL_*` components return `string|null|false` (`int|null|false` for `PHP_URL_PORT`) instead of including `array`.
 
 ## [0.100.0] - 2026-11-13
 

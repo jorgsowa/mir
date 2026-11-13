@@ -1251,6 +1251,16 @@ impl CallAnalyzer {
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // A single PHP_URL_* component is a string (int for PHP_URL_PORT), null when absent.
+                "parse_url" => match arg_types.get(1).map(|t| t.types.as_slice()) {
+                    Some([Atomic::TLiteralInt(c @ 0..=7)]) => {
+                        let mut ty = if *c == 2 { Type::int() } else { Type::string() };
+                        ty.add_type(Atomic::TNull);
+                        ty.add_type(Atomic::TFalse);
+                        ty
+                    }
+                    _ => return_ty,
+                },
                 // Property names are always strings, even numeric ones.
                 "get_object_vars" => Type::single(Atomic::TArray {
                     key: Box::new(Type::string()),
