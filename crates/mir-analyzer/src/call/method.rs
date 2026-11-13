@@ -803,9 +803,16 @@ impl CallAnalyzer {
                 )),
                 call.method.span,
             );
-            // The unknown callee may take an array element by reference and write to it.
+            // The unknown callee may take a local array's element by reference and write to it;
+            // a property element isn't assumed written, so a readonly one isn't reported.
             for value in call.args.iter().filter_map(|a| a.value()) {
-                super::write_byref_element(ea, ctx, value, Type::mixed());
+                let mut base = value;
+                while let ExprKind::ArrayAccess(aa) = &base.kind {
+                    base = &aa.array;
+                }
+                if matches!(base.kind, ExprKind::Variable(_)) {
+                    super::write_byref_element(ea, ctx, value, Type::mixed());
+                }
             }
             return Type::mixed();
         }
