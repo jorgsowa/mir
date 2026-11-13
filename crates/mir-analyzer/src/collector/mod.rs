@@ -1723,6 +1723,19 @@ impl<'a> DefinitionCollector<'a> {
                         is_list: *is_list,
                     });
                 }
+                mir_types::Atomic::TObjectShape { properties } => {
+                    let new_props = properties.map_types(|ty| {
+                        self.resolve_union_doc_with_templates(
+                            ty.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )
+                    });
+                    result.add_type(mir_types::Atomic::TObjectShape {
+                        properties: std::sync::Arc::new(new_props),
+                    });
+                }
                 // Conditional return type: recurse into subject and both branches with the
                 // same template context so class names and template references inside them
                 // are resolved correctly.

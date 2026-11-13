@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An object offset on a `mixed` container (`static $map; $map ??= new WeakMap(); $map[$obj]`) is no longer `InvalidArrayOffset`, since the container may be an `ArrayAccess` object.
 - Destructuring a nullable or falsable array (`[$a, $b] = f()` with `array{A, B}|null`) gives nullable targets instead of the element types alone.
 - An override without a docblock inherits a parent's `@param T` through the class's `@implements Runner<Concrete>` / `@extends` binding, so its native `Handle $h` is read as the bound `WinHandle`.
+- A template named in an `object{…}` shape property (`object{key: T}`) is the template instead of a class named `T`, so its bound applies (an `int|string` bound is a valid array offset).
 
 ## [0.100.0] - 2026-11-13
 
