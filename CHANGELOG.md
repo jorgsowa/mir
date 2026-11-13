@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@return CONST[T]` and `@return self::MAP[T]` with `T of key-of<…>` are the constant's value at the key the caller passed (or at the parameter's default) instead of the native return type, so passing that value on is checked per key.
 - `@return new<T>` is an instance of the class the caller passed, including a class picked from a constant map (`new<CLASSES[T]>`), instead of the native return type.
 - `callable-array` and `callable-object` are enforced instead of being read as `array` / `object`: an array that is not `[object|class-string, existing-method]` (such as `[1, 2]`) and an object without `__invoke()` are `InvalidArgument`. A two-element array whose first element is never an object or string is no longer accepted for `callable` either.
+- `@pure-unless-callable-is-impure $f` on a function: calling it from a `@pure` function is pure when the callable passed as `$f` is (a closure, or a pure function or method), and `ImpureFunctionCall` otherwise.
 - `class-string-map<T of X, T>` checks each value against its key: `[RuntimeException::class => new LogicException()]` is `InvalidArgument`. Its keys are typed `class-string<X>`.
 
 ### Changed

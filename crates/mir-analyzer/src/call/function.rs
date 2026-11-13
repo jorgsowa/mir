@@ -39,6 +39,7 @@ struct ResolvedFn {
     no_named_arguments: bool,
     no_discard: Option<Arc<str>>,
     is_pure: bool,
+    pure_unless_callable_impure: Vec<Arc<str>>,
     /// `@psalm-mutation-free`/`@psalm-external-mutation-free` on a free
     /// function — both forbid mutating an argument (a free function has no
     /// `$this`, so the two collapse to the same "don't touch parameters"
@@ -127,6 +128,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             no_named_arguments: f.no_named_arguments,
             no_discard: f.no_discard.clone(),
             is_pure: f.is_pure,
+            pure_unless_callable_impure: f.pure_unless_callable_impure.clone(),
             is_mutation_free: f.is_mutation_free || f.is_external_mutation_free,
             taint_sink_params: f.taint_sink_params.clone(),
             location: f.location.clone(),
@@ -870,7 +872,14 @@ impl CallAnalyzer {
 
             if ctx.is_in_pure_fn
                 && !is_pure
-                && !callback_builtin_call_is_pure(ea, ctx, &resolved.fqn, &params, &call.args)
+                && !callback_builtin_call_is_pure(
+                    ea,
+                    ctx,
+                    &resolved.fqn,
+                    &resolved.pure_unless_callable_impure,
+                    &params,
+                    &call.args,
+                )
             {
                 ea.emit(
                     IssueKind::ImpureFunctionCall {

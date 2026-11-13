@@ -7,6 +7,7 @@ use crate::ast_ext::{ArgExt as _, ByteStringExt as _};
 use crate::ast_ext::{FunctionRef, FunctionRefExt as _};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{Arg, CallableCreateKind, Expr, ExprKind};
+use std::sync::Arc;
 
 use mir_codebase::definitions::DeclaredParam;
 
@@ -31,31 +32,39 @@ fn takes_callback_purity(fqn: &str) -> bool {
     )
 }
 
-/// Whether a call to the callback builtin `fqn` is pure inside a `@pure` body.
+/// Whether a call to `fqn` is pure inside a `@pure` body because every callback it runs is.
 pub(crate) fn callback_builtin_call_is_pure(
     ea: &ExpressionAnalyzer<'_>,
     ctx: &FlowState,
     fqn: &str,
+    pure_unless_callable_impure: &[Arc<str>],
     params: &[DeclaredParam],
     args: &[Arg],
 ) -> bool {
-    if !takes_callback_purity(fqn) {
-        return false;
-    }
-    // A spread can land on the callback position.
-    if args.iter().any(|a| a.unpack()) {
-        return false;
-    }
-    let Some(idx) = params.iter().position(|p| p.name.as_ref() == "callback") else {
-        return false;
+    let callback_params: Vec<&str> = if takes_callback_purity(fqn) {
+        vec!["callback"]
+    } else {
+        pure_unless_callable_impure
+            .iter()
+            .map(|n| n.as_ref())
+            .collect()
     };
-    match crate::call::resolve_named_arg_type_index(params, args, idx)
-        .and_then(|i| args.get(i))
-        .and_then(|a| a.value())
-    {
-        Some(callback) => callback_is_pure(ea, ctx, callback),
-        None => true,
+    // A spread can land on the callback position.
+    if callback_params.is_empty() || args.iter().any(|a| a.unpack()) {
+        return false;
     }
+    callback_params.iter().all(|name| {
+        let Some(idx) = params.iter().position(|p| p.name.as_ref() == *name) else {
+            return false;
+        };
+        match crate::call::resolve_named_arg_type_index(params, args, idx)
+            .and_then(|i| args.get(i))
+            .and_then(|a| a.value())
+        {
+            Some(callback) => callback_is_pure(ea, ctx, callback),
+            None => true,
+        }
+    })
 }
 
 fn callback_is_pure(ea: &ExpressionAnalyzer<'_>, ctx: &FlowState, expr: &Expr) -> bool {

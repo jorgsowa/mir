@@ -552,6 +552,16 @@ impl DocblockParser {
                     });
                 }
                 "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
+                "pure-unless-callable-is-impure" => {
+                    if let Some(body_str) = body_text(tag.body.as_ref()) {
+                        result.pure_unless_callable_impure.extend(
+                            body_str
+                                .split_whitespace()
+                                .filter_map(|w| w.strip_prefix('$'))
+                                .map(str::to_string),
+                        );
+                    }
+                }
                 // Phan's tag covers a function, a method or every method of a class.
                 "phan-side-effect-free" => {
                     result.is_pure = true;
@@ -991,6 +1001,8 @@ pub struct ParsedDocblock {
     /// `@phpstan-sealed A|B` / `@psalm-inheritors A|B`.
     pub sealed: Vec<String>,
     pub is_pure: bool,
+    /// `@pure-unless-callable-is-impure $f`: parameter names, without `$`.
+    pub pure_unless_callable_impure: Vec<String>,
     /// `@phpstan-all-methods-pure` on a class.
     pub all_methods_pure: bool,
     /// `@psalm-allow-private-mutation`: a `@readonly` property stays writable inside its class.

@@ -392,6 +392,11 @@ impl DefinitionCollector<'_> {
                 }
             }),
             is_pure: doc.is_pure || self.pure_attr(&decl.attributes),
+            pure_unless_callable_impure: doc
+                .pure_unless_callable_impure
+                .iter()
+                .map(|n| Arc::from(n.as_str()))
+                .collect(),
             is_impure: doc.is_impure
                 || super::mutation_free::has_visible_side_effect(&decl.body.stmts),
             is_mutation_free: doc.is_mutation_free,

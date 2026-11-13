@@ -1035,6 +1035,9 @@ pub struct FunctionDef {
     pub throws: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
+    /// `@pure-unless-callable-is-impure`: pure when the callables passed to these parameters are.
+    #[serde(default)]
+    pub pure_unless_callable_impure: Vec<Arc<str>>,
     /// `@impure`, or a body that visibly has side effects (output, `exit`, `global`, `static`).
     #[serde(default)]
     pub is_impure: bool,

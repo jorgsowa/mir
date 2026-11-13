@@ -86,6 +86,7 @@ Only the prefixed forms are supported.
 | `@mutation-free` | The method doesn't change any state |
 | `@external-mutation-free` | The method changes only `$this` |
 | `@impure` | The function has side effects, even if it looks pure |
+| `@pure-unless-callable-is-impure $f` | The function is pure when the callable passed as `$f` is |
 | `@immutable` | No property of the class changes after construction |
 | `@readonly` | The property (or every property of the class) is assigned only once |
 
