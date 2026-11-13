@@ -939,6 +939,9 @@ impl CallAnalyzer {
                     .collect();
                 &substituted_params
             };
+            // `__call` takes its arguments as an array, so a `@method` call never throws a TypeError.
+            let strict_types = ea.strict_types;
+            ea.strict_types &= !resolved.is_virtual;
             check_args(
                 ea,
                 CheckArgsParams {
@@ -958,6 +961,7 @@ impl CallAnalyzer {
                     args: &call.args,
                 },
             );
+            ea.strict_types = strict_types;
             // `self::`/`static::`/`parent::`/`$this::` forwarding a
             // non-static method call still runs against the current `$this`
             // — a call we can't prove pure/mutation-free may reassign its

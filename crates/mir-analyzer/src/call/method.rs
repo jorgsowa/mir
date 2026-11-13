@@ -121,6 +121,8 @@ pub(crate) struct ResolvedMethod {
     pub(crate) internal_scope: Option<Arc<str>>,
     pub(crate) is_static: bool,
     pub(crate) is_abstract: bool,
+    /// Declared by a docblock `@method`.
+    pub(crate) is_virtual: bool,
     pub(crate) is_pure: bool,
     pub(crate) is_mutation_free: bool,
     pub(crate) is_external_mutation_free: bool,
@@ -487,6 +489,7 @@ pub(crate) fn resolve_method_from_db(
             }),
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
+            is_virtual: storage.is_virtual,
             is_pure: crate::db::method_is_pure_in_chain(
                 db,
                 crate::db::Fqcn::from_str(db, fqcn.as_ref()),
@@ -1650,6 +1653,9 @@ fn resolve_method_return<'a>(
             }
         }
 
+        // `__call` takes its arguments as an array, so a `@method` call never throws a TypeError.
+        let strict_types = ea.strict_types;
+        ea.strict_types &= !resolved.is_virtual;
         check_args(
             ea,
             CheckArgsParams {
@@ -1669,6 +1675,7 @@ fn resolve_method_return<'a>(
                 args: &call.args,
             },
         );
+        ea.strict_types = strict_types;
 
         // A call we can't prove pure/mutation-free may reassign the
         // receiver's own properties from inside the callee (its `$this` IS
