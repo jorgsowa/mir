@@ -76,9 +76,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $class;]]></code>
     </InvalidReturnType>
-    <InvalidStringClass>
-      <code><![CDATA[$class]]></code>
-    </InvalidStringClass>
   </file>
   <file src="core/lib/Drupal/Component/Utility/Environment.php">
     <InvalidReturnType>
@@ -387,13 +384,6 @@
     <PossiblyUndefinedVariable>
       <code><![CDATA[$statement]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/lib/Drupal/Core/Database/Database.php">
-    <InvalidStringClass>
-      <code><![CDATA[$driver_class]]></code>
-      <code><![CDATA[$driver_class]]></code>
-      <code><![CDATA[$connection_class]]></code>
-    </InvalidStringClass>
   </file>
   <file src="core/lib/Drupal/Core/Database/Query/Condition.php">
     <InvalidReturnType>
@@ -746,11 +736,6 @@
       <code><![CDATA[$node->replaceChild($rss_dom->createTextNode(Html::transformRootRelativeUrlsToAbsolute($html_markup, $request->getSchemeAndHttpHost())), $node->firstChild)]]></code>
     </InvalidArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Extension/DatabaseDriver.php">
-    <InvalidStringClass>
-      <code><![CDATA[$installTasksClass]]></code>
-    </InvalidStringClass>
-  </file>
   <file src="core/lib/Drupal/Core/Extension/DatabaseDriverList.php">
     <InvalidReturnType>
       <code><![CDATA[return $installableDrivers;]]></code>
@@ -1085,11 +1070,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->annotationReader = new SimpleAnnotationReader()]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="core/lib/Drupal/Core/Plugin/Discovery/ContainerDerivativeDiscoveryDecorator.php">
-    <InvalidStringClass>
-      <code><![CDATA[$class]]></code>
-    </InvalidStringClass>
   </file>
   <file src="core/lib/Drupal/Core/Plugin/Discovery/DirectoryWithMetadataPluginDiscovery.php">
     <InvalidPropertyAssignment>
@@ -1928,9 +1908,6 @@
     <InvalidArgument>
       <code><![CDATA['filter']]></code>
     </InvalidArgument>
-    <InvalidStringClass>
-      <code><![CDATA[$link_target_handler]]></code>
-    </InvalidStringClass>
   </file>
   <file src="core/modules/filter/src/Plugin/Filter/FilterAlign.php">
     <UndefinedMethod>
@@ -3670,9 +3647,6 @@
     </InvalidArgument>
   </file>
   <file src="core/modules/system/src/Hook/SystemRequirementsHooks.php">
-    <InvalidStringClass>
-      <code><![CDATA[$class]]></code>
-    </InvalidStringClass>
     <UndefinedConstant>
       <code><![CDATA[FILE_NOT_WRITABLE]]></code>
       <code><![CDATA[FILE_EXIST]]></code>
@@ -4030,11 +4004,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $field_ids;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="core/modules/views/src/Entity/Render/EntityTranslationRenderTrait.php">
-    <InvalidStringClass>
-      <code><![CDATA[$class]]></code>
-    </InvalidStringClass>
   </file>
   <file src="core/modules/views/src/Entity/View.php">
     <UndefinedFunction>
