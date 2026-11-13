@@ -1,7 +1,8 @@
 ===description===
 Without `strict_types`, PHP casts a Stringable object returned for `string` by
-calling `__toString()`, as it does for arguments. A non-Stringable object and
-any object under `strict_types` are still `InvalidReturnType`.
+calling `__toString()`: an `ImplicitToStringCast` notice, not `InvalidReturnType`.
+A return type that accepts the object itself has no cast. A non-Stringable object
+and any object under `strict_types` are still `InvalidReturnType`.
 ===file:Weak.php===
 <?php
 final class Line implements Stringable {
@@ -12,12 +13,15 @@ final class Renderer {
     public function __toString(): string { return 'r'; }
 
     public function render(): string { return $this; }
+//                                     ^^^^^^^^^^^^^ ImplicitToStringCast: Class Renderer is implicitly cast to string
 
     public function line(): string { return new Line(); }
+//                                   ^^^^^^^^^^^^^^^^^^ ImplicitToStringCast: Class Line is implicitly cast to string
 
     public function maybe(): ?string { return rand(0, 1) ? $this : null; }
+//                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImplicitToStringCast: Class Renderer is implicitly cast to string
 
-    public function arrow(): Closure { return fn (): string => new Line(); }
+    public function either(): string|Stringable { return $this; }
 }
 
 final class Plain {}

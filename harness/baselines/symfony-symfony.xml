@@ -584,16 +584,6 @@
       <code><![CDATA[$parentNode->appendChild($parentNode->ownerDocument->importNode($childNode, true))]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/Symfony/Component/Console/Formatter/OutputFormatter.php">
-    <InvalidReturnType>
-      <code><![CDATA[return b($text)->toUnicodeString($encoding)->wordwrap($width, "\n", true)->toByteString($encoding);]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Console/Helper/Helper.php">
-    <InvalidReturnType>
-      <code><![CDATA[return (new UnicodeString($string))->slice($from, $length);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="src/Symfony/Component/Console/Helper/ProgressBar.php">
     <ImplicitFloatToIntCast>
       <code><![CDATA[$completeBars]]></code>

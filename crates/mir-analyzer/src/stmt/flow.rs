@@ -139,6 +139,32 @@ fn stringable_return_coercion_ok(
         })
 }
 
+/// Stringable classes in `actual` that only fit `declared` by a `__toString()` cast.
+fn implicit_string_cast_classes(
+    actual: &Type,
+    declared: &Type,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Vec<String> {
+    if !declared.types.iter().any(|d| matches!(d, Atomic::TString)) {
+        return Vec::new();
+    }
+    actual
+        .types
+        .iter()
+        .filter_map(|a| match a {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn } => Some((a, fqcn)),
+            _ => None,
+        })
+        .filter(|(a, _)| {
+            return_type_is_invalid(&Type::single((*a).clone()), declared, true, db, file)
+        })
+        .map(|(_, fqcn)| fqcn.to_string())
+        .collect()
+}
+
 /// A returned shape has a scalar or plain-object value that fits no declared shape under the
 /// same key; missing keys aren't judged, and no scalar coercion happens inside an array.
 fn shape_value_is_invalid(
@@ -375,6 +401,27 @@ impl<'a> StatementsAnalyzer<'a> {
                         Atomic::TNamedObject { fqcn, .. } => crate::subtype::is_type_operator(fqcn),
                         _ => false,
                     });
+                if !has_invalid && !ctx.strict_types {
+                    for class in
+                        implicit_string_cast_classes(&check_ty, declared, self.db, &self.file)
+                    {
+                        let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
+                        let mut issue = mir_issues::Issue::new(
+                            IssueKind::ImplicitToStringCast { class },
+                            Location {
+                                file: self.file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
+                            },
+                        );
+                        issue.severity = Severity::Info;
+                        self.issues.add(issue);
+                    }
+                }
                 if is_mixed_return {
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(

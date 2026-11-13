@@ -198,133 +198,39 @@
       <code><![CDATA[$last_write_timestamp === 0]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/AccountPermissionsCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t("Account's permissions");]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Cache/Context/CookiesCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('HTTP cookies');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->requestStack->getCurrentRequest()->cookies->get($cookie);]]></code>
     </NullableReturnStatement>
   </file>
   <file src="core/lib/Drupal/Core/Cache/Context/HeadersCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('HTTP headers');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $value;]]></code>
     </NullableReturnStatement>
   </file>
   <file src="core/lib/Drupal/Core/Cache/Context/IpCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('IP address');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->requestStack->getCurrentRequest()->getClientIp();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/IsFrontPathCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Is front page');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/IsSuperUserCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Is super user');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/LanguagesCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Language');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/MenuActiveTrailsCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t("Active menu trail");]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Cache/Context/PagersCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Pager');]]></code>
-    </InvalidReturnType>
     <InvalidScalarArgument>
       <code><![CDATA[$pager_id]]></code>
     </InvalidScalarArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/PathCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Path');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/PathParentCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Parent path');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Cache/Context/ProtocolVersionCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Protocol version');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->requestStack->getCurrentRequest()->getProtocolVersion();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/QueryArgsCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Query arguments');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/RouteCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Route');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Cache/Context/RouteNameCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Route name');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->routeMatch->getRouteName();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/SessionExistsCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Session exists');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/SiteCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Site');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/ThemeCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Theme');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/TimeZoneCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t("Time zone");]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/UrlCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('URL');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Cache/Context/UserCacheContext.php">
     <InvalidReturnType>
-      <code><![CDATA[return t('User');]]></code>
       <code><![CDATA[return $this->user->id();]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Cache/Context/UserRolesCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t("User's roles");]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Cache/DatabaseBackend.php">
@@ -471,13 +377,6 @@
   </file>
   <file src="core/lib/Drupal/Core/Config/UnmetDependenciesException.php">
     <InvalidReturnType>
-      <code><![CDATA[return $string_translation->translate(
-      'Unable to install %extension due to unmet dependencies: %config_names',
-      [
-        '%config_names' => static::formatConfigObjectList($this->configObjects),
-        '%extension' => $extension,
-      ]
-    );]]></code>
       <code><![CDATA[return $e;]]></code>
     </InvalidReturnType>
   </file>
@@ -514,11 +413,6 @@
       <code><![CDATA[NULL]]></code>
     </NullArgument>
   </file>
-  <file src="core/lib/Drupal/Core/Database/Query/SelectExtender.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Database/Query/Upsert.php">
     <InvalidReturnType>
       <code><![CDATA[return NULL;]]></code>
@@ -541,13 +435,6 @@
       <code><![CDATA[return $this->clientStatement;]]></code>
       <code><![CDATA[return $this->connection->getTarget();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/lib/Drupal/Core/Datetime/DateFormatter.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $output ?: $this->t('0 sec', [], ['langcode' => $langcode]);]]></code>
-      <code><![CDATA[return $string;]]></code>
-      <code><![CDATA[return $output;]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Datetime/DateHelper.php">
     <InvalidReturnType>
@@ -624,16 +511,6 @@
   <file src="core/lib/Drupal/Core/Entity/ContentUninstallValidator.php">
     <InvalidReturnType>
       <code><![CDATA[return $reasons;]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Entity/Controller/EntityController.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Add @entity-type', ['@entity-type' => $entity_type->getSingularLabel()]);]]></code>
-      <code><![CDATA[return $this->t('Add @bundle', ['@bundle' => $bundles[$bundle]['label']]);]]></code>
-      <code><![CDATA[return $this->t('Edit');]]></code>
-      <code><![CDATA[return $this->t('Edit %label', ['%label' => $label]);]]></code>
-      <code><![CDATA[return $this->t('Delete');]]></code>
-      <code><![CDATA[return $this->t('Delete %label', ['%label' => $label]);]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Entity/Entity/EntityFormDisplay.php">
@@ -886,9 +763,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->constraintString = $constraint]]></code>
     </InvalidPropertyAssignment>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->constraintString;]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Extension/ExtensionVersion.php">
     <ImpossibleIdenticalComparison>
@@ -930,8 +804,6 @@
   </file>
   <file src="core/lib/Drupal/Core/Extension/module.api.php">
     <InvalidReturnType>
-      <code><![CDATA[return t('All foo bars were updated with the new suffix');]]></code>
-      <code><![CDATA[return $result;]]></code>
       <code><![CDATA[return $requirements;]]></code>
     </InvalidReturnType>
     <UndefinedConstant>
@@ -979,16 +851,6 @@
       <code><![CDATA[$delta]]></code>
       <code><![CDATA[$delta]]></code>
     </InvalidArgument>
-  </file>
-  <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldWidget/OptionsButtonsWidget.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('N/A');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Field/Plugin/Field/FieldWidget/OptionsSelectWidget.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('- None -');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/File/FileSystem.php">
     <ImpossibleIdenticalComparison>
@@ -1134,13 +996,6 @@
       <code><![CDATA[return $this->direction;]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/lib/Drupal/Core/Language/LanguageManager.php">
-    <InvalidReturnType>
-      <code><![CDATA[return new TranslatableMarkup('None');]]></code>
-      <code><![CDATA[return new TranslatableMarkup('Unknown');]]></code>
-      <code><![CDATA[return new TranslatableMarkup('Unknown (@langcode)', ['@langcode' => $langcode]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Layout/LayoutDefinition.php">
     <InvalidReturnType>
       <code><![CDATA[return array_keys($this->getRegions());]]></code>
@@ -1159,11 +1014,6 @@
   <file src="core/lib/Drupal/Core/Lock/NullLockBackend.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Menu/InaccessibleMenuLink.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Inaccessible');]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Menu/MenuActiveTrail.php">
@@ -1392,7 +1242,6 @@
   <file src="core/lib/Drupal/Core/Template/TwigExtension.php">
     <InvalidReturnType>
       <code><![CDATA[return 0;]]></code>
-      <code><![CDATA[return $arg;]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/Template/TwigThemeEngine.php">
@@ -1570,16 +1419,6 @@
       <code><![CDATA[drupal_get_updaters()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/lib/Drupal/Core/Utility/Error.php">
-    <InvalidReturnType>
-      <code><![CDATA[return new FormattableMarkup(Error::DEFAULT_ERROR_MESSAGE . ' <pre class="backtrace">@backtrace</pre>', $decode);]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/lib/Drupal/Core/Validation/DrupalTranslator.php">
-    <InvalidReturnType>
-      <code><![CDATA[return new TranslatableMarkup($id, $this->processParameters($parameters), $this->getOptions($domain, $locale));]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/lib/Drupal/Core/Validation/Plugin/Validation/Constraint/CountryCodeConstraint.php">
     <InvalidReturnType>
       <code><![CDATA[return new Choice(...$configuration);]]></code>
@@ -1623,11 +1462,6 @@
       <code><![CDATA[]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/block_content/src/BlockContentTranslationHandler.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('<em>Edit @type</em> @title', ['@type' => $block_type->label(), '@title' => $entity->label()]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/block_content/src/BlockContentTypeForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -1636,20 +1470,10 @@
       <code><![CDATA[SAVED_UPDATED]]></code>
     </UndefinedConstant>
   </file>
-  <file src="core/modules/block_content/src/Controller/BlockContentController.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Add %type content block', ['%type' => $block_content_type->label()]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/block_content/src/Hook/BlockContentHooks.php">
     <InvalidArgument>
       <code><![CDATA[TRUE]]></code>
     </InvalidArgument>
-  </file>
-  <file src="core/modules/breakpoint/src/Breakpoint.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t($this->pluginDefinition['label'], [], ['context' => 'breakpoint']);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/ckeditor5/src/Controller/CKEditor5ImageController.php">
     <TaintedFile>
@@ -1712,25 +1536,9 @@
       <code><![CDATA[NULL]]></code>
     </NullArgument>
   </file>
-  <file src="core/modules/comment/src/CommentManager.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('<a href=":login">Log in</a> or <a href=":register">register</a> to post comments', [
-          ':login' => Url::fromRoute('user.login', [], ['query' => $destination])->toString(),
-          ':register' => Url::fromRoute('user.register', [], ['query' => $destination])->toString(),
-        ]);]]></code>
-      <code><![CDATA[return $this->t('<a href=":login">Log in</a> to post comments', [
-          ':login' => Url::fromRoute('user.login', [], ['query' => $destination])->toString(),
-        ]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/comment/src/CommentStorage.php">
     <InvalidReturnType>
       <code><![CDATA[return $comments_per_page > 0 ? (int) ($count / $comments_per_page) : 0;]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/comment/src/CommentTranslationHandler.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Edit comment @subject', ['@subject' => $entity->label()]);]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/comment/src/CommentTypeForm.php">
@@ -1769,11 +1577,6 @@
       <code><![CDATA[RESPONSIVE_PRIORITY_LOW]]></code>
     </UndefinedConstant>
   </file>
-  <file src="core/modules/comment/src/Plugin/Menu/LocalTask/UnapprovedComments.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Unapproved comments (@count)', ['@count' => $this->commentStorage->getUnapprovedCount()]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/comment/src/Plugin/Validation/Constraint/CommentNameConstraintValidator.php">
     <NullableReturnStatement>
       <code><![CDATA[return AnonymousContact::tryFrom($comment
@@ -1787,11 +1590,6 @@
     <PossiblyUndefinedVariable>
       <code><![CDATA[$state]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/modules/comment/src/Plugin/views/field/CommentBulkForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Select one or more comments to perform the update on.');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/comment/src/Plugin/views/row/Rss.php">
     <ImplicitFloatToIntCast>
@@ -1819,29 +1617,10 @@
       <code><![CDATA[batch_set($batch_builder->toArray())]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/modules/config_translation/src/ConfigFieldMapper.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('@label fields', ['@label' => $base_entity_info->getLabel()]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/config_translation/src/ConfigNamesMapper.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t($this->pluginDefinition['title']);]]></code>
-      <code><![CDATA[return $this->t('Settings');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->routeCollection->get($this->getBaseRouteName());]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/config_translation/src/Plugin/Menu/ContextualLink/ConfigTranslationContextualLink.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Translate @type_name', ['@type_name' => $type_name]);]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/config_translation/src/Plugin/Menu/LocalTask/ConfigTranslationLocalTask.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Translate @type_name', ['@type_name' => $type_name]);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/contact/src/ContactFormEditForm.php">
     <InvalidReturnType>
@@ -1859,11 +1638,6 @@
   <file src="core/modules/contact/src/MessageForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/contact/src/Plugin/views/field/ContactLink.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $title;]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/content_moderation/src/ModerationInformation.php">
@@ -2159,17 +1933,6 @@
     </InvalidStringClass>
   </file>
   <file src="core/modules/filter/src/Plugin/Filter/FilterAlign.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('
-        <p>You can align images, videos, blockquotes and so on to the left, right or center. Examples:</p>
-        <ul>
-          <li>Align an image to the left: <code>&lt;img src="" data-align="left" /&gt;</code></li>
-          <li>Align an image to the center: <code>&lt;img src="" data-align="center" /&gt;</code></li>
-          <li>Align an image to the right: <code>&lt;img src="" data-align="right" /&gt;</code></li>
-          <li>… and you can apply this to other elements as well: <code>&lt;video src="" data-align="center" /&gt;</code></li>
-        </ul>');]]></code>
-      <code><![CDATA[return $this->t('You can align images (<code>data-align="center"</code>), but also videos, blockquotes, and so on.');]]></code>
-    </InvalidReturnType>
     <UndefinedMethod>
       <code><![CDATA[$node->getAttribute('data-align')]]></code>
       <code><![CDATA[$node->removeAttribute('data-align')]]></code>
@@ -2177,28 +1940,11 @@
       <code><![CDATA[$node->setAttribute('class', implode(' ', $classes))]]></code>
     </UndefinedMethod>
   </file>
-  <file src="core/modules/filter/src/Plugin/Filter/FilterAutoP.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Lines and paragraphs are automatically recognized. The &lt;br /&gt; line break, &lt;p&gt; paragraph and &lt;/p&gt; close paragraph tags are inserted automatically. If paragraphs are not recognized simply add a couple of blank lines.');]]></code>
-      <code><![CDATA[return $this->t('Lines and paragraphs break automatically.');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/filter/src/Plugin/Filter/FilterCaption.php">
     <InvalidArgument>
       <code><![CDATA[$node->parentNode->insertBefore($updated_node, $node)]]></code>
       <code><![CDATA[$node->parentNode->removeChild($node)]]></code>
     </InvalidArgument>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('
-        <p>You can caption images, videos, blockquotes, and so on. Examples:</p>
-        <ul>
-            <li><code>&lt;img src="" data-caption="This is a caption" /&gt;</code></li>
-            <li><code>&lt;video src="" data-caption="The Drupal Dance" /&gt;</code></li>
-            <li><code>&lt;blockquote data-caption="Dries Buytaert"&gt;Drupal is awesome!&lt;/blockquote&gt;</code></li>
-            <li><code>&lt;code data-caption="Hello world in JavaScript."&gt;alert("Hello world!");&lt;/code&gt;</code></li>
-        </ul>');]]></code>
-      <code><![CDATA[return $this->t('You can caption images (<code>data-caption="Text"</code>), but also videos, blockquotes, and so on.');]]></code>
-    </InvalidReturnType>
     <UndefinedMethod>
       <code><![CDATA[$node->getAttribute('data-caption')]]></code>
       <code><![CDATA[$node->removeAttribute('data-caption')]]></code>
@@ -2217,9 +1963,6 @@
     <InvalidArgument>
       <code><![CDATA[$allowed_attributes['prefix']]]></code>
     </InvalidArgument>
-    <InvalidReturnType>
-      <code><![CDATA[return $output;]]></code>
-    </InvalidReturnType>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$rows]]></code>
     </PossiblyUndefinedVariable>
@@ -2227,28 +1970,10 @@
       <code><![CDATA[tagName]]></code>
     </UndefinedProperty>
   </file>
-  <file src="core/modules/filter/src/Plugin/Filter/FilterHtmlEscape.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('No HTML tags allowed.');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/filter/src/Plugin/Filter/FilterHtmlImageSecure.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Only images hosted on this site may be used in &lt;img&gt; tags.');]]></code>
-    </InvalidReturnType>
     <UndefinedFunction>
       <code><![CDATA[base_path()]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/filter/src/Plugin/Filter/FilterNull.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Missing filter. All text is removed');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/filter/src/Plugin/Filter/FilterUrl.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Web page addresses and email addresses turn into links automatically.');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/filter/src/Plugin/migrate/process/FilterID.php">
     <NullableReturnStatement>
@@ -2718,12 +2443,6 @@
     ]);]]></code>
     </InvalidReturnType>
   </file>
-  <file src="core/modules/language/src/Form/ContentLanguageSettingsForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Content language and translation');]]></code>
-      <code><![CDATA[return $this->t('Content language');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/language/src/Form/LanguageAddForm.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -2758,30 +2477,10 @@
       <code><![CDATA[base_path()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/modules/layout_builder/src/Cache/LayoutBuilderIsActiveCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Layout Builder');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/layout_builder/src/Cache/LayoutBuilderUiCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Layout Builder user interface');]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/layout_builder/src/Controller/LayoutBuilderController.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Edit layout for %label', ['%label' => $section_storage->label() ?? $section_storage->getStorageType() . ' ' . $section_storage->getStorageId()]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/layout_builder/src/Form/DefaultsEntityForm.php">
     <NullableReturnStatement>
       <code><![CDATA[return $this->entityTypeManager->getStorage('entity_view_display')->load($route_parameters['entity_type_id'] . '.' . $route_parameters['bundle'] . '.' . $route_parameters['view_mode_name']);]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/layout_builder/src/Form/MoveBlockForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Move the @block_label block', ['@block_label' => $block_label]);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/layout_builder/src/InlineBlockUsage.php">
     <NullableReturnStatement>
@@ -2895,14 +2594,6 @@
       <code><![CDATA[$project_info->files]]></code>
       <code><![CDATA[$project_info->files]]></code>
     </InvalidPropertyFetch>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('File not found at %remote_path nor at %local_path', [
-        '%remote_path' => $remote_path,
-        '%local_path' => $local_path,
-      ]);]]></code>
-      <code><![CDATA[return $this->t('File not found at %local_path', ['%local_path' => $local_path]);]]></code>
-      <code><![CDATA[return $this->t('Translation file location could not be determined.');]]></code>
-    </InvalidReturnType>
     <UndefinedConstant>
       <code><![CDATA[LOCALE_TRANSLATION_LOCAL]]></code>
       <code><![CDATA[LOCALE_TRANSLATION_REMOTE]]></code>
@@ -3160,16 +2851,6 @@
     <InvalidArgument>
       <code><![CDATA[$node->parentNode->insertBefore($replacement_node, $node)]]></code>
     </InvalidArgument>
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('
-      <p>You can embed media items:</p>
-      <ul>
-        <li>Choose which media item to embed: <code>&lt;drupal-media data-entity-uuid="07bf3a2e-1941-4a44-9b02-2d1d7a41ec0e" /&gt;</code></li>
-        <li>Optionally also choose a view mode: <code>data-view-mode="tiny_embed"</code>, otherwise the default view mode is used.</li>
-        <li>The <code>data-entity-type="media"</code> attribute is required for consistency.</li>
-      </ul>');]]></code>
-      <code><![CDATA[return $this->t('You can embed media items (using the <code>&lt;drupal-media&gt;</code> tag).');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/media/src/Plugin/media/Source/File.php">
     <InvalidReturnType>
@@ -3328,32 +3009,27 @@
     </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return $this->restartUpgradeForm();]]></code>
-      <code><![CDATA[return $this->t('Review upgrade');]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/migrate_drupal_ui/src/Form/IdConflictForm.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->restartUpgradeForm();]]></code>
       <code><![CDATA[return $this->redirect('migrate_drupal_ui.upgrade_review');]]></code>
-      <code><![CDATA[return $this->t('I acknowledge I may lose data. Continue anyway.');]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/migrate_drupal_ui/src/Form/IncrementalForm.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->restartUpgradeForm();]]></code>
-      <code><![CDATA[return $this->t('Import new configuration and content from old site');]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/migrate_drupal_ui/src/Form/OverviewForm.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->redirect('migrate_drupal_ui.upgrade_incremental');]]></code>
-      <code><![CDATA[return $this->t('Continue');]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/migrate_drupal_ui/src/Form/ReviewForm.php">
     <InvalidReturnType>
       <code><![CDATA[return $this->restartUpgradeForm();]]></code>
-      <code><![CDATA[return $this->t('Perform upgrade');]]></code>
       <code><![CDATA[return $output;]]></code>
     </InvalidReturnType>
     <UndefinedFunction>
@@ -3370,13 +3046,6 @@
     <PossiblyUndefinedVariable>
       <code><![CDATA[$last_insert_id]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="core/modules/mysql/src/Driver/Database/mysql/Install/Tasks.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('MariaDB');]]></code>
-      <code><![CDATA[return $this->t('MySQL or equivalent');]]></code>
-      <code><![CDATA[return $this->t('MySQL, MariaDB, or equivalent');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/mysql/src/Driver/Database/mysql/Schema.php">
     <InvalidReturnType>
@@ -3407,11 +3076,6 @@
       <code><![CDATA[SAVED_NEW]]></code>
     </UndefinedConstant>
   </file>
-  <file src="core/modules/node/src/Cache/NodeAccessGrantsCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t("Content access view grants");]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/node/src/ConfigTranslation/NodeTypeMapper.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -3419,7 +3083,6 @@
   </file>
   <file src="core/modules/node/src/Controller/NodeController.php">
     <InvalidReturnType>
-      <code><![CDATA[return $this->t('Create @name', ['@name' => $node_type->label()]);]]></code>
       <code><![CDATA[return array_keys($result);]]></code>
     </InvalidReturnType>
   </file>
@@ -3493,14 +3156,6 @@
       ->execute();]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/node/src/NodeTranslationHandler.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('<em>Edit @type</em> @title', [
-      '@type' => $entity->getBundleEntity()->label(),
-      '@title' => $entity->label(),
-    ]);]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/node/src/NodeTypeListBuilder.php">
     <UndefinedConstant>
       <code><![CDATA[RESPONSIVE_PRIORITY_MEDIUM]]></code>
@@ -3520,11 +3175,6 @@
     <NullableReturnStatement>
       <code><![CDATA[return $node->getChangedTime();]]></code>
     </NullableReturnStatement>
-  </file>
-  <file src="core/modules/node/src/Plugin/views/field/NodeBulkForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('No content selected.');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/node/src/Plugin/views/row/Rss.php">
     <ImplicitFloatToIntCast>
@@ -3670,11 +3320,6 @@
       <code><![CDATA[return $this->query($query . ' LIMIT ' . (int) $count . ' OFFSET ' . (int) $from, $args, $options);]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="core/modules/pgsql/src/Driver/Database/pgsql/Install/Tasks.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('PostgreSQL');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/pgsql/src/Driver/Database/pgsql/Select.php">
     <NullArgument>
       <code><![CDATA[NULL]]></code>
@@ -3718,9 +3363,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/search/src/Controller/SearchController.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Edit %label search page', ['%label' => $search_page->label()]);]]></code>
-    </InvalidReturnType>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$keys]]></code>
     </PossiblyUndefinedVariable>
@@ -3738,12 +3380,6 @@
   <file src="core/modules/search/src/Form/SearchPageFormBase.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="core/modules/search/src/Plugin/SearchPluginBase.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Search for @keywords', ['@keywords' => Unicode::truncate($this->keywords, 60, TRUE, TRUE)]);]]></code>
-      <code><![CDATA[return $this->t('Search');]]></code>
     </InvalidReturnType>
   </file>
   <file src="core/modules/search/src/Plugin/views/argument/Search.php">
@@ -3892,9 +3528,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/sqlite/src/Driver/Database/sqlite/Install/Tasks.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('SQLite');]]></code>
-    </InvalidReturnType>
     <UndefinedFunction>
       <code><![CDATA[drupal_install_profile_distribution_name()]]></code>
     </UndefinedFunction>
@@ -4198,18 +3831,6 @@
       <code><![CDATA[$violation_messages]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/modules/update/src/ProjectSecurityRequirement.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t(
-      '<a href=":update_status_report">Update to a supported minor</a> as soon as possible to continue receiving security updates.',
-      [':update_status_report' => Url::fromRoute('update.status')->toString()]
-    );]]></code>
-      <code><![CDATA[return $this->t(
-        'Visit the <a href=":url">release cycle overview</a> for more information on supported releases.',
-        [':url' => 'https://www.drupal.org/core/release-cycle-overview']
-      );]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/update/src/UpdateProcessor.php">
     <InvalidReturnType>
       <code><![CDATA[return NULL;]]></code>
@@ -4326,12 +3947,6 @@
       <code><![CDATA[$route_object]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="core/modules/user/src/Plugin/Menu/LoginLogoutMenuLink.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Log out');]]></code>
-      <code><![CDATA[return $this->t('Log in');]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/user/src/Plugin/Validation/Constraint/UserCancelMethodsConstraint.php">
     <InvalidReturnType>
       <code><![CDATA[return new Choice(...$configuration);]]></code>
@@ -4345,11 +3960,6 @@
       <code><![CDATA[_user_mail_notify('register_no_approval_required', $account)]]></code>
       <code><![CDATA[_user_mail_notify('register_pending_approval', $account)]]></code>
     </UndefinedFunction>
-  </file>
-  <file src="core/modules/user/src/Plugin/views/field/UserBulkForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('No users selected.');]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/user/src/Plugin/views/field/UserData.php">
     <InvalidReturnType>
@@ -4597,9 +4207,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="core/modules/views/src/Plugin/views/field/BulkForm.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('No items selected.');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $entity;]]></code>
     </NullableReturnStatement>
@@ -4645,11 +4252,6 @@
       <code><![CDATA[base_path()]]></code>
     </UndefinedFunction>
   </file>
-  <file src="core/modules/views/src/Plugin/views/field/LinkBase.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $text;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="core/modules/views/src/Plugin/views/field/Markup.php">
     <InvalidReturnType>
       <code><![CDATA[]]></code>
@@ -4672,11 +4274,6 @@
     <TaintedCallable>
       <code><![CDATA[EntityAutocomplete::getEntityLabels($this->getDefaultSelectedEntities())]]></code>
     </TaintedCallable>
-  </file>
-  <file src="core/modules/views/src/Plugin/views/filter/FilterPluginBase.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $error;]]></code>
-    </InvalidReturnType>
   </file>
   <file src="core/modules/views/src/Plugin/views/filter/InOperator.php">
     <PossiblyUndefinedVariable>
@@ -4884,9 +4481,6 @@
     </InvalidArgument>
   </file>
   <file src="core/modules/workspaces/src/WorkspaceCacheContext.php">
-    <InvalidReturnType>
-      <code><![CDATA[return t('Workspace');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->workspaceManager->hasActiveWorkspace() ? $this->workspaceManager->getActiveWorkspace()->id() : 'live';]]></code>
     </NullableReturnStatement>
@@ -4898,9 +4492,6 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/workspaces/src/WorkspacePublisher.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $this->t('Live');]]></code>
-    </InvalidReturnType>
     <NullableReturnStatement>
       <code><![CDATA[return $this->sourceWorkspace->label();]]></code>
     </NullableReturnStatement>

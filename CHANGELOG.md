@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inside a `PHP_VERSION_ID` check that only versions newer than the configured one pass (`PHP_VERSION_ID >= 80400` on 8.3), methods, functions and classes added in those versions are no longer `UndefinedMethod`, `UndefinedFunction` or `UndefinedClass`.
 - A class named in an `object{…}` shape is resolved against the namespace and `use` imports instead of being read as a global class.
 - A docblock `Generator`, `Closure` or other bare built-in class name in a namespace that declares a class of that name is the local class on untyped `@var` properties and on `@param` types seen from a call site, as it already was elsewhere.
-- A Stringable object returned for a `string` return type in a file without `strict_types` is accepted, as PHP casts it by `__toString()` (arguments already were), instead of `InvalidReturnType`.
+- A Stringable object returned for a `string` return type in a file without `strict_types` is an info-level `ImplicitToStringCast`, as PHP casts it by `__toString()`, instead of `InvalidReturnType`.
 - `@psalm-suppress InaccessibleProperty` and `ImpurePropertyAssignment` suppress `ImmutablePropertyModification`, `ImpureStaticProperty` suppresses `ImpureStaticPropertyAccess` and `ImpureStaticPropertyAssignment`, and `UndefinedPropertyFetch`, `UndefinedPropertyAssignment` and their `UndefinedThisProperty*` forms suppress `UndefinedProperty`.
 - A `@psalm-suppress` on a class, interface, trait or enum docblock covers its whole body, as one on a function does, instead of only the declaration line.
 - `new X` in a `@psalm-pure` function is no longer `ImpureFunctionCall` when `X` is `@psalm-immutable` or its constructor is `@psalm-external-mutation-free`.
