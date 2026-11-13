@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `count($l) === N` (and `!== N` on the false side) narrows a `list<T>` to the sealed shape `array{T, …, T}` of N elements, for N up to 8, so it satisfies a `array{T, T}` parameter.
 - `T::class` (or `Foo::class`) in a docblock is the class string of that template or class instead of a class named `T::class`.
 - A subclass of a concrete built-in class is no longer asked to implement interface methods the built-in provides, such as `SplObjectStorage::seek()` under PHP 8.1–8.3, where the stub marks it as added in 8.4.
+- A generic object argument whose type argument is unknown (`new ArrayIterator($docblockArray)`, `ArrayIterator<int|string, mixed>`) for a more specific generic parameter is `ArgumentTypeCoercion` instead of `InvalidArgument`.
 
 ## [0.100.0] - 2026-11-13
 

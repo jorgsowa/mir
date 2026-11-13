@@ -2055,9 +2055,17 @@ fn generic_narrowing_coercion(arg_ty: &Type, param_ty: &Type) -> bool {
         let Atomic::TNamedObject { fqcn, type_params } = p else {
             return false;
         };
+        // An unknown (`mixed`) type argument may hold the expected one too, though a
+        // call-site projection (`covariant T`) asks for a known one.
+        let projected = |p: &Type| {
+            p.types
+                .iter()
+                .any(|t| matches!(t, Atomic::TTemplateParam { .. }))
+        };
         let refines = |a: &Type, p: &Type| {
-            super::super::callable::narrows_to(&a.remove_null(), p)
-                && (!a.is_nullable() || p.is_nullable())
+            (a.is_mixed() && !projected(p))
+                || (super::super::callable::narrows_to(&a.remove_null(), p)
+                    && (!a.is_nullable() || p.is_nullable()))
         };
         fqcn.eq_ignore_ascii_case(arg_fqcn)
             && !arg_params.is_empty()
