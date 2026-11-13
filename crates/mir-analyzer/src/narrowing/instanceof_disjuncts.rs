@@ -556,6 +556,7 @@ pub(crate) fn narrow_prop_type_fn_disjuncts(
 
     let original = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
     let mut union_ty = Type::empty();
+    let mut receiver_ty = Type::empty();
     for fn_name in &fn_names {
         let mut scratch = ctx.branch();
         scratch.set_prop_refined(&obj_var, &prop, original.clone());
@@ -563,7 +564,9 @@ pub(crate) fn narrow_prop_type_fn_disjuncts(
         union_ty.merge_with(&resolve_prop_current_type(
             &scratch, &obj_var, &prop, db, file,
         ));
+        merge_disjunct_receiver(&mut receiver_ty, &scratch, &obj_var);
     }
+    narrow_receiver_to_disjuncts(ctx, &obj_var, receiver_ty);
     if !union_ty.is_empty() {
         apply_prop_narrowed(ctx, &obj_var, &prop, original, union_ty, true);
         // An `is_null($this->prop)`-true disjunct doesn't prove the
@@ -807,6 +810,7 @@ pub(crate) fn narrow_mixed_prop_disjuncts(
     let (obj_var, prop) = receiver?;
     let original = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
     let mut union_ty = Type::empty();
+    let mut receiver_ty = Type::empty();
     for cond in conditions {
         let mut scratch = ctx.branch();
         scratch.set_prop_refined(&obj_var, &prop, original.clone());
@@ -814,7 +818,9 @@ pub(crate) fn narrow_mixed_prop_disjuncts(
         union_ty.merge_with(&resolve_prop_current_type(
             &scratch, &obj_var, &prop, db, file,
         ));
+        merge_disjunct_receiver(&mut receiver_ty, &scratch, &obj_var);
     }
+    narrow_receiver_to_disjuncts(ctx, &obj_var, receiver_ty);
     if !union_ty.is_empty() {
         apply_prop_narrowed(ctx, &obj_var, &prop, original, union_ty, true);
         if !conditions
@@ -946,4 +952,20 @@ pub(super) fn narrow_or_instanceof_true(
         || narrow_mixed_disjuncts(&[left, right], ctx, db, file).is_some()
         || narrow_mixed_prop_disjuncts(&[left, right], ctx, db, file).is_some()
         || narrow_mixed_static_prop_disjuncts(&[left, right], ctx, db, file).is_some()
+}
+
+fn merge_disjunct_receiver(acc: &mut Type, scratch: &FlowState, obj_var: &str) {
+    if !scratch.diverges {
+        acc.merge_with(&scratch.get_var(obj_var));
+    }
+}
+
+/// Narrows the receiver to the union of what the reachable disjuncts leave it.
+fn narrow_receiver_to_disjuncts(ctx: &mut FlowState, obj_var: &str, receiver_ty: Type) {
+    if !obj_var.contains("->")
+        && !receiver_ty.is_empty()
+        && receiver_ty.types.len() < ctx.get_var(obj_var).types.len()
+    {
+        ctx.narrow_var(obj_var, receiver_ty);
+    }
 }

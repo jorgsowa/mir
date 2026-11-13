@@ -62,8 +62,40 @@ pub(super) fn narrow_prop_from_type_fn(
     // also proves the receiver itself wasn't null (see the comment above).
     let proved_prop_non_null = is_true != is_null_check;
     let mark_diverges = !receiver_nullable || proved_prop_non_null;
+    narrow_receiver_by_prop_type(ctx, fn_name, obj_var, prop, db, is_true);
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
     narrow_receiver_non_null_on_prop_match(ctx, obj_var, proved_prop_non_null);
+}
+
+/// Drops the receiver classes whose declared `$prop` type can never pass the check.
+fn narrow_receiver_by_prop_type(
+    ctx: &mut FlowState,
+    fn_name: &str,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) {
+    if obj_var.contains("->") {
+        return;
+    }
+    let receiver = ctx.get_var(obj_var);
+    let check_fails = |atomic: &Atomic| {
+        let Atomic::TNamedObject { fqcn, .. } = atomic else {
+            return false;
+        };
+        crate::db::find_property_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), prop)
+            .and_then(|(_, p)| p.ty.as_deref().cloned())
+            .and_then(|ty| type_fn_narrowed(&ty, fn_name, db, is_true))
+            .is_some_and(|t| t.is_empty())
+    };
+    if !receiver.types.iter().any(check_fails) {
+        return;
+    }
+    let kept = receiver.filter(|a| !check_fails(a));
+    if !kept.is_empty() {
+        ctx.narrow_var(obj_var, kept);
+    }
 }
 
 /// Static-property counterpart of `narrow_prop_from_type_fn`, for
