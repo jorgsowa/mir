@@ -25,6 +25,9 @@ pub(crate) fn return_type_is_invalid(
     if projected_template_return_compatible(actual, declared) {
         return false;
     }
+    if shape_value_is_invalid(actual, declared, db, file) {
+        return true;
+    }
     // Fast path: scalar actual is already a structural subtype of declared.
     if actual.is_subtype_structural(declared) {
         return false;
@@ -113,6 +116,43 @@ pub(crate) fn return_type_is_invalid(
         return false;
     }
     true
+}
+
+/// A returned shape has a scalar or plain-object value that fits no declared shape under the
+/// same key; missing keys aren't judged, and no scalar coercion happens inside an array.
+fn shape_value_is_invalid(
+    actual: &Type,
+    declared: &Type,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    let mut declared_shapes = Vec::new();
+    for d in &declared.types {
+        match d {
+            Atomic::TKeyedArray { properties, .. } => declared_shapes.push(properties),
+            Atomic::TNull | Atomic::TFalse => {}
+            _ => return false,
+        }
+    }
+    let plain = |ty: &Type| {
+        super::return_type::is_plain_checkable(ty)
+            && !ty.contains(|a| matches!(a, Atomic::TClassString(Some(_))))
+    };
+    !declared_shapes.is_empty()
+        && actual.types.iter().any(|a| {
+            let Atomic::TKeyedArray { properties, .. } = a else {
+                return false;
+            };
+            declared_shapes.iter().all(|declared_props| {
+                properties.iter().any(|(key, prop)| {
+                    declared_props.get(key).is_some_and(|d| {
+                        plain(&prop.ty)
+                            && plain(&d.ty)
+                            && return_type_is_invalid(&prop.ty, &d.ty, true, db, file)
+                    })
+                })
+            })
+        })
 }
 
 /// Some arm of `actual` is a class no declared type can ever hold, so the leniencies for a

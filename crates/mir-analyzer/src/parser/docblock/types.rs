@@ -1334,8 +1334,12 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
                 match ch {
                     '<' | '(' | '{' => depth += 1,
                     '>' | ')' | '}' => depth -= 1,
-                    // A colon after `)` is a callable's return-type separator.
-                    ':' if depth == 0 && !item[..i].trim_end().ends_with(')') => {
+                    // A colon after `)` is a callable's return-type separator; `::` is a constant.
+                    ':' if depth == 0
+                        && !item[..i].trim_end().ends_with(')')
+                        && !item[..i].ends_with(':')
+                        && !item[i + 1..].starts_with(':') =>
+                    {
                         found = Some(i);
                         break;
                     }
