@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `trigger_error()` and `user_error()` with `E_USER_ERROR` never return, so a variable assigned only before them is no longer `PossiblyUndefinedVariable` afterwards.
 - A sentence-ending dot after a `@return` type (`@return void.`) is no longer read as part of a class name.
 - `extract()` and `array_multisort()` accept a non-variable array (`extract(f())`) instead of reporting `InvalidPassByReference`, since PHP passes it by reference only when it can.
+- `get_object_vars()` returns `array<string, mixed>`, so its keys are no longer `int|string`.
 
 ## [0.100.0] - 2026-11-13
 

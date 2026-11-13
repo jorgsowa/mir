@@ -1251,6 +1251,11 @@ impl CallAnalyzer {
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // Property names are always strings, even numeric ones.
+                "get_object_vars" => Type::single(Atomic::TArray {
+                    key: Box::new(Type::string()),
+                    value: Box::new(Type::mixed()),
+                }),
                 "get_class" => match arg_types.first().map(|t| t.types.as_slice()) {
                     Some([Atomic::TNamedObject { fqcn, .. }]) => {
                         Type::single(Atomic::TClassString(Some(*fqcn)))
