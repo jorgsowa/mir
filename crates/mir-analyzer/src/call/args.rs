@@ -743,6 +743,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         let param = &params[*param_idx];
 
         if param.is_byref
+            && !is_prefer_ref_function(fn_name)
             && !arg_can_be_byref.get(*arg_idx).copied().unwrap_or(false)
             && !args
                 .get(*arg_idx)
@@ -991,4 +992,10 @@ fn param_contains_template_or_unknown(
         }
         _ => false,
     })
+}
+
+/// Built-ins whose by-ref params also accept a value (`ZEND_ARG_SEND_PREFER_REF`).
+fn is_prefer_ref_function(fn_name: &str) -> bool {
+    let name = fn_name.trim_start_matches('\\');
+    name.eq_ignore_ascii_case("extract") || name.eq_ignore_ascii_case("array_multisort")
 }
