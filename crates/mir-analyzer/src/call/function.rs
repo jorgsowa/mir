@@ -1418,6 +1418,14 @@ impl CallAnalyzer {
                     }
                     super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // E_USER_ERROR (256) halts the script.
+                "trigger_error" | "user_error"
+                    if arg_types.get(1).is_some_and(|t| {
+                        t.types.len() == 1 && t.types[0] == Atomic::TLiteralInt(256)
+                    }) =>
+                {
+                    Type::never()
+                }
                 "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
                 "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
                 "rand" | "mt_rand" | "random_int" => {

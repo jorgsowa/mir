@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `instanceof` check on a property path deeper than `$a->b` (`$a->b->c`, `$args[1]->value`, `$m->stmts[0]->expr`) narrows later reads of that path until part of it is written, instead of being dropped.
 - `throw throw $e` is no longer `InvalidThrow 'never'`.
 - `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
+- `trigger_error()` and `user_error()` with `E_USER_ERROR` never return, so a variable assigned only before them is no longer `PossiblyUndefinedVariable` afterwards.
 
 ## [0.100.0] - 2026-11-13
 
