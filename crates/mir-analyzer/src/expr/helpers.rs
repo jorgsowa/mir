@@ -550,8 +550,16 @@ fn try_insert_new_shape_key(
     if current.types.is_empty() {
         return None;
     }
+    // A known non-empty untyped array is as open as a plain one.
+    let is_untyped = |a: &Atomic| match a {
+        Atomic::TNonEmptyArray { key, value } => is_untyped_array(&Atomic::TArray {
+            key: key.clone(),
+            value: value.clone(),
+        }),
+        _ => is_untyped_array(a),
+    };
     let all_growable = current.types.iter().all(|a| {
-        (grow_untyped && is_untyped_array(a))
+        (grow_untyped && is_untyped(a))
             || matches!(a, Atomic::TKeyedArray { properties, .. }
                 if properties.contains_key(key) || properties.len() < MAX_SHAPE_KEYS)
     });
@@ -562,7 +570,7 @@ fn try_insert_new_shape_key(
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
     for atomic in &current.types {
-        if grow_untyped && is_untyped_array(atomic) {
+        if grow_untyped && is_untyped(atomic) {
             let mut properties = mir_types::KeyedProperties::default();
             properties.insert(
                 key.clone(),

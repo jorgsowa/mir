@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `T::class` (or `Foo::class`) in a docblock is the class string of that template or class instead of a class named `T::class`.
 - A subclass of a concrete built-in class is no longer asked to implement interface methods the built-in provides, such as `SplObjectStorage::seek()` under PHP 8.1–8.3, where the stub marks it as added in 8.4.
 - A generic object argument whose type argument is unknown (`new ArrayIterator($docblockArray)`, `ArrayIterator<int|string, mixed>`) for a more specific generic parameter is `ArgumentTypeCoercion` instead of `InvalidArgument`.
+- A literal key written to an untyped array known to be non-empty (after an `empty()` check) is read back with the written type instead of `mixed`.
 
 ## [0.100.0] - 2026-11-13
 
