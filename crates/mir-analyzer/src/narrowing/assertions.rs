@@ -213,10 +213,12 @@ pub(crate) fn apply_one_assertion(
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
             };
+            let current = ctx.get_var(obj_key);
             let ty = if assertion.negated {
-                negate_assertion_type(&ctx.get_var(obj_key), &ty, db)
+                negate_assertion_type(&current, &ty, db)
             } else {
-                ty
+                instanceof_assertion_type(&current, &ty, db, &ctx.template_param_names)
+                    .unwrap_or_else(|| positive_assertion_type(&current, ty, db))
             };
             ctx.narrow_var(obj_key, ty);
             return true;
@@ -431,11 +433,11 @@ pub(crate) fn compute_assertion_template_bindings(
 
 /// Resolve a method-call receiver's exact class FQCN for dispatching a
 /// `@psalm-assert-if-true`/`-if-false` docblock assertion — only handles a
-/// receiver resolved to a single concrete class atom, or a `TIntersection`
-/// whose parts unambiguously agree on which one declares `method_name`
-/// (mirroring `narrow_nullsafe_method_call_null`'s same conservative scope;
-/// a union of multiple UNRELATED classes could resolve the same method name
-/// to different signatures, so that case still falls through). Handles a
+/// receiver resolved to a single concrete class atom, a `TIntersection`
+/// whose parts unambiguously agree on which one declares `method_name`, or a
+/// union whose members all inherit it from the same class (a union of
+/// UNRELATED classes could resolve the same method name to different
+/// signatures, so that case still falls through). Handles a
 /// bare-variable receiver (`$v->isInt($p)`), a 1-hop property receiver
 /// (`$this->validator->isInt($p)`, a very common real-world shape), a
 /// static-property receiver, and — via `resolve_chained_receiver_type` — a
@@ -504,6 +506,23 @@ pub(crate) fn method_call_receiver_fqcn(
                     }
                     _ => None,
                 })
+        }
+        // A union whose members all inherit the method from one declaration
+        // (`Mapping|ManyToOne` after an earlier narrowing) has one signature.
+        atoms if atoms.len() > 1 => {
+            let mut owners = atoms.iter().map(|atomic| match atomic {
+                Atomic::TNamedObject { fqcn, .. } => crate::db::find_method_in_chain(
+                    db,
+                    crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                    method_name,
+                )
+                .map(|(owner, _)| owner),
+                _ => None,
+            });
+            let first = owners.next()??;
+            owners
+                .all(|owner| owner.as_deref() == Some(first.as_ref()))
+                .then_some(first)
         }
         _ => None,
     }
