@@ -749,6 +749,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             } else if idx_ty.is_mixed() {
                 self.emit(IssueKind::MixedArrayOffset, Severity::Info, idx.span);
             } else if !idx_ty.types.is_empty()
+                // A `mixed` container may be an `ArrayAccess` object such as a `WeakMap`.
+                && !arr_ty.is_mixed()
                 && idx_ty.types.iter().all(|a| {
                     matches!(
                         a,
