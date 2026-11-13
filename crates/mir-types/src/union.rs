@@ -672,16 +672,26 @@ impl Type {
         } = &atomic
         {
             if properties.is_empty() && !is_open {
-                for existing in &self.types {
-                    match existing {
-                        Atomic::TArray { .. }
-                        | Atomic::TNonEmptyArray { .. }
-                        | Atomic::TList { .. }
-                        | Atomic::TNonEmptyList { .. } => {
-                            return; // Don't add empty array, it's subsumed
-                        }
-                        _ => {}
+                // `array{} | non-empty-list<T>` is `list<T>`.
+                if let Some(idx) = self.types.iter().position(|t| {
+                    matches!(
+                        t,
+                        Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+                    )
+                }) {
+                    let existing = self.types.remove(idx);
+                    let widened = Type::single(existing).widen_non_empty();
+                    for t in widened.types {
+                        self.add_absent_type(t);
                     }
+                    return;
+                }
+                if self
+                    .types
+                    .iter()
+                    .any(|t| matches!(t, Atomic::TArray { .. } | Atomic::TList { .. }))
+                {
+                    return; // Don't add empty array, it's subsumed
                 }
             }
         }
@@ -695,7 +705,9 @@ impl Type {
                 | Atomic::TList { .. }
                 | Atomic::TNonEmptyList { .. }
         );
+        let mut atomic = atomic;
         if is_generic_array_or_list {
+            let before = self.types.len();
             self.types.retain(|t| {
                 if let Atomic::TKeyedArray {
                     properties,
@@ -708,6 +720,17 @@ impl Type {
                     true
                 }
             });
+            // A dropped `array{}` makes a non-empty array possibly empty.
+            if self.types.len() != before {
+                if let Some(widened) = Type::single(atomic.clone()).widen_non_empty().types.pop() {
+                    if widened != atomic {
+                        if self.types.contains(&widened) {
+                            return;
+                        }
+                        atomic = widened;
+                    }
+                }
+            }
         }
 
         self.types.push(atomic);

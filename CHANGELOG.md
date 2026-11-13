@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[$obj, 'method']` with an intersection-typed `$obj` (`Coll&Sel`) is callable instead of `InvalidArgument`.
 - `unset($a[$k])` drops the non-emptiness of a `non-empty-array` or `non-empty-list` variable, so a later `array_shift()` result may be `null` again.
 - A property passed by reference to a function (`array_shift($o->extra)`) loses a narrowed non-emptiness, so a later `array_shift()` result may be `null` again.
+- `array{}` joined with a `non-empty-list<T>` or `non-empty-array<K, V>` is `list<T>` / `array<K, V>` instead of the non-empty type, so the empty case is no longer lost (`RedundantCondition` on `if ($keys)`).
 
 ## [0.100.0] - 2026-11-13
 
