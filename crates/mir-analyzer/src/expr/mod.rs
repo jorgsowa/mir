@@ -2377,10 +2377,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                     "__clone",
                 ) {
                     if method.visibility == Visibility::Private {
-                        // Private __clone is accessible only from within the declaring class
-                        let accessible = caller_fqcn
-                            .map(|c| c.eq_ignore_ascii_case(owner_fqcn.as_ref()))
-                            .unwrap_or(false);
+                        // A trait's private __clone belongs to each class using the trait.
+                        let from_trait = crate::db::class_kind(self.db, owner_fqcn.as_ref())
+                            .is_some_and(|k| k.is_trait);
+                        let accessible = caller_fqcn.is_some_and(|c| {
+                            c.eq_ignore_ascii_case(owner_fqcn.as_ref())
+                                || (from_trait
+                                    && crate::db::extends_or_implements(
+                                        self.db,
+                                        c,
+                                        owner_fqcn.as_ref(),
+                                    ))
+                        });
                         if !accessible {
                             self.emit(
                                 IssueKind::InvalidClone {
