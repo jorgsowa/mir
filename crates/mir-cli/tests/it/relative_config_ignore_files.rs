@@ -161,3 +161,47 @@ fn ignore_files_follows_symlinked_path_arguments() {
          must not be analyzed, got:\n{filtered}"
     );
 }
+
+/// An explicit directory argument is walked without entering ignored directories, while a
+/// sibling whose name merely starts with an ignored one is still analyzed.
+#[test]
+fn explicit_path_skips_glob_ignored_directories() {
+    let dir = TempDir::new().expect("failed to create temp dir");
+    for sub in ["src/A/Tests/Deep", "src/A/TestsKeep"] {
+        std::fs::create_dir_all(dir.path().join(sub)).unwrap();
+    }
+    std::fs::write(
+        dir.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("mir.xml"),
+        r#"<mir>
+    <ignoreFiles>
+        <directory name="src/*/Tests"/>
+    </ignoreFiles>
+</mir>"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/A/Tests/Deep/Ignored.php"),
+        "<?php class Ignored { public function f(): int { return 'ignored'; } }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/A/TestsKeep/Kept.php"),
+        "<?php class Kept { public function f(): int { return 'kept'; } }\n",
+    )
+    .unwrap();
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_mir"));
+    cmd.env_clear();
+    cmd.current_dir(dir.path());
+    cmd.args(["--no-cache", "--no-progress", "src"]);
+    let combined = stdout_and_stderr(&cmd.output().expect("failed to run mir binary"));
+    assert!(
+        combined.contains("Kept.php") && !combined.contains("Ignored.php"),
+        "only src/A/TestsKeep/Kept.php should be analyzed, got:\n{combined}"
+    );
+}

@@ -37,3 +37,61 @@ pub(crate) fn strip_verbatim_prefix(p: &Path) -> PathBuf {
 pub(crate) fn normalize_for_compare(p: &Path) -> PathBuf {
     strip_verbatim_prefix(&p.canonicalize().unwrap_or_else(|_| p.to_path_buf()))
 }
+
+/// [`normalize_for_compare`] over many paths, canonicalizing each distinct parent once.
+pub(crate) fn normalize_all_for_compare(paths: &[PathBuf]) -> Vec<PathBuf> {
+    use rayon::prelude::*;
+    use std::collections::{HashMap, HashSet};
+
+    let parents: HashSet<&Path> = paths.iter().filter_map(|p| p.parent()).collect();
+    let canonical_parents: HashMap<&Path, PathBuf> = parents
+        .into_par_iter()
+        .map(|parent| (parent, normalize_for_compare(parent)))
+        .collect();
+    paths
+        .par_iter()
+        .map(|p| {
+            // A path that exists and isn't a symlink canonicalizes to its parent's canonical
+            // form plus its own name; anything else goes through realpath on its own.
+            let plain_entry = p
+                .symlink_metadata()
+                .is_ok_and(|m| !m.file_type().is_symlink());
+            match (plain_entry, p.parent(), p.file_name()) {
+                (true, Some(parent), Some(name)) if !parent.as_os_str().is_empty() => {
+                    canonical_parents[parent].join(name)
+                }
+                _ => normalize_for_compare(p),
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn batch_normalization_matches_per_path() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("real/sub")).unwrap();
+        std::fs::write(root.join("real/a.php"), "").unwrap();
+        let mut paths = vec![
+            root.join("real/a.php"),
+            root.join("real/sub"),
+            root.join("real/./a.php"),
+            root.join("real/missing.php"),
+            root.join("nowhere/b.php"),
+        ];
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.join("real"), root.join("linked")).unwrap();
+            std::os::unix::fs::symlink(root.join("real/a.php"), root.join("real/link.php"))
+                .unwrap();
+            paths.push(root.join("linked/a.php"));
+            paths.push(root.join("real/link.php"));
+        }
+        let expected: Vec<PathBuf> = paths.iter().map(|p| normalize_for_compare(p)).collect();
+        assert_eq!(normalize_all_for_compare(&paths), expected);
+    }
+}

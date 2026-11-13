@@ -564,11 +564,20 @@ pub fn discover_files(root: &Path) -> Vec<PathBuf> {
 
 /// Discover all files under a directory whose extension is in `extensions`, recursively.
 pub fn discover_files_with_extensions(root: &Path, extensions: &PhpFileExtensions) -> Vec<PathBuf> {
+    discover_files_pruned(root, extensions, &|_| false)
+}
+
+/// [`discover_files_with_extensions`], not descending into subdirectories `skip_dir` accepts.
+pub fn discover_files_pruned(
+    root: &Path,
+    extensions: &PhpFileExtensions,
+    skip_dir: &(dyn Fn(&Path) -> bool + Sync),
+) -> Vec<PathBuf> {
     if root.is_file() {
         return vec![root.to_path_buf()];
     }
     let mut files = Vec::new();
-    collect_php_files(root, &mut files, extensions);
+    walk_php_files(root, &mut files, extensions, skip_dir);
     files
 }
 
@@ -576,6 +585,15 @@ pub(crate) fn collect_php_files(
     dir: &Path,
     out: &mut Vec<PathBuf>,
     extensions: &PhpFileExtensions,
+) {
+    walk_php_files(dir, out, extensions, &|_| false);
+}
+
+fn walk_php_files(
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+    extensions: &PhpFileExtensions,
+    skip_dir: &(dyn Fn(&Path) -> bool + Sync),
 ) {
     enum Entry {
         File(PathBuf),
@@ -599,7 +617,8 @@ pub(crate) fn collect_php_files(
             if matches!(
                 name,
                 "vendor" | ".git" | "node_modules" | ".cache" | ".pnpm-store"
-            ) {
+            ) || skip_dir(&path)
+            {
                 continue;
             }
             has_dirs = true;
@@ -620,7 +639,7 @@ pub(crate) fn collect_php_files(
             Entry::File(path) => vec![path],
             Entry::Dir(path) => {
                 let mut sub = Vec::new();
-                collect_php_files(&path, &mut sub, extensions);
+                walk_php_files(&path, &mut sub, extensions, skip_dir);
                 sub
             }
         })

@@ -5,14 +5,16 @@ use mir_issues::{Issue, Severity};
 
 use crate::config::{Baseline, Config, ErrorLevel};
 use crate::format::{format_issue, format_junit, format_sarif, format_taint_trace};
-use crate::path_util::normalize_for_compare;
+use crate::path_util::{normalize_all_for_compare, normalize_for_compare};
 use crate::{color, Cli, OutputFormat};
 
 const BASELINE_FILE: &str = "mir-baseline.xml";
 const PSALM_BASELINE_FILE: &str = "psalm-baseline.xml";
 
 fn cwd() -> PathBuf {
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    static CWD: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    CWD.get_or_init(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+        .clone()
 }
 
 /// Load baseline from `--baseline` flag or auto-discover `mir-baseline.xml` / `psalm-baseline.xml`.
@@ -351,10 +353,10 @@ fn take_unanalyzed_entries(
         .iter()
         .map(|t| normalize_for_compare(&cwd.join(t)))
         .collect();
-    let analyzed: std::collections::HashSet<PathBuf> = files
-        .iter()
-        .map(|f| normalize_for_compare(&cwd.join(f)))
-        .collect();
+    let analyzed: std::collections::HashSet<PathBuf> =
+        normalize_all_for_compare(&files.iter().map(|f| cwd.join(f)).collect::<Vec<_>>())
+            .into_iter()
+            .collect();
     let mut taken = Baseline::default();
     baseline.entries.retain(|file, by_kind| {
         let existing: Vec<PathBuf> = [dir.join(file), cwd.join(file)]
@@ -506,7 +508,18 @@ fn baseline_key(file: &str, baseline_dir: Option<&Path>) -> String {
     if let Ok(rel) = path.strip_prefix(dir) {
         return key(rel);
     }
-    let normalized = normalize_for_compare(&cwd().join(path));
+    thread_local! {
+        static NORMALIZED: std::cell::RefCell<std::collections::HashMap<String, PathBuf>> =
+            Default::default();
+    }
+    // A file usually has several issues, and each lookup is a realpath.
+    let normalized = NORMALIZED.with(|cache| {
+        cache
+            .borrow_mut()
+            .entry(file.to_string())
+            .or_insert_with(|| normalize_for_compare(&cwd().join(path)))
+            .clone()
+    });
     if let Ok(rel) = normalized.strip_prefix(dir) {
         return key(rel);
     }

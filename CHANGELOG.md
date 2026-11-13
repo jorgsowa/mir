@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `object` assigned to a class-typed property is `PropertyTypeCoercion` instead of `InvalidPropertyAssignment`, and after any property coercion the property holds its declared type, so a lazily initialized `?T` property returned as `T` is no longer `NullableReturnStatement`.
 - A sealed shape parameter (`array{a: int}`) rejects extra keys only in an array literal: a wider shape from a variable or another expression (`array{a: int, b: string}`) is accepted again.
 - A callback whose parameter is required where the expected signature has a typed variadic (`callable(float ...$values)` given `fn (float $value) => …`) is `InvalidArgument`, since the variadic may receive no arguments. An untyped or `mixed` variadic still accepts any callback.
+- Performance: a directory path argument (`mir src`) is walked without entering `<ignoreFiles>` directories, and the baseline check resolves analyzed files' real paths once per directory and each issue file's once (Symfony at `-j 8`: cached run 0.61 → 0.40 s, about 24% fewer instructions; cold run about 5% fewer).
 
 ### Fixed
 

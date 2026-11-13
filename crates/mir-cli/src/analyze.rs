@@ -6,9 +6,9 @@ use std::time::{Duration, Instant};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use mir_analyzer::{
-    dead_code_issue_kinds, discover_files_with_extensions, unused_variable_issue_kinds,
-    AnalysisResult, AnalysisSession, BatchOptions, IndexCancel, IndexParallelism,
-    PhpFileExtensions, PhpVersion,
+    dead_code_issue_kinds, discover_files_pruned, discover_files_with_extensions,
+    unused_variable_issue_kinds, AnalysisResult, AnalysisSession, BatchOptions, IndexCancel,
+    IndexParallelism, PhpFileExtensions, PhpVersion,
 };
 
 use crate::config::Config;
@@ -94,8 +94,9 @@ pub fn run_composer_flow(
     };
     if !cli.paths.is_empty() {
         let mut seen: std::collections::HashSet<PathBuf> = discovered.iter().cloned().collect();
+        let ignored = normalized_dir_set(&ignore_dirs);
         for path in cli.paths.iter().filter(|p| !is_composer_root(p)) {
-            for file in discover_files_with_extensions(path, &extensions) {
+            for file in discover_unignored(path, &extensions, &ignored, composer_root) {
                 if seen.insert(file.clone()) {
                     discovered.push(file);
                 }
@@ -179,10 +180,11 @@ pub fn run_plain_flow(
     };
 
     let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let ignored = normalized_dir_set(&ignore_dirs);
     let files = filter_ignore(
         scan_roots
             .iter()
-            .flat_map(|p| discover_files_with_extensions(p, &extensions))
+            .flat_map(|p| discover_unignored(p, &extensions, &ignored, &cwd_abs))
             .collect(),
         &ignore_dirs,
         &cwd_abs,
@@ -504,6 +506,41 @@ fn collect_stub_paths(
         })
         .collect();
     (stub_files, stub_dirs)
+}
+
+fn normalized_dir_set(dirs: &[PathBuf]) -> std::collections::HashSet<PathBuf> {
+    use rayon::prelude::*;
+    dirs.par_iter().map(|d| normalize_for_compare(d)).collect()
+}
+
+/// Discover PHP files under `root` without descending into an `ignored` (normalized)
+/// directory; `base` is what [`filter_ignore`] anchors relative paths at.
+fn discover_unignored(
+    root: &std::path::Path,
+    extensions: &PhpFileExtensions,
+    ignored: &std::collections::HashSet<PathBuf>,
+    base: &std::path::Path,
+) -> Vec<PathBuf> {
+    // Pruning must judge a directory exactly as `filter_ignore` later judges its files,
+    // which only holds when anchoring at `base` names the tree being walked.
+    let same_anchor = || {
+        std::env::current_dir()
+            .is_ok_and(|cwd| normalize_for_compare(&cwd) == normalize_for_compare(base))
+    };
+    if ignored.is_empty() || !(root.is_absolute() || same_anchor()) {
+        return discover_files_with_extensions(root, extensions);
+    }
+    let canonical_root = normalize_for_compare(root);
+    // The walk never follows symlinks, so a subdirectory's canonical path is the
+    // root's plus its relative path; `filter_ignore` still runs on the result.
+    discover_files_pruned(root, extensions, &|dir| {
+        dir.strip_prefix(root).is_ok_and(|rel| {
+            canonical_root
+                .join(rel)
+                .ancestors()
+                .any(|a| ignored.contains(a))
+        })
+    })
 }
 
 fn filter_ignore(
