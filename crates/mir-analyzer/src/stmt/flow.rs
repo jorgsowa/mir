@@ -1001,15 +1001,39 @@ impl<'a> StatementsAnalyzer<'a> {
                         crate::expr::helpers::extract_simple_var(&aa.array),
                         &aa.index,
                     ) {
-                        if let Some(key) =
-                            crate::expr::helpers::literal_array_key_of_kind(&idx.kind)
-                        {
-                            let current = ctx.get_var(name);
-                            let updated =
-                                crate::expr::helpers::remove_key_from_shapes(&current, &key);
-                            if updated != current {
-                                ctx.set_var(name, updated);
+                        let current = ctx.get_var(name);
+                        let mut updated =
+                            match crate::expr::helpers::literal_array_key_of_kind(&idx.kind) {
+                                Some(key) => {
+                                    crate::expr::helpers::remove_key_from_shapes(&current, &key)
+                                }
+                                None => current.clone(),
+                            };
+                        // Removing an element may leave the array empty.
+                        if updated.types.iter().any(|a| {
+                            matches!(
+                                a,
+                                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+                            )
+                        }) {
+                            let mut widened = Type::empty();
+                            widened.from_docblock = updated.from_docblock;
+                            for a in &updated.types {
+                                widened.add_type(match a {
+                                    Atomic::TNonEmptyArray { key, value } => Atomic::TArray {
+                                        key: key.clone(),
+                                        value: value.clone(),
+                                    },
+                                    Atomic::TNonEmptyList { value } => Atomic::TList {
+                                        value: value.clone(),
+                                    },
+                                    other => other.clone(),
+                                });
                             }
+                            updated = widened;
+                        }
+                        if updated != current {
+                            ctx.set_var(name, updated);
                         }
                     }
                 }
