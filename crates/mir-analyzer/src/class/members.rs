@@ -76,7 +76,27 @@ impl<'a> ClassAnalyzer<'a> {
                 .cloned()
                 .collect();
 
+        // A built-in concrete parent implements its interfaces itself, even methods its stub
+        // marks as added in a newer PHP version (`SplObjectStorage::seek()` before 8.4).
+        let builtin_parents: Vec<Arc<str>> =
+            crate::db::class_ancestors_by_fqcn(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+                .iter()
+                .skip(1)
+                .filter(|p| {
+                    crate::stubs::stub_path_for_class(p.as_ref()).is_some()
+                        && crate::db::class_kind(self.db, p.as_ref())
+                            .is_some_and(|k| !k.is_interface && !k.is_abstract && !k.is_trait)
+                })
+                .cloned()
+                .collect();
+
         for iface_fqcn in &all_ifaces {
+            if builtin_parents
+                .iter()
+                .any(|p| crate::db::extends_or_implements(self.db, p.as_ref(), iface_fqcn.as_ref()))
+            {
+                continue;
+            }
             let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
             let method_names: Vec<Arc<str>> = match crate::db::find_class_like(self.db, here) {
                 Some(c) => c
