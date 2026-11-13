@@ -1262,6 +1262,17 @@ fn file_function_locs(db: &dyn MirDatabase, file: SourceFile) -> FxHashMap<Name,
     locs
 }
 
+/// The built-in stub's declaration of function `name`, even when user code (a
+/// polyfill) declares the same name.
+pub(crate) fn find_stub_function(db: &dyn MirDatabase, name: &str) -> Option<Arc<FunctionDef>> {
+    let file = db.lookup_source_file(crate::stubs::stub_path_for_function(name)?)?;
+    let key = Name::new(name.trim_start_matches('\\')).ascii_lowercase();
+    let SymbolLoc::Function { file, idx } = *file_function_locs(db, file).get(&key)? else {
+        return None;
+    };
+    function_def_at(db, file, idx as u32)
+}
+
 /// [`find_function`] as seen from `file`, preferring a declaration in that file
 /// over a workspace-wide declaration with the same name.
 pub fn find_function_from<'db>(

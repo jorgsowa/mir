@@ -872,6 +872,8 @@ impl CallAnalyzer {
 
             if ctx.is_in_pure_fn
                 && !is_pure
+                // A polyfill of a pure built-in is as pure as the built-in.
+                && !crate::db::find_stub_function(ea.db, &resolved.fqn).is_some_and(|f| f.is_pure)
                 && !callback_builtin_call_is_pure(
                     ea,
                     ctx,
