@@ -590,7 +590,7 @@ fn next_code_line(
         // A statement continued by an operator-leading line (`? a`, `: b`,
         // `->c()`) or an open bracket is one statement; later issues on those
         // lines belong to the same directive.
-        if skip_comments && !is_function_like(trimmed) && paren_depth <= 0 {
+        if skip_comments && !has_body_like(trimmed) && paren_depth <= 0 {
             let mut depth = bracket_delta(trimmed);
             let mut last = cont_idx - 1;
             while depth > 0 || !ends_statement(raw_lines[last].trim()) {
@@ -606,12 +606,12 @@ fn next_code_line(
                 last = next;
             }
         }
-        // A "documents the following element" directive above a function or
-        // method covers its whole body in real Psalm/PHPStan semantics, not
-        // just the signature line — extend coverage to every line spanned by
-        // the function's own `{ ... }`, if it has one (abstract/interface
+        // A "documents the following element" directive above a function,
+        // method or class-like covers its whole body in real Psalm/PHPStan
+        // semantics, not just the signature line — extend coverage to every
+        // line spanned by its own `{ ... }`, if it has one (abstract/interface
         // methods don't).
-        if skip_comments && is_function_like(trimmed) {
+        if skip_comments && has_body_like(trimmed) {
             if let Some(body_lines) = function_body_lines(raw_lines, offset) {
                 extra_covered_lines.extend(body_lines);
             }
@@ -633,6 +633,24 @@ fn continues_statement(trimmed: &str) -> bool {
         .iter()
         .any(|op| trimmed.starts_with(op))
         && !trimmed.starts_with("?>")
+}
+
+/// A function, method or class-like declaration line.
+fn has_body_like(trimmed: &str) -> bool {
+    is_function_like(trimmed) || is_class_like(trimmed)
+}
+
+/// Whether a trimmed line declares a class, interface, trait or enum.
+fn is_class_like(trimmed: &str) -> bool {
+    const MODIFIERS: &[&str] = &["abstract", "final", "readonly"];
+    for word in trimmed.split_whitespace() {
+        let lower = word.to_ascii_lowercase();
+        if MODIFIERS.contains(&lower.as_str()) {
+            continue;
+        }
+        return matches!(lower.as_str(), "class" | "interface" | "trait" | "enum");
+    }
+    false
 }
 
 /// Whether a trimmed line is itself a function/method DECLARATION (after

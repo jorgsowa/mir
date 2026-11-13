@@ -1,5 +1,5 @@
 ===description===
-No exception on missing class
+No exception on missing class: a class-level `@suppress UndefinedClass` covers its methods.
 ===config===
 <mir>
   <issueHandlers>
@@ -10,7 +10,6 @@ No exception on missing class
 ===file===
 <?php
 /** @suppress UndefinedClass */
-//            ^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedClass' is never used
 class A
 {
     /** @var class-string<Foo> */
@@ -20,6 +19,5 @@ class A
     {
         $bar = $this->bar;
         $bar::baz();
-//      ^^^^ UndefinedClass: Class Foo does not exist
     }
 }
