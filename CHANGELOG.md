@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `Cls::MODE_*` docblock type is a valid arithmetic and bitwise operand (`$mode & Cls::MODE_GET`): it is the matching constants' values instead of `InvalidOperand`.
 - `clone $this` in a class whose private `__clone()` comes from a trait is no longer `InvalidClone`.
 - `define(__NAMESPACE__ . '\NAME', …)` declares the constant in the current namespace instead of being ignored.
+- `do { … } while (true)` is an infinite loop like `while (true)`: a function that returns from it and never breaks no longer falls through to an implicit `void` return.
 - `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
 
 ## [0.100.0] - 2026-11-13

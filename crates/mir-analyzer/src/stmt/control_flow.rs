@@ -345,7 +345,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 sa.check_docblock_contradiction(&dw.condition, iter);
             },
             true,
-            false,
+            is_always_true_literal(&dw.condition),
             Some(&dw.condition),
             None,
         );
