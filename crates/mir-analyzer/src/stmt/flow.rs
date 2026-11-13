@@ -1002,7 +1002,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         &aa.index,
                     ) {
                         let current = ctx.get_var(name);
-                        let mut updated =
+                        let updated =
                             match crate::expr::helpers::literal_array_key_of_kind(&idx.kind) {
                                 Some(key) => {
                                     crate::expr::helpers::remove_key_from_shapes(&current, &key)
