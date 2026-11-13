@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A shape returned for a declared shape has its scalar and plain-object values checked on the keys both have: `return ['a', 'b']` for `@return array{0: int, 1: int}` is `InvalidReturnType`. Missing keys and array, list or generic values are not judged.
 - `self::A` or `Foo::BAR` as an unkeyed item of a shape (`array{self::A, list<self::B>}`) is the item's type instead of a key named `self`.
 - `%` and `%=` are typed `int` for float and numeric-string operands instead of `int|float`, since PHP casts both operands to int.
+- A `Cls::MODE_*` docblock type is a valid arithmetic and bitwise operand (`$mode & Cls::MODE_GET`): it is the matching constants' values instead of `InvalidOperand`.
 - `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
 
 ## [0.100.0] - 2026-11-13

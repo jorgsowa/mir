@@ -1136,7 +1136,7 @@ pub(crate) fn enum_backing_values(db: &dyn MirDatabase, target: &Type) -> Option
 
 /// Union of the constant types a docblock `Cls::NAME` / `Cls::PREFIX*` / `Cls::*_SUFFIX` names. `None` for enums
 /// (their cases are handled separately) and when no constant matches.
-fn class_constant_ref_type(db: &dyn MirDatabase, name: &str) -> Option<Type> {
+pub(crate) fn class_constant_ref_type(db: &dyn MirDatabase, name: &str) -> Option<Type> {
     let (class_name, pattern) = name.split_once("::")?;
     let fqcn = crate::db::Fqcn::from_str(db, class_name);
     if matches!(

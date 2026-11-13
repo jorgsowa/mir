@@ -100,6 +100,29 @@ pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
     })
 }
 
+/// `Cls::MODE_*` docblock refs as the matching constants' values.
+fn resolve_class_constant_refs(db: &dyn crate::db::MirDatabase, ty: Type) -> Type {
+    if !ty
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.contains("::")))
+    {
+        return ty;
+    }
+    let mut out = Type::empty();
+    for atomic in ty.types.iter() {
+        let values = match atomic {
+            Atomic::TNamedObject { fqcn, .. } => crate::subtype::class_constant_ref_type(db, fqcn),
+            _ => None,
+        };
+        match values {
+            Some(values) => values.types.into_iter().for_each(|a| out.add_type(a)),
+            None => out.add_type(atomic.clone()),
+        }
+    }
+    out
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_binary_expr(
         &mut self,
@@ -228,6 +251,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::Div
             | BinaryOp::Mod
             | BinaryOp::Pow => {
+                let left_ty = resolve_class_constant_refs(self.db, left_ty);
+                let right_ty = resolve_class_constant_refs(self.db, right_ty);
                 // `array + array` is the valid array-union operation; everything
                 // else requires numeric operands. Flag an operand only when it is
                 // *definitely* non-numeric (a non-numeric literal string, array,
@@ -506,6 +531,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::BitwiseXor
             | BinaryOp::ShiftLeft
             | BinaryOp::ShiftRight => {
+                let left_ty = resolve_class_constant_refs(self.db, left_ty);
+                let right_ty = resolve_class_constant_refs(self.db, right_ty);
                 if let Some(result) = overloaded_number_result(&left_ty, &right_ty, true) {
                     return result;
                 }
