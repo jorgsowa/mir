@@ -2585,12 +2585,33 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     return p.ty.clone();
                                 }
                             }
-                            if let Atomic::TNamedObject { fqcn, .. } = inner_atomic {
+                            if let Atomic::TNamedObject { fqcn, type_params } = inner_atomic {
                                 let prop_result = crate::db::find_property_in_chain(
                                     self.db,
                                     crate::db::Fqcn::interned(self.db, *fqcn),
                                     prop_name,
                                 );
+                                let is_class = crate::db::class_kind(self.db, fqcn.as_ref())
+                                    .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum);
+                                if prop_result.is_some() && is_class {
+                                    let mut receiver = inner_atomic.clone();
+                                    if let Atomic::TNamedObject {
+                                        type_params: tps, ..
+                                    } = &mut receiver
+                                    {
+                                        if type_params.is_empty() {
+                                            *tps = sibling_type_params(self.db, parts, fqcn);
+                                        }
+                                    }
+                                    return self.resolve_first_property_type(
+                                        &Type::single(receiver),
+                                        prop_name,
+                                        span,
+                                        declaring_class,
+                                        ctx,
+                                        guard_key,
+                                    );
+                                }
                                 if let Some((owner, p)) = prop_result {
                                     self.record_ref(
                                         Arc::from(format!("prop:{}::{}", owner, prop_name)),
@@ -2628,4 +2649,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         Type::mixed()
     }
+}
+
+/// Type params for a bare intersection part, projected from a generic sibling it extends or implements.
+fn sibling_type_params(db: &dyn crate::db::MirDatabase, parts: &[Type], fqcn: &str) -> Arc<[Type]> {
+    parts
+        .iter()
+        .flat_map(|part| part.types.iter())
+        .filter_map(|a| match a {
+            Atomic::TNamedObject {
+                fqcn: sib,
+                type_params,
+            } if !type_params.is_empty() && sib.as_ref() != fqcn => Some(
+                crate::narrowing::project_type_params_onto_subclass(db, sib, type_params, fqcn),
+            ),
+            _ => None,
+        })
+        .find(|tps| !tps.is_empty())
+        .unwrap_or_else(mir_types::union::empty_type_params)
 }

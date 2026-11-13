@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A property read through an intersection such as `C<string>&B`, where `B` implements `C<T>`, is typed with `B`'s template bound from the `C<string>` part (`string`) instead of a raw `T`.
 - `is_string($b->v)` (also negated, or in an `||` with other checks on `$b->v`) drops the classes of `$b` whose declared `$v` type can never pass the check, so `S|I` narrows to `S` and returning it as `S` isn't `InvalidReturnType`.
 - In the language server, adding a file that passes a callable to a function updates what `array_map()` / `array_reduce()` over that function's `callable` parameter return; the result from before the file existed was kept.
 - A call to a method of the same class keeps the narrowing of every property that method (and the methods it calls) can't change: mir now infers which `$this` properties a method writes. A property only appended to with `.=` widens to `string`, one reassigned falls back to its declared type, and one whose object has a method called on it drops only the narrowing below it. Calls on other objects are assumed not to reach `$this` unless it is passed along; `include`, `eval`, dynamic calls and non-static closures still drop everything.

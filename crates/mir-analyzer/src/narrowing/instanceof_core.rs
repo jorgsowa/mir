@@ -28,7 +28,7 @@ use super::core::{
 /// analyzer's own `class_template_params`) treats as an implicit,
 /// unchanged passthrough. Anything else (arity mismatch, no relationship
 /// found) falls back to no type params.
-pub(super) fn project_type_params_onto_subclass(
+pub(crate) fn project_type_params_onto_subclass(
     db: &dyn MirDatabase,
     atom_fqcn: &str,
     atom_type_params: &[Type],

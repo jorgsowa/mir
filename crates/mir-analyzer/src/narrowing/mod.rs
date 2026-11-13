@@ -21,6 +21,7 @@ mod dom;
 mod elements;
 mod enum_class;
 mod instanceof_core;
+pub(crate) use instanceof_core::project_type_params_onto_subclass;
 mod instanceof_disjuncts;
 mod literals;
 mod strings;
