@@ -269,12 +269,56 @@ pub(crate) fn narrow_array_count_comparison(
         Some(false) => non_null.narrow_to_empty_collection(),
         None => non_null,
     };
+    let exact = matches!(
+        (op, is_true),
+        (BinaryOp::Identical | BinaryOp::Equal, true)
+            | (BinaryOp::NotIdentical | BinaryOp::NotEqual, false)
+    );
+    let narrowed = if exact {
+        lists_to_exact_shapes(&narrowed, n)
+    } else {
+        narrowed
+    };
     // `narrow_to_empty_collection` can filter every atom away when `current` is
     // already known to be exclusively non-empty (a provably-dead branch); leave
     // the type as-is rather than collapsing the variable to an empty union.
     if !narrowed.is_empty() && narrowed != current {
         ctx.set_var(arr_var, narrowed);
     }
+}
+
+/// A list counted to exactly `n` (small) elements is the sealed shape `array{T, …, T}`.
+fn lists_to_exact_shapes(ty: &Type, n: i64) -> Type {
+    const MAX_EXACT_LIST_SHAPE: i64 = 8;
+    if !(1..=MAX_EXACT_LIST_SHAPE).contains(&n) {
+        return ty.clone();
+    }
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    for a in &ty.types {
+        match a {
+            Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+                let properties = (0..n)
+                    .map(|i| {
+                        (
+                            mir_types::ArrayKey::Int(i),
+                            mir_types::atomic::KeyedProperty {
+                                ty: (**value).clone(),
+                                optional: false,
+                            },
+                        )
+                    })
+                    .collect();
+                out.add_type(Atomic::TKeyedArray {
+                    properties: std::sync::Arc::new(properties),
+                    is_open: false,
+                    is_list: true,
+                });
+            }
+            other => out.add_type(other.clone()),
+        }
+    }
+    out
 }
 
 /// Property-access counterpart of `narrow_array_count_comparison`.

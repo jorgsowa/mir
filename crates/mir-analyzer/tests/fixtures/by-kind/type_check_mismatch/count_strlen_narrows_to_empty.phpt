@@ -64,7 +64,7 @@ function test_count_not_identical_positive_false_branch_narrows(array $arr): voi
     if (count($arr) !== 3) {
         return;
     }
-    /** @mir-check $arr is non-empty-list<int>|non-empty-array<string, int> */
+    /** @mir-check $arr is array{0: int, 1: int, 2: int}|non-empty-array<string, int> */
     $_ = $arr;
 }
 

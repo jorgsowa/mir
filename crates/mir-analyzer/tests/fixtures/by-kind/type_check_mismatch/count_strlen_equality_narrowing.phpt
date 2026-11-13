@@ -47,7 +47,7 @@ function test_zero_not_identical_count(array $arr): void {
 /** @param list<string> $arr */
 function test_count_identical_exact_positive(array $arr): void {
     if (count($arr) === 3) {
-        /** @mir-check $arr is non-empty-list<string> */
+        /** @mir-check $arr is array{0: string, 1: string, 2: string} */
         $_ = $arr;
     }
 }
