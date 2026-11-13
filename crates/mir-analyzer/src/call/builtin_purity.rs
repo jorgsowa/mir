@@ -170,6 +170,12 @@ pub(crate) fn arg_dependent_builtin_purity(fqn: &str, arg_types: &[Type]) -> Opt
         let value = arg_types.first()?;
         return Some(!value.types.is_empty() && value.types.iter().all(Atomic::is_array));
     }
+    if name.eq_ignore_ascii_case("print_r") || name.eq_ignore_ascii_case("var_export") {
+        // With `$return = true` the dump is returned instead of printed.
+        return Some(arg_types.get(1).is_some_and(|t| {
+            t.types.len() == 1 && matches!(t.types[0], Atomic::TTrue)
+        }));
+    }
     if !name.eq_ignore_ascii_case("is_callable") {
         return None;
     }

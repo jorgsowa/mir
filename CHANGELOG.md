@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A readonly property's element passed to a method on `mixed` (`$m->dispatch($r->context['e'])`) is no longer a `ReadonlyPropertyAssignment`.
 - A `non-empty-string` or `non-falsy-string` class name (`$class . 'Query'`) is a valid `new` or `::` receiver instead of `InvalidStringClass`, as a plain `string` already was.
 - A variable assigned inside a property fetch's receiver or offset in the right operand of `&&` (`$n > 0 && $d[$i = $n - 1]->p > 0`, `$a && ($e = f())->p`) is defined in the truthy branch instead of `PossiblyUndefinedVariable`.
+- `print_r($v, true)` and `var_export($v, true)` are pure, since they return the dump instead of printing it.
 
 ## [0.100.0] - 2026-11-13
 
