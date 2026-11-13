@@ -164,21 +164,34 @@ fn ancestor_param_refinement(
                 .ty
                 .as_ref()
                 .filter(|t| t.from_docblock)?;
-            let generic = !m.template_params.is_empty()
-                || crate::db::class_template_params(db, anc.as_ref())
-                    .is_some_and(|t| !t.is_empty());
+            if !m.template_params.is_empty() {
+                return None;
+            }
+            // A class template is read through the receiver's `@extends`/`@implements` binding.
+            let ty = if crate::db::class_template_params(db, anc.as_ref())
+                .is_some_and(|t| !t.is_empty())
+            {
+                let bindings =
+                    crate::db::inherited_template_bindings(db, fqcn, &Default::default());
+                let bound = ty.substitute_templates(&bindings);
+                if crate::call::has_unbound_template(&bound) {
+                    return None;
+                }
+                Arc::new(bound)
+            } else {
+                Arc::clone(ty)
+            };
             let mut referenced = Vec::new();
-            classes::collect_named_object_fqcns(ty, &mut referenced);
+            classes::collect_named_object_fqcns(&ty, &mut referenced);
             let resolvable = referenced
                 .iter()
                 .all(|c| crate::db::class_kind(db, c.as_ref()).is_some());
             (m.visibility != mir_codebase::definitions::Visibility::Private
-                && !generic
                 && resolvable
                 // A child that adds `null` to the native type accepts it deliberately.
                 && (ty.is_nullable() || !own_ty.is_nullable())
-                && crate::subtype::is_subtype(db, ty, own_ty))
-            .then(|| Arc::clone(ty))
+                && crate::subtype::is_subtype(db, &ty, own_ty))
+            .then_some(ty)
         })
 }
 
