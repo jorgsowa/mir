@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A call to a docblock `@method` in a `strict_types` file is checked like a call from a non-strict file, since `__call` / `__callStatic` receive the arguments as an array and never throw a `TypeError`: a `float` for an `int` parameter is `ImplicitFloatToIntCast` instead of `InvalidArgument`.
 - A shape returned for a declared shape has its scalar and plain-object values checked on the keys both have: `return ['a', 'b']` for `@return array{0: int, 1: int}` is `InvalidReturnType`. Missing keys and array, list or generic values are not judged.
 - `self::A` or `Foo::BAR` as an unkeyed item of a shape (`array{self::A, list<self::B>}`) is the item's type instead of a key named `self`.
+- `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
 
 ## [0.100.0] - 2026-11-13
 

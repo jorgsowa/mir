@@ -242,7 +242,7 @@ function stream_context_set_default(array $options) {}
  * @return resource|false a resource which can be used to refer to this filter
  * instance during a call to stream_filter_remove.
  */
-function stream_filter_prepend($stream, string $filter_name, int $mode = 0, mixed $params) {}
+function stream_filter_prepend($stream, string $filter_name, int $mode = 0, mixed $params = null) {}
 
 /**
  * Attach a filter to a stream
@@ -276,7 +276,7 @@ function stream_filter_prepend($stream, string $filter_name, int $mode = 0, mixe
  * @return resource|false a resource which can be used to refer to this filter
  * instance during a call to stream_filter_remove.
  */
-function stream_filter_append($stream, string $filter_name, int $mode = 0, mixed $params) {}
+function stream_filter_append($stream, string $filter_name, int $mode = 0, mixed $params = null) {}
 
 /**
  * Remove a filter from a stream
