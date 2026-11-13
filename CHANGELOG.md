@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A polyfill that redeclares a pure built-in (`str_contains()`, `mb_strlen()`) is as pure as the built-in when called from a `@psalm-pure` function.
 - `@phpstan-assert-if-true X $this` (and the `-if-false` and `@psalm-` forms) narrows the receiver like `instanceof X`, intersecting an interface with its class instead of replacing its type, and also applies to a receiver an earlier check left as a union of classes inheriting the method.
 - An `instanceof` check on a property path deeper than `$a->b` (`$a->b->c`, `$args[1]->value`, `$m->stmts[0]->expr`) narrows later reads of that path until part of it is written, instead of being dropped.
+- `throw throw $e` is no longer `InvalidThrow 'never'`.
 - `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
 
 ## [0.100.0] - 2026-11-13

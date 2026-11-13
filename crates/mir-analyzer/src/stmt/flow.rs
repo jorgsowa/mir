@@ -733,7 +733,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                     }
                 }
+                // `never` (`throw throw $e`) evaluates to nothing, so nothing invalid is thrown.
                 mir_types::Atomic::TMixed
+                | mir_types::Atomic::TNever
                 | mir_types::Atomic::TObject
                 | mir_types::Atomic::TObjectShape { .. } => {}
                 // `A&B` is throwable when any part is (`new class extends \Exception implements I {}`).
