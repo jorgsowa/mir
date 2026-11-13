@@ -43,6 +43,7 @@ pub(crate) fn is_callable_array_pair(arg: &Type, db: &dyn MirDatabase) -> bool {
             matches!(
                 t,
                 Atomic::TNamedObject { .. }
+                    | Atomic::TIntersection { .. }
                     | Atomic::TObject
                     | Atomic::TObjectShape { .. }
                     | Atomic::TSelf { .. }

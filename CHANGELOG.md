@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `string` passed for a template bounded by `int|float` in a file without `strict_types` is `InvalidScalarArgument`, as for a plain `int|float` parameter, instead of `InvalidArgument`.
 - A method template bounded by a class template that the call leaves unbound (`@template R of TResponse` called statically) is checked against the class template's own bound instead of rejecting every argument as not a `TResponse`.
 - Calling a method of a `@psalm-immutable` class on a parameter in a `@psalm-pure` or `@psalm-external-mutation-free` function is no longer `ImpureMethodCall`, since such methods are checked as mutation-free.
+- `[$obj, 'method']` with an intersection-typed `$obj` (`Coll&Sel`) is callable instead of `InvalidArgument`.
 
 ## [0.100.0] - 2026-11-13
 
