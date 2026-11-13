@@ -2666,11 +2666,26 @@ impl FlowState {
         let mut var_updates: Vec<(Name, Arc<Type>)> = Vec::new();
         let mut assigned_updates: Vec<Name> = Vec::new();
         let mut possibly_updates: Vec<Name> = Vec::new();
+        let vars_untouched = Arc::ptr_eq(&if_ctx.vars, &pre.vars)
+            && Arc::ptr_eq(&else_ctx.vars, &pre.vars)
+            && Arc::ptr_eq(&if_ctx.assigned_vars, &pre.assigned_vars)
+            && Arc::ptr_eq(&else_ctx.assigned_vars, &pre.assigned_vars);
+        if vars_untouched {
+            // Every type merges to `pre`'s own; only unassigned vars still become possibly assigned.
+            possibly_updates.extend(pre.vars.keys().copied().filter(|name| {
+                !pre.assigned_vars.contains(name) && !pre.possibly_assigned_vars.contains(name)
+            }));
+        }
         let else_only = else_ctx
             .vars
             .keys()
             .filter(|name| !if_ctx.vars.contains_key(*name));
-        for &name in if_ctx.vars.keys().chain(else_only) {
+        for &name in if_ctx
+            .vars
+            .keys()
+            .chain(else_only)
+            .filter(|_| !vars_untouched)
+        {
             let in_if = if_ctx.assigned_vars.contains(&name);
             let in_else = else_ctx.assigned_vars.contains(&name);
             let in_pre = pre.assigned_vars.contains(&name);
@@ -2789,17 +2804,21 @@ impl FlowState {
                 })
                 .collect::<Vec<_>>()
         };
-        let mut merged = FxHashMap::default();
-        for (var, guard) in kept_from(&if_ctx, &else_ctx)
-            .into_iter()
-            .chain(kept_from(&else_ctx, &if_ctx))
-        {
-            let guards: &mut Vec<Guard> = merged.entry(var).or_default();
-            if !guards.contains(&guard) {
-                guards.push(guard);
+        if if_ctx.guarded_defs.is_empty() && else_ctx.guarded_defs.is_empty() {
+            result.guarded_defs = if_ctx.guarded_defs.clone();
+        } else {
+            let mut merged = FxHashMap::default();
+            for (var, guard) in kept_from(&if_ctx, &else_ctx)
+                .into_iter()
+                .chain(kept_from(&else_ctx, &if_ctx))
+            {
+                let guards: &mut Vec<Guard> = merged.entry(var).or_default();
+                if !guards.contains(&guard) {
+                    guards.push(guard);
+                }
             }
+            result.guarded_defs = Arc::new(merged);
         }
-        result.guarded_defs = Arc::new(merged);
         // Both branches inherit a check the condition dropped, so `pre`'s map can't stand in.
         result.stored_checks = if Arc::ptr_eq(&if_ctx.stored_checks, &else_ctx.stored_checks) {
             if_ctx.stored_checks.clone()
@@ -2858,32 +2877,46 @@ impl FlowState {
         // sets above — a property written on only one branch was NOT
         // definitely written on every path reaching the merge point, so it
         // must not be treated as certainly initialized afterward.
-        result.readonly_initialized = Arc::new(
-            if_ctx
-                .readonly_initialized
-                .intersection(&else_ctx.readonly_initialized)
-                .cloned()
-                .collect(),
-        );
+        result.readonly_initialized =
+            if Arc::ptr_eq(&if_ctx.readonly_initialized, &else_ctx.readonly_initialized) {
+                if_ctx.readonly_initialized.clone()
+            } else {
+                Arc::new(
+                    if_ctx
+                        .readonly_initialized
+                        .intersection(&else_ctx.readonly_initialized)
+                        .cloned()
+                        .collect(),
+                )
+            };
 
         // Same reasoning again for constructor definite-assignment: a
         // property assigned on only one branch isn't definitely assigned on
         // every path reaching the merge point.
-        result.assigned_this_props = Arc::new(
-            if_ctx
-                .assigned_this_props
-                .intersection(&else_ctx.assigned_this_props)
-                .cloned()
-                .collect(),
-        );
+        result.assigned_this_props =
+            if Arc::ptr_eq(&if_ctx.assigned_this_props, &else_ctx.assigned_this_props) {
+                if_ctx.assigned_this_props.clone()
+            } else {
+                Arc::new(
+                    if_ctx
+                        .assigned_this_props
+                        .intersection(&else_ctx.assigned_this_props)
+                        .cloned()
+                        .collect(),
+                )
+            };
 
-        result.local_props = Arc::new(
-            if_ctx
-                .local_props
-                .intersection(&else_ctx.local_props)
-                .copied()
-                .collect(),
-        );
+        result.local_props = if Arc::ptr_eq(&if_ctx.local_props, &else_ctx.local_props) {
+            if_ctx.local_props.clone()
+        } else {
+            Arc::new(
+                if_ctx
+                    .local_props
+                    .intersection(&else_ctx.local_props)
+                    .copied()
+                    .collect(),
+            )
+        };
         result.local_prop_keys = if Arc::ptr_eq(&if_ctx.local_prop_keys, &else_ctx.local_prop_keys)
         {
             if_ctx.local_prop_keys.clone()
@@ -2903,7 +2936,9 @@ impl FlowState {
         // Property refinements: keep only keys present in BOTH branches with the
         // union of their types.  A refinement present in only one branch cannot
         // be relied upon after the merge (the other path didn't narrow it).
-        {
+        if Arc::ptr_eq(&if_ctx.prop_refined, &else_ctx.prop_refined) {
+            result.prop_refined = if_ctx.prop_refined.clone();
+        } else {
             let mut merged_props: FxHashMap<(Name, Name), Arc<Type>> = FxHashMap::default();
             for (key, if_ty) in if_ctx.prop_refined.iter() {
                 if let Some(else_ty) = else_ctx.prop_refined.get(key) {
