@@ -27,4 +27,4 @@ $base->accept($base);
 $base->accept(new Base());
 
 $base->accept(new Unrelated());
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'self(Base)'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of accept() expects 'self(Base)', got 'Unrelated'

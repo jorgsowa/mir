@@ -10,6 +10,6 @@ function f(int $b): int { return $b; }
 
 function g(int $i): int {
     f(3);
-//  ^^^^ InvalidTemplateParam: Template type 'B' inferred as '3' does not satisfy bound '1|2'
+//  ^^^^ InvalidArgument: Argument $b of f() expects '1|2', got '3'
     return f($i);
 }

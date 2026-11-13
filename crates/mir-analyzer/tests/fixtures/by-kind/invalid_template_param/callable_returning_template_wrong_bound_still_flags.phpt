@@ -21,4 +21,4 @@ class Unrelated {}
 function wrap($item): void {}
 
 wrap(fn(): Unrelated => new Unrelated());
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $item of wrap() expects 'Base', got 'Unrelated'

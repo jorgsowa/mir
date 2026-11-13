@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A call argument that violates the `@template T of Bound` of the parameter it is passed to (a parameter typed `T` itself) is reported under the argument kinds, as Psalm does, instead of `InvalidTemplateParam`: `ArgumentTypeCoercion` when the value is wider than the bound and may still fit (a runtime `string` for `T of literal-string|int`, a `Node` for `T of Element`), `InvalidArgument` otherwise. A template nested in the parameter type (`array<T>`, `class-string<T>`) is still `InvalidTemplateParam`.
+
 ## [0.100.0] - 2026-11-13
 
 ### Added

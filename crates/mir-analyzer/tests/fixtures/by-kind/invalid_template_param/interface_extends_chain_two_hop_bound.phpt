@@ -42,4 +42,4 @@ class TypedList implements Collection {
 function accept_bad($c): void {}
 
 accept_bad(new TypedList(new Unrelated()));
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'TypedList<Unrelated>' does not satisfy bound 'GrandCollection<Animal>'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of accept_bad() expects 'GrandCollection<Animal>', got 'TypedList<Unrelated>'

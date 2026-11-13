@@ -24,4 +24,4 @@ class Sub extends Base {}
 
 $sub = new Sub();
 $sub->accept(new Base());
-//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Base' does not satisfy bound 'Sub'
+//<^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $x of accept() expects 'Sub', got 'Base' — coercion may fail at runtime

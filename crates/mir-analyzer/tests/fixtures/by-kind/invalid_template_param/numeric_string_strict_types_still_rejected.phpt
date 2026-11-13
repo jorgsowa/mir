@@ -14,5 +14,5 @@ function twice($n) { return $n; }
 /** @param numeric-string $ns */
 function f($ns): void {
     echo twice($ns);
-//       ^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'numeric-string' does not satisfy bound 'int|float'
+//       ^^^^^^^^^^ InvalidArgument: Argument $n of twice() expects 'int|float', got 'numeric-string'
 }

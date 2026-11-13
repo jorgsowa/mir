@@ -36,6 +36,6 @@ function takesInt(int $value): void {}
 createNow('immutable');
 createNow('mutable');
 createNow('other');
-//<^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as '"other"' does not satisfy bound 'key-of<App\DATETIME_CLASSES>'
+//<^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $type of createNow() expects 'key-of<App\DATETIME_CLASSES>', got '"other"'
 takesInt(Registry::DEFAULT);
 //       ^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of takesInt() expects 'int', got 'class-string<ArrayObject>'

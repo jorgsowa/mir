@@ -1801,15 +1801,15 @@ fn resolve_method_return<'a>(
                 &unchecked,
                 Some(fqcn.as_ref()),
             ) {
-                ea.emit(
-                    IssueKind::InvalidTemplateParam {
-                        name: name.to_string(),
-                        expected_bound: format!("{bound}"),
-                        actual: format!("{inferred}"),
-                    },
-                    Severity::Error,
-                    span,
+                let (kind, severity) = crate::generic::template_bound_issue(
+                    ea.db,
+                    method_name,
+                    effective_params,
+                    name,
+                    inferred,
+                    &bound,
                 );
+                ea.emit(kind, severity, span);
             }
         }
 

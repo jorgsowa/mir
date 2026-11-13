@@ -322,7 +322,7 @@
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Bundle/FrameworkBundle/Console/Descriptor/XmlDescriptor.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerAliasDocument($alias, $options['id'] ?? null)->childNodes->item(0), true))]]></code>
       <code><![CDATA[$dom->appendChild($dom->importNode($this->getContainerDefinitionDocument($container->getDefinition((string) $alias), (string) $alias, false, $container)->childNodes->item(0), true))]]></code>
       <code><![CDATA[$routesXML->appendChild($routesXML->ownerDocument->importNode($routeXML->childNodes->item(0), true))]]></code>
@@ -333,7 +333,7 @@
       <code><![CDATA[$containerXML->appendChild($containerXML->ownerDocument->importNode($serviceXML->childNodes->item(0), true))]]></code>
       <code><![CDATA[$argumentXML->appendChild($dom->importNode($this->getContainerDefinitionDocument($argument, null, false, $container)->childNodes->item(0), true))]]></code>
       <code><![CDATA[$element->appendChild($element->ownerDocument->importNode($callableXML->childNodes->item(0), true))]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
     <UndefinedMethod>
       <code><![CDATA[$callableXML->childNodes->item(0)->setAttribute('priority', $eventDispatcher->getListenerPriority($event, $listener))]]></code>
     </UndefinedMethod>
@@ -580,9 +580,9 @@
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Console/Descriptor/XmlDescriptor.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[$parentNode->appendChild($parentNode->ownerDocument->importNode($childNode, true))]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Console/Formatter/OutputFormatter.php">
     <InvalidReturnType>
@@ -750,9 +750,9 @@
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/DependencyInjection/ParameterBag/ParameterBag.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[$this->resolveValue($this->get($key), $resolving)]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/DependencyInjection/ReverseContainer.php">
     <InvalidReturnType>
@@ -1107,9 +1107,9 @@
     </UndefinedClass>
   </file>
   <file src="src/Symfony/Component/HttpKernel/Controller/ArgumentResolver/RequestPayloadValueResolver.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[$this->serializer->deserialize($data, $type, $format, self::CONTEXT_DESERIALIZE + $attribute->serializationContext)]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/HttpKernel/Event/ControllerEvent.php">
     <InvalidReturnType>
@@ -1238,11 +1238,6 @@
   <file src="src/Symfony/Component/JsonStreamer/Mapping/GenericTypePropertyMetadataLoader.php">
     <InvalidTemplateParam>
       <code><![CDATA[Type::intersection(...array_map(fn (Type $t): Type => $this->replaceVariableTypes($t, $variableTypes), $type->getTypes()))]]></code>
-      <code><![CDATA[new CollectionType($this->replaceVariableTypes($type->getWrappedType(), $variableTypes), $type->isList())]]></code>
-      <code><![CDATA[Type::generic(
-                $this->replaceVariableTypes($type->getWrappedType(), $variableTypes),
-                ...array_map(fn (Type $t): Type => $this->replaceVariableTypes($t, $variableTypes), $type->getVariableTypes()),
-            )]]></code>
     </InvalidTemplateParam>
   </file>
   <file src="src/Symfony/Component/Ldap/Adapter/ExtLdap/EntryManager.php">
@@ -1519,12 +1514,6 @@
       <code><![CDATA[return $this->writePropertyCache[$key] = $mutator;]]></code>
     </NullableReturnStatement>
   </file>
-  <file src="src/Symfony/Component/PropertyInfo/Extractor/PhpDocExtractor.php">
-    <InvalidTemplateParam>
-      <code><![CDATA[new CollectionType($wrappedType, $type->isList())]]></code>
-      <code><![CDATA[new GenericType($wrappedType, ...$variableTypes)]]></code>
-    </InvalidTemplateParam>
-  </file>
   <file src="src/Symfony/Component/PropertyInfo/Extractor/PhpStanExtractor.php">
     <InvalidArgument>
       <code><![CDATA[true]]></code>
@@ -1539,13 +1528,13 @@
     </TooFewArguments>
   </file>
   <file src="src/Symfony/Component/PropertyInfo/Util/PhpDocTypeHelper.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[Type::nullable($type)]]></code>
       <code><![CDATA[Type::collection($type, $value, $key)]]></code>
       <code><![CDATA[Type::generic($type, ...array_filter($variableTypes))]]></code>
       <code><![CDATA[Type::collection($type, $value, $key)]]></code>
       <code><![CDATA[Type::generic($type, ...$variableTypes)]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
     <UndefinedClass>
       <code><![CDATA[Collection]]></code>
       <code><![CDATA[LegacyScalar]]></code>
@@ -1610,10 +1599,10 @@
     </InvalidArgument>
   </file>
   <file src="src/Symfony/Component/Serializer/Encoder/XmlEncoder.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[$node->appendChild($child)]]></code>
       <code><![CDATA[$node->appendChild($child)]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
     <NullableReturnStatement>
       <code><![CDATA[return $node->nodeValue;]]></code>
       <code><![CDATA[return $node->firstChild->nodeValue;]]></code>
@@ -1631,11 +1620,6 @@
     <InvalidReturnType>
       <code><![CDATA[return $allowedAttributes;]]></code>
     </InvalidReturnType>
-  </file>
-  <file src="src/Symfony/Component/Serializer/Normalizer/AbstractObjectNormalizer.php">
-    <InvalidTemplateParam>
-      <code><![CDATA[Type::object($parameterType->getName())]]></code>
-    </InvalidTemplateParam>
   </file>
   <file src="src/Symfony/Component/Serializer/Normalizer/ArrayDenormalizer.php">
     <UndefinedClass>
@@ -1744,15 +1728,7 @@
       <code><![CDATA[true]]></code>
     </InvalidArgument>
     <InvalidTemplateParam>
-      <code><![CDATA[Type::collection($type)]]></code>
-      <code><![CDATA[Type::generic($type, $keyType, $variableTypes[0])]]></code>
-      <code><![CDATA[Type::collection($type, $variableTypes[1], $variableTypes[0], $asList)]]></code>
-      <code><![CDATA[Type::collection($type, $variableTypes[0])]]></code>
-      <code><![CDATA[Type::collection($type, $variableTypes[1], $variableTypes[0])]]></code>
-      <code><![CDATA[Type::collection($type)]]></code>
-      <code><![CDATA[Type::generic($type, ...$variableTypes)]]></code>
       <code><![CDATA[Type::intersection(...$types)]]></code>
-      <code><![CDATA[Type::object($className)]]></code>
     </InvalidTemplateParam>
     <TooFewArguments>
       <code><![CDATA[new Lexer()]]></code>

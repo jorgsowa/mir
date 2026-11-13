@@ -20,4 +20,4 @@ function pair($t, $u): void {}
 //                ^^ UnusedParam: Parameter $u is never used
 
 pair(new Cat(), new Dog());
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as 'Dog' does not satisfy bound 'Cat'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $u of pair() expects 'Cat', got 'Dog'

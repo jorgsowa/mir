@@ -20,4 +20,4 @@ final class Box {
     public function __construct(int|string|Wrong $v) {}
 }
 new Box(new Wrong());
-//<^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'A' inferred as 'Wrong' does not satisfy bound 'literal-int|literal-string'
+//<^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $v of Box::__construct() expects 'literal-int|literal-string', got 'Wrong'

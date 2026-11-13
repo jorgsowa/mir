@@ -36,5 +36,5 @@ function acceptsOwnClass(NotTaggableRepo $r): void {
 
 function rejectsUnrelatedClass(NotTaggableRepo $r, Unrelated $u): void {
     $r->tagged(new Collection($u));
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as 'Collection<Unrelated>' does not satisfy bound 'Collection<NotTaggableRepo>'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $items of tagged() expects 'Collection<NotTaggableRepo>', got 'Collection<Unrelated>'
 }

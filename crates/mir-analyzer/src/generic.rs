@@ -379,6 +379,65 @@ pub fn check_template_bounds_with_inheritance<'a>(
     violations
 }
 
+/// A bound violation on a parameter typed as the template itself is reported under the argument kinds.
+pub(crate) fn template_bound_issue(
+    db: &dyn MirDatabase,
+    fn_name: &str,
+    params: &[DeclaredParam],
+    name: &Name,
+    inferred: &Type,
+    bound: &Type,
+) -> (mir_issues::IssueKind, mir_issues::Severity) {
+    use mir_issues::{IssueKind, Severity};
+    let is_template = |a: &Atomic| match a {
+        Atomic::TTemplateParam { name: n, .. } => n == name,
+        Atomic::TNamedObject { fqcn, type_params } => fqcn == name && type_params.is_empty(),
+        _ => false,
+    };
+    let expected = format!("{bound}");
+    let actual = format!("{inferred}");
+    let Some(param) = params
+        .iter()
+        .find(|p| p.ty.as_ref().is_some_and(|t| t.contains(is_template)))
+    else {
+        let kind = IssueKind::InvalidTemplateParam {
+            name: name.to_string(),
+            expected_bound: expected,
+            actual,
+        };
+        return (kind, Severity::Error);
+    };
+    let param = param.name.to_string();
+    let fn_name = fn_name.to_string();
+    // A value wider than the bound may still hold an allowed one; a float never holds an int.
+    let narrows_to_bound = inferred.types.iter().all(|a| {
+        let single = Type::single(a.clone());
+        is_subtype(db, &single, bound)
+            || crate::call::scalar_refinement_coercion(&single, bound)
+            || bound.types.iter().any(|b| {
+                !(b.is_int() && matches!(a, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+                    && is_subtype(db, &Type::single(b.clone()), &single)
+            })
+    });
+    if narrows_to_bound {
+        let kind = IssueKind::ArgumentTypeCoercion {
+            param,
+            fn_name,
+            expected,
+            actual,
+        };
+        (kind, Severity::Info)
+    } else {
+        let kind = IssueKind::InvalidArgument {
+            param,
+            fn_name,
+            expected,
+            actual,
+        };
+        (kind, Severity::Error)
+    }
+}
+
 /// `int` against a `1|2` bound may hold an allowed value: a coercion, not a violation.
 fn is_wider_than_literal_bound(db: &dyn MirDatabase, inferred: &Type, bound: &Type) -> bool {
     bound

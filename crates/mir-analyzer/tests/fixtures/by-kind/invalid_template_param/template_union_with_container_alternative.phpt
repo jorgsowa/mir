@@ -30,7 +30,7 @@ function test_array_of_bound_subtype_is_fine($dogs): void {
 /** @param array<NotAnimal> $notAnimals */
 function test_array_element_violating_bound_is_flagged($notAnimals): void {
     processArrayOrSingle($notAnimals);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of processArrayOrSingle() expects 'Animal', got 'NotAnimal'
 }
 
 /**
@@ -47,5 +47,5 @@ function test_closure_returning_bound_subtype_is_fine($f): void {
 /** @param Closure(): NotAnimal $f */
 function test_closure_return_violating_bound_is_flagged($f): void {
     processClosureOrSingle($f);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of processClosureOrSingle() expects 'Animal', got 'NotAnimal'
 }

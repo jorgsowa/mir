@@ -21,4 +21,4 @@ class StringCollection implements Collection {}
 function takesIntCollection($c): void {}
 
 takesIntCollection(new StringCollection());
-//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'StringCollection' does not satisfy bound 'Collection<int>'
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of takesIntCollection() expects 'Collection<int>', got 'StringCollection'

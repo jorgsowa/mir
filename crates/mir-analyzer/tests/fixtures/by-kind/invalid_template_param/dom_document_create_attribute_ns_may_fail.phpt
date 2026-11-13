@@ -11,7 +11,7 @@ DOMDocument::createAttributeNS() really returns false (no root element), so it s
 
 function insert(DOMDocument $document, DOMElement $root, string $name): void {
     $root->appendChild($document->createAttributeNS('urn:example', $name));
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TNode' inferred as 'DOMAttr|false' can be false and therefore does not satisfy bound 'DOMNode'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $node of appendChild() expects 'DOMNode', got 'DOMAttr|false'
 }
 
 function guarded(DOMDocument $document, DOMElement $root, string $name): void {

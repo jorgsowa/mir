@@ -1036,15 +1036,10 @@ impl CallAnalyzer {
                     &unchecked,
                     None,
                 ) {
-                    ea.emit(
-                        IssueKind::InvalidTemplateParam {
-                            name: name.to_string(),
-                            expected_bound: format!("{bound}"),
-                            actual: format!("{inferred}"),
-                        },
-                        Severity::Error,
-                        span,
+                    let (kind, severity) = crate::generic::template_bound_issue(
+                        ea.db, fn_name, &params, name, inferred, &bound,
                     );
+                    ea.emit(kind, severity, span);
                 }
                 Some(bindings)
             } else {

@@ -51,5 +51,5 @@ function test(string $c, string $plain): void {
     $r3 = Box::s($c);
     /** @mir-check $r3 is class-string<X> */
     ident($plain);
-//  ^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'class-string'
+//  ^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $c of ident() expects 'class-string', got 'string' — coercion may fail at runtime
 }

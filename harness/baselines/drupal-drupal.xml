@@ -865,9 +865,9 @@
     </InvalidReturnType>
   </file>
   <file src="core/lib/Drupal/Core/EventSubscriber/RssResponseRelativeUrlFilter.php">
-    <InvalidTemplateParam>
+    <InvalidArgument>
       <code><![CDATA[$node->replaceChild($rss_dom->createTextNode(Html::transformRootRelativeUrlsToAbsolute($html_markup, $request->getSchemeAndHttpHost())), $node->firstChild)]]></code>
-    </InvalidTemplateParam>
+    </InvalidArgument>
   </file>
   <file src="core/lib/Drupal/Core/Extension/DatabaseDriver.php">
     <InvalidStringClass>
@@ -2184,6 +2184,10 @@
     </InvalidReturnType>
   </file>
   <file src="core/modules/filter/src/Plugin/Filter/FilterCaption.php">
+    <InvalidArgument>
+      <code><![CDATA[$node->parentNode->insertBefore($updated_node, $node)]]></code>
+      <code><![CDATA[$node->parentNode->removeChild($node)]]></code>
+    </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('
         <p>You can caption images, videos, blockquotes, and so on. Examples:</p>
@@ -2195,10 +2199,6 @@
         </ul>');]]></code>
       <code><![CDATA[return $this->t('You can caption images (<code>data-caption="Text"</code>), but also videos, blockquotes, and so on.');]]></code>
     </InvalidReturnType>
-    <InvalidTemplateParam>
-      <code><![CDATA[$node->parentNode->insertBefore($updated_node, $node)]]></code>
-      <code><![CDATA[$node->parentNode->removeChild($node)]]></code>
-    </InvalidTemplateParam>
     <UndefinedMethod>
       <code><![CDATA[$node->getAttribute('data-caption')]]></code>
       <code><![CDATA[$node->removeAttribute('data-caption')]]></code>
@@ -3157,6 +3157,9 @@
     </NullableReturnStatement>
   </file>
   <file src="core/modules/media/src/Plugin/Filter/MediaEmbed.php">
+    <InvalidArgument>
+      <code><![CDATA[$node->parentNode->insertBefore($replacement_node, $node)]]></code>
+    </InvalidArgument>
     <InvalidReturnType>
       <code><![CDATA[return $this->t('
       <p>You can embed media items:</p>
@@ -3167,9 +3170,6 @@
       </ul>');]]></code>
       <code><![CDATA[return $this->t('You can embed media items (using the <code>&lt;drupal-media&gt;</code> tag).');]]></code>
     </InvalidReturnType>
-    <InvalidTemplateParam>
-      <code><![CDATA[$node->parentNode->insertBefore($replacement_node, $node)]]></code>
-    </InvalidTemplateParam>
   </file>
   <file src="core/modules/media/src/Plugin/media/Source/File.php">
     <InvalidReturnType>

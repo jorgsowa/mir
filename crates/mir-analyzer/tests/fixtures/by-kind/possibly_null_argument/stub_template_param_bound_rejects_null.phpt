@@ -22,7 +22,7 @@ function stubs(Container $c, ?string $class): void {
     new ReflectionClass($class);
 //                      ^^^^^^ PossiblyNullArgument: Argument $objectOrClass of ReflectionClass::__construct() might be null
     WeakReference::create($c->get('b'));
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TIn' inferred as 'object|null' does not satisfy bound 'object'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $object of create() expects 'object', got 'object|null'
     $o = $c->get('c');
     if ($o !== null) {
         new ReflectionClass($o);
@@ -38,5 +38,5 @@ final class Holder {
 
 function user(Container $c): void {
     new Holder($c->get('d'));
-//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'object|null' does not satisfy bound 'object'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of Holder::__construct() expects 'object', got 'object|null'
 }

@@ -15,7 +15,7 @@ mod counts;
 mod nullability;
 mod types;
 
-pub(crate) use types::stringable_coercion_ok;
+pub(crate) use types::{scalar_refinement_coercion, stringable_coercion_ok};
 
 // ---------------------------------------------------------------------------
 // Shared types

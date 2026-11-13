@@ -28,4 +28,4 @@ function resolve(mixed $value): mixed {
 resolve(['a' => 1, 'b' => ['c' => true]]);
 resolve('plain');
 resolve(new \stdClass());
-//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TValue' inferred as 'stdClass' does not satisfy bound 'array<int|string, array|scalar>|scalar'
+//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of resolve() expects 'array<int|string, array|scalar>|scalar', got 'stdClass'

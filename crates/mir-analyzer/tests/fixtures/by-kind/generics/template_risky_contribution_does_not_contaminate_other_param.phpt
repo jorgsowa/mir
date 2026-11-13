@@ -32,4 +32,4 @@ needsInt(f(null, 5));
 function g($a, $b): void {}
 
 g(null, 5);
-//<^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as '5' does not satisfy bound 'string'
+//<^^^^^^^^^^ InvalidArgument: Argument $a of g() expects 'string', got '5'

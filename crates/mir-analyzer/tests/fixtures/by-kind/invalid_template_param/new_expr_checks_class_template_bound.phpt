@@ -27,4 +27,4 @@ $ok = new Box(new Unrelated());
 
 // Violates the bound — NotBase does not extend Base.
 $bad = new Box(new NotBase());
-//     ^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
+//     ^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $item of Box::__construct() expects 'Base', got 'NotBase'

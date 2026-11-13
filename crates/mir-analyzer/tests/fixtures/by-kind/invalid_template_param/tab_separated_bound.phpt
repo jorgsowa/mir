@@ -10,4 +10,4 @@ function f($x): void {}
 //         ^^ UnusedParam: Parameter $x is never used
 
 f(5);
-//<^^^^ InvalidTemplateParam: Template type 'T' inferred as '5' does not satisfy bound 'ArrayAccess'
+//<^^^^ InvalidArgument: Argument $x of f() expects 'ArrayAccess', got '5'

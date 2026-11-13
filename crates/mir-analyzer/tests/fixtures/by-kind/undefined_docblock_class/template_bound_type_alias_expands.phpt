@@ -31,4 +31,4 @@ class Box {
 
 new Box(new Related());
 new Box(new Unrelated());
-//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'
+//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $item of Box::__construct() expects 'Base', got 'Unrelated'

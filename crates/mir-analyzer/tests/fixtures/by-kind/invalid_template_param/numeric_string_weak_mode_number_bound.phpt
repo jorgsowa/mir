@@ -24,7 +24,7 @@ function f(string $s, int $i, $ns): void {
     $c = twice($i);
     /** @mir-check $c is int */
     $d = twice($s);
-//       ^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'int|float'
+//       ^^^^^^^^^ InvalidArgument: Argument $n of twice() expects 'int|float', got 'string'
     $e = twice('abc');
-//       ^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as '"abc"' does not satisfy bound 'int|float'
+//       ^^^^^^^^^^^^ InvalidArgument: Argument $n of twice() expects 'int|float', got '"abc"'
 }

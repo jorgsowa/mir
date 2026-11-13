@@ -29,4 +29,4 @@ function lookUp(string $type): int|string
 lookUp('immutable');
 lookUp('mutable');
 lookUp('missing');
-//<^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as '"missing"' does not satisfy bound 'key-of<App\ID_TABLE>'
+//<^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $type of lookUp() expects 'key-of<App\ID_TABLE>', got '"missing"'

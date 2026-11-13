@@ -60,5 +60,5 @@ function reflection(string $class, ?object $maybe, int $i): void {
 
 function userClassStillReported(int $i): void {
     new Mirror($i);
-//  ^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'int' does not satisfy bound 'object'
+//  ^^^^^^^^^^^^^^ InvalidArgument: Argument $target of Mirror::__construct() expects 'object', got 'int'
 }

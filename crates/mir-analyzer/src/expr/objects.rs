@@ -242,15 +242,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         } else {
             for (name, inferred, bound) in violations {
-                self.emit(
-                    IssueKind::InvalidTemplateParam {
-                        name: name.to_string(),
-                        expected_bound: format!("{bound}"),
-                        actual: format!("{inferred}"),
-                    },
-                    Severity::Error,
-                    call_span,
+                let (kind, severity) = crate::generic::template_bound_issue(
+                    self.db,
+                    &format!("{fqcn}::__construct"),
+                    ctor_params,
+                    name,
+                    inferred,
+                    &bound,
                 );
+                self.emit(kind, severity, call_span);
             }
         }
 
