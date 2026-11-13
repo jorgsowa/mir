@@ -1112,6 +1112,7 @@ impl CallAnalyzer {
                                 ctx.set_var_taint(var_name, args_taint);
                             } else {
                                 ea.check_byref_arg_purity(value, ctx, value.span);
+                                super::widen_byref_property(value, ctx);
                             }
                         }
                     } else if let Some(value) =
@@ -1126,6 +1127,7 @@ impl CallAnalyzer {
                             ctx.set_var_taint(var_name, args_taint);
                         } else {
                             ea.check_byref_arg_purity(value, ctx, value.span);
+                            super::widen_byref_property(value, ctx);
                             super::write_byref_element(ea, ctx, value, output_ty);
                         }
                     }

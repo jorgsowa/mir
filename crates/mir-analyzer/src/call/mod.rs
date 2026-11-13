@@ -454,6 +454,31 @@ pub(crate) fn byref_written_type(
 }
 
 /// An array element passed by reference takes the type the param writes, like a variable does.
+/// A property (or an element of one) passed by reference may be emptied, so it loses a
+/// narrowed non-emptiness.
+pub(crate) fn widen_byref_property(
+    value: &php_ast::owned::Expr,
+    ctx: &mut crate::flow_state::FlowState,
+) {
+    let mut base = value;
+    while let php_ast::owned::ExprKind::ArrayAccess(aa) = &base.kind {
+        base = &aa.array;
+    }
+    if let php_ast::owned::ExprKind::PropertyAccess(pa) = &base.kind {
+        if let (Some(obj_key), Some(prop)) = (
+            crate::narrowing::chained_prop_receiver_key(&pa.object),
+            crate::expr::helpers::extract_string_from_expr(&pa.property),
+        ) {
+            if let Some(widened) = ctx
+                .get_prop_refined(&obj_key, &prop)
+                .map(|t| t.widen_non_empty())
+            {
+                ctx.set_prop_refined(&obj_key, &prop, widened);
+            }
+        }
+    }
+}
+
 pub(crate) fn write_byref_element(
     ea: &mut crate::expr::ExpressionAnalyzer<'_>,
     ctx: &mut crate::flow_state::FlowState,

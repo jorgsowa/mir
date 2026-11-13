@@ -1010,28 +1010,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 None => current.clone(),
                             };
                         // Removing an element may leave the array empty.
-                        if updated.types.iter().any(|a| {
-                            matches!(
-                                a,
-                                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
-                            )
-                        }) {
-                            let mut widened = Type::empty();
-                            widened.from_docblock = updated.from_docblock;
-                            for a in &updated.types {
-                                widened.add_type(match a {
-                                    Atomic::TNonEmptyArray { key, value } => Atomic::TArray {
-                                        key: key.clone(),
-                                        value: value.clone(),
-                                    },
-                                    Atomic::TNonEmptyList { value } => Atomic::TList {
-                                        value: value.clone(),
-                                    },
-                                    other => other.clone(),
-                                });
-                            }
-                            updated = widened;
-                        }
+                        let updated = updated.widen_non_empty();
                         if updated != current {
                             ctx.set_var(name, updated);
                         }

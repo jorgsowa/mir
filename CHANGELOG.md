@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calling a method of a `@psalm-immutable` class on a parameter in a `@psalm-pure` or `@psalm-external-mutation-free` function is no longer `ImpureMethodCall`, since such methods are checked as mutation-free.
 - `[$obj, 'method']` with an intersection-typed `$obj` (`Coll&Sel`) is callable instead of `InvalidArgument`.
 - `unset($a[$k])` drops the non-emptiness of a `non-empty-array` or `non-empty-list` variable, so a later `array_shift()` result may be `null` again.
+- A property passed by reference to a function (`array_shift($o->extra)`) loses a narrowed non-emptiness, so a later `array_shift()` result may be `null` again.
 
 ## [0.100.0] - 2026-11-13
 

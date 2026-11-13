@@ -968,6 +968,26 @@ impl Type {
         .with_callable_form(self, callable_array())
     }
 
+    /// Turns a top-level `non-empty-list`/`non-empty-array` into `list`/`array`.
+    pub fn widen_non_empty(&self) -> Type {
+        let mut out = Type::empty();
+        out.from_docblock = self.from_docblock;
+        out.possibly_undefined = self.possibly_undefined;
+        for a in &self.types {
+            out.add_type(match a {
+                Atomic::TNonEmptyList { value } => Atomic::TList {
+                    value: value.clone(),
+                },
+                Atomic::TNonEmptyArray { key, value } => Atomic::TArray {
+                    key: key.clone(),
+                    value: value.clone(),
+                },
+                other => other.clone(),
+            });
+        }
+        out
+    }
+
     /// Keeps the outer collection kind but turns every nested `non-empty-list`/`non-empty-array`
     /// into `list`/`array`, for comparisons that ignore element emptiness.
     pub fn widen_nested_non_empty(&self) -> Type {
