@@ -329,6 +329,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // int-preserving `+`/`-`/`*` path.
                     if matches!(b.op, BinaryOp::Div | BinaryOp::Pow) {
                         infer_div(&left_ty, &right_ty)
+                    } else if b.op == BinaryOp::Mod {
+                        // `%` casts both operands to int, so it never yields a float.
+                        Type::single(Atomic::TInt)
                     } else {
                         infer_arithmetic(&left_ty, &right_ty)
                     }

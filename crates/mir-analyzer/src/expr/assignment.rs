@@ -892,6 +892,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     AssignOp::Minus => Some(BinaryOp::Sub),
                     AssignOp::Mul => Some(BinaryOp::Mul),
                     AssignOp::Div => Some(BinaryOp::Div),
+                    AssignOp::Mod => Some(BinaryOp::Mod),
                     _ => None,
                 };
                 let range_result =
@@ -901,6 +902,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .unwrap_or_else(|| {
                         if a.op == AssignOp::Div {
                             infer_div(&lhs_ty, &rhs_ty)
+                        } else if a.op == AssignOp::Mod {
+                            Type::single(Atomic::TInt)
                         } else {
                             infer_arithmetic(&lhs_ty, &rhs_ty)
                         }
