@@ -554,6 +554,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                     && operand_is_definitely_string(&right_ty)
                 {
                     Type::single(Atomic::TString)
+                } else if matches!(
+                    b.op,
+                    BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor
+                ) && ((left_ty.is_mixed() && operand_is_definitely_string(&right_ty))
+                    || (right_ty.is_mixed() && operand_is_definitely_string(&left_ty)))
+                {
+                    // A `mixed` operand may itself be a string, giving a string result.
+                    let mut ty = Type::single(Atomic::TInt);
+                    ty.add_type(Atomic::TString);
+                    ty
                 } else {
                     infer_bitwise_range(b.op, &left_ty, &right_ty)
                         .unwrap_or_else(|| Type::single(Atomic::TInt))
