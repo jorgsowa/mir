@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Concatenating `lowercase-string`s, or one with a literal that has no uppercase letters (`strtolower($c) . '::m'`), is a `lowercase-string` (likewise `uppercase-string`) instead of a plain `non-empty-string`.
 - A truthy `$x?->m()` makes `$x` non-null, so `if (!$x?->m()) { throw … }` no longer leaves `$x` nullable afterwards.
 - A readonly property's element passed to a method on `mixed` (`$m->dispatch($r->context['e'])`) is no longer a `ReadonlyPropertyAssignment`.
+- A `non-empty-string` or `non-falsy-string` class name (`$class . 'Query'`) is a valid `new` or `::` receiver instead of `InvalidStringClass`, as a plain `string` already was.
 
 ## [0.100.0] - 2026-11-13
 

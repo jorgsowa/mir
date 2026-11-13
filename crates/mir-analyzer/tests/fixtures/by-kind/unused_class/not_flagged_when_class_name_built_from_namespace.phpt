@@ -20,7 +20,6 @@ final class Factory {
     public function make(string $method): object {
         $component = '\App\Components\\' . ucfirst($method);
         return new $component();
-//                 ^^^^^^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'non-empty-string'
     }
 }
 

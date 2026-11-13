@@ -105,6 +105,9 @@ fn is_valid_class_name_type(ty: &Type) -> bool {
         matches!(
             t,
             Atomic::TString
+                | Atomic::TNonEmptyString
+                | Atomic::TNonFalsyString
+                | Atomic::TRefinedString { .. }
                 | Atomic::TClassString(_)
                 | Atomic::TLiteralString(_)
                 | Atomic::TMixed
