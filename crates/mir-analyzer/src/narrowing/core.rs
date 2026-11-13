@@ -59,10 +59,7 @@ pub(crate) fn resolve_prop_current_type(
     if prop.ends_with("()") {
         return resolve_method_call_current_type(ctx, obj_var, prop, db);
     }
-    let obj_ty = match split_prop_hop(obj_var) {
-        Some((base, mid)) => resolve_prop_current_type(ctx, base, mid, db, file),
-        None => receiver_type(ctx, obj_var, db),
-    };
+    let obj_ty = prop_receiver_type(ctx, obj_var, db, file);
     // A union receiver's property is the union of each object's declared type.
     let mut found: Option<Type> = None;
     for atomic in &obj_ty.types {
@@ -161,17 +158,67 @@ fn split_prop_hop(key: &str) -> Option<(&str, &str)> {
         .filter(|(_, prop)| !prop.ends_with("()"))
 }
 
-/// Type of a property-narrowing receiver key: a variable or a one-hop
-/// property path.
+/// Type of a property-narrowing receiver key: a variable, a call chain, or a
+/// property or literal-index path on those.
 pub(crate) fn prop_receiver_type(
     ctx: &FlowState,
     key: &str,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Type {
+    if let Some((base, element)) = split_index_hop(key) {
+        if let Some(refined) = ctx.get_prop_refined(base, element) {
+            return refined.clone();
+        }
+        return literal_offset_type(&prop_receiver_type(ctx, base, db, file), element);
+    }
     match split_prop_hop(key) {
         Some((base, prop)) => resolve_prop_current_type(ctx, base, prop, db, file),
-        None => ctx.get_var(key),
+        None => receiver_type(ctx, key, db),
+    }
+}
+
+/// `(base, element)` of a receiver key ending in a literal-index hop
+/// (`args[1]` → `("args", "[1]")`), the element in `element_access_key`'s form.
+fn split_index_hop(key: &str) -> Option<(&str, &str)> {
+    key.strip_suffix(']')?;
+    let open = key.rfind('[')?;
+    Some((&key[..open], &key[open..]))
+}
+
+/// The value type at a literal `[1]` / `['k']` element of an array type; `mixed` when unknown.
+fn literal_offset_type(ty: &Type, element: &str) -> Type {
+    use mir_types::atomic::ArrayKey;
+    let inner = &element[1..element.len() - 1];
+    let key = match inner.strip_prefix('\'').and_then(|k| k.strip_suffix('\'')) {
+        Some(k) => ArrayKey::String(k.into()),
+        None => match inner.parse::<i64>() {
+            Ok(n) => ArrayKey::Int(n),
+            Err(_) => return Type::mixed(),
+        },
+    };
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        let value = match atomic {
+            mir_types::Atomic::TKeyedArray { properties, .. } => {
+                properties.get(&key).map(|p| p.ty.clone())
+            }
+            mir_types::Atomic::TList { value } | mir_types::Atomic::TNonEmptyList { value } => {
+                Some((**value).clone())
+            }
+            mir_types::Atomic::TArray { value, .. }
+            | mir_types::Atomic::TNonEmptyArray { value, .. } => Some((**value).clone()),
+            _ => None,
+        };
+        match value {
+            Some(v) => v.types.iter().for_each(|a| result.add_type(a.clone())),
+            None => return Type::mixed(),
+        }
+    }
+    if result.types.is_empty() {
+        Type::mixed()
+    } else {
+        result
     }
 }
 
@@ -308,12 +355,16 @@ pub(crate) fn memoized_receiver_key(expr: &php_ast::owned::Expr) -> Option<Strin
 /// Whether every call in `key`'s chain is pure, mutation-free or memoized, so
 /// a refinement recorded under `key` still describes a repeated evaluation.
 pub(crate) fn receiver_key_is_stable(ctx: &FlowState, key: &str, db: &dyn MirDatabase) -> bool {
+    if let Some((base, _)) = split_index_hop(key) {
+        return receiver_key_is_stable(ctx, base, db);
+    }
     match key.rsplit_once("->") {
         Some((base, call)) if call.ends_with("()") => {
             stable_method_return(ctx, base, call, db).is_some()
                 && receiver_key_is_stable(ctx, base, db)
         }
-        _ => true,
+        Some((base, _)) => receiver_key_is_stable(ctx, base, db),
+        None => true,
     }
 }
 
@@ -412,26 +463,37 @@ pub(crate) fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(St
 }
 
 /// Compute `prop_refined`'s "object" key component for a property-access
-/// receiver expression, accepting one MORE hop than a bare variable —
-/// `$this->a` (as a receiver) encodes as `"this->a"` instead of returning
-/// `None`. `prop_refined` is a flat `(Name, Name)` map keyed by
-/// receiver+property, not a real path; a full path-based refactor is a much
-/// bigger change, but a synthetic multi-hop string key (mirroring
-/// `extract_expr_guard_key`'s own synthetic-key precedent) lets a 2-hop
-/// chain reuse the exact same map without one. Still bottoms out at a bare
-/// variable base — a 3+-hop chain or a method-call/array-index hop in the
-/// middle is NOT covered.
+/// receiver expression: a variable, a zero-arg method chain, or a property
+/// chain of any depth on those (`$this->a->b` encodes as `"this->a->b"`).
+/// `prop_refined` is a flat `(Name, Name)` map keyed by receiver+property, not
+/// a real path; the synthetic multi-hop string key (mirroring
+/// `extract_expr_guard_key`'s own synthetic-key precedent) lets a chain reuse
+/// the same map, and invalidating `"a->"` drops every chain rooted at `$a`.
+/// A literal-index hop encodes as `"args[1]"`.
 pub(crate) fn chained_prop_receiver_key(object_expr: &php_ast::owned::Expr) -> Option<String> {
     match &object_expr.kind {
         ExprKind::Variable(name) => Some(name.to_string()),
         ExprKind::MethodCall(_) => method_chain_key(object_expr),
         ExprKind::PropertyAccess(inner_pa) | ExprKind::NullsafePropertyAccess(inner_pa) => {
-            let base = extract_var_name(&inner_pa.object)?;
+            let base = chained_prop_receiver_key(&inner_pa.object)?;
             let mid_prop = match &inner_pa.property.kind {
                 ExprKind::Identifier(s) => s.as_ref(),
                 _ => return None,
             };
             Some(format!("{base}->{mid_prop}"))
+        }
+        ExprKind::ArrayAccess(aa) => {
+            let element = match &aa.index.as_ref()?.kind {
+                ExprKind::Int(n) => format!("[{n}]"),
+                ExprKind::String(s) if !s.as_str().contains(['[', ']', '\'']) => {
+                    format!("['{}']", s.as_str())
+                }
+                _ => return None,
+            };
+            Some(format!(
+                "{}{element}",
+                chained_prop_receiver_key(&aa.array)?
+            ))
         }
         _ => None,
     }

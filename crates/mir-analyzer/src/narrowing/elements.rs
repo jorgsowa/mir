@@ -60,6 +60,7 @@ pub(crate) fn forget_element_write(target: &Expr, ctx: &mut FlowState) {
         },
     };
     ctx.drop_element_refinements(&receiver, false);
+    ctx.drop_index_hop_receivers(&receiver);
 }
 
 /// Narrows the element a leaf check tests, when it is read from a generic array.

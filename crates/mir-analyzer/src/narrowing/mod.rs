@@ -1491,6 +1491,16 @@ pub fn narrow_from_condition(
                         narrow_var_null(ctx, &obj, false);
                     }
                 }
+            } else if let Some((obj, prop)) = extract_chained_prop_access(&b.left) {
+                if let Some(class_name) = extract_class_name(
+                    &b.right,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
+                }
             } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
                 if let Some(class_name) = extract_class_name(
                     &b.right,

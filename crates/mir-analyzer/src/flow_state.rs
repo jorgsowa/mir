@@ -1175,6 +1175,19 @@ impl FlowState {
         self.unbind_closure(sym);
         self.drop_guards_on(sym);
         self.drop_element_refinements(sym.as_str(), true);
+        self.drop_index_hop_receivers(sym.as_str());
+    }
+
+    /// Discards refinements keyed on a literal-index hop of `root` (`"args[1]"`, `"args[1]->p"`).
+    pub(crate) fn drop_index_hop_receivers(&mut self, root: &str) {
+        let stale = |obj: &Name| {
+            obj.as_str()
+                .strip_prefix(root)
+                .is_some_and(|rest| rest.starts_with('['))
+        };
+        if self.prop_refined.keys().any(|(obj, _)| stale(obj)) {
+            Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| !stale(obj));
+        }
     }
 
     /// Discards element refinements (`[key]` entries) read from `receiver`, or keyed by the variable `receiver`.
@@ -1508,8 +1521,13 @@ impl FlowState {
     pub fn clear_prop_refined_chain(&mut self, obj_var: &str, prop: &str) {
         let chain = format!("{}->{prop}", obj_var.trim_start_matches('$'));
         self.drop_prop_guards(&chain);
-        let prefix = format!("{chain}->");
-        let stale = |obj: &Name| obj.as_ref() == chain || obj.as_ref().starts_with(prefix.as_str());
+        let stale = |obj: &Name| {
+            obj.as_str()
+                .strip_prefix(chain.as_str())
+                .is_some_and(|rest| {
+                    rest.is_empty() || rest.starts_with("->") || rest.starts_with('[')
+                })
+        };
         if self.prop_refined.keys().any(|(obj, _)| stale(obj)) {
             Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| !stale(obj));
         }
@@ -1568,6 +1586,7 @@ impl FlowState {
             self.mark_this_escaped_to_call();
         }
         let receiver = Name::from(stripped);
+        self.drop_index_hop_receivers(stripped);
         self.forget_local_props(receiver);
         self.drop_prop_guards(&format!("{stripped}->"));
         // A 2-hop chained receiver key (`chained_prop_receiver_key`) encodes
