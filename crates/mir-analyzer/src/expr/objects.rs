@@ -2066,7 +2066,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             const_ty.clone(),
         );
 
-        if found.is_none() && !crate::db::has_unknown_ancestor(self.db, fqcn) {
+        // An unknown receiver class is already reported where it is named.
+        if found.is_none()
+            && crate::db::class_exists(self.db, fqcn)
+            && !crate::db::has_unknown_ancestor(self.db, fqcn)
+        {
             self.emit(
                 IssueKind::UndefinedConstant {
                     name: format!("{fqcn}::{const_name}"),
