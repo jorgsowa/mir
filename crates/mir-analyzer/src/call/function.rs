@@ -1055,8 +1055,11 @@ impl CallAnalyzer {
             // result, rather than leaving its taint bit untouched from
             // whatever it happened to hold before the call.
             let args_taint = crate::taint::args_taint(&call.args, ctx, ea.db, &ea.file);
+            // These only move the array's internal pointer; its value is unchanged.
+            let moves_pointer_only = resolved_fn_name.eq_ignore_ascii_case("reset")
+                || resolved_fn_name.eq_ignore_ascii_case("end");
             for (i, param) in params.iter().enumerate() {
-                if param.is_byref {
+                if param.is_byref && !moves_pointer_only {
                     // Prefer @param-out type if declared; fall back to declared in-type.
                     // Substitute the function's own inferred template bindings so a
                     // generic identity/setter-style helper reports the concrete
