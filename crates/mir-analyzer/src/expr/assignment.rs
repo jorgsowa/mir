@@ -1991,6 +1991,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 result.merge_with(&non_keyed_value_ty);
                                 found_any = true;
                             }
+                            // Destructuring `null` or `false` gives `null` for every target.
+                            if found_any && has_non_array {
+                                result.add_type(Atomic::TNull);
+                            }
                             found_any.then_some(result)
                         })
                         .unwrap_or_else(Type::mixed);

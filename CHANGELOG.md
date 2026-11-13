@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A method missing on one member of a union that also holds an unknown class (`Ex|Missing`) is `PossiblyUndefinedMethod` instead of an `UndefinedMethod` error, since the unknown class may declare it.
 - `$obj::CONST` on an object of an unknown class no longer adds an `UndefinedConstant` to the `UndefinedClass` already reported for it.
 - An object offset on a `mixed` container (`static $map; $map ??= new WeakMap(); $map[$obj]`) is no longer `InvalidArrayOffset`, since the container may be an `ArrayAccess` object.
+- Destructuring a nullable or falsable array (`[$a, $b] = f()` with `array{A, B}|null`) gives nullable targets instead of the element types alone.
 
 ## [0.100.0] - 2026-11-13
 
