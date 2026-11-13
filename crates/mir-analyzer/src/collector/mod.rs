@@ -2495,7 +2495,7 @@ impl<'a> DefinitionCollector<'a> {
         let Some(name_value) = name_arg.value() else {
             return;
         };
-        let php_ast::owned::ExprKind::String(name) = &name_value.kind else {
+        let Some(name) = self.define_name(name_value) else {
             return;
         };
         let define_doc = stmt
@@ -2516,6 +2516,30 @@ impl<'a> DefinitionCollector<'a> {
             .unwrap_or(Type::mixed());
         let const_type = widen_environment_dependent_constant(&fqn, const_type);
         self.slice.constants.push((fqn, const_type));
+    }
+
+    /// A `define()` name: `'NAME'` or `__NAMESPACE__ . '\\NAME'`.
+    fn define_name(&self, expr: &php_ast::owned::Expr) -> Option<String> {
+        use php_ast::ast::{BinaryOp, MagicConstKind};
+        use php_ast::owned::ExprKind;
+        match &expr.kind {
+            ExprKind::String(name) => Some(name.as_str().to_string()),
+            ExprKind::Binary(b) if b.op == BinaryOp::Concat => {
+                let ExprKind::MagicConst(MagicConstKind::Namespace) = &b.left.kind else {
+                    return None;
+                };
+                let ExprKind::String(rest) = &b.right.kind else {
+                    return None;
+                };
+                let name = format!(
+                    "{}{}",
+                    self.namespace.as_deref().unwrap_or(""),
+                    rest.as_str()
+                );
+                Some(name.trim_start_matches('\\').to_string())
+            }
+            _ => None,
+        }
     }
 
     /// Recurses through control-flow wrappers to find `define()` calls inside
