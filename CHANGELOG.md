@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A class named in an `object{…}` shape is resolved against the namespace and `use` imports instead of being read as a global class.
 - A docblock `Generator`, `Closure` or other bare built-in class name in a namespace that declares a class of that name is the local class on untyped `@var` properties and on `@param` types seen from a call site, as it already was elsewhere.
 - A Stringable object returned for a `string` return type in a file without `strict_types` is accepted, as PHP casts it by `__toString()` (arguments already were), instead of `InvalidReturnType`.
+- `@psalm-suppress InaccessibleProperty` and `ImpurePropertyAssignment` suppress `ImmutablePropertyModification`, `ImpureStaticProperty` suppresses `ImpureStaticPropertyAccess` and `ImpureStaticPropertyAssignment`, and `UndefinedPropertyFetch`, `UndefinedPropertyAssignment` and their `UndefinedThisProperty*` forms suppress `UndefinedProperty`.
 - `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
 
 ## [0.100.0] - 2026-11-13

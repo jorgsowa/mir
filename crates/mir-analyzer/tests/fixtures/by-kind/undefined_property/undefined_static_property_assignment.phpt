@@ -1,13 +1,12 @@
 ===description===
-Undefined static property assignment
+Undefined static property assignment. mir reports reads and writes as one `UndefinedProperty`
+kind, so Psalm's `UndefinedPropertyFetch` suppresses the write too.
 ===file===
 <?php
 class A {
     public static function barBar(): void
     {
         /** @suppress UndefinedPropertyFetch */
-//                    ^^^^^^^^^^^^^^^^^^^^^^ UnusedSuppress: Suppress annotation for 'UndefinedPropertyFetch' is never used
         self::$foo = 5;
-//            ^^^^ UndefinedProperty: Property A::$foo does not exist
     }
 }

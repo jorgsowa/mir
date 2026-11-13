@@ -111,6 +111,26 @@ const ISSUE_NAME_ALIASES: &[(&str, &[&str])] = &[
     // Psalm reports a read of an undeclared key on a closed shape as
     // `InvalidArrayOffset`; mir names it `NonExistentArrayOffset`.
     ("InvalidArrayOffset", &["NonExistentArrayOffset"]),
+    // Psalm reports a write to an immutable object's property as
+    // `InaccessibleProperty` (outside the class) or `ImpurePropertyAssignment`.
+    ("InaccessibleProperty", &["ImmutablePropertyModification"]),
+    (
+        "ImpurePropertyAssignment",
+        &["ImmutablePropertyModification"],
+    ),
+    // One Psalm kind for both reading and writing a static property in a pure scope.
+    (
+        "ImpureStaticProperty",
+        &[
+            "ImpureStaticPropertyAccess",
+            "ImpureStaticPropertyAssignment",
+        ],
+    ),
+    // mir has one kind for reading and writing an undeclared property.
+    ("UndefinedPropertyFetch", &["UndefinedProperty"]),
+    ("UndefinedPropertyAssignment", &["UndefinedProperty"]),
+    ("UndefinedThisPropertyFetch", &["UndefinedProperty"]),
+    ("UndefinedThisPropertyAssignment", &["UndefinedProperty"]),
 ];
 
 /// Mir `IssueKind` names that `name` (a third-party identifier) should also
