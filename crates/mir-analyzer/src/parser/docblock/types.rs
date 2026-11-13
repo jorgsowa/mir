@@ -1852,7 +1852,14 @@ pub(super) fn extract_return_type(s: &str) -> String {
         }
     }
 
-    current_token.trim().to_string()
+    // A sentence-ending dot (`@return void.`) isn't part of the type; `1.` and `...` are kept.
+    let token = current_token.trim();
+    match token.strip_suffix('.') {
+        Some(t) if t.ends_with(|c: char| c.is_ascii_alphabetic() || c == '>' || c == ']') => {
+            t.to_string()
+        }
+        _ => token.to_string(),
+    }
 }
 
 pub(super) fn split_union(s: &str) -> Vec<String> {

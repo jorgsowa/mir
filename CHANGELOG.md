@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `throw throw $e` is no longer `InvalidThrow 'never'`.
 - `stream_filter_append()` and `stream_filter_prepend()` accept `params:` without `mode`: the stubs' `$params` has its default.
 - `trigger_error()` and `user_error()` with `E_USER_ERROR` never return, so a variable assigned only before them is no longer `PossiblyUndefinedVariable` afterwards.
+- A sentence-ending dot after a `@return` type (`@return void.`) is no longer read as part of a class name.
 
 ## [0.100.0] - 2026-11-13
 
