@@ -81,6 +81,9 @@ pub(crate) fn return_type_is_invalid(
     if return_arrays_compatible(actual, declared, db, file) {
         return false;
     }
+    if !strict_types && stringable_return_coercion_ok(actual, declared, db) {
+        return false;
+    }
     if has_unrelated_class_arm(actual, declared, db) {
         return true;
     }
@@ -116,6 +119,24 @@ pub(crate) fn return_type_is_invalid(
         return false;
     }
     true
+}
+
+/// A Stringable object returned for `string` in a non-strict file, which PHP casts by `__toString()`.
+fn stringable_return_coercion_ok(
+    actual: &Type,
+    declared: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> bool {
+    declared.types.iter().any(|d| matches!(d, Atomic::TString))
+        && actual.types.iter().all(|a| match a {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn } => {
+                crate::db::extends_or_implements(db, fqcn, "Stringable")
+                    || crate::db::has_method_in_chain(db, fqcn, "__toString")
+            }
+            _ => Type::single(a.clone()).is_subtype_structural(declared),
+        })
 }
 
 /// A returned shape has a scalar or plain-object value that fits no declared shape under the
