@@ -1348,10 +1348,18 @@ fn resolve_method_return<'a>(
         // @psalm-external-mutation-free method — it would indirectly mutate the
         // argument. Only @pure and @mutation-free callees are safe because they
         // guarantee not to mutate their own `$this`.
+        // Methods of an immutable class are checked as mutation-free, so they are safe on any receiver.
+        let immutable_class_member = !resolved.is_static
+            && crate::db::method_is_immutable_class_member(
+                ea.db,
+                &resolved.owner_fqcn,
+                &resolved.name,
+            );
         if ctx.is_in_external_mutation_free_method
             && !resolved.is_pure
             && !resolved.is_mutation_free
             && !resolved.is_static
+            && !immutable_class_member
         {
             if let Some(recv_name) = crate::expr::root_receiver_var(&call.object) {
                 let recv_stripped = recv_name.trim_start_matches('$');
@@ -1381,6 +1389,7 @@ fn resolve_method_return<'a>(
             && !resolved.is_pure
             && !resolved.is_mutation_free
             && !resolved.is_static
+            && !immutable_class_member
         {
             if let Some(recv_name) = crate::expr::root_receiver_var(&call.object) {
                 let recv_stripped = recv_name.trim_start_matches('$');
