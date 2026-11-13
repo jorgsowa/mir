@@ -1039,7 +1039,13 @@ impl CallAnalyzer {
                     None,
                 ) {
                     let (kind, severity) = crate::generic::template_bound_issue(
-                        ea.db, fn_name, &params, name, inferred, &bound,
+                        ea.db,
+                        fn_name,
+                        &params,
+                        name,
+                        inferred,
+                        &bound,
+                        ea.strict_types,
                     );
                     ea.emit(kind, severity, span);
                 }

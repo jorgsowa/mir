@@ -724,7 +724,7 @@ pub(crate) fn check_one(
 
 /// Whether PHP's non-strict conversion of `arg` can produce a value of `param`: a general
 /// `int`, `float`, `string` or `bool` parameter, and not only non-numeric strings for a number.
-fn converts_to(arg: &Type, param: &Type) -> bool {
+pub(crate) fn converts_to(arg: &Type, param: &Type) -> bool {
     let param = param.remove_null();
     let numeric = |p: &Atomic| matches!(p, Atomic::TInt | Atomic::TFloat);
     !param.types.is_empty()
@@ -740,7 +740,7 @@ fn converts_to(arg: &Type, param: &Type) -> bool {
 
 /// Non-empty and made only of int, float, string or bool values, which PHP converts between
 /// in a file without `strict_types`.
-fn only_scalars(ty: &Type) -> bool {
+pub(crate) fn only_scalars(ty: &Type) -> bool {
     !ty.types.is_empty()
         && ty.types.iter().all(|a| {
             a.is_int()

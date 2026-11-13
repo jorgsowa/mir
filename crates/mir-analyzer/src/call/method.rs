@@ -1820,6 +1820,7 @@ fn resolve_method_return<'a>(
                     name,
                     inferred,
                     &bound,
+                    ea.strict_types,
                 );
                 ea.emit(kind, severity, span);
             }

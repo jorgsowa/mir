@@ -24,7 +24,7 @@ function f(string $s, int $i, $ns): void {
     $c = twice($i);
     /** @mir-check $c is int */
     $d = twice($s);
-//       ^^^^^^^^^ InvalidArgument: Argument $n of twice() expects 'int|float', got 'string'
+//       ^^^^^^^^^ InvalidScalarArgument: Argument $n of twice() expects 'int|float', got scalar 'string'
     $e = twice('abc');
 //       ^^^^^^^^^^^^ InvalidArgument: Argument $n of twice() expects 'int|float', got '"abc"'
 }

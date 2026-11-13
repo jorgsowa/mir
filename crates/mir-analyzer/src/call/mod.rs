@@ -13,8 +13,8 @@ pub use args::{
     spread_element_type, CheckArgsParams,
 };
 pub(crate) use args::{
-    scalar_refinement_coercion, stringable_coercion_ok, substitute_static_in_return,
-    unpacked_arg_type,
+    converts_to, only_scalars, scalar_refinement_coercion, stringable_coercion_ok,
+    substitute_static_in_return, unpacked_arg_type,
 };
 pub(crate) use callable::callable_string_token_span;
 pub(crate) use function::{extract_class_docblock, report_undefined_function};

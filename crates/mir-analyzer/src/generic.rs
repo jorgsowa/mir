@@ -387,6 +387,7 @@ pub(crate) fn template_bound_issue(
     name: &Name,
     inferred: &Type,
     bound: &Type,
+    strict_types: bool,
 ) -> (mir_issues::IssueKind, mir_issues::Severity) {
     use mir_issues::{IssueKind, Severity};
     let is_template = |a: &Atomic| match a {
@@ -427,6 +428,19 @@ pub(crate) fn template_bound_issue(
             actual,
         };
         (kind, Severity::Info)
+    } else if !strict_types
+        // A string juggled to a number, as for a plain `int|float` parameter.
+        && inferred.types.iter().all(Atomic::is_string)
+        && crate::call::only_scalars(inferred)
+        && crate::call::converts_to(inferred, bound)
+    {
+        let kind = IssueKind::InvalidScalarArgument {
+            param,
+            fn_name,
+            expected,
+            actual,
+        };
+        (kind, Severity::Warning)
     } else {
         let kind = IssueKind::InvalidArgument {
             param,

@@ -1047,6 +1047,7 @@ impl CallAnalyzer {
                         name,
                         inferred,
                         &bound,
+                        ea.strict_types,
                     );
                     ea.emit(kind, severity, span);
                 }

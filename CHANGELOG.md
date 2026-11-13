@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Destructuring a nullable or falsable array (`[$a, $b] = f()` with `array{A, B}|null`) gives nullable targets instead of the element types alone.
 - An override without a docblock inherits a parent's `@param T` through the class's `@implements Runner<Concrete>` / `@extends` binding, so its native `Handle $h` is read as the bound `WinHandle`.
 - A template named in an `object{…}` shape property (`object{key: T}`) is the template instead of a class named `T`, so its bound applies (an `int|string` bound is a valid array offset).
+- A `string` passed for a template bounded by `int|float` in a file without `strict_types` is `InvalidScalarArgument`, as for a plain `int|float` parameter, instead of `InvalidArgument`.
 
 ## [0.100.0] - 2026-11-13
 

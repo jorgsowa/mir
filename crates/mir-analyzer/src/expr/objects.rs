@@ -252,6 +252,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     name,
                     inferred,
                     &bound,
+                    self.strict_types,
                 );
                 self.emit(kind, severity, call_span);
             }
