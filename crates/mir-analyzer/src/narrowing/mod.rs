@@ -2047,6 +2047,12 @@ pub fn narrow_from_condition(
         // `NullsafeMethodCall` (`$obj?->isFoo($x)`) the same way taint.rs's
         // taint-source check pairs both.
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            // `$x?->m()` is null when `$x` is, so a truthy result proves `$x` non-null.
+            if is_true && matches!(expr.kind, ExprKind::NullsafeMethodCall(_)) {
+                if let Some(var) = extract_var_name(&mc.object) {
+                    narrow_var_null(ctx, var, false);
+                }
+            }
             if let ExprKind::Identifier(name) = &mc.method.kind {
                 let method_name_lower = crate::util::php_ident_lowercase(name);
                 if let Some(fqcn) =
