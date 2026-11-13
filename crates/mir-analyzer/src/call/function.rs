@@ -1827,10 +1827,11 @@ pub(crate) fn report_undefined_function(
     // are case-insensitive). The short name is matched too, since a bare
     // call in a namespace falls back to the global function the guard names.
     let short_fn = fn_name.rsplit('\\').next().unwrap_or(fn_name);
-    let guarded = ctx
-        .function_exists_guards
-        .iter()
-        .any(|g| g.eq_ignore_ascii_case(fn_name) || g.eq_ignore_ascii_case(short_fn));
+    let guarded = ctx.newer_php_guard
+        || ctx
+            .function_exists_guards
+            .iter()
+            .any(|g| g.eq_ignore_ascii_case(fn_name) || g.eq_ignore_ascii_case(short_fn));
     if !call_user_func_string_arg && !guarded {
         let is_relative = fn_name
             .get(..10)

@@ -249,7 +249,7 @@ impl OwnedVisitor for IncludeTargetScanner<'_> {
 
 /// The lowest `PHP_VERSION_ID` that `condition` evaluating to `is_true`
 /// guarantees, from comparisons of `PHP_VERSION_ID` with an integer; 0 for none.
-fn implied_min_version_id(condition: &Expr, is_true: bool) -> u32 {
+pub(crate) fn implied_min_version_id(condition: &Expr, is_true: bool) -> u32 {
     use php_ast::ast::UnaryPrefixOp;
     match &condition.kind {
         ExprKind::Parenthesized(inner) => implied_min_version_id(inner, is_true),

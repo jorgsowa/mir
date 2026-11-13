@@ -190,6 +190,10 @@ pub fn narrow_from_condition(
     if let Some(var) = crate::taint::proven_object(expr, is_true) {
         crate::taint::guard_object(ctx, var);
     }
+    let min_version_id = crate::include_graph::implied_min_version_id(expr, is_true);
+    if min_version_id > crate::db::db_php_version(db).version_id() {
+        ctx.newer_php_guard = true;
+    }
     if let ExprKind::Variable(var) = &expr.kind {
         if let Some(check) = ctx.stored_check(var) {
             narrow_from_condition(&check, ctx, is_true, db, file);

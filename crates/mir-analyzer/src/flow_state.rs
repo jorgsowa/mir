@@ -607,6 +607,10 @@ pub struct FlowState {
     /// block — the calling code explicitly verified the extension is present.
     pub extension_loaded_guards: FxHashSet<Arc<str>>,
 
+    /// Inside a `PHP_VERSION_ID` check that only versions newer than the target pass,
+    /// where built-in symbols those versions add aren't reported as undefined.
+    pub newer_php_guard: bool,
+
     /// Narrowed/refined types for instance-property accesses tracked through
     /// the current scope.  Key: `(object_var, prop_name)` e.g. `("this", "id")`.
     /// Set by property assignments and null-guard narrowing; read by
@@ -882,6 +886,7 @@ impl FlowState {
             property_exists_guards: FxHashSet::default(),
             reflection_throws_guards: FxHashSet::default(),
             extension_loaded_guards: FxHashSet::default(),
+            newer_php_guard: false,
             prop_refined: Arc::new(FxHashMap::default()),
             readonly_initialized: Arc::new(FxHashSet::default()),
             assigned_this_props: Arc::new(FxHashSet::default()),
@@ -896,7 +901,9 @@ impl FlowState {
     /// directly consulting `class_exists_guards` so that both guard kinds are
     /// respected uniformly.
     pub fn is_class_guarded(&self, fqcn: &str) -> bool {
-        self.class_exists_guards.contains(fqcn) || !self.extension_loaded_guards.is_empty()
+        self.class_exists_guards.contains(fqcn)
+            || !self.extension_loaded_guards.is_empty()
+            || self.newer_php_guard
     }
 
     /// True when `method_exists()` proves `method_lc` on the receiver: keyed by its
@@ -911,7 +918,9 @@ impl FlowState {
             self.method_exists_guards
                 .contains(&(key, Arc::from(method_lc)))
         };
-        receiver_key.is_some_and(guarded) || guarded(Arc::from(format!("cls:{fqcn}").as_str()))
+        self.newer_php_guard
+            || receiver_key.is_some_and(guarded)
+            || guarded(Arc::from(format!("cls:{fqcn}").as_str()))
     }
 
     /// Create a context seeded with the given parameters.
@@ -2872,6 +2881,7 @@ impl FlowState {
             .intersection(&else_ctx.extension_loaded_guards)
             .cloned()
             .collect();
+        result.newer_php_guard = if_ctx.newer_php_guard && else_ctx.newer_php_guard;
 
         // Readonly-initialized: intersection, same reasoning as the guard
         // sets above — a property written on only one branch was NOT
@@ -3501,6 +3511,7 @@ impl FlowState {
             property_exists_guards,
             reflection_throws_guards,
             extension_loaded_guards,
+            newer_php_guard,
             readonly_initialized,
             assigned_this_props,
             local_props,

@@ -1498,14 +1498,13 @@ impl CallAnalyzer {
             } else {
                 extract_expr_guard_key(&call.class, ctx, ea.db, &ea.file)
             };
-            let guarded_by_method_exists = guard_key
-                .map(|key| {
+            let guarded_by_method_exists = ctx.newer_php_guard
+                || guard_key.is_some_and(|key| {
                     ctx.method_exists_guards.contains(&(
                         key,
                         Arc::from(crate::util::php_ident_lowercase(method_name)),
                     ))
-                })
-                .unwrap_or(false);
+                });
             // The method didn't resolve, but the class itself is real
             // (`class_exists` above) — scope the posting to it directly
             // rather than the class-agnostic `methname:` bucket. The bare
