@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A variable assigned inside a property fetch's receiver or offset in the right operand of `&&` (`$n > 0 && $d[$i = $n - 1]->p > 0`, `$a && ($e = f())->p`) is defined in the truthy branch instead of `PossiblyUndefinedVariable`.
 - `print_r($v, true)` and `var_export($v, true)` are pure, since they return the dump instead of printing it.
 - `reset()` and `end()` on a property are no longer writes to it (`ImmutablePropertyModification`, `ImpurePropertyAssignment`), since they only move the internal pointer.
+- Appending to a `@psalm-readonly` (docblock) array property in its own constructor is no longer `ReadonlyPropertyAssignment`.
 
 ## [0.100.0] - 2026-11-13
 

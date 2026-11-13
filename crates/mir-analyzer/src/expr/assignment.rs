@@ -1487,9 +1487,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     &prop_name,
                                 )
                         });
+                    // A docblock-readonly property may still be built up in its own constructor.
+                    let docblock_readonly_in_constructor = !prop_def.has_native_readonly
+                        && ctx.inside_constructor
+                        && ctx
+                            .self_fqcn
+                            .as_deref()
+                            .is_some_and(|self_cls| self_cls.eq_ignore_ascii_case(owner.as_ref()));
                     if prop_def.is_readonly
                         && !dispatches_to_offset_method
                         && !unset_in_declaring_scope
+                        && !docblock_readonly_in_constructor
                     {
                         self.emit(
                             IssueKind::ReadonlyPropertyAssignment {
