@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Performance: with taint analysis on, the include graph that global-variable taint reads is built in parallel before body analysis when an analyzed file has a `global` statement or reads `$GLOBALS`, instead of serially on first use while other workers wait (WordPress at `-j 8` without cache: about 5% faster wall time, same instructions).
+
 ## [0.101.0] - 2026-11-14
 
 ### Added

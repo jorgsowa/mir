@@ -411,6 +411,22 @@ impl AnalysisSession {
 
         let _t_class_checks = _t0.elapsed();
 
+        // Global taint's include graph is otherwise built serially on first use while workers block.
+        if self.db.salsa.taint_analysis()
+            && parsed_files
+                .iter()
+                .any(|p| p.parsed.is_parsed() && crate::include_graph::may_read_globals(p.source()))
+        {
+            let db_prewarm = self.db.snapshot_db();
+            self.db
+                .salsa
+                .all_source_files()
+                .into_par_iter()
+                .for_each_with(db_prewarm, |db, sf| {
+                    crate::db::taint_sources::prewarm_included_files(db as &dyn MirDatabase, sf);
+                });
+        }
+
         let mut db_main = self.db.snapshot_db();
         // All index mutation for the body pass is done (lazy_load_missing_classes
         // + refresh ran above; lazy_load_from_body_issues runs *after* this pass

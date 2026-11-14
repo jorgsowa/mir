@@ -301,6 +301,11 @@ fn included_files(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
         .collect()
 }
 
+/// Memoizes `file`'s include targets ahead of the first [`include_group`] demand.
+pub(crate) fn prewarm_included_files(db: &dyn MirDatabase, file: SourceFile) {
+    let _ = included_files(db, file);
+}
+
 /// Include edges between workspace files: what each file includes, and who includes it.
 #[derive(PartialEq, Eq)]
 struct IncludeLinks {

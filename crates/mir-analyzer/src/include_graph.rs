@@ -74,6 +74,19 @@ pub(crate) fn may_include(text: &str) -> bool {
     has_keyword(text, "require") || has_keyword(text, "include")
 }
 
+/// Cheap pre-check for a `global $var` statement or a `$GLOBALS` read; may over-match.
+pub(crate) fn may_read_globals(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    text.contains("$GLOBALS")
+        || text.match_indices("global").any(|(at, _)| {
+            let after = &bytes[at + "global".len()..];
+            let spaces = after.iter().take_while(|b| b.is_ascii_whitespace()).count();
+            (at == 0 || !(bytes[at - 1].is_ascii_alphanumeric() || bytes[at - 1] == b'_'))
+                && spaces > 0
+                && after.get(spaces) == Some(&b'$')
+        })
+}
+
 /// `keyword` or `keyword_once` as a whole word, so `required` and `$included` don't match.
 fn has_keyword(text: &str, keyword: &str) -> bool {
     let is_word = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b >= 0x80;
@@ -418,6 +431,28 @@ mod tests {
             "éinclude",
         ] {
             assert!(!may_include(text), "{text}");
+        }
+    }
+
+    #[test]
+    fn may_read_globals_needs_a_global_statement_or_superglobal() {
+        for text in [
+            "global $wpdb;",
+            "<?php\n\tglobal\n$a, $b;",
+            "{global $x;}",
+            "return $GLOBALS['x'];",
+        ] {
+            assert!(may_read_globals(text), "{text}");
+        }
+        for text in [
+            "// a global setting",
+            "@global WP_Query $wp_query",
+            "$global = 1;",
+            "function myglobal $x",
+            "global_function($x);",
+            "$GLOBAL['x']",
+        ] {
+            assert!(!may_read_globals(text), "{text}");
         }
     }
 
