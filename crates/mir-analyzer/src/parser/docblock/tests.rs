@@ -1110,3 +1110,20 @@ fn docblock_type_keyword_match_is_case_insensitive() {
     assert!(!is_docblock_type_keyword("intx"));
     assert!(!is_docblock_type_keyword("ïnt"));
 }
+
+#[test]
+fn int_mask_expansion_matches_a_union_built_by_add_type() {
+    for members in [
+        &[1, 2, 4][..],
+        &[1, 3, 4],
+        &[0, 2],
+        &[1, 2, 4, 8, 16, 32, 64, 128],
+    ] {
+        let expanded = expand_int_mask_members(members).unwrap();
+        let mut built = mir_types::Type::empty();
+        for atomic in expanded.types.iter().cloned() {
+            built.add_type(atomic);
+        }
+        assert_eq!(expanded, built, "{members:?}");
+    }
+}

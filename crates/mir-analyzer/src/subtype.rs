@@ -804,8 +804,14 @@ fn normalize_enum_cases(db: &dyn MirDatabase, ty: &Type) -> Type {
             }
         }
         if let Atomic::TRefinedInt(mir_types::IntRefinement::MaskOf(target)) = atomic {
-            for a in int_mask_of_constants(db, target).types {
-                out.add_type(a);
+            let mask = int_mask_of_constants(db, target);
+            // The mask is already a canonical union; re-adding it to an empty one changes nothing.
+            if out.types.is_empty() {
+                out.types = mask.types;
+            } else {
+                for a in mask.types {
+                    out.add_type(a);
+                }
             }
             continue;
         }

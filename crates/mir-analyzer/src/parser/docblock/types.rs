@@ -1146,10 +1146,9 @@ pub(crate) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
             .fold(0i64, |acc, (_, &v)| acc | v);
         values.insert(value);
     }
+    // Distinct int literals never absorb each other, so `add_type` would build the same union.
     let mut u = Type::empty();
-    for v in values {
-        u.add_type(Atomic::TLiteralInt(v));
-    }
+    u.types.extend(values.into_iter().map(Atomic::TLiteralInt));
     Some(u)
 }
 

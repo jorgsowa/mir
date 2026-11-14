@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Performance: with taint analysis on, the include graph that global-variable taint reads is built in parallel before body analysis when an analyzed file has a `global` statement or reads `$GLOBALS`, instead of serially on first use while other workers wait (WordPress at `-j 8` without cache: about 5% faster wall time, same instructions).
+- Performance: checking an argument against an `int-mask-of<Cls::PREFIX_*>` parameter builds the mask's literal union in linear rather than quadratic time. SimplePie's `sanitize()` calls dominated WordPress's taint summaries, which other workers waited on (WordPress at `-j 8` without cache: about 10% faster wall time, 5% fewer instructions).
 
 ## [0.101.0] - 2026-11-14
 
