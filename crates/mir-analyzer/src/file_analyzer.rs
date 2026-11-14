@@ -546,7 +546,7 @@ impl<'a> FileAnalyzer<'a> {
             let view = self.session.db_view();
             let db = view.db();
             db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(db as &dyn crate::db::MirDatabase).clone())
+                .map(|sf| sf.contents(db as &dyn crate::db::MirDatabase).clone())
         };
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());
@@ -652,7 +652,7 @@ impl AnalysisSnapshot {
             // dead on arrival if the owner has since swapped the input.
             let text = db
                 .lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(&db as &dyn MirDatabase).clone());
+                .map(|sf| sf.contents(&db as &dyn MirDatabase).clone());
             let mut driver = BodyAnalyzer::new(&db, self.php_version());
             driver.collect_symbols = collect_symbols;
             let (issues, symbols) =

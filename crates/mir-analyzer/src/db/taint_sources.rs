@@ -111,7 +111,7 @@ pub(crate) fn file_source_facts(db: &dyn MirDatabase, file: SourceFile) -> Arc<F
     let path = Arc::clone(file.path(db));
     // Untracked: a memoized `parse_file` would pin a second AST of every callee file for the run.
     let version = crate::db::queries::db_php_version(db);
-    let text = file.text(db);
+    let text = &file.text(db);
     let parsed = db.batch_parse(&path, text, version).unwrap_or_else(|| {
         Arc::new(crate::recursion::parse_for_file(
             &path,
@@ -194,7 +194,7 @@ type GuardHelpers = Arc<FxHashMap<DeclKey, crate::taint_guard::HelperGuard>>;
 pub(crate) fn file_guard_helpers(db: &dyn MirDatabase, file: SourceFile) -> GuardHelpers {
     let path = Arc::clone(file.path(db));
     let version = crate::db::queries::db_php_version(db);
-    let text = file.text(db);
+    let text = &file.text(db);
     let parsed = db.batch_parse(&path, text, version).unwrap_or_else(|| {
         Arc::new(crate::recursion::parse_for_file(
             &path,
@@ -285,7 +285,7 @@ fn scan_top_level(scan: &mut Scan<'_>, stmts: &[php_ast::owned::Stmt]) {
 /// Files the static `require`/`include` targets of `file` name.
 #[salsa::tracked]
 fn included_files(db: &dyn MirDatabase, file: SourceFile) -> Arc<[SourceFile]> {
-    let text = file.text(db);
+    let text = &file.text(db);
     if !crate::include_graph::may_include(text) {
         return Arc::from([]);
     }

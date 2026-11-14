@@ -870,7 +870,7 @@ impl Eq for TrackedParseResult {}
 /// peak RSS. Keep the small cap — it bounds steady-state memory for free.
 #[salsa::tracked(lru = 256)]
 pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult {
-    let text = file.text(db);
+    let text = &file.text(db);
     let version = db_php_version(db);
     if let Some(parsed) = db.batch_parse(file.path(db), text, version) {
         return TrackedParseResult(parsed);
@@ -893,7 +893,7 @@ pub fn collect_file_definitions_uncached(
     file: SourceFile,
 ) -> FileDefinitions {
     let path = file.path(db);
-    let text = file.text(db);
+    let text = &file.text(db);
 
     let php_version = db_php_version(db);
 
@@ -1159,7 +1159,7 @@ pub fn db_php_version(db: &dyn MirDatabase) -> crate::php_version::PhpVersion {
 /// future parse/version changes land in one place.
 pub struct PreparedAnalysisFile<'a> {
     pub path: &'a Arc<str>,
-    pub text: &'a Arc<str>,
+    pub text: Arc<str>,
     pub parsed: &'a TrackedParseResult,
     pub php_version: crate::php_version::PhpVersion,
     pub has_hard_parse_errors: bool,

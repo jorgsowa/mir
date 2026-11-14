@@ -219,21 +219,66 @@ fn cache_epoch(php_version: u8, user_stub_fp: u64) -> u64 {
 #[derive(Debug, Clone)]
 struct CacheEntry {
     content_hash: String,
-    /// Arc-shared so `get` hands out the stored slice without deep-cloning
-    /// every Issue while holding the cache lock.
-    issues: std::sync::Arc<[Issue]>,
-    /// Reference locations recorded during body analysis. Stored so that cache
-    /// hits can replay symbol_reference_locations without re-running
-    /// analyze_bodies. Arc-shared for the same reason as `issues`.
-    reference_locations: std::sync::Arc<[CachedRefLoc]>,
     /// Digest of this file's cross-file surface (see [`surface_fingerprint`]).
     /// Dependents are evicted only when this changes between runs — a body-only
     /// edit to a declared-return callable leaves it untouched. An empty value
     /// is treated as "unknown" and conservatively cascades.
     surface_hash: String,
-    /// Class-level check issues of the class-likes this file declares; `None`
-    /// until a batch run stores them.
+    /// An LZ4-compressed [`Payload`], decoded on read: entries outlive every request.
+    payload: std::sync::Arc<[u8]>,
+}
+
+/// An entry's issues, the reference locations its hits replay instead of
+/// re-running body analysis, and the class-level check issues of the
+/// class-likes it declares (`None` until a batch run stores them).
+#[derive(Deserialize)]
+struct Payload {
+    issues: Vec<Issue>,
+    /// `(symbol, line, col_start, col_end)`, the symbol an id in [`Symbols`].
+    refs: Vec<(u32, u32, u16, u16)>,
+    class_issues: Option<Vec<Issue>>,
+}
+
+/// Borrowing counterpart of [`Payload`]; bincode encodes it identically.
+#[derive(Serialize)]
+struct PayloadView<'a> {
+    issues: &'a [Issue],
+    refs: Vec<(u32, u32, u16, u16)>,
+    class_issues: Option<&'a [Issue]>,
+}
+
+struct Decoded {
+    issues: std::sync::Arc<[Issue]>,
+    refs: std::sync::Arc<[CachedRefLoc]>,
     class_issues: Option<std::sync::Arc<[Issue]>>,
+}
+
+/// Reference symbol keys by id, one shared copy each.
+#[derive(Default)]
+struct Symbols {
+    ids: HashMap<std::sync::Arc<str>, u32>,
+    names: Vec<std::sync::Arc<str>>,
+}
+
+impl Symbols {
+    fn from_names(names: Vec<std::sync::Arc<str>>) -> Self {
+        let ids = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.clone(), i as u32))
+            .collect();
+        Self { ids, names }
+    }
+
+    fn id(&mut self, name: &std::sync::Arc<str>) -> u32 {
+        if let Some(&id) = self.ids.get(name.as_ref()) {
+            return id;
+        }
+        let id = self.names.len() as u32;
+        self.names.push(name.clone());
+        self.ids.insert(name.clone(), id);
+        id
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +295,8 @@ struct CacheFile {
     /// Kept first: `load` compares the leading 8 bytes before decoding the rest.
     _version: u64,
     strings: Vec<std::sync::Arc<str>>,
+    /// [`Symbols`] by id.
+    symbols: Vec<std::sync::Arc<str>>,
     entries: Vec<DiskEntry>,
     /// Defining file → files that depend on it.
     reverse_deps: Vec<(u32, Vec<u32>)>,
@@ -263,10 +310,8 @@ struct DiskEntry {
     path: u32,
     content_hash: String,
     surface_hash: String,
-    issues: Vec<Issue>,
-    /// `(symbol, line, col_start, col_end)`, the symbol an index into `strings`.
-    refs: Vec<(u32, u32, u16, u16)>,
-    class_issues: Option<Vec<Issue>>,
+    unresolved: bool,
+    payload: Vec<u8>,
 }
 
 /// Borrowing counterpart of [`CacheFile`] for `flush`; bincode encodes it
@@ -275,6 +320,7 @@ struct DiskEntry {
 struct CacheFileView<'a> {
     version: u64,
     strings: Vec<&'a str>,
+    symbols: &'a [std::sync::Arc<str>],
     entries: Vec<DiskEntryView<'a>>,
     reverse_deps: Vec<(u32, Vec<u32>)>,
     dep_hashes: Vec<(u32, &'a DepHash)>,
@@ -285,9 +331,8 @@ struct DiskEntryView<'a> {
     path: u32,
     content_hash: &'a str,
     surface_hash: &'a str,
-    issues: &'a [Issue],
-    refs: Vec<(u32, u32, u16, u16)>,
-    class_issues: Option<&'a [Issue]>,
+    unresolved: bool,
+    payload: &'a [u8],
 }
 
 #[derive(Default)]
@@ -431,6 +476,7 @@ pub struct AnalysisCache {
     /// maps can use 4-byte keys instead of heap-allocated path strings.
     file_id_map: Mutex<FileIdMap>,
     entries: Mutex<HashMap<FileId, CacheEntry>>,
+    symbols: Mutex<Symbols>,
     /// Entries whose diagnostics contain a workspace-resolvable missing name.
     /// Kept separately so workspace growth invalidates only this small set.
     unresolved_entries: Mutex<HashSet<FileId>>,
@@ -467,23 +513,18 @@ impl AnalysisCache {
             Some(*slot.get_or_insert_with(|| id_map.assign_or_get(&strings[index as usize])))
         };
         let mut entries: HashMap<FileId, CacheEntry> = HashMap::default();
+        let mut unresolved_entries: HashSet<FileId> = HashSet::default();
         for e in disk.entries {
             let Some(id) = file_id(e.path) else { continue };
-            let reference_locations = e
-                .refs
-                .iter()
-                .filter_map(|&(sym, line, start, end)| {
-                    Some((strings.get(sym as usize)?.clone(), line, start, end))
-                })
-                .collect();
+            if e.unresolved {
+                unresolved_entries.insert(id);
+            }
             entries.insert(
                 id,
                 CacheEntry {
                     content_hash: e.content_hash,
-                    issues: e.issues.into(),
-                    reference_locations,
                     surface_hash: e.surface_hash,
-                    class_issues: e.class_issues.map(Into::into),
+                    payload: e.payload.into(),
                 },
             );
         }
@@ -501,17 +542,11 @@ impl AnalysisCache {
             .filter_map(|(path, hash)| Some((file_id(*path)?, *hash)))
             .collect();
 
-        let unresolved_entries = entries
-            .iter()
-            .filter_map(|(&id, entry)| {
-                crate::db::issues_have_unresolved_names(&entry.issues).then_some(id)
-            })
-            .collect();
-
         Self {
             cache_dir: cache_dir.to_path_buf(),
             file_id_map: Mutex::new(id_map),
             entries: Mutex::new(entries),
+            symbols: Mutex::new(Symbols::from_names(disk.symbols)),
             unresolved_entries: Mutex::new(unresolved_entries),
             reverse_deps: Mutex::new(DepGraph {
                 dependents: reverse_deps,
@@ -538,15 +573,59 @@ impl AnalysisCache {
     /// salsa db via `MirDatabase::set_file_reference_locations` (see
     /// `AnalysisSession::warm_start_files` for the session-level replay path).
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
+        let payload = self.payload(file_path, content_hash)?;
+        let decoded = self.decode(&payload)?;
+        Some((decoded.issues, decoded.refs))
+    }
+
+    /// The payload stored for `file_path` if its entry matches `content_hash`.
+    fn payload(&self, file_path: &str, content_hash: &str) -> Option<std::sync::Arc<[u8]>> {
         let id = self.file_id_map.lock().get(file_path)?;
         let entries = self.entries.lock();
-        entries.get(&id).and_then(|e| {
-            if e.content_hash == content_hash {
-                // Arc clones: O(1) while holding the lock.
-                Some((e.issues.clone(), e.reference_locations.clone()))
-            } else {
-                None
-            }
+        let entry = entries.get(&id)?;
+        (entry.content_hash == content_hash).then(|| entry.payload.clone())
+    }
+
+    fn encode(
+        &self,
+        issues: &[Issue],
+        refs: &[CachedRefLoc],
+        class_issues: Option<&[Issue]>,
+    ) -> std::sync::Arc<[u8]> {
+        let refs = {
+            let mut symbols = self.symbols.lock();
+            refs.iter()
+                .map(|(sym, line, start, end)| (symbols.id(sym), *line, *start, *end))
+                .collect()
+        };
+        let view = PayloadView {
+            issues,
+            refs,
+            class_issues,
+        };
+        let bytes = bincode::serialize(&view).unwrap_or_default();
+        lz4_flex::block::compress_prepend_size(&bytes).into()
+    }
+
+    /// `None` for a payload that fails to decode, which callers treat as a miss.
+    fn decode(&self, payload: &[u8]) -> Option<Decoded> {
+        let bytes = lz4_flex::block::decompress_size_prepended(payload).ok()?;
+        #[allow(deprecated)]
+        let cfg = bincode::config().limit(bytes.len() as u64).clone();
+        let p: Payload = cfg.deserialize(&bytes).ok()?;
+        let refs = {
+            let symbols = self.symbols.lock();
+            p.refs
+                .iter()
+                .map(|&(sym, line, start, end)| {
+                    Some((symbols.names.get(sym as usize)?.clone(), line, start, end))
+                })
+                .collect::<Option<std::sync::Arc<[CachedRefLoc]>>>()?
+        };
+        Some(Decoded {
+            issues: p.issues.into(),
+            refs,
+            class_issues: p.class_issues.map(Into::into),
         })
     }
 
@@ -635,20 +714,19 @@ impl AnalysisCache {
         issues: std::sync::Arc<[Issue]>,
         reference_locations: std::sync::Arc<[CachedRefLoc]>,
     ) {
+        let payload = self.encode(&issues, &reference_locations, None);
         let id = self.file_id_map.lock().assign_or_get(file_path);
         let mut entries = self.entries.lock();
         entries.insert(
             id,
             CacheEntry {
                 content_hash,
-                issues,
-                reference_locations,
                 surface_hash,
-                class_issues: None,
+                payload,
             },
         );
         let mut unresolved = self.unresolved_entries.lock();
-        if crate::db::issues_have_unresolved_names(&entries[&id].issues) {
+        if crate::db::issues_have_unresolved_names(&issues) {
             unresolved.insert(id);
         } else {
             unresolved.remove(&id);
@@ -663,12 +741,8 @@ impl AnalysisCache {
         file_path: &str,
         content_hash: &str,
     ) -> Option<std::sync::Arc<[Issue]>> {
-        let id = self.file_id_map.lock().get(file_path)?;
-        let entries = self.entries.lock();
-        let entry = entries.get(&id)?;
-        (entry.content_hash == content_hash)
-            .then(|| entry.class_issues.clone())
-            .flatten()
+        let payload = self.payload(file_path, content_hash)?;
+        self.decode(&payload)?.class_issues
     }
 
     /// Attach class-level issues to the entry [`Self::put`] stored for `content_hash`.
@@ -678,12 +752,19 @@ impl AnalysisCache {
         content_hash: &str,
         issues: std::sync::Arc<[Issue]>,
     ) {
+        let Some(stored) = self.payload(file_path, content_hash) else {
+            return;
+        };
+        let Some(decoded) = self.decode(&stored) else {
+            return;
+        };
+        let payload = self.encode(&decoded.issues, &decoded.refs, Some(&issues));
         let Some(id) = self.file_id_map.lock().get(file_path) else {
             return;
         };
         if let Some(entry) = self.entries.lock().get_mut(&id) {
-            if entry.content_hash == content_hash {
-                entry.class_issues = Some(issues);
+            if std::sync::Arc::ptr_eq(&entry.payload, &stored) {
+                entry.payload = payload;
                 self.dirty.store(true, Ordering::Relaxed);
             }
         }
@@ -710,23 +791,18 @@ impl AnalysisCache {
         let entries_guard = self.entries.lock();
         let deps_guard = self.reverse_deps.lock();
 
+        let unresolved = self.unresolved_entries.lock();
+        let symbols = self.symbols.lock();
         let mut table = StringTable::default();
         let entries: Vec<DiskEntryView> = entries_guard
             .iter()
             .filter_map(|(&id, entry)| {
-                let path = table.id(id_map.path(id)?);
-                let refs = entry
-                    .reference_locations
-                    .iter()
-                    .map(|(sym, line, start, end)| (table.id(sym), *line, *start, *end))
-                    .collect();
                 Some(DiskEntryView {
-                    path,
+                    path: table.id(id_map.path(id)?),
                     content_hash: &entry.content_hash,
                     surface_hash: &entry.surface_hash,
-                    issues: &entry.issues,
-                    refs,
-                    class_issues: entry.class_issues.as_deref(),
+                    unresolved: unresolved.contains(&id),
+                    payload: &entry.payload,
                 })
             })
             .collect();
@@ -753,6 +829,7 @@ impl AnalysisCache {
         let view = CacheFileView {
             version: self.epoch,
             strings: table.strings,
+            symbols: &symbols.names,
             entries,
             reverse_deps,
             dep_hashes,
@@ -1009,33 +1086,38 @@ impl AnalysisCache {
     /// Visit every issue of the results that report a missing name, without
     /// the cache's locks held.
     pub fn for_each_unresolved_issue(&self, mut visit: impl FnMut(&Issue)) {
-        let issues: Vec<std::sync::Arc<[Issue]>> = {
+        let payloads: Vec<std::sync::Arc<[u8]>> = {
             let entries = self.entries.lock();
             let unresolved = self.unresolved_entries.lock();
             unresolved
                 .iter()
-                .filter_map(|id| entries.get(id).map(|e| e.issues.clone()))
+                .filter_map(|id| entries.get(id).map(|e| e.payload.clone()))
                 .collect()
         };
-        for issue in issues.iter().flat_map(|i| i.iter()) {
-            visit(issue);
+        for decoded in payloads.iter().filter_map(|p| self.decode(p)) {
+            decoded.issues.iter().for_each(&mut visit);
         }
     }
 
     /// Evict results with an issue matching `stale`; returns their paths.
     /// `stale` runs without the cache's locks held, so it may call back in.
     pub fn evict_unresolved_where(&self, stale: impl Fn(&Issue) -> bool) -> Vec<String> {
-        let candidates: Vec<(FileId, Option<std::sync::Arc<[Issue]>>)> = {
+        let candidates: Vec<(FileId, Option<std::sync::Arc<[u8]>>)> = {
             let entries = self.entries.lock();
             let unresolved = self.unresolved_entries.lock();
             unresolved
                 .iter()
-                .map(|id| (*id, entries.get(id).map(|e| e.issues.clone())))
+                .map(|id| (*id, entries.get(id).map(|e| e.payload.clone())))
                 .collect()
         };
         let stale_ids: Vec<FileId> = candidates
             .into_iter()
-            .filter(|(_, issues)| issues.as_ref().is_none_or(|i| i.iter().any(&stale)))
+            .filter(|(_, payload)| {
+                payload
+                    .as_ref()
+                    .and_then(|p| self.decode(p))
+                    .is_none_or(|d| d.issues.iter().any(&stale))
+            })
             .map(|(id, _)| id)
             .collect();
         let mut entries = self.entries.lock();
@@ -1082,6 +1164,7 @@ impl AnalysisCache {
         let empty = || CacheFile {
             _version: epoch,
             strings: Vec::new(),
+            symbols: Vec::new(),
             entries: Vec::new(),
             reverse_deps: Vec::new(),
             dep_hashes: Vec::new(),
@@ -1136,6 +1219,20 @@ mod tests {
     fn surface(src: &str) -> String {
         let parsed = php_rs_parser::parse(src);
         surface_fingerprint(src, &parsed.program)
+    }
+
+    #[test]
+    fn entries_share_one_copy_of_each_symbol_key() {
+        let dir = TempDir::new().unwrap();
+        let cache = make_cache(&dir);
+        let refs = |n: u32| -> std::sync::Arc<[CachedRefLoc]> {
+            [(std::sync::Arc::from("cls:App\\User"), n, 0, 4)].into()
+        };
+        cache.put("/a.php", "a".into(), String::new(), [].into(), refs(1));
+        cache.put("/b.php", "b".into(), String::new(), [].into(), refs(2));
+        let (_, a) = cache.get("/a.php", "a").expect("a stored");
+        let (_, b) = cache.get("/b.php", "b").expect("b stored");
+        assert!(std::sync::Arc::ptr_eq(&a[0].0, &b[0].0));
     }
 
     #[test]

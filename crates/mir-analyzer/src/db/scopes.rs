@@ -318,7 +318,7 @@ fn analyze_scope(
     issues: &mut Vec<Issue>,
 ) {
     let path = prepared.path;
-    let text = prepared.text;
+    let text = &prepared.text;
     let parsed = prepared.parse_result();
     match scope {
         ScopeKey::FileHeader => {
@@ -521,19 +521,37 @@ fn check_use_decls(
 /// Ref locs are concatenated unsorted; the caller (`analyze_file`)
 /// sorts + dedups for memo determinism.
 pub fn analyze_file_per_scope(db: &dyn MirDatabase, file: SourceFile) -> (Vec<Issue>, Vec<RefLoc>) {
+    merge_scopes(db, file, |key| infer_scope(db, file, key).clone())
+}
+
+/// [`analyze_file_per_scope`] without memoizing the per-scope results.
+pub(crate) fn analyze_file_per_scope_unmemoized(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+) -> (Vec<Issue>, Vec<RefLoc>) {
+    merge_scopes(db, file, |key| {
+        crate::recursion::ensure_phase_stack(|| infer_scope_body(db, file, key))
+    })
+}
+
+fn merge_scopes(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    mut infer: impl FnMut(ScopeKey) -> Arc<ScopeInferenceResult>,
+) -> (Vec<Issue>, Vec<RefLoc>) {
     let mut issues: Vec<Issue> = Vec::new();
     let mut ref_locs: Vec<RefLoc> = Vec::new();
 
-    let mut merge = |r: &ScopeInferenceResult| {
+    let mut merge = |r: Arc<ScopeInferenceResult>| {
         issues.extend(r.issues.iter().cloned());
         ref_locs.extend(r.ref_locs.iter().cloned());
     };
 
-    merge(infer_scope(db, file, ScopeKey::FileHeader));
+    merge(infer(ScopeKey::FileHeader));
     for key in file_scopes(db, file).iter() {
-        merge(infer_scope(db, file, key.clone()));
+        merge(infer(key.clone()));
     }
-    merge(infer_scope(db, file, ScopeKey::FileExec));
+    merge(infer(ScopeKey::FileExec));
 
     (issues, ref_locs)
 }

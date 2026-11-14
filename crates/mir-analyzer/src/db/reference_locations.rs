@@ -142,19 +142,33 @@ pub(crate) fn missing_name_declaring_file(
 /// reached by the change re-execute — the rest return their memoized
 /// results during the merge.
 ///
-/// `lru = 16384` bounds the memo table: hosts that background-warm the whole
-/// workspace (php-lsp's analysis warm sweep) would otherwise hold one memo
-/// per indexed file with no ceiling. The cap covers Laravel-scale workspaces
-/// fully; beyond it the least-recently-analyzed files fall back to the
-/// per-scope merge on next read.
+/// `lru = 16384` bounds the memo table for hosts that analyze many files
+/// through this query; beyond it the least-recently-analyzed files fall back
+/// to the per-scope merge on next read.
 #[salsa::tracked(lru = 16384)]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
+    analyze_file_with(db, file, true)
+}
+
+/// [`analyze_file`]'s result without leaving its memo or its scopes' memos behind.
+pub(crate) fn analyze_file_unmemoized(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+) -> Arc<AnalyzeOutput> {
+    analyze_file_with(db, file, false)
+}
+
+fn analyze_file_with(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    memoize_scopes: bool,
+) -> Arc<AnalyzeOutput> {
     db.note_work(super::Work::FileAnalysis, 1);
     let prepared = super::queries::prepare_analysis_file(db, file);
     let parsed = prepared.parse_result();
     let mut issues: Vec<Issue> = crate::parser::parse_error_issues(
         prepared.path,
-        prepared.text,
+        &prepared.text,
         parsed,
         crate::db::db_php_version(db),
     );
@@ -162,7 +176,11 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
     // Run full analysis unless there are hard parse errors.
     let mut ref_locs: Vec<RefLoc> = Vec::new();
     if !prepared.has_hard_parse_errors {
-        let (scope_issues, scope_refs) = super::scopes::analyze_file_per_scope(db, file);
+        let (scope_issues, scope_refs) = if memoize_scopes {
+            super::scopes::analyze_file_per_scope(db, file)
+        } else {
+            super::scopes::analyze_file_per_scope_unmemoized(db, file)
+        };
         issues.extend(scope_issues);
 
         // The shared reference index is intentionally NOT mutated from

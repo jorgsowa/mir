@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `SourceText`, the stored form of a `SourceFile`'s text, plain (`SourceText::new`) or LZ4-compressed (`SourceText::compressed`), with `AnalysisSession::upsert_source_text` and `AnalysisSession::warm_start_sources` for hosts that build it off the session lock.
+- `AnalysisSession::with_compressed_sources` keeps every stored source text LZ4-compressed (files under 512 bytes stay plain), decompressed on read. Off by default, since a one-shot run reads each text many times. In php-lsp on Symfony (17,400 files) it cuts memory by about 75 MB after a first start and 80 MB after a restart, for under 1 s more CPU per start.
+
 ### Changed
 
+- `SourceFile`'s salsa field is now `contents: SourceText`: `SourceFile::text(db)` still returns the text, and `SourceFile::new`/`set_contents` take a `SourceText` (`SourceText::from` an `Arc<str>` or `&str`).
+- Performance: analysis-cache entries are held LZ4-compressed and decoded on read, with one shared table of reference symbols; `cache.bin` stores them the same way, so it loads and flushes without re-encoding entries. On Symfony the cache file drops from 13 MB to 8 MB, and php-lsp's memory after a first start drops by about 205 MB together with the next entry. The cache from an earlier mir build is discarded.
+- Performance: a warm pass over files with an analysis cache (`AnalysisSnapshot::warm_files`) no longer keeps each file's `analyze_file` and `infer_scope` memos, which only an edit's re-analysis reads.
 - A call argument that violates the `@template T of Bound` of the parameter it is passed to (a parameter typed `T` itself) is reported under the argument kinds, as Psalm does, instead of `InvalidTemplateParam`: `ArgumentTypeCoercion` when the value is wider than the bound and may still fit (a runtime `string` for `T of literal-string|int`, a `Node` for `T of Element`), `InvalidArgument` otherwise. A template nested in the parameter type (`array<T>`, `class-string<T>`) is still `InvalidTemplateParam`.
 
 ### Fixed

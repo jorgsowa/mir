@@ -6,7 +6,7 @@ use super::*;
 struct WarmStartHit {
     file: Arc<str>,
     sf: crate::db::SourceFile,
-    stored_text: Arc<str>,
+    stored_text: crate::db::SourceText,
     /// `(reference locations, resolved, their digest)` from a cached `AnalysisCache` hit.
     refs: Option<(Vec<RefLoc>, bool, super::index_state::PostingDigest)>,
     /// `(subtype edges, declarations, structural symbols)` from a cached stub-slice hit.
@@ -102,18 +102,40 @@ impl AnalysisSession {
         text: Arc<str>,
         durability: salsa::Durability,
     ) -> crate::db::SourceFile {
+        let contents = {
+            let db = &self.db.salsa;
+            match db.lookup_source_file(path.as_ref()) {
+                Some(sf) if sf.contents(db).matches(&text) => sf.contents(db).clone(),
+                _ => db.pack_source(text),
+            }
+        };
+        self.upsert_source_text(path, contents, durability)
+    }
+
+    /// [`Self::upsert_source_file`] for text the caller already packed, e.g. off the session lock.
+    #[doc(hidden)]
+    pub fn upsert_source_text(
+        &mut self,
+        path: Arc<str>,
+        text: crate::db::SourceText,
+        durability: salsa::Durability,
+    ) -> crate::db::SourceFile {
         self.index.clear_transient_batch_replay();
         let (sf, changed, was_registered, had_index) = {
             let db = &mut self.db.salsa;
             let had_index = db.workspace_symbol_index_singleton().is_some();
             let existing = db.lookup_source_file(path.as_ref());
-            let changed = existing.is_none_or(|sf| sf.text(db).as_ref() != text.as_ref());
-            let sf = db.upsert_source_file_with_durability(path.clone(), text.clone(), durability);
+            let changed = existing.is_none_or(|sf| *sf.contents(db) != text);
+            let sf = db.upsert_source_text(path.clone(), text.clone(), durability);
             (sf, changed, existing.is_some(), had_index)
         };
         if changed {
             self.index.clear_dependency_graph_cache();
-            let new_content = self.evict_for_new_content(&path, &text, was_registered);
+            let new_content = self.evict_for_new_content(
+                &path,
+                &crate::cache::digest_hex(text.digest()),
+                was_registered,
+            );
             if new_content && !had_index {
                 self.evict_unresolved_declared_by(&[path.to_string()]);
             }
@@ -123,11 +145,16 @@ impl AnalysisSession {
     }
 
     /// Evict what depends on `path` unless the cache knows `text`; returns whether it was new.
-    fn evict_for_new_content(&self, path: &Arc<str>, text: &str, was_registered: bool) -> bool {
+    fn evict_for_new_content(
+        &self,
+        path: &Arc<str>,
+        content_hex: &str,
+        was_registered: bool,
+    ) -> bool {
         let Some(cache) = self.cache.as_deref() else {
             return false;
         };
-        let unchanged = cache.observe_dependency(path, text);
+        let unchanged = cache.observe_content(path, content_hex);
         let new_content = was_registered || !unchanged;
         if new_content {
             self.invalidate_dependents(&[path.to_string()], true);
@@ -152,7 +179,7 @@ impl AnalysisSession {
         let db = &self.db.salsa;
         for path in db.take_unobserved_on_demand_files() {
             if let Some(sf) = db.lookup_source_file(&path) {
-                self.record_read_content(&path, sf.text(db));
+                self.record_read_content(&path, &sf.text(db));
             }
         }
     }
@@ -313,7 +340,7 @@ impl AnalysisSession {
                 .expect("collect_and_ingest_file must register SourceFile");
             (
                 crate::db::decls_from_slice(&file_defs.slice, sf),
-                sf.text(&self.db.salsa).clone(),
+                sf.contents(&self.db.salsa).clone(),
             )
         };
 
@@ -467,13 +494,17 @@ impl AnalysisSession {
             let db = &mut self.db.salsa;
             let index_was_initialized = db.workspace_symbol_index_singleton().is_some();
             let existing = db.lookup_source_file(file.as_ref());
-            let changed = existing.is_none_or(|sf| sf.text(db).as_ref() != source.as_ref());
+            let changed = existing.is_none_or(|sf| !sf.contents(db).matches(&source));
             db.upsert_source_file(file.clone(), source.clone());
             (changed, existing.is_some(), index_was_initialized)
         };
         self.index.clear_dependency_graph_cache();
         if changed {
-            let new_content = self.evict_for_new_content(&file, &source, was_registered);
+            let new_content = self.evict_for_new_content(
+                &file,
+                &crate::cache::hash_content(&source),
+                was_registered,
+            );
             if new_content && !index_was_initialized {
                 self.evict_unresolved_declared_by(&[file.to_string()]);
             }
@@ -503,7 +534,7 @@ impl AnalysisSession {
             let mut changed_inputs = Vec::new();
             for (file, source) in files {
                 let existing = db.lookup_source_file(file.as_ref());
-                if existing.is_none_or(|sf| sf.text(db).as_ref() != source.as_ref()) {
+                if existing.is_none_or(|sf| !sf.contents(db).matches(&source)) {
                     changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
                 }
                 db.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
@@ -574,7 +605,7 @@ impl AnalysisSession {
             let mut changed = Vec::new();
             for (file, source) in files {
                 let existing = db.lookup_source_file(file.as_ref());
-                if existing.is_none_or(|sf| sf.text(db).as_ref() != source.as_ref()) {
+                if existing.is_none_or(|sf| !sf.contents(db).matches(&source)) {
                     changed.push((file.clone(), source.clone(), existing.is_some()));
                 }
                 db.upsert_source_file(file.clone(), source);
@@ -664,7 +695,7 @@ impl AnalysisSession {
                 .iter()
                 .map(|(file, source)| {
                     let existing = db.lookup_source_file(file.as_ref());
-                    if existing.is_none_or(|sf| sf.text(db).as_ref() != source.as_ref()) {
+                    if existing.is_none_or(|sf| !sf.contents(db).matches(source)) {
                         changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
                     }
                     db.upsert_source_file_with_durability(
@@ -850,6 +881,18 @@ impl AnalysisSession {
     /// query — it cannot eliminate the freshness check itself, since an
     /// unresolved posting is workspace-generation-sensitive by design.
     pub fn warm_start_files(&mut self, files: &[(Arc<str>, Arc<str>)]) -> Vec<Arc<str>> {
+        let sources: Vec<(Arc<str>, crate::db::SourceText)> = files
+            .iter()
+            .map(|(file, text)| (file.clone(), self.db.salsa.pack_source(text.clone())))
+            .collect();
+        self.warm_start_sources(&sources)
+    }
+
+    /// [`Self::warm_start_files`] for texts the caller already packed.
+    pub fn warm_start_sources(
+        &mut self,
+        files: &[(Arc<str>, crate::db::SourceText)],
+    ) -> Vec<Arc<str>> {
         let Some(cache) = self.cache.clone() else {
             return Vec::new();
         };
@@ -870,14 +913,10 @@ impl AnalysisSession {
             let mut changed_inputs = Vec::new();
             for (file, text) in files {
                 let existing = db.lookup_source_file(file.as_ref());
-                if existing.is_none_or(|sf| sf.text(db).as_ref() != text.as_ref()) {
-                    changed_inputs.push((file.clone(), text.clone(), existing.is_some()));
+                if existing.is_none_or(|sf| *sf.contents(db) != *text) {
+                    changed_inputs.push((file.clone(), text.text(), existing.is_some()));
                 }
-                db.upsert_source_file_with_durability(
-                    file.clone(),
-                    text.clone(),
-                    salsa::Durability::HIGH,
-                );
+                db.upsert_source_text(file.clone(), text.clone(), salsa::Durability::HIGH);
             }
             changed_inputs
         };
@@ -903,10 +942,10 @@ impl AnalysisSession {
                     // `ingest_file`), so read back what's really there rather
                     // than assume identity with the file's own `text`.
                     let sf = db.lookup_source_file(file.as_ref())?;
-                    let stored_text = sf.text(db).clone();
+                    let stored_text = sf.contents(db).clone();
 
                     // Both caches key on the same BLAKE3 content digest.
-                    let hash = crate::stub_cache::hash_source(&stored_text);
+                    let hash = *stored_text.digest();
                     let hex = crate::cache::digest_hex(&hash);
                     let refs = cache.get(file, &hex).map(|(issues, ref_locs)| {
                         let locs: Vec<RefLoc> = ref_locs
@@ -955,7 +994,7 @@ impl AnalysisSession {
             Vec::with_capacity(hits.len());
         let mut replayed: Vec<(
             crate::db::SourceFile,
-            Arc<str>,
+            crate::db::SourceText,
             bool,
             super::index_state::PostingDigest,
         )> = Vec::new();

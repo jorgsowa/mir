@@ -203,7 +203,7 @@ impl AnalysisSession {
             let Some(sf) = db.lookup_source_file(path.as_ref()) else {
                 return true;
             };
-            let text = sf.text(db as &dyn crate::db::MirDatabase).clone();
+            let text = sf.contents(db as &dyn crate::db::MirDatabase).clone();
             if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
                 return true;
             }
@@ -249,11 +249,13 @@ impl AnalysisSession {
             let with_resolver = self.resolver.is_some();
             let view = self.db_view();
             // Unknown and already-prepared files take the single-file path below.
-            let pending: Vec<Option<(crate::db::SourceFile, std::sync::Arc<str>)>> = paths
+            let pending: Vec<Option<(crate::db::SourceFile, crate::db::SourceText)>> = paths
                 .iter()
                 .map(|path| {
                     let sf = view.db().lookup_source_file(path.as_ref())?;
-                    let text = sf.text(view.db() as &dyn crate::db::MirDatabase).clone();
+                    let text = sf
+                        .contents(view.db() as &dyn crate::db::MirDatabase)
+                        .clone();
                     (!self.is_prepared_for_analysis(path.as_ref(), &text, generation))
                         .then_some((sf, text))
                 })
@@ -313,9 +315,9 @@ impl AnalysisSession {
             let view = self.db_view();
             let db = view.db();
             db.lookup_source_file(plan.path.as_ref())
-                .map(|sf| sf.text(db as &dyn crate::db::MirDatabase).clone())
+                .map(|sf| sf.contents(db as &dyn crate::db::MirDatabase).clone())
         };
-        if !current_text.is_some_and(|text| std::sync::Arc::ptr_eq(&text, &plan.text)) {
+        if !current_text.is_some_and(|text| text.same(&plan.text)) {
             return self.prepare_file_for_analysis_cancellable(&plan.path, should_cancel);
         }
         if self.is_prepared_for_analysis(plan.path.as_ref(), &plan.text, generation) {
@@ -369,13 +371,13 @@ impl AnalysisSession {
     pub(crate) fn is_prepared_for_analysis(
         &self,
         file: &str,
-        current_text: &std::sync::Arc<str>,
+        current_text: &crate::db::SourceText,
         generation: u64,
     ) -> bool {
         self.prepared_files
             .get(file)
             .is_some_and(|(text, prepared_gen)| {
-                *prepared_gen == generation && std::sync::Arc::ptr_eq(text, current_text)
+                *prepared_gen == generation && text.same(current_text)
             })
     }
 
@@ -385,7 +387,7 @@ impl AnalysisSession {
     pub(crate) fn mark_prepared_for_analysis(
         &mut self,
         file: &std::sync::Arc<str>,
-        text: std::sync::Arc<str>,
+        text: crate::db::SourceText,
         generation: u64,
     ) {
         self.prepared_files.insert(file.clone(), (text, generation));
@@ -449,7 +451,7 @@ impl AnalysisSession {
 /// so it can be computed on a read snapshot ahead of the serial loads.
 struct PreparePlan {
     path: std::sync::Arc<str>,
-    text: std::sync::Arc<str>,
+    text: crate::db::SourceText,
     stub_paths: Vec<&'static str>,
     classes: Vec<crate::db::NameResolution>,
 }
@@ -457,7 +459,7 @@ struct PreparePlan {
 fn plan_prepare(
     db: &crate::db::MirDbStorage,
     path: &std::sync::Arc<str>,
-    text: std::sync::Arc<str>,
+    text: crate::db::SourceText,
     sf: crate::db::SourceFile,
     stubs_pending: bool,
     with_resolver: bool,

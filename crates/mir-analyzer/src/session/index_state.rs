@@ -16,7 +16,7 @@ use parking_lot::{Mutex, MutexGuard, RwLock};
 use salsa::Cancelled;
 
 use crate::cache::AnalysisCache;
-use crate::db::{FileSlab, MirDatabase, MirDbStorage, SourceFile};
+use crate::db::{FileSlab, MirDatabase, MirDbStorage, SourceFile, SourceText};
 
 use super::BatchReplayState;
 
@@ -36,7 +36,7 @@ pub(crate) struct IndexState {
     /// file → source text its subtype-index class edges were last committed
     /// from. Definitions depend only on the file's own text, so a
     /// pointer-equal entry is always exact (no cross-file drift).
-    defs_committed: FileSlab<Arc<str>>,
+    defs_committed: FileSlab<SourceText>,
     /// Memoized `indexed_references_to` results. Without this, a repeat
     /// query against an unchanged candidate set re-pays the O(candidates)
     /// freshness scan on every call — measured at tens of MB / seconds of
@@ -136,9 +136,8 @@ impl Default for IndexState {
 
 /// One file's reference-posting commit. See `IndexState::ref_committed`.
 struct RefCommit {
-    /// Source text the postings were computed from (pointer identity; a
-    /// text write self-invalidates).
-    text: Arc<str>,
+    /// Source version the postings were computed from (a text write self-invalidates).
+    text: SourceText,
     /// Weak handle on the analyze memo — pointer-identical output means
     /// identical postings, so sweeps can skip the index rewrite. The upgrade
     /// guards against ABA on evicted memos.
@@ -294,12 +293,12 @@ impl IndexState {
     pub(crate) fn ref_freshness(
         &self,
         file: SourceFile,
-        current_text: &Arc<str>,
+        current_text: &SourceText,
         current_gen: u64,
     ) -> RefFreshness {
         self.ref_committed
             .read(file, |c| {
-                let same_text = Arc::ptr_eq(&c.text, current_text);
+                let same_text = c.text.same(current_text);
                 if same_text && (c.resolved || c.generation == current_gen) {
                     RefFreshness::Fresh
                 } else if same_text && c.live_analyzed {
@@ -318,12 +317,12 @@ impl IndexState {
     pub(crate) fn ref_commit_is_current(
         &self,
         file: SourceFile,
-        current_text: &Arc<str>,
+        current_text: &SourceText,
         out: &Arc<crate::db::AnalyzeOutput>,
     ) -> bool {
         self.ref_committed
             .read(file, |c| {
-                Arc::ptr_eq(&c.text, current_text)
+                c.text.same(current_text)
                     && c.out.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
             })
             .unwrap_or(false)
@@ -334,12 +333,11 @@ impl IndexState {
     fn replayed_postings(
         &self,
         file: SourceFile,
-        current_text: &Arc<str>,
+        current_text: &SourceText,
     ) -> Option<PostingDigest> {
         self.ref_committed
             .read(file, |c| {
-                c.replayed_postings
-                    .filter(|_| Arc::ptr_eq(&c.text, current_text))
+                c.replayed_postings.filter(|_| c.text.same(current_text))
             })
             .flatten()
     }
@@ -367,7 +365,7 @@ impl IndexState {
     pub(crate) fn mark_ref_replayed(
         &self,
         file: SourceFile,
-        text: &Arc<str>,
+        text: &SourceText,
         generation: u64,
         resolved: bool,
         postings: PostingDigest,
@@ -393,7 +391,7 @@ impl IndexState {
     pub(crate) fn mark_ref_committed(
         &self,
         file: SourceFile,
-        text: &Arc<str>,
+        text: &SourceText,
         out: Option<&Arc<crate::db::AnalyzeOutput>>,
         generation: u64,
         resolved: bool,
@@ -432,9 +430,9 @@ impl IndexState {
 
     /// Whether `file`'s subtype-index class edges were committed from exactly
     /// `current_text`.
-    pub(crate) fn is_defs_committed(&self, file: SourceFile, current_text: &Arc<str>) -> bool {
+    pub(crate) fn is_defs_committed(&self, file: SourceFile, current_text: &SourceText) -> bool {
         self.defs_committed
-            .read(file, |t| Arc::ptr_eq(t, current_text))
+            .read(file, |t| t.same(current_text))
             .unwrap_or(false)
     }
 
@@ -442,11 +440,11 @@ impl IndexState {
     pub(crate) fn defs_freshness(
         &self,
         file: SourceFile,
-        current_text: &Arc<str>,
+        current_text: &SourceText,
     ) -> DefsFreshness {
         self.defs_committed
             .read(file, |t| {
-                if Arc::ptr_eq(t, current_text) {
+                if t.same(current_text) {
                     DefsFreshness::Fresh
                 } else {
                     DefsFreshness::Stale
@@ -455,7 +453,7 @@ impl IndexState {
             .unwrap_or(DefsFreshness::Uncommitted)
     }
 
-    pub(crate) fn mark_defs_committed(&self, file: SourceFile, text: &Arc<str>) {
+    pub(crate) fn mark_defs_committed(&self, file: SourceFile, text: &SourceText) {
         self.defs_committed.set(file, text.clone());
     }
 
@@ -523,7 +521,7 @@ impl IndexState {
         db: &MirDbStorage,
         cache: Option<&AnalysisCache>,
         file: &Arc<str>,
-        text: Option<Arc<str>>,
+        text: Option<SourceText>,
         locs: Vec<crate::db::RefLoc>,
         resolved: bool,
         stamp: ViewStamp,
@@ -546,19 +544,23 @@ impl IndexState {
         Ok(())
     }
 
-    /// Analyze `path` via the memoized `analyze_file` query and stage
-    /// everything [`Self::commit_analyzed`] writes for it. Pure: safe on a
-    /// parallel pass snapshot.
+    /// Analyze `path` and stage everything [`Self::commit_analyzed`] writes
+    /// for it. Pure: safe on a parallel pass snapshot.
     pub(crate) fn stage_analyzed(
         &self,
         db: &MirDbStorage,
         cache: Option<&AnalysisCache>,
         mention_scanner: Option<&crate::db::class_mention_index::MentionScanner>,
         path: &Arc<str>,
+        memoize: bool,
     ) -> Option<AnalyzedFile> {
         let sf = db.lookup_source_file(path.as_ref())?;
-        let text = sf.text(db as &dyn MirDatabase).clone();
-        let out = crate::db::analyze_file(db as &dyn MirDatabase, sf).clone();
+        let text = sf.contents(db as &dyn MirDatabase).clone();
+        let out = if memoize {
+            crate::db::analyze_file(db as &dyn MirDatabase, sf).clone()
+        } else {
+            crate::db::analyze_file_unmemoized(db as &dyn MirDatabase, sf)
+        };
         let defs = crate::db::collect_file_definitions(db as &dyn MirDatabase, sf);
         let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
         let current = self.ref_commit_is_current(sf, &text, &out);
@@ -580,7 +582,8 @@ impl IndexState {
         // Mention scan piggybacks on the analysis pass, skipped when the file
         // already holds a current scan.
         let mentions = mention_scanner.and_then(|s| {
-            (!db.class_mentions_current(path.as_ref(), &text, s.epoch())).then(|| s.scan(&text))
+            (!db.class_mentions_current(path.as_ref(), &text, s.epoch()))
+                .then(|| s.scan(&text.text()))
         });
         Some(AnalyzedFile {
             file: path.clone(),
@@ -597,7 +600,7 @@ impl IndexState {
 
     /// [`Self::stage_analyzed`], or with `fresh_at` set, only what a file
     /// whose postings are [`RefFreshness::Fresh`] at that generation still
-    /// lacks: its class edges and mention scan.
+    /// lacks: its class edges and mention scan. With `fresh_at` set, analysis leaves no memos.
     pub(crate) fn stage_warm_file(
         &self,
         db: &MirDbStorage,
@@ -608,7 +611,7 @@ impl IndexState {
     ) -> Option<StagedFile> {
         if let Some(generation) = fresh_at {
             let sf = db.lookup_source_file(path.as_ref())?;
-            let text = sf.text(db as &dyn MirDatabase).clone();
+            let text = sf.contents(db as &dyn MirDatabase).clone();
             if self.ref_freshness(sf, &text, generation) == RefFreshness::Fresh {
                 let entries = (!self.is_defs_committed(sf, &text)).then(|| {
                     let defs = crate::db::collect_file_definitions(db as &dyn MirDatabase, sf);
@@ -616,7 +619,7 @@ impl IndexState {
                 });
                 let mentions = mention_scanner.and_then(|s| {
                     (!db.class_mentions_current(path.as_ref(), &text, s.epoch()))
-                        .then(|| s.scan(&text))
+                        .then(|| s.scan(&text.text()))
                 });
                 return Some(StagedFile::Fresh(FreshFile {
                     file: path.clone(),
@@ -627,7 +630,7 @@ impl IndexState {
                 }));
             }
         }
-        self.stage_analyzed(db, cache, mention_scanner, path)
+        self.stage_analyzed(db, cache, mention_scanner, path, fresh_at.is_none())
             .map(StagedFile::Analyzed)
     }
 
@@ -741,7 +744,7 @@ impl IndexState {
         &self,
         db: &MirDbStorage,
         file: &Arc<str>,
-        text: &Arc<str>,
+        text: &SourceText,
         entries: Vec<crate::db::SubtypeEntry>,
         epoch: RetireEpoch,
     ) -> Result<(), Cancelled> {
@@ -763,7 +766,7 @@ impl IndexState {
 pub(crate) struct AnalyzedFile {
     pub(crate) file: Arc<str>,
     sf: SourceFile,
-    text: Arc<str>,
+    text: SourceText,
     pub(crate) out: Arc<crate::db::AnalyzeOutput>,
     entries: Vec<crate::db::SubtypeEntry>,
     cache_put: Option<RefCachePut>,
@@ -784,7 +787,7 @@ pub(crate) enum StagedFile {
 pub(crate) struct FreshFile {
     file: Arc<str>,
     sf: SourceFile,
-    text: Arc<str>,
+    text: SourceText,
     entries: Option<Vec<crate::db::SubtypeEntry>>,
     mentions: Option<crate::db::FileScan>,
 }
@@ -804,15 +807,15 @@ fn stage_ref_cache_put(
     db: &dyn MirDatabase,
     sf: crate::db::SourceFile,
     file: &str,
-    text: &Arc<str>,
+    text: &SourceText,
     out: &Arc<crate::db::AnalyzeOutput>,
 ) -> Option<RefCachePut> {
-    let content_hash = crate::cache::hash_content(text);
+    let content_hash = crate::cache::digest_hex(text.digest());
     if cache.is_valid(file, &content_hash) {
         return None;
     }
     let parsed = crate::db::parse_file(db, sf);
-    let surface_hash = crate::cache::surface_fingerprint(text, &parsed.0.program);
+    let surface_hash = crate::cache::surface_fingerprint(&text.text(), &parsed.0.program);
     let ref_locs: Arc<[crate::cache::CachedRefLoc]> = out
         .ref_locs
         .iter()

@@ -16,16 +16,43 @@ mod tests {
     #[test]
     fn source_file_input_roundtrip() {
         let db = MirDbStorage::default();
-        let file = SourceFile::new(&db, Arc::from("/tmp/test.php"), Arc::from("<?php echo 1;"));
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/test.php"),
+            crate::db::SourceText::from("<?php echo 1;"),
+        );
         assert_eq!(file.path(&db).as_ref(), "/tmp/test.php");
         assert_eq!(file.text(&db).as_ref(), "<?php echo 1;");
     }
 
     #[test]
+    fn sources_are_stored_plain_unless_compression_is_enabled() {
+        let text: Arc<str> = Arc::from("<?php\nfunction f(): int { return 1; }\n".repeat(32));
+        let mut db = MirDbStorage::default();
+        let plain = db.upsert_source_file(Arc::from("/tmp/plain.php"), text.clone());
+        assert!(plain
+            .contents(&db)
+            .as_plain()
+            .is_some_and(|t| Arc::ptr_eq(t, &text)));
+
+        db.set_compress_sources(true);
+        let packed = db.upsert_source_file(Arc::from("/tmp/packed.php"), text.clone());
+        assert!(packed.contents(&db).is_compressed());
+        assert_eq!(packed.text(&db), text);
+
+        let before = plain.contents(&db).clone();
+        db.upsert_source_file(Arc::from("/tmp/plain.php"), text.clone());
+        assert!(
+            plain.contents(&db).same(&before),
+            "re-upserting equal text keeps the stored version"
+        );
+    }
+
+    #[test]
     fn collect_file_definitions_basic() {
         let db = MirDbStorage::default();
-        let src = Arc::from("<?php class Foo {}");
-        let file = SourceFile::new(&db, Arc::from("/tmp/foo.php"), src);
+        let src: Arc<str> = Arc::from("<?php class Foo {}");
+        let file = SourceFile::new(&db, Arc::from("/tmp/foo.php"), src.into());
         let defs = collect_file_definitions(&db, file);
         assert!(defs.issues.is_empty());
         assert_eq!(defs.slice.classes.len(), 1);
@@ -38,7 +65,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/memo.php"),
-            Arc::from("<?php class Bar {}"),
+            crate::db::SourceText::from("<?php class Bar {}"),
         );
 
         let defs1 = collect_file_definitions(&db, file);
@@ -55,7 +82,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/parse_err.php"),
-            Arc::from("<?php $x = \"unterminated"),
+            crate::db::SourceText::from("<?php $x = \"unterminated"),
         );
         let out = analyze_file(&db, file);
         assert!(
@@ -74,7 +101,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/clean.php"),
-            Arc::from("<?php class Foo {}"),
+            crate::db::SourceText::from("<?php class Foo {}"),
         );
         let out = analyze_file(&db, file);
         assert!(out.issues.is_empty());
@@ -87,7 +114,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/analyze_memo.php"),
-            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+            crate::db::SourceText::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let o1 = analyze_file(&db, file);
         let o2 = analyze_file(&db, file);
@@ -104,17 +131,17 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/target.php"),
-            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+            crate::db::SourceText::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let other = SourceFile::new(
             &db,
             Arc::from("/tmp/other.php"),
-            Arc::from("<?php function bar(): int { return 1; }"),
+            crate::db::SourceText::from("<?php function bar(): int { return 1; }"),
         );
         let o1 = analyze_file(&db, file).clone();
-        other
-            .set_text(&mut db)
-            .to(Arc::from("<?php function bar(): int { return 2; }"));
+        other.set_contents(&mut db).to(crate::db::SourceText::from(
+            "<?php function bar(): int { return 2; }",
+        ));
         let o2 = analyze_file(&db, file);
         assert!(
             Arc::ptr_eq(&o1, o2),
@@ -131,7 +158,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/cross_clone.php"),
-            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+            crate::db::SourceText::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let worker = db.clone();
         let o1 = std::thread::scope(|s| {
@@ -152,7 +179,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/version_dep.php"),
-            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+            crate::db::SourceText::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let o1 = analyze_file(&db, file).clone();
         let mut db = db;
@@ -175,9 +202,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/scopes.php"),
-            Arc::from(
-                "<?php function foo(): string { return \"x\"; }\nclass Bar { public function m(): int { return 1; } }",
-            ),
+            crate::db::SourceText::from("<?php function foo(): string { return \"x\"; }\nclass Bar { public function m(): int { return 1; } }"),
         );
         let scopes = file_scopes(&db, file);
         assert_eq!(scopes.len(), 2, "expected fn + class scopes: {scopes:?}");
@@ -198,7 +223,9 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_scope_symbol_free.php"),
-            Arc::from("<?php function foo(Dep $dep): Dep { return $dep; }\nclass Dep {}"),
+            crate::db::SourceText::from(
+                "<?php function foo(Dep $dep): Dep { return $dep; }\nclass Dep {}",
+            ),
         );
         let scopes = file_scopes(&db, file);
         assert!(!scopes.is_empty(), "expected at least one scope to analyze");
@@ -223,9 +250,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_file_types.php"),
-            Arc::from(
-                "<?php\nclass Base { public function id(): int { return 1; } }\nfunction helper(): int { return 1; }\n",
-            ),
+            crate::db::SourceText::from("<?php\nclass Base { public function id(): int { return 1; } }\nfunction helper(): int { return 1; }\n"),
         );
 
         let inferred = infer_file_return_types(&db, file);
@@ -255,9 +280,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_member.php"),
-            Arc::from(
-                "<?php\nclass Pair { public function first() { return 1; } public function Second() { return 'b'; } }\n",
-            ),
+            crate::db::SourceText::from("<?php\nclass Pair { public function first() { return 1; } public function Second() { return 'b'; } }\n"),
         );
         let _ = collect_file_definitions(&db, file);
         let scope = ScopeKey::ClassLike(Arc::from("Pair"), 0);
@@ -312,7 +335,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_existing.php"),
-            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+            crate::db::SourceText::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let _ = collect_file_definitions(&db, file);
         let result = infer_function(&db, file, Arc::from("foo"));
@@ -330,7 +353,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_unknown.php"),
-            Arc::from("<?php function foo(): void {}"),
+            crate::db::SourceText::from("<?php function foo(): void {}"),
         );
         let _ = collect_file_definitions(&db, file);
         let result = infer_function(&db, file, Arc::from("not_a_fn"));
@@ -343,7 +366,7 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_memo.php"),
-            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+            crate::db::SourceText::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let _ = collect_file_definitions(&db, file);
         let r1 = infer_function(&db, file, Arc::from("foo")).clone().unwrap();
@@ -360,7 +383,9 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_symbol_free.php"),
-            Arc::from("<?php function foo(Dep $dep): Dep { return $dep; } class Dep {}"),
+            crate::db::SourceText::from(
+                "<?php function foo(Dep $dep): Dep { return $dep; } class Dep {}",
+            ),
         );
         let _ = collect_file_definitions(&db, file);
 
@@ -381,12 +406,13 @@ mod tests {
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/memo2.php"),
-            Arc::from("<?php class Foo {}"),
+            crate::db::SourceText::from("<?php class Foo {}"),
         );
 
         let defs1 = collect_file_definitions(&db, file).clone();
-        file.set_text(&mut db)
-            .to(Arc::from("<?php class Foo {} class Bar {}"));
+        file.set_contents(&mut db).to(crate::db::SourceText::from(
+            "<?php class Foo {} class Bar {}",
+        ));
         let defs2 = collect_file_definitions(&db, file);
 
         assert!(

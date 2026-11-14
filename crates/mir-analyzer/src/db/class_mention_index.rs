@@ -194,8 +194,8 @@ impl MentionScanner {
 
 /// One file's recorded mention set.
 struct FileMentions {
-    /// Text the scan ran against (`Arc` identity; an edit self-invalidates).
-    text: Arc<str>,
+    /// Source version the scan ran against (an edit self-invalidates).
+    text: crate::db::SourceText,
     /// Scanner epoch of the scan: definitive for pattern needles added at or before it.
     epoch: u64,
     scan: FileScan,
@@ -393,10 +393,10 @@ impl ClassMentionIndex {
         &self,
         file: crate::db::FileNo,
         q: &MentionQuery,
-        current_text: &Arc<str>,
+        current_text: &crate::db::SourceText,
     ) -> Option<bool> {
         let e = self.by_file.get(&file)?;
-        if !Arc::ptr_eq(&e.text, current_text) {
+        if !e.text.same(current_text) {
             return None;
         }
         if q.word.is_none() && e.epoch < q.added_epoch {
@@ -411,19 +411,30 @@ impl ClassMentionIndex {
 
     /// Whether `file` already holds a scan of exactly `text` at `epoch` or
     /// newer (used by analyze sweeps to skip redundant rescans).
-    pub fn is_current(&self, file: crate::db::FileNo, text: &Arc<str>, epoch: u64) -> bool {
+    pub fn is_current(
+        &self,
+        file: crate::db::FileNo,
+        text: &crate::db::SourceText,
+        epoch: u64,
+    ) -> bool {
         self.by_file
             .get(&file)
-            .is_some_and(|e| Arc::ptr_eq(&e.text, text) && e.epoch >= epoch)
+            .is_some_and(|e| e.text.same(text) && e.epoch >= epoch)
     }
 
     /// Record a scan result. Never downgrades a same-text entry from a newer
     /// epoch.
-    pub fn set_file(&self, file: crate::db::FileNo, text: Arc<str>, epoch: u64, scan: FileScan) {
+    pub fn set_file(
+        &self,
+        file: crate::db::FileNo,
+        text: crate::db::SourceText,
+        epoch: u64,
+        scan: FileScan,
+    ) {
         match self.by_file.entry(file) {
             dashmap::mapref::entry::Entry::Occupied(mut o) => {
                 let prev = o.get();
-                if Arc::ptr_eq(&prev.text, &text) && prev.epoch >= epoch {
+                if prev.text.same(&text) && prev.epoch >= epoch {
                     return;
                 }
                 o.insert(FileMentions { text, epoch, scan });
@@ -523,9 +534,9 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("token")]);
         let s1 = scanner_for(&idx);
-        let text: Arc<str> = Arc::from("xtoken");
+        let text = crate::db::SourceText::from("xtoken");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
+        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text.text()));
         let q = idx.prepare_query("token").unwrap();
         assert_eq!(idx.answer(file, &q, &text), Some(false));
 
@@ -538,7 +549,7 @@ mod tests {
         );
         let s2 = scanner_for(&idx);
         assert!(
-            s2.scan(&text).contains(&q_after),
+            s2.scan(&text.text()).contains(&q_after),
             "once raw, the same text now matches with no boundary"
         );
     }
@@ -548,9 +559,9 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("Alpha")]);
         let s1 = scanner_for(&idx);
-        let text: Arc<str> = Arc::from("uses Alpha and BETA, not gammaray");
+        let text = crate::db::SourceText::from("uses Alpha and BETA, not gammaray");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
+        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text.text()));
 
         idx.add_names([lc("Beta"), lc("Gamma")]);
         assert_eq!(
@@ -569,9 +580,9 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("Àlpha")]);
         let s1 = scanner_for(&idx);
-        let text: Arc<str> = Arc::from("uses Àlpha and Ébeta");
+        let text = crate::db::SourceText::from("uses Àlpha and Ébeta");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
+        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text.text()));
 
         let q_alpha = idx.prepare_query("Àlpha").unwrap();
         assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
@@ -582,7 +593,7 @@ mod tests {
         assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
 
         let s2 = scanner_for(&idx);
-        idx.set_file(file, text.clone(), s2.epoch(), s2.scan(&text));
+        idx.set_file(file, text.clone(), s2.epoch(), s2.scan(&text.text()));
         assert_eq!(idx.answer(file, &q_beta, &text), Some(true));
     }
 
@@ -591,12 +602,12 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("Alpha")]);
         let s1 = scanner_for(&idx);
-        let without: Arc<str> = Arc::from("use App\\Other; new Alpha();");
-        let with: Arc<str> = Arc::from("use App\\Target; // target");
-        let raw_file: Arc<str> = Arc::from("$x->go();");
-        idx.set_file(0, without.clone(), s1.epoch(), s1.scan(&without));
-        idx.set_file(1, with.clone(), s1.epoch(), s1.scan(&with));
-        idx.set_file(2, raw_file.clone(), s1.epoch(), s1.scan(&raw_file));
+        let without = crate::db::SourceText::from("use App\\Other; new Alpha();");
+        let with = crate::db::SourceText::from("use App\\Target; // target");
+        let raw_file = crate::db::SourceText::from("$x->go();");
+        idx.set_file(0, without.clone(), s1.epoch(), s1.scan(&without.text()));
+        idx.set_file(1, with.clone(), s1.epoch(), s1.scan(&with.text()));
+        idx.set_file(2, raw_file.clone(), s1.epoch(), s1.scan(&raw_file.text()));
 
         idx.add_names([lc("App\\Target")]);
         idx.add_raw_names([lc("->go")]);
@@ -616,13 +627,13 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("Job")]);
         let s = scanner_for(&idx);
-        let text: Arc<str> = Arc::from("new Job();");
+        let text = crate::db::SourceText::from("new Job();");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), s.epoch(), s.scan(&text));
+        idx.set_file(file, text.clone(), s.epoch(), s.scan(&text.text()));
         let q = idx.prepare_query("Job").unwrap();
         assert_eq!(idx.answer(file, &q, &text), Some(true));
         // Content-equal but different Arc: not answerable (must rescan).
-        let other: Arc<str> = Arc::from("new Job();");
+        let other = crate::db::SourceText::from("new Job();");
         assert_eq!(idx.answer(file, &q, &other), None);
     }
 
@@ -655,9 +666,9 @@ mod tests {
         idx.scanner().unwrap();
         idx.add_names([lc("Àb")]);
         let old = idx.scanner_reusing_cached().unwrap();
-        let text: Arc<str> = Arc::from("new Àa(); new Àb();");
+        let text = crate::db::SourceText::from("new Àa(); new Àb();");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), old.epoch(), old.scan(&text));
+        idx.set_file(file, text.clone(), old.epoch(), old.scan(&text.text()));
         let q = idx.prepare_query("Àb").unwrap();
         assert_eq!(idx.answer(file, &q, &text), None);
         let qa = idx.prepare_query("Àa").unwrap();
@@ -697,9 +708,9 @@ mod tests {
     fn set_file_keeps_newer_same_text_entry() {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("A")]);
-        let text: Arc<str> = Arc::from("A");
+        let text = crate::db::SourceText::from("A");
         let file: crate::db::FileNo = 0;
-        idx.set_file(file, text.clone(), 5, scanner_for(&idx).scan(&text));
+        idx.set_file(file, text.clone(), 5, scanner_for(&idx).scan(&text.text()));
         // A stale (older-epoch) commit racing in must not downgrade coverage.
         idx.set_file(file, text.clone(), 3, FileScan::default());
         let q = idx.prepare_query("A").unwrap();

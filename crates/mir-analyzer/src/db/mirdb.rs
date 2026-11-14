@@ -143,6 +143,8 @@ pub struct MirDbStorage {
     memoize_method_call_results: Arc<std::sync::atomic::AtomicBool>,
     /// Read untracked: set once while building the session, before any analysis.
     taint_analysis: Arc<std::sync::atomic::AtomicBool>,
+    /// Whether source texts stored from here on are LZ4-compressed; see [`SourceText::compressed`].
+    compress_sources: Arc<std::sync::atomic::AtomicBool>,
     /// Seed for [`crate::db::AnalyzeFileInput::forbidden_functions`].
     forbidden_functions: Arc<parking_lot::RwLock<Arc<[Arc<str>]>>>,
     /// Lazily-created [`crate::db::AnalyzeFileInput`] singleton input (see
@@ -368,6 +370,7 @@ impl Default for MirDbStorage {
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
             memoize_method_call_results: Arc::default(),
             taint_analysis: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            compress_sources: Arc::default(),
             forbidden_functions: Arc::new(parking_lot::RwLock::new(Arc::from([]))),
             analyze_config_input: Arc::default(),
             stub_cache: Arc::default(),
@@ -628,6 +631,7 @@ impl MirDatabase for MirDbStorage {
             self.on_demand_misses.lock().insert(revision, path);
             return None;
         };
+        let text = self.pack_source(text);
         let mut on_demand = self.on_demand_files.write();
         // A racing loader may have registered `path` during the read; every
         // reader must share its handle.
@@ -1432,7 +1436,7 @@ impl MirDbStorage {
         &self,
         file: &str,
         q: &crate::db::class_mention_index::MentionQuery,
-        current_text: &Arc<str>,
+        current_text: &SourceText,
     ) -> Option<bool> {
         let file_no = self.lookup_path(file)?;
         self.class_mentions.answer(file_no, q, current_text)
@@ -1440,7 +1444,7 @@ impl MirDbStorage {
 
     /// Whether `file` already holds a mention scan of exactly `text` at
     /// `epoch` or newer.
-    pub fn class_mentions_current(&self, file: &str, text: &Arc<str>, epoch: u64) -> bool {
+    pub fn class_mentions_current(&self, file: &str, text: &SourceText, epoch: u64) -> bool {
         let Some(file_no) = self.lookup_path(file) else {
             return false;
         };
@@ -1451,7 +1455,7 @@ impl MirDbStorage {
     pub fn set_file_class_mentions(
         &self,
         file: &Arc<str>,
-        text: &Arc<str>,
+        text: &SourceText,
         epoch: u64,
         scan: crate::db::FileScan,
     ) {
@@ -1546,6 +1550,22 @@ impl MirDbStorage {
             .store(enabled, std::sync::atomic::Ordering::Relaxed);
     }
 
+    /// Compress source texts stored from now on. Pays off for long-lived hosts
+    /// that hold every file but read few; a one-shot run reads each text many times.
+    pub fn set_compress_sources(&self, enabled: bool) {
+        self.compress_sources
+            .store(enabled, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// `text` in the form [`Self::set_compress_sources`] selects.
+    pub fn pack_source(&self, text: Arc<str>) -> SourceText {
+        SourceText::packed(
+            text,
+            self.compress_sources
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )
+    }
+
     /// Set the functions whose calls are reported as `ForbiddenCode`.
     pub fn set_forbidden_functions(&mut self, names: Vec<String>) {
         let names: Arc<[Arc<str>]> = names
@@ -1601,22 +1621,36 @@ impl MirDbStorage {
         text: Arc<str>,
         durability: salsa::Durability,
     ) -> SourceFile {
+        let contents = match self.source_files.get(&path) {
+            Some(&sf) if sf.contents(self).matches(&text) => sf.contents(self).clone(),
+            _ => self.pack_source(text),
+        };
+        self.upsert_source_text(path, contents, durability)
+    }
+
+    /// [`Self::upsert_source_file_with_durability`] for text the caller already packed.
+    pub fn upsert_source_text(
+        &mut self,
+        path: Arc<str>,
+        text: SourceText,
+        durability: salsa::Durability,
+    ) -> SourceFile {
         use salsa::Setter as _;
         self.adopt_on_demand_files();
         if let Some(&sf) = self.source_files.get(&path) {
             Arc::make_mut(&mut self.deleted_files).remove(path.as_ref());
-            if *sf.text(self) != text {
-                // Entry pins the old text Arc; the ptr guard would already
+            if *sf.contents(self) != text {
+                // Entry pins the old text; the identity guard would already
                 // sideline it, dropping it now frees the memory too.
                 if let Some(file_no) = self.lookup_path(&path) {
                     self.clear_file_class_mentions(file_no);
                 }
-                sf.set_text(self).with_durability(durability).to(text);
+                sf.set_contents(self).with_durability(durability).to(text);
                 self.mark_index_pending(&path);
             } else if self.raise_on_demand_durability(&path, sf, durability) {
-                // The stored Arc keeps text-identity freshness marks valid.
-                let text = sf.text(self).clone();
-                sf.set_text(self).with_durability(durability).to(text);
+                // The stored version keeps text-identity freshness marks valid.
+                let text = sf.contents(self).clone();
+                sf.set_contents(self).with_durability(durability).to(text);
             }
             return sf;
         }
@@ -1807,9 +1841,9 @@ impl MirDbStorage {
                 // also invalidates the file's cached memos.
                 {
                     use salsa::Setter as _;
-                    sf.set_text(self)
+                    sf.set_contents(self)
                         .with_durability(salsa::Durability::LOW)
-                        .to(Arc::from(""));
+                        .to(SourceText::from(""));
                 }
             }
             self.bump_workspace_revision();

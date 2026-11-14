@@ -79,7 +79,7 @@ mod tests {
                 SourceFile::new(
                     db,
                     Arc::from(format!("f{i}.php").as_str()),
-                    Arc::from("<?php"),
+                    crate::db::SourceText::from("<?php"),
                 )
             })
             .collect()

@@ -22,7 +22,7 @@ pub(crate) fn file_fixed_private_props(
 ) -> Arc<FxHashSet<(Name, Name)>> {
     let path = Arc::clone(file.path(db));
     let version = crate::db::queries::db_php_version(db);
-    let text = file.text(db);
+    let text = &file.text(db);
     let parsed = db.batch_parse(&path, text, version).unwrap_or_else(|| {
         Arc::new(crate::recursion::parse_for_file(
             &path,

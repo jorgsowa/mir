@@ -135,7 +135,7 @@ pub enum ReferenceIncludes {
 }
 
 /// file → `(text, prepare generation)`. See `AnalysisSession::prepared_files`.
-type PreparedFilesCache = HashMap<Arc<str>, (Arc<str>, u64)>;
+type PreparedFilesCache = HashMap<Arc<str>, (crate::db::SourceText, u64)>;
 
 /// Parsed inline suppressions keyed by file path and source text.
 type SuppressionMapCache = HashMap<Arc<str>, (Arc<str>, Arc<crate::suppression::SuppressionMap>)>;
@@ -295,7 +295,7 @@ impl AnalysisSession {
         let db = &self.db.salsa;
         db.lookup_source_file(file).is_some_and(|sf| {
             self.index
-                .ref_freshness(sf, sf.text(db), self.index_generation())
+                .ref_freshness(sf, sf.contents(db), self.index_generation())
                 == index_state::RefFreshness::Fresh
         })
     }
@@ -530,6 +530,13 @@ impl AnalysisSession {
     pub fn with_taint_analysis(mut self, enabled: bool) -> Self {
         self.taint_analysis = enabled;
         self.db.salsa.set_taint_analysis(enabled);
+        self
+    }
+
+    /// Keep source texts LZ4-compressed (off by default). Saves memory for a
+    /// long-lived host holding a whole workspace, at a decompression per read.
+    pub fn with_compressed_sources(self, enabled: bool) -> Self {
+        self.db.salsa.set_compress_sources(enabled);
         self
     }
 

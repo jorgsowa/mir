@@ -130,7 +130,7 @@ pub(crate) fn file_callable_call_args(
     file: SourceFile,
 ) -> Arc<[CallArgReturn]> {
     let path = file.path(db);
-    let text = file.text(db);
+    let text = &file.text(db);
     let parsed = php_rs_parser::parse(text);
     let mut scanner = OpaqueCallScanner {
         db,

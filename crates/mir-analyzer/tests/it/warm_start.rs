@@ -1021,6 +1021,60 @@ fn deleted_dependency_between_sessions_evicts_replayed_dependent() {
     assert!(!session.reference_postings_fresh("caller.php"));
 }
 
+/// Work `analyze_file` does on each of `files` in one read.
+fn analyze_work(session: &AnalysisSession, files: &[(Arc<str>, Arc<str>)]) -> (u64, u64) {
+    use mir_analyzer::db::{analyze_file, MirDatabase, Work};
+    let before = (
+        session.work_count(Work::FileAnalysis),
+        session.work_count(Work::ScopeAnalysis),
+    );
+    session
+        .snapshot()
+        .read(|db: &dyn MirDatabase| {
+            for (path, _) in files {
+                let file = db.lookup_source_file(path).expect("registered");
+                analyze_file(db, file);
+            }
+        })
+        .expect("not cancelled");
+    (
+        session.work_count(Work::FileAnalysis) - before.0,
+        session.work_count(Work::ScopeAnalysis) - before.1,
+    )
+}
+
+/// A cache-backed sweep keeps postings, not every swept file's analysis memos.
+#[test]
+fn cached_warm_pass_leaves_no_analysis_memos() {
+    let dir = create_temp_dir("warm_start_no_analysis_memos");
+    let files = factory_workspace(FACTORY_OF_A);
+    let mut session = lsp_boot(dir.path(), &files);
+    assert_eq!(warm_sweep(&mut session, &files), files.len() as u64);
+    assert_eq!(run_refs(&mut session, "A", &files), ["caller.php"]);
+
+    let (file_work, scope_work) = analyze_work(&session, &files);
+    assert_eq!(file_work, files.len() as u64, "analyze_file memos survived");
+    assert!(scope_work > 0, "infer_scope memos survived");
+    assert_eq!(
+        analyze_work(&session, &files),
+        (0, 0),
+        "on-demand reads memoize"
+    );
+}
+
+#[test]
+fn uncached_warm_pass_keeps_analysis_memos() {
+    let files = factory_workspace(FACTORY_OF_A);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    for (path, text) in &files {
+        session.upsert_source_file(path.clone(), text.clone(), salsa::Durability::LOW);
+    }
+    session.rebuild_workspace_symbol_index();
+    warm_sweep(&mut session, &files);
+    assert_eq!(analyze_work(&session, &files), (0, 0));
+}
+
 #[test]
 fn warm_pass_skips_fresh_replays_but_records_their_mentions() {
     let dir = create_temp_dir("warm_start_skip_fresh");
@@ -1037,7 +1091,7 @@ fn warm_pass_skips_fresh_replays_but_records_their_mentions() {
     for (path, _) in &files {
         let sf = session.lookup_source_file(path).expect("registered");
         assert!(
-            db.class_mentions_current(path, sf.text(&db), scanner.epoch()),
+            db.class_mentions_current(path, sf.contents(&db), scanner.epoch()),
             "{path} has no mention scan"
         );
     }

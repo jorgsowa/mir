@@ -97,7 +97,7 @@ struct WarmPass {
 
 /// A fallback mention scan `(file, text scanned, names found)`, recorded
 /// after the pass so later gate checks become set lookups.
-type MentionScanRecord = (Arc<str>, Arc<str>, crate::db::FileScan);
+type MentionScanRecord = (Arc<str>, crate::db::SourceText, crate::db::FileScan);
 
 /// Below this many files the serial loop beats spawning workers.
 const MIN_PARALLEL_FILES: usize = 4;
@@ -419,13 +419,13 @@ impl AnalysisSnapshot {
             .par_iter()
             .map_with(db, |db, f| -> Option<Arc<str>> {
                 let sf = db.lookup_source_file(f.as_ref())?;
-                let text = sf.text(&*db as &dyn MirDatabase).clone();
+                let text = sf.contents(&*db as &dyn MirDatabase).clone();
                 for q in &queries {
                     match db.class_mention_answer(f.as_ref(), q, &text) {
                         Some(true) => return Some(f.clone()),
                         Some(false) => continue,
                         None => {
-                            let names = scanner.scan(text.as_ref());
+                            let names = scanner.scan(&text.text());
                             let hit = queries.iter().any(|q2| names.contains(q2));
                             db.set_file_class_mentions(f, &text, scanner.epoch(), names);
                             return hit.then(|| f.clone());
@@ -617,7 +617,7 @@ impl AnalysisSnapshot {
             let Some(sf) = db.lookup_source_file(f.as_ref()) else {
                 continue;
             };
-            let text = sf.text(db as &dyn MirDatabase);
+            let text = sf.contents(db as &dyn MirDatabase);
             match self.index.ref_freshness(sf, text, current_gen) {
                 RefFreshness::Fresh => continue,
                 RefFreshness::Stale => {
@@ -648,7 +648,7 @@ impl AnalysisSnapshot {
                         let scanner = mention_scanner
                             .as_ref()
                             .expect("gate_complete implies a scanner");
-                        let names = scanner.scan(text);
+                        let names = scanner.scan(&text.text());
                         let hit = mention_queries.iter().any(|q| names.contains(q));
                         scanned.push((f.clone(), text.clone(), names));
                         if hit {
@@ -1088,7 +1088,7 @@ impl AnalysisSnapshot {
         let loc = index.constant_loc(mir_types::Name::from(fqn.trim_start_matches('\\')))?;
         let file = loc.file().path(db).clone();
         let sf = db.lookup_source_file(file.as_ref())?;
-        let text = sf.text(db as &dyn MirDatabase);
+        let text = &sf.text(db as &dyn MirDatabase);
         for (idx, line) in text.lines().enumerate() {
             let trimmed = line.trim_start();
             let is_decl_line = trimmed.starts_with("const ")
@@ -1361,7 +1361,11 @@ impl AnalysisSnapshot {
         // anything else is defensive — the gate then admits every candidate
         // (recommit rather than skip, the conservative direction).
         let use_mentions = queries.len() == shorts.len() && mention_scanner.is_some();
-        type Work = (Arc<str>, Arc<str>, Vec<crate::db::SubtypeEntry>);
+        type Work = (
+            Arc<str>,
+            crate::db::SourceText,
+            Vec<crate::db::SubtypeEntry>,
+        );
         let index = &*self.index;
         let results: Vec<(Option<Work>, Option<MentionScanRecord>)> = files
             .par_iter()
@@ -1369,7 +1373,7 @@ impl AnalysisSnapshot {
                 let Some(sf) = db.lookup_source_file(path.as_ref()) else {
                     return (None, None);
                 };
-                let text = sf.text(&*db as &dyn MirDatabase).clone();
+                let text = sf.contents(&*db as &dyn MirDatabase).clone();
                 let freshness = index.defs_freshness(sf, &text);
                 if freshness == DefsFreshness::Fresh {
                     return (None, None);
@@ -1396,7 +1400,7 @@ impl AnalysisSnapshot {
                             // Uncoverable entry: one scan answers every
                             // query and is recorded below.
                             let scanner = mention_scanner.as_ref().unwrap();
-                            let names = scanner.scan(&text);
+                            let names = scanner.scan(&text.text());
                             let hit = queries.iter().any(|q| names.contains(q));
                             scan_rec = Some((path.clone(), text.clone(), names));
                             hit
@@ -1886,7 +1890,14 @@ mod tests {
         file: &Arc<str>,
         analysis: crate::FileAnalysis,
     ) -> AnalysisOutcome {
-        let text = session.source_of(file).unwrap();
+        let text = {
+            let view = session.db_view();
+            let db = view.db();
+            db.lookup_source_file(file)
+                .unwrap()
+                .contents(db as &dyn MirDatabase)
+                .clone()
+        };
         AnalysisOutcome {
             issues: analysis
                 .issues
