@@ -58,6 +58,7 @@ pub fn opt_in_issue_kinds() -> &'static [&'static str] {
         "UnsafeUnserialize",
         "UnserializeGadget",
         "MissingSensitiveParameter",
+        "TaintedLog",
     ]
 }
 

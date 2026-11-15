@@ -127,6 +127,7 @@ pub enum SinkKind {
     Xml,         // XML parsed with entity expansion → XXE / XML denial of service
     Eval,        // code that will run: PHP files written, templates compiled → code injection
     Csv,         // spreadsheet export fields → formula injection
+    Log,         // log messages → forged log entries
 }
 
 impl SinkKind {
@@ -147,6 +148,7 @@ impl SinkKind {
             SinkKind::Xml => IssueKind::TaintedXml,
             SinkKind::Eval => IssueKind::TaintedEval,
             SinkKind::Csv => IssueKind::TaintedCsv,
+            SinkKind::Log => IssueKind::TaintedLog,
         }
     }
 
@@ -166,6 +168,8 @@ impl SinkKind {
             SinkKind::Xml => Taint::OTHER,
             SinkKind::Eval => Taint::EVAL,
             SinkKind::Csv => Taint::OTHER,
+            // A line break is what forges an entry, as it splits a header.
+            SinkKind::Log => Taint::HEADER,
         }
     }
 }
@@ -211,6 +215,7 @@ pub fn builtin_sinks(fn_name: &str) -> &'static [SinkParam] {
         "print_r" | "var_export" | "highlight_string" => sinks![at(0, "value", Html)],
 
         "header" => sinks![at(0, "header", Header)],
+        "error_log" => sinks![at(0, "message", Log)],
         "setcookie" | "setrawcookie" => sinks![at(0, "name", Cookie), at(1, "value", Cookie)],
         "mail" | "mb_send_mail" => sinks![
             at(3, "additional_headers", Header),
@@ -461,6 +466,18 @@ pub fn method_sink_value<'e>(
     };
     if method_lower == "fputcsv" && is_a("SplFileObject") {
         return first().map(csv_formula_fields).unwrap_or_default();
+    }
+    if is_a("Psr\\Log\\LoggerInterface") {
+        let message = match method_lower {
+            "emergency" | "alert" | "critical" | "error" | "warning" | "notice" | "info"
+            | "debug" => first(),
+            "log" => args
+                .get(1)
+                .filter(|a| a.name.is_none())
+                .and_then(|a| a.value()),
+            _ => None,
+        };
+        return message.map(|m| (m, SinkKind::Log)).into_iter().collect();
     }
     let value = match method_lower {
         "loadxml" if is_a("DOMDocument") => {
@@ -718,6 +735,7 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
         "callable" => mir_issues::IssueKind::TaintedCallable,
         "xml" => mir_issues::IssueKind::TaintedXml,
         "nosql" => mir_issues::IssueKind::TaintedNoSql,
+        "log" => mir_issues::IssueKind::TaintedLog,
         "header" => mir_issues::IssueKind::TaintedHeader,
         "cookie" => mir_issues::IssueKind::TaintedCookie,
         "sql" => mir_issues::IssueKind::TaintedSql,
@@ -737,7 +755,7 @@ pub fn taint_sink_kind(kind: &str) -> Taint {
     match kind {
         "llm_prompt" => Taint::LLM_PROMPT,
         "html" => Taint::HTML,
-        "header" => Taint::HEADER,
+        "header" | "log" => Taint::HEADER,
         "cookie" => Taint::COOKIE,
         "sql" => Taint::SQL,
         "shell" => Taint::SHELL,

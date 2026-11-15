@@ -788,6 +788,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/tainted_csv/`.
     TaintedCsv,
 
+    /// User input reaches a log message, where a line break forges log entries.
+    /// Emitted by `mir-analyzer/src/taint/sinks.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_log/`.
+    TaintedLog,
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1173,6 +1178,7 @@ impl IssueKind {
             | IssueKind::TaintedEval
             | IssueKind::TaintedUnserialize
             | IssueKind::TaintedXml
+            | IssueKind::TaintedLog
             | IssueKind::TaintedCsv
             | IssueKind::TaintedNoSql
             | IssueKind::TaintedCommandArgument
@@ -1535,6 +1541,7 @@ impl IssueKind {
             IssueKind::HostHeaderInjection => "MIR0827",
             IssueKind::TaintedNoSql => "MIR0828",
             IssueKind::TaintedCsv => "MIR0829",
+            IssueKind::TaintedLog => "MIR0830",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1655,7 +1662,7 @@ impl IssueKind {
             | "MIR0811" | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0819" | "MIR0900" | "MIR1205"
             | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602"
             | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" | "MIR0823" | "MIR0824" | "MIR0828"
-            | "MIR0829" => Some(Severity::Error),
+            | "MIR0829" | "MIR0830" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1861,6 +1868,7 @@ impl IssueKind {
             IssueKind::HostHeaderInjection => "HostHeaderInjection",
             IssueKind::TaintedNoSql => "TaintedNoSql",
             IssueKind::TaintedCsv => "TaintedCsv",
+            IssueKind::TaintedLog => "TaintedLog",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2626,6 +2634,7 @@ impl IssueKind {
             IssueKind::HostHeaderInjection => "Email body built from the request's Host header — possible password-reset link poisoning".to_string(),
             IssueKind::TaintedNoSql => "Tainted NoSQL query — possible NoSQL injection".to_string(),
             IssueKind::TaintedCsv => "Tainted CSV field — possible spreadsheet formula injection".to_string(),
+            IssueKind::TaintedLog => "Tainted log message — possible log injection".to_string(),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3482,6 +3491,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::MissingSensitiveParameter { param: s() },
+            IssueKind::TaintedLog,
             IssueKind::TaintedCsv,
             IssueKind::TaintedNoSql,
             IssueKind::HostHeaderInjection,
@@ -3689,6 +3699,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 210);
+        assert_eq!(one_of_each().len(), 211);
     }
 }

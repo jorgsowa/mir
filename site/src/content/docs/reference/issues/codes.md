@@ -186,6 +186,7 @@ issues keep their code.
 | MIR0827  | HostHeaderInjection           | [security/host-header-injection](../security/host-header-injection/) |
 | MIR0828  | TaintedNoSql                  | [security/tainted-no-sql](../security/tainted-no-sql/) |
 | MIR0829  | TaintedCsv                    | [security/tainted-csv](../security/tainted-csv/) |
+| MIR0830  | TaintedLog                    | [security/tainted-log](../security/tainted-log/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |
