@@ -34,5 +34,6 @@ function dn($c): void {
 
 function values($c): void {
     ldap_bind($c, 'cn=a', $_GET['password']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LdapAnonymousBind: ldap_bind() with a request password that may be empty — an empty password is an anonymous bind, which succeeds
     ldap_add($c, 'cn=a', ['cn' => $_GET['x']]);
 }

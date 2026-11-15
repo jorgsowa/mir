@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CodeAfterRedirect` (MIR0833, warning): a `header('Location: ...')` call followed by `echo`, `print` or inline HTML on a path with no `exit`, `return`, `throw` or never-returning call in between, so the protected page is still sent in the body.
 - `InsecureCheckResult` (MIR0834, warning): `openssl_verify()`, `openssl_x509_verify()`, `openssl_pkcs7_verify()` or `ldap_compare()` used as a condition, or compared with `== true`, `!= 0` or `!== false`, which accepts their `-1` error result.
 - `InsecureCheckResult` also covers `if (preg_match(...)) { exit; }` deny-list checks on tainted input with a `/u` pattern or a quantified group: `preg_match()` returns false on invalid UTF-8 or at the backtracking limit, which skips the rejection.
+- `LdapAnonymousBind` (MIR0835, warning): `ldap_bind()` with a password read from the request and not checked to be non-empty. LDAP servers accept a DN with an empty password as an anonymous bind, so such a login lets anyone in. A comparison, `empty()` or `strlen()` check on the variable counts.
 
 ### Changed
 

@@ -1,6 +1,7 @@
 //! Misuse of security-sensitive builtins that shows in constant arguments.
 use php_ast::owned::{Arg, Expr, ExprKind};
 
+use crate::ast_ext::ArgExt as _;
 use crate::ast_ext::ByteStringExt as _;
 use crate::ast_ext::NameBareExt as _;
 use crate::flow_state::{FlowState, ValueOrigin};
@@ -755,6 +756,17 @@ pub(crate) fn forget_checked_origins(cond: &Expr, ctx: &mut FlowState) {
         _ => return,
     };
     for operand in operands {
+        let operand = match &operand.kind {
+            ExprKind::FunctionCall(fc)
+                if named_one_of(&fc.name, &["strlen", "mb_strlen", "trim"]) =>
+            {
+                match fc.args.first().and_then(|a| a.value()) {
+                    Some(inner) => inner,
+                    None => continue,
+                }
+            }
+            _ => operand,
+        };
         if let ExprKind::Variable(var) = &operand.kind {
             ctx.forget_value_origin(var, ValueOrigin::HostHeader);
             ctx.forget_value_origin(var, ValueOrigin::RequestInput);
@@ -1106,4 +1118,44 @@ fn pattern_failure(pattern: &str) -> Option<&'static str> {
                         .is_some_and(|q| q.contains(','))))
     });
     quantified_group.then_some("when a long input hits the backtracking limit")
+}
+
+// ---------------------------------------------------------------------------
+// LDAP
+// ---------------------------------------------------------------------------
+
+/// Report `ldap_bind()` with a request password not checked to be non-empty: LDAP servers treat
+/// a bind with a DN and an empty password as an anonymous bind, which succeeds.
+pub(crate) fn check_ldap_bind(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    args: &[Arg],
+    arg_types: &[mir_types::Type],
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let Some(index) = args
+        .iter()
+        .position(|a| a.name.as_ref().is_some_and(|n| n.last_part() == "password"))
+        .or_else(|| {
+            (args.len() > 2 && args[..3].iter().all(|a| a.name.is_none() && !a.unpack()))
+                .then_some(2)
+        })
+    else {
+        return;
+    };
+    let (Some(password), Some(ty)) = (args[index].value(), arg_types.get(index)) else {
+        return;
+    };
+    if ty.can_be_falsy()
+        && is_request_input(password, ctx)
+        && !crate::taint::expr_taint(password, ctx, ea.db, &ea.file)
+            .concrete()
+            .is_empty()
+    {
+        ea.emit(
+            mir_issues::IssueKind::LdapAnonymousBind,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
 }

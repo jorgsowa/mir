@@ -191,6 +191,7 @@ issues keep their code.
 | MIR0832  | SpoofableClientIp             | [security/spoofable-client-ip](../security/spoofable-client-ip/) |
 | MIR0833  | CodeAfterRedirect             | [security/code-after-redirect](../security/code-after-redirect/) |
 | MIR0834  | InsecureCheckResult           | [security/insecure-check-result](../security/insecure-check-result/) |
+| MIR0835  | LdapAnonymousBind             | [security/ldap-anonymous-bind](../security/ldap-anonymous-bind/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

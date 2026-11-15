@@ -813,6 +813,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/insecure_check_result/`.
     InsecureCheckResult { reason: String },
 
+    /// `ldap_bind()` takes a password from the request that isn't checked to be non-empty.
+    /// Emitted by `mir-analyzer/src/security.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/ldap_anonymous_bind/`.
+    LdapAnonymousBind,
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1281,6 +1286,7 @@ impl IssueKind {
             | IssueKind::SpoofableClientIp
             | IssueKind::CodeAfterRedirect
             | IssueKind::InsecureCheckResult { .. }
+            | IssueKind::LdapAnonymousBind
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1570,6 +1576,7 @@ impl IssueKind {
             IssueKind::SpoofableClientIp => "MIR0832",
             IssueKind::CodeAfterRedirect => "MIR0833",
             IssueKind::InsecureCheckResult { .. } => "MIR0834",
+            IssueKind::LdapAnonymousBind => "MIR0835",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1701,7 +1708,7 @@ impl IssueKind {
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
             | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
             | "MIR0821" | "MIR0822" | "MIR0825" | "MIR0826" | "MIR0827" | "MIR0831" | "MIR0832"
-            | "MIR0833" | "MIR0834" => Some(Severity::Warning),
+            | "MIR0833" | "MIR0834" | "MIR0835" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1902,6 +1909,7 @@ impl IssueKind {
             IssueKind::SpoofableClientIp => "SpoofableClientIp",
             IssueKind::CodeAfterRedirect => "CodeAfterRedirect",
             IssueKind::InsecureCheckResult { .. } => "InsecureCheckResult",
+            IssueKind::LdapAnonymousBind => "LdapAnonymousBind",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2672,6 +2680,7 @@ impl IssueKind {
             IssueKind::SpoofableClientIp => "Client IP from a header the client can forge decides a check — possible IP allowlist bypass".to_string(),
             IssueKind::CodeAfterRedirect => "Location redirect isn't followed by exit — the rest of the page is still sent".to_string(),
             IssueKind::InsecureCheckResult { reason } => format!("Insecure check: {reason}"),
+            IssueKind::LdapAnonymousBind => "ldap_bind() with a request password that may be empty — an empty password is an anonymous bind, which succeeds".to_string(),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3528,6 +3537,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::MissingSensitiveParameter { param: s() },
+            IssueKind::LdapAnonymousBind,
             IssueKind::InsecureCheckResult { reason: s() },
             IssueKind::CodeAfterRedirect,
             IssueKind::SpoofableClientIp,
@@ -3740,6 +3750,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 215);
+        assert_eq!(one_of_each().len(), 216);
     }
 }
