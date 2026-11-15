@@ -199,6 +199,7 @@ pub fn narrow_from_condition(
         if let Some((captures, safe)) = crate::taint_guard::guarded_captures(expr, is_true, scope) {
             ctx.apply_taint_guard(captures, safe, db, file);
         }
+        crate::security::forget_checked_origins(expr, ctx);
         crate::taint::mark_dash_checked(expr, is_true, ctx);
     }
     if let Some(var) = crate::taint::proven_object(expr, is_true) {

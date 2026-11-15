@@ -106,6 +106,8 @@ pub enum ValueOrigin {
     ShellEscaped,
     /// A path or name ending in the name the client gave an uploaded file.
     ClientFileName,
+    /// A value built from the request's `Host` header.
+    HostHeader,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1869,6 +1871,13 @@ impl FlowState {
     pub fn mark_value_origin(&mut self, name: &str, origin: ValueOrigin) {
         Arc::make_mut(&mut self.value_origins)
             .insert(Name::from(name.trim_start_matches('$')), origin);
+    }
+
+    pub fn forget_value_origin(&mut self, name: &str, origin: ValueOrigin) {
+        if self.has_value_origin(name, origin) {
+            Arc::make_mut(&mut self.value_origins)
+                .remove(&Name::from(name.trim_start_matches('$')));
+        }
     }
 
     pub fn has_value_origin(&self, name: &str, origin: ValueOrigin) -> bool {

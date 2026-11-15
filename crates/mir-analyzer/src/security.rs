@@ -67,6 +67,15 @@ pub(crate) fn check_builtin_call(
             check_quoted_shell_escape(ea, command, ctx, span);
         }
     }
+    if matches!(fn_name_lower, "mail" | "mb_send_mail")
+        && arg(args, 2, "message").is_some_and(|body| is_host_derived(body, ctx))
+    {
+        ea.emit(
+            mir_issues::IssueKind::HostHeaderInjection,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if fn_name_lower == "move_uploaded_file"
         && arg(args, 1, "to").is_some_and(|to| is_client_file_name(to, ctx))
         && !checks_uploaded_files(ea.source)
@@ -652,4 +661,92 @@ fn checks_uploaded_files(source: &str) -> bool {
     ]
     .iter()
     .any(|check| source.contains(check))
+}
+
+// ---------------------------------------------------------------------------
+// Host header
+// ---------------------------------------------------------------------------
+
+/// A value built from the `Host` header the client sent: `$_SERVER['HTTP_HOST']`,
+/// `$request->getSchemeAndHttpHost()`, or a string or variable made from one.
+pub(crate) fn is_host_derived(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::HostHeader),
+        ExprKind::ArrayAccess(aa) => {
+            matches!(&aa.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_SERVER")
+                && matches!(
+                    literal_str(aa.index.as_ref()),
+                    Some("HTTP_HOST" | "HTTP_X_FORWARDED_HOST")
+                )
+        }
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => matches!(
+            &mc.method.kind,
+            ExprKind::Identifier(m)
+                if m.eq_ignore_ascii_case("getHttpHost") || m.eq_ignore_ascii_case("getSchemeAndHttpHost")
+        ),
+        ExprKind::NullCoalesce(nc) => is_host_derived(&nc.left, ctx),
+        ExprKind::FunctionCall(fc) => {
+            named_one_of(
+                &fc.name,
+                &["sprintf", "str_replace", "strtr", "rtrim", "trim"],
+            ) && fc
+                .args
+                .iter()
+                .filter_map(|a| a.value())
+                .any(|v| is_host_derived(v, ctx))
+        }
+        _ => any_string_part(expr, &mut |part| is_host_derived(part, ctx)),
+    }
+}
+
+/// Forget origins a condition may have validated: a variable compared with something,
+/// looked up in a list or matched against a pattern.
+pub(crate) fn forget_checked_origins(cond: &Expr, ctx: &mut FlowState) {
+    let operands: Vec<&Expr> = match &cond.kind {
+        ExprKind::Binary(b)
+            if matches!(
+                b.op,
+                php_ast::ast::BinaryOp::Identical
+                    | php_ast::ast::BinaryOp::NotIdentical
+                    | php_ast::ast::BinaryOp::Equal
+                    | php_ast::ast::BinaryOp::NotEqual
+                    | php_ast::ast::BinaryOp::Less
+                    | php_ast::ast::BinaryOp::LessOrEqual
+                    | php_ast::ast::BinaryOp::Greater
+                    | php_ast::ast::BinaryOp::GreaterOrEqual
+                    | php_ast::ast::BinaryOp::Spaceship
+            ) =>
+        {
+            vec![&b.left, &b.right]
+        }
+        ExprKind::FunctionCall(fc) => {
+            let index = if named_one_of(&fc.name, &["in_array", "array_key_exists", "array_search"])
+            {
+                0
+            } else if named_one_of(&fc.name, &["preg_match"]) {
+                1
+            } else {
+                return;
+            };
+            fc.args
+                .get(index)
+                .and_then(|a| a.value())
+                .into_iter()
+                .collect()
+        }
+        ExprKind::Isset(items) => items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                ExprKind::ArrayAccess(aa) => aa.index.as_ref(),
+                _ => None,
+            })
+            .collect(),
+        _ => return,
+    };
+    for operand in operands {
+        if let ExprKind::Variable(var) = &operand.kind {
+            ctx.forget_value_origin(var, ValueOrigin::HostHeader);
+            ctx.forget_value_origin(var, ValueOrigin::RequestInput);
+        }
+    }
 }
