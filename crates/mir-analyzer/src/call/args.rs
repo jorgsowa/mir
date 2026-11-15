@@ -699,6 +699,10 @@ fn call_returns_by_ref(
 // ---------------------------------------------------------------------------
 
 pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>) {
+    // These checks only report issues.
+    if ea.issues.is_discarding() {
+        return;
+    }
     let CheckArgsParams {
         fn_name,
         params,

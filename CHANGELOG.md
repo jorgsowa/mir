@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance: checking an argument against an `int-mask-of<Cls::PREFIX_*>` parameter builds the mask's literal union in linear rather than quadratic time. SimplePie's `sanitize()` calls dominated WordPress's taint summaries, which other workers waited on (WordPress at `-j 8` without cache: about 10% faster wall time, 5% fewer instructions).
 - Performance: argument checks, opaque-call property invalidation and reference recording no longer format strings that are only needed when an issue is reported or references are kept (about 2% fewer instructions on WordPress, Symfony and Laravel).
 - Performance: unused-assignment tracking keeps overwritten writes in an insertion-ordered set, so merging branches extends it with what the other branch added instead of rebuilding a hash set and copying the list, and `int-mask-of<...>` unions are expanded once per member set (SimplePie's `Item` 13% fewer instructions).
+- Performance: return-type inference and taint summaries skip argument type checks, whose issues they discard (WordPress about 1.5% fewer instructions).
 
 ## [0.101.0] - 2026-11-14
 
