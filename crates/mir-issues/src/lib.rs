@@ -778,6 +778,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/host_header_injection/`.
     HostHeaderInjection,
 
+    /// User input reaches a MongoDB `$where` clause, or may be an array in a MongoDB filter.
+    /// Emitted by `mir-analyzer/src/taint/sinks.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_no_sql/`.
+    TaintedNoSql,
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1163,6 +1168,7 @@ impl IssueKind {
             | IssueKind::TaintedEval
             | IssueKind::TaintedUnserialize
             | IssueKind::TaintedXml
+            | IssueKind::TaintedNoSql
             | IssueKind::TaintedCommandArgument
             | IssueKind::TaintedMassAssignment { .. }
             | IssueKind::CircularInheritance { .. }
@@ -1521,6 +1527,7 @@ impl IssueKind {
             IssueKind::QuotedShellEscape => "MIR0825",
             IssueKind::UnrestrictedFileUpload => "MIR0826",
             IssueKind::HostHeaderInjection => "MIR0827",
+            IssueKind::TaintedNoSql => "MIR0828",
             IssueKind::TaintedInput { .. } => "MIR0800",
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
@@ -1640,7 +1647,7 @@ impl IssueKind {
             | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810"
             | "MIR0811" | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0819" | "MIR0900" | "MIR1205"
             | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602"
-            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" | "MIR0823" | "MIR0824" => {
+            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" | "MIR0823" | "MIR0824" | "MIR0828" => {
                 Some(Severity::Error)
             }
 
@@ -1846,6 +1853,7 @@ impl IssueKind {
             IssueKind::QuotedShellEscape => "QuotedShellEscape",
             IssueKind::UnrestrictedFileUpload => "UnrestrictedFileUpload",
             IssueKind::HostHeaderInjection => "HostHeaderInjection",
+            IssueKind::TaintedNoSql => "TaintedNoSql",
             IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
@@ -2609,6 +2617,7 @@ impl IssueKind {
             IssueKind::QuotedShellEscape => "escapeshellarg() result placed inside quotes — its own quotes close them, so the value runs unquoted".to_string(),
             IssueKind::UnrestrictedFileUpload => "Uploaded file saved under the client's file name with no extension check — possible web shell upload".to_string(),
             IssueKind::HostHeaderInjection => "Email body built from the request's Host header — possible password-reset link poisoning".to_string(),
+            IssueKind::TaintedNoSql => "Tainted NoSQL query — possible NoSQL injection".to_string(),
             IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
@@ -3465,6 +3474,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::MissingSensitiveParameter { param: s() },
+            IssueKind::TaintedNoSql,
             IssueKind::HostHeaderInjection,
             IssueKind::UnrestrictedFileUpload,
             IssueKind::QuotedShellEscape,
@@ -3670,6 +3680,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 208);
+        assert_eq!(one_of_each().len(), 209);
     }
 }

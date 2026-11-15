@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UnrestrictedFileUpload` (MIR0826, warning): `move_uploaded_file()` to a path ending in the client's file name (`$_FILES[...]['name']`, also through `basename()` or a variable), in a file with no extension or content check, so the client picks the extension. A check of `$_FILES[...]['type']` alone doesn't count.
 - `HostHeaderInjection` (MIR0827, warning): a `mail()` or `mb_send_mail()` message built from `$_SERVER['HTTP_HOST']`, `$_SERVER['HTTP_X_FORWARDED_HOST']`, `getHttpHost()` or `getSchemeAndHttpHost()`, directly or through variables, which lets the client point password-reset links at their own server. A host compared with an expected value or looked up in a list first isn't reported.
 - `TaintedEval` also covers server-side template injection: request data compiled by Twig's `Environment::createTemplate()`, Blade's `Blade::render()` or `BladeCompiler::render()`, or a Smarty `fetch()`, `display()` or `createTemplate()` of a `string:` or `eval:` resource.
+- `TaintedNoSql` (MIR0828, error): a tainted MongoDB `$where` clause, a request value that may be an array (operator injection such as `user[$ne]=x`) in the filter of a `MongoDB\Collection` query or write method or `new MongoDB\Driver\Query()`, and `@taint-sink nosql` parameters, which used to report `TaintedInput`.
 
 ### Changed
 

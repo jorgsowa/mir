@@ -701,6 +701,7 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
         "xpath" => mir_issues::IssueKind::TaintedXpath,
         "callable" => mir_issues::IssueKind::TaintedCallable,
         "xml" => mir_issues::IssueKind::TaintedXml,
+        "nosql" => mir_issues::IssueKind::TaintedNoSql,
         "header" => mir_issues::IssueKind::TaintedHeader,
         "cookie" => mir_issues::IssueKind::TaintedCookie,
         "sql" => mir_issues::IssueKind::TaintedSql,
@@ -1052,5 +1053,95 @@ fn first_char_subject<'e>(subject: &'e Expr, literal: &Expr) -> Option<&'e str> 
             }
         }
         _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NoSQL
+// ---------------------------------------------------------------------------
+
+/// Report a tainted MongoDB `$where` clause, which runs as JavaScript on the server.
+pub fn check_mongo_where(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    elements: &[php_ast::owned::ArrayElement],
+    ctx: &FlowState,
+) {
+    for element in elements {
+        let is_where = matches!(
+            element.key.as_ref().map(|k| &k.kind),
+            Some(ExprKind::String(k)) if k.as_str() == "$where"
+        );
+        let value = element.value();
+        let issue = mir_issues::IssueKind::TaintedNoSql;
+        if is_where
+            && reaches_sink(
+                value,
+                Taint::OTHER,
+                &issue,
+                ctx,
+                ea.db,
+                &ea.file,
+                ea.taint_summary,
+            )
+        {
+            ea.emit_taint(issue, value.span, value, Taint::OTHER, ctx);
+        }
+    }
+}
+
+/// The filter a `MongoDB\Collection` query or write method takes.
+pub fn mongo_filter_arg<'e>(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_lower: &str,
+    args: &'e [php_ast::owned::Arg],
+) -> Option<&'e Expr> {
+    let base = "MongoDB\\Collection";
+    if !(fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)) {
+        return None;
+    }
+    let index = match method_lower {
+        "find" | "findone" | "findoneanddelete" | "findoneandreplace" | "findoneandupdate"
+        | "updateone" | "updatemany" | "deleteone" | "deletemany" | "replaceone"
+        | "countdocuments" | "count" => 0,
+        "distinct" => 1,
+        _ => return None,
+    };
+    args.get(index)
+        .filter(|a| a.name.is_none() && !a.unpack())
+        .and_then(|a| a.value())
+}
+
+/// Report a request value that may be an array in a MongoDB filter: `?user[$ne]=x` turns
+/// `['user' => $_GET['user']]` into an operator query that matches every document.
+pub fn check_mongo_filter(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    filter: &Expr,
+    ctx: &FlowState,
+    span: php_ast::Span,
+) {
+    let ExprKind::Array(elements) = &unwrap_parens(filter).kind else {
+        return;
+    };
+    for element in elements {
+        let value = unwrap_parens(element.value());
+        let may_be_array = match &value.kind {
+            ExprKind::ArrayAccess(_) => crate::security::is_request_input(value, ctx),
+            ExprKind::Variable(name) => ctx
+                .get_var(name)
+                .types
+                .iter()
+                .any(|atom| atom.is_array() || matches!(atom, mir_types::Atomic::TMixed)),
+            _ => false,
+        };
+        if may_be_array
+            && !expr_taint(value, ctx, ea.db, &ea.file)
+                .concrete()
+                .is_empty()
+        {
+            let issue = mir_issues::IssueKind::TaintedNoSql;
+            ea.emit_taint(issue, span, value, Taint::OTHER, ctx);
+            return;
+        }
     }
 }

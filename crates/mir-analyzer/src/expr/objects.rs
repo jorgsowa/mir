@@ -307,6 +307,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .kind
                     .resolve_name_ref(self.db, &self.file)
                     .unwrap_or_default();
+                if fqcn.eq_ignore_ascii_case("MongoDB\\Driver\\Query") {
+                    if let Some(filter) = n.args.first().and_then(|a| a.value()) {
+                        crate::taint::check_mongo_filter(self, filter, ctx, span);
+                    }
+                }
                 if crate::taint::runs_program_directly(self.db, &fqcn) {
                     if let Some(command) = n.args.first().and_then(|a| a.value()) {
                         crate::taint::check_command_arguments(self, command, ctx, span);

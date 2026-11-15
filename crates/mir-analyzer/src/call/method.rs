@@ -1764,6 +1764,11 @@ fn resolve_method_return<'a>(
             }
         }
 
+        if let Some(filter) =
+            crate::taint::mongo_filter_arg(ea.db, fqcn.as_ref(), &method_name_lower, &call.args)
+        {
+            crate::taint::check_mongo_filter(ea, filter, ctx, span);
+        }
         if let Some((value, kind)) =
             crate::taint::method_sink_value(ea.db, fqcn.as_ref(), &method_name_lower, &call.args)
         {
