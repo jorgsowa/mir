@@ -992,3 +992,118 @@ pub(crate) fn is_location_header(args: &[Arg]) -> bool {
         .to_ascii_lowercase()
         .starts_with("location:")
 }
+
+/// Report `if (preg_match('/evil/u', $input)) exit;` on tainted input: `preg_match()` returns
+/// false when matching fails, so input that breaks the pattern skips the rejection.
+pub(crate) fn check_deny_list_match(
+    ea: &mut crate::expr::ExpressionAnalyzer<'_>,
+    cond: &Expr,
+    ctx: &FlowState,
+) {
+    for part in either_parts(cond) {
+        let Some(fc) = matched_call(part) else {
+            continue;
+        };
+        let (Some(pattern), Some(subject)) = (
+            literal_str(arg(&fc.args, 0, "pattern")),
+            arg(&fc.args, 1, "subject"),
+        ) else {
+            continue;
+        };
+        let Some(failure) = pattern_failure(pattern) else {
+            continue;
+        };
+        if crate::taint::expr_taint(subject, ctx, ea.db, &ea.file)
+            .concrete()
+            .is_empty()
+        {
+            continue;
+        }
+        ea.emit(
+            mir_issues::IssueKind::InsecureCheckResult {
+                reason: format!(
+                    "preg_match() returns false {failure}, which skips this rejection; compare with !== 0"
+                ),
+            },
+            mir_issues::Severity::Warning,
+            part.span,
+        );
+    }
+}
+
+/// The operands `||` joins: any of them holding takes the branch.
+fn either_parts(cond: &Expr) -> Vec<&Expr> {
+    match &cond.kind {
+        ExprKind::Parenthesized(inner) => either_parts(inner),
+        ExprKind::Binary(b)
+            if matches!(
+                b.op,
+                php_ast::ast::BinaryOp::BooleanOr | php_ast::ast::BinaryOp::LogicalOr
+            ) =>
+        {
+            let mut parts = either_parts(&b.left);
+            parts.extend(either_parts(&b.right));
+            parts
+        }
+        _ => vec![cond],
+    }
+}
+
+/// A `preg_match()` call in a check that a `false` result fails: used as a condition, or
+/// compared with `== 1`, `=== 1`, `> 0`, `>= 1`, `== true` or `!= 0`.
+fn matched_call(check: &Expr) -> Option<&php_ast::owned::FunctionCallExpr> {
+    if let Some(fc) = preg_match_call(check) {
+        return Some(fc);
+    }
+    let ExprKind::Binary(b) = &check.kind else {
+        return None;
+    };
+    use php_ast::ast::BinaryOp;
+    let fc = preg_match_call(&b.left)?;
+    let fails_on_false = matches!(
+        (b.op, &b.right.kind),
+        (
+            BinaryOp::Equal | BinaryOp::Identical | BinaryOp::GreaterOrEqual,
+            ExprKind::Int(1)
+        ) | (BinaryOp::Greater | BinaryOp::NotEqual, ExprKind::Int(0))
+            | (BinaryOp::Equal, ExprKind::Bool(true))
+    );
+    fails_on_false.then_some(fc)
+}
+
+fn preg_match_call(e: &Expr) -> Option<&php_ast::owned::FunctionCallExpr> {
+    match &e.kind {
+        ExprKind::FunctionCall(fc) if named_one_of(&fc.name, &["preg_match"]) => Some(fc),
+        _ => None,
+    }
+}
+
+/// How a literal pattern can make `preg_match()` fail on attacker input.
+fn pattern_failure(pattern: &str) -> Option<&'static str> {
+    let delimiter = pattern.chars().next()?;
+    let closer = match delimiter {
+        '(' => ')',
+        '{' => '}',
+        '[' => ']',
+        '<' => '>',
+        c => c,
+    };
+    let end = pattern.rfind(closer).filter(|&end| end > 0)?;
+    let (body, flags) = (&pattern[1..end], &pattern[end + 1..]);
+    if flags.contains('u') {
+        return Some("on invalid UTF-8");
+    }
+    let bytes = body.as_bytes();
+    let quantified_group = bytes.windows(2).enumerate().any(|(i, w)| {
+        w[0] == b')'
+            && (i == 0 || bytes[i - 1] != b'\\')
+            && (w[1] == b'*'
+                || w[1] == b'+'
+                || (w[1] == b'{'
+                    && body[i + 1..]
+                        .split('}')
+                        .next()
+                        .is_some_and(|q| q.contains(','))))
+    });
+    quantified_group.then_some("when a long input hits the backtracking limit")
+}

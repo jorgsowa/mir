@@ -9,6 +9,8 @@ sidebar:
 
 Reported for a condition that lets a function's error value through. `openssl_verify()`, `openssl_x509_verify()`, `openssl_pkcs7_verify()` and `ldap_compare()` return `-1` on error, and `-1` is truthy, so `if (openssl_verify($data, $sig, $key))`, `== true`, `!= 0` or `!== false` accepts a signature that failed to verify. This has caused real signature-bypass vulnerabilities.
 
+It also covers a deny-list match on tainted input, `if (preg_match('/<script/iu', $input)) { exit; }`, whose branch rejects the input. `preg_match()` returns `false`, not `0` or `1`, when matching fails: always on invalid UTF-8 with the `u` modifier, and on long input when a quantified group (`(...)+`, `(...)*`) hits the backtracking limit. The rejection is skipped, which turns a regex failure into a bypass. Compare with `!== 0` so that a failed match rejects too, or check `preg_last_error()`.
+
 ## Example
 
 ```php
@@ -20,4 +22,4 @@ if (openssl_verify($data, $signature, $publicKey)) { // InsecureCheckResult
 
 ## How to fix
 
-Compare with the success value: `openssl_verify($data, $signature, $publicKey) === 1`.
+Compare with the success value: `openssl_verify($data, $signature, $publicKey) === 1`. For a deny-list match, use `preg_match(...) !== 0`.

@@ -45,6 +45,13 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         if !then_ctx.diverges {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
+            if then_ctx.diverges {
+                crate::security::check_deny_list_match(
+                    &mut self.expr_analyzer(ctx),
+                    &if_stmt.condition,
+                    ctx,
+                );
+            }
         } else if !pre_diverges {
             self.analyze_impossible_branch(&if_stmt.then_branch, ctx);
         }

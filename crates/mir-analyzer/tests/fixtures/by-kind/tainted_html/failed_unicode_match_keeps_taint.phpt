@@ -22,6 +22,7 @@ function failed_match_in_branch(): void {
 function failed_match_after_return(): void {
     $x = $_GET['x'];
     if (preg_match('/[^a-z0-9]/u', $x)) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InsecureCheckResult: Insecure check: preg_match() returns false on invalid UTF-8, which skips this rejection; compare with !== 0
         return;
     }
     echo $x;
