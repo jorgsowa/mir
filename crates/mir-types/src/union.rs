@@ -121,7 +121,7 @@ const MAX_GENERIC_ARRAYS: usize = 8;
 const MAX_LITERAL_STRINGS: usize = 128;
 
 /// `array<K1|K2, V1|V2>` for two generic arrays (or lists) of the same kind.
-fn combine_generic_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
+pub(crate) fn combine_generic_arrays(a: &Atomic, b: &Atomic) -> Option<Atomic> {
     let union = |x: &Type, y: &Type| {
         let mut t = x.clone();
         t.merge_with(y);
@@ -492,9 +492,9 @@ impl Type {
 
     /// [`Self::add_type`] for a plain atomic `self` neither holds nor is subsumed by as `mixed`.
     fn add_absent_type(&mut self, atomic: Atomic) {
+        let mut atomic = crate::generalize::cap_array_depth(atomic);
         // Past the limit, fold a new shape into a compatible existing one
         // rather than growing the union (see `MAX_KEYED_SHAPES`).
-        let mut atomic = atomic;
         if matches!(atomic, Atomic::TKeyedArray { .. })
             && self
                 .types
@@ -734,6 +734,33 @@ impl Type {
         }
 
         self.types.push(atomic);
+        if self.types.len() > crate::generalize::MAX_UNION_MEMBERS {
+            self.collapse_wide_union();
+        }
+    }
+
+    /// Generalizes a union past [`crate::generalize::MAX_UNION_MEMBERS`] members.
+    #[cold]
+    fn collapse_wide_union(&mut self) {
+        let literal = |t: &Atomic| matches!(t, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_));
+        let counted = self.types.iter().filter(|t| !literal(t)).count();
+        if counted <= crate::generalize::MAX_UNION_MEMBERS
+            || !self
+                .types
+                .iter()
+                .any(|t| !literal(t) && crate::generalize::is_generalizable(t))
+        {
+            return;
+        }
+        let members = std::mem::take(&mut self.types);
+        for atomic in members {
+            let atomic = if literal(&atomic) {
+                atomic
+            } else {
+                crate::generalize::generalize_atomic(&atomic, crate::generalize::MAX_ARRAY_DEPTH)
+            };
+            self.add_type(atomic);
+        }
     }
 
     // --- Narrowing -----------------------------------------------------------

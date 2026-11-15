@@ -22,7 +22,7 @@ use std::sync::Arc;
 ///
 /// Salsa's own cancellation is query-granular and does not unwind the
 /// plain-Rust body-analysis walk, so long-running loops here check this flag at
-/// chunk / file boundaries instead. On each new edit the consumer should drop
+/// chunk / file boundaries instead. Snapshot passes also poll it between loop-body passes. On each new edit the consumer should drop
 /// the old flag and create a fresh one for the new work rather than reusing a
 /// single flag.
 #[derive(Clone, Default)]
@@ -43,6 +43,37 @@ impl IndexCancel {
     /// Whether cancellation has been requested.
     pub fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::Relaxed)
+    }
+}
+
+std::thread_local! {
+    static ACTIVE_CANCEL: std::cell::RefCell<Option<IndexCancel>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `f` with `cancel` polled by statement analysis on this thread.
+pub(crate) fn with_active_cancel<R>(cancel: &IndexCancel, f: impl FnOnce() -> R) -> R {
+    struct Restore(Option<IndexCancel>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let previous = self.0.take();
+            ACTIVE_CANCEL.with(|active| *active.borrow_mut() = previous);
+        }
+    }
+    let previous = ACTIVE_CANCEL.with(|active| active.replace(Some(cancel.clone())));
+    let _restore = Restore(previous);
+    f()
+}
+
+/// Unwinds with [`salsa::Cancelled::Local`], as salsa does, once this thread's active cancel fired.
+pub(crate) fn unwind_if_cancelled() {
+    let cancelled = ACTIVE_CANCEL.with(|active| {
+        active
+            .borrow()
+            .as_ref()
+            .is_some_and(IndexCancel::is_cancelled)
+    });
+    if cancelled {
+        std::panic::resume_unwind(Box::new(salsa::Cancelled::Local));
     }
 }
 

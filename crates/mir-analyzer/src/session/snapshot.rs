@@ -126,7 +126,9 @@ fn stage_in_parallel<T: Send>(
             if cancel.is_cancelled() {
                 return None;
             }
-            analyzed.extend(stage(db, path));
+            analyzed.extend(crate::indexing::with_active_cancel(cancel, || {
+                stage(db, path)
+            }));
         }
         return Some(analyzed);
     }
@@ -146,7 +148,8 @@ fn stage_in_parallel<T: Send>(
         }
         let i = next.fetch_add(1, Ordering::Relaxed);
         let Some(path) = files.get(i) else { return };
-        match std::panic::catch_unwind(AssertUnwindSafe(|| stage(&db, path))) {
+        let staged = || crate::indexing::with_active_cancel(cancel, || stage(&db, path));
+        match std::panic::catch_unwind(AssertUnwindSafe(staged)) {
             Ok(staged) => *slots[i].lock().unwrap() = staged,
             Err(payload) => {
                 stop.store(true, Ordering::Relaxed);
@@ -471,12 +474,15 @@ impl AnalysisSnapshot {
     /// query generation)` — see `RefQueryCacheKey` — so a repeat query
     /// against unchanged state (a code-lens refresh) is one hashmap lookup
     /// instead of an O(candidates) freshness scan.
+    ///
+    /// Once `cancel` fires, even inside one file's analysis, it returns `Err(Cancelled::Local)` uncached.
     pub fn indexed_references_to(
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],
         include_declaration: bool,
         includes: crate::ReferenceIncludes,
+        cancel: &crate::IndexCancel,
     ) -> Result<Vec<(Arc<str>, crate::Range)>, Cancelled> {
         let key = self.reference_query_key(symbol, files, include_declaration, includes);
         if let Some(hit) = self.index.ref_queries.get(&key) {
@@ -484,7 +490,7 @@ impl AnalysisSnapshot {
         }
         let stale = catch(|| self.stale_reference_candidates_unguarded(symbol, files))?;
         if !stale.is_empty() {
-            self.commit_reference_candidates(&stale)?;
+            self.commit_reference_candidates(&stale, cancel)?;
         }
         let out = catch(|| self.read_references(symbol, files, include_declaration, includes))?;
         self.ensure_no_retire_since(key.generation)?;
@@ -512,8 +518,15 @@ impl AnalysisSnapshot {
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],
+        cancel: &crate::IndexCancel,
     ) -> Result<Vec<(Arc<str>, crate::Range)>, Cancelled> {
-        self.indexed_references_to(symbol, files, false, crate::ReferenceIncludes::UseImports)
+        self.indexed_references_to(
+            symbol,
+            files,
+            false,
+            crate::ReferenceIncludes::UseImports,
+            cancel,
+        )
     }
 
     pub(super) fn reference_query_key(
@@ -673,9 +686,15 @@ impl AnalysisSnapshot {
     /// Analyze `stale` and commit their postings and class edges. Serial: a
     /// request runs on its caller's thread, and concurrent requests fanning
     /// out workers would starve one another and the background warm sweep.
-    pub(super) fn commit_reference_candidates(&self, stale: &[Arc<str>]) -> Result<(), Cancelled> {
-        self.warm_pass(stale, &crate::IndexCancel::new(), false, false)
-            .map(drop)
+    pub(super) fn commit_reference_candidates(
+        &self,
+        stale: &[Arc<str>],
+        cancel: &crate::IndexCancel,
+    ) -> Result<(), Cancelled> {
+        match self.warm_pass(stale, cancel, false, false)? {
+            Some(_) => Ok(()),
+            None => Err(Cancelled::Local),
+        }
     }
 
     /// Bring the reference postings, class edges and mention scans of
@@ -733,7 +752,11 @@ impl AnalysisSnapshot {
         parallel: bool,
         skip_fresh: bool,
     ) -> Result<Option<Vec<AnalyzedFile>>, Cancelled> {
-        let Some(mut pass) = self.stage_warm(files, cancel, parallel, skip_fresh)? else {
+        let staged = match self.stage_warm(files, cancel, parallel, skip_fresh) {
+            Err(Cancelled::Local) if cancel.is_cancelled() => return Ok(None),
+            staged => staged?,
+        };
+        let Some(mut pass) = staged else {
             return Ok(None);
         };
         self.commit_warm(&mut pass)?;
@@ -1690,7 +1713,9 @@ mod tests {
             session
         });
         await_pending_write(&snap);
-        assert!(snap.commit_reference_candidates(&stale).is_err());
+        assert!(snap
+            .commit_reference_candidates(&stale, &IndexCancel::new())
+            .is_err());
         drop(snap);
         writer.join().unwrap();
     }

@@ -205,10 +205,16 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
                     let result = if r % 2 == 0 && i % 2 == 1 {
                         snap.warm_files(&scope, &IndexCancel::new()).map(drop)
                     } else {
-                        snap.indexed_references_to(&symbol, &scope, false, ReferenceIncludes::Plain)
-                            .map(|refs| {
-                                assert_eq!(refs.len(), EXPECTED_SITES, "reader {r} query {i}");
-                            })
+                        snap.indexed_references_to(
+                            &symbol,
+                            &scope,
+                            false,
+                            ReferenceIncludes::Plain,
+                            &IndexCancel::new(),
+                        )
+                        .map(|refs| {
+                            assert_eq!(refs.len(), EXPECTED_SITES, "reader {r} query {i}");
+                        })
                     };
                     completed_last = result.is_ok();
                     if completed_last {

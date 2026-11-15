@@ -245,32 +245,92 @@ pub(super) fn vars_stabilized(
     })
 }
 
-/// For any variable whose type changed relative to `pre_vars`, widen to
-/// the union of both types.  Called after MAX_ITERS to avoid non-termination.
-///
-/// If `loop_guaranteed` is true (loop is guaranteed to execute at least once),
-/// variables that are new in the loop (only in current, not in pre) won't be
-/// merged with null/undefined, since the loop will definitely assign them.
-pub(super) fn widen_unstable(
-    pre_vars: &rustc_hash::FxHashMap<Name, Arc<Type>>,
-    current_vars: &mut rustc_hash::FxHashMap<Name, Arc<Type>>,
-    loop_guaranteed: bool,
-) {
-    for (name, ty) in current_vars.iter_mut() {
-        if let Some(pre_ty) = pre_vars.get(name) {
-            if !Arc::ptr_eq(ty, pre_ty) && **ty != **pre_ty {
-                let mut merged = (**ty).clone();
-                merged.merge_with(pre_ty);
-                *ty = mir_codebase::definitions::wrap_var_type(merged);
-            }
-        } else if loop_guaranteed {
-            // Variable is new in loop and loop is guaranteed to execute.
-            // Don't merge with pre-type (which would be null/undefined).
-            // The variable type is just its assigned value.
-        } else {
-            // Loop might not execute; variable might be undefined.
-            // Leave as-is since it's already set in the entry context.
+pub(super) type VarTypes = rustc_hash::FxHashMap<Name, Arc<Type>>;
+
+/// Variables a loop generalized; every later pass generalizes them again so the search settles.
+#[derive(Clone, Default)]
+pub(super) struct Widened(Vec<Name>);
+
+impl Widened {
+    pub(super) fn reapply(&self, prev: &VarTypes, next: &mut crate::flow_state::FlowState) {
+        for name in &self.0 {
+            generalize_var(prev, next, name);
         }
+    }
+
+    /// Generalizes the variables whose array nesting grew since `prev`, or changed at the depth cap.
+    pub(super) fn widen_deepening(
+        &mut self,
+        prev: &VarTypes,
+        next: &mut crate::flow_state::FlowState,
+    ) {
+        let deepening: Vec<Name> = next
+            .vars
+            .iter()
+            .filter(|(name, ty)| {
+                prev.get(*name).is_some_and(|before| {
+                    !Arc::ptr_eq(before, ty) && {
+                        let depth = ty.array_depth();
+                        // At the global cap a recursive shape stops deepening.
+                        depth > before.array_depth()
+                            || (depth >= mir_types::generalize::MAX_ARRAY_DEPTH
+                                && **before != ***ty)
+                    }
+                }) && !self.0.contains(name)
+            })
+            .map(|(name, _)| *name)
+            .collect();
+        for name in deepening {
+            generalize_var(prev, next, &name);
+            self.0.push(name);
+        }
+    }
+
+    /// Generalizes every variable that changed since `prev`, or makes it `mixed` with `to_mixed`.
+    pub(super) fn widen_changed(
+        &mut self,
+        prev: &VarTypes,
+        next: &mut crate::flow_state::FlowState,
+        to_mixed: bool,
+    ) {
+        let changed: Vec<Name> = next
+            .vars
+            .iter()
+            .filter(|(name, ty)| {
+                prev.get(*name)
+                    .is_none_or(|before| !Arc::ptr_eq(before, ty) && **before != ***ty)
+            })
+            .map(|(name, _)| *name)
+            .collect();
+        for name in changed {
+            if to_mixed {
+                let vars = Arc::make_mut(&mut next.vars);
+                if let Some(ty) = vars.get_mut(&name) {
+                    let mut mixed = Type::mixed();
+                    mixed.possibly_undefined = ty.possibly_undefined;
+                    *ty = mir_codebase::definitions::wrap_var_type(mixed);
+                }
+            } else {
+                generalize_var(prev, next, &name);
+                if !self.0.contains(&name) {
+                    self.0.push(name);
+                }
+            }
+        }
+    }
+}
+
+fn generalize_var(prev: &VarTypes, next: &mut crate::flow_state::FlowState, name: &Name) {
+    let Some(ty) = next.vars.get(name) else {
+        return;
+    };
+    if prev.get(name).is_some_and(|before| Arc::ptr_eq(before, ty)) {
+        return;
+    }
+    let general = ty.generalized();
+    if general != **ty {
+        Arc::make_mut(&mut next.vars)
+            .insert(*name, mir_codebase::definitions::wrap_var_type(general));
     }
 }
 

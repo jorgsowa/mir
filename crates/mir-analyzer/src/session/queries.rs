@@ -232,7 +232,9 @@ impl AnalysisSession {
             if !self.prepare_stale_candidates(&stale, should_cancel) {
                 return None;
             }
-            self.query_snapshot(|snap| snap.commit_reference_candidates(&stale));
+            self.query_snapshot(|snap| {
+                snap.commit_reference_candidates(&stale, &crate::IndexCancel::new())
+            });
         }
 
         if include_declaration {

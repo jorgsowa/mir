@@ -1,6 +1,7 @@
 pub mod atomic;
 pub mod compact;
 pub mod display;
+pub mod generalize;
 pub mod location;
 pub mod symbol;
 pub mod union;

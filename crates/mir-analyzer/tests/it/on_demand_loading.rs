@@ -251,8 +251,14 @@ fn owner_reference_query_sees_references_a_pending_adoption_resolves() {
     // resolves it until that file is loaded and indexed.
     let (query, scope) = (run.clone(), files.clone());
     let before = on_snapshot(&session, move |snap| {
-        snap.indexed_references_to(&query, &scope, false, ReferenceIncludes::Plain)
-            .unwrap()
+        snap.indexed_references_to(
+            &query,
+            &scope,
+            false,
+            ReferenceIncludes::Plain,
+            &mir_analyzer::IndexCancel::new(),
+        )
+        .unwrap()
     });
     assert!(before.is_empty(), "{before:?}");
     declaring_file(&session, "Vendor\\Base");

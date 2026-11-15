@@ -46,6 +46,7 @@ mod perf_open_file_closure;
 mod plugin_hooks;
 mod prepare_files_batch;
 mod ref_index_locks;
+mod reference_cancel_mid_file;
 mod reference_locations;
 mod regression_timing;
 mod salsa_update_optimization;

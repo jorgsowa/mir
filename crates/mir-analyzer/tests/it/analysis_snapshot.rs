@@ -38,7 +38,13 @@ fn snapshot_queries_on_another_thread_match_the_session() {
     let thread_run = run.clone();
     let (refs, subs, name, class_found) = thread::spawn(move || {
         let refs = snap
-            .indexed_references_to(&thread_run, &thread_files, true, ReferenceIncludes::Plain)
+            .indexed_references_to(
+                &thread_run,
+                &thread_files,
+                true,
+                ReferenceIncludes::Plain,
+                &mir_analyzer::IndexCancel::new(),
+            )
             .unwrap();
         let subs = snap
             .indexed_subtype_classes("App\\Base", &thread_files, false)

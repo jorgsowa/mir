@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `AnalysisSnapshot::indexed_references_to` and `indexed_use_import_locations` take an `&IndexCancel`. Cancelling it stops the query inside a file's analysis, at the next loop-body pass, with `Err(Cancelled::Local)` and nothing memoized. `warm_files` and `reanalyze_files` now honor their token the same way.
+- Performance: a loop nested inside another loop starts from its previous fixed point on each outer pass instead of converging from scratch (ten nested `for` loops: 2.3 s → 0.3 s).
 - Performance: with taint analysis on, the include graph that global-variable taint reads is built in parallel before body analysis when an analyzed file has a `global` statement or reads `$GLOBALS`, instead of serially on first use while other workers wait (WordPress at `-j 8` without cache: about 5% faster wall time, same instructions).
 - Performance: checking an argument against an `int-mask-of<Cls::PREFIX_*>` parameter builds the mask's literal union in linear rather than quadratic time. SimplePie's `sanitize()` calls dominated WordPress's taint summaries, which other workers waited on (WordPress at `-j 8` without cache: about 10% faster wall time, 5% fewer instructions).
 - Performance: argument checks, opaque-call property invalidation and reference recording no longer format strings that are only needed when an issue is reported or references are kept (about 2% fewer instructions on WordPress, Symfony and Laravel).
@@ -53,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Analysis no longer hangs on loops that build recursive arrays, such as `$s = [$s]` in nested loops, which ran past 20 seconds and 6 GB of memory at four levels. A loop variable that still changes after three passes is generalized (literals to their base type, shapes to generic arrays) until it reaches a fixed point. Array types are also capped at 8 levels of nesting, and unions of more than 30 members other than string and int literals are generalized.
+- A loop's post-loop state and its `continue` handling use only the first and final passes' `break`/`continue` states, instead of re-merging every earlier pass's.
 - `assert()` no longer clears taint. It still narrows types, but production builds set `zend.assertions=-1`, so `assert(ctype_digit($id)); echo $id;` sends the input out unchecked.
 - A URL parsed with PHP 8.5's `new Uri\Rfc3986\Uri()`, `new Uri\WhatWg\Url()` or their `::parse()` keeps the request taint of its input, so `curl_init($url->toAsciiString())` on request data is `TaintedSsrf`. Comparing the parsed host with literal hosts (`$uri->getHost() === 'api.example.com'`, or `in_array()` over a fixed list) clears the SSRF taint, since the parser resolves the host the way the request does.
 - `filter_var($x, FILTER_VALIDATE_IP)` and `filter_input(..., FILTER_VALIDATE_IP)` no longer clear SSRF taint, since a valid IP can be a loopback, private or cloud metadata address. Passing `FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE` or `FILTER_FLAG_GLOBAL_RANGE` still clears it.

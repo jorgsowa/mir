@@ -285,6 +285,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let condition = w.condition.clone();
         let mut passes = 0;
         let post = self.analyze_loop_widened(
+            std::ptr::from_ref(w) as usize,
             &pre,
             entry,
             |sa, iter| {
@@ -334,6 +335,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Do-while always executes at least once (body before condition check)
         let mut first_pass = true;
         let post = self.analyze_loop_widened(
+            std::ptr::from_ref(dw) as usize,
             &pre,
             entry,
             |sa, iter| {
@@ -399,6 +401,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let full = self.mode == crate::body_analysis::AnalysisMode::Full;
         let head: Vec<&php_ast::owned::Expr> = f.condition.iter().collect();
         let mut post = self.analyze_loop_widened(
+            std::ptr::from_ref(f) as usize,
             &pre,
             entry,
             |sa, iter| {
@@ -650,6 +653,7 @@ impl<'a> StatementsAnalyzer<'a> {
             .map(|name| mir_types::Name::from(name.trim_start_matches('$')))
             .collect();
         let mut post = self.analyze_loop_widened(
+            std::ptr::from_ref(fe) as usize,
             &pre,
             entry,
             |sa, iter| {

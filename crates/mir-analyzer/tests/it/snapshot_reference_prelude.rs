@@ -96,6 +96,7 @@ fn snapshot_refs(
             &files,
             include_declaration,
             ReferenceIncludes::Plain,
+            &mir_analyzer::IndexCancel::new(),
         )
         .unwrap()
     })

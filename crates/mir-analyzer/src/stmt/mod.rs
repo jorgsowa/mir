@@ -15,7 +15,7 @@ use crate::ast_ext::NameResolveExt as _;
 pub(crate) use flow::return_type_is_invalid;
 pub(crate) use loops::infer_foreach_types;
 pub(crate) use loops::resolve_iterator_item_types;
-use loops::{vars_stabilized, widen_unstable};
+use loops::{vars_stabilized, Widened};
 pub(crate) use return_type::named_object_return_compatible;
 pub(crate) use return_type::resolve_union_for_file;
 pub(crate) use return_type::resolve_union_for_file_native;
@@ -273,6 +273,8 @@ pub struct StatementsAnalyzer<'a> {
     /// real loop, `false` if it's a `switch`. `continue` behaves differently
     /// depending on which kind its target level is — see `analyze_continue_stmt`.
     loop_kind_stack: Vec<bool>,
+    /// Per loop statement address, its last fixed point while an enclosing loop iterates (entries only widen).
+    loop_seeds: rustc_hash::FxHashMap<usize, (loops::VarTypes, Widened)>,
     /// One frame per enclosing `try` with a `finally`, collecting the states at each `return` in it.
     finally_return_stack: Vec<Vec<FlowState>>,
     /// Snapshot of the installed plugin registry — see
@@ -332,6 +334,7 @@ impl<'a> StatementsAnalyzer<'a> {
             break_ctx_stack: Vec::new(),
             continue_ctx_stack: Vec::new(),
             loop_kind_stack: Vec::new(),
+            loop_seeds: rustc_hash::FxHashMap::default(),
             finally_return_stack: Vec::new(),
             plugins: mir_plugin::snapshot(),
             class_like_cache: None,
@@ -419,6 +422,31 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         for (frame, len) in self.continue_ctx_stack.iter_mut().zip(continues) {
             frame.truncate(len);
+        }
+    }
+
+    /// Removes and returns the `break`/`continue` states recorded since `marks`.
+    fn split_loop_exits(&mut self, (breaks, continues): &(Vec<usize>, Vec<usize>)) -> LoopExits {
+        let split = |stack: &mut Vec<Vec<FlowState>>, marks: &[usize]| {
+            stack
+                .iter_mut()
+                .zip(marks)
+                .map(|(frame, len)| frame.split_off(*len))
+                .collect()
+        };
+        (
+            split(&mut self.break_ctx_stack, breaks),
+            split(&mut self.continue_ctx_stack, continues),
+        )
+    }
+
+    /// Puts back states taken by [`Self::split_loop_exits`].
+    fn extend_loop_exits(&mut self, (breaks, continues): LoopExits) {
+        for (frame, states) in self.break_ctx_stack.iter_mut().zip(breaks) {
+            frame.extend(states);
+        }
+        for (frame, states) in self.continue_ctx_stack.iter_mut().zip(continues) {
+            frame.extend(states);
         }
     }
 
@@ -1324,7 +1352,7 @@ impl<'a> StatementsAnalyzer<'a> {
     // Fixed-point loop widening (M12)
     // -----------------------------------------------------------------------
 
-    /// Analyse a loop body with a fixed-point widening algorithm (≤ 3 passes).
+    /// Analyse a loop body to a fixed point, generalizing what has not converged after 3 passes.
     ///
     /// * `pre`   — context *before* the loop (used as the merge base)
     /// * `entry` — context on first iteration entry (may be narrowed / seeded)
@@ -1340,6 +1368,7 @@ impl<'a> StatementsAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     fn analyze_loop_widened<F>(
         &mut self,
+        loop_key: usize,
         pre: &FlowState,
         entry: FlowState,
         mut body: F,
@@ -1352,21 +1381,38 @@ impl<'a> StatementsAnalyzer<'a> {
         F: FnMut(&mut Self, &mut FlowState),
     {
         const MAX_ITERS: usize = 3;
+        // Then one pass on the generalized state and a last one on `mixed`.
+        const PASS_LIMIT: usize = MAX_ITERS + 2;
 
         // Push a fresh break-context bucket for this loop level
         self.break_ctx_stack.push(Vec::new());
         self.continue_ctx_stack.push(Vec::new());
         self.loop_kind_stack.push(true);
+        // Later passes can lose first-iteration state, so the first pass's exits join the final pass's.
+        let exit_marks = self.loop_exit_marks();
+        let mut first_pass_exits = None;
 
         let mut current = entry;
         current.inside_loop = true;
         // A guaranteed loop's `current` holds only post-iteration states, but
         // every pass must still see the first iteration's entry.
         let first_entry = loop_guaranteed.then(|| current.clone());
+        let entry_vars = current.vars.clone();
+        let mut widened = Widened::default();
+        if let Some((seed, seed_widened)) = self.loop_seeds.get(&loop_key) {
+            seed_loop_entry(&mut current, seed);
+            widened = seed_widened.clone();
+            widened.reapply(&loops::VarTypes::default(), &mut current);
+        }
 
-        let mut stabilized = false;
         let mut back_edge_pass_done = false;
-        for iter_idx in 0..MAX_ITERS {
+        for iter_idx in 0..PASS_LIMIT {
+            crate::indexing::unwind_if_cancelled();
+            if iter_idx == 1 {
+                first_pass_exits = Some(self.split_loop_exits(&exit_marks));
+            } else if iter_idx > 1 {
+                self.truncate_loop_exits(exit_marks.clone());
+            }
             let prev_vars = current.vars.clone();
 
             // `body` runs the real statement analyzer, which emits diagnostics
@@ -1442,50 +1488,64 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
 
+            widened.reapply(&prev_vars, &mut next);
+            // An array nesting deeper on every pass (`$s = [$s]`) never converges on its own.
+            if iter_idx > 0 {
+                widened.widen_deepening(&prev_vars, &mut next);
+            }
+
+            let last_pass = iter_idx + 1 == PASS_LIMIT;
             if vars_stabilized(&prev_vars, &next.vars) {
                 // A write left pending at the end of the body reaches the next
                 // iteration's reads, but only a pass entered with it pending
                 // can consume it. Types converge too early to provide one.
-                if !back_edge_pass_done && has_back_edge_read(&iter, &current) {
+                if !back_edge_pass_done && !last_pass && has_back_edge_read(&iter, &current) {
                     back_edge_pass_done = true;
-                    if iter_idx + 1 < MAX_ITERS {
-                        self.issues.truncate_to(issues_mark);
-                    }
+                    self.issues.truncate_to(issues_mark);
                     current = next;
                     continue;
                 }
                 current = next;
-                stabilized = true;
                 break;
             }
             // A second pass that can't observe how its entry differs from the
             // first's would repeat it exactly, so the first pass is the fixed point.
             if iter_idx == 0 && repeats_first_pass.is_some_and(|repeats| repeats(&current, &next)) {
                 current = next;
-                stabilized = true;
                 break;
+            }
+            if last_pass {
+                current = next;
+                break;
+            }
+            // Not converged within `MAX_ITERS`: generalize what still changes, then fall back to `mixed`.
+            if iter_idx + 1 >= MAX_ITERS {
+                widened.widen_changed(&prev_vars, &mut next, iter_idx + 1 > MAX_ITERS);
             }
             // Not the fixed point yet, and (since the loop keeps going) not
             // the last pass either — this pass's diagnostics were computed
             // against a type state later passes will refine, so they're
             // provisional. Roll them back; a real issue at the same
             // condition will re-emit on a later pass if it's still real.
-            if iter_idx + 1 < MAX_ITERS {
-                self.issues.truncate_to(issues_mark);
-            }
+            self.issues.truncate_to(issues_mark);
             current = next;
         }
 
-        // Widen only if the bounded fixed-point search did not converge.  Doing
-        // this after a converged guaranteed loop would merge stable body state
-        // back with `pre`, recreating the impossible zero-iteration path.
-        if !stabilized {
-            widen_unstable(
-                &pre.vars,
-                std::sync::Arc::make_mut(&mut current.vars),
-                loop_guaranteed,
-            );
+        if let Some(exits) = first_pass_exits {
+            self.extend_loop_exits(exits);
         }
+
+        let changed: loops::VarTypes = current
+            .vars
+            .iter()
+            .filter(|(name, ty)| {
+                entry_vars
+                    .get(*name)
+                    .is_some_and(|before| !Arc::ptr_eq(before, ty) && **before != ***ty)
+            })
+            .map(|(name, ty)| (*name, ty.clone()))
+            .collect();
+        self.loop_seeds.insert(loop_key, (changed, widened.clone()));
 
         // For infinite loops (while(true)/for(;;)) the normal-exit path is unreachable;
         // only break statements can leave the loop. Marking current as diverging causes
@@ -1507,7 +1567,12 @@ impl<'a> StatementsAnalyzer<'a> {
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
         let continue_ctxs = self.continue_ctx_stack.pop().unwrap_or_default();
         self.loop_kind_stack.pop();
-        for bctx in break_ctxs {
+        if !self.loop_kind_stack.contains(&true) {
+            self.loop_seeds.clear();
+        }
+        let no_vars = loops::VarTypes::default();
+        for mut bctx in break_ctxs {
+            widened.reapply(&no_vars, &mut bctx);
             current = FlowState::merge_branches(pre, current, Some(bctx));
         }
         // A real-loop `continue` returns to the next iteration and can reach
@@ -1515,7 +1580,8 @@ impl<'a> StatementsAnalyzer<'a> {
         // loop, whose post-loop state remains unreachable unless a `break`
         // supplied one above.
         if !is_infinite {
-            for cctx in continue_ctxs {
+            for mut cctx in continue_ctxs {
+                widened.reapply(&no_vars, &mut cctx);
                 current = FlowState::merge_branches(pre, current, Some(cctx));
             }
         }
@@ -1526,6 +1592,28 @@ impl<'a> StatementsAnalyzer<'a> {
         current.inside_loop = pre.inside_loop;
 
         current
+    }
+}
+
+type LoopExits = (Vec<Vec<FlowState>>, Vec<Vec<FlowState>>);
+
+/// Widens `entry`'s defined variables by a loop's earlier fixed point.
+fn seed_loop_entry(entry: &mut FlowState, seed: &loops::VarTypes) {
+    for (name, seeded) in seed {
+        let Some(ty) = entry.vars.get(name) else {
+            continue;
+        };
+        if Arc::ptr_eq(ty, seeded) || **ty == **seeded {
+            continue;
+        }
+        let mut merged = (**ty).clone();
+        let possibly_undefined = merged.possibly_undefined;
+        merged.merge_with(seeded);
+        merged.possibly_undefined = possibly_undefined;
+        if merged != **ty {
+            Arc::make_mut(&mut entry.vars)
+                .insert(*name, mir_codebase::definitions::wrap_var_type(merged));
+        }
     }
 }
 

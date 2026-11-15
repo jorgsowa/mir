@@ -565,11 +565,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-            return Type::single(Atomic::TKeyedArray {
-                properties: Arc::new(keyed_props),
-                is_open: false,
-                is_list,
-            });
+            return Type::single(mir_types::generalize::cap_array_depth(
+                Atomic::TKeyedArray {
+                    properties: Arc::new(keyed_props),
+                    is_open: false,
+                    is_list,
+                },
+            ));
         }
 
         // Fallback: generic TArray. `all_value_types`/`key_union` were already
