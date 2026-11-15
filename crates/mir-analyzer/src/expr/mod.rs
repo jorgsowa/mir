@@ -672,6 +672,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let mut literal = String::new();
                 let mut all_literal = true;
                 let mut any_non_empty_literal = false;
+                let mut parts_literal_text = true;
                 for part in crate::ast_ext::StringPartsExt::string_parts(&expr.kind) {
                     match part {
                         php_ast::owned::StringPart::Literal(s) => {
@@ -683,6 +684,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         php_ast::owned::StringPart::Expr(e) => {
                             all_literal = false;
                             let expr_ty = self.analyze(e, ctx);
+                            parts_literal_text &= crate::expr::helpers::is_literal_text(&expr_ty);
                             self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                         }
                         _ => {}
@@ -690,6 +692,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 if all_literal {
                     Type::single(Atomic::TLiteralString(literal.into()))
+                } else if parts_literal_text {
+                    crate::expr::helpers::literal_string(any_non_empty_literal)
                 } else if any_non_empty_literal {
                     // A non-empty literal part stays in the result no matter how
                     // the embedded expressions coerce to string, so the whole

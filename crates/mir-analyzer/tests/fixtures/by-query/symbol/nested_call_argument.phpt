@@ -7,4 +7,4 @@ symbol
 echo strlen(tr<CURSOR>im(' a '));
 ===expect===
 kind: function call trim
-type: string
+type: literal-string

@@ -1255,9 +1255,16 @@ impl CallAnalyzer {
                     super::array_builtins::array_fill_return_type(&arg_types).unwrap_or(return_ty)
                 }
                 // implode/join with a non-empty array of non-empty strings returns non-empty-string.
-                "implode" | "join" => {
-                    super::callable::implode_return_type(&arg_types).unwrap_or(return_ty)
-                }
+                "implode" | "join" => super::callable::literal_text_return_type(
+                    resolved_fn_name.as_str(),
+                    &arg_types,
+                    super::callable::implode_return_type(&arg_types).unwrap_or(return_ty),
+                ),
+                "trim" | "ltrim" | "rtrim" => super::callable::literal_text_return_type(
+                    resolved_fn_name.as_str(),
+                    &arg_types,
+                    return_ty,
+                ),
                 // str_split with a non-empty string returns a non-empty list<non-empty-string>.
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
@@ -1504,15 +1511,19 @@ impl CallAnalyzer {
                 // vsprintf's args are passed as a single array, but the return-type
                 // inference only ever looks at arg_types[0] (the format string), so
                 // the same helper applies unchanged.
-                "sprintf" | "vsprintf" => {
-                    super::callable::sprintf_return_type(&arg_types).unwrap_or(return_ty)
-                }
+                "sprintf" | "vsprintf" => super::callable::literal_text_return_type(
+                    resolved_fn_name.as_str(),
+                    &arg_types,
+                    super::callable::sprintf_return_type(&arg_types).unwrap_or(return_ty),
+                ),
                 // number_format() always returns a non-empty string.
                 "number_format" => super::callable::number_format_return_type(),
                 // str_repeat() with a non-empty string and positive count returns non-empty.
-                "str_repeat" => {
-                    super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
-                }
+                "str_repeat" => super::callable::literal_text_return_type(
+                    resolved_fn_name.as_str(),
+                    &arg_types,
+                    super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty),
+                ),
                 // array_chunk splits an array into sub-arrays; outer list is non-empty when
                 // source is non-empty; chunks are list<T> by default (preserve_keys=false).
                 "array_chunk" => {

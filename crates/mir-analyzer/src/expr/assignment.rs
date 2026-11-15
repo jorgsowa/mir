@@ -1,9 +1,8 @@
 use super::helpers::{
-    as_concat_str, definite_key_state, extract_simple_var, extract_string_from_expr,
-    infer_arithmetic, infer_div, infer_int_range_arithmetic, is_non_empty_when_concat,
-    is_property_type_coercion, literal_array_key_of_kind, partial_property_assignment,
-    property_assign_compatible, type_refs_any_template, widen_array_as_list,
-    widen_array_with_value_and_key, DefiniteKeyState,
+    definite_key_state, extract_simple_var, extract_string_from_expr, infer_arithmetic, infer_div,
+    infer_int_range_arithmetic, is_non_empty_when_concat, is_property_type_coercion,
+    literal_array_key_of_kind, partial_property_assignment, property_assign_compatible,
+    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key, DefiniteKeyState,
 };
 use super::ExpressionAnalyzer;
 use crate::ast_ext::ByteStringExt as _;
@@ -792,15 +791,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // `.=` reads the LHS before writing — mark the old write consumed.
                     ctx.mark_consumed(var_name);
                     let lhs_ty = ctx.get_var(var_name);
-                    let result_ty = if let (Some(l), Some(r)) =
-                        (as_concat_str(&lhs_ty), as_concat_str(&rhs_ty))
+                    let result_ty = if let Some(ty) =
+                        crate::expr::helpers::literal_concat(&lhs_ty, &rhs_ty)
                     {
-                        let combined = format!("{l}{r}");
-                        if combined.len() <= 1000 {
-                            Type::single(Atomic::TLiteralString(combined.into()))
-                        } else {
-                            Type::single(Atomic::TNonEmptyString)
-                        }
+                        ty
                     } else if is_non_empty_when_concat(&lhs_ty) || is_non_empty_when_concat(&rhs_ty)
                     {
                         Type::single(Atomic::TNonEmptyString)
@@ -823,15 +817,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // never run, and the concatenated type is never written back,
                     // leaving the tracked type stale.
                     let lhs_ty = self.analyze(&a.target, ctx);
-                    let result_ty = if let (Some(l), Some(r)) =
-                        (as_concat_str(&lhs_ty), as_concat_str(&rhs_ty))
+                    let result_ty = if let Some(ty) =
+                        crate::expr::helpers::literal_concat(&lhs_ty, &rhs_ty)
                     {
-                        let combined = format!("{l}{r}");
-                        if combined.len() <= 1000 {
-                            Type::single(Atomic::TLiteralString(combined.into()))
-                        } else {
-                            Type::single(Atomic::TNonEmptyString)
-                        }
+                        ty
                     } else if is_non_empty_when_concat(&lhs_ty) || is_non_empty_when_concat(&rhs_ty)
                     {
                         Type::single(Atomic::TNonEmptyString)

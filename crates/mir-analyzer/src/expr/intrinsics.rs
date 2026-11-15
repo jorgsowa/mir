@@ -116,7 +116,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             | MagicConstKind::Method
             | MagicConstKind::Namespace
             | MagicConstKind::Trait
-            | MagicConstKind::Property => Type::single(Atomic::TString),
+            // Fixed at compile time, so never runtime input.
+            | MagicConstKind::Property => crate::expr::helpers::literal_string(false),
             _ => Type::mixed(),
         }
     }

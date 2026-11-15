@@ -26,6 +26,6 @@ function test_positive_int(string $s, int $n): void {
 
 function test_empty_string_is_not_narrowed(): void {
     $r = str_repeat("", 5);
-    /** @mir-check $r is string */
+    /** @mir-check $r is literal-string */
     $_ = $r;
 }

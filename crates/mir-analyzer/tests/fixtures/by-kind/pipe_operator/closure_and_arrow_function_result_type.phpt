@@ -14,4 +14,4 @@ $c = 3 |> function (int $x): string { return str_repeat('x', $x); };
 //<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Trace: Type of $b is float
 /** @trace $c */
 echo $a, $b, $c;
-//<^^^^^^^^^^^^^^^^ Trace: Type of $c is string
+//<^^^^^^^^^^^^^^^^ Trace: Type of $c is literal-string

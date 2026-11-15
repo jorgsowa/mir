@@ -11,4 +11,4 @@ $len = "  padded  "
     |> (fn(int $n): string => str_repeat('-', $n));
 /** @trace $len */
 echo $len;
-//<^^^^^^^^^^ Trace: Type of $len is string
+//<^^^^^^^^^^ Trace: Type of $len is literal-string

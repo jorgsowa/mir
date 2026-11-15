@@ -1356,6 +1356,44 @@ pub fn as_concat_str(ty: &Type) -> Option<String> {
     }
 }
 
+/// Whether every value of `ty` is a string or int spelled out in the source.
+pub fn is_literal_text(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TLiteralString(_)
+                    | Atomic::TLiteralInt(_)
+                    | Atomic::TRefinedInt(_)
+                    | Atomic::TRefinedString {
+                        refinement: mir_types::StringRefinement::Literal,
+                        ..
+                    }
+            )
+        })
+}
+
+pub fn literal_string(non_empty: bool) -> Type {
+    Type::single(Atomic::TRefinedString {
+        refinement: mir_types::StringRefinement::Literal,
+        non_empty,
+    })
+}
+
+/// `left . right` when both sides are literal text: folded when short, `literal-string` otherwise.
+pub fn literal_concat(left: &Type, right: &Type) -> Option<Type> {
+    if let (Some(l), Some(r)) = (as_concat_str(left), as_concat_str(right)) {
+        let combined = format!("{l}{r}");
+        return Some(if combined.len() <= 1000 {
+            Type::single(Atomic::TLiteralString(combined.into()))
+        } else {
+            literal_string(true)
+        });
+    }
+    (is_literal_text(left) && is_literal_text(right))
+        .then(|| literal_string(is_non_empty_when_concat(left) || is_non_empty_when_concat(right)))
+}
+
 pub fn extract_simple_var(expr: &Expr) -> Option<&str> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name),

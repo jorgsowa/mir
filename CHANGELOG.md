@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance: argument checks, opaque-call property invalidation and reference recording no longer format strings that are only needed when an issue is reported or references are kept (about 2% fewer instructions on WordPress, Symfony and Laravel).
 - Performance: unused-assignment tracking keeps overwritten writes in an insertion-ordered set, so merging branches extends it with what the other branch added instead of rebuilding a hash set and copying the list, and `int-mask-of<...>` unions are expanded once per member set (SimplePie's `Item` 13% fewer instructions).
 - Performance: return-type inference and taint summaries skip argument type checks, whose issues they discard (WordPress about 1.5% fewer instructions).
+- A string that may be built at runtime passed to a `literal-string` parameter is `InvalidArgument` instead of an info-level `ArgumentTypeCoercion`, so the annotation enforces that query builders only receive source-written SQL. Literal-only unions (`'asc'|'desc'`) keep the coercion.
+- Strings built only from literals stay `literal-string`: interpolation of literal parts, concatenating literal unions (a query extended with `.=` in a loop), concatenations over 1000 characters, magic constants such as `__CLASS__`, and `implode()`, `str_repeat()`, `trim()`/`ltrim()`/`rtrim()` and `sprintf()` of literal arguments.
 
 ### Fixed
 

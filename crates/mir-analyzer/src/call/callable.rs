@@ -455,6 +455,39 @@ pub(crate) fn str_repeat_return_type(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
+/// `implode`, `str_repeat`, `sprintf` and `trim` of literal text return literal text.
+pub(crate) fn literal_text_return_type(fn_name: &str, arg_types: &[Type], return_ty: Type) -> Type {
+    use crate::expr::helpers::is_literal_text;
+    let values_literal = |arr: &Type| {
+        !arr.types.is_empty()
+            && arr.types.iter().all(|a| match a {
+                Atomic::TList { value }
+                | Atomic::TNonEmptyList { value }
+                | Atomic::TArray { value, .. }
+                | Atomic::TNonEmptyArray { value, .. } => is_literal_text(value),
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open: false,
+                    ..
+                } => properties.values().all(|p| is_literal_text(&p.ty)),
+                _ => false,
+            })
+    };
+    let literal_args = match (fn_name, arg_types) {
+        ("implode" | "join", [arr]) => values_literal(arr),
+        ("implode" | "join", [separator, arr]) => is_literal_text(separator) && values_literal(arr),
+        // The count adds no characters of its own.
+        ("str_repeat", [input, _]) => is_literal_text(input),
+        ("trim" | "ltrim" | "rtrim" | "sprintf", [_, ..]) => arg_types.iter().all(is_literal_text),
+        _ => false,
+    };
+    let all_strings = !return_ty.types.is_empty() && return_ty.types.iter().all(|a| a.is_string());
+    if !literal_args || !all_strings || is_literal_text(&return_ty) {
+        return return_ty;
+    }
+    crate::expr::helpers::literal_string(is_non_empty_string(&return_ty))
+}
+
 /// Infer the return type of `implode($separator, $array)` / `join($separator, $array)`.
 ///
 /// When the array argument is a non-empty collection of non-empty strings,
@@ -1162,19 +1195,41 @@ fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAna
     is_int_or_float(expected) && is_int_or_float(actual)
 }
 
-/// True when `broad` is plain `int`/`string` (or a union of them) and `narrow` refines it
+/// True when `broad` is plain `int`/`string`/`literal-string` (or a union of them) and `narrow` refines it
 /// (`positive-int`, `non-empty-string`): a value typed `broad` may or may not satisfy
 /// `narrow`, so it is a coercion, not a mismatch. A nullable `narrow` is refined by its
 /// non-null part. Other supertypes (`float`, `int|null`, partial classes) stay errors.
 pub(crate) fn narrows_to(broad: &Type, narrow: &Type) -> bool {
     let narrow = narrow.remove_null();
+    let is_literal_string = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TRefinedString {
+                refinement: mir_types::StringRefinement::Literal,
+                ..
+            }
+        )
+    };
+    let broad = if broad.types.iter().any(is_literal_string) {
+        let mut widened = Type::empty();
+        for a in &broad.types {
+            widened.add_type(if is_literal_string(a) {
+                Atomic::TString
+            } else {
+                a.clone()
+            });
+        }
+        std::borrow::Cow::Owned(widened)
+    } else {
+        std::borrow::Cow::Borrowed(broad)
+    };
     !broad.types.is_empty()
         && !narrow.types.is_empty()
         && broad
             .types
             .iter()
             .all(|a| matches!(a, Atomic::TInt | Atomic::TString))
-        && narrow.is_subtype_structural(broad)
+        && narrow.is_subtype_structural(&broad)
 }
 
 /// Rewrites docblock `Enum::Case` references (parsed as an opaque named type) to enum-case

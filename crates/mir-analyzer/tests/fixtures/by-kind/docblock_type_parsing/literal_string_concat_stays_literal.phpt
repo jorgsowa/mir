@@ -26,5 +26,5 @@ function select(string $table, int $limit, string $filter): void {
     $filtered = $base . ' WHERE ' . $filter;
     /** @mir-check $filtered is non-empty-string */
     run($filtered);
-//      ^^^^^^^^^ ArgumentTypeCoercion: Argument $sql of run() expects 'literal-string', got 'non-empty-string' — coercion may fail at runtime
+//      ^^^^^^^^^ InvalidArgument: Argument $sql of run() expects 'literal-string', got 'non-empty-string'
 }

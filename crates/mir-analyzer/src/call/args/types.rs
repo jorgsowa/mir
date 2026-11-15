@@ -567,6 +567,20 @@ pub(crate) fn check_one(
         return;
     }
 
+    if non_literal_for_literal_string(arg_ty, param_ty) {
+        ea.emit(
+            IssueKind::InvalidArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: format!("{param_ty}"),
+                actual: unsplit_arg_ty.to_string(),
+            },
+            Severity::Error,
+            arg_span,
+        );
+        return;
+    }
+
     let arg_core = arg_ty.core_type();
     let mismatch = !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()
@@ -850,6 +864,37 @@ fn class_fits_object_shape(
             None => want.optional,
         }
     })
+}
+
+/// A string that may be built at runtime passed where only `literal-string` is accepted.
+fn non_literal_for_literal_string(arg: &Type, param: &Type) -> bool {
+    let is_literal_string = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TRefinedString {
+                refinement: mir_types::StringRefinement::Literal,
+                ..
+            }
+        )
+    };
+    param.types.iter().any(is_literal_string)
+        && !param.types.iter().any(|p| {
+            p.is_string() && !is_literal_string(p) && !matches!(p, Atomic::TLiteralString(_))
+        })
+        && arg.types.iter().any(|a| {
+            matches!(
+                a,
+                Atomic::TString
+                    | Atomic::TNonEmptyString
+                    | Atomic::TNonFalsyString
+                    | Atomic::TRefinedString {
+                        refinement: mir_types::StringRefinement::Lowercase
+                            | mir_types::StringRefinement::Uppercase
+                            | mir_types::StringRefinement::NonDecimalInt,
+                        ..
+                    }
+            )
+        })
 }
 
 /// A plain `string`/`int`/`resource` passed where only a refinement of it is accepted (`non-empty-string`, `positive-int`, `'a'|'b'`, `closed-resource`).

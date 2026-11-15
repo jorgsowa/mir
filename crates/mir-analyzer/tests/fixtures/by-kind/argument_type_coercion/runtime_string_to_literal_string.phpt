@@ -24,11 +24,11 @@ function run(string $input, bool $all): void {
     query($all ? 'SELECT *' : 'SELECT id');
     query('');
     query($input);
-//        ^^^^^^ ArgumentTypeCoercion: Argument $sql of query() expects 'literal-string', got 'string' — coercion may fail at runtime
+//        ^^^^^^ InvalidArgument: Argument $sql of query() expects 'literal-string', got 'string'
     query('SELECT * FROM ' . $input);
-//        ^^^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $sql of query() expects 'literal-string', got 'non-empty-string' — coercion may fail at runtime
+//        ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $sql of query() expects 'literal-string', got 'non-empty-string'
     query("SELECT $input");
-//        ^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $sql of query() expects 'literal-string', got 'non-empty-string' — coercion may fail at runtime
+//        ^^^^^^^^^^^^^^^ InvalidArgument: Argument $sql of query() expects 'literal-string', got 'non-empty-string'
     query(trim($input));
-//        ^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $sql of query() expects 'literal-string', got 'string' — coercion may fail at runtime
+//        ^^^^^^^^^^^^ InvalidArgument: Argument $sql of query() expects 'literal-string', got 'string'
 }

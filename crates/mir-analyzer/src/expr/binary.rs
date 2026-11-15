@@ -1,6 +1,5 @@
 use super::helpers::{
-    as_concat_str, infer_arithmetic, infer_div, infer_int_range_arithmetic,
-    is_non_empty_when_concat,
+    infer_arithmetic, infer_div, infer_int_range_arithmetic, is_non_empty_when_concat,
 };
 use super::ExpressionAnalyzer;
 use crate::ast_ext::NameRefExt as _;
@@ -401,15 +400,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         b.right.span,
                     );
                 }
-                // Literal string fold: "foo" . "bar" = "foobar".
-                // Also folds single literal int operands to their string repr.
-                // Cap at 1000 chars to avoid storing arbitrarily large strings.
-                if let (Some(l), Some(r)) = (as_concat_str(&left_ty), as_concat_str(&right_ty)) {
-                    let combined = format!("{l}{r}");
-                    if combined.len() <= 1000 {
-                        return Type::single(Atomic::TLiteralString(combined.into()));
-                    }
-                    return Type::single(Atomic::TNonEmptyString);
+                // Literal string fold: "foo" . "bar" = "foobar"; longer or unknown literal text
+                // stays `literal-string`.
+                if let Some(ty) = crate::expr::helpers::literal_concat(&left_ty, &right_ty) {
+                    return ty;
                 }
                 // If either operand is guaranteed non-empty when cast to string,
                 // the result is also non-empty (concatenation can only add characters).
@@ -417,37 +411,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                     is_non_empty_when_concat(&left_ty),
                     is_non_empty_when_concat(&right_ty),
                 );
-                // A literal-string joined with other source-written parts stays one.
-                let is_literal_string = |a: &Atomic| {
-                    matches!(
-                        a,
-                        Atomic::TRefinedString {
-                            refinement: mir_types::StringRefinement::Literal,
-                            ..
-                        }
-                    )
-                };
-                let written_in_source = |t: &Type| {
-                    !t.types.is_empty()
-                        && t.types.iter().all(|a| {
-                            is_literal_string(a)
-                                || matches!(
-                                    a,
-                                    Atomic::TLiteralString(_)
-                                        | Atomic::TLiteralInt(_)
-                                        | Atomic::TRefinedInt(_)
-                                )
-                        })
-                };
-                if (left_ty.contains(is_literal_string) || right_ty.contains(is_literal_string))
-                    && written_in_source(&left_ty)
-                    && written_in_source(&right_ty)
-                {
-                    return Type::single(Atomic::TRefinedString {
-                        refinement: mir_types::StringRefinement::Literal,
-                        non_empty: left_non_empty || right_non_empty,
-                    });
-                }
                 for case in [
                     mir_types::StringRefinement::Lowercase,
                     mir_types::StringRefinement::Uppercase,

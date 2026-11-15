@@ -19,7 +19,7 @@ function test_literal_prefix(int $n): void {
 
 function test_percent_d(): void {
     $r = sprintf("%d", 42);
-    /** @mir-check $r is non-empty-string */
+    /** @mir-check $r is non-empty-literal-string */
     $_ = $r;
 }
 
@@ -31,7 +31,7 @@ function test_literal_suffix(string $s): void {
 
 function test_escaped_percent(): void {
     $r = sprintf("100%%");
-    /** @mir-check $r is non-empty-string */
+    /** @mir-check $r is non-empty-literal-string */
     $_ = $r;
 }
 
