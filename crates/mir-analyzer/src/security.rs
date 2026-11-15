@@ -98,6 +98,17 @@ pub(crate) fn check_builtin_call(
             span,
         );
     }
+    if fn_name_lower == "header"
+        && !ctx.origin_checked
+        && arg(args, 0, "header").is_some_and(|h| reflects_origin(h, ctx))
+        && allows_credentials(ea.source)
+    {
+        ea.emit(
+            mir_issues::IssueKind::InsecureCors,
+            mir_issues::Severity::Warning,
+            span,
+        );
+    }
     if let Some(what) = hardcoded_password(fn_name_lower, args) {
         ea.emit(
             mir_issues::IssueKind::HardcodedCredential { what },
@@ -1299,4 +1310,81 @@ fn secret_shape(text: &str) -> Option<&'static str> {
         }
     }
     None
+}
+
+// ---------------------------------------------------------------------------
+// CORS
+// ---------------------------------------------------------------------------
+
+/// The request's `Origin` header: `$_SERVER['HTTP_ORIGIN']` or a variable holding it.
+pub(crate) fn is_request_origin(expr: &Expr, ctx: &FlowState) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(name) => ctx.has_value_origin(name, ValueOrigin::OriginHeader),
+        ExprKind::ArrayAccess(aa) => {
+            matches!(&aa.array.kind, ExprKind::Variable(v) if v.trim_start_matches('$') == "_SERVER")
+                && literal_str(aa.index.as_ref()) == Some("HTTP_ORIGIN")
+        }
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => is_request_origin(inner, ctx),
+        ExprKind::NullCoalesce(nc) => is_request_origin(&nc.left, ctx),
+        _ => false,
+    }
+}
+
+/// Whether a condition checks the request's `Origin` header's value; `isset()`, `empty()` and
+/// comparisons with an empty value only check that it was sent.
+pub(crate) fn mentions_request_origin(expr: &Expr, ctx: &FlowState) -> bool {
+    if is_request_origin(expr, ctx) {
+        return true;
+    }
+    let args_mention = |args: &[Arg]| {
+        args.iter()
+            .filter_map(|a| a.value())
+            .any(|v| mentions_request_origin(v, ctx))
+    };
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) | ExprKind::Cast(_, inner) => {
+            mentions_request_origin(inner, ctx)
+        }
+        ExprKind::UnaryPrefix(u) => mentions_request_origin(&u.operand, ctx),
+        ExprKind::Binary(b) => {
+            let empty = |e: &Expr| match &e.kind {
+                ExprKind::String(s) => s.is_empty(),
+                ExprKind::Null | ExprKind::Bool(_) => true,
+                _ => false,
+            };
+            !empty(&b.left)
+                && !empty(&b.right)
+                && (mentions_request_origin(&b.left, ctx) || mentions_request_origin(&b.right, ctx))
+        }
+        ExprKind::FunctionCall(fc) => args_mention(&fc.args),
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => args_mention(&mc.args),
+        ExprKind::StaticMethodCall(sc) => args_mention(&sc.args),
+        _ => false,
+    }
+}
+
+/// `Access-Control-Allow-Origin: ` followed by the request's `Origin` header.
+fn reflects_origin(header: &Expr, ctx: &FlowState) -> bool {
+    let mut parts = Vec::new();
+    command_parts(header, &mut parts);
+    let mut text = String::new();
+    for part in parts {
+        match part {
+            CommandPart::Text(t) => text.push_str(t),
+            CommandPart::Value(v) => {
+                return text
+                    .trim()
+                    .eq_ignore_ascii_case("access-control-allow-origin:")
+                    && is_request_origin(v, ctx);
+            }
+        }
+    }
+    false
+}
+
+/// Whether the file sends `Access-Control-Allow-Credentials: true`.
+fn allows_credentials(source: &str) -> bool {
+    source
+        .to_ascii_lowercase()
+        .contains("access-control-allow-credentials: true")
 }

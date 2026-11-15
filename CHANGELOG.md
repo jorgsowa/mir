@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LdapAnonymousBind` (MIR0835, warning): `ldap_bind()` with a password read from the request and not checked to be non-empty. LDAP servers accept a DN with an empty password as an anonymous bind, so such a login lets anyone in. A comparison, `empty()` or `strlen()` check on the variable counts.
 - `InsecureFilePermissions` (MIR0836, warning): `chmod()` with a literal mode that includes the others-write bit (`0777`, `0666`) and `umask()` with a literal mask that keeps it (`umask(0)`). `mkdir()` isn't checked, since the umask applies to its mode.
 - `HardcodedCredential` (MIR0837, warning): a non-empty literal password passed to `new PDO()`, `new mysqli()`, `mysqli_connect()`, `mysqli_real_connect()`, `ldap_bind()` or `oci_connect()`, or in a literal `pg_connect()` string, and string literals shaped like an AWS access key ID, a PEM private key with key material, or a Stripe live secret key.
+- `InsecureCors` (MIR0838, warning): `Access-Control-Allow-Origin` echoing `$_SERVER['HTTP_ORIGIN']`, directly or through a variable, in a file that sends `Access-Control-Allow-Credentials: true`, when no earlier condition checked the origin's value. A wildcard origin isn't reported, since browsers refuse it with credentials.
 
 ### Changed
 

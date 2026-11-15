@@ -110,6 +110,8 @@ pub enum ValueOrigin {
     HostHeader,
     /// A client IP taken from a header the client can forge, such as `X-Forwarded-For`.
     SpoofableIp,
+    /// The request's `Origin` header.
+    OriginHeader,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -375,6 +377,9 @@ pub struct FlowState {
 
     /// A `header('Location: ...')` call no `exit` has followed on some path to here.
     pub redirect_pending: Option<php_ast::Span>,
+
+    /// A condition has looked at the request's `Origin` header, as an allowlist check would.
+    pub origin_checked: bool,
 
     /// `(slot, name)` of each by-ref parameter whose exit taint the summary records.
     pub byref_out_slots: Arc<[(usize, Name)]>,
@@ -873,6 +878,7 @@ impl FlowState {
             summarizing_taint: false,
             ignore_taint_guards: false,
             redirect_pending: None,
+            origin_checked: false,
             byref_out_slots: Arc::default(),
             param_parts: Arc::default(),
             plain_vars: Arc::default(),
@@ -3128,6 +3134,7 @@ impl FlowState {
         result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
         result.non_html_response = if_ctx.non_html_response && else_ctx.non_html_response;
         result.redirect_pending = if_ctx.redirect_pending.or(else_ctx.redirect_pending);
+        result.origin_checked = if_ctx.origin_checked || else_ctx.origin_checked;
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx

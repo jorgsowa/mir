@@ -658,6 +658,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 name.as_ref(),
                                 crate::flow_state::ValueOrigin::WeakRandom,
                             );
+                        } else if !a.by_ref && crate::security::is_request_origin(&a.value, ctx) {
+                            ctx.mark_value_origin(
+                                name.as_ref(),
+                                crate::flow_state::ValueOrigin::OriginHeader,
+                            );
                         } else if !a.by_ref && crate::security::is_spoofable_ip(&a.value, ctx) {
                             ctx.mark_value_origin(
                                 name.as_ref(),
