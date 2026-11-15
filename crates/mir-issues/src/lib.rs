@@ -733,6 +733,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/insecure_randomness/`.
     InsecureRandomness { context: String },
 
+    /// User-controlled XML is parsed with flags that load external entities or lift libxml's size limits.
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_xml/`.
+    TaintedXml,
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1117,6 +1122,7 @@ impl IssueKind {
             | IssueKind::TaintedInclude
             | IssueKind::TaintedEval
             | IssueKind::TaintedUnserialize
+            | IssueKind::TaintedXml
             | IssueKind::CircularInheritance { .. }
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
@@ -1477,6 +1483,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => "MIR0812",
             IssueKind::TaintedEval => "MIR0813",
             IssueKind::TaintedUnserialize => "MIR0814",
+            IssueKind::TaintedXml => "MIR0819",
             IssueKind::InsecureRandomness { .. } => "MIR0818",
             IssueKind::InsecureSessionConfig { .. } => "MIR0817",
             IssueKind::WeakCryptography { .. } => "MIR0816",
@@ -1575,9 +1582,9 @@ impl IssueKind {
             | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0718" | "MIR0719"
             | "MIR0720" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803"
             | "MIR0804" | "MIR0805" | "MIR0806" | "MIR0807" | "MIR0808" | "MIR0809" | "MIR0810"
-            | "MIR0811" | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0900" | "MIR1205" | "MIR1207"
-            | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
-            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0811" | "MIR0812" | "MIR0813" | "MIR0814" | "MIR0819" | "MIR0900" | "MIR1205"
+            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1401" | "MIR1500" | "MIR1503" | "MIR1602"
+            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1777,6 +1784,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => "TaintedInclude",
             IssueKind::TaintedEval => "TaintedEval",
             IssueKind::TaintedUnserialize => "TaintedUnserialize",
+            IssueKind::TaintedXml => "TaintedXml",
             IssueKind::InsecureRandomness { .. } => "InsecureRandomness",
             IssueKind::InsecureSessionConfig { .. } => "InsecureSessionConfig",
             IssueKind::WeakCryptography { .. } => "WeakCryptography",
@@ -2531,6 +2539,7 @@ impl IssueKind {
             IssueKind::TaintedUnserialize => {
                 "Tainted unserialize() payload — possible object injection".to_string()
             }
+            IssueKind::TaintedXml => "Tainted XML parsed with entity expansion, DTD loading or huge documents enabled — possible XXE or XML denial of service".to_string(),
             IssueKind::InsecureRandomness { context } => format!("Insecure randomness: {context} comes from a non-cryptographic generator; use random_bytes() or random_int()"),
             IssueKind::InsecureSessionConfig { reason } => format!("Insecure session handling: {reason}"),
             IssueKind::WeakCryptography { reason } => format!("Weak cryptography: {reason}"),
@@ -3376,6 +3385,7 @@ mod code_tests {
             IssueKind::WeakCryptography { reason: s() },
             IssueKind::InsecureSessionConfig { reason: s() },
             IssueKind::InsecureRandomness { context: s() },
+            IssueKind::TaintedXml,
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -3576,6 +3586,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 199);
+        assert_eq!(one_of_each().len(), 200);
     }
 }

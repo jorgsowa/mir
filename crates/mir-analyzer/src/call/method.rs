@@ -5,7 +5,7 @@ use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use crate::narrowing::{extract_any_prop_access, extract_expr_guard_key};
-use crate::taint::{classify_method_sink, reaches_sink};
+use crate::taint::{classify_method_sink, reaches_sink, Taint};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
 };
@@ -1761,6 +1761,26 @@ fn resolve_method_return<'a>(
                 ) {
                     ea.emit_taint(issue, span, value, sink_kind.taint(), ctx);
                 }
+            }
+        }
+
+        if let Some(xml) = crate::taint::xml_method_sink_value(
+            ea.db,
+            fqcn.as_ref(),
+            &method_name_lower,
+            &call.args,
+        ) {
+            let issue = mir_issues::IssueKind::TaintedXml;
+            if reaches_sink(
+                xml,
+                Taint::OTHER,
+                &issue,
+                ctx,
+                ea.db,
+                &ea.file,
+                ea.taint_summary,
+            ) {
+                ea.emit_taint(issue, span, xml, Taint::OTHER, ctx);
             }
         }
 

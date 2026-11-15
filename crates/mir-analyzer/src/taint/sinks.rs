@@ -119,6 +119,7 @@ pub enum SinkKind {
     Ldap,        // LDAP filters and DNs → LDAP injection
     Xpath,       // XPath expressions → XPath injection
     Callable,    // callbacks and dynamic calls → arbitrary code paths
+    Xml,         // XML parsed with entity expansion → XXE / XML denial of service
 }
 
 impl SinkKind {
@@ -136,6 +137,7 @@ impl SinkKind {
             SinkKind::Ldap => IssueKind::TaintedLdap,
             SinkKind::Xpath => IssueKind::TaintedXpath,
             SinkKind::Callable => IssueKind::TaintedCallable,
+            SinkKind::Xml => IssueKind::TaintedXml,
         }
     }
 
@@ -152,6 +154,7 @@ impl SinkKind {
             SinkKind::Ldap => Taint::LDAP,
             SinkKind::Xpath => Taint::XPATH,
             SinkKind::Callable => Taint::CALLABLE,
+            SinkKind::Xml => Taint::OTHER,
         }
     }
 }
@@ -355,7 +358,51 @@ pub fn option_sink_values<'e>(
                 .collect(),
             _ => Vec::new(),
         },
+        "simplexml_load_string" => xml_with_unsafe_flags(args, 0, "data", 2, "options")
+            .map(|v| (v, SinkKind::Xml))
+            .into_iter()
+            .collect(),
         _ => Vec::new(),
+    }
+}
+
+/// The XML argument of a parse call whose libxml flags load external entities or
+/// DTDs, or lift the size limits.
+fn xml_with_unsafe_flags<'e>(
+    args: &'e [php_ast::owned::Arg],
+    xml_index: usize,
+    xml_name: &str,
+    flags_index: usize,
+    flags_name: &str,
+) -> Option<&'e Expr> {
+    let arg = |index: usize, name: &str| {
+        args.iter()
+            .find(|a| a.name.as_ref().is_some_and(|n| n.last_part() == name))
+            .or_else(|| args.get(index).filter(|a| a.name.is_none()))
+            .and_then(|a| a.value())
+    };
+    let flags = arg(flags_index, flags_name)?;
+    ["LIBXML_NOENT", "LIBXML_DTDLOAD", "LIBXML_PARSEHUGE"]
+        .iter()
+        .any(|flag| has_flag(flags, flag))
+        .then(|| arg(xml_index, xml_name))
+        .flatten()
+}
+
+/// The XML a `DOMDocument::loadXML()` or `XMLReader::XML()` call parses with unsafe flags.
+pub fn xml_method_sink_value<'e>(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_lower: &str,
+    args: &'e [php_ast::owned::Arg],
+) -> Option<&'e Expr> {
+    let is_a = |base: &str| {
+        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+    };
+    match method_lower {
+        "loadxml" if is_a("DOMDocument") => xml_with_unsafe_flags(args, 0, "source", 1, "options"),
+        "xml" if is_a("XMLReader") => xml_with_unsafe_flags(args, 0, "source", 2, "flags"),
+        _ => None,
     }
 }
 
@@ -519,10 +566,17 @@ pub fn classify_method_sink(
 /// Constructors whose first argument is a sink: `new SplFileObject($path)`.
 /// Only the stub constructor counts: a subclass overriding `__construct`, or
 /// `SplTempFileObject` (first argument isn't a path), takes other arguments.
-pub fn classify_constructor_sink(db: &dyn crate::db::MirDatabase, fqcn: &str) -> Option<SinkKind> {
+pub fn classify_constructor_sink(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    args: &[php_ast::owned::Arg],
+) -> Option<SinkKind> {
     let (declarer, _) =
         crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), "__construct")?;
     match crate::util::php_ident_lowercase(declarer.as_ref()).as_str() {
+        "simplexmlelement" => {
+            xml_with_unsafe_flags(args, 0, "data", 1, "options").map(|_| SinkKind::Xml)
+        }
         "splfileobject"
         | "directoryiterator"
         | "filesystemiterator"
@@ -545,6 +599,7 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
         "ldap" => mir_issues::IssueKind::TaintedLdap,
         "xpath" => mir_issues::IssueKind::TaintedXpath,
         "callable" => mir_issues::IssueKind::TaintedCallable,
+        "xml" => mir_issues::IssueKind::TaintedXml,
         "header" => mir_issues::IssueKind::TaintedHeader,
         "cookie" => mir_issues::IssueKind::TaintedCookie,
         "sql" => mir_issues::IssueKind::TaintedSql,
