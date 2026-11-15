@@ -54,7 +54,11 @@ pub fn unused_variable_issue_kinds() -> &'static [&'static str] {
 /// Issue kinds reported only when the configuration enables them: noisy enough for an
 /// audit, not for every run.
 pub fn opt_in_issue_kinds() -> &'static [&'static str] {
-    &["UnsafeUnserialize", "UnserializeGadget"]
+    &[
+        "UnsafeUnserialize",
+        "UnserializeGadget",
+        "MissingSensitiveParameter",
+    ]
 }
 
 /// Per-batch options for [`AnalysisSession::analyze_paths`] and friends.

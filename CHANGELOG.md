@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Opt-in issue kinds, listed by `opt_in_issue_kinds()`: the CLI and fixtures report them only when an `<issueHandlers>` entry gives them a level other than `suppress` (`<UnsafeUnserialize errorLevel="warning"/>`). Library hosts filter them through `BatchOptions::suppressed_issue_kinds` themselves.
 - `UnsafeUnserialize` (MIR0820, warning, opt-in): `unserialize()` of non-literal data without an `allowed_classes` restriction, which catches second-order payloads read from a database or cache. Data already reported as `TaintedUnserialize` isn't reported again.
 - `UnserializeGadget` (MIR0821, warning, opt-in): `__destruct()`, `__wakeup()`, `__unserialize()` or `__toString()` passing `$this->prop` to a file, shell, callback, `unserialize()`, network or SQL call, the gadgets that turn object injection into code execution.
+- `MissingSensitiveParameter` (MIR0822, warning, opt-in): an untyped, `string` or `mixed` parameter named `password`, `secret`, `token` or `apiKey`, or ending in one (`$newPassword`, `$accessToken`), without `#[\SensitiveParameter]`, in a function or method with a body when targeting PHP 8.2 or later.
 
 ### Changed
 

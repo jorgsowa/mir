@@ -748,6 +748,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/unserialize_gadget/`.
     UnserializeGadget { class: String, method: String },
 
+    /// A parameter named like a password, secret, token or API key lacks `#[\SensitiveParameter]`.
+    /// Emitted by `mir-analyzer/src/attributes.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/missing_sensitive_parameter/`.
+    MissingSensitiveParameter { param: String },
+
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
@@ -1203,6 +1208,7 @@ impl IssueKind {
             | IssueKind::InsecureRandomness { .. }
             | IssueKind::UnsafeUnserialize
             | IssueKind::UnserializeGadget { .. }
+            | IssueKind::MissingSensitiveParameter { .. }
             | IssueKind::NoDiscardReturnIgnored { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -1495,6 +1501,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => "MIR0812",
             IssueKind::TaintedEval => "MIR0813",
             IssueKind::TaintedUnserialize => "MIR0814",
+            IssueKind::MissingSensitiveParameter { .. } => "MIR0822",
             IssueKind::UnserializeGadget { .. } => "MIR0821",
             IssueKind::UnsafeUnserialize => "MIR0820",
             IssueKind::TaintedXml => "MIR0819",
@@ -1608,7 +1615,7 @@ impl IssueKind {
             | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1707"
             | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" | "MIR1511" | "MIR1512" | "MIR1513"
             | "MIR1514" | "MIR0238" | "MIR0815" | "MIR0816" | "MIR0817" | "MIR0818" | "MIR0820"
-            | "MIR0821" => Some(Severity::Warning),
+            | "MIR0821" | "MIR0822" => Some(Severity::Warning),
 
             // Info
             "MIR0015" | "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207"
@@ -1797,6 +1804,7 @@ impl IssueKind {
             IssueKind::TaintedInclude => "TaintedInclude",
             IssueKind::TaintedEval => "TaintedEval",
             IssueKind::TaintedUnserialize => "TaintedUnserialize",
+            IssueKind::MissingSensitiveParameter { .. } => "MissingSensitiveParameter",
             IssueKind::UnserializeGadget { .. } => "UnserializeGadget",
             IssueKind::UnsafeUnserialize => "UnsafeUnserialize",
             IssueKind::TaintedXml => "TaintedXml",
@@ -2554,6 +2562,7 @@ impl IssueKind {
             IssueKind::TaintedUnserialize => {
                 "Tainted unserialize() payload — possible object injection".to_string()
             }
+            IssueKind::MissingSensitiveParameter { param } => format!("Parameter ${param} looks like a secret but lacks #[\\SensitiveParameter], so its value can appear in stack traces and logs"),
             IssueKind::UnserializeGadget { class, method } => format!("{class}::{method}() passes a property to a dangerous call; an unserialized object controls that property"),
             IssueKind::UnsafeUnserialize => "unserialize() of non-literal data without allowed_classes can instantiate any class".to_string(),
             IssueKind::TaintedXml => "Tainted XML parsed with entity expansion, DTD loading or huge documents enabled — possible XXE or XML denial of service".to_string(),
@@ -3408,6 +3417,7 @@ mod code_tests {
                 class: s(),
                 method: s(),
             },
+            IssueKind::MissingSensitiveParameter { param: s() },
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -3608,6 +3618,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 202);
+        assert_eq!(one_of_each().len(), 203);
     }
 }

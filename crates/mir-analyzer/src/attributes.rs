@@ -256,6 +256,7 @@ pub(crate) fn check_function_attributes(
         all_symbols.as_deref_mut(),
         resolved_navigation_facts.as_deref_mut(),
     );
+    check_sensitive_params(&decl.params, db, file, source, source_map, issues);
     for param in decl.params.iter() {
         check_attribute_list(
             &param.attributes,
@@ -358,6 +359,9 @@ pub(crate) fn check_class_attributes(
                     all_symbols.as_deref_mut(),
                     resolved_navigation_facts.as_deref_mut(),
                 );
+                if method.body.is_some() {
+                    check_sensitive_params(&method.params, db, file, source, source_map, issues);
+                }
                 for param in method.params.iter() {
                     check_attribute_list(
                         &param.attributes,
@@ -547,6 +551,9 @@ pub(crate) fn check_trait_attributes(
                     all_symbols.as_deref_mut(),
                     resolved_navigation_facts.as_deref_mut(),
                 );
+                if method.body.is_some() {
+                    check_sensitive_params(&method.params, db, file, source, source_map, issues);
+                }
                 for param in method.params.iter() {
                     check_attribute_list(
                         &param.attributes,
@@ -642,6 +649,9 @@ pub(crate) fn check_enum_attributes(
                     all_symbols.as_deref_mut(),
                     resolved_navigation_facts.as_deref_mut(),
                 );
+                if method.body.is_some() {
+                    check_sensitive_params(&method.params, db, file, source, source_map, issues);
+                }
                 for param in method.params.iter() {
                     check_attribute_list(
                         &param.attributes,
@@ -917,5 +927,62 @@ fn check_attribute_list(
                 seen_fqcns.push((fqcn, attr.span.start, attr.span.end));
             }
         }
+    }
+}
+
+/// Report secret-named parameters without `#[\SensitiveParameter]` (PHP 8.2+), whose values
+/// otherwise show up in stack traces.
+fn check_sensitive_params(
+    params: &[php_ast::owned::Param],
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    if crate::db::db_php_version(db) < PhpVersion::new(8, 2) {
+        return;
+    }
+    for param in params {
+        let Some(name) = param.name.as_str() else {
+            continue;
+        };
+        let marked = param.attributes.iter().any(|attr| {
+            resolve_attr_name(db, file, attr)
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("SensitiveParameter")
+        });
+        if !marked && names_secret(name) && holds_plain_value(param.type_hint.as_ref()) {
+            issues.push(Issue::new(
+                IssueKind::MissingSensitiveParameter {
+                    param: name.to_string(),
+                },
+                span_to_location(file, source, source_map, param.span.start, param.span.end),
+            ));
+        }
+    }
+}
+
+fn names_secret(name: &str) -> bool {
+    let name = name.to_ascii_lowercase().replace('_', "");
+    ["password", "secret", "token", "apikey"]
+        .iter()
+        .any(|word| name.ends_with(word))
+}
+
+/// Untyped, `string` or `mixed` (optionally nullable): an object such as a parser token isn't a secret.
+fn holds_plain_value(hint: Option<&php_ast::owned::TypeHint>) -> bool {
+    use php_ast::ast::BuiltinType;
+    use php_ast::owned::TypeHintKind;
+    let Some(hint) = hint else {
+        return true;
+    };
+    match &hint.kind {
+        TypeHintKind::Keyword(BuiltinType::String | BuiltinType::Mixed | BuiltinType::Null, _) => {
+            true
+        }
+        TypeHintKind::Nullable(inner) => holds_plain_value(Some(inner)),
+        TypeHintKind::Union(types) => types.iter().all(|t| holds_plain_value(Some(t))),
+        _ => false,
     }
 }
